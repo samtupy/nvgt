@@ -1,0 +1,25 @@
+/**
+	Hides the currently shown window, if it exists.
+	bool hide_window();
+	## Returns:
+		bool: true if the window was successfully hidden, false otherwise.
+	## Remarks:
+		You can reshow the window by using show_window().
+*/
+
+// Example:
+void main() {
+	alert("Info", "Press space to hide the window. It should come back shortly.");
+	show_window("Example");
+	while (true) {
+		wait(5); // Prevent CPU hogging.
+		if (key_pressed(KEY_SPACE)) {
+			hide_window();
+			wait(1000);
+			alert("Info", show_window("Example") ? "success" : "fail");
+			// show_window("Example");
+		}
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}

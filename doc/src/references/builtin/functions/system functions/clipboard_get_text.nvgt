@@ -1,0 +1,18 @@
+/**
+	Returns the text currently on the user's clipboard.
+	string clipboard_get_text();
+	## Returns:
+		The text on the user's clipboard, as UTF_8.
+*/
+
+// Example:
+void main() {
+	string text = clipboard_get_text();
+	if (text == "")
+		alert("Info", "Your clipboard is empty");
+	else
+		if (text.length() > 1024)
+			alert("Info", "Your clipboard contains a long string. It is " + text.length() + " characters");
+		else
+			alert("Info", "Your clipboard contains " + text);
+}

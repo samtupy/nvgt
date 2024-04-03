@@ -1,0 +1,20 @@
+/**
+	Destroys the currently shown window, if it exists.
+	bool destroy_window();
+	## Returns:
+		bool: true if the window was successfully destroyed, false otherwise.
+*/
+
+// Example:
+void main() {
+	alert("Info", "Pressing SPACE will destroy the window");
+	show_window("Example");
+	while (true) {
+		wait(5); // Don't hog all the CPU time.
+		if (key_pressed(KEY_SPACE)) {
+			destroy_window();
+			wait(2000); // Simulate doing things while the window isn't active.
+			exit();
+		}
+	}
+}

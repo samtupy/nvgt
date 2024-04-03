@@ -1,0 +1,11 @@
+/**
+	The number of bytes in a terabyte.
+	const uint GIGABYTES;
+*/
+
+// Example:
+#include "size.nvgt"
+
+void main() {	
+	alert("Info", "A terabyte is " + TERABYTES + " bytes");
+}

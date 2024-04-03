@@ -1,0 +1,9 @@
+/**
+	Returns the number of the current day through the month.
+	const int DATE_DAY;
+*/
+
+// example:
+void main() {
+	alert("example", "It is day " + DATE_DAY + " of " + DATE_MONTH_NAME);
+}

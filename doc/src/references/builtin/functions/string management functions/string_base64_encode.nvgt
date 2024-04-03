@@ -1,0 +1,20 @@
+/**
+	Encodes a string as base64.
+	string string_base64_encode(string the_data, string_base64_options options = STRING_BASE64_DEFAULT);
+	## Arguments:
+		* string the_data: The data that is to be encoded.
+		* string_base64_options options = STRING_BASE64_DEFAULT: A bitwise of options that control the behavior of the encoding (see remarks).
+	## Returns:
+		String: The encoded string on success or an empty string on failure.
+	## Remarks:
+		The following options may be passed to the options argument of this function:
+			* STRING_BASE64_DEFAULT: The default options (i.e. insert padding and do not use URL encoding).
+			* STRING_BASE64_URL: Use base64 URL encoding as aposed to the / and = characters.
+			* STRING_BASE64_PADLESS: Allows decoding even if the string does not end with = padding characters.
+		You can learn more about base64 [here.](https://en.wikipedia.org/wiki/Base64)
+*/
+
+// Example:
+void main() {
+	alert("example", string_base64_encode("Hello")); // Should print SGVsbG8=
+}

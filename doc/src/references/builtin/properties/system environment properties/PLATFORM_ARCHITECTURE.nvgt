@@ -1,0 +1,9 @@
+/**
+	This property returns a string containing the current platform architecture, such as "AMD64".
+	const string PLATFORM_ARCHITECTURE;
+*/
+
+// example:
+void main() {
+	alert("Your current Platform architecture is", PLATFORM_ARCHITECTURE);
+}

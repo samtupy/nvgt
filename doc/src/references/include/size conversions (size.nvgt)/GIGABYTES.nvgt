@@ -1,0 +1,11 @@
+/**
+	The number of bytes in a gigabyte.
+	const uint GIGABYTES;
+*/
+
+// Example:
+#include "size.nvgt"
+
+void main() {	
+	alert("Info", "A gigabyte is " + GIGABYTES + " bytes");
+}

@@ -1,0 +1,23 @@
+/**
+	Checks whether a string contains only punctuation characters and nothing else.
+	bool string::is_punctuation(string encoding = "UTF8");
+	## Arguments:
+		* string encoding = "UTF8": The encoding to check against, with the UTF8 encoding being cached for speed.
+	## Returns:
+		bool: true if the input string contains only punctuation characters.
+	## Remarks:
+		This function only returns true if the string contains only punctuation characters in the given encoding. If a single alphanumeric or other non-punctuation character is encountered, this function will return false.
+		If this function is called on a string that contains data that is not in the specified encoding, the results are undefined.
+*/
+
+// example:
+void main() {
+	alert("example", ".?!".is_punctuation()); // Should show true.
+	string input = input_box("example", "enter a string");
+	if(input == "")
+		exit();
+	if(input.is_punctuation())
+		alert("example", "you typed a string that contains only punctuation characters");
+	else
+		alert("example", "this string contains more than just punctuation");
+}

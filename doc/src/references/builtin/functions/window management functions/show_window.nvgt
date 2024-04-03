@@ -1,0 +1,21 @@
+/**
+	Shows a window with the specified title.
+	bool show_window(string title);
+	## Arguments:
+		* string title: the title of the window.
+	## Returns:
+		bool: true if window creation was successful, false otherwise.
+	## Remarks:
+		This window doesn't do any event processing by default. As such, you have to create a loop in order to keep it alive.
+*/
+
+// Example:
+void main() {
+	alert("Info", "Press escape to close the window.");
+	show_window("Example");
+	while (true) {
+		wait(5); // Don't hog all the CPU.
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}

@@ -1,0 +1,17 @@
+/**
+	String array of all the supported units for size_to_string().
+	const array<string> SIZE_TO_STRING_UNITS;
+*/
+
+// Example:
+#include "size.nvgt"
+
+void main() {
+	string possible_units;
+	for (uint i = 0; i < SIZE_TO_STRING_UNITS.length(); i++)
+		possible_units += SIZE_TO_STRING_UNITS[i] + ",\n";
+	// Strip off the trailing comma and new line.
+	possible_units.trim_whitespace_right_this();
+	possible_units.erase(possible_units.length() - 1);
+	alert("Info", "The possible units are: " + possible_units + ".");
+}

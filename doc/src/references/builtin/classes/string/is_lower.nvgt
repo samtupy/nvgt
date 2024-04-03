@@ -1,0 +1,23 @@
+/**
+	Checks whether a string is completely lowercase.
+	bool string::is_lower(string encoding = "UTF8");
+	## Arguments:
+		* string encoding = "UTF8": The encoding to check against, with the UTF8 encoding being cached for speed.
+	## Returns:
+		bool: true if the input string is lowercase.
+	## Remarks:
+		This function only returns true if the string contains only lowercase characters in the given encoding. If a single uppercase or punctuation character is encountered, this function will return false.
+		If this function is called on a string that contains data that is not in the specified encoding, the results are undefined.
+*/
+
+// example:
+void main() {
+	alert("example", "HELLO".is_lower()); // Should show true.
+	string input = input_box("example", "enter a string");
+	if(input == "")
+		exit();
+	if(input.is_lower())
+		alert("example", "you typed a lowercase string");
+	else
+		alert("example", "you did not type a lowercase string");
+}

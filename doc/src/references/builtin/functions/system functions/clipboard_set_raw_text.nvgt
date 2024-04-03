@@ -1,0 +1,20 @@
+/**
+	Sets the text on the user's clipboard, using the system encoding.
+	bool clipboard_set_raw_text(string text);
+	## Arguments:
+		* string text: the text to copy, assumed to be in the system's encoding.
+	## Returns:
+		Bool: true on success, false on failure.
+	## Remarks:
+		To copy UTF-8 textt, see clipboard_set_text().
+*/
+
+// Example:
+void main() {
+	string text = input_box("Text", "Enter the text to copy.");
+	clipboard_set_raw_text(text);
+	if (text == "")
+		alert("Info", "Your clipboard has been cleared.");
+	else
+		alert("Info", "Text coppied");
+}

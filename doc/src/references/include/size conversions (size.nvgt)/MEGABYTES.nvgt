@@ -1,0 +1,11 @@
+/**
+	The number of bytes in a megabyte.
+	const uint MEGABYTES;
+*/
+
+// Example:
+#include "size.nvgt"
+
+void main() {
+	alert("Info", "19 megabytes is " + 19 * MEGABYTES + " bytes");
+}

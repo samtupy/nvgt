@@ -1,0 +1,12 @@
+/**
+	This property is true if the application is running on a unix operating system, which in regards to NVGT's platforms is almost everything other than windows.
+	const bool system_is_unix;
+*/
+
+// example:
+void main() {
+	if(system_is_unix)
+		alert("example", "This application is running on a unix operating system!");
+	else
+		alert("example", "This application is probably running on windows, or in any case not a unix operating system");
+}

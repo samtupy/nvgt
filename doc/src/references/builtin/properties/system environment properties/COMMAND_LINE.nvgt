@@ -1,0 +1,13 @@
+/**
+	COMMAND_LINE returns anything that is passed as command line arguments. Note that it returns anything after the application name, and keep in mind that you will have to parse the output yourself (basic example below).
+*/
+
+// example:
+void main() {
+	const string[]@ arguments = COMMAND_LINE.split(" ");
+	// Did we get any arguments?
+	if (arguments[0] == "")
+		alert("Command Line", "No arguments provided.");
+	else
+		alert("Command Line", "The first argument is " + arguments[0]);
+}

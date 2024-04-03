@@ -1,0 +1,12 @@
+/**
+	This property is true if the application is running on a windows operating system.
+	const bool system_is_windows;
+*/
+
+// example:
+void main() {
+	if(system_is_windows)
+		alert("example", "This application is running on windows!");
+	else
+		alert("example", "This application is not running on windows.");
+}

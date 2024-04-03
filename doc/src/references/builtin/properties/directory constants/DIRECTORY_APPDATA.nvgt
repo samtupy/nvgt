@@ -1,0 +1,17 @@
+/**
+	Property that returns the user's roaming application directory, which is usually where game data can be written to.
+	const string DIRECTORY_APPDATA;
+	
+	## remarks:
+		A slash character is already appended to the directory returned by this property.
+		This function may return different values depending on the operating system the application is being run on.
+			* On Windows, usually C:\Users\%username%\appdata\roaming/.
+			* on macOS, usually ~/Library/Preferences/.
+			* on Linux, usually ~/.config/.
+		In any case, the directory returned should be writable.
+*/
+
+// example:
+void main() {
+	alert("example", "data for the game could be stored at " + DIRECTORY_APPDATA + "my_game/");
+}

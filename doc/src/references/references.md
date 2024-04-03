@@ -1,0 +1,2 @@
+# API References
+This section contains several complete class and function API references that allow the creation of games and other applications. To see examples of how any of these objects or functions work together with any great detail, you should look in the NVGT User Manual instead of the API references. However if you are trying to find the name of a specific function or browse the complete list of what this engine has to offer, you have come to the right place!

@@ -1,0 +1,17 @@
+/**
+	Generates a string of random characters, or token.
+	string generate_token(int token_length)
+	## Arguments:
+		* int token_length: the length of the token to generate.
+	## returns:
+		String: a random token.
+	## Remarks:
+		The characters used to generate the token are: "1234567890abcdefthijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".
+*/
+
+// Example:
+#include "token_gen.nvgt"
+
+void main() {
+	alert("Info", "Your token is: " + generate_token(10));
+}

@@ -1,0 +1,20 @@
+/**
+	Writes a string to a file.
+	bool put_file_contents(string filename, string content, bool append = false)
+	## Arguments:
+		* string filename: the name of the file to write to.
+		* string content: the content to write.
+		* bool append = false: specifies whether the current contents of the file should be overwritten when writing.
+	## Returns:
+		true on success, false on failure.
+*/
+
+// Example:
+#include "file_contents.nvgt"
+
+void main() {
+	if (!put_file_contents("example.txt", "This is an example"))
+		alert("Example", "Failed to write the file.");
+	else
+		alert("Example", "Successfully wrote the example file.");
+}

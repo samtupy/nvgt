@@ -1,0 +1,22 @@
+/**
+	Reads the contents of a file as a string.
+	string get_file_contents(string filename)
+	## Arguments:
+		* string filename: the name of the file to read.
+	## Returns:
+		The contents of the file on success, an empty string on failure.
+*/
+
+// Example:
+#include "file_contents.nvgt"
+
+void main() {
+	string filename = input_box("Filename", "Enter the name of a file to read.", "");
+	string contents = get_file_contents(filename);
+	if (contents == "")
+		alert("Example", "Either the file was not found, or it contained no text.");
+	else {
+		clipboard_set_text(contents);
+		alert("Example", "The contents of the file is now on your clipboard.");
+	}
+}

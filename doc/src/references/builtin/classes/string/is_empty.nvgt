@@ -1,0 +1,21 @@
+/**
+	Check to see if a string is empty.
+	bool string::is_empty();
+	## Returns:
+		True if the string is empty; false otherwise.
+	## Remarks:
+		An alternative method of obtaining the same result is using, for example:
+		```
+		if (my_string == "")
+		```
+*/
+
+// example:
+void main() {
+	string test = input_box("String is Empty Tester", "Enter a string.");
+	
+	if (test.is_empty())
+		alert("String is Empty Tester", "The string appears to be empty.");
+	else
+		alert("String is Empty Tester", "The string isn't empty.");
+}

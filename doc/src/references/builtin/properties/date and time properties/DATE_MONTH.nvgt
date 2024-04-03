@@ -1,0 +1,9 @@
+/**
+	Returns the month set on the system, from 1 to 12.
+	const int DATE_MONTH;
+*/
+
+// example:
+void main() {
+	alert("example", "the month is " + DATE_MONTH);
+}

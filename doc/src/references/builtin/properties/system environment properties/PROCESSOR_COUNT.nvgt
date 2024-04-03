@@ -1,0 +1,8 @@
+/**
+	This property returns the number of processors on your system. Note that this returns the number of threads, not physical cores.
+*/
+
+// example:
+void main() {
+	alert("Processor Threads Count", PROCESSOR_COUNT);
+}

@@ -1,0 +1,9 @@
+/**
+	Returns the current hour, in 24-hour format.
+	const int TIME_HOUR;
+*/
+
+// Example:
+void main() {
+	alert("Example", "It is currently " + TIME_HOUR);
+}

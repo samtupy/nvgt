@@ -1,0 +1,9 @@
+/**
+	Returns the number of the current day through the week.
+	const int DATE_WEEKDAY;
+*/
+
+// example:
+void main() {
+	alert("example", "It is day " + DATE_WEEKDAY + " of the week");
+}
