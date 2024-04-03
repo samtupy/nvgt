@@ -1,0 +1,8 @@
+*.exe
+*.dll
+*.bin
+*.obj
+*.pdb
+tmp
+dep/plugin/*.a
+dep/plugin/*.lib
