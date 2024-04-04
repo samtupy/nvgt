@@ -3,6 +3,9 @@
 *.bin
 *.obj
 *.pdb
+*.lib
 tmp
 dep/plugin/*.a
 dep/plugin/*.lib
+build/windev_path
+.sconsign.dblite

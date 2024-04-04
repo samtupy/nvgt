@@ -1,0 +1,3 @@
+Import("env")
+
+env.StaticLibrary("deps", [Glob("*.cpp"), Glob("*.c")], CPPDEFINES = ["_LIB"])
