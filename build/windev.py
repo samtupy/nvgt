@@ -1,0 +1,13 @@
+# on windows, the easiest way to build nvgt is using the provided package of build artifacts used when constructing the public nvgt releases, consisting of many static libraries, headers, and even some redistributable dlls. We will try to find that here and add include/libpaths, or else you can add paths to your own libraries manually if desired. This is included from any sconstruct scripts that need these paths set.
+import os
+def set_windev_paths(env, windev_path = "windev"):
+	found = False
+	if not os.path.isdir(windev_path):
+		try: windev_path = open("build/windev_path").read()
+		except: return
+	else: found = True
+	if not found and not os.path.isdir(windev_path): return
+	else: found = True
+	env["CPPPATH"] = [os.path.join(windev_path, "include")]
+	env["LIBPATH"] = [os.path.join(windev_path, "lib")]
+

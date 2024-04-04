@@ -9,3 +9,4 @@ dep/plugin/*.a
 dep/plugin/*.lib
 build/windev_path
 .sconsign.dblite
+__pycache__
