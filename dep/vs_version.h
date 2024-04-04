@@ -112,7 +112,7 @@ class yybuf
 		*mp = cb;
 	};
 
-	void yybuf::pushTwostr( __in LPCWSTR name, __in LPCWSTR val )
+	void push_twostr( const wchar_t* name, const wchar_t* value )
 	{
 	//struct String { 
 	//  WORD   wLength; 
@@ -122,7 +122,7 @@ class yybuf
 	//  WORD   Padding[]; 
 	//  WORD   Value[]; 
 	//};
-		WORD wValueLength = val ? (WORD)wcslen(val) : 0;
+		WORD wValueLength = value ? (WORD)wcslen(value) : 0;
         WORD wValueSize = (WORD)( wValueLength ? (wValueLength + 1) * sizeof(WCHAR) : 0 );
 		WORD wNameSize = (WORD)((wcslen(name) + 1 ) * sizeof(WCHAR));
 		ASSERT(wNameSize > sizeof(WCHAR));
@@ -136,7 +136,7 @@ class yybuf
 		pushw( 1 ); //type
 		pushstr( name ); // with align
 		if ( wValueLength )
-			pushstr( val, false ); // don't align yet
+			pushstr( value, false ); // don't align yet
         *m_curptr++ = 0; // add 2 zero bytes
         *m_curptr++ = 0;
 		patchsize(porig);

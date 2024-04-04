@@ -1,3 +1,8 @@
+# Script to generate 3rd_party_licenses.md which attributes all third party components used by nvgt.
+# NVGT - NonVisual Gaming Toolkit (https://nvgt.gg)
+# Copyright (c) 2022-2024 Sam Tupy
+# license: zlib
+
 import glob, os, shutil
 
 license_types = {

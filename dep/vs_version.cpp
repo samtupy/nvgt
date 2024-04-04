@@ -101,7 +101,7 @@ BOOL makeVersionResource( __in file_ver_data_s const * fvd, __out PUCHAR *retp )
 			hr = ::StringCbCatW(&temps[0], sizeof(temps), fvd->sFileVerTail);
 			if ( !SUCCEEDED(hr) ) temps[0] = 0;
 		}
-		vbuf.pushTwostr( L"FileVersion", &temps[0] );
+		vbuf.push_twostr( L"FileVersion", &temps[0] );
 
         switch ( fvd->nProductVerParts ) {
             case 1:
@@ -132,18 +132,18 @@ BOOL makeVersionResource( __in file_ver_data_s const * fvd, __out PUCHAR *retp )
 		if (fvd->sProductVerOverride)
 		{
 			d2print("Overriding Product version:[%ws]\n", (PCWSTR)fvd->sProductVerOverride);
-			vbuf.pushTwostr(L"ProductVersion", fvd->sProductVerOverride);
+			vbuf.push_twostr(L"ProductVersion", fvd->sProductVerOverride);
 		}
 		else
 		{
-			vbuf.pushTwostr(L"ProductVersion", &temps[0]);
+			vbuf.push_twostr(L"ProductVersion", &temps[0]);
 		}
 	
 		// Strings
 		for ( int k = 0; k < ARRAYSIZE(fvd->CustomStrNames); k++ ) {
 			if ( fvd->CustomStrNames[k] != NULL ) {
 
-				vbuf.pushTwostr( fvd->CustomStrNames[k], fvd->CustomStrVals[k] );
+				vbuf.push_twostr( fvd->CustomStrNames[k], fvd->CustomStrVals[k] );
 
 				if ( 0 == _wcsicmp( L"SpecialBuild", fvd->CustomStrNames[k] ) )
 					fxi->dwFileFlags |= VS_FF_SPECIALBUILD;
