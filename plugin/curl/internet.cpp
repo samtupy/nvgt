@@ -396,7 +396,7 @@ void RegisterInternet(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("internet_request", "void reset() const", asMETHODPR(internet_request, reset, (), void), asCALL_THISCALL);
 }
 
-extern "C" __declspec(dllexport) bool nvgt_plugin(nvgt_plugin_shared* shared) {
+plugin_main(nvgt_plugin_shared* shared) {
 	prepare_plugin(shared);
 	RegisterInternet(shared->script_engine);
 	return true;

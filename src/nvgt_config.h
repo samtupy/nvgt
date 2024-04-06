@@ -16,6 +16,7 @@
 // static plugins: When a plugin is compiled with the macro NVGT_PLUGIN_STATIC into a .lib or .a static library, a symbol from that library must be defined somewhere in the nvgt project so that the linker will load the library, thus performing the remainder of plugin registration via a static variable that will initialize at program startup.
 #include "nvgt_plugin.h"
 //static_plugin(git2nvgt)
+//static_plugin(nvgt_curl)
 //static_plugin(nvgt_sqlite)
 
 // A simple integer can be used to xor encrypt numbers used to save bits of the bytecode location data.
