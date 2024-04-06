@@ -8,6 +8,6 @@ def set_windev_paths(env, windev_path = "windev"):
 	else: found = True
 	if not found and not os.path.isdir(windev_path): return
 	else: found = True
-	env["CPPPATH"] = [os.path.join(windev_path, "include")]
-	env["LIBPATH"] = [os.path.join(windev_path, "lib")]
+	env.Append(CPPPATH = [os.path.join(windev_path, "include")])
+	env.Append(LIBPATH = [os.path.join(windev_path, "lib")])
 

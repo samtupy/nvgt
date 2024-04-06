@@ -1,0 +1,194 @@
+// Logger class taken from bgt for games that need to use it
+
+class logger
+{
+
+//properties
+
+string header_text;
+string footer_text;
+string date_format;
+bool date_all_entries;
+bool overwrite_file;
+bool always_include_header;
+
+//private variables
+
+string entry;
+
+//constructor
+
+logger()
+{
+entry="";
+header_text="";
+footer_text="";
+date_format="<dd>/<mm>/<y>, <hh>:<nn>:<ss> <TT>";
+date_all_entries=false;
+overwrite_file=false;
+always_include_header=false;
+}
+
+//methods
+
+void add_entry(string the_entry)
+{
+if(date_all_entries==true)
+{
+entry+=parse_time()+": ";
+}
+entry=entry+the_entry+"\r\n";
+}
+
+void reset()
+{
+entry="";
+}
+
+bool write(string filename, bool reset_text)
+{
+file log_file;
+bool include_header=false;
+if(entry=="")
+{
+return false;
+}
+bool active = log_file.open(filename, "rb");
+if((log_file.get_size()<=0)||(always_include_header==true))
+{
+include_header=true;
+}
+log_file.close();
+if(overwrite_file==false)
+{
+active=log_file.open(filename, "ab");
+}
+else
+{
+active = log_file.open(filename, "wb");
+}
+if (active==false)
+{
+alert("error", "can't open log file");
+return false;
+}
+if((include_header==true)&&(header_text!=""))
+{
+log_file.write(header_text+"\r\n");
+}
+log_file.write(entry);
+if(reset_text==true)
+{
+entry="";
+if(footer_text!="")
+{
+log_file.write(footer_text+"\r\n");
+}
+}
+log_file.close();
+return true;
+}
+
+//private functions
+
+string parse_time()
+{
+string result;
+string date, month, year, hour12, hour12x0, hour24, minute, second, daytime_lc, daytime;
+date=""+DATE_DAY;
+if(DATE_DAY<10)
+{
+date="0"+date;
+}
+month=""+DATE_MONTH;
+if(DATE_MONTH<10)
+{
+month="0"+month;
+}
+year=""+DATE_YEAR;
+year=string_trim_left(year, 2);
+hour24=""+TIME_HOUR;
+if(TIME_HOUR<10)
+{
+hour24="0"+hour24;
+}
+if(TIME_HOUR>12)
+{
+hour12=""+(TIME_HOUR-12);
+hour12x0=""+(TIME_HOUR-12);
+daytime="PM";
+daytime_lc="pm";
+}
+if(TIME_HOUR==0)
+{
+hour12="12";
+hour12x0="12";
+daytime="AM";
+daytime_lc="am";
+}
+if(TIME_HOUR<=12)
+{
+if(TIME_HOUR>0)
+{
+hour12=""+TIME_HOUR;
+hour12x0=""+TIME_HOUR;
+daytime="AM";
+daytime_lc="am";
+}
+}
+if(TIME_HOUR<10)
+{
+if(TIME_HOUR>0)
+{
+hour12="0"+hour12;
+}
+}
+if(TIME_HOUR<22)
+{
+if(TIME_HOUR>12)
+{
+hour12="0"+hour12;
+}
+}
+minute=TIME_MINUTE;
+if(TIME_MINUTE<10)
+{
+minute="0"+minute;
+}
+second=TIME_SECOND;
+if(TIME_SECOND<10)
+{
+second="0"+second;
+}
+if(date_format!="")
+{
+result=date_format;
+result=string_replace(result, "<d>", ""+DATE_DAY+"", true);
+result=string_replace(result, "<D>", ""+DATE_DAY+"", true);
+result=string_replace(result, "<dd>", date, true);
+result=string_replace(result, "<DD>", date, true);
+result=string_replace(result, "<w>", ""+DATE_WEEKDAY, true);
+result=string_replace(result, "<W>", DATE_WEEKDAY_NAME, true);
+result=string_replace(result, "<m>", ""+DATE_MONTH, true);
+result=string_replace(result, "<M>", DATE_MONTH_NAME, true);
+result=string_replace(result, "<mm>", month, true);
+result=string_replace(result, "<y>", ""+DATE_YEAR, true);
+result=string_replace(result, "<Y>", year, true);
+result=string_replace(result, "<h>", hour12x0, true);
+result=string_replace(result, "<hh>", hour12, true);
+result=string_replace(result, "<H>", ""+TIME_HOUR, true);
+result=string_replace(result, "<HH>", hour24, true);
+result=string_replace(result, "<n>", ""+TIME_MINUTE, true);
+result=string_replace(result, "<N>", ""+TIME_MINUTE, true);
+result=string_replace(result, "<nn>", minute, true);
+result=string_replace(result, "<NN>", minute, true);
+result=string_replace(result, "<s>", ""+TIME_SECOND, true);
+result=string_replace(result, "<S>", ""+TIME_SECOND, true);
+result=string_replace(result, "<ss>", second, true);
+result=string_replace(result, "<SS>", second, true);
+result=string_replace(result, "<tt>", daytime_lc, true);
+result=string_replace(result, "<TT>", daytime, true);
+}
+return result;
+}
+}

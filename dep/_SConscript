@@ -5,4 +5,4 @@
 
 Import("env")
 
-env.StaticLibrary("#dep/deps", [Glob("*.cpp"), Glob("*.c")], CPPDEFINES = ["_LIB"])
+env.StaticLibrary("#lib/deps", [Glob("*.cpp"), Glob("*.c")], CPPDEFINES = ["_LIB"])

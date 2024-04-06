@@ -1,0 +1,47 @@
+/* instance.nvgt
+ * This class uses a named mutex to recreate bgt's instance object which used to be built into nvgt until low enough level components were added to the engine to actually write the class in nvgt. Not included in bgt_compat just because a scripter may want to use this standalone. For backwards compatibility though, this file shall be included by bgt_compat.
+ *
+ * NVGT - NonVisual Gaming Toolkit
+ * Copyright (c) 2022-2024 Sam Tupy
+ * https://nvgt.gg
+ * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+ * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+ * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+*/
+
+class instance {
+	private bool already_locked = false;
+	instance(const string&in app_id = "") {
+		mtx_name = crc32("G_INSTANCE_" + app_id);
+		@mtx = named_mutex(mtx_name);
+		try {
+			already_locked = mtx.try_lock(); // If this is the first time the mutex was created by name, try_lock will return true.
+		} catch {} // encase the mutex already being locked causes an exception.
+	}
+	~instance() {
+		try { mtx.unlock(); } catch {} // If another process has locked this mutex, we shouldn't be able to unlock it from this end. We attempt to explicitly unlock because otherwise the operating system will need to do it on process cleanup sometimes a bit after exit.
+	@mtx=null;
+	}
+	bool get_is_already_running() property {
+		if(already_locked) return false; // On some platforms it is possible to double lock named mutexes, so we need to keep track of whether this instance object successfully locked the mutex upon creation. If it did, the process is not already running.
+		try {
+			return !mtx.try_lock(); // If a lock is successful, no other instance object is alive. So long as the mutex is locked by the same process that called this function, try_lock() will return true. Otherwise another instance object in another process has locked this mutex first.
+		} catch { // The process used to be running, now it is not and the mutex was abandoned. Take control and make a new one.
+			@mtx = named_mutex(mtx_name);
+			try { already_locked = mtx.try_lock(); } catch { return false; }
+			return false;
+		}
+	}
+	void wait_until_standalone() {
+		try {
+		mtx.lock(); // If a lock is already held, this function will block forever until that lock is released E. another version of the process exits.
+	} catch { // The mutex becoming abandoned while waiting for it to unlock may throw an exception, recreate the mutex in that case.
+		@mtx = named_mutex(mtx_name);
+		try { mtx.try_lock(); } catch {} // It's one minor issue with the poco libraries that nvgt uses, they are just a bit exception centric for our wants on ocasion.
+	}
+	}
+	private named_mutex@ mtx;
+	private string mtx_name;
+}
