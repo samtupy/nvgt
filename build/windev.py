@@ -5,7 +5,9 @@ def set_windev_paths(env, windev_path = "windev"):
 	if not os.path.isdir(windev_path):
 		try: windev_path = open("build/windev_path").read()
 		except: return
-	else: found = True
+	else:
+		windev_path = "#" + windev_path
+		found = True
 	if not found and not os.path.isdir(windev_path): return
 	else: found = True
 	env.Append(CPPPATH = [os.path.join(windev_path, "include")])

@@ -8,7 +8,7 @@ import os, multiprocessing
 # setup
 env = Environment()
 VariantDir("build/obj_src", "src", duplicate = 0)
-#env.SetOption("num_jobs", multiprocessing.cpu_count())
+env.SetOption("num_jobs", multiprocessing.cpu_count())
 if env["PLATFORM"] == "win32":
 	from build import windev
 	windev.set_windev_paths(env)

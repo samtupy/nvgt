@@ -1,12 +1,16 @@
 # the NonVisual Gaming Toolkit (NVGT)
 [website](https://nvgt.gg)
 
+## What is NVGT?
 Enspired by the Blastbay Gaming Toolkit (bgt) known to much of the community and originally created because of that engine's discontinuation, the NVGT engine aims to not only preserve old BGT games and make them better but to also provide a new platform for anybody who wishes to get into game development without learning some of the lower level programming concepts or languages, continuing where the BGT engine left off.
 
 If you are not fermiliar with BGT, this was an inspirational audiogame creation engine that allowed a user to, with very little programming knowledge, begin coding games ranging from the very simple to the extremely complex. A scripting engine called Angelscript insured that a user could create a game without needing to learn a more complex programming language, it's functionality from a sound system to keyboard input to internet access insured that users wouldn't need to spend time hunting for components and libraries but instead could instantly begin developing their game, and it's built-in and fast compilation features insured that a user could release executable binaries of their games without endangering their sourcecode and without needing to learn a compiler toolchain for another language and/or wait for such a toolchain to actually build their project.
 
 In 2014, BGT sadly became free/abandonware. Though it took a few years for them to truly manifest, this started to create issues for anyone who had developed games using that engine. Libraries began getting out of date, you couldn't sign games with ssl certificates, and the number of wanted features and discovered bugs continued to pile  higher and higher. Finally as 2021 roled over into 2022, I made the decision that BGT was no longer viable to continue developing games in but I didn't want to abandon my projects (some of which had been running for years), and thus NVGT was born.
 
+finish this...
+
+## Features
 The NVGT engine adtertises the following qualities and features:
 * full UTF-8 support; develop games without internationalization issues.
 * Steam Audio support; immerse your players with hrtf audio and realistic reverb generated from the geometry of your game maps.
@@ -23,3 +27,10 @@ The NVGT engine adtertises the following qualities and features:
 * builtin fallback speech synthesizer; Allow wine users or players on unusual platforms to maintain accessibility during game setup if an external speech system is temporarily unavailable.
 * accessible documentation; You can choose to read NVGT's documentation in markdown, html, plain text or a good old .chm file.
 *  opensource with a permissive license; Add to or modify the engine in any way you please if it doesn't suit all of your requirements.
+
+## building
+NVGT uses SCons, a python build system. If you have python, you can get it by running pip install scons.
+
+Once you have scons, open a command or terminal window up to the root directory of nvgt, and run scons -s.
+
+Talk of platform specific cdependencies to be written.
