@@ -2,7 +2,7 @@ Import("env")
 
 scriptarray = env.Object("scriptarray", "#plugin/ASAddon/scriptarray.cpp")
 sqlite_addons = env.Object(Glob("*.c"), CPPDEFINES = ["SQLITE_CORE"])
-if ARGUMENTS.get("shared_plugins", "0") == "1":
+if ARGUMENTS.get("no_shared_plugins", "0") == "0":
 	env.SharedLibrary("#release/lib/nvgt_sqlite", ["nvgt_sqlite.cpp", "zlib_uncompr/uncompr.c", scriptarray, sqlite_addons], LIBS = ["PocoFoundationMT", "PocoDataSQLiteMT"])
 static = env.Object("nvgt_sqlite_static", "nvgt_sqlite.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "nvgt_sqlite")])
 static = env.StaticLibrary("#lib/nvgt_sqlite", [static, sqlite_addons])

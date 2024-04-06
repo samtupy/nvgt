@@ -25,6 +25,7 @@ env["CPPDEFINES"] = ["POCO_STATIC"]
 plugin_env = env.Clone()
 if env["PLATFORM"] == "win32":
 	plugin_env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"])
+	plugin_env["no_import_lib"] = 1
 static_plugins = []
 for s in Glob("plugin/*/_SConscript"):
 	plugname = str(s).split(os.path.sep)[1]

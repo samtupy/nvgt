@@ -4,7 +4,7 @@ scriptarray = env.Object("scriptarray", "#plugin/ASAddon/scriptarray.cpp")
 winlibs = ""
 if env["PLATFORM"] == "win32":
 	winlibs = "kernel32 user32 crypt32 advapi32 iphlpapi netapi32 uuid wldap32 ws2_32 normaliz"
-if ARGUMENTS.get("shared_plugins", "0") == "1":
+if ARGUMENTS.get("no_shared_plugins", "0") == "0":
 	env.SharedLibrary("#release/lib/nvgt_curl", ["internet.cpp", scriptarray], LIBS = Split(winlibs) + ["libcurl", "PocoFoundationMT"], CPPDEFINES = ["CURL_STATICLIB"])
 static = env.Object("internet_static", "internet.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "nvgt_curl"), "CURL_STATICLIB"])
 static = env.StaticLibrary("#lib/nvgt_curl", [static], LIBS = ["libcurl"])
