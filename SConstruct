@@ -12,7 +12,7 @@ env.SetOption("num_jobs", multiprocessing.cpu_count())
 if env["PLATFORM"] == "win32":
 	from build import windev
 	windev.set_windev_paths(env)
-	env.Append(CCFLAGS = ["/EHsc", "/J", "/std:c++20", "/GF", "/Zc:inline"])
+	env.Append(CCFLAGS = ["/EHsc", "/J", "/std:c++20", "/GF", "/Zc:inline", "/O2"])
 	env.Append(LIBS = ["tolk", "angelscript64"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
 else:
@@ -49,6 +49,7 @@ elif env["PLATFORM"] == "darwin": stub_platform = "mac"
 else: stub_platform = env["PLATFORM"]
 VariantDir("build/obj_stub", "src", duplicate = 0)
 stub_env = env.Clone(CPPDEFINES = list(env["CPPDEFINES"]) + ["NVGT_STUB"], PROGSUFFIX = ".bin")
+if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
 stub_objects = stub_env.Object(Glob("build/obj_stub/*.cpp"))
 stub_env.Program(f"release/nvgt_{stub_platform}", stub_objects)
 # on windows, we should have a version of the Angelscript library without the compiler, allowing for slightly smaller executables.
