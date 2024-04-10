@@ -1,5 +1,5 @@
 /* filesystem.cpp - filesystem functions code
- * Most of this taken from Angelscript's filesystem addon and may be replaced with Poco functions at any time.
+ * Originally these consisted of Angelscript's filesystem addon but with the class removed, however are in the process of being replaced with Poco::File.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -293,20 +293,11 @@ asINT64 FileGetSize(const string &path) {
 	#endif
 }
 
-bool DirectoryCreate(const string &path) {
-	#if defined(_WIN32)
-	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
-
-	// Create the directory
-	BOOL success = CreateDirectoryW(bufUTF16, 0);
-	return success;
-	#else
-	// Create the directory
-	int failure = mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-	return !failure ? true : false;
-	#endif
+bool DirectoryCreate(const string& path) {
+	try {
+		Poco::File(path).createDirectories();
+	} catch(Poco::Exception& e) { return false; }
+	return true;
 }
 
 bool DirectoryDelete(const string &path) {
