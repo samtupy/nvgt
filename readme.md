@@ -17,7 +17,7 @@ Of course, having run into bgt's limitations myself and having been trapped by i
 In the beginning I just created NVGT because I wanted to continue my Survive the Wild project without rewriting it from scratch, but in the end what was created is a customizable game engine that, with a bit more work, may hopefully have the potential of being pleaseing and useful to everyone from those who want to restore an old bgt project to those who want to make a new game without worrying about the internals to maybe even some of those who want to be able to wrest their knowledge of and take a break from low level programming and dependency hunting to just simply create a game, like me.
 
 ## Features
-The NVGT engine adtertises the following qualities and features:
+The NVGT engine advertises the following qualities and features:
 * full UTF-8 support; develop games without internationalization issues.
 * Steam Audio support; immerse your players with hrtf audio and realistic reverb generated from the geometry of your game maps.
 * sound mixers and effects; Change attributes or even the HRTF position on large groups of sounds at once by adding them to a chain of mixers, and add effects like reverb, distortion, flanging, amp etc to them while you're at it.
@@ -26,8 +26,8 @@ The NVGT engine adtertises the following qualities and features:
 * multithreading primatives; Make your game run faster using multiple threads, including related mutual exclusion/locking primatives like mutexes and events.
 * ever expanding plugin system; Be free of the Angelscript sandbox and code whatever extensions to your game you want in c++ or another language.
 * subscripting; Add downloadable levels to your games or make them more dynamic with NVGT's ability to execute Angelscript code from within Angelscript code like the javascript or python eval function.
-* cross platform; Release your games for MacOS and Linux!
-* 64 bit; Your old BGT projects can now utalize all system resources.
+* cross platform; Release your games for macOS and Linux!
+* 64-bit; Your old BGT projects can now utalize all system resources.
 * 3d pathfinder; Find intellegent paths in 3 dimentions with possibly more in the future.
 * builtin JSON support; Connect your projects to online services using one of the most widely recognised API data exchange languages.
 * https connections; Use ssl to secure your project's access to the web and successfully connect to websites that enforce it.
@@ -40,13 +40,13 @@ The NVGT engine adtertises the following qualities and features:
 *  opensource with a permissive license; Add to or modify the engine in any way you please if it doesn't suit all of your requirements.
 
 ## building
-NVGT uses SCons, a python build system. If you have python, you can get it by running pip install scons.
+NVGT uses SCons, a python build system. If you have python, you can get it by running `pip install scons`.
 
 Other than scons, the following libraries are needed to build NVGT:
 * Angelscript scripting library
 * bullet3 physics library, though at the time of writing only some headers (the Bullet3Common and LinearMath folders) are neded
 * enet networking library
-* Poco c++ portable components
+* Poco C++ portable components
 * SDL2
 You also need to locate headers and binaries for the bass audio library (bass, bassmix and bass_fx) and for phonon (steam audio).
 
