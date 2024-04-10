@@ -8,7 +8,6 @@ Our goal is to make the transission as seemless as possible from BGT to NVGT, bu
 * The Angelscript syntax for naming arguments in function calls has changed. func(arg, arg, arg=value); must now become func(arg, arg, arg:value);
 * Take care to check any method calls using the tts_voice object as a few methods such as set_voice have changed from their BGT counterparts.
 * When splitting a string, matching against \r\n is advised as BGT handles this differently. This will result in not having spurious line breaks at the ends of split text.
-* Currently directory_create will not create a sub-level directory if the top-level one does not exist. Example. passing Developer/my game will fail if the Developer directory does not exist.
 * The settings object has been crafted as a ghost object. That is, it will not actually load or write any data from the registry. If you use the registry, consider using a data or ini file instead.
 * The joystick object is also a ghost object and does not currently function.
 * The calendar object has been renamed to datetime.
