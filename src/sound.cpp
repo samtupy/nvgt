@@ -30,7 +30,11 @@
 #include "window.h" // wait
 #include "misc_functions.h" // range_convert
 #include "nvgt.h" // g_ScriptEngine
-#include "nvgt_config.h" // sound_data_char_decrypt
+#ifndef NVGT_USER_CONFIG // sound_data_char_decrypt
+#include "nvgt_config.h"
+#else
+#include "../user/nvgt_config.h"
+#endif
 #include "pack.h"
 #define riffheader_impl
 #include "riffheader.h"

@@ -20,7 +20,11 @@
 #include <io.h>
 #endif
 #include "filesystem.h"
-#include "nvgt_config.h" // pack_byte_encrypt/decrypt
+#ifndef NVGT_USER_CONFIG // pack_char_encrypt/decrypt
+#include "nvgt_config.h"
+#else
+#include "../user/nvgt_config.h"
+#endif
 #include "pack.h"
 
 using namespace std;

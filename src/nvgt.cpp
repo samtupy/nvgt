@@ -27,7 +27,11 @@
 #include "input.h"
 #include "misc_functions.h"
 #include "nvgt.h"
+#ifndef NVGT_USER_CONFIG
 #include "nvgt_config.h"
+#else
+#include "../user/nvgt_config.h"
+#endif
 #include "sound.h"
 #include "srspeech.h"
 #include "timestuff.h"

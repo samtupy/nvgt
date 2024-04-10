@@ -35,7 +35,11 @@
 #include "map.h"
 #include "misc_functions.h"
 #include "nvgt.h"
+#ifndef NVGT_USER_CONFIG
 #include "nvgt_config.h"
+#else
+#include "../user/nvgt_config.h"
+#endif
 #include "nvgt_plugin.h"
 #include "pack.h"
 #include "pathfinder.h"
