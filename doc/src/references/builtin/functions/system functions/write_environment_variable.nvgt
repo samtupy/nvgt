@@ -2,8 +2,8 @@
 	Write to an environment variable.
 	void write_environment_variable(string variable, string value);
 	## Arguments:
-		* Variable: The environment variable you wish to write to.
-		* Value: The value you wish to write to this variable.
+		* string variable: The environment variable you wish to write to.
+		* string value: The value you wish to write to this variable.
 */
 
 // Example:

@@ -1,6 +1,8 @@
 /**
 	Attempts to install NVGT's JAWS keyhook.
-	bool install_keyhook();
+	bool install_keyhook(bool allow_reinstall = true);
+	## Arguments:
+		* bool allow_reinstall = true: whether or not this function will reinstall the hook on subsequent calls.
 	## Returns:
 		bool: true if the keyhook was successfully installed, false otherwise.
 	## Remarks:

@@ -1,7 +1,6 @@
 /* tts.cpp - code for OS based text to speech system
- * On windows this is SAPI, on MacOS it will be NSSpeech/AVSpeechSynthesizer, on linux speech dispatcher etc.
+ * On windows this is SAPI, on macOS it will be NSSpeech/AVSpeechSynthesizer, on linux speech dispatcher etc.
  * If no OS based speech system can be found for a given platform, a derivative of RSynth that is built into NVGT will be used instead.
- * At this time, windows SAPI is the only thing implemented with support for other platforms coming soon.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy

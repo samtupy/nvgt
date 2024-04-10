@@ -1,0 +1,12 @@
+/**
+	Get the uptime of the user's system (in seconds).
+	double system_get_uptime();
+	## Returns:
+		double: the uptime (in seconds) of the system.
+*/
+
+// Example:
+void main() {
+	double uptime = system_get_uptime();
+	alert("Info", "Your system has been up for " + uptime + " seconds.");
+}

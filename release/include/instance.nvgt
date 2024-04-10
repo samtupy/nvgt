@@ -13,17 +13,19 @@
 
 class instance {
 	private bool already_locked = false;
-	instance(const string& in app_id = "") {
+	instance(const string&in app_id = "") {
 		mtx_name = crc32("G_INSTANCE_" + app_id);
 		@mtx = named_mutex(mtx_name);
 		try {
 			already_locked = mtx.try_lock(); // If this is the first time the mutex was created by name, try_lock will return true.
 		} catch {} // encase the mutex already being locked causes an exception.
 	}
+
 	~instance() {
 		try { mtx.unlock(); } catch {} // If another process has locked this mutex, we shouldn't be able to unlock it from this end. We attempt to explicitly unlock because otherwise the operating system will need to do it on process cleanup sometimes a bit after exit.
 		@mtx = null;
 	}
+
 	bool get_is_already_running() property {
 		if (already_locked) return false; // On some platforms it is possible to double lock named mutexes, so we need to keep track of whether this instance object successfully locked the mutex upon creation. If it did, the process is not already running.
 		try {
@@ -34,6 +36,7 @@ class instance {
 			return false;
 		}
 	}
+
 	void wait_until_standalone() {
 		try {
 			mtx.lock(); // If a lock is already held, this function will block forever until that lock is released E. another version of the process exits.
@@ -42,6 +45,7 @@ class instance {
 			try { mtx.try_lock(); } catch {} // It's one minor issue with the poco libraries that nvgt uses, they are just a bit exception centric for our wants on ocasion.
 		}
 	}
+
 	private named_mutex@ mtx;
 	private string mtx_name;
 }
