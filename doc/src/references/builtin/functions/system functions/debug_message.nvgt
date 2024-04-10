@@ -1,3 +1,11 @@
+/**
+	debug_message
+	void debug_message(string message);
+	## Arguments:
+		* Message: The message to send as a debug message.
+*/
+
+// Example:
 void main() {
 	debug_message("NVGT debug_message test");
 }
