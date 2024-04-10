@@ -1,0 +1,3 @@
+void main() {
+	debug_message("NVGT debug_message test");
+}
