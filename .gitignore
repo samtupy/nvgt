@@ -10,3 +10,4 @@ build/windev_path
 user/**
 !user/readme.md
 __pycache__
+windev
