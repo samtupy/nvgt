@@ -1,9 +1,8 @@
 /**
 	Expand environment variables.
 	string expand_environment_variables(string variables);
-	
 	## Arguments:
-		* variables: A string of the variable(s) you wish to expand.
+		* string variables: A string containing the variable(s) you wish to expand.
 	## Returns:
 		The expanded environment variable(s) if successful or an empty string if not.
 */

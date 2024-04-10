@@ -1,0 +1,18 @@
+/**
+	Get a list of the user's preferred locales.
+	string[]@ get_preferred_locales();
+	## Returns:
+		string[]@: a handle to an array containing the locale names (as strings).
+*/
+
+// Example:
+void main() {
+	string[]@ locales = get_preferred_locales();
+	string result; // To be shown to the user.
+	for (uint i = 0; i < locales.length(); i++)
+		result += locales[i] + ",\n";
+	// Strip off the trailing comma and new line.
+	result.trim_whitespace_right_this();
+	result.erase(result.length() - 1);
+	alert("Info", "The locales on your system are: " + result);
+}

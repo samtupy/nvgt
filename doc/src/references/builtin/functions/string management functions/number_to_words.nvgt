@@ -1,0 +1,16 @@
+/**
+	Convert a number into its string equivalent, for example, one thousand four hundred and fifty six.
+	string number_to_words(int64 the_number, bool include_and = true);
+	## Arguments:
+		* int64 the_number: the number to convert.
+		* bool include_and = true: whether or not to include the word "and" in the output.
+	## Returns:
+		string: the specified number, converted to a readable string.
+*/
+
+// Example:
+void main() {
+	int64 num = random(1000, 100000);
+	string result = number_to_words(num);
+	alert("Info", num + " as a string is " + result);
+}
