@@ -39,25 +39,28 @@ env.Append(LIBS = ["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "enet", "opus"
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB", "/SUBSYSTEM:WINDOWS", "/LTCG", "/OPT:REF", "/OPT:ICF", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll", "/delayload:Tolk.dll"])
+if os.path.isfile("user/_SConscript"):
+	SConscript("user/_SConscript", exports = {"plugin_env": plugin_env, "nvgt_env": env})
 SConscript("ASAddon/_SConscript", variant_dir = "build/obj_ASAddon", duplicate = 0, exports = "env")
 SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, exports = "env")
 env.Program("release/nvgt", Glob("build/obj_src/*.cpp"))
 
 # stubs
-stub_platform = "" # This detection will likely need to be improved as we get more platforms working.
-if env["PLATFORM"] == "win32": stub_platform = "windows"
-elif env["PLATFORM"] == "darwin": stub_platform = "mac"
-else: stub_platform = env["PLATFORM"]
-VariantDir("build/obj_stub", "src", duplicate = 0)
-stub_env = env.Clone(CPPDEFINES = list(env["CPPDEFINES"]) + ["NVGT_STUB"], PROGSUFFIX = ".bin")
-if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
-stub_objects = stub_env.Object(Glob("build/obj_stub/*.cpp"))
-stub_env.Program(f"release/nvgt_{stub_platform}", stub_objects)
-# on windows, we should have a version of the Angelscript library without the compiler, allowing for slightly smaller executables.
-if env["PLATFORM"] == "win32":
-	stublibs = list(stub_env["LIBS"])
-	if "angelscript64" in stublibs:
-		stublibs.remove("angelscript64")
-		stublibs.append("angelscript64nc")
-		stub_env.Program(f"release/nvgt_{stub_platform}_nc", stub_objects, LIBS = stublibs)
+if ARGUMENTS.get("no_stubs", "0") == "0":
+	stub_platform = "" # This detection will likely need to be improved as we get more platforms working.
+	if env["PLATFORM"] == "win32": stub_platform = "windows"
+	elif env["PLATFORM"] == "darwin": stub_platform = "mac"
+	else: stub_platform = env["PLATFORM"]
+	VariantDir("build/obj_stub", "src", duplicate = 0)
+	stub_env = env.Clone(CPPDEFINES = list(env["CPPDEFINES"]) + ["NVGT_STUB"], PROGSUFFIX = ".bin")
+	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
+	stub_objects = stub_env.Object(Glob("build/obj_stub/*.cpp"))
+	stub_env.Program(f"release/nvgt_{stub_platform}", stub_objects)
+	# on windows, we should have a version of the Angelscript library without the compiler, allowing for slightly smaller executables.
+	if env["PLATFORM"] == "win32":
+		stublibs = list(stub_env["LIBS"])
+		if "angelscript64" in stublibs:
+			stublibs.remove("angelscript64")
+			stublibs.append("angelscript64nc")
+			stub_env.Program(f"release/nvgt_{stub_platform}_nc", stub_objects, LIBS = stublibs)
 

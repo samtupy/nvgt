@@ -1,4 +1,4 @@
-/* speech.nvgt - text-to-speech output and configuration
+/* speech.nvgt - very high level text-to-speech output and configuration routines
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
