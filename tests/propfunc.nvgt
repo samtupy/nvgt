@@ -1,0 +1,12 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+class test {
+	int get_length() const property {
+		return 0;
+	}
+	int length(int x) {
+		return 0;
+	}
+}

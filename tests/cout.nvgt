@@ -1,0 +1,17 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+#pragma console
+void main() {
+	cout << "Enter something here...\n";
+	string l = cin.read_line().trim_whitespace();
+	if (l == "") {
+		cout << "This code has successfully executed because you've pressed the enter key without providing any input\n";
+		string char = cin.read_uint8();
+		// Unfortunately, still blocks until enter keypress, solution doesn't appear to be easily portable.
+		cout << char << ". Good job I guess\n";
+		exit();
+	}
+	cout << "Good job! you entered " << l << " which is " << l.length() << "chars.\n";
+}

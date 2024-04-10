@@ -1,0 +1,11 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	string s = "this is a random test! ";
+	for (int i = 0; i < 1000; i++) s += "This is a random test! ";
+	alert("test", "" + s.length());
+	s = string_aes_encrypt(s, "ultratest");
+	alert("test", "done");
+}

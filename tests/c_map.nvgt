@@ -1,0 +1,11 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+c_map<string, int> test;
+void main() {
+	test["t"] = 1;
+	test.erase("t");
+	test["t"] = 5;
+	alert("test", test["t"]);
+}

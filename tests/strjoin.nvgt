@@ -1,0 +1,9 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	string[] list = {"test", "test again", "idk", "asdf"};
+	alert("test", join(list, ", "));
+	alert("endless loop test", join({}, ","));
+}

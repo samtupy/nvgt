@@ -1,0 +1,37 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	dictionary d;
+	d["hi"] = false;
+	d["test"] = 12345.6;
+	d["num"] = 7;
+	d["str"] = "this is a string!";
+	string s = d.serialize();
+	alert("test", s.length());
+	file f;
+	f.open("serialize.dat", "wb");
+	f.write(s);
+	f.close();
+	dictionary@ D = deserialize(s);
+	if (@D == null) {
+		alert("error", "deserialization failed");
+		return;
+	}
+	alert("deserialized", D.getSize());
+	string[] k = D.getKeys();
+	for (uint i = 0; i < k.length(); i++) alert("key", k[i]);
+	string S;
+	if (D.get("str", S))
+		alert("test", S);
+	double nd;
+	if (D.get("test", nd))
+		alert("test", nd);
+	int ni;
+	if (D.get("num", ni))
+		alert("test", ni);
+	bool b;
+	if (D.get("hi", b))
+		alert("test", b ? "true" : "false");
+}

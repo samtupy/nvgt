@@ -1,0 +1,22 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+c_unordered_map<string, string> test;
+void main() {
+	test.insert("bla", "bla");
+	try {
+		alert("test", test.contains("bla"));
+		test["bla"] = "abc123Hello";
+		alert("test", test["bla"]);
+	} catch {
+		alert("Fail", "Failure");
+	}
+	c_map<int, int> test;
+	test[1] = 1;
+	test[1] = test[1] + 9;
+	alert("test", test[1]);
+	c_vector<float> flt;
+	flt.push_back(9.21);
+	alert("test", flt[1]);
+}

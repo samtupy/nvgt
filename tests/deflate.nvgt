@@ -1,0 +1,14 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	string c = string_deflate("aaaaaaaaaaaaaaaaaaaaaaaaaa! This is some compressed data! 0000aaaa0000aaaa0000aaaaaaaaaaaaaaaaaaaaaaaa!");
+	alert("test", c.length());
+	alert("test", string_inflate(c));
+	try {
+		string_inflate("oh snap!");
+	} catch {
+		alert("oops", "inflation failed " + getExceptionInfo());
+	}
+}

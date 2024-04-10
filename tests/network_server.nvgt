@@ -1,0 +1,25 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+network n;
+tts_voice v;
+void main() {
+	if (!n.setup_server(23456, 1, 10)) {
+		alert("error", "can't bind server");
+		return;
+	}
+	show_window("server up");
+	while (!key_down(KEY_ESCAPE)) {
+		wait(5);
+		network_event@ e = n.request();
+		if (e.type == event_connect)
+			v.speak("connection from peer " + e.peer_id + " " + n.get_peer_address(e.peer_id), true);
+		else if (e.type == event_disconnect)
+			v.speak("disconnection from peer " + e.peer_id + " " + n.get_peer_address(e.peer_id), true);
+		else if (e.type == event_receive) {
+			if (e.message == "spk")
+				v.speak("it seems peer " + e.peer_id + " told me to speak!", true);
+		}
+	}
+}

@@ -1,0 +1,19 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+class test {
+	string str = "bla";
+	test(string s) {
+		str = s;
+	}
+}
+weakref<test>[] t;
+void main() {
+	t.insert_last(test("test"));
+	test t1("asdf");
+	test t2("str");
+	test t3("");
+	t.insert_at(0, {t1, t2, t3});
+	alert("test", t.find(t2));
+}

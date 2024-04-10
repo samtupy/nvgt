@@ -16,3 +16,7 @@ build/windev_path
 user/**
 !user/readme.md
 windev
+
+# Tests
+tests/**
+!tests/*.nvgt

@@ -1,0 +1,17 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+class test {
+	int var;
+	int get_n() property { return var; }
+	void set_n(int n) property { var = n; }
+	test& set_n(int n) {
+		var = n;
+	}
+}
+void main() {
+	test t;
+	t.n = 12;
+	alert("test", t.set_n(20).n);
+}

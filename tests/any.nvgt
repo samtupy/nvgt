@@ -1,0 +1,14 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void f(any& a1, any& a2) {
+	string s;
+	int i;
+	a1.retrieve(s);
+	a2.retrieve(i);
+	alert(i, s);
+}
+void main() {
+	f(any("test"), any(2));
+}

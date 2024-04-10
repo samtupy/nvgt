@@ -1,0 +1,18 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	sound s;
+	s.load("C:\\windows\\media\\ding.wav");
+	s.play_looped();
+	s.volume = -5;
+	alert("test", s.volume);
+	s.volume = s.volume - 1;
+	alert("test", s.volume);
+	s.volume = s.volume - 1;
+	alert("test", s.volume);
+	double fv = -7;
+	if (s.volume != fv)
+		alert("test", "volumes don't match");
+}

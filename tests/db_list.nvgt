@@ -1,0 +1,42 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+#pragma plugin nvgt_sqlite
+#include "db_props.nvgt"
+#include "sqlite3constants.nvgt"
+
+sqlite3 db("db_list.db");
+class table : database_object {
+	database_int id("rowid", "auto");
+	database_list list("list");
+	table() {
+		super(db, "table");
+		postconstruct();
+	}
+	table(sqlite3statement@ s) {
+		super(db, "table");
+		postconstruct(s);
+	}
+}
+void main() {
+	table t;
+	db.execute(t.schema);
+	t.list.insert_last("haha");
+	t.list.insert_last("Blah!");
+	alert("test", t.commit());
+	t.list.remove_last();
+	alert("test", t.commit());
+	string[] nl = {"random", "list"};
+	t.list = nl;
+	alert("test", t.commit());
+	sqlite3statement@ s = db.prepare("select * from 'table';");
+	if (@s == null) {
+		alert("An error has occurred", db.get_last_error_text());
+		exit();
+	}
+	while (s.step() == SQLITE_ROW) {
+		table t2(s);
+		alert("test", join(t2.list, ","));
+	}
+}

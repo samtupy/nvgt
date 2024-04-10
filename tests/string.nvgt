@@ -1,0 +1,17 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+string s = "test";
+void main() {
+	alert("number", 5);
+	alert("global", s);
+	int n = parseInt("6");
+	n *= 2;
+	alert("test", "" + n);
+	string st = "this is a test";
+	alert("test", "" + st[1]);
+	alert("test", st[-4, 0]);
+	alert("test", st[5, 7]);
+	alert("test", st[-1, 1]);
+}

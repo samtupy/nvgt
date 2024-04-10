@@ -1,0 +1,20 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+tts_voice v;
+bool setvoice = false;
+bool speak(string text, bool interrupt = true, bool braille = true) {
+	//return screen_reader_speak(text, interrupt);
+	v.rate = 4;
+	if (!setvoice) {
+		setvoice = true;
+		//v.set_voice(2);
+	}
+	return v.speak(text, interrupt);
+	if (braille)
+		return screen_reader_braille(text);
+}
+void stop_speech() {
+	v.stop();
+}

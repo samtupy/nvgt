@@ -1,0 +1,34 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+class soundstream {
+	string filename;
+	file f;
+	uint offset = 0;
+	soundstream(string fn) {
+		filename = fn;
+		f.open(fn, "rb");
+	}
+	void sound_close(string u) {
+		f.close();
+	}
+	uint sound_len(string u) {
+		return f.size;
+	}
+	void sound_read(string& out buffer, uint l, string u) {
+		buffer = f.read(l);
+	}
+	bool sound_seek(uint o, string u) {
+		f.seek(o);
+		offset = o;
+		return true;
+	}
+}
+
+void main() {
+	soundstream ss("C:\\windows\\media\\ding.wav");
+	sound s;
+	s.load(sound_close_callback(ss.sound_close), sound_length_callback(ss.sound_len), sound_read_callback(ss.sound_read), sound_seek_callback(ss.sound_seek), "");
+	s.play_wait();
+}

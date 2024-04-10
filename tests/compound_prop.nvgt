@@ -1,0 +1,22 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+class obj {
+	int v = 0;
+	int get_v() property {
+		return v;
+	}
+	void set_v(int n) property {
+		v = n;
+	}
+	int get_number(int n) {
+		return n;
+	}
+}
+void main() {
+	obj@ o = obj(); // Declare without handle to compile.
+	o.v += o.get_number(20); // Not just +=, other assigns too.
+	alert("test", o.v);
+}
+
