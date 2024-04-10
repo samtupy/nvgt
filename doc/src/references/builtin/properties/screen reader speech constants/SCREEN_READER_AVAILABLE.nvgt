@@ -1,0 +1,12 @@
+/**
+	reports if a screen reader is currently available.
+	const bool SCREEN_READER_AVAILABLE;
+*/
+
+// Example:
+void main() {
+	if (SCREEN_READER_AVAILABLE)
+		alert("Info", "A screen reader is available.");
+	else
+		alert("Info", "A screen reader is not available.");
+}

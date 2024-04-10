@@ -12,9 +12,9 @@
 
 // example:
 void main() {
-	alert("example", "HELLO".is_lower()); // Should show true.
+	alert("example", "HELLO".is_lower()); // Should show tfalse.
 	string input = input_box("example", "enter a string");
-	if(input == "")
+	if(input.is_empty())
 		exit();
 	if(input.is_lower())
 		alert("example", "you typed a lowercase string");

@@ -1,10 +1,10 @@
 /**
 	Checks whether a string is completely uppercase.
 	bool string::is_upper(string encoding = "UTF8");
-	## Returns:
-		bool: true if the input string is uppercase.
 	## Arguments:
 		* string encoding = "UTF8": The encoding to check against, with the UTF8 encoding being cached for speed.
+	## Returns:
+		bool: true if the input string is uppercase.
 	## Remarks:
 		This function only returns true if the string contains only uppercase characters in the given encoding. If a single lowercase or punctuation character is encountered, this function will return false.
 		If this function is called on a string that contains data that is not in the specified encoding, the results are undefined.
@@ -14,7 +14,7 @@
 void main() {
 	alert("example", "HELLO".is_upper()); // Should show true.
 	string input = input_box("example", "enter a string");
-	if(input == "")
+	if(input.is_empty())
 		exit();
 	if(input.is_upper())
 		alert("example", "you typed an uppercase string");

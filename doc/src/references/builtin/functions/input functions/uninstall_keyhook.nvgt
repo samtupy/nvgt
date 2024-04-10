@@ -1,0 +1,14 @@
+/**
+	Uninstall's NVGT's JAWS keyhook.
+	void uninstall_keyhook();
+	## Remarks:
+		This keyhook allows NVGT games to properly capture keyboard input while the JAWS for Windows screen reader is running.
+*/
+
+// Example:
+void main() {
+	install_keyhook();
+	alert("Info", "Keyhook installed. Uninstalling...");
+	uninstall_keyhook();
+	alert("Done", "Keyhook uninstalled.");
+}

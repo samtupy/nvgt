@@ -1,0 +1,11 @@
+/**
+	Check the current working directory.
+	string cwdir();
+	## Returns:
+		A string containing the current working directory.
+*/
+
+// Example:
+void main() {
+	alert("Current Working Directory", cwdir());
+}

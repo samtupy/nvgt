@@ -9,5 +9,5 @@
 
 // Example:
 void main() {
-	alert("Example", "The cosine of 45 is " + cos(60 * 3.14159 / 180) + " radians"); // Should print "The cosine of 45 is 0.500000774860382 radians"
+	alert("Example", "The cosine of 45 is " + cos(45 * 3.14159 / 180) + " radians");
 }

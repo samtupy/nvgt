@@ -1,0 +1,14 @@
+/**
+	Speaks a string through the currently active screen reader, if supported.
+	bool screen_reader_speak(string text, bool interrupt);
+	## Arguments:
+		* string text: the text to speak.
+		* bool interrupt: Whether or not the previously spoken speech should be interrupted or not when speaking the new string.
+	## Returns:
+		bool: true if the function succeeded, false otherwise.
+*/
+
+// Example:
+void main() {
+	screen_reader_speak("This message will only be spoken.", true);
+}

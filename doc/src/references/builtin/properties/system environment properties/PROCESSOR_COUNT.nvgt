@@ -1,5 +1,6 @@
 /**
 	This property returns the number of processors on your system. Note that this returns the number of threads, not physical cores.
+	const uint PROCESSOR_COUNT;
 */
 
 // example:

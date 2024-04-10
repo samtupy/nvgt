@@ -1,0 +1,15 @@
+/**
+	Determines if the active screen reader supports speech output.
+	bool screen_reader_has_speech();
+	## Returns:
+		bool: true if the screen reader supports speech, false if not, or if no screen reader is active.
+*/
+
+// Example:
+void main() {
+	bool has_speech = screen_reader_has_speech();
+	if (has_speech)
+		alert("Info", "The active screen reader supports speech.");
+	else
+		alert("Info", "The active screen reader does not support speech.");
+}

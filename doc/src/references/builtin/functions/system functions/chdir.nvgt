@@ -1,0 +1,20 @@
+/**
+	Change the current working directory.
+	bool chdir(const string&in new_directory);
+	## Arguments:
+		* new_directory: The directory you'd like to change into. Note that this directory must already exist.
+	## Returns:
+		True if NVGT could set the current working directory to the specified directory; false otherwise.
+*/
+
+// Example:
+void main() {
+	string directory = input_box("Chdir Test", "Enter a valid path to a directory: ");
+	// Could we switch to it?
+	if (chdir(directory)) {
+		alert("Success", "That directory is valid and could be switch to.");
+	}
+	else {
+		alert("Failure", "The directory could not be switched to. Check that you have typed the name correctly and that the directory exists.");
+	}
+}

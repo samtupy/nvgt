@@ -1,0 +1,15 @@
+/**
+	Opens the specified URL in the appropriate application, for example an https:// link in your web browser, or a tt://link in TeamTalk.
+	bool urlopen(string url);
+	## Arguments:
+		* string url: The URL to open.
+	## Returns:
+		bool: true if the URl was successfully opened, false otherwise.
+	## Remarks:
+		What application this function opens depends on what the user has set on their system; there's no way for you to control it.
+*/
+
+// Example:
+void main() {
+	urlopen("https://nvgt.gg");
+}

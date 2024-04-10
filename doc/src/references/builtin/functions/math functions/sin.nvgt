@@ -9,5 +9,5 @@
 
 // Example:
 void main() {
-	alert("Example", "The sine of 45 is " + sin(60 * 3.14159 / 180) + " radians"); // Should print "The sine of 45 is 0.866024971008301 radians"
+	alert("Example", "The sine of 45 is " + sin(45 * 3.14159 / 180) + " radians");
 }

@@ -1,0 +1,17 @@
+/**
+	Check if the given environment variable exists.
+	bool environment_variable_exists(string name);
+	## Arguments:
+		* string name: the name of the environment variable to check.
+	## Returns:
+		bool: true if the variable exists, false if not.
+*/
+
+// Example:
+void main() {
+	bool exists = environment_variable_exists("PATH");
+	if (exists)
+		alert("Info", "The PATH variable exists.");
+	else
+		alert("Info", "The PATH variable does not exist.");
+}

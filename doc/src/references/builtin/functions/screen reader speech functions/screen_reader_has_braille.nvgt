@@ -1,0 +1,15 @@
+/**
+	Determine if the active screen reader supports braille output.
+	bool screen_reader_has_braille();
+	## Returns:
+		bool: true if the active screen reader supports braille, false otherwise.
+*/
+
+// Example:
+void main() {
+	bool has_braille  = screen_reader_has_braille();
+	if (has_braille)
+		alert("Info", "The currently active screen reader supports braille.");
+	else
+		alert("Info", "The currently active screen reader does not support braille.");
+}

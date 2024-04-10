@@ -1,0 +1,15 @@
+/**
+	Determines if your app is being ran through a debugger.
+	bool is_debugger_present();
+	## Returns:
+		bool: true if a debugger is present, false otherwise.
+*/
+
+// Example:
+void main() {
+	bool present = is_debugger_present();
+	if (present)
+		alert("Info", "A debugger is present.");
+	else
+		alert("Info", "A debugger is not present.");
+}

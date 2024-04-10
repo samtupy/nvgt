@@ -3,7 +3,7 @@
 	string size_to_string(uint64 size, uint8 round_place = 2);
 	## Arguments:
 		* uint64 size: the size to convert.
-		* uint8 round_place: what place to round the sizes to.
+		* uint8 round_place = 2: how many decimal places to round the sizes to.
 	## Returns:
 		The given size as a human-readable string.
 */

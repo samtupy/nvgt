@@ -1,6 +1,6 @@
 /**
 	The number of bytes in a terabyte.
-	const uint GIGABYTES;
+	const uint TERABYTES;
 */
 
 // Example:

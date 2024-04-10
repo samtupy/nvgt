@@ -1,10 +1,8 @@
 /**
 	Returns the length (how large a string is).
 	uint string::length();
-	
 	## returns:
 		uint: The length of a string.
-	
 	## Remarks:
 		Note: This returns the length in bytes, rather than characters of any given text encoding.
 */
@@ -12,7 +10,6 @@
 // example:
 void main() {
 	string test = input_box("String Length Tester", "Enter a string to see its length.");
-	
 	if (test.length() <= 0) {
 		alert("String Length Tester", "You appear to have provided an empty string!");
 	}

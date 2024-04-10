@@ -1,0 +1,19 @@
+/**
+	Determine if the currently active screen reader (if any) is currently speaking.
+	bool screen_reader_is_speaking();
+	## Returns:
+		bool: true if the currently active screen reader is speaking, false otherwise.
+	## Remarks:
+		This function isn't foolproof, as some screen readers (e.g. NVDA) don't have a way to query this information.
+*/
+
+// Example:
+void main() {
+	screen_reader_speak("Hello there, this is a very long string that will hopefully be spoken!", true);
+	wait(50);
+	bool speaking = screen_reader_is_speaking();
+	if (speaking)
+		alert("Info", "The screen reader is speaking.");
+	else
+		alert("Info", "The screen reader is not speaking.");
+}

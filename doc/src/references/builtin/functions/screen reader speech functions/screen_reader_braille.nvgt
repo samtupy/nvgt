@@ -1,0 +1,13 @@
+/**
+	Brailles a string through the currently active screen reader, if supported.
+	bool screen_reader_braille(string text);
+	## Arguments:
+		* string text: the text to braille.
+	## Returns:
+		bool: true if the function succeeded, false otherwise.
+*/
+
+// Example:
+void main() {
+	screen_reader_braille("This message will only be brailled.");
+}

@@ -1,7 +1,6 @@
 /**
 	Property that returns the user's roaming application directory, which is usually where game data can be written to.
 	const string DIRECTORY_APPDATA;
-	
 	## remarks:
 		A slash character is already appended to the directory returned by this property.
 		This function may return different values depending on the operating system the application is being run on.

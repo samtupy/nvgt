@@ -14,7 +14,7 @@
 void main() {
 	alert("example", ".?!".is_punctuation()); // Should show true.
 	string input = input_box("example", "enter a string");
-	if(input == "")
+	if(input.is_empty())
 		exit();
 	if(input.is_punctuation())
 		alert("example", "you typed a string that contains only punctuation characters");

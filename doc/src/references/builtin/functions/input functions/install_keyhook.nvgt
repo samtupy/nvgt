@@ -1,0 +1,19 @@
+/**
+	Attempts to install NVGT's JAWS keyhook.
+	bool install_keyhook();
+	## Returns:
+		bool: true if the keyhook was successfully installed, false otherwise.
+	## Remarks:
+		This keyhook allows NVGT games to properly capture keyboard input while the JAWS for Windows screen reader is running.
+*/
+
+// Example:
+void main() {
+	bool success = install_keyhook();
+	if (success) {
+		alert("Info", "The keyhook was successfully installed!");
+		uninstall_keyhook();
+	}
+	else
+		alert("Info", "The keyhook was not successfully installed.");
+}

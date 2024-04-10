@@ -1,8 +1,9 @@
-# Rough notes for building on Mac OS
+# Rough notes for building on macOS
 I have no idea what I'm doing here!
 
-assuming xcode and homebrew are installed:
+Assuming xcode and homebrew are installed:
 
+```bash
 brew install autoconf automake libgit2 libtool openssl sdl2
 
 mkdir deps
@@ -36,4 +37,4 @@ cd build
 cmake ..
 cmake --build .
 sudo cmake --install .
-
+```

@@ -1,0 +1,15 @@
+/**
+	Returns the name of the currently active screen reader as a string.
+	string screen_reader_detect();
+	## Returns:
+		string: the name of the given screen reader, or a blank string if none was found.
+*/
+
+// Example:
+void main() {
+	string sr = screen_reader_detect();
+	if (sr.is_empty())
+		alert("Info", "No screen reader found.");
+	else
+		alert("Info", "The active screen reader is " + sr);
+}

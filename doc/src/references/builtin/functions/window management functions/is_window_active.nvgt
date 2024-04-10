@@ -1,0 +1,17 @@
+/**
+	Determines if your game's window is active (i.e. has the keyboard focus).
+	bool is_window_active();
+	## Returns:
+		bool: true if your game window has the keyboard focus, false if not.
+*/
+
+// Example:
+void main() {
+	show_window("Test");
+	wait(1000); // Give the user time to alt+tab away if they so choose.
+	bool active = is_window_active();
+	if (active)
+		alert("Info", "Your game window is active.");
+	else
+		alert("Info", "Your game window is not active.");
+}

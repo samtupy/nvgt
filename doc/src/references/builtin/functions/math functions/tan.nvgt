@@ -9,5 +9,5 @@
 
 // Example:
 void main() {
-	alert("Example", "The tangent of 45 is " + tan(60 * 3.14159 / 180) + " radians"); // Should print "The tangent of 45 is 1.73204708099365 radians"
+	alert("Example", "The tangent of 45 is " + tan(45 * 3.14159 / 180) + " radians");
 }

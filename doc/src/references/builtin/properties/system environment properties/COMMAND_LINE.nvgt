@@ -1,5 +1,6 @@
 /**
 	COMMAND_LINE returns anything that is passed as command line arguments. Note that it returns anything after the application name, and keep in mind that you will have to parse the output yourself (basic example below).
+	const string COMMAND_LINE;
 */
 
 // example:
