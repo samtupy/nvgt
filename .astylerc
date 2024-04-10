@@ -1,5 +1,5 @@
 # Artistic style configuration file for nvgt
-# Any code added to the engine is formatted according to the rules in this file, weather that be done by astyle or by hand.
+# Any code added to the engine is formatted according to the rules in this file, whether that be done by astyle or by hand.
 # NVGT - NonVisual Gaming Toolkit (https://nvgt.gg)
 # Copyright (c) 2022-2024 Sam Tupy
 # license: zlib

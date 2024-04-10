@@ -39,8 +39,11 @@ env.Append(LIBS = ["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "enet", "opus"
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB", "/SUBSYSTEM:WINDOWS", "/LTCG", "/OPT:REF", "/OPT:ICF", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll", "/delayload:Tolk.dll"])
-if os.path.isfile("user/_SConscript"):
-	SConscript("user/_SConscript", exports = {"plugin_env": plugin_env, "nvgt_env": env})
+if ARGUMENTS.get("no_user", "0") == "0":
+	if os.path.isfile("user/nvgt_config.h"):
+		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
+	if os.path.isfile("user/_SConscript"):
+		SConscript("user/_SConscript", exports = {"plugin_env": plugin_env, "nvgt_env": env})
 SConscript("ASAddon/_SConscript", variant_dir = "build/obj_ASAddon", duplicate = 0, exports = "env")
 SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, exports = "env")
 env.Program("release/nvgt", Glob("build/obj_src/*.cpp"))
