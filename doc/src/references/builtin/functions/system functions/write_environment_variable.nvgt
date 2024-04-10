@@ -1,0 +1,13 @@
+/**
+	Write to an environment variable.
+	void write_environment_variable(string variable, string value);
+	## Arguments:
+		* Variable: The environment variable you wish to write to.
+		* Value: The value you wish to write to this variable.
+*/
+
+// Example:
+void main() {
+	write_environment_variable("NVGT_Test_for_docs", "Testing");
+	alert("Result", read_environment_variable("NVGT_Test_for_docs"));
+}

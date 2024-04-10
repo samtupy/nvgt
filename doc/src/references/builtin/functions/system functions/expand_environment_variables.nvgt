@@ -1,0 +1,21 @@
+/**
+	Expand environment variables.
+	string expand_environment_variables(string variables);
+	
+	## Arguments:
+		* variables: A string of the variable(s) you wish to expand.
+	## Returns:
+		The expanded environment variable(s) if successful or an empty string if not.
+*/
+
+// Example:
+void main() {
+	// The end goal here is to obtain the user's home directory on the running system if possible. This logic happens in a below function; here we just display the result.
+	alert("Result", get_home_directory());
+}
+
+string get_home_directory() {
+	if (system_is_windows) return expand_environment_variables("%USERPROFILE%");
+	else if (system_is_unix) return expand_environment_variables("$HOME");
+	else return "Unknown";
+}
