@@ -1,4 +1,6 @@
 /* sound pool originally taken from BGT, then modified, in particular no more sound_positioning.bgt or .nvgt because this is now a builtin.
+Copyright (C) 2010-2014 Blastbay Studios, zlib like license
+
 sound Pool Class
 
 This class provides a convenient way of managing sounds in an environment, both with 1 and 2 dimensions. It uses the functions found in sound_positioning.bgt to do the actual sound adjustments, so modifying these functions will affect the entire system. The sound_pool_item class holds all the information necessary for one single sound in the game world. Note that you should not make instances of the sound_pool_item class directly but always use the methods and properties provided in the sound_pool class.

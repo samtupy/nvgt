@@ -13,7 +13,6 @@
 */
 
 #define NOMINMAX
-#define AS_MAX_PORTABILITY
 #include "window.h"
 #include "network.h"
 #include <exception>
