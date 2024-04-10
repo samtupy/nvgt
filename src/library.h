@@ -31,7 +31,9 @@ public:
 	void release();
 	bool load(const std::string& filename);
 	bool unload();
-	bool is_active() { return engine&&shared_object; }
+	bool is_active() {
+		return engine && shared_object;
+	}
 	void call(asIScriptGeneric* gen);
 };
 

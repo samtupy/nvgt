@@ -20,15 +20,15 @@ extern std::string g_compiled_basename;
 extern std::vector<asIScriptContext*> g_ctxPool;
 
 void ShowAngelscriptMessages();
-int               ConfigureEngine(asIScriptEngine *engine);
+int ConfigureEngine(asIScriptEngine* engine);
 #ifndef NVGT_STUB
-int               CompileScript(asIScriptEngine *engine, const char *scriptFile);
-int SaveCompiledScript(asIScriptEngine* engine, const unsigned char** output);
+	int               CompileScript(asIScriptEngine* engine, const char* scriptFile);
+	int SaveCompiledScript(asIScriptEngine* engine, const unsigned char** output);
 #endif
 int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size);
-int               ExecuteScript(asIScriptEngine *engine, const char *scriptFile);
-void              MessageCallback(const asSMessageInfo *msg, void *param);
-asIScriptContext *RequestContextCallback(asIScriptEngine *engine, void *param);
-void              ReturnContextCallback(asIScriptEngine *engine, asIScriptContext *ctx, void *param);
+int ExecuteScript(asIScriptEngine* engine, const char* scriptFile);
+void MessageCallback(const asSMessageInfo* msg, void* param);
+asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* param);
+void ReturnContextCallback(asIScriptEngine* engine, asIScriptContext* ctx, void* param);
 void ExceptionHandlerCallback(asIScriptContext* ctx, void* obj);
 asUINT GetTimeCallback();

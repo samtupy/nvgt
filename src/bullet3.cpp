@@ -13,45 +13,45 @@
 
 #include "bullet3.h"
 
-static void Vector3DefaultConstructor(Vector3 *self) {
-	new(self) Vector3();
+static void Vector3DefaultConstructor(Vector3* self) {
+	new (self) Vector3();
 }
 
-static void Vector3CopyConstructor(Vector3 *self, const Vector3 &other) {
-	new(self) Vector3();
+static void Vector3CopyConstructor(Vector3* self, const Vector3& other) {
+	new (self) Vector3();
 	self->setValue(other.x, other.y, other.z);
 }
 
-static void Vector3InitConstructor(float x, float y, float z, Vector3 *self) {
-	new(self) Vector3();
+static void Vector3InitConstructor(float x, float y, float z, Vector3* self) {
+	new (self) Vector3();
 	self->setValue(x, y, z);
 }
 
-static void Vector3Destruct(Vector3 *self) {
+static void Vector3Destruct(Vector3* self) {
 	self->~Vector3();
 }
 
-static Vector3 &Vector3Assign(const Vector3& other, Vector3* self) {
+static Vector3& Vector3Assign(const Vector3& other, Vector3* self) {
 	self->setValue(other.x, other.y, other.z);
 	return *self;
 }
 static Vector3 Vector3OpAdd(Vector3* self, const Vector3& other) {
-	return *self+other;
+	return *self + other;
 }
 static Vector3 Vector3OpSub(Vector3* self, const Vector3& other) {
-	return *self-other;
+	return *self - other;
 }
 static Vector3 Vector3OpMul(Vector3* self, const Vector3& other) {
-	return *self*other;
+	return *self * other;
 }
 static Vector3 Vector3OpDiv(Vector3* self, const Vector3& other) {
-	return *self/other;
+	return *self / other;
 }
 static Vector3 Vector3OpMulN(Vector3* self, float other) {
-	return *self*other;
+	return *self * other;
 }
 static Vector3 Vector3OpDivN(Vector3* self, float other) {
-	return *self/other;
+	return *self / other;
 }
 
 void RegisterScriptBullet3(asIScriptEngine* engine) {
@@ -59,13 +59,13 @@ void RegisterScriptBullet3(asIScriptEngine* engine) {
 	engine->RegisterObjectProperty("vector", "float x", asOFFSET(Vector3, x));
 	engine->RegisterObjectProperty("vector", "float y", asOFFSET(Vector3, y));
 	engine->RegisterObjectProperty("vector", "float z", asOFFSET(Vector3, z));
-	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT,  "void f()",                     asFUNCTION(Vector3DefaultConstructor), asCALL_CDECL_OBJLAST);
-	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT,  "void f(const vector &in)", asFUNCTION(Vector3CopyConstructor), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT,  "void f(float, float = 0, float = 0)",  asFUNCTION(Vector3InitConstructor), asCALL_CDECL_OBJLAST);
-	engine->RegisterObjectBehaviour("vector", asBEHAVE_DESTRUCT,  "void f()",                     asFUNCTION(Vector3Destruct), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(Vector3DefaultConstructor), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f(const vector &in)", asFUNCTION(Vector3CopyConstructor), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f(float, float = 0, float = 0)", asFUNCTION(Vector3InitConstructor), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectBehaviour("vector", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(Vector3Destruct), asCALL_CDECL_OBJLAST);
 	engine->RegisterObjectMethod("vector", "vector &opAssign(const vector &in)", asFUNCTION(Vector3Assign), asCALL_CDECL_OBJLAST);
-	engine->RegisterObjectMethod("vector", "vector &opAddAssign(const vector &in)", asMETHODPR(Vector3, operator+=, (const Vector3 &), Vector3&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector &opSubAssign(const vector &in)", asMETHODPR(Vector3, operator-=, (const Vector3 &), Vector3&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector &opAddAssign(const vector &in)", asMETHODPR(Vector3, operator+=, (const Vector3&), Vector3&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector &opSubAssign(const vector &in)", asMETHODPR(Vector3, operator-=, (const Vector3&), Vector3&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "vector &opMulAssign(const float &in)", asMETHODPR(Vector3, operator*=, (const float&), Vector3&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "vector &opDivAssign(const float&in)", asMETHODPR(Vector3, operator/=, (const float&), Vector3&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "bool opEquals(const vector &in) const", asMETHODPR(Vector3, operator==, (const b3Vector3&) const, bool), asCALL_THISCALL);

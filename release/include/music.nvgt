@@ -10,314 +10,267 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-class music_track
-{
-string intro_filename;
-string main_filename;
-int repeat_point;
-int predelay;
-int switch_predelay=300;
-int switch_fade=2000;
-sound@ track=null;
-sound@ next_track=null;
-uint64 intro_end=0;
-uint64 start_playing=0;
-uint64 last_played=0;
-int intro_duration;
-int track_volume;
-int start_fade_ms;
-int repeat_fade_ms;
-float start_position;
-int track_pitch=100;
-bool intro_repeating=false;
-bool paused=false;
-bool stopping=false;
-bool was_next_track_playing=false;
-bool prerepeat=false;
-music_manager@ parent=null;
-music_track(string data, music_manager@ parent=null)
-{
-@this.parent=@parent;
-string[]@ vars=data.split("; ");
-if(vars[0].find("=")>-1) return;
-this.main_filename=vars[0];
-vars.remove_at(0);
-for(uint i=0; i<vars.length(); i++)
-{
-int eq=vars[i].find("=");
-if(eq<0)
-{
-set_option(vars[i]);
-continue;
-}
-string varname=vars[i].slice(0, eq);
-string value=vars[i].slice(eq+1, 0);
-set_option(varname, value);
-}
-setup();
-}
-bool set_option(string varname, string value="")
-{
-if(value=="")
-{
-if(varname=="stinger") repeat_point=-1;
-else if(varname=="loop") repeat_point=0;
-else if(varname=="repeat_intro") intro_repeating=true;
-else if(varname=="instaplay")
-{
-switch_predelay=0;
-switch_fade=0;
-}
-else return false;
-return true;
-}
-if(varname=="f") start_fade_ms=parse_float(value);
-else if(varname=="p") track_pitch=parse_int(value);
-else if(varname=="v") track_volume=parse_int(value);
-else if(varname=="intro") intro_filename=value;
-else if(varname=="repeat") repeat_point=parse_float(value)*1000;
-else if(varname=="repeat_f") repeat_fade_ms=parse_float(value);
-else if(varname=="predelay") predelay=parse_float(value)*1000;
-else if(varname=="switch_predelay") switch_predelay=parse_float(value)*1000;
-else if(varname=="switch_f") switch_fade=parse_int(value);
-else if(varname=="intro_end") intro_end=parse_float(value)*1000;
-else if(varname=="startpos") start_position=parse_float(value)*1000;
-else return false;
-if(track_volume<=-50) track_volume=-50;
-return true;
-}
-sound@ load_sound(sound@ s, string filename)
-{
-if(@s==null) @s=sound();
-if(@parent!=null)
-return parent.load_sound(@s, filename);
-else
-{
-s.load(filename);
-if(!s.active) return null;
-return @s;
-}
-}
-void setup()
-{
-@track=sound();
-if(intro_filename!="")
-{
-load_sound(@track, intro_filename);
-if(track.active)
-{
-track.pitch=track_pitch;
-track.volume=track_volume;
-if(intro_end==0) intro_end=5;
-intro_duration=track.length;
-}
-else load_sound(track, main_filename);
-}
-if(!track.active and main_filename!="")
-load_sound(track, main_filename);
-if(track.active)
-{
-track.pitch=track_pitch;
-track.volume=track_volume;
-track.seek(start_position*1000);
-}
-}
-bool get_playing() property
-{
-return @track!=null and track.playing and track.volume>-60 or @next_track!=null and next_track.playing and next_track.volume>-60 or !paused and @next_track!=null and prerepeat;
-}
-int get_position() property
-{
-if(@track==null and @next_track==null) return -1;
-if(intro_end>0 and @track!=null) return track.position;
-return intro_duration+track.position;
-}
-void play_obj(sound@ handle, int fade_ms)
-{
-if(!handle.playing)
-{
-if(fade_ms>0) handle.volume=-60;
-else handle.volume=track_volume;
-if(intro_end>0 or repeat_point!=0) handle.play();
-else handle.play_looped();
-}
-if(fade_ms>0) handle.slide_volume(track_volume, fade_ms);
-}
-void play(int fade_ms=0)
-{
-start_playing=-1;
-stopping=false;
-if(paused and @track!=null)
-{
-paused=false;
-if(was_next_track_playing)
-play_obj(next_track, fade_ms);
-else
-play_obj(track, fade_ms);
-was_next_track_playing=false;
-return;
-}
-if(@track!=null and track.active and !was_next_track_playing)
-play_obj(track, start_fade_ms);
-}
-void pause(int fade_ms=0)
-{
-if(paused or !playing) return;
-paused=true;
-if(@track!=null)
-track.slide_volume(-60, fade_ms);
-if(@next_track!=null and !prerepeat)
-next_track.slide_volume(-60, fade_ms);
-was_next_track_playing=@next_track!=null and next_track.playing;
-}
-void stop(int fade_ms=0)
-{
-pause(fade_ms);
-stopping=true;
-}
-void loop(uint64 t)
-{
-if(stopping and !playing)
-{
-stopping=false;
-@track=null;
-@next_track=null;
-setup();
-start_playing=0;
-}
-if(!stopping and start_playing>=0 and !playing and !paused and t>=start_playing)
-play();
-if(intro_end>0 and @track!=null)
-{
-int cur_ms=track.position;
-if(track.length-cur_ms<intro_end+300)
-{
-@next_track=sound();
-load_sound(next_track, main_filename);
-if(paused)
-next_track.volume=-60;
-else
-next_track.volume=track_volume;
-next_track.pitch=track_pitch;
-}
-if(track.playing and track.length-cur_ms<intro_end+5 and @next_track!=null)
-{
-if(!paused)
-{
-if(repeat_point!=0) next_track.play();
-else next_track.play_looped();
-}
-else
-was_next_track_playing=true;
-intro_end=0;
-}
-}
-if(paused and @track!=null and track.volume==-60) track.pause();
-if(paused and @next_track!=null and next_track.volume==-60) next_track.pause();
-if(!prerepeat and @track!=null and @next_track!=null and !track.playing and next_track.playing)
-{
-track.close();
-@track=next_track;
-@next_track=null;
-}
-if(repeat_point>0 and @track!=null and track.length>0)
-{
-int cur_ms=track.position;
-if(@next_track==null and track.length-cur_ms<repeat_point+500)
-{
-@next_track=sound();
-load_sound(next_track, main_filename);
-next_track.pitch=track_pitch;
-next_track.volume=track_volume;
-prerepeat=true;
-}
-if(track.length-cur_ms<repeat_point+5 and @next_track!=null and !paused and !next_track.playing)
-{
-next_track.play();
-prerepeat=false;
-}
-}
-}
+class music_track {
+	string intro_filename;
+	string main_filename;
+	int repeat_point;
+	int predelay;
+	int switch_predelay = 300;
+	int switch_fade = 2000;
+	sound@ track = null;
+	sound@ next_track = null;
+	uint64 intro_end = 0;
+	uint64 start_playing = 0;
+	uint64 last_played = 0;
+	int intro_duration;
+	int track_volume;
+	int start_fade_ms;
+	int repeat_fade_ms;
+	float start_position;
+	int track_pitch = 100;
+	bool intro_repeating = false;
+	bool paused = false;
+	bool stopping = false;
+	bool was_next_track_playing = false;
+	bool prerepeat = false;
+	music_manager@ parent = null;
+	music_track(string data, music_manager@ parent = null) {
+		@this.parent = @parent;
+		string[]@ vars = data.split("; ");
+		if (vars[0].find("=") > -1) return;
+		this.main_filename = vars[0];
+		vars.remove_at(0);
+		for (uint i = 0; i < vars.length(); i++) {
+			int eq = vars[i].find("=");
+			if (eq < 0) {
+				set_option(vars[i]);
+				continue;
+			}
+			string varname = vars[i].slice(0, eq);
+			string value = vars[i].slice(eq + 1, 0);
+			set_option(varname, value);
+		}
+		setup();
+	}
+	bool set_option(string varname, string value = "") {
+		if (value == "") {
+			if (varname == "stinger") repeat_point = -1;
+			else if (varname == "loop") repeat_point = 0;
+			else if (varname == "repeat_intro") intro_repeating = true;
+			else if (varname == "instaplay") {
+				switch_predelay = 0;
+				switch_fade = 0;
+			} else return false;
+			return true;
+		}
+		if (varname == "f") start_fade_ms = parse_float(value);
+		else if (varname == "p") track_pitch = parse_int(value);
+		else if (varname == "v") track_volume = parse_int(value);
+		else if (varname == "intro") intro_filename = value;
+		else if (varname == "repeat") repeat_point = parse_float(value) * 1000;
+		else if (varname == "repeat_f") repeat_fade_ms = parse_float(value);
+		else if (varname == "predelay") predelay = parse_float(value) * 1000;
+		else if (varname == "switch_predelay") switch_predelay = parse_float(value) * 1000;
+		else if (varname == "switch_f") switch_fade = parse_int(value);
+		else if (varname == "intro_end") intro_end = parse_float(value) * 1000;
+		else if (varname == "startpos") start_position = parse_float(value) * 1000;
+		else return false;
+		if (track_volume <= -50) track_volume = -50;
+		return true;
+	}
+	sound@ load_sound(sound@ s, string filename) {
+		if (@s == null) @s = sound();
+		if (@parent != null)
+			return parent.load_sound(@s, filename);
+		else {
+			s.load(filename);
+			if (!s.active) return null;
+			return @s;
+		}
+	}
+	void setup() {
+		@track = sound();
+		if (intro_filename != "") {
+			load_sound(@track, intro_filename);
+			if (track.active) {
+				track.pitch = track_pitch;
+				track.volume = track_volume;
+				if (intro_end == 0) intro_end = 5;
+				intro_duration = track.length;
+			} else load_sound(track, main_filename);
+		}
+		if (!track.active and main_filename != "")
+			load_sound(track, main_filename);
+		if (track.active) {
+			track.pitch = track_pitch;
+			track.volume = track_volume;
+			track.seek(start_position * 1000);
+		}
+	}
+	bool get_playing() property {
+		return @track != null and track.playing and track.volume > -60 or @next_track != null and next_track.playing and next_track.volume > -60 or !paused and @next_track != null and prerepeat;
+	}
+	int get_position() property {
+		if (@track == null and @next_track == null) return -1;
+		if (intro_end > 0 and @track != null) return track.position;
+		return intro_duration + track.position;
+	}
+	void play_obj(sound@ handle, int fade_ms) {
+		if (!handle.playing) {
+			if (fade_ms > 0) handle.volume = -60;
+			else handle.volume = track_volume;
+			if (intro_end > 0 or repeat_point != 0) handle.play();
+			else handle.play_looped();
+		}
+		if (fade_ms > 0) handle.slide_volume(track_volume, fade_ms);
+	}
+	void play(int fade_ms = 0) {
+		start_playing = -1;
+		stopping = false;
+		if (paused and @track != null) {
+			paused = false;
+			if (was_next_track_playing)
+				play_obj(next_track, fade_ms);
+			else
+				play_obj(track, fade_ms);
+			was_next_track_playing = false;
+			return;
+		}
+		if (@track != null and track.active and !was_next_track_playing)
+			play_obj(track, start_fade_ms);
+	}
+	void pause(int fade_ms = 0) {
+		if (paused or !playing) return;
+		paused = true;
+		if (@track != null)
+			track.slide_volume(-60, fade_ms);
+		if (@next_track != null and !prerepeat)
+			next_track.slide_volume(-60, fade_ms);
+		was_next_track_playing = @next_track != null and next_track.playing;
+	}
+	void stop(int fade_ms = 0) {
+		pause(fade_ms);
+		stopping = true;
+	}
+	void loop(uint64 t) {
+		if (stopping and !playing) {
+			stopping = false;
+			@track = null;
+			@next_track = null;
+			setup();
+			start_playing = 0;
+		}
+		if (!stopping and start_playing >= 0 and !playing and !paused and t >= start_playing)
+			play();
+		if (intro_end > 0 and @track != null) {
+			int cur_ms = track.position;
+			if (track.length - cur_ms < intro_end + 300) {
+				@next_track = sound();
+				load_sound(next_track, main_filename);
+				if (paused)
+					next_track.volume = -60;
+				else
+					next_track.volume = track_volume;
+				next_track.pitch = track_pitch;
+			}
+			if (track.playing and track.length - cur_ms < intro_end + 5 and @next_track != null) {
+				if (!paused) {
+					if (repeat_point != 0) next_track.play();
+					else next_track.play_looped();
+				} else
+					was_next_track_playing = true;
+				intro_end = 0;
+			}
+		}
+		if (paused and @track != null and track.volume == -60) track.pause();
+		if (paused and @next_track != null and next_track.volume == -60) next_track.pause();
+		if (!prerepeat and @track != null and @next_track != null and !track.playing and next_track.playing) {
+			track.close();
+			@track = next_track;
+			@next_track = null;
+		}
+		if (repeat_point > 0 and @track != null and track.length > 0) {
+			int cur_ms = track.position;
+			if (@next_track == null and track.length - cur_ms < repeat_point + 500) {
+				@next_track = sound();
+				load_sound(next_track, main_filename);
+				next_track.pitch = track_pitch;
+				next_track.volume = track_volume;
+				prerepeat = true;
+			}
+			if (track.length - cur_ms < repeat_point + 5 and @next_track != null and !paused and !next_track.playing) {
+				next_track.play();
+				prerepeat = false;
+			}
+		}
+	}
 }
 
 funcdef sound@ load_music_sound(sound@, string);
-class music_manager
-{
-music_track@ main_track=null;
-music_track@ next_track=null;
-int64 next_play=0;
-mixer music_mixer;
-bool stopping=false;
-load_music_sound@ load_callback=null;
-void set_load_callback(load_music_sound@ cb)
-{
-@load_callback=@cb;
-}
-sound@ load_sound(sound@ s, string filename)
-{
-if(@s==null) @s=sound();
-s.set_mixer(music_mixer);
-if(@load_callback!=null) return load_callback(s, filename);
-s.load(filename);
-if(!s.active) return null;
-return s;
-}
-float get_volume() const property
-{
-return music_mixer.volume;
-}
-void set_volume(float volume) property
-{
-music_mixer.volume=volume;
-}
-bool set_fx(string fx, int index=-1)
-{
-return music_mixer.set_fx(fx, index);
-}
-bool play(string track)
-{
-stopping=false;
-if(@main_track==null)
-{
-@main_track=music_track(track, this);
-return true;
-}
-@next_track=music_track(track, this);
-next_play=ticks()+next_track.switch_predelay;
-if(@main_track!=null and main_track.playing)
-main_track.pause(next_track.switch_fade);
-return true;
-}
-void stop(int fade_ms=0)
-{
-if(!playing) return;
-stopping=true;
-if(@main_track!=null) main_track.stop(fade_ms);
-if(@next_track!=null) next_track.stop(fade_ms);
-}
-bool get_playing() const property
-{
-if(@main_track!=null) return main_track.playing;
-else if(@next_track!=null) return next_track.playing;
-return false;
-}
-void loop(uint64 t)
-{
-if(@main_track!=null) main_track.loop(t);
-if(stopping and !playing)
-{
-stopping=false;
-@main_track=null;
-@next_track=null;
-}
-if(next_play>0 and next_play-t<0 and @next_track!=null)
-{
-music_track@ tmp=@main_track;
-@main_track=@next_track;
-@next_track=@tmp;
-next_play=0;
-}
-if(@next_track!=null and next_play==0 and !next_track.playing)
-@next_track=null;
-}
+class music_manager {
+	music_track@ main_track = null;
+	music_track@ next_track = null;
+	int64 next_play = 0;
+	mixer music_mixer;
+	bool stopping = false;
+	load_music_sound@ load_callback = null;
+	void set_load_callback(load_music_sound@ cb) {
+		@load_callback = @cb;
+	}
+	sound@ load_sound(sound@ s, string filename) {
+		if (@s == null) @s = sound();
+		s.set_mixer(music_mixer);
+		if (@load_callback != null) return load_callback(s, filename);
+		s.load(filename);
+		if (!s.active) return null;
+		return s;
+	}
+	float get_volume() const property {
+		return music_mixer.volume;
+	}
+	void set_volume(float volume) property {
+		music_mixer.volume = volume;
+	}
+	bool set_fx(string fx, int index = -1) {
+		return music_mixer.set_fx(fx, index);
+	}
+	bool play(string track) {
+		stopping = false;
+		if (@main_track == null) {
+			@main_track = music_track(track, this);
+			return true;
+		}
+		@next_track = music_track(track, this);
+		next_play = ticks() + next_track.switch_predelay;
+		if (@main_track != null and main_track.playing)
+			main_track.pause(next_track.switch_fade);
+		return true;
+	}
+	void stop(int fade_ms = 0) {
+		if (!playing) return;
+		stopping = true;
+		if (@main_track != null) main_track.stop(fade_ms);
+		if (@next_track != null) next_track.stop(fade_ms);
+	}
+	bool get_playing() const property {
+		if (@main_track != null) return main_track.playing;
+		else if (@next_track != null) return next_track.playing;
+		return false;
+	}
+	void loop(uint64 t) {
+		if (@main_track != null) main_track.loop(t);
+		if (stopping and !playing) {
+			stopping = false;
+			@main_track = null;
+			@next_track = null;
+		}
+		if (next_play > 0 and next_play - t < 0 and @next_track != null) {
+			music_track@ tmp = @main_track;
+			@main_track = @next_track;
+			@next_track = @tmp;
+			next_play = 0;
+		}
+		if (@next_track != null and next_play == 0 and !next_track.playing)
+			@next_track = null;
+	}
 }

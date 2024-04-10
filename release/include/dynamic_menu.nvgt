@@ -12,489 +12,361 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-class dynamic_menu_item
-{
-string option;
-bool is_filename;
-string name;
+class dynamic_menu_item {
+	string option;
+	bool is_filename;
+	string name;
 
-dynamic_menu_item()
-{
-option="";
-is_filename=true;
-name="";
-}
+	dynamic_menu_item() {
+		option = "";
+		is_filename = true;
+		name = "";
+	}
 }
 
-class dynamic_menu
-{
-bool wrap;
-bool allow_escape;
-bool enable_home_and_end;
+class dynamic_menu {
+	bool wrap;
+	bool allow_escape;
+	bool enable_home_and_end;
 
-dynamic_menu()
-{
-running=false;
-reset(true);
-}
+	dynamic_menu() {
+		running = false;
+		reset(true);
+	}
 
-int add_item(string filename, string name="")
-{
-return add_item_extended(filename, true, name);
-}
+	int add_item(string filename, string name = "") {
+		return add_item_extended(filename, true, name);
+	}
 
-int add_item_tts(string text, string name="")
-{
-return add_item_extended(text, false, name);
-}
+	int add_item_tts(string text, string name = "") {
+		return add_item_extended(text, false, name);
+	}
 
-bool set_speech_mode(int speech_output)
-{
-if((speech_output<0)||(speech_output>4))
-{
-return false;
-}
-this.speech_output=speech_output;
-return true;
-}
+	bool set_speech_mode(int speech_output) {
+		if ((speech_output < 0) || (speech_output > 4))
+			return false;
+		this.speech_output = speech_output;
+		return true;
+	}
 
-int get_item_count()
-{
-return item_list.length();
-}
+	int get_item_count() {
+		return item_list.length();
+	}
 
-int get_position()
-{
-if(running==false)
-{
-return -1;
-}
-return menu_position;
-}
+	int get_position() {
+		if (running == false)
+			return -1;
+		return menu_position;
+	}
 
-bool is_running()
-{
-return running;
-}
+	bool is_running() {
+		return running;
+	}
 
-bool set_tts_object(tts_voice@ handle)
-{
-if(running==true)
-{
-return false;
-}
-@tts_handle=@handle;
-return true;
-}
+	bool set_tts_object(tts_voice@ handle) {
+		if (running == true)
+			return false;
+		@tts_handle = @handle;
+		return true;
+	}
 
-bool set_sound_object(sound@ handle)
-{
-if(running==true)
-{
-return false;
-}
-@sound_handle=@handle;
-return true;
-}
+	bool set_sound_object(sound@ handle) {
+		if (running == true)
+			return false;
+		@sound_handle = @handle;
+		return true;
+	}
 
-bool set_callback(menu_callback@ callback, string user_data)
-{
-if(running==true)
-{
-return false;
-}
-@callback_handle=@callback;
-callback_data=user_data;
-return true;
-}
+	bool set_callback(menu_callback@ callback, string user_data) {
+		if (running == true)
+			return false;
+		@callback_handle = @callback;
+		callback_data = user_data;
+		return true;
+	}
 
-string get_item_name(int menu_item)
-{
-if(menu_item<1 or menu_item>item_list.length())
-{
-return "";
-}
-return item_list[menu_item-1].name;
-}
+	string get_item_name(int menu_item) {
+		if (menu_item<1 or menu_item>item_list.length())
+			return "";
+		return item_list[menu_item - 1].name;
+	}
 
-bool configure_joystick(joystick@ new_stick=null, int ok_button=-1, int cancel_button=-1)
-{
-if(ok_button>-1 && cancel_button==ok_button)
-return false;
-@stick=@new_stick;
-stick_ok=ok_button;
-stick_cancel=cancel_button;
-return true;
-}
+	bool configure_joystick(joystick@ new_stick = null, int ok_button = -1, int cancel_button = -1) {
+		if (ok_button > -1 && cancel_button == ok_button)
+			return false;
+		@stick = @new_stick;
+		stick_ok = ok_button;
+		stick_cancel = cancel_button;
+		return true;
+	}
 
-int run(string intro, bool is_intro_tts)
-{
-return run_extended(intro, is_intro_tts, 0, false);
-}
+	int run(string intro, bool is_intro_tts) {
+		return run_extended(intro, is_intro_tts, 0, false);
+	}
 
-int run_extended(string intro, bool is_intro_tts, int start_position, bool auto_speak_first)
-{
-if(running==true)
-{
-return -1;
-}
-int item_count=item_list.length();
-if(item_count==0)
-{
-return -1;
-}
-if(start_position>item_count)
-{
-return -1;
-}
-menu_position=start_position;
-bool speak_item=false;
-if(start_position<1 && auto_speak_first==true)
-{
-return -1;
-}
-bool initial=auto_speak_first;
-sound@ internal_sound;
-tts_voice@ internal_tts;
-if(@sound_handle==null)
-{
-sound temp_sound;
-@internal_sound=temp_sound;
-}
-else
-{
-@internal_sound=sound_handle;
-}
-bool has_tts_items=is_intro_tts;
-if(has_tts_items==false)
-{
-for(int i=0;i<item_count;i++)
-{
-if(item_list[i].is_filename==false)
-{
-has_tts_items=true;
-break;
-}
-}
-}
-if(speech_output==0 and has_tts_items==true)
-{
-if(@tts_handle==null)
-{
-tts_voice temp_voice;
-@internal_tts=temp_voice;
-}
-else
-{
-@internal_tts=tts_handle;
-}
-}
-int stick_aim=0;
-int stick_last_aim=0;
-if(intro!="")
-{
-if(is_intro_tts==true)
-{
-if(speech_output>0 and speech_output<5)
-{
-if(screen_reader_speak_interrupt(speech_output, intro)==false)
-{
-return -1;
-}
-}
-else
-{
-if(internal_tts.speak_interrupt(intro)==false)
-{
-return -1;
-}
-}
-}
-else
-{
-if(internal_sound.load(intro)==false)
-{
-return -1;
-}
-internal_sound.play();
-}
-}
-running=true;
-while(true)
-{
+	int run_extended(string intro, bool is_intro_tts, int start_position, bool auto_speak_first) {
+		if (running == true)
+			return -1;
+		int item_count = item_list.length();
+		if (item_count == 0)
+			return -1;
+		if (start_position > item_count)
+			return -1;
+		menu_position = start_position;
+		bool speak_item = false;
+		if (start_position < 1 && auto_speak_first == true)
+			return -1;
+		bool initial = auto_speak_first;
+		sound@ internal_sound;
+		tts_voice@ internal_tts;
+		if (@sound_handle == null) {
+			sound temp_sound;
+			@internal_sound = temp_sound;
+		} else
+			@internal_sound = sound_handle;
+		bool has_tts_items = is_intro_tts;
+		if (has_tts_items == false) {
+			for (int i = 0; i < item_count; i++) {
+				if (item_list[i].is_filename == false) {
+					has_tts_items = true;
+					break;
+				}
+			}
+		}
+		if (speech_output == 0 and has_tts_items == true) {
+			if (@tts_handle == null) {
+				tts_voice temp_voice;
+				@internal_tts = temp_voice;
+			} else
+				@internal_tts = tts_handle;
+		}
+		int stick_aim = 0;
+		int stick_last_aim = 0;
+		if (intro != "") {
+			if (is_intro_tts == true) {
+				if (speech_output > 0 and speech_output < 5) {
+					if (screen_reader_speak_interrupt(speech_output, intro) == false)
+						return -1;
+				} else {
+					if (internal_tts.speak_interrupt(intro) == false)
+						return -1;
+				}
+			} else {
+				if (internal_sound.load(intro) == false)
+					return -1;
+				internal_sound.play();
+			}
+		}
+		running = true;
+		while (true) {
 
-// Invoke the user callback.
-if(@callback_handle!=null)
-{
-int callback_result=callback_handle(this, callback_data);
-if(callback_result!=0)
-{
-running=false;
-return callback_result;
-}
-}
+			// Invoke the user callback.
+			if (@callback_handle != null) {
+				int callback_result = callback_handle(this, callback_data);
+				if (callback_result != 0) {
+					running = false;
+					return callback_result;
+				}
+			}
 
-// Check to see if there's an item that needs to be spoken.
-if(speak_item==true)
-{
-if(item_list[menu_position-1].is_filename==true)
-{
-if(@internal_tts!=null)
-{
-internal_tts.stop();
-}
-if(internal_sound.load(item_list[menu_position-1].option)==false)
-{
-running=false;
-return -1;
-}
-internal_sound.play();
-}
-else
-{
-if(internal_sound.active==true)
-{
-internal_sound.close();
-}
-if(speech_output>0 and speech_output<5)
-{
-if(screen_reader_speak_interrupt(speech_output, item_list[menu_position-1].option)==false)
-{
-running=false;
-return -1;
-}
-}
-else
-{
-if(internal_tts.speak_interrupt(item_list[menu_position-1].option)==false)
-{
-running=false;
-return -1;
-}
-}
-}
-speak_item=false;
-}
-if(initial==true)
-{
-bool finished_intro=false;
-if(is_intro_tts==false)
-{
-if(internal_sound.playing==false)
-finished_intro=true;
-}
-else
-{
-if(speech_output>0 and speech_output<5)
-{
-finished_intro=true;
-}
-else
-{
-if(internal_tts.speaking==false)
-finished_intro=true;
-}
-}
+			// Check to see if there's an item that needs to be spoken.
+			if (speak_item == true) {
+				if (item_list[menu_position - 1].is_filename == true) {
+					if (@internal_tts != null)
+						internal_tts.stop();
+					if (internal_sound.load(item_list[menu_position - 1].option) == false) {
+						running = false;
+						return -1;
+					}
+					internal_sound.play();
+				} else {
+					if (internal_sound.active == true)
+						internal_sound.close();
+					if (speech_output > 0 and speech_output < 5) {
+						if (screen_reader_speak_interrupt(speech_output, item_list[menu_position - 1].option) == false) {
+							running = false;
+							return -1;
+						}
+					} else {
+						if (internal_tts.speak_interrupt(item_list[menu_position - 1].option) == false) {
+							running = false;
+							return -1;
+						}
+					}
+				}
+				speak_item = false;
+			}
+			if (initial == true) {
+				bool finished_intro = false;
+				if (is_intro_tts == false) {
+					if (internal_sound.playing == false)
+						finished_intro = true;
+				} else {
+					if (speech_output > 0 and speech_output < 5)
+						finished_intro = true;
+					else {
+						if (internal_tts.speaking == false)
+							finished_intro = true;
+					}
+				}
 
-if(finished_intro==true)
-{
-initial=false;
-if(item_list[menu_position-1].is_filename==true)
-{
-speak_item=true;
-continue;
-}
-else
-{
-if(speech_output>0 and speech_output<5)
-{
-if(screen_reader_speak(speech_output, item_list[menu_position-1].option)==false)
-{
-running=false;
-return -1;
-}
-}
-else
-{
-speak_item=true;
-continue;
-}
-}
-}
-}
+				if (finished_intro == true) {
+					initial = false;
+					if (item_list[menu_position - 1].is_filename == true) {
+						speak_item = true;
+						continue;
+					} else {
+						if (speech_output > 0 and speech_output < 5) {
+							if (screen_reader_speak(speech_output, item_list[menu_position - 1].option) == false) {
+								running = false;
+								return -1;
+							}
+						} else {
+							speak_item = true;
+							continue;
+						}
+					}
+				}
+			}
 
-// Use the act variable for triggering movement up and down, and for choosing ok and cancel.
-bool act=false;
-if(key_pressed(KEY_RETURN))
-act=true;
-if(@stick!=null && stick_ok>=0)
-{
-if(stick.button_pressed(stick_ok))
-act=true;
-}
-if(act)
-{
-if(menu_position!=0)
-{
-running=false;
-return menu_position;
-}
-}
-act=false;
-if(allow_escape==true)
-{
-if(key_pressed(KEY_ESCAPE))
-act=true;
-if(@stick!=null && stick_cancel>=0)
-{
-if(stick.button_pressed(stick_cancel))
-act=true;
-}
-if(act)
-{
-running=false;
-return 0;
-}
-}
-act=false;
+			// Use the act variable for triggering movement up and down, and for choosing ok and cancel.
+			bool act = false;
+			if (key_pressed(KEY_RETURN))
+				act = true;
+			if (@stick != null && stick_ok >= 0) {
+				if (stick.button_pressed(stick_ok))
+					act = true;
+			}
+			if (act) {
+				if (menu_position != 0) {
+					running = false;
+					return menu_position;
+				}
+			}
+			act = false;
+			if (allow_escape == true) {
+				if (key_pressed(KEY_ESCAPE))
+					act = true;
+				if (@stick != null && stick_cancel >= 0) {
+					if (stick.button_pressed(stick_cancel))
+						act = true;
+				}
+				if (act) {
+					running = false;
+					return 0;
+				}
+			}
+			act = false;
 
-// Determine where the joystick is aimed.
-if(@stick!=null)
-{
-if(stick.y<-150)
-stick_aim=1; // Up.
-else if(stick.y>150)
-stick_aim=2; // Down.
-else
-stick_aim=0;
-if(stick_aim==0)
-stick_last_aim=0;
-if(stick_last_aim!=0)
-{
-stick_aim=0;
-}
-else
-{
-stick_last_aim=stick_aim;
-}
-}
-if(key_pressed(KEY_UP) or stick_aim==1)
-{
-initial=false;
-if(menu_position==0)
-{
-menu_position=item_count;
-speak_item=true;
-continue;
-}
-if(menu_position==1)
-{
-if(wrap==true)
-{
-menu_position=item_count;
-speak_item=true;
-continue;
-}
-else
-{
-continue;
-}
-}
-menu_position-=1;
-speak_item=true;
-continue;
-}
-if(key_pressed(KEY_DOWN) or stick_aim==2)
-{
-initial=false;
-if(menu_position==item_count)
-{
-if(wrap==true)
-{
-menu_position=1;
-speak_item=true;
-continue;
-}
-else
-{
-continue;
-}
-}
-menu_position+=1;
-speak_item=true;
-continue;
-}
-if(enable_home_and_end==true)
-{
-if(key_pressed(KEY_HOME))
-{
-initial=false;
-menu_position=1;
-speak_item=true;
-continue;
-}
-if(key_pressed(KEY_END))
-{
-initial=false;
-menu_position=item_count;
-speak_item=true;
-continue;
-}
-}
-wait(5);
-}
-running=false;
-return -1;
-}
+			// Determine where the joystick is aimed.
+			if (@stick != null) {
+				if (stick.y < -150)
+					stick_aim = 1; // Up.
+				else if (stick.y > 150)
+					stick_aim = 2; // Down.
+				else
+					stick_aim = 0;
+				if (stick_aim == 0)
+					stick_last_aim = 0;
+				if (stick_last_aim != 0)
+					stick_aim = 0;
+				else
+					stick_last_aim = stick_aim;
+			}
+			if (key_pressed(KEY_UP) or stick_aim == 1) {
+				initial = false;
+				if (menu_position == 0) {
+					menu_position = item_count;
+					speak_item = true;
+					continue;
+				}
+				if (menu_position == 1) {
+					if (wrap == true) {
+						menu_position = item_count;
+						speak_item = true;
+						continue;
+					} else
+						continue;
+				}
+				menu_position -= 1;
+				speak_item = true;
+				continue;
+			}
+			if (key_pressed(KEY_DOWN) or stick_aim == 2) {
+				initial = false;
+				if (menu_position == item_count) {
+					if (wrap == true) {
+						menu_position = 1;
+						speak_item = true;
+						continue;
+					} else
+						continue;
+				}
+				menu_position += 1;
+				speak_item = true;
+				continue;
+			}
+			if (enable_home_and_end == true) {
+				if (key_pressed(KEY_HOME)) {
+					initial = false;
+					menu_position = 1;
+					speak_item = true;
+					continue;
+				}
+				if (key_pressed(KEY_END)) {
+					initial = false;
+					menu_position = item_count;
+					speak_item = true;
+					continue;
+				}
+			}
+			wait(5);
+		}
+		running = false;
+		return -1;
+	}
 
-bool reset(bool completely)
-{
-if(running==true)
-{
-return false;
-}
-item_list.resize(0);
-if(completely==true)
-{
-wrap=true;
-allow_escape=true;
-enable_home_and_end=false;
-speech_output=0;
-@tts_handle=null;
-@sound_handle=null;
-@callback_handle=null;
-@stick=null;
-}
-return true;
-}
+	bool reset(bool completely) {
+		if (running == true)
+			return false;
+		item_list.resize(0);
+		if (completely == true) {
+			wrap = true;
+			allow_escape = true;
+			enable_home_and_end = false;
+			speech_output = 0;
+			@tts_handle = null;
+			@sound_handle = null;
+			@callback_handle = null;
+			@stick = null;
+		}
+		return true;
+	}
 
-// The following is private content and should not be modified from the outside.
+	// The following is private content and should not be modified from the outside.
 
-tts_voice@ tts_handle;
-sound@ sound_handle;
-int speech_output;
-menu_callback@ callback_handle;
-string callback_data;
-bool running;
-int menu_position;
-dynamic_menu_item[] item_list;
-joystick@ stick;
-int stick_ok;
-int stick_cancel;
+	tts_voice@ tts_handle;
+	sound@ sound_handle;
+	int speech_output;
+	menu_callback@ callback_handle;
+	string callback_data;
+	bool running;
+	int menu_position;
+	dynamic_menu_item[] item_list;
+	joystick@ stick;
+	int stick_ok;
+	int stick_cancel;
 
-int add_item_extended(string filename, bool is_filename, string name="")
-{
-if(running==true)
-{
-return -1;
-}
-int new_index=item_list.length();
-item_list.resize(new_index+1);
-item_list[new_index].option=filename;
-item_list[new_index].is_filename=is_filename;
-item_list[new_index].name=name;
-return new_index+1;
-}
+	int add_item_extended(string filename, bool is_filename, string name = "") {
+		if (running == true)
+			return -1;
+		int new_index = item_list.length();
+		item_list.resize(new_index + 1);
+		item_list[new_index].option = filename;
+		item_list[new_index].is_filename = is_filename;
+		item_list[new_index].name = name;
+		return new_index + 1;
+	}
 
 }
 

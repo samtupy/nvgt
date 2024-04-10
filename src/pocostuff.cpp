@@ -18,32 +18,32 @@
 #include <obfuscate.h>
 #include <scriptarray.h>
 // Poco includes:
-	#include <Poco/Base32Decoder.h>
-	#include <Poco/Base32Encoder.h>
-	#include <Poco/Base64Decoder.h>
-	#include <Poco/Base64Encoder.h>
-	#include <Poco/Dynamic/Var.h>
-	#include <Poco/Debugger.h>
-	#include <Poco/Environment.h>
-	#include <Poco/Format.h>
-	#include <Poco/Glob.h>
-	#include <Poco/HexBinaryDecoder.h>
-	#include <Poco/HexBinaryEncoder.h>
-	#include <Poco/JSON/Array.h>
-	#include <Poco/JSON/Object.h>
-	#include <Poco/JSON/Parser.h>
-	#include <Poco/JSON/Query.h>
-	#include <Poco/Path.h>
-	#include <Poco/RefCountedObject.h>
-	#include <Poco/RegularExpression.h>
-	#include <Poco/SharedPtr.h>
-	#include <Poco/String.h>
-	#include <Poco/TextConverter.h>
-	#include <Poco/TextEncoding.h>
-	#include <Poco/TextIterator.h>
-	#include <Poco/Unicode.h>
-	#include <Poco/UTF8Encoding.h>
-	#include <Poco/UTF8String.h>
+#include <Poco/Base32Decoder.h>
+#include <Poco/Base32Encoder.h>
+#include <Poco/Base64Decoder.h>
+#include <Poco/Base64Encoder.h>
+#include <Poco/Dynamic/Var.h>
+#include <Poco/Debugger.h>
+#include <Poco/Environment.h>
+#include <Poco/Format.h>
+#include <Poco/Glob.h>
+#include <Poco/HexBinaryDecoder.h>
+#include <Poco/HexBinaryEncoder.h>
+#include <Poco/JSON/Array.h>
+#include <Poco/JSON/Object.h>
+#include <Poco/JSON/Parser.h>
+#include <Poco/JSON/Query.h>
+#include <Poco/Path.h>
+#include <Poco/RefCountedObject.h>
+#include <Poco/RegularExpression.h>
+#include <Poco/SharedPtr.h>
+#include <Poco/String.h>
+#include <Poco/TextConverter.h>
+#include <Poco/TextEncoding.h>
+#include <Poco/TextIterator.h>
+#include <Poco/Unicode.h>
+#include <Poco/UTF8Encoding.h>
+#include <Poco/UTF8String.h>
 #include "datastreams.h"
 #include "nvgt.h" // subsystem constants
 #include "pocostuff.h"
@@ -63,156 +63,256 @@ std::string string_to_hex(const std::string& str) {
 	std::ostringstream ostr;
 	HexBinaryEncoder enc(ostr);
 	enc.rdbuf()->setLineLength(0);
-	enc<<str;
+	enc << str;
 	enc.close();
 	return ostr.str();
 }
 std::string hex_to_string(const std::string& str) {
-	if(str.size()<2) return "";
+	if (str.size() < 2) return "";
 	std::istringstream istr(str);
-	istr>>std::noskipws;
+	istr >> std::noskipws;
 	HexBinaryDecoder dec(istr);
 	std::string output;
-	output.reserve(str.size()/2);
+	output.reserve(str.size() / 2);
 	char c;
-	while(dec.get(c)) { output+=c; }
+	while (dec.get(c))
+		output += c;
 	return output;
 }
 std::string base64_encode(const std::string& str, int options) {
 	std::ostringstream ostr;
 	Base64Encoder enc(ostr, options);
 	enc.rdbuf()->setLineLength(0);
-	enc<<str;
+	enc << str;
 	enc.close();
 	return ostr.str();
 }
 std::string base64_decode(const std::string& str, int options) {
-	if(str.size()<2) return "";
+	if (str.size() < 2) return "";
 	std::istringstream istr(str);
-	istr>>std::noskipws;
+	istr >> std::noskipws;
 	Poco::Base64Decoder dec(istr, options);
 	std::string output;
-	output.reserve(str.size()/3);
+	output.reserve(str.size() / 3);
 	char c;
-	while(dec.get(c)) { output+=c; }
+	while (dec.get(c))
+		output += c;
 	return output;
 }
 std::string base32_encode(const std::string& str) {
 	std::ostringstream ostr;
 	Poco::Base32Encoder enc(ostr);
-	enc<<str;
+	enc << str;
 	enc.close();
 	return ostr.str();
 }
 std::string base32_decode(const std::string& str) {
-	if(str.size()<2) return "";
+	if (str.size() < 2) return "";
 	std::istringstream istr(str);
-	istr>>std::noskipws;
+	istr >> std::noskipws;
 	Base32Decoder dec(istr);
 	std::string output;
-	output.reserve(str.size()/3);
+	output.reserve(str.size() / 3);
 	char c;
-	while(dec.get(c)) { output+=c; }
+	while (dec.get(c))
+		output += c;
 	return output;
 }
 std::string string_recode(const std::string& text, const std::string& in_encoding, const std::string& out_encoding, int* errors) {
 	try {
 		TextConverter tc(TextEncoding::byName(in_encoding), TextEncoding::byName(out_encoding));
 		std::string output;
-		int ret=tc.convert(text, output);
-		if(errors) *errors=ret;
+		int ret = tc.convert(text, output);
+		if (errors) *errors = ret;
 		return output;
-	} catch(Poco::Exception) {
-		if(errors) *errors=-1;
+	} catch (Poco::Exception) {
+		if (errors) *errors = -1;
 		return "";
 	}
 }
 
 // Even more generic string manipulation routines, these used to be in a modified scriptstring_utils addon but now are here because we are taking advantage of Poco's UTF8 support.
 static UTF8Encoding g_UTF8;
-bool character_is_alphanum(int ch) { return Unicode::isAlpha(ch) || Unicode::isDigit(ch); }
+bool character_is_alphanum(int ch) {
+	return Unicode::isAlpha(ch) || Unicode::isDigit(ch);
+}
 bool string_is(std::string* str, const std::string& encoding, bool(x(int))) {
-	if(str->size() < 1) return false;
+	if (str->size() < 1) return false;
 	TextEncoding& enc = g_UTF8;
 	try {
-	if(encoding != "") enc = TextEncoding::byName(encoding);
-	} catch(...) { return false; }	
+		if (encoding != "") enc = TextEncoding::byName(encoding);
+	} catch (...) {
+		return false;
+	}
 	TextIterator it(*str, enc);
 	TextIterator end(*str);
-	while(it != end) {
-		if(!x(*it)) return false;
+	while (it != end) {
+		if (!x(*it)) return false;
 		++it;
 	}
 	return true;
 }
 std::string string_reverse(std::string* str, const std::string& encoding) {
-	if(str->size() < 1) return *str;
+	if (str->size() < 1) return *str;
 	TextEncoding& enc = g_UTF8;
 	try {
-	if(encoding != "") enc = TextEncoding::byName(encoding);
-	} catch(...) { return *str; }	
+		if (encoding != "") enc = TextEncoding::byName(encoding);
+	} catch (...) {
+		return *str;
+	}
 	TextIterator it(*str, enc);
 	TextIterator end(*str);
 	std::string result(str->size(), '\0'); // Cannot initialize a string to a certain size with uninitialized memory.
 	int wpos = str->size();
 	unsigned char character[4];
-	while(it != end && wpos > 0) {
+	while (it != end && wpos > 0) {
 		int c = enc.convert(*it, character, 4);
-		if(!c) {
-			character[0]='?';
+		if (!c) {
+			character[0] = '?';
 			c = 1;
 		}
 		wpos -= c;
 		memcpy(&result[wpos], &character, c); // I don't know if this is the best way, is there an stl function for this?
 		++it;
 	}
-	if(wpos > 0) result.erase(0, wpos);
+	if (wpos > 0) result.erase(0, wpos);
 	return result;
 }
-bool string_is_lower(std::string* str, const std::string& encoding) { return string_is(str, encoding, Unicode::isLower); }
-bool string_is_upper(std::string* str, const std::string& encoding) { return string_is(str, encoding, Unicode::isUpper); }
-bool string_is_punct(std::string* str, const std::string& encoding) { return string_is(str, encoding, Unicode::isPunct); }
-bool string_is_alpha(std::string* str, const std::string& encoding) { return string_is(str, encoding, Unicode::isAlpha); }
-bool string_is_digits(std::string* str, const std::string& encoding) { return string_is(str, encoding, Unicode::isDigit); }
-bool string_is_alphanum(std::string* str, const std::string& encoding) { return string_is(str, encoding, character_is_alphanum); }
-std::string string_upper(std::string* str) { return UTF8::toUpper(*str); }
-std::string& string_upper_this(std::string* str) { return UTF8::toUpperInPlace(*str); }
-std::string string_lower(std::string* str) { return UTF8::toLower(*str); }
-std::string& string_lower_this(std::string* str) { return UTF8::toLowerInPlace(*str); }
-void string_remove_BOM(std::string* str) { UTF8::removeBOM(*str); }
-std::string string_escape(std::string* str, bool strict_json) { return UTF8::escape(*str, strict_json); }
-std::string string_unescape(std::string* str) { return UTF8::escape(*str); }
-std::string string_trim_whitespace_left(std::string* str) { return trimLeft<std::string>(*str); }
-std::string& string_trim_whitespace_left_this(std::string* str) { return trimLeftInPlace<std::string>(*str); }
-std::string string_trim_whitespace_right(std::string* str) { return trimRight<std::string>(*str); }
-std::string& string_trim_whitespace_right_this(std::string* str) { return trimRightInPlace<std::string>(*str); }
-std::string string_trim_whitespace(std::string* str) { return trim<std::string>(*str); }
-std::string& string_trim_whitespace_this(std::string* str) { return trimInPlace<std::string>(*str); }
-std::string string_replace_characters(std::string* str, const std::string& from, const std::string& to) { return translate<std::string>(*str, from, to); }
-std::string& string_replace_characters_this(std::string* str, const std::string& from, const std::string& to) { return translateInPlace<std::string>(*str, from, to); }
-bool string_starts_with(std::string* str, const std::string& value) { return startsWith<std::string>(*str, value); }
-bool string_ends_with(std::string* str, const std::string& value) { return endsWith<std::string>(*str, value); }
+bool string_is_lower(std::string* str, const std::string& encoding) {
+	return string_is(str, encoding, Unicode::isLower);
+}
+bool string_is_upper(std::string* str, const std::string& encoding) {
+	return string_is(str, encoding, Unicode::isUpper);
+}
+bool string_is_punct(std::string* str, const std::string& encoding) {
+	return string_is(str, encoding, Unicode::isPunct);
+}
+bool string_is_alpha(std::string* str, const std::string& encoding) {
+	return string_is(str, encoding, Unicode::isAlpha);
+}
+bool string_is_digits(std::string* str, const std::string& encoding) {
+	return string_is(str, encoding, Unicode::isDigit);
+}
+bool string_is_alphanum(std::string* str, const std::string& encoding) {
+	return string_is(str, encoding, character_is_alphanum);
+}
+std::string string_upper(std::string* str) {
+	return UTF8::toUpper(*str);
+}
+std::string& string_upper_this(std::string* str) {
+	return UTF8::toUpperInPlace(*str);
+}
+std::string string_lower(std::string* str) {
+	return UTF8::toLower(*str);
+}
+std::string& string_lower_this(std::string* str) {
+	return UTF8::toLowerInPlace(*str);
+}
+void string_remove_BOM(std::string* str) {
+	UTF8::removeBOM(*str);
+}
+std::string string_escape(std::string* str, bool strict_json) {
+	return UTF8::escape(*str, strict_json);
+}
+std::string string_unescape(std::string* str) {
+	return UTF8::escape(*str);
+}
+std::string string_trim_whitespace_left(std::string* str) {
+	return trimLeft<std::string>(*str);
+}
+std::string& string_trim_whitespace_left_this(std::string* str) {
+	return trimLeftInPlace<std::string>(*str);
+}
+std::string string_trim_whitespace_right(std::string* str) {
+	return trimRight<std::string>(*str);
+}
+std::string& string_trim_whitespace_right_this(std::string* str) {
+	return trimRightInPlace<std::string>(*str);
+}
+std::string string_trim_whitespace(std::string* str) {
+	return trim<std::string>(*str);
+}
+std::string& string_trim_whitespace_this(std::string* str) {
+	return trimInPlace<std::string>(*str);
+}
+std::string string_replace_characters(std::string* str, const std::string& from, const std::string& to) {
+	return translate<std::string>(*str, from, to);
+}
+std::string& string_replace_characters_this(std::string* str, const std::string& from, const std::string& to) {
+	return translateInPlace<std::string>(*str, from, to);
+}
+bool string_starts_with(std::string* str, const std::string& value) {
+	return startsWith<std::string>(*str, value);
+}
+bool string_ends_with(std::string* str, const std::string& value) {
+	return endsWith<std::string>(*str, value);
+}
 
 
 // Function wrappers for poco var, since we can't register overloaded functions within a class using composition in Angelscript. Sorry, this as well as the below angelscript registration just sucks and I'm not currently clever enough to combine templates and macros to get around all of the horror. Part of me wonders if I should have registered var as a value type or something, but I wish for handles to be supported!
-poco_shared<Dynamic::Var>* poco_var_assign_var(poco_shared<Dynamic::Var>* var, const poco_shared<Dynamic::Var>& val) { (*var->ptr)=*val.shared; return var; }
-template<typename T> poco_shared<Dynamic::Var>* poco_var_assign(poco_shared<Dynamic::Var>* var, const T& val) { var->ptr->operator=<T>(val); return var; }
-template<typename T> poco_shared<Dynamic::Var>* poco_var_assign_shared(poco_shared<Dynamic::Var>* var, poco_shared<T>* val) { var->ptr->operator=(val->shared); return var; }
-template<typename T> T poco_var_extract(poco_shared<Dynamic::Var>* var) { return var->ptr->convert<T>(); }
-template<typename T> poco_shared<T>* poco_var_extract_shared(poco_shared<Dynamic::Var>* var) { try { return new poco_shared<T>(var->ptr->extract<SharedPtr<T>>()); } catch(...) { return NULL; } }
-template<typename T> T poco_var_add_assign(poco_shared<Dynamic::Var>* var, const T& val) { var->ptr->operator+=<T>(val); return var->ptr->convert<T>(); }
-template<typename T> T poco_var_add(poco_shared<Dynamic::Var>* var, const T& val) { return var->ptr->template operator+<T>(val).template convert<T>(); }
-template<typename T> T poco_var_add_r(poco_shared<Dynamic::Var>* var, const T& val) { return val+var->ptr->template convert<T>(); }
-template<typename T> T poco_var_sub_assign(poco_shared<Dynamic::Var>* var, const T& val) { var->ptr->template operator-=<T>(val); return var->ptr->template convert<T>(); }
-template<typename T> T poco_var_sub(poco_shared<Dynamic::Var>* var, const T& val) { return var->ptr->template operator-<T>(val).template convert<T>(); }
-template<typename T> T poco_var_mul_assign(poco_shared<Dynamic::Var>* var, const T& val) { var->ptr->template operator*=<T>(val); return var->ptr->template convert<T>(); }
-template<typename T> T poco_var_mul(poco_shared<Dynamic::Var>* var, const T& val) { return var->ptr->template operator*<T>(val).template convert<T>(); }
-template<typename T> T poco_var_div_assign(poco_shared<Dynamic::Var>* var, const T& val) { var->ptr->template operator/=<T>(val); return var->ptr->template convert<T>(); }
-template<typename T> T poco_var_div(poco_shared<Dynamic::Var>* var, const T& val) { return var->ptr->template operator/<T>(val).template convert<T>(); }
+poco_shared<Dynamic::Var>* poco_var_assign_var(poco_shared<Dynamic::Var>* var, const poco_shared<Dynamic::Var>& val) {
+	(*var->ptr) = *val.shared;
+	return var;
+}
+template<typename T> poco_shared<Dynamic::Var>* poco_var_assign(poco_shared<Dynamic::Var>* var, const T& val) {
+	var->ptr->operator=<T>(val);
+	return var;
+}
+template<typename T> poco_shared<Dynamic::Var>* poco_var_assign_shared(poco_shared<Dynamic::Var>* var, poco_shared<T>* val) {
+	var->ptr->operator=(val->shared);
+	return var;
+}
+template<typename T> T poco_var_extract(poco_shared<Dynamic::Var>* var) {
+	return var->ptr->convert<T>();
+}
+template<typename T> poco_shared<T>* poco_var_extract_shared(poco_shared<Dynamic::Var>* var) {
+	try {
+		return new poco_shared<T>(var->ptr->extract<SharedPtr<T>>());
+	} catch (...) {
+		return NULL;
+	}
+}
+template<typename T> T poco_var_add_assign(poco_shared<Dynamic::Var>* var, const T& val) {
+	var->ptr->operator+=<T>(val);
+	return var->ptr->convert<T>();
+}
+template<typename T> T poco_var_add(poco_shared<Dynamic::Var>* var, const T& val) {
+	return var->ptr->template operator+<T>(val).template convert<T>();
+}
+template<typename T> T poco_var_add_r(poco_shared<Dynamic::Var>* var, const T& val) {
+	return val + var->ptr->template convert<T>();
+}
+template<typename T> T poco_var_sub_assign(poco_shared<Dynamic::Var>* var, const T& val) {
+	var->ptr->template operator-=<T>(val);
+	return var->ptr->template convert<T>();
+}
+template<typename T> T poco_var_sub(poco_shared<Dynamic::Var>* var, const T& val) {
+	return var->ptr->template operator-<T>(val).template convert<T>();
+}
+template<typename T> T poco_var_mul_assign(poco_shared<Dynamic::Var>* var, const T& val) {
+	var->ptr->template operator*=<T>(val);
+	return var->ptr->template convert<T>();
+}
+template<typename T> T poco_var_mul(poco_shared<Dynamic::Var>* var, const T& val) {
+	return var->ptr->template operator*<T>(val).template convert<T>();
+}
+template<typename T> T poco_var_div_assign(poco_shared<Dynamic::Var>* var, const T& val) {
+	var->ptr->template operator/=<T>(val);
+	return var->ptr->template convert<T>();
+}
+template<typename T> T poco_var_div(poco_shared<Dynamic::Var>* var, const T& val) {
+	return var->ptr->template operator/<T>(val).template convert<T>();
+}
 // Special opAssign, opAdd and opAddAssign operator overloads for string, so one can do "str"+var etc.
-std::string poco_var_add_string(std::string* var, const poco_shared<Dynamic::Var>& val) { return (*var)+val.ptr->convert<std::string>(); }
-std::string& poco_var_assign_string(std::string* var, const poco_shared<Dynamic::Var>& val) { return (*var)=val.ptr->convert<std::string>(); }
-std::string& poco_var_add_assign_string(std::string* var, const poco_shared<Dynamic::Var>& val) { return (*var)+=val.ptr->convert<std::string>(); }
+std::string poco_var_add_string(std::string* var, const poco_shared<Dynamic::Var>& val) {
+	return (*var) + val.ptr->convert<std::string>();
+}
+std::string& poco_var_assign_string(std::string* var, const poco_shared<Dynamic::Var>& val) {
+	return (*var) = val.ptr->convert<std::string>();
+}
+std::string& poco_var_add_assign_string(std::string* var, const poco_shared<Dynamic::Var>& val) {
+	return (*var) += val.ptr->convert<std::string>();
+}
 
 // Poco encapsolates json parsing in an object. If this turns out to be too slow, use tls/global objects or something.
 poco_shared<Dynamic::Var>* json_parse(const std::string& input) {
@@ -221,7 +321,7 @@ poco_shared<Dynamic::Var>* json_parse(const std::string& input) {
 }
 poco_shared<Dynamic::Var>* json_parse_datastream(datastream* input) {
 	std::istream* istr = input->get_istr();
-	if(!istr) throw InvalidArgumentException("parse_json got a bad datastream");
+	if (!istr) throw InvalidArgumentException("parse_json got a bad datastream");
 	JSON::Parser parser;
 	return new poco_shared<Dynamic::Var>(new Dynamic::Var(parser.parse(*istr)));
 }
@@ -239,9 +339,15 @@ public:
 	void set(const std::string& key, poco_shared<Dynamic::Var>* v) {
 		ptr->set(key, *v->ptr);
 	}
-	bool is_array(const std::string& key) { return ptr->isArray(key); }
-	bool is_null(const std::string& key) { return ptr->isNull(key); }
-	bool is_object(const std::string& key) { return ptr->isObject(key); }
+	bool is_array(const std::string& key) {
+		return ptr->isArray(key);
+	}
+	bool is_null(const std::string& key) {
+		return ptr->isNull(key);
+	}
+	bool is_object(const std::string& key) {
+		return ptr->isObject(key);
+	}
 	std::string stringify(unsigned int indent = 0, int step = -1) {
 		std::ostringstream ostr;
 		ptr->stringify(ostr, indent, step);
@@ -253,7 +359,7 @@ public:
 		asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
 		CScriptArray* array = CScriptArray::Create(arrayType, ptr->size());
 		int c = 0;
-		for(JSON::Object::ConstIterator i = ptr->begin(); i !=ptr->end(); i++, c++) ((std::string*)(array->At(c)))->assign(i->first);
+		for (JSON::Object::ConstIterator i = ptr->begin(); i != ptr->end(); i++, c++)((std::string*)(array->At(c)))->assign(i->first);
 		return array;
 	}
 };
@@ -273,9 +379,15 @@ public:
 	void add(poco_shared<Dynamic::Var>* v) {
 		ptr->add(*v->ptr);
 	}
-	bool is_array(unsigned int index) { return ptr->isArray(index); }
-	bool is_null(unsigned int index) { return ptr->isNull(index); }
-	bool is_object(unsigned int index) { return ptr->isObject(index); }
+	bool is_array(unsigned int index) {
+		return ptr->isArray(index);
+	}
+	bool is_null(unsigned int index) {
+		return ptr->isNull(index);
+	}
+	bool is_object(unsigned int index) {
+		return ptr->isObject(index);
+	}
 	std::string stringify(unsigned int indent = 0, int step = -1) {
 		std::ostringstream ostr;
 		ptr->stringify(ostr, indent, step);
@@ -288,40 +400,56 @@ static asITypeInfo* StringArrayType = NULL;
 std::string poco_regular_expression_extract(RegularExpression* exp, const std::string& subject, std::string::size_type offset, int options) {
 	std::string str;
 	try {
-		if(!exp->extract(subject, offset, str, options)) return "";
-	} catch(RegularExpressionException& e) { return ""; }
+		if (!exp->extract(subject, offset, str, options)) return "";
+	} catch (RegularExpressionException& e) {
+		return "";
+	}
 	return str;
 }
-std::string poco_regular_expression_extract(RegularExpression* exp, const std::string& subject, std::string::size_type offset) { return poco_regular_expression_extract(exp, subject, offset, 0); }
+std::string poco_regular_expression_extract(RegularExpression* exp, const std::string& subject, std::string::size_type offset) {
+	return poco_regular_expression_extract(exp, subject, offset, 0);
+}
 int poco_regular_expression_subst(RegularExpression* exp, std::string& subject, std::string::size_type offset, const std::string& replacement, int options) {
 	try {
 		return exp->subst(subject, offset, replacement, options);
-	} catch(RegularExpressionException& e) { return -1; }
+	} catch (RegularExpressionException& e) {
+		return -1;
+	}
 }
-int poco_regular_expression_subst(RegularExpression* exp, std::string& subject, const std::string& replacement, int options) { return poco_regular_expression_subst(exp, subject, 0, replacement, options); }
+int poco_regular_expression_subst(RegularExpression* exp, std::string& subject, const std::string& replacement, int options) {
+	return poco_regular_expression_subst(exp, subject, 0, replacement, options);
+}
 CScriptArray* poco_regular_expression_split(RegularExpression* exp, const std::string& subject, std::string::size_type offset, int options) {
-	if(!StringArrayType) StringArrayType = g_ScriptEngine->GetTypeInfoByDecl("array<string>");
+	if (!StringArrayType) StringArrayType = g_ScriptEngine->GetTypeInfoByDecl("array<string>");
 	CScriptArray* array = CScriptArray::Create(StringArrayType);
 	std::vector<std::string> strings;
 	try {
-		if(!exp->split(subject, offset, strings, options)) return array;
-	} catch(RegularExpressionException& e) { return array; }
+		if (!exp->split(subject, offset, strings, options)) return array;
+	} catch (RegularExpressionException& e) {
+		return array;
+	}
 	array->Resize(strings.size());
-	for(int i = 0; i < strings.size(); i++) (*(std::string*)array->At(i)) = strings[i];
+	for (int i = 0; i < strings.size(); i++)(*(std::string*)array->At(i)) = strings[i];
 	return array;
 }
-CScriptArray* poco_regular_expression_split(RegularExpression* exp, const std::string& subject, std::string::size_type offset) { return poco_regular_expression_split(exp, subject, offset, 0); }
+CScriptArray* poco_regular_expression_split(RegularExpression* exp, const std::string& subject, std::string::size_type offset) {
+	return poco_regular_expression_split(exp, subject, offset, 0);
+}
 bool poco_regular_expression_match(const std::string& subject, const std::string& pattern, int options) {
 	try {
 		return RegularExpression::match(subject, pattern, options);
-	} catch(RegularExpressionException) { return false; }
+	} catch (RegularExpressionException) {
+		return false;
+	}
 }
 bool poco_regular_expression_search(const std::string& subject, const std::string& pattern, int options) {
 	try {
 		RegularExpression re(pattern, options);
 		RegularExpression::Match tmp;
 		return re.match(subject, tmp, 0) > 0;
-	} catch(RegularExpressionException) { return false; }
+	} catch (RegularExpressionException) {
+		return false;
+	}
 }
 std::string poco_regular_expression_replace(const std::string& subject, const std::string& pattern, const std::string& replacement, int options) {
 	try {
@@ -329,28 +457,58 @@ std::string poco_regular_expression_replace(const std::string& subject, const st
 		RegularExpression re(pattern, RegularExpression::RE_UTF8 | options);
 		re.subst(ret, replacement, RegularExpression::RE_GLOBAL);
 		return ret;
-	} catch(RegularExpressionException) { return ""; }
+	} catch (RegularExpressionException) {
+		return "";
+	}
 }
 
 // ref factories
-poco_shared<Dynamic::Var>* poco_var_factory() { return new poco_shared<Dynamic::Var>(new Dynamic::Var()); }
-template<typename T> poco_shared<Dynamic::Var>* poco_var_factory_value(const T& value) { return new poco_shared<Dynamic::Var>(new Dynamic::Var(value)); }
-template<typename T> poco_shared<Dynamic::Var>* poco_var_factory_value_shared(poco_shared<T>* value) { return new poco_shared<Dynamic::Var>(new Dynamic::Var(value->shared)); }
-poco_json_object* poco_json_object_factory() { return new poco_json_object(new JSON::Object()); }
-poco_json_array* poco_json_array_factory() { return new poco_json_array(new JSON::Array()); }
+poco_shared<Dynamic::Var>* poco_var_factory() {
+	return new poco_shared<Dynamic::Var>(new Dynamic::Var());
+}
+template<typename T> poco_shared<Dynamic::Var>* poco_var_factory_value(const T& value) {
+	return new poco_shared<Dynamic::Var>(new Dynamic::Var(value));
+}
+template<typename T> poco_shared<Dynamic::Var>* poco_var_factory_value_shared(poco_shared<T>* value) {
+	return new poco_shared<Dynamic::Var>(new Dynamic::Var(value->shared));
+}
+poco_json_object* poco_json_object_factory() {
+	return new poco_json_object(new JSON::Object());
+}
+poco_json_array* poco_json_array_factory() {
+	return new poco_json_array(new JSON::Array());
+}
 // value constructors and destructors
-void poco_regular_expression_construct(RegularExpression* mem, const std::string& pattern, int options) { new(mem) RegularExpression(pattern, options); }
-void poco_path_construct(Path* mem) { new(mem) Path(); }
-void poco_path_construct(Path* mem, bool absolute) { new(mem) Path(absolute); }
-void poco_path_construct(Path* mem, const std::string& path) { new(mem) Path(path); }
-void poco_path_construct(Path* mem, const std::string& path, int style) { new(mem) Path(path, style); }
-void poco_path_construct(Path* mem, const Path& path) { new(mem) Path(path); }
-void poco_path_construct(Path* mem, const Path& parent, const std::string& filename) { new(mem) Path(parent, filename); }
-void poco_path_construct(Path* mem, const Path& parent, const Path& relative) { new(mem) Path(parent, relative); }
-template <class T> void poco_value_destruct(T* mem) { mem->~T(); }
+void poco_regular_expression_construct(RegularExpression* mem, const std::string& pattern, int options) {
+	new (mem) RegularExpression(pattern, options);
+}
+void poco_path_construct(Path* mem) {
+	new (mem) Path();
+}
+void poco_path_construct(Path* mem, bool absolute) {
+	new (mem) Path(absolute);
+}
+void poco_path_construct(Path* mem, const std::string& path) {
+	new (mem) Path(path);
+}
+void poco_path_construct(Path* mem, const std::string& path, int style) {
+	new (mem) Path(path, style);
+}
+void poco_path_construct(Path* mem, const Path& path) {
+	new (mem) Path(path);
+}
+void poco_path_construct(Path* mem, const Path& parent, const std::string& filename) {
+	new (mem) Path(parent, filename);
+}
+void poco_path_construct(Path* mem, const Path& parent, const Path& relative) {
+	new (mem) Path(parent, relative);
+}
+template <class T> void poco_value_destruct(T* mem) {
+	mem->~T();
+}
 
 // Template wrapper function to make the registration of types with Dynamic::Var easier.
-template<typename T, bool is_string=false> void RegisterPocoVarType(asIScriptEngine* engine, const std::string& type) {
+template<typename T, bool is_string = false> void RegisterPocoVarType(asIScriptEngine* engine, const std::string& type) {
 	engine->RegisterObjectBehaviour("var", asBEHAVE_FACTORY, format("var@ v(const %s&in)", type).c_str(), asFUNCTION(poco_var_factory_value<T>), asCALL_CDECL);
 	engine->RegisterObjectMethod("var", format("var& opAssign(const %s&in)", type).c_str(), asFUNCTION(poco_var_assign<T>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("var", format("%s opAddAssign(const %s&in)", type, type).c_str(), asFUNCTION(poco_var_add_assign<T>), asCALL_CDECL_OBJFIRST);

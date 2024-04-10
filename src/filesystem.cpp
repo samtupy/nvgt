@@ -13,18 +13,18 @@
 
 #include <string>
 #if defined(_WIN32)
-#include <direct.h> // _getcwd
-#include <Windows.h> // FindFirstFile, GetFileAttributes
-#include <shlwapi.h>
+	#include <direct.h> // _getcwd
+	#include <Windows.h> // FindFirstFile, GetFileAttributes
+	#include <shlwapi.h>
 
-#undef DeleteFile
-#undef CopyFile
+	#undef DeleteFile
+	#undef CopyFile
 
 #else
-#include <unistd.h> // getcwd
-#include <dirent.h> // opendir, readdir, closedir
-#include <fnmatch.h> // fnmatch
-#include <sys/stat.h> // stat
+	#include <unistd.h> // getcwd
+	#include <dirent.h> // opendir, readdir, closedir
+	#include <fnmatch.h> // fnmatch
+	#include <sys/stat.h> // stat
 #endif
 #include <assert.h> // assert
 #include <angelscript.h>
@@ -40,7 +40,7 @@ using namespace std;
 bool FileHardLink(const std::string& source, const std::string& target) {
 	try {
 		Poco::File(source).linkTo(target, Poco::File::LINK_HARD);
-	} catch(Poco::Exception) {
+	} catch (Poco::Exception) {
 		return false;
 	}
 	/*try
@@ -68,15 +68,15 @@ int FileHardLinkCount(const std::string& path) {
 
 CScriptArray* FindFiles(const string& path) {
 	// Obtain a pointer to the engine
-	asIScriptContext *ctx = asGetActiveContext();
-	asIScriptEngine *engine = ctx->GetEngine();
+	asIScriptContext* ctx = asGetActiveContext();
+	asIScriptEngine* engine = ctx->GetEngine();
 
 	// TODO: This should only be done once
 	// TODO: This assumes that CScriptArray was already registered
-	asITypeInfo *arrayType = engine->GetTypeInfoByDecl("array<string>");
+	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
 
 	// Create the array object
-	CScriptArray *array = CScriptArray::Create(arrayType);
+	CScriptArray* array = CScriptArray::Create(arrayType);
 
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
@@ -85,12 +85,12 @@ CScriptArray* FindFiles(const string& path) {
 
 	WIN32_FIND_DATAW ffd;
 	HANDLE hFind = FindFirstFileW(bufUTF16, &ffd);
-	if( INVALID_HANDLE_VALUE == hFind )
+	if (INVALID_HANDLE_VALUE == hFind)
 		return array;
 
 	do {
 		// Skip directories
-		if( (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) )
+		if ((ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
 			continue;
 
 		// Convert the file name back to UTF8
@@ -98,45 +98,45 @@ CScriptArray* FindFiles(const string& path) {
 		WideCharToMultiByte(CP_UTF8, 0, ffd.cFileName, -1, bufUTF8, 1024, 0, 0);
 
 		// Add the file to the array
-		array->Resize(array->GetSize()+1);
-		((string*)(array->At(array->GetSize()-1)))->assign(bufUTF8);
-	} while( FindNextFileW(hFind, &ffd) != 0 );
+		array->Resize(array->GetSize() + 1);
+		((string*)(array->At(array->GetSize() - 1)))->assign(bufUTF8);
+	} while (FindNextFileW(hFind, &ffd) != 0);
 
 	FindClose(hFind);
 	#else
-	int wildcard=path.rfind("/");
-	if(wildcard==std::string::npos) wildcard=path.rfind("\\");
-	string currentPath=path;
-	string Wildcard="*";
-	if(wildcard!=std::string::npos) {
-		currentPath=path.substr(0, wildcard);
-		Wildcard=path.substr(wildcard+1);
+	int wildcard = path.rfind("/");
+	if (wildcard == std::string::npos) wildcard = path.rfind("\\");
+	string currentPath = path;
+	string Wildcard = "*";
+	if (wildcard != std::string::npos) {
+		currentPath = path.substr(0, wildcard);
+		Wildcard = path.substr(wildcard + 1);
 	}
-	dirent *ent = 0;
-	DIR *dir = opendir(currentPath.c_str());
-	if(!dir) return array;
-	while( (ent = readdir(dir)) != NULL ) {
+	dirent* ent = 0;
+	DIR* dir = opendir(currentPath.c_str());
+	if (!dir) return array;
+	while ((ent = readdir(dir)) != NULL) {
 		const string filename = ent->d_name;
 
 		// Skip . and ..
-		if( filename[0] == '.' )
+		if (filename[0] == '.')
 			continue;
 
 		// Skip sub directories
 		const string fullname = currentPath + "/" + filename;
 		struct stat st;
-		if( stat(fullname.c_str(), &st) == -1 )
+		if (stat(fullname.c_str(), &st) == -1)
 			continue;
-		if( (st.st_mode & S_IFDIR) != 0 )
+		if ((st.st_mode & S_IFDIR) != 0)
 			continue;
 
 		// wildcard matching
-		if(fnmatch(Wildcard.c_str(), filename.c_str(), 0)!=0)
+		if (fnmatch(Wildcard.c_str(), filename.c_str(), 0) != 0)
 			continue;
 
 		// Add the file to the array
-		array->Resize(array->GetSize()+1);
-		((string*)(array->At(array->GetSize()-1)))->assign(filename);
+		array->Resize(array->GetSize() + 1);
+		((string*)(array->At(array->GetSize() - 1)))->assign(filename);
 	}
 	closedir(dir);
 	#endif
@@ -144,17 +144,17 @@ CScriptArray* FindFiles(const string& path) {
 	return array;
 }
 
-CScriptArray *FindDirectories(const string& path) {
+CScriptArray* FindDirectories(const string& path) {
 	// Obtain a pointer to the engine
-	asIScriptContext *ctx = asGetActiveContext();
-	asIScriptEngine *engine = ctx->GetEngine();
+	asIScriptContext* ctx = asGetActiveContext();
+	asIScriptEngine* engine = ctx->GetEngine();
 
 	// TODO: This should only be done once
 	// TODO: This assumes that CScriptArray was already registered
-	asITypeInfo *arrayType = engine->GetTypeInfoByDecl("array<string>");
+	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
 
 	// Create the array object
-	CScriptArray *array = CScriptArray::Create(arrayType);
+	CScriptArray* array = CScriptArray::Create(arrayType);
 
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
@@ -163,61 +163,61 @@ CScriptArray *FindDirectories(const string& path) {
 
 	WIN32_FIND_DATAW ffd;
 	HANDLE hFind = FindFirstFileW(bufUTF16, &ffd);
-	if( INVALID_HANDLE_VALUE == hFind )
+	if (INVALID_HANDLE_VALUE == hFind)
 		return array;
 
 	do {
 		// Skip files
-		if( !(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) )
+		if (!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
 			continue;
 
 		// Convert the file name back to UTF8
 		char bufUTF8[1024];
 		WideCharToMultiByte(CP_UTF8, 0, ffd.cFileName, -1, bufUTF8, 1024, 0, 0);
 
-		if( strcmp(bufUTF8, ".") == 0 || strcmp(bufUTF8, "..") == 0 )
+		if (strcmp(bufUTF8, ".") == 0 || strcmp(bufUTF8, "..") == 0)
 			continue;
 
 		// Add the dir to the array
-		array->Resize(array->GetSize()+1);
-		((string*)(array->At(array->GetSize()-1)))->assign(bufUTF8);
-	} while( FindNextFileW(hFind, &ffd) != 0 );
+		array->Resize(array->GetSize() + 1);
+		((string*)(array->At(array->GetSize() - 1)))->assign(bufUTF8);
+	} while (FindNextFileW(hFind, &ffd) != 0);
 
 	FindClose(hFind);
 	#else
-	int wildcard=path.rfind("/");
-	if(wildcard==std::string::npos) wildcard=path.rfind("\\");
-	string currentPath=path;
-	string Wildcard="*";
-	if(wildcard!=std::string::npos) {
-		currentPath=path.substr(0, wildcard);
-		Wildcard=path.substr(wildcard+1);
+	int wildcard = path.rfind("/");
+	if (wildcard == std::string::npos) wildcard = path.rfind("\\");
+	string currentPath = path;
+	string Wildcard = "*";
+	if (wildcard != std::string::npos) {
+		currentPath = path.substr(0, wildcard);
+		Wildcard = path.substr(wildcard + 1);
 	}
-	dirent *ent = 0;
-	DIR *dir = opendir(currentPath.c_str());
-	if(!dir) return array;
-	while( (ent = readdir(dir)) != NULL ) {
+	dirent* ent = 0;
+	DIR* dir = opendir(currentPath.c_str());
+	if (!dir) return array;
+	while ((ent = readdir(dir)) != NULL) {
 		const string filename = ent->d_name;
 
 		// Skip . and ..
-		if( filename[0] == '.' )
+		if (filename[0] == '.')
 			continue;
 
 		// Skip files
 		const string fullname = currentPath + "/" + filename;
 		struct stat st;
-		if( stat(fullname.c_str(), &st) == -1 )
+		if (stat(fullname.c_str(), &st) == -1)
 			continue;
-		if( (st.st_mode & S_IFDIR) == 0 )
+		if ((st.st_mode & S_IFDIR) == 0)
 			continue;
 
 		// wildcard matching
-		if(fnmatch(Wildcard.c_str(), filename.c_str(), 0)!=0)
+		if (fnmatch(Wildcard.c_str(), filename.c_str(), 0) != 0)
 			continue;
 
 		// Add the dir to the array
-		array->Resize(array->GetSize()+1);
-		((string*)(array->At(array->GetSize()-1)))->assign(filename);
+		array->Resize(array->GetSize() + 1);
+		((string*)(array->At(array->GetSize() - 1)))->assign(filename);
 	}
 	closedir(dir);
 	#endif
@@ -225,7 +225,7 @@ CScriptArray *FindDirectories(const string& path) {
 	return array;
 }
 
-bool DirectoryExists(const string &path) {
+bool DirectoryExists(const string& path) {
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
 	wchar_t bufUTF16[1024];
@@ -233,21 +233,21 @@ bool DirectoryExists(const string &path) {
 
 	// Check if the path exists and is a directory
 	DWORD attrib = GetFileAttributesW(bufUTF16);
-	if( attrib == INVALID_FILE_ATTRIBUTES || !(attrib & FILE_ATTRIBUTE_DIRECTORY) )
+	if (attrib == INVALID_FILE_ATTRIBUTES || !(attrib & FILE_ATTRIBUTE_DIRECTORY))
 		return false;
 	#else
 	// Check if the path exists and is a directory
 	struct stat st;
-	if( stat(path.c_str(), &st) == -1 )
+	if (stat(path.c_str(), &st) == -1)
 		return false;
-	if( (st.st_mode & S_IFDIR) == 0 )
+	if ((st.st_mode & S_IFDIR) == 0)
 		return false;
 	#endif
 
 	return true;
 }
 
-bool FileExists(const string &path) {
+bool FileExists(const string& path) {
 	#ifdef _WIN32
 	// Windows uses UTF16 so it is necessary to convert the string
 	wchar_t bufUTF16[1024];
@@ -255,22 +255,22 @@ bool FileExists(const string &path) {
 
 	// Check if the path exists and is a directory
 	DWORD attrib = GetFileAttributesW(bufUTF16);
-	if( attrib == INVALID_FILE_ATTRIBUTES || (attrib & FILE_ATTRIBUTE_DIRECTORY) )
+	if (attrib == INVALID_FILE_ATTRIBUTES || (attrib & FILE_ATTRIBUTE_DIRECTORY))
 		return false;
 	return true;
 	#else
 	// Check if the path exists and is a file
 	struct stat st;
-	if( stat(path.c_str(), &st) == -1 )
+	if (stat(path.c_str(), &st) == -1)
 		return false;
-	if( (st.st_mode & S_IFDIR) != 0 )
+	if ((st.st_mode & S_IFDIR) != 0)
 		return false;
 	return true;
 	#endif
 	return false;
 }
 
-asINT64 FileGetSize(const string &path) {
+asINT64 FileGetSize(const string& path) {
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
 	wchar_t bufUTF16[1024];
@@ -296,11 +296,13 @@ asINT64 FileGetSize(const string &path) {
 bool DirectoryCreate(const string& path) {
 	try {
 		Poco::File(path).createDirectories();
-	} catch(Poco::Exception& e) { return false; }
+	} catch (Poco::Exception& e) {
+		return false;
+	}
 	return true;
 }
 
-bool DirectoryDelete(const string &path) {
+bool DirectoryDelete(const string& path) {
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
 	wchar_t bufUTF16[1024];
@@ -316,7 +318,7 @@ bool DirectoryDelete(const string &path) {
 	#endif
 }
 
-bool FileDelete(const string &path) {
+bool FileDelete(const string& path) {
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
 	wchar_t bufUTF16[1024];
@@ -332,7 +334,7 @@ bool FileDelete(const string &path) {
 	#endif
 }
 
-bool FileCopy(const string &source, const string &target, bool overwrite) {
+bool FileCopy(const string& source, const string& target, bool overwrite) {
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
 	wchar_t bufUTF16_1[1024];
@@ -342,17 +344,17 @@ bool FileCopy(const string &source, const string &target, bool overwrite) {
 	MultiByteToWideChar(CP_UTF8, 0, target.c_str(), -1, bufUTF16_2, 1024);
 
 	// Copy the file
-	BOOL success = CopyFileW(bufUTF16_1, bufUTF16_2, (overwrite? FALSE : TRUE));
+	BOOL success = CopyFileW(bufUTF16_1, bufUTF16_2, (overwrite ? FALSE : TRUE));
 	return success;
 	#else
 	// Copy the file manually as there is no posix function for this
 	bool failure = !FileExists(source);
-	if(failure) return false;
-	FILE *src = 0, *tgt = 0;
+	if (failure) return false;
+	FILE* src = 0, * tgt = 0;
 	src = fopen(source.c_str(), "r");
 	if (src == 0) failure = true;
-	failure=!overwrite&&FileExists(target);
-	if( !failure ) tgt = fopen(target.c_str(), "w");
+	failure = !overwrite && FileExists(target);
+	if (!failure) tgt = fopen(target.c_str(), "w");
 	if (tgt == 0) failure = true;
 	char buf[1024];
 	size_t n;
@@ -366,7 +368,7 @@ bool FileCopy(const string &source, const string &target, bool overwrite) {
 	#endif
 }
 
-bool FileMove(const string &source, const string &target) {
+bool FileMove(const string& source, const string& target) {
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
 	wchar_t bufUTF16_1[1024];
@@ -385,7 +387,7 @@ bool FileMove(const string &source, const string &target) {
 	#endif
 }
 
-CDateTime FileGetCreated(const string &path) {
+CDateTime FileGetCreated(const string& path) {
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
 	wchar_t bufUTF16[1024];
@@ -396,9 +398,9 @@ CDateTime FileGetCreated(const string &path) {
 	HANDLE file = CreateFileW(bufUTF16, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 	BOOL success = GetFileTime(file, &createTm, 0, 0);
 	CloseHandle(file);
-	if( !success ) {
-		asIScriptContext *ctx = asGetActiveContext();
-		if( ctx )
+	if (!success) {
+		asIScriptContext* ctx = asGetActiveContext();
+		if (ctx)
 			ctx->SetException("Failed to get file creation date/time");
 		return CDateTime();
 	}
@@ -409,17 +411,17 @@ CDateTime FileGetCreated(const string &path) {
 	// Get the create date/time of the file
 	struct stat st;
 	if (stat(path.c_str(), &st) == -1) {
-		asIScriptContext *ctx = asGetActiveContext();
-		if( ctx )
+		asIScriptContext* ctx = asGetActiveContext();
+		if (ctx)
 			ctx->SetException("Failed to get file creation date/time");
 		return CDateTime();
 	}
-	tm *t = localtime(&st.st_ctime);
+	tm* t = localtime(&st.st_ctime);
 	return CDateTime(t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
 	#endif
 }
 
-CDateTime FileGetModified(const string &path) {
+CDateTime FileGetModified(const string& path) {
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
 	wchar_t bufUTF16[1024];
@@ -429,9 +431,9 @@ CDateTime FileGetModified(const string &path) {
 	HANDLE file = CreateFileW(bufUTF16, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 	BOOL success = GetFileTime(file, 0, 0, &modifyTm);
 	CloseHandle(file);
-	if( !success ) {
-		asIScriptContext *ctx = asGetActiveContext();
-		if( ctx )
+	if (!success) {
+		asIScriptContext* ctx = asGetActiveContext();
+		if (ctx)
 			ctx->SetException("Failed to get file modify date/time");
 		return CDateTime();
 	}
@@ -442,12 +444,12 @@ CDateTime FileGetModified(const string &path) {
 	// Get the last modify date/time of the file
 	struct stat st;
 	if (stat(path.c_str(), &st) == -1) {
-		asIScriptContext *ctx = asGetActiveContext();
-		if( ctx )
+		asIScriptContext* ctx = asGetActiveContext();
+		if (ctx)
 			ctx->SetException("Failed to get file modify date/time");
 		return CDateTime();
 	}
-	tm *t = localtime(&st.st_mtime);
+	tm* t = localtime(&st.st_mtime);
 	return CDateTime(t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
 	#endif
 }
@@ -455,15 +457,15 @@ bool FNMatch(const std::string& file, const std::string& pattern) {
 	#ifdef _WIN32
 	return PathMatchSpec(file.c_str(), pattern.c_str());
 	#else
-	return fnmatch(pattern.c_str(), file.c_str(), 0)==0;
+	return fnmatch(pattern.c_str(), file.c_str(), 0) == 0;
 	#endif
 }
 
 
-void RegisterScriptFileSystemFunctions(asIScriptEngine *engine) {
-	assert( engine->GetTypeInfoByName("string") );
-	assert( engine->GetTypeInfoByDecl("array<string>") );
-	assert( engine->GetTypeInfoByName("datetime") );
+void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
+	assert(engine->GetTypeInfoByName("string"));
+	assert(engine->GetTypeInfoByDecl("array<string>"));
+	assert(engine->GetTypeInfoByName("datetime"));
 	engine->RegisterGlobalFunction("bool directory_exists(const string& in)", asFUNCTION(DirectoryExists), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool directory_create(const string& in)", asFUNCTION(DirectoryCreate), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool directory_delete(const string& in)", asFUNCTION(DirectoryDelete), asCALL_CDECL);

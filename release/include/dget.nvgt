@@ -10,34 +10,30 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-double dgetn(dictionary@ d, const string&in key, double def=0.0)
-{
-if(@d==null) return def;
-double v;
-if(!d.get(key, v)) return def;
-return v;
+double dgetn(dictionary@ d, const string& in key, double def = 0.0) {
+	if (@d == null) return def;
+	double v;
+	if (!d.get(key, v)) return def;
+	return v;
 }
-string dgets(dictionary@ d, const string&in key, string def="")
-{
-if(@d==null) return def;
-string v;
-if(!d.get(key, v)) return def;
-return v;
+string dgets(dictionary@ d, const string& in key, string def = "") {
+	if (@d == null) return def;
+	string v;
+	if (!d.get(key, v)) return def;
+	return v;
 }
 string[] dgetsl_default(0);
-string[] dgetsl(dictionary@ d, const string&in key, string[] def=dgetsl_default)
-{
-string[] sl;
-if(@d==null) return def;
-if(!d.exists(key)) return def;
-string v;
-d.get(key, sl);
-return sl;
+string[] dgetsl(dictionary@ d, const string& in key, string[] def = dgetsl_default) {
+	string[] sl;
+	if (@d == null) return def;
+	if (!d.exists(key)) return def;
+	string v;
+	d.get(key, sl);
+	return sl;
 }
-bool dgetb(dictionary@ d, const string&in key, bool def=false)
-{
-if(@d==null) return def;
-bool v;
-if(!d.get(key, v)) return def;
-return v;
+bool dgetb(dictionary@ d, const string& in key, bool def = false) {
+	if (@d == null) return def;
+	bool v;
+	if (!d.get(key, v)) return def;
+	return v;
 }

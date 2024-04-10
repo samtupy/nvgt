@@ -33,28 +33,28 @@ inline int angelscript_bytecode_decrypt(unsigned char* code, int size, int alloc
 	char tmp[32];
 	Poco::SHA2Engine hash;
 	hash.update(tmp, snprintf(tmp, 32, "Kernel32.lib"));
-	const unsigned char* key=hash.digest().data();
-	for(int i=0; i<16; i++)
-		iv[i]=key[i*2+1]^(31+i*4);
+	const unsigned char* key = hash.digest().data();
+	for (int i = 0; i < 16; i++)
+		iv[i] = key[i * 2 + 1] ^ (31 + i * 4);
 	AES_ctx crypt;
 	AES_init_ctx_iv(&crypt, key, iv);
 	AES_CBC_decrypt_buffer(&crypt, code, size);
-	return size-code[size-1];
+	return size - code[size - 1];
 }
 inline int angelscript_bytecode_encrypt(unsigned char* code, int size, int alloc_size) {
-	unsigned char r=16-(size%16);
-	if(r==0) r=16;
-	if(alloc_size-size<r) code=(unsigned char*)realloc(code, alloc_size+16);
-	for(int i=size; i<size+r; i++)
-		code[i]=r;
-	size+=r;
+	unsigned char r = 16 - (size % 16);
+	if (r == 0) r = 16;
+	if (alloc_size - size < r) code = (unsigned char*)realloc(code, alloc_size + 16);
+	for (int i = size; i < size + r; i++)
+		code[i] = r;
+	size += r;
 	unsigned char iv[16];
 	char tmp[32];
 	Poco::SHA2Engine hash;
 	hash.update(tmp, snprintf(tmp, 32, "Kernel32.lib"));
-	const unsigned char* key=hash.digest().data();
-	for(int i=0; i<16; i++)
-		iv[i]=key[i*2+1]^(31+i*4);
+	const unsigned char* key = hash.digest().data();
+	for (int i = 0; i < 16; i++)
+		iv[i] = key[i * 2 + 1] ^ (31 + i * 4);
 	AES_ctx crypt;
 	AES_init_ctx_iv(&crypt, key, iv);
 	AES_CBC_encrypt_buffer(&crypt, code, size);

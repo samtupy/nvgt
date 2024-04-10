@@ -17,17 +17,17 @@
 #include <regex>
 #include <math.h>
 #ifdef _WIN32
-#include "InputBox.h"
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <direct.h>
+	#include "InputBox.h"
+	#define WIN32_LEAN_AND_MEAN
+	#include <windows.h>
+	#include <direct.h>
 #else
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
+	#include <unistd.h>
+	#include <sys/types.h>
+	#include <sys/wait.h>
 #endif
 #ifdef __APPLE__
-#include "apple.h"
+	#include "apple.h"
 #endif
 #include <Poco/Exception.h>
 #include <Poco/UnicodeConverter.h>
@@ -49,15 +49,15 @@
 int message_box(const std::string& title, const std::string& text, const std::vector<std::string>& buttons, unsigned int mb_flags) {
 	// Start with the buttons.
 	std::vector<SDL_MessageBoxButtonData> sdlbuttons;
-	for(int i = 0; i < buttons.size(); i++) {
+	for (int i = 0; i < buttons.size(); i++) {
 		std::string btn = buttons[i];
 		int skip = 0;
 		unsigned int button_flag = 0;
-		if(btn.substr(0, 1) == "`") {
+		if (btn.substr(0, 1) == "`") {
 			button_flag |= SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
 			skip += 1;
 		}
-		if(btn.substr(skip, 1) == "~") {
+		if (btn.substr(skip, 1) == "~") {
 			button_flag |= SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT;
 			skip += 1;
 		}
@@ -68,59 +68,59 @@ int message_box(const std::string& title, const std::string& text, const std::ve
 	}
 	SDL_MessageBoxData box = {mb_flags, g_WindowHandle, title.c_str(), text.c_str(), int(sdlbuttons.size()), sdlbuttons.data(), NULL};
 	int ret;
-	if(SDL_ShowMessageBox(&box, &ret) != 0) return 0; // failure.
+	if (SDL_ShowMessageBox(&box, &ret) != 0) return 0; // failure.
 	return ret;
 }
 int message_box_script(const std::string& title, const std::string& text, CScriptArray* buttons, unsigned int flags) {
 	std::vector<std::string> v_buttons(buttons->GetSize());
-	for(unsigned int i = 0; i < buttons->GetSize(); i++) v_buttons[i] = (*(std::string*)(buttons->At(i)));
+	for (unsigned int i = 0; i < buttons->GetSize(); i++) v_buttons[i] = (*(std::string*)(buttons->At(i)));
 	return message_box(title, text, v_buttons, flags);
 }
 int alert(const std::string& title, const std::string& text, bool can_cancel, unsigned int flags) {
-	std::vector<std::string> buttons={can_cancel? "`OK" : "`~OK"};
-	if(can_cancel) buttons.push_back("~Cancel");
+	std::vector<std::string> buttons = {can_cancel ? "`OK" : "`~OK"};
+	if (can_cancel) buttons.push_back("~Cancel");
 	return message_box(title, text, buttons, flags);
 }
 int question(const std::string& title, const std::string& text, bool can_cancel, unsigned int flags) {
-	std::vector<std::string> buttons={"`Yes", "No"};
-	if(can_cancel) buttons.push_back("~Cancel");
+	std::vector<std::string> buttons = {"`Yes", "No"};
+	if (can_cancel) buttons.push_back("~Cancel");
 	return message_box(title, text, buttons, flags);
 }
-BOOL ChDir(const std::string &d) {
+BOOL ChDir(const std::string& d) {
 	#ifdef _WIN32
-	return _chdir(d.c_str())==0;
+	return _chdir(d.c_str()) == 0;
 	#else
-	return chdir(d.c_str())==0;
+	return chdir(d.c_str()) == 0;
 	#endif
 }
 std::string ClipboardGetText() {
 	InputInit();
-	char* r=SDL_GetClipboardText();
+	char* r = SDL_GetClipboardText();
 	std::string cb_text(r);
 	SDL_free(r);
 	return cb_text;
 }
 BOOL ClipboardSetText(const std::string& text) {
 	InputInit();
-	return SDL_SetClipboardText(text.c_str())==0;
+	return SDL_SetClipboardText(text.c_str()) == 0;
 }
 BOOL ClipboardSetRawText(const std::string& text) {
 	#ifdef _WIN32
-	if(!OpenClipboard(nullptr))
+	if (!OpenClipboard(nullptr))
 		return FALSE;
 	EmptyClipboard();
-	if(text=="") {
+	if (text == "") {
 		CloseClipboard();
 		return TRUE;
 	}
-	HGLOBAL hMem=GlobalAlloc(GMEM_MOVEABLE, text.size()+1);
-	if(!hMem) {
+	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, text.size() + 1);
+	if (!hMem) {
 		CloseClipboard();
 		return FALSE;
 	}
-	char* cbText=(char*)GlobalLock(hMem);
+	char* cbText = (char*)GlobalLock(hMem);
 	memcpy(cbText, text.c_str(), text.size());
-	cbText[text.size()]=0;
+	cbText[text.size()] = 0;
 	GlobalUnlock(hMem);
 	SetClipboardData(CF_TEXT, hMem);
 	CloseClipboard();
@@ -130,14 +130,14 @@ BOOL ClipboardSetRawText(const std::string& text) {
 	#endif
 }
 asBYTE character_to_ascii(const std::string& character) {
-	if(character=="") return 0;
+	if (character == "") return 0;
 	return character[0];
 }
 std::string ascii_to_character(asBYTE ascii) {
 	return std::string(1, ascii);
 }
 // next ffunction mostly from the cpptotp project:
-std::string base32_normalize(const std::string & unnorm) {
+std::string base32_normalize(const std::string& unnorm) {
 	std::string ret;
 	for (char c : unnorm) {
 		if (c == ' ' || c == '\n' || c == '-') {
@@ -146,11 +146,10 @@ std::string base32_normalize(const std::string & unnorm) {
 			// make uppercase
 			char u = std::toupper(c);
 			ret.push_back(u);
-		} else {
+		} else
 			ret.push_back(c);
-		}
 	}
-	while(ret.size()%8!=0)
+	while (ret.size() % 8 != 0)
 		ret.push_back('=');
 	return ret;
 }
@@ -161,36 +160,36 @@ std::string get_command_line() {
 	return g_command_line;
 }
 double Round(double n, int p) {
-	int P=powf(10, fabs(p));
-	if(p>0)
-		return round(n*P)/P;
-	else if(p<0)
-		return round(n/P)*P;
+	int P = powf(10, fabs(p));
+	if (p > 0)
+		return round(n * P) / P;
+	else if (p < 0)
+		return round(n / P) * P;
 	return round(n);
 }
 bool run(const std::string& filename, const std::string& cmdline, bool wait_for_completion, bool background) {
 	#ifdef _WIN32
 	PROCESS_INFORMATION info;
 	STARTUPINFO si;
-	ZeroMemory( &si, sizeof(si) );
+	ZeroMemory(&si, sizeof(si));
 	si.cb = sizeof(si);
-	si.dwFlags=STARTF_USESHOWWINDOW;
-	si.wShowWindow=(background? SW_HIDE : SW_SHOW);
+	si.dwFlags = STARTF_USESHOWWINDOW;
+	si.wShowWindow = (background ? SW_HIDE : SW_SHOW);
 	char c_cmdline[32768];
-	c_cmdline[0]=0;
-	if(cmdline.size()>0) {
-		std::string tmp="\"";
-		tmp+=filename;
-		tmp+="\" ";
-		tmp+=cmdline;
+	c_cmdline[0] = 0;
+	if (cmdline.size() > 0) {
+		std::string tmp = "\"";
+		tmp += filename;
+		tmp += "\" ";
+		tmp += cmdline;
 		strncpy(c_cmdline, tmp.c_str(), tmp.size());
-		c_cmdline[tmp.size()]=0;
+		c_cmdline[tmp.size()] = 0;
 	}
-	BOOL r=CreateProcess(filename.c_str(), c_cmdline, NULL, NULL, FALSE, INHERIT_CALLER_PRIORITY, NULL, NULL, &si, &info);
-	if(r==FALSE)
+	BOOL r = CreateProcess(filename.c_str(), c_cmdline, NULL, NULL, FALSE, INHERIT_CALLER_PRIORITY, NULL, NULL, &si, &info);
+	if (r == FALSE)
 		return false;
-	if(wait_for_completion) {
-		while(WaitForSingleObject(info.hProcess, 0)==WAIT_TIMEOUT)
+	if (wait_for_completion) {
+		while (WaitForSingleObject(info.hProcess, 0) == WAIT_TIMEOUT)
 			wait(5);
 	}
 	CloseHandle(info.hProcess);
@@ -198,17 +197,17 @@ bool run(const std::string& filename, const std::string& cmdline, bool wait_for_
 	return true;
 	#else
 	int status;
-	pid_t pid=fork();
-	if(pid<0) return false;
-	else if(pid==0) {
-		std::string cmd=filename;
-		cmd+=" ";
-		cmd+=cmdline;
+	pid_t pid = fork();
+	if (pid < 0) return false;
+	else if (pid == 0) {
+		std::string cmd = filename;
+		cmd += " ";
+		cmd += cmdline;
 		execl("/bin/sh", "/bin/sh", "-c", cmd.c_str(), NULL);
 		_exit(EXIT_FAILURE);
 	} else {
-		if(!wait_for_completion) return true;
-		else return waitpid(pid, &status, 0)==pid;
+		if (!wait_for_completion) return true;
+		else return waitpid(pid, &status, 0) == pid;
 	}
 	#endif
 }
@@ -225,12 +224,12 @@ void next_keyboard_layout() {
 	#endif
 }
 std::string number_to_words(asINT64 number, bool include_and) {
-	if(number<0) return "negative "+number_to_words(number*-1, include_and);
+	if (number < 0) return "negative " + number_to_words(number * -1, include_and);
 	std::string output(128, '\0');
-	size_t size=bl_number_to_words(number, &output[0], 96, include_and);
-	if(size>96) {
+	size_t size = bl_number_to_words(number, &output[0], 96, include_and);
+	if (size > 96) {
 		output.resize(size);
-		size=bl_number_to_words(number, &output[0], size, include_and);
+		size = bl_number_to_words(number, &output[0], size, include_and);
 	}
 	output.resize(size);
 	return output;
@@ -241,9 +240,9 @@ std::string input_box(const std::string& title, const std::string& text, const s
 	Poco::UnicodeConverter::convert(title, titleU);
 	Poco::UnicodeConverter::convert(text, textU);
 	Poco::UnicodeConverter::convert(default_value, defaultU);
-	std::wstring r=InputBox(titleU, textU, defaultU);
-	if(r==L"\xff") {
-		g_LastError=-12;
+	std::wstring r = InputBox(titleU, textU, defaultU);
+	if (r == L"\xff") {
+		g_LastError = -12;
 		return "";
 	}
 	std::string resultA;
@@ -251,9 +250,9 @@ std::string input_box(const std::string& title, const std::string& text, const s
 	return resultA;
 	#elif defined(__APPLE__)
 	std::string r = apple_input_box(title, text, default_value, false, false);
-	if(g_WindowHandle) SDL_RaiseWindow(g_WindowHandle);
-	if(r == "\xff") {
-		g_LastError=-12;
+	if (g_WindowHandle) SDL_RaiseWindow(g_WindowHandle);
+	if (r == "\xff") {
+		g_LastError = -12;
 		return "";
 	}
 	return r;
@@ -276,47 +275,47 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 	#endif
 }
 int get_last_error() {
-	int e=g_LastError;
-	g_LastError=0;
+	int e = g_LastError;
+	g_LastError = 0;
 	return e;
 }
 
 double range_convert(double old_value, double old_min, double old_max, double new_min, double new_max) {
-	return ((old_value - old_min) / (old_max - old_min) ) * (new_max - new_min) + new_min;
+	return ((old_value - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min;
 }
 std::string float_to_bytes(float f) {
 	return std::string((char*)&f, 4);
 }
 float bytes_to_float(const std::string& s) {
-	if(s.size()!=4) return 0;
+	if (s.size() != 4) return 0;
 	return *((float*)&s[0]);
 }
 std::string double_to_bytes(double d) {
 	return std::string((char*)&d, 8);
 }
 double bytes_to_double(const std::string& s) {
-	if(s.size()!=8) return 0;
+	if (s.size() != 8) return 0;
 	return *((double*)&s[0]);
 }
 
 std::string string_to_upper_case(std::string s) {
-	for(int i=0; i<(int)s.length(); i++)
-		s[i]=toupper(s[i]);
+	for (int i = 0; i < (int)s.length(); i++)
+		s[i] = toupper(s[i]);
 	return s;
 }
 
 //Following function originally from https://stackoverflow.com/questions/642213/how-to-implement-a-natural-sort-algorithm-in-c
-bool natural_number_sort(const std::string&a, const std::string&b) {
-	if(a.empty())
+bool natural_number_sort(const std::string& a, const std::string& b) {
+	if (a.empty())
 		return true;
-	if(b.empty())
+	if (b.empty())
 		return false;
-	if(isdigit(a[0])&&!isdigit(b[0]))
+	if (isdigit(a[0]) && !isdigit(b[0]))
 		return true;
-	if(!isdigit(a[0])&&isdigit(b[0]))
+	if (!isdigit(a[0]) && isdigit(b[0]))
 		return false;
-	if(!isdigit(a[0])&&!isdigit(b[0])) {
-		if(a[0]==b[0])
+	if (!isdigit(a[0]) && !isdigit(b[0])) {
+		if (a[0] == b[0])
 			return natural_number_sort(a.substr(1), b.substr(1));
 		return (string_to_upper_case(a) < string_to_upper_case(b));
 	}
@@ -325,62 +324,62 @@ bool natural_number_sort(const std::string&a, const std::string&b) {
 	int ia, ib;
 	issa >> ia;
 	issb >> ib;
-	if(ia!=ib)
-		return ia<ib;
+	if (ia != ib)
+		return ia < ib;
 	std::string anew, bnew;
 	std::getline(issa, anew);
 	std::getline(issb, bnew);
 	return (natural_number_sort(anew, bnew));
 }
 
-refstring* new_refstring() { return new refstring(); }
+refstring* new_refstring() {
+	return new refstring();
+}
 
-template<typename T> typename T::size_type LevenshteinDistance(const T &source, const T &target, typename T::size_type insert_cost = 1, typename T::size_type delete_cost = 1, typename T::size_type replace_cost = 1) {
-	if(source.size()>target.size())
+template<typename T> typename T::size_type LevenshteinDistance(const T& source, const T& target, typename T::size_type insert_cost = 1, typename T::size_type delete_cost = 1, typename T::size_type replace_cost = 1) {
+	if (source.size() > target.size())
 		return LevenshteinDistance(target, source, delete_cost, insert_cost, replace_cost);
 	using TSizeType = typename T::size_type;
 	const TSizeType min_size = source.size(), max_size = target.size();
 	std::vector<TSizeType> lev_dist(min_size + 1);
 	lev_dist[0] = 0;
-	for (TSizeType i=1; i<=min_size; ++i) {
+	for (TSizeType i = 1; i <= min_size; ++i)
 		lev_dist[i] = lev_dist[i - 1] + delete_cost;
-	}
-	for (TSizeType j=1; j<=max_size; ++j) {
-		TSizeType previous_diagonal=lev_dist[0], previous_diagonal_save;
+	for (TSizeType j = 1; j <= max_size; ++j) {
+		TSizeType previous_diagonal = lev_dist[0], previous_diagonal_save;
 		lev_dist[0] += insert_cost;
-		for (TSizeType i=1; i<=min_size; ++i) {
+		for (TSizeType i = 1; i <= min_size; ++i) {
 			previous_diagonal_save = lev_dist[i];
-			if(source[i-1]==target[j - 1]) {
+			if (source[i - 1] == target[j - 1])
 				lev_dist[i] = previous_diagonal;
-			} else {
-				lev_dist[i]=std::min(std::min(lev_dist[i-1]+delete_cost, lev_dist[i]+insert_cost), previous_diagonal+replace_cost);
-			}
-			previous_diagonal=previous_diagonal_save;
+			else
+				lev_dist[i] = std::min(std::min(lev_dist[i - 1] + delete_cost, lev_dist[i] + insert_cost), previous_diagonal + replace_cost);
+			previous_diagonal = previous_diagonal_save;
 		}
 	}
 	return lev_dist[min_size];
 }
-int string_distance(const std::string& a, const std::string& b, unsigned int insert_cost=1, unsigned int delete_cost=1, unsigned int replace_cost=1) {
+int string_distance(const std::string& a, const std::string& b, unsigned int insert_cost = 1, unsigned int delete_cost = 1, unsigned int replace_cost = 1) {
 	return LevenshteinDistance<std::string>(a, b, insert_cost, delete_cost, replace_cost);
 }
-int utf8prev(const std::string& text, int offset=0) {
-	if(offset<1||offset>text.size()) return offset-1;
+int utf8prev(const std::string& text, int offset = 0) {
+	if (offset < 1 || offset > text.size()) return offset - 1;
 	offset--;
-	char b=text[offset];
-	while((b&(1<<7))!=0&&(b&(1<<6))==0) { // UTF8 continuation char
+	char b = text[offset];
+	while ((b & (1 << 7)) != 0 && (b & (1 << 6)) == 0) { // UTF8 continuation char
 		offset--;
-		if(offset<0) break;
-		b=text[offset];
+		if (offset < 0) break;
+		b = text[offset];
 	}
 	return offset;
 }
 int utf8size(const std::string& character) {
-	if(character.size()<1) return 0;
-	char b=character[0];
-	if(b&1<<7) {
-		if(b&1<<6) {
-			if(b&1<<5) {
-				if(b&1<<4) {
+	if (character.size() < 1) return 0;
+	char b = character[0];
+	if (b & 1 << 7) {
+		if (b & 1 << 6) {
+			if (b & 1 << 5) {
+				if (b & 1 << 4) {
 					return 4; // because bit pattern 1111
 				}
 				return 3; // because bit pattern 111
@@ -391,28 +390,28 @@ int utf8size(const std::string& character) {
 	}
 	return 1; // char is less than 128
 }
-int utf8next(const std::string& text, int offset=0) {
-	if(offset<0) return offset-1;
-	if(offset>=text.size()) return offset+1;
-	return offset+utf8size(text.substr(offset, 1));
+int utf8next(const std::string& text, int offset = 0) {
+	if (offset < 0) return offset - 1;
+	if (offset >= text.size()) return offset + 1;
+	return offset + utf8size(text.substr(offset, 1));
 }
 
 CScriptArray* get_preferred_locales() {
-	asITypeInfo *arrayType=g_ScriptEngine->GetTypeInfoByDecl("array<string>");
-	CScriptArray *array=CScriptArray::Create(arrayType);
-	SDL_Locale* locales=SDL_GetPreferredLocales();
-	if(!locales) return array;
-	for(int i=0; locales[i].language; i++) {
-		std::string tmp=locales[i].language;
-		if(locales[i].country) tmp+=std::string("-")+locales[i].country;
-		array->Resize(array->GetSize()+1);
-		((std::string*)(array->At(array->GetSize()-1)))->assign(tmp);
+	asITypeInfo* arrayType = g_ScriptEngine->GetTypeInfoByDecl("array<string>");
+	CScriptArray* array = CScriptArray::Create(arrayType);
+	SDL_Locale* locales = SDL_GetPreferredLocales();
+	if (!locales) return array;
+	for (int i = 0; locales[i].language; i++) {
+		std::string tmp = locales[i].language;
+		if (locales[i].country) tmp += std::string("-") + locales[i].country;
+		array->Resize(array->GetSize() + 1);
+		((std::string*)(array->At(array->GetSize() - 1)))->assign(tmp);
 	}
 	SDL_free(locales);
 	return array;
 }
 
-void RegisterMiscFunctions(asIScriptEngine *engine) {
+void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UI);
 	engine->RegisterEnum(_O("message_box_flags"));
 	engine->RegisterEnumValue(_O("message_box_flags"), _O("MESSAGE_BOX_ERROR"), SDL_MESSAGEBOX_ERROR);

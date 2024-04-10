@@ -32,31 +32,31 @@ typedef struct {
 	Thread* thread;
 } script_thread_extra;
 void script_thread(void* extra) {
-	script_thread_extra* e=(script_thread_extra*)extra;
+	script_thread_extra* e = (script_thread_extra*)extra;
 	Thread* thread = e->thread;
-	asIScriptFunction* func=e->func;
-	CScriptDictionary* args=e->args;
+	asIScriptFunction* func = e->func;
+	CScriptDictionary* args = e->args;
 	free(e);
-	if(!func) {
+	if (!func) {
 		angelscript_refcounted_release<Thread>(thread);
 		return;
 	}
-	asIScriptContext* ctx=g_ScriptEngine->CreateContext();
-	if(!ctx) {
+	asIScriptContext* ctx = g_ScriptEngine->CreateContext();
+	if (!ctx) {
 		angelscript_refcounted_release<Thread>(thread);
 		return;
 	}
-	if(ctx->Prepare(func)<0) {
+	if (ctx->Prepare(func) < 0) {
 		ctx->Release();
 		angelscript_refcounted_release<Thread>(thread);
 		return;
 	}
-	if(ctx->SetArgObject(0, args)<0) {
+	if (ctx->SetArgObject(0, args) < 0) {
 		ctx->Release();
 		angelscript_refcounted_release<Thread>(thread);
 		return;
 	}
-	if(ctx->Execute()!=asEXECUTION_FINISHED) {
+	if (ctx->Execute() != asEXECUTION_FINISHED) {
 		ctx->Release();
 		angelscript_refcounted_release<Thread>(thread);
 		return;
@@ -68,50 +68,50 @@ void script_thread(void* extra) {
 }
 
 void thread_begin(Thread* thread, asIScriptFunction* func, CScriptDictionary* args) {
-	if(!func) return;
-	script_thread_extra* e=(script_thread_extra*)malloc(sizeof(script_thread_extra));
-	e->func=func;
+	if (!func) return;
+	script_thread_extra* e = (script_thread_extra*)malloc(sizeof(script_thread_extra));
+	e->func = func;
 	e->thread = thread;
-	e->args=args;
+	e->args = args;
 	angelscript_refcounted_duplicate<Thread>(thread);
 	thread->start(script_thread, e);
 }
 
 Thread* thread_factory() {
-	return new(angelscript_refcounted_create<Thread>()) Thread();
+	return new (angelscript_refcounted_create<Thread>()) Thread();
 }
 Thread* thread_named_factory(const std::string& name) {
-	return new(angelscript_refcounted_create<Thread>()) Thread(name);
+	return new (angelscript_refcounted_create<Thread>()) Thread(name);
 }
-void* mutex_factory() { 
-	return new(angelscript_refcounted_create<Mutex>()) Mutex();
+void* mutex_factory() {
+	return new (angelscript_refcounted_create<Mutex>()) Mutex();
 }
-void* fast_mutex_factory() { 
-	return new(angelscript_refcounted_create<FastMutex>()) FastMutex();
+void* fast_mutex_factory() {
+	return new (angelscript_refcounted_create<FastMutex>()) FastMutex();
 }
-void* spinlock_mutex_factory() { 
-	return new(angelscript_refcounted_create<SpinlockMutex>()) SpinlockMutex();
+void* spinlock_mutex_factory() {
+	return new (angelscript_refcounted_create<SpinlockMutex>()) SpinlockMutex();
 }
-void* named_mutex_factory(const std::string& name) { 
-	return new(angelscript_refcounted_create<NamedMutex>()) NamedMutex(name);
+void* named_mutex_factory(const std::string& name) {
+	return new (angelscript_refcounted_create<NamedMutex>()) NamedMutex(name);
 }
-void* rw_lock_factory() { 
-	return new(angelscript_refcounted_create<RWLock>()) RWLock();
+void* rw_lock_factory() {
+	return new (angelscript_refcounted_create<RWLock>()) RWLock();
 }
 template <class T> void scoped_lock_construct(void* mem, T* mutex) {
-	new(mem) ScopedLockWithUnlock<T>(*mutex);
+	new (mem) ScopedLockWithUnlock<T>(*mutex);
 }
 template <class T> void scoped_lock_construct_ms(void* mem, T* mutex, long ms) {
-	new(mem) ScopedLockWithUnlock<T>(*mutex, ms);
+	new (mem) ScopedLockWithUnlock<T>(*mutex, ms);
 }
 void scoped_rw_lock_construct(void* mem, RWLock* lock, bool write) {
-	new(mem) ScopedRWLock(*lock, write);
+	new (mem) ScopedRWLock(*lock, write);
 }
 void scoped_read_rw_lock_construct(void* mem, RWLock* lock) {
-	new(mem) ScopedReadRWLock(*lock);
+	new (mem) ScopedReadRWLock(*lock);
 }
 void scoped_write_rw_lock_construct(void* mem, RWLock* lock) {
-	new(mem) ScopedWriteRWLock(*lock);
+	new (mem) ScopedWriteRWLock(*lock);
 }
 template <class T> void scoped_lock_destruct(ScopedLockWithUnlock<T>* mem) {
 	mem->~ScopedLockWithUnlock<T>();

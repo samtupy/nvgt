@@ -13,14 +13,14 @@
 #pragma once
 #include <string>
 #ifdef _WIN32
-#include <windows.h>
+	#include <windows.h>
 #endif
 #include <angelscript.h>
 #include "nvgt.h"
 
 asINT64 GetFileSize(const std::string& path);
-int alert(const std::string& title, const std::string& text, bool can_cancel=false, unsigned int flags = 0);
-int question(const std::string& title, const std::string& text, bool can_cancel=false, unsigned int flags = 0);
+int alert(const std::string& title, const std::string& text, bool can_cancel = false, unsigned int flags = 0);
+int question(const std::string& title, const std::string& text, bool can_cancel = false, unsigned int flags = 0);
 bool info_box(const std::string& title, const std::string& text, const std::string& value);
 BOOL ChDir(const std::string& d);
 BOOL ClipboardSetText(const std::string& text);
@@ -30,7 +30,11 @@ public:
 	int RefCount;
 	std::string str;
 	refstring() : RefCount(1) {}
-	void AddRef() { asAtomicInc(RefCount); }
-	void Release() { if(asAtomicDec(RefCount)<1) delete this; }
+	void AddRef() {
+		asAtomicInc(RefCount);
+	}
+	void Release() {
+		if (asAtomicDec(RefCount) < 1) delete this;
+	}
 };
-void RegisterMiscFunctions(asIScriptEngine *engine);
+void RegisterMiscFunctions(asIScriptEngine* engine);

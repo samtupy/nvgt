@@ -14,15 +14,15 @@
 #include <angelscript.h>
 #include "srspeech.h"
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define VC_EXTRALEAN
-#include <windows.h>
-#include <wingdi.h>
-#include <comip.h>
-#include <comdef.h>
-#include <shlobj.h>
-#include <shellapi.h>
-_COM_SMARTPTR_TYPEDEF(ITaskbarList3, __uuidof(ITaskbarList3));
+	#define WIN32_LEAN_AND_MEAN
+	#define VC_EXTRALEAN
+	#include <windows.h>
+	#include <wingdi.h>
+	#include <comip.h>
+	#include <comdef.h>
+	#include <shlobj.h>
+	#include <shellapi.h>
+	_COM_SMARTPTR_TYPEDEF(ITaskbarList3, __uuidof(ITaskbarList3));
 #endif
 #include <SDL.h>
 #include <SDL_syswm.h>
@@ -37,37 +37,37 @@ _COM_SMARTPTR_TYPEDEF(ITaskbarList3, __uuidof(ITaskbarList3));
 #include "timestuff.h"
 #include "window.h"
 
-SDL_Window* g_WindowHandle=0;
+SDL_Window* g_WindowHandle = 0;
 #ifdef _WIN32
-HWND g_OSWindowHandle=NULL;
+	HWND g_OSWindowHandle = NULL;
 #elif defined(__APPLE__)
-#include "macos.h"
-NSWindow* g_OSWindowHandle=NULL;
+	#include "macos.h"
+	NSWindow* g_OSWindowHandle = NULL;
 #else
-void* g_OSWindowHandle=NULL;
+	void* g_OSWindowHandle = NULL;
 #endif
-thread_id_t g_WindowThreadId=0;
-bool g_WindowHidden=false;
+thread_id_t g_WindowThreadId = 0;
+bool g_WindowHidden = false;
 
 static std::vector<SDL_Event> post_events; // holds events that should be processed after the next wait() call.
 #ifdef _WIN32
 void sdl_windows_messages(void* udata, void* hwnd, unsigned int message, uint64_t wParam, int64_t lParam) {
-	if(message==WM_KEYDOWN&&wParam=='V'&&lParam==1) {
+	if (message == WM_KEYDOWN && wParam == 'V' && lParam == 1) {
 		SDL_Event e{};
-		e.type=SDL_KEYDOWN;
-		e.key.timestamp=SDL_GetTicks();
-		e.key.keysym.scancode=SDL_SCANCODE_PASTE;
-		e.key.keysym.sym=SDLK_PASTE;
+		e.type = SDL_KEYDOWN;
+		e.key.timestamp = SDL_GetTicks();
+		e.key.keysym.scancode = SDL_SCANCODE_PASTE;
+		e.key.keysym.sym = SDLK_PASTE;
 		SDL_PushEvent(&e);
-		e.type=SDL_KEYUP;
+		e.type = SDL_KEYUP;
 		post_events.push_back(e);
 	}
 }
 #endif
 bool set_application_name(const std::string& name) {
-	bool ret=SDL_SetHintWithPriority(SDL_HINT_APP_NAME, name.c_str(), SDL_HINT_OVERRIDE);
+	bool ret = SDL_SetHintWithPriority(SDL_HINT_APP_NAME, name.c_str(), SDL_HINT_OVERRIDE);
 	#ifdef _WIN32
-	if(!g_OSWindowHandle) return ret;
+	if (!g_OSWindowHandle) return ret;
 	std::wstring name_u;
 	Poco::UnicodeConverter::convert(name, name_u);
 	ITaskbarList3Ptr sptb3;
@@ -77,10 +77,10 @@ bool set_application_name(const std::string& name) {
 	return ret;
 }
 bool ShowNVGTWindow(std::string& window_title) {
-	if(g_WindowHandle) {
+	if (g_WindowHandle) {
 		SDL_SetWindowTitle(g_WindowHandle, window_title.c_str());
-		if(g_WindowHidden) {
-			g_WindowHidden=false;
+		if (g_WindowHidden) {
+			g_WindowHidden = false;
 			SDL_ShowWindow(g_WindowHandle);
 			SDL_RaiseWindow(g_WindowHandle);
 		}
@@ -90,56 +90,56 @@ bool ShowNVGTWindow(std::string& window_title) {
 	#ifdef _WIN32
 	SDL_SetWindowsMessageHook(sdl_windows_messages, NULL);
 	#endif
-	g_WindowHandle=SDL_CreateWindow(window_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 640, 0);
-	if(!g_WindowHandle) return false;
+	g_WindowHandle = SDL_CreateWindow(window_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 640, 0);
+	if (!g_WindowHandle) return false;
 	SDL_SysWMinfo winf;
 	SDL_VERSION(&winf.version);
 	SDL_GetWindowWMInfo(g_WindowHandle, &winf);
 	#ifdef _WIN32
-	g_OSWindowHandle=winf.info.win.window;
+	g_OSWindowHandle = winf.info.win.window;
 	#elif defined(SDL_VIDEO_DRIVER_COCOA)
 	g_OSWindowHandle = winf.info.cocoa.window;
 	SDL_ShowWindow(g_WindowHandle);
 	SDL_RaiseWindow(g_WindowHandle);
 	voice_over_window_created();
 	#endif
-	g_WindowThreadId=thread_current_thread_id();
+	g_WindowThreadId = thread_current_thread_id();
 	return true;
 }
 bool DestroyNVGTWindow() {
-	if(!g_WindowHandle) return false;
+	if (!g_WindowHandle) return false;
 	SDL_DestroyWindow(g_WindowHandle);
 	InputDestroy();
-	g_WindowHandle=NULL;
-	g_OSWindowHandle=NULL;
+	g_WindowHandle = NULL;
+	g_OSWindowHandle = NULL;
 	return true;
 }
 BOOL HideNVGTWindow() {
-	if(!g_WindowHandle) return false;
+	if (!g_WindowHandle) return false;
 	SDL_HideWindow(g_WindowHandle);
 	g_WindowHidden = true;
 	return true;
 }
 BOOL FocusNVGTWindow() {
-	if(!g_WindowHandle) return false;
+	if (!g_WindowHandle) return false;
 	SDL_RaiseWindow(g_WindowHandle);
 	return true;
 }
 BOOL WindowIsFocused() {
-	if(!g_WindowHandle) return false;
-	return g_WindowHandle==SDL_GetKeyboardFocus();
+	if (!g_WindowHandle) return false;
+	return g_WindowHandle == SDL_GetKeyboardFocus();
 }
 std::string get_window_text() {
-	if(!g_WindowHandle) return "";
+	if (!g_WindowHandle) return "";
 	return std::string(SDL_GetWindowTitle(g_WindowHandle));
 }
 std::string get_focused_window_text() {
 	#ifdef _WIN32
-	HWND win=GetForegroundWindow();
-	int bytes=GetWindowTextLength(win)*2;
+	HWND win = GetForegroundWindow();
+	int bytes = GetWindowTextLength(win) * 2;
 	std::wstring text(bytes, '\0');
-	int r=GetWindowTextW(win, &text[0], bytes);
-	if(r<1) return "";
+	int r = GetWindowTextW(win, &text[0], bytes);
+	if (r < 1) return "";
 	std::string textA;
 	Poco::UnicodeConverter::convert(text, textA);
 	return textA;
@@ -148,48 +148,48 @@ std::string get_focused_window_text() {
 	#endif
 }
 void handle_sdl_event(SDL_Event* evt) {
-	if(evt->type==SDL_KEYDOWN||evt->type==SDL_KEYUP||evt->type==SDL_TEXTINPUT||evt->type==SDL_MOUSEMOTION||evt->type==SDL_MOUSEBUTTONDOWN||evt->type==SDL_MOUSEBUTTONUP||evt->type==SDL_MOUSEWHEEL)
+	if (evt->type == SDL_KEYDOWN || evt->type == SDL_KEYUP || evt->type == SDL_TEXTINPUT || evt->type == SDL_MOUSEMOTION || evt->type == SDL_MOUSEBUTTONDOWN || evt->type == SDL_MOUSEBUTTONUP || evt->type == SDL_MOUSEWHEEL)
 		InputEvent(evt);
-	else if(evt->type==SDL_WINDOWEVENT&&evt->window.event==SDL_WINDOWEVENT_FOCUS_LOST)
+	else if (evt->type == SDL_WINDOWEVENT && evt->window.event == SDL_WINDOWEVENT_FOCUS_LOST)
 		SDL_ResetKeyboard();
 }
 void wait(int ms) {
-	if(!g_WindowHandle||g_WindowThreadId!=thread_current_thread_id()) {
+	if (!g_WindowHandle || g_WindowThreadId != thread_current_thread_id()) {
 		Sleep(ms);
 		return;
 	}
-	while(ms>=0) {
-		int MS=(ms>25? 25 : ms);
-		if(g_GCMode==2)
+	while (ms >= 0) {
+		int MS = (ms > 25 ? 25 : ms);
+		if (g_GCMode == 2)
 			garbage_collect_action();
 		Sleep(MS);
 		SDL_PumpEvents();
-		ms-=MS;
-		if(ms<1) break;
+		ms -= MS;
+		if (ms < 1) break;
 	}
 	SDL_Event evt;
 	#ifdef __APPLE__
 	bool left_just_pressed = false, right_just_pressed = false;
 	#endif
-	while(SDL_PollEvent(&evt)) {
+	while (SDL_PollEvent(&evt)) {
 		#ifdef __APPLE__
-			// Hack to fix voiceover's weird handling of the left and right arrow keys. If a left/right arrow down/up event get generated in the same frame, we need to move the up event to the next frame.
-			bool evt_handled = false;
-			if(evt.type == SDL_KEYDOWN) {
-				if(evt.key.keysym.scancode == SDL_SCANCODE_LEFT) left_just_pressed = true;
-				if(evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) right_just_pressed = true;
-			} else if((left_just_pressed || right_just_pressed) && evt.type == SDL_KEYUP) {
-				evt_handled = true;
-				if(left_just_pressed && evt.key.keysym.scancode == SDL_SCANCODE_LEFT) post_events.push_back(evt);
-				else if(right_just_pressed && evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) post_events.push_back(evt);
-				else evt_handled = false;
-			}
-			if(evt_handled) continue;
+		// Hack to fix voiceover's weird handling of the left and right arrow keys. If a left/right arrow down/up event get generated in the same frame, we need to move the up event to the next frame.
+		bool evt_handled = false;
+		if (evt.type == SDL_KEYDOWN) {
+			if (evt.key.keysym.scancode == SDL_SCANCODE_LEFT) left_just_pressed = true;
+			if (evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) right_just_pressed = true;
+		} else if ((left_just_pressed || right_just_pressed) && evt.type == SDL_KEYUP) {
+			evt_handled = true;
+			if (left_just_pressed && evt.key.keysym.scancode == SDL_SCANCODE_LEFT) post_events.push_back(evt);
+			else if (right_just_pressed && evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) post_events.push_back(evt);
+			else evt_handled = false;
+		}
+		if (evt_handled) continue;
 		#endif
 		handle_sdl_event(&evt);
-		}
-	if(post_events.size()>0) {
-		for(SDL_Event& e : post_events)
+	}
+	if (post_events.size() > 0) {
+		for (SDL_Event& e : post_events)
 			SDL_PushEvent(&e);
 		post_events.clear();
 	}

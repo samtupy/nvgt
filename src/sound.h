@@ -25,7 +25,7 @@
 #include "misc_functions.h"
 #include "pack.h"
 
-BOOL init_sound(DWORD dev=-1);
+BOOL init_sound(DWORD dev = -1);
 BOOL shutdown_sound();
 
 class sound;
@@ -68,7 +68,7 @@ class sound_environment {
 	std::vector<sound_base*> attached;
 	std::unordered_map<std::string, IPLMaterial> materials;
 	bool scene_needs_commit = false;
-	public:
+public:
 	int ref_count;
 	IPLSimulator sim;
 	IPLSimulationSharedInputs sim_inputs;
@@ -121,7 +121,9 @@ public:
 	sound_base() : env(NULL), source(NULL), direct_effect(NULL), reflection_effect(NULL), reflection_decode_effect(NULL) {}
 	virtual void AddRef();
 	virtual void Release();
-	void set_hrtf(BOOL enable) { use_hrtf=enable; }
+	void set_hrtf(BOOL enable) {
+		use_hrtf = enable;
+	}
 	BOOL set_position(float listener_x, float listener_y, float listener_z, float sound_x, float sound_y, float sound_z, float rotation, float pan_step, float volume_step);
 };
 
@@ -147,17 +149,21 @@ public:
 	sound();
 	~sound();
 	void Release();
-	BOOL load(const std::string& filename, pack* containing_pack=NULL, BOOL allow_preloads=TRUE);
-	BOOL load_script(asIScriptFunction* close, asIScriptFunction* len, asIScriptFunction* read, asIScriptFunction* seek, const std::string& data, const std::string& preload_filename="");
-	BOOL load_memstream(std::string& data, DWORD size, const std::string& preload_filename="", bool legacy_encrypt = false);
+	BOOL load(const std::string& filename, pack* containing_pack = NULL, BOOL allow_preloads = TRUE);
+	BOOL load_script(asIScriptFunction* close, asIScriptFunction* len, asIScriptFunction* read, asIScriptFunction* seek, const std::string& data, const std::string& preload_filename = "");
+	BOOL load_memstream(std::string& data, DWORD size, const std::string& preload_filename = "", bool legacy_encrypt = false);
 	BOOL load_url(const std::string& url);
-	BOOL stream(const std::string& filename, pack* containing_pack=NULL) { return load(filename, containing_pack, FALSE); }
-	BOOL push_memory(unsigned char* buffer, DWORD length, BOOL stream_end=FALSE, int pcm_rate=0, int pcm_chans=0);
-	BOOL push_string(const std::string& buffer, BOOL stream_end=FALSE, int pcm_rate=0, int pcm_chans=0);
-	BOOL postload(const std::string& filename=std::string(""));
+	BOOL stream(const std::string& filename, pack* containing_pack = NULL) {
+		return load(filename, containing_pack, FALSE);
+	}
+	BOOL push_memory(unsigned char* buffer, DWORD length, BOOL stream_end = FALSE, int pcm_rate = 0, int pcm_chans = 0);
+	BOOL push_string(const std::string& buffer, BOOL stream_end = FALSE, int pcm_rate = 0, int pcm_chans = 0);
+	BOOL postload(const std::string& filename = std::string(""));
 	BOOL close();
-	int set_fx(std::string& fx, int idx=-1);
-	void set_length(float len) { if(len>=0) length=len; }
+	int set_fx(std::string& fx, int idx = -1);
+	void set_length(float len) {
+		if (len >= 0) length = len;
+	}
 	BOOL set_mixer(mixer* m);
 	BOOL play();
 	BOOL play_wait();
@@ -203,17 +209,17 @@ class mixer : public sound_base {
 	mixer* parent_mixer;
 	int get_effect_index(const char* id);
 public:
-	mixer(mixer* parent=NULL, BOOL for_single_sound=FALSE, BOOL for_decode=FALSE, BOOL floatingpoint=TRUE);
+	mixer(mixer* parent = NULL, BOOL for_single_sound = FALSE, BOOL for_decode = FALSE, BOOL floatingpoint = TRUE);
 	~mixer();
 	void AddRef();
 	void Release();
 	int get_data(const unsigned char* buffer, int bufsize);
 	BOOL add_mixer(mixer* m);
-	BOOL remove_mixer(mixer* m, BOOL internal=FALSE);
-	BOOL add_sound(sound& s, BOOL internal=FALSE);
-	BOOL remove_sound(sound& s, BOOL internal=FALSE);
+	BOOL remove_mixer(mixer* m, BOOL internal = FALSE);
+	BOOL add_sound(sound& s, BOOL internal = FALSE);
+	BOOL remove_sound(sound& s, BOOL internal = FALSE);
 	bool set_impulse_response(const std::string& response, float dry, float wet);
-	int set_fx(std::string& fx, int idx=-1);
+	int set_fx(std::string& fx, int idx = -1);
 	BOOL set_mixer(mixer* m);
 	BOOL is_sliding();
 	BOOL is_pan_sliding();

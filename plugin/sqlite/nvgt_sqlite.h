@@ -31,14 +31,14 @@ public:
 	std::string get_sql_statement();
 	int get_bind_param_count();
 	int get_column_count();
-	int bind_blob(int index, const std::string& blob, bool transient=true);
+	int bind_blob(int index, const std::string& blob, bool transient = true);
 	int bind_double(int index, double val);
 	int bind_int(int index, int val);
 	int bind_int64(int index, asINT64 val);
 	int bind_null(int index);
 	int bind_param_index(const std::string& name);
 	std::string bind_param_name(int index);
-	int bind_text(int index, const std::string& text, bool transient=true);
+	int bind_text(int index, const std::string& text, bool transient = true);
 	int clear_bindings();
 	std::string column_blob(int index);
 	int column_bytes(int index);
@@ -57,13 +57,13 @@ public:
 	sqlite3context(sqlite3_context* ctx);
 	void add_ref();
 	void release();
-	void set_blob(const std::string& blob, bool transient=true);
+	void set_blob(const std::string& blob, bool transient = true);
 	void set_double(double val);
-	void set_error(const std::string& errormsg, int errorcode=SQLITE_ERROR);
+	void set_error(const std::string& errormsg, int errorcode = SQLITE_ERROR);
 	void set_int(int val);
 	void set_int64(asINT64 val);
 	void set_null();
-	void set_text(const std::string& text, bool transient=true);
+	void set_text(const std::string& text, bool transient = true);
 };
 class sqlite3value {
 	int ref_count;
@@ -87,22 +87,22 @@ public:
 	std::string authorizer_user_data;
 	sqlite3* db;
 	sqlite3DB();
-	sqlite3DB(const std::string& filename, int mode=SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE);
+	sqlite3DB(const std::string& filename, int mode = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE);
 	void add_ref();
 	void release();
 	int close();
-	int open(const std::string& filename, int mode=SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE);
-	sqlite3statement* prepare(const std::string& statement, int* statement_tail=NULL);
-	int execute(const std::string& statements, CScriptArray* results=NULL);
+	int open(const std::string& filename, int mode = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE);
+	sqlite3statement* prepare(const std::string& statement, int* statement_tail = NULL);
+	int execute(const std::string& statements, CScriptArray* results = NULL);
 	asINT64 get_rows_changed();
 	asINT64 get_total_rows_changed();
 	int limit(int id, int val);
-	int set_authorizer(asIScriptFunction* auth, const std::string& user_data="");
+	int set_authorizer(asIScriptFunction* auth, const std::string& user_data = "");
 	asINT64 get_last_insert_rowid();
 	void set_last_insert_rowid(asINT64 val);
 	int get_last_error();
 	std::string get_last_error_text();
-	bool active() { return db!=NULL; }
+	bool active() { return db != NULL; }
 };
 
 void RegisterSqlite3(asIScriptEngine* engine);

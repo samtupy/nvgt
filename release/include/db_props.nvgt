@@ -11,949 +11,788 @@
 */
 
 database_object@ __DBO_CONSTRUCTING__;
-class database_object
-{
-sqlite3@ database; // Database pointed to should remain open for the lifetime of this object. A null handle or a pointer to an invalid database will lead to completely undefined results.
-string table; // Table this object type is stored in.
-database_property@[] properties;
-dictionary property_names; // Especially for database objects with many properties, it's faster to search for their index in this dictionary than to loop through the array comparing column_name strings.
-string primary_column; // A single primary column name in the table that uniquely identifies this particular object's row. When updates are performed, the value of this column is used in the UPDATE TABLE statement.
-string primary_column_value; // The value of primary_column in this object's row, cached for speed.
-private bool exists_in_table=false; // Internal property that will be set to true upon first commit if working with a new row.
-string _last_query_error=""; // Used to get debug information after the functions drop, commit, database_property.bind or database_property.retrieve are called. Set to an empty string upon success of these functions.
-database_object(sqlite3@ db, const string&in table, const string&in primary_column="rowid")
-{
-@__DBO_CONSTRUCTING__=this;
-@this.database=db;
-this.table=table;
-this.primary_column=primary_column;
-}
-void postconstruct(sqlite3statement@ s=null) // It's imparitive that you call this function in all database_object children directly following the super call in their constructor.
-{
-if(@s!=null)
-{
-for(uint i=0; i<s.column_count; i++)
-{
-int idx;
-if(!property_names.get(s.column_name(i), idx)) continue;
-if(idx<0 or idx>=properties.length()) continue;
-properties[idx].retrieve(s, i, this);
-}
-for(uint i=0; i<properties.length(); i++)
-properties[i].modified=false;
-exists_in_table=true;
-}
-@__DBO_CONSTRUCTING__=null;
-}
-string get_row_filter() property
-{
-if(primary_column_value.length()>0) return primary_column+"='"+primary_column_value+"'";
-int i;
-if(!property_names.get(primary_column, i) or i>=properties.length()) return "";
-if(!properties[i].modified and !properties[i].retrieved) return ""; // Primary column cannot be retrieved, instead it must always be provided.
-primary_column_value=properties[i].text();
-return primary_column+"='"+primary_column_value+"'";
-}
-string get_schema() property
-{
-if(table=="" or properties.length()<1) return "";
-string r="CREATE TABLE IF NOT EXISTS '"+table+"' (";
-for(uint i=0; i<properties.length(); i++)
-{
-if(properties[i].column_name=="rowid" or properties[i].column_name=="oid" or properties[i].column_name=="_rowid_") continue;
-r+=properties[i].column_name;
-string t=properties[i].type;
-if(t!="") r+=" "+t;
-if(primary_column==properties[i].column_name) r+=" PRIMARY KEY";
-if(properties[i].type_extra!="") r+=" "+properties[i].type_extra;
-if(i<properties.length()-1) r+=", ";
-}
-r+=");";
-return r;
-}
-bool drop()
-{
-_last_query_error="";
-if(!exists_in_table)
-{
-_last_query_error="not in table";
-return false;
-}
-string filter=row_filter;
-if(filter=="")
-{
-_last_query_error="unknown row filter";
-return false;
-}
-bool ret=database.execute("DELETE FROM "+table+" WHERE "+filter+";")==SQLITE_OK;
-if(!ret)
-{
-_last_query_error="db: "+database.get_last_error_text();
-return false;
-}
-for(uint i=0; i<properties.length(); i++)
-{
-if(primary_column==properties[i].column_name)
-{
-if(properties[i].type=="INTEGER")
-{
-database_int@ I=cast<database_int@>(@properties[i]);
-if(@I!=null and I.autoincrementing) continue;
-}
-}
-properties[i].modified=true;
-}
-exists_in_table=false;
-return ret;
-}
-bool commit()
-{
-_last_query_error="";
-if(exists_in_table)
-{
-string filter=row_filter;
-if(filter=="")
-{
-_last_query_error="invalid row filter";
-return false;
-}
-database_property@[] updating_props;
-string statement="UPDATE '"+table+"' SET ";
-for(uint i=0; i<properties.length(); i++)
-{
-if(!properties[i].modified) continue;
-if(updating_props.length()>0) statement+=", ";
-updating_props.insert_last(properties[i]);
-statement+=properties[i].column_name+"=?";
-}
-if(updating_props.length()<1) return true;
-statement+=" WHERE "+filter+";";
-sqlite3statement@ s=database.prepare(statement);
-if(@s==null)
-{
-_last_query_error="db: "+database.get_last_error_text();
-return false;;
-}
-for(uint i=0; i<updating_props.length(); i++)
-{
-if(!updating_props[i].bind(s, i+1)) continue;
-updating_props[i].modified=false;
-updating_props[i].retrieved=true;
-}
-bool ret=s.step()==SQLITE_DONE;
-if(!ret)
-_last_query_error="db step: "+database.get_last_error_text();
-}
-else // this row must be inserted from scratch.
-{
-database_property@[] updating_props;
-string statement="INSERT INTO '"+table+"' (";
-string bind_placeholders="";
-bool integer_primary;
-int primary_idx=-1;
-if(!property_names.get(primary_column, primary_idx) or primary_idx<0)
-{
-_last_query_error="primary column "+primary_column+" is not a property of this object";
-return false;
-}
-integer_primary=properties[primary_idx].type=="INTEGER";
-for(uint i=0; i<properties.length(); i++)
-{
-if(!properties[i].modified) continue;
-if(updating_props.length()>0)
-{
-statement+=", ";
-bind_placeholders+=", ";
-}
-updating_props.insert_last(properties[i]);
-statement+=properties[i].column_name;
-bind_placeholders+="?";
-}
-statement+=") VALUES ("+bind_placeholders+");";
-sqlite3statement@ s=database.prepare(statement);
-if(@s==null)
-{
-_last_query_error="db: "+database.get_last_error_text();
-return false;
-}
-for(uint i=0; i<updating_props.length(); i++)
-{
-if(!updating_props[i].bind(s, i+1)) continue;
-updating_props[i].modified=false;
-updating_props[i].retrieved=true;
-}
-int r=s.step();
-bool ret=r==SQLITE_DONE or r==SQLITE_CONSTRAINT and !integer_primary; // The hope is that if a database object with a primary text column is created and committed but a row with the primary column already exists, replace that row's contents with that of the new object.
-if(!ret)
-{
-_last_query_error="db step: "+database.get_last_error_text();
-return false;
-}
-if(properties[primary_idx].type=="INTEGER")
-{
-database_int@ I=cast<database_int@>(@properties[primary_idx]);
-if(@I!=null and I.autoincrementing)
-I.set_autoincrement_value(database.last_insert_rowid);
-}
-exists_in_table=true;
-return ret;
-}
-return false;
-}
-string dump(bool multiline_data=false)
-{
-string r;
-for(uint i=0; i<properties.length(); i++)
-{
-string t=properties[i].text();
-if(t.substr(0, 4)=="\x0e\x16\x07\x14") // This is probably an nvgt dictionary.
-t=string(deserialize(t));
-else if(properties[i].type=="BLOB" and cast<database_list@>(properties[i])==null) // For now we'll just encode it because it probably contains binary data that we don't have a pretty way of representing yet.
-t=string_base64_encode(t);
-else if(!multiline_data)
-{
-t.replace_this("\r", "");
-t.replace_this("\n", " : ");
-}
-r+=properties[i].column_name+"="+t+"\r\n";
-}
-return r;
-}
-}
-class database_property
-{
-weakref<database_object> parent; // A weak reference to the database object that this property belongs to. If we use an ordinary handle, we will create a needless circular reference.
-string column_name; // Column name in the parent table that this property points to.
-bool retrieved=false; // Internal variable used by this class to determine whether to retrieve the property's value from the database or to return an already retrieved stored value.
-bool modified=false; // This is internally set to true when the value of this property is updated so that database_object::commit knows to save it in the database.
-string get_type() property { return ""; } // Set by each property type, for example to TEXT, BLOB, or FLOAT. Only used for database_object::schema.
-string type_extra; // Free floating variable intended to be set in children of database_objects, gets appended to this properties declaration E. you may set this to "NOT NULL", or "UNIQUE", for example.
-database_property(const string&in column_name)
-{
-this.parent=weakref<database_object>(__DBO_CONSTRUCTING__);
-this.column_name=column_name;
-__DBO_CONSTRUCTING__.properties.insert_last(this);
-__DBO_CONSTRUCTING__.property_names.set(column_name, __DBO_CONSTRUCTING__.properties.length()-1);
-}
-database_property(database_property& other)
-{
-parent=@other.parent;
-column_name=other.column_name;
-type_extra=other.type_extra;
-}
-bool bind(sqlite3statement@ s, int idx)
-{
-return false;
-}
-bool retrieve()
-{
-database_object@ p=@parent;
-if(@p==null) return false;
-p._last_query_error="";
-string filter=p.row_filter;
-if(filter=="")
-{
-p._last_query_error="unknown row filter";
-return false; // we don't have enough information to retrieve this column.
-}
-sqlite3statement@ s=p.database.prepare("SELECT "+column_name+" from '"+p.table+"' WHERE "+filter+";");
-if(@s==null)
-{
-p._last_query_error="db: "+p.database.get_last_error_text();
-return false;
-}
-if(s.step()!=SQLITE_ROW)
-{
-p._last_query_error="db step: "+p.database.get_last_error_text();
-return false;
-}
-bool ret=retrieve(s, 0, p);
-return ret;
-}
-bool retrieve(sqlite3statement@ s, int idx)
-{
-database_object@ p=@parent;
-if(@p==null) return false;
-return retrieve(s, idx, p.database);
-}
-bool retrieve(sqlite3statement@ s, int idx, database_object@ p)
-{
-return retrieve(s, idx, p.database);
-}
-bool retrieve(sqlite3statement@ s, int idx, sqlite3@ db)
-{
-return false;
-}
-void opAssign(database_property@ other)
-{
-}
-string text()
-{
-return "";
-}
-}
-class database_string : database_property
-{
-private string val="";
-bool blob=false; // Must recommit manually for change to take effect, and should be set before first value retrieval.
-string get_type() property { return blob? "BLOB" : "TEXT"; }
-database_string(const string&in column_name, const string&in default_value)
-{
-super(column_name);
-val=default_value;
-modified=true;
-}
-database_string(const string&in column_name)
-{
-super(column_name);
-}
-database_string(database_string& other)
-{
-super(cast<database_property@>(other));
-val=other;
-}
-bool bind(sqlite3statement@ s, int idx)
-{
-if(blob)
-return s.bind_blob(idx, val, false)==SQLITE_OK;
-else
-return s.bind_text(idx, val, false)==SQLITE_OK;
-}
-bool retrieve(sqlite3statement@ s, int idx, sqlite3@ db)
-{
-if(blob)
-val=s.column_blob(idx);
-else
-val=s.column_text(idx);
-retrieved=db.get_last_error()==SQLITE_ROW;
-if(!retrieved) val="";
-return retrieved;
-}
-string text() { return opImplConv(); }
-string upper() { fetch(); return val.upper(); }
-string lower() { fetch(); return val.lower(); }
-string replace_range(uint start, int count, const string& in text) { fetch(); return val.replace_range(start, count, text); }
-string replace(const string& in search, const string& in replace, bool replace_all = true) { fetch(); return val.replace(search, replace, replace_all); }
-void replace_this(const string& in search, const string& in replace, bool replace_all = true) { fetch(); modified=true; val.replace_this(search, replace, replace_all); }
-void insert(uint pos, const string &in other) { fetch(); modified=true; val.insert(pos, other); }
-void erase(uint pos, int count = -1) { fetch(); modified=true; val.erase(pos, count); }
-void resize(uint count) { fetch(); modified=true; val.resize(count); }
-string reverse() { fetch(); return val.reverse(); }
-bool is_upper() { fetch(); return val.is_upper(); }
-bool is_lower() { fetch(); return val.is_lower(); }
-bool is_alphabetic() { fetch(); return val.is_alphabetic(); }
-bool is_digits() { fetch(); return val.is_digits(); }
-bool is_alphanumeric() { fetch(); return val.is_alphanumeric(); }
-bool is_punctuation() { fetch(); return val.is_punctuation(); }
-bool is_empty() { fetch(); return val.is_empty(); }
-uint length() { fetch(); return val.length(); }
-int find(const string&in text, int start=0) { fetch(); return val.find(text, start); }
-int find_first_of(const string&in text, int start=0) { fetch(); return val.find_first_of(text, start); }
-int find_first_not_of(const string&in text, int start=0) { fetch(); return val.find_first_not_of(text, start); }
-int rfind(const string&in text, int start=0) { fetch(); return val.rfind(text, start); }
-int find_last_of(const string&in text, int start=0) { fetch(); return val.find_last_of(text, start); }
-int find_last_not_of(const string&in text, int start=0) { fetch(); return val.find_last_not_of(text, start); }
-string substr(uint start=0, int count=-1) { fetch(); return val.substr(start, count); }
-string get_opIndex(int idx) property { fetch(); return this.val[idx]; }
-void set_opIndex(int idx, const string&in char) { fetch(); modified=true; this.val[idx]=char; }
-string[]@ split(const string&in delim, bool full=true) { fetch(); return this.val.split(delim, full); }
-string opImplConv()
-{
-fetch();
-return this.val;
-}
-private void fetch()
-{
-if(!retrieved and !modified) retrieve();
-}
-bool opEquals(const string&in val)
-{
-fetch();
-return this.val==val;
-}
-int opCmp(const string&in val)
-{
-fetch();
-if(this.val==val) return 0;
-return this.val<val? -1 : 1;
-}
-string opAssign(const string&in val)
-{
-modified=true;
-return this.val=val;
-}
-string opAssign(database_string@ other)
-{
-modified=true;
-return this.val=other.text();
-}
-void opAssign(database_property@ other)
-{
-database_string@ str=cast<database_string@>(other);
-if(@str!=null) opAssign(str);
-else opAssign(other.text());
-}
-string opAdd(const string&in val)
-{
-fetch();
-return this.val+val;
-}
-string opAddAssign(const string&in val)
-{
-fetch();
-if(val.length()>0) modified=true;
-return this.val+=val;
-}
-}
-class database_list : database_property
-{
-private string[] val={};
-string delimiter="\x1f"; // If you intend to change, make sure to do so before first commit and before first retrieve.
-string get_type() property { return "BLOB"; }
-database_list(const string&in column_name, string[]@ default_value)
-{
-super(column_name);
-val=default_value;
-modified=true;
-}
-database_list(const string&in column_name)
-{
-super(column_name);
-}
-database_list(database_list& other)
-{
-super(other);
-val=other;
-delimiter=other.delimiter;
-}
-bool bind(sqlite3statement@ s, int idx)
-{
-return s.bind_blob(idx, join(val, delimiter))==SQLITE_OK;
-}
-bool retrieve(sqlite3statement@ s, int idx, sqlite3@ db)
-{
-string tmp_val=s.column_blob(idx);
-retrieved=db.get_last_error()==SQLITE_ROW;
-if(retrieved and tmp_val!="") val=tmp_val.split(delimiter);
-return retrieved;
-}
-string text() { return string(value); }
-void insert_at(uint pos, const string &in v) { modified=true; value.insert_at(pos, v); }
-void insert_last(const string &in v) { modified=true; value.insert_last(v); }
-void remove_last() { modified=true; value.remove_last(); }
-void remove_at(uint pos) { modified=true; value.remove_at(pos); }
-void remove_range(uint start, uint count) { modified=true; value.remove_range(start, count); }
-void reserve(uint count) { value.resize(count); }
-void resize(uint count) { modified=true; value.resize(count); }
-void reverse() { modified=true; value.reverse(); }
-bool is_empty() { return value.is_empty(); }
-uint length() { return value.length(); }
-int find(const string&in v) { return value.find(v); }
-int find(int start, const string&in v) { return value.find(start, v); }
-string get_opIndex(int idx) property { return value[idx]; }
-void set_opIndex(int idx, const string&in v) { modified=true; val[idx]=v; }
-string[]@ opImplCast()
-{
-if(!retrieved and !modified and !retrieve()) return {};
-return @val;
-}
-private string[]@ get_value() property
-{
-if(!retrieved and !modified) retrieve();
-return @val;
-}
-bool opEquals(string[]@ val)
-{
-return this.value==val;
-}
-string[]@ opAssign(string[]@ val)
-{
-modified=true;
-return this.val=val;
-}
-void opAssign(database_property@ other)
-{
-opAssign(cast<database_list@>(other).opImplCast());
-}
-}
-class database_int : database_property
-{
-private int64 val=0;
-bool autoincrementing;
-string get_type() property { return "INTEGER"; }
-database_int(database_int& other)
-{
-super(other);
-val=other;
-}
-database_int(const string&in column_name, int64 default_value)
-{
-super(column_name);
-val=default_value;
-modified=true;
-}
-database_int(const string&in column_name, const string&in modifier)
-{
-super(column_name);
-if(modifier=="auto") autoincrementing=true;
-}
-database_int(const string&in column_name)
-{
-super(column_name);
-}
-bool bind(sqlite3statement@ s, int idx)
-{
-bool ret;
-if(val>0xffffffff)
-ret=s.bind_int64(idx, val)==SQLITE_OK;
-else
-ret=s.bind_int(idx, val)==SQLITE_OK;
-return ret;
-}
-bool retrieve(sqlite3statement@ s, int idx, sqlite3@ db)
-{
-val=s.column_int64(idx);
-retrieved=db.get_last_error()==SQLITE_ROW;
-return retrieved;
-}
-void set_autoincrement_value(int64 v)
-{
-if(!autoincrementing) return;
-val=v;
-retrieved=true;
-modified=false;
-}
-string text()
-{
-if(!retrieved and !modified and !retrieve()) return 0;
-return val;
-}
-int64 opImplConv()
-{
-fetch();
-return val;
-}
-int64 get()
-{
-fetch();
-return val;
-}
-private void fetch()
-{
-if(!retrieved and !modified) retrieve();
-}
-int64 opAssign(int64 val)
-{
-modified=true;
-return this.val=val;
-}
-void opAssign(database_property@ other)
-{
-database_int@ n=cast<database_int@>(other);
-if(@n!=null) opAssign(n.get());
-else opAssign(parse_int(other.text()));
-}
-bool opEquals(int64 val)
-{
-fetch();
-return this.val==val;
-}
-int opCmp(int64 val)
-{
-fetch();
-if(this.val==val) return 0;
-return this.val<val? -1 : 1;
-}
-int64 opNeg()
-{
-fetch();
-return -val;
-}
-int64 opCom()
-{
-fetch();
-return ~val;
-}
-int64 opPreInc()
-{
-fetch();
-modified=true;
-return ++val;
-}
-int64 opPostInc()
-{
-fetch();
-modified=true;
-return val++;
-}
-int64 opPreDec()
-{
-fetch();
-modified=true;
-return --val;
-}
-int64 opPostDec()
-{
-fetch();
-modified=true;
-return val--;
-}
-int64 opAdd(int64 val)
-{
-fetch();
-return this.val+val;
-}
-int64 opAddAssign(int64 val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val+=val;
-}
-int64 opSub(int64 val)
-{
-fetch();
-return this.val-val;
-}
-int64 opSubAssign(int64 val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val-=val;
-}
-int64 opMul(int64 val)
-{
-fetch();
-return this.val*val;
-}
-int64 opMulAssign(int64 val)
-{
-fetch();
-modified=true;
-return this.val*=val;
-}
-int64 opDiv(int64 val)
-{
-fetch();
-return this.val/val;
-}
-int64 opDivAssign(int64 val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val/=val;
-}
-int64 opMod(int64 val)
-{
-fetch();
-return this.val%val;
-}
-int64 opModAssign(int64 val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val%=val;
-}
-int64 opPow(int64 val)
-{
-fetch();
-return this.val**val;
-}
-int64 opPowAssign(int64 val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val**=val;
-}
-int64 opAnd(int64 val)
-{
-fetch();
-return this.val&val;
-}
-int64 opAndAssign(int64 val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val&=val;
-}
-int64 opOr(int64 val)
-{
-fetch();
-return this.val|val;
-}
-int64 opOrAssign(int64 val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val|=val;
-}
-int64 opXor(int64 val)
-{
-fetch();
-return this.val^val;
-}
-int64 opXorAssign(int64 val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val^=val;
-}
-int64 opShl(int64 val)
-{
-fetch();
-return this.val<<val;
-}
-int64 opShlAssign(int64 val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val<<=val;
-}
-int64 opShr(int64 val)
-{
-fetch();
-return this.val>>val;
-}
-int64 opShrAssign(int64 val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val>>=val;
-}
-int64 opUShr(int64 val)
-{
-fetch();
-return this.val>>>val;
-}
-int64 opUShrAssign(int64 val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val>>>=val;
-}
-}
-class database_double : database_property
-{
-private double val=0;
-string get_type() property { return "FLOAT"; }
-database_double(database_double& other)
-{
-super(other);
-val=other;
-}
-database_double(const string&in column_name, double default_value)
-{
-super(column_name);
-val=default_value;
-modified=true;
-}
-database_double(const string&in column_name)
-{
-super(column_name);
-}
-bool bind(sqlite3statement@ s, int idx)
-{
-return s.bind_double(idx, val)==SQLITE_OK;
-}
-bool retrieve(sqlite3statement@ s, int idx, sqlite3@ db)
-{
-val=s.column_double(idx);
-retrieved=db.get_last_error()==SQLITE_ROW;
-return retrieved;
-}
-string text()
-{
-fetch();
-return val;
-}
-string opImplConv()
-{
-fetch();
-return val;
-}
-double opImplConv()
-{
-fetch();
-return val;
-}
-double get()
-{ // TBC this absolutely shouldn't be needed (see opAssign below)
-fetch();
-return val;
-}
-private void fetch()
-{
-if(!retrieved and !modified) retrieve();
-}
-double opAssign(double val)
-{
-modified=true;
-return this.val=val;
-}
-void opAssign(database_property@ other)
-{
-database_double@ n=cast<database_double@>(other);
-if(@n!=null) opAssign(n.get()); // Must use a custom get function here or else multiple opAssigns according to compiler.
-else opAssign(parse_float(other.text()));
-}
-bool opEquals(double val)
-{
-fetch();
-return this.val==val;
-}
-int opCmp(double val)
-{
-fetch();
-if(this.val==val) return 0;
-return this.val<val? -1 : 1;
-}
-double opNeg()
-{
-fetch();
-return -val;
-}
-double opPreInc()
-{
-fetch();
-modified=true;
-return ++val;
-}
-double opPostInc()
-{
-fetch();
-modified=true;
-return val++;
-}
-double opPreDec()
-{
-fetch();
-modified=true;
-return --val;
-}
-double opPostDec()
-{
-fetch();
-modified=true;
-return val--;
-}
-double opAdd(double val)
-{
-fetch();
-return this.val+val;
-}
-double opAddAssign(double val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val+=val;
-}
-double opSub(double val)
-{
-fetch();
-return this.val-val;
-}
-double opSubAssign(double val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val-=val;
-}
-double opMul(double val)
-{
-fetch();
-return this.val*val;
-}
-double opMulAssign(double val)
-{
-fetch();
-modified=true;
-return this.val*=val;
-}
-double opDiv(double val)
-{
-fetch();
-return this.val/val;
-}
-double opDivAssign(double val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val/=val;
-}
-double opMod(double val)
-{
-fetch();
-return this.val%val;
-}
-double opModAssign(double val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val%=val;
-}
-double opPow(double val)
-{
-fetch();
-return this.val**val;
-}
-double opPowAssign(double val)
-{
-fetch();
-if(val!=0) modified=true;
-return this.val**=val;
-}
-}
-class database_bool : database_property
-{
-private bool val;
-string get_type() property { return "INT8"; }
-database_bool(const string&in column_name, bool default_value)
-{
-super(column_name);
-val=default_value;
-modified=true;
-}
-database_bool(const string&in column_name)
-{
-super(column_name);
-}
-bool bind(sqlite3statement@ s, int idx)
-{
-return s.bind_int(idx, val? 1 : 0)==SQLITE_OK;
-}
-bool retrieve(sqlite3statement@ s, int idx, sqlite3@ db)
-{
-val=s.column_int(idx)>0;
-retrieved=db.get_last_error()==SQLITE_ROW;
-return retrieved;
-}
-string text()
-{
-return get();
-}
-bool opImplConv()
-{
-return get();
-}
-bool get()
-{
-if(!retrieved and !modified) retrieve();
-return val;
-}
-bool opAssign(bool val)
-{
-modified=true;
-return this.val=val;
-}
-void opAssign(database_property@ other)
-{
-opAssign(cast<database_bool@>(other).get());
-}
-bool opEquals(bool val)
-{
-return get()==val;
-}
-bool opEquals(database_bool@ val)
-{
-return get()==val;
-}
+class database_object {
+	sqlite3@ database; // Database pointed to should remain open for the lifetime of this object. A null handle or a pointer to an invalid database will lead to completely undefined results.
+	string table; // Table this object type is stored in.
+	database_property@[] properties;
+	dictionary property_names; // Especially for database objects with many properties, it's faster to search for their index in this dictionary than to loop through the array comparing column_name strings.
+	string primary_column; // A single primary column name in the table that uniquely identifies this particular object's row. When updates are performed, the value of this column is used in the UPDATE TABLE statement.
+	string primary_column_value; // The value of primary_column in this object's row, cached for speed.
+	private bool exists_in_table = false; // Internal property that will be set to true upon first commit if working with a new row.
+	string _last_query_error = ""; // Used to get debug information after the functions drop, commit, database_property.bind or database_property.retrieve are called. Set to an empty string upon success of these functions.
+	database_object(sqlite3@ db, const string& in table, const string& in primary_column = "rowid") {
+		@__DBO_CONSTRUCTING__ = this;
+		@this.database = db;
+		this.table = table;
+		this.primary_column = primary_column;
+	}
+	void postconstruct(sqlite3statement@ s = null) { // It's imparitive that you call this function in all database_object children directly following the super call in their constructor.
+		if (@s != null) {
+			for (uint i = 0; i < s.column_count; i++) {
+				int idx;
+				if (!property_names.get(s.column_name(i), idx)) continue;
+				if (idx<0 or idx >= properties.length()) continue;
+				properties[idx].retrieve(s, i, this);
+			}
+			for (uint i = 0; i < properties.length(); i++)
+				properties[i].modified = false;
+			exists_in_table = true;
+		}
+		@__DBO_CONSTRUCTING__ = null;
+	}
+	string get_row_filter() property {
+		if (primary_column_value.length() > 0) return primary_column + "='" + primary_column_value + "'";
+		int i;
+		if (!property_names.get(primary_column, i) or i >= properties.length()) return "";
+		if (!properties[i].modified and !properties[i].retrieved) return ""; // Primary column cannot be retrieved, instead it must always be provided.
+		primary_column_value = properties[i].text();
+		return primary_column + "='" + primary_column_value + "'";
+	}
+	string get_schema() property {
+		if (table == "" or properties.length() < 1) return "";
+		string r = "CREATE TABLE IF NOT EXISTS '" + table + "' (";
+		for (uint i = 0; i < properties.length(); i++) {
+			if (properties[i].column_name == "rowid" or properties[i].column_name == "oid" or properties[i].column_name == "_rowid_") continue;
+			r += properties[i].column_name;
+			string t = properties[i].type;
+			if (t != "") r += " " + t;
+			if (primary_column == properties[i].column_name) r += " PRIMARY KEY";
+			if (properties[i].type_extra != "") r += " " + properties[i].type_extra;
+			if (i < properties.length() - 1) r += ", ";
+		}
+		r += ");";
+		return r;
+	}
+	bool drop() {
+		_last_query_error = "";
+		if (!exists_in_table) {
+			_last_query_error = "not in table";
+			return false;
+		}
+		string filter = row_filter;
+		if (filter == "") {
+			_last_query_error = "unknown row filter";
+			return false;
+		}
+		bool ret = database.execute("DELETE FROM " + table + " WHERE " + filter + ";") == SQLITE_OK;
+		if (!ret) {
+			_last_query_error = "db: " + database.get_last_error_text();
+			return false;
+		}
+		for (uint i = 0; i < properties.length(); i++) {
+			if (primary_column == properties[i].column_name) {
+				if (properties[i].type == "INTEGER") {
+					database_int@ I = cast < database_int@ > (@properties[i]);
+					if (@I != null and I.autoincrementing) continue;
+				}
+			}
+			properties[i].modified = true;
+		}
+		exists_in_table = false;
+		return ret;
+	}
+	bool commit() {
+		_last_query_error = "";
+		if (exists_in_table) {
+			string filter = row_filter;
+			if (filter == "") {
+				_last_query_error = "invalid row filter";
+				return false;
+			}
+			database_property@[] updating_props;
+			string statement = "UPDATE '" + table + "' SET ";
+			for (uint i = 0; i < properties.length(); i++) {
+				if (!properties[i].modified) continue;
+				if (updating_props.length() > 0) statement += ", ";
+				updating_props.insert_last(properties[i]);
+				statement += properties[i].column_name + "=?";
+			}
+			if (updating_props.length() < 1) return true;
+			statement += " WHERE " + filter + ";";
+			sqlite3statement@ s = database.prepare(statement);
+			if (@s == null) {
+				_last_query_error = "db: " + database.get_last_error_text();
+				return false;;
+			}
+			for (uint i = 0; i < updating_props.length(); i++) {
+				if (!updating_props[i].bind(s, i + 1)) continue;
+				updating_props[i].modified = false;
+				updating_props[i].retrieved = true;
+			}
+			bool ret = s.step() == SQLITE_DONE;
+			if (!ret)
+				_last_query_error = "db step: " + database.get_last_error_text();
+		} else { // this row must be inserted from scratch.
+			database_property@[] updating_props;
+			string statement = "INSERT INTO '" + table + "' (";
+			string bind_placeholders = "";
+			bool integer_primary;
+			int primary_idx = -1;
+			if (!property_names.get(primary_column, primary_idx) or primary_idx < 0) {
+				_last_query_error = "primary column " + primary_column + " is not a property of this object";
+				return false;
+			}
+			integer_primary = properties[primary_idx].type == "INTEGER";
+			for (uint i = 0; i < properties.length(); i++) {
+				if (!properties[i].modified) continue;
+				if (updating_props.length() > 0) {
+					statement += ", ";
+					bind_placeholders += ", ";
+				}
+				updating_props.insert_last(properties[i]);
+				statement += properties[i].column_name;
+				bind_placeholders += "?";
+			}
+			statement += ") VALUES (" + bind_placeholders + ");";
+			sqlite3statement@ s = database.prepare(statement);
+			if (@s == null) {
+				_last_query_error = "db: " + database.get_last_error_text();
+				return false;
+			}
+			for (uint i = 0; i < updating_props.length(); i++) {
+				if (!updating_props[i].bind(s, i + 1)) continue;
+				updating_props[i].modified = false;
+				updating_props[i].retrieved = true;
+			}
+			int r = s.step();
+			bool ret = r == SQLITE_DONE or r == SQLITE_CONSTRAINT and !integer_primary; // The hope is that if a database object with a primary text column is created and committed but a row with the primary column already exists, replace that row's contents with that of the new object.
+			if (!ret) {
+				_last_query_error = "db step: " + database.get_last_error_text();
+				return false;
+			}
+			if (properties[primary_idx].type == "INTEGER") {
+				database_int@ I = cast < database_int@ > (@properties[primary_idx]);
+				if (@I != null and I.autoincrementing)
+					I.set_autoincrement_value(database.last_insert_rowid);
+			}
+			exists_in_table = true;
+			return ret;
+		}
+		return false;
+	}
+	string dump(bool multiline_data = false) {
+		string r;
+		for (uint i = 0; i < properties.length(); i++) {
+			string t = properties[i].text();
+			if (t.substr(0, 4) == "\x0e\x16\x07\x14") // This is probably an nvgt dictionary.
+				t = string(deserialize(t));
+			else if (properties[i].type == "BLOB" and cast < database_list@ > (properties[i]) == null) // For now we'll just encode it because it probably contains binary data that we don't have a pretty way of representing yet.
+				t = string_base64_encode(t);
+			else if (!multiline_data) {
+				t.replace_this("\r", "");
+				t.replace_this("\n", " : ");
+			}
+			r += properties[i].column_name + "=" + t + "\r\n";
+		}
+		return r;
+	}
+}
+class database_property {
+	weakref<database_object> parent; // A weak reference to the database object that this property belongs to. If we use an ordinary handle, we will create a needless circular reference.
+	string column_name; // Column name in the parent table that this property points to.
+	bool retrieved = false; // Internal variable used by this class to determine whether to retrieve the property's value from the database or to return an already retrieved stored value.
+	bool modified = false; // This is internally set to true when the value of this property is updated so that database_object::commit knows to save it in the database.
+	string get_type() property { return ""; } // Set by each property type, for example to TEXT, BLOB, or FLOAT. Only used for database_object::schema.
+	string type_extra; // Free floating variable intended to be set in children of database_objects, gets appended to this properties declaration E. you may set this to "NOT NULL", or "UNIQUE", for example.
+	database_property(const string& in column_name) {
+		this.parent = weakref<database_object>(__DBO_CONSTRUCTING__);
+		this.column_name = column_name;
+		__DBO_CONSTRUCTING__.properties.insert_last(this);
+		__DBO_CONSTRUCTING__.property_names.set(column_name, __DBO_CONSTRUCTING__.properties.length() - 1);
+	}
+	database_property(database_property& other) {
+		parent = @other.parent;
+		column_name = other.column_name;
+		type_extra = other.type_extra;
+	}
+	bool bind(sqlite3statement@ s, int idx) {
+		return false;
+	}
+	bool retrieve() {
+		database_object@ p = @parent;
+		if (@p == null) return false;
+		p._last_query_error = "";
+		string filter = p.row_filter;
+		if (filter == "") {
+			p._last_query_error = "unknown row filter";
+			return false; // we don't have enough information to retrieve this column.
+		}
+		sqlite3statement@ s = p.database.prepare("SELECT " + column_name + " from '" + p.table + "' WHERE " + filter + ";");
+		if (@s == null) {
+			p._last_query_error = "db: " + p.database.get_last_error_text();
+			return false;
+		}
+		if (s.step() != SQLITE_ROW) {
+			p._last_query_error = "db step: " + p.database.get_last_error_text();
+			return false;
+		}
+		bool ret = retrieve(s, 0, p);
+		return ret;
+	}
+	bool retrieve(sqlite3statement@ s, int idx) {
+		database_object@ p = @parent;
+		if (@p == null) return false;
+		return retrieve(s, idx, p.database);
+	}
+	bool retrieve(sqlite3statement@ s, int idx, database_object@ p) {
+		return retrieve(s, idx, p.database);
+	}
+	bool retrieve(sqlite3statement@ s, int idx, sqlite3@ db) {
+		return false;
+	}
+	void opAssign(database_property@ other) {
+	}
+	string text() {
+		return "";
+	}
+}
+class database_string : database_property {
+	private string val = "";
+	bool blob = false; // Must recommit manually for change to take effect, and should be set before first value retrieval.
+	string get_type() property { return blob ? "BLOB" : "TEXT"; }
+	database_string(const string& in column_name, const string& in default_value) {
+		super(column_name);
+		val = default_value;
+		modified = true;
+	}
+	database_string(const string& in column_name) {
+		super(column_name);
+	}
+	database_string(database_string& other) {
+		super(cast < database_property@ > (other));
+		val = other;
+	}
+	bool bind(sqlite3statement@ s, int idx) {
+		if (blob)
+			return s.bind_blob(idx, val, false) == SQLITE_OK;
+		else
+			return s.bind_text(idx, val, false) == SQLITE_OK;
+	}
+	bool retrieve(sqlite3statement@ s, int idx, sqlite3@ db) {
+		if (blob)
+			val = s.column_blob(idx);
+		else
+			val = s.column_text(idx);
+		retrieved = db.get_last_error() == SQLITE_ROW;
+		if (!retrieved) val = "";
+		return retrieved;
+	}
+	string text() { return opImplConv(); }
+	string upper() { fetch(); return val.upper(); }
+	string lower() { fetch(); return val.lower(); }
+	string replace_range(uint start, int count, const string& in text) { fetch(); return val.replace_range(start, count, text); }
+	string replace(const string& in search, const string& in replace, bool replace_all = true) { fetch(); return val.replace(search, replace, replace_all); }
+	void replace_this(const string& in search, const string& in replace, bool replace_all = true) { fetch(); modified = true; val.replace_this(search, replace, replace_all); }
+	void insert(uint pos, const string& in other) { fetch(); modified = true; val.insert(pos, other); }
+	void erase(uint pos, int count = -1) { fetch(); modified = true; val.erase(pos, count); }
+	void resize(uint count) { fetch(); modified = true; val.resize(count); }
+	string reverse() { fetch(); return val.reverse(); }
+	bool is_upper() { fetch(); return val.is_upper(); }
+	bool is_lower() { fetch(); return val.is_lower(); }
+	bool is_alphabetic() { fetch(); return val.is_alphabetic(); }
+	bool is_digits() { fetch(); return val.is_digits(); }
+	bool is_alphanumeric() { fetch(); return val.is_alphanumeric(); }
+	bool is_punctuation() { fetch(); return val.is_punctuation(); }
+	bool is_empty() { fetch(); return val.is_empty(); }
+	uint length() { fetch(); return val.length(); }
+	int find(const string& in text, int start = 0) { fetch(); return val.find(text, start); }
+	int find_first_of(const string& in text, int start = 0) { fetch(); return val.find_first_of(text, start); }
+	int find_first_not_of(const string& in text, int start = 0) { fetch(); return val.find_first_not_of(text, start); }
+	int rfind(const string& in text, int start = 0) { fetch(); return val.rfind(text, start); }
+	int find_last_of(const string& in text, int start = 0) { fetch(); return val.find_last_of(text, start); }
+	int find_last_not_of(const string& in text, int start = 0) { fetch(); return val.find_last_not_of(text, start); }
+	string substr(uint start = 0, int count = -1) { fetch(); return val.substr(start, count); }
+	string get_opIndex(int idx) property { fetch(); return this.val[idx]; }
+	void set_opIndex(int idx, const string& in char) { fetch(); modified = true; this.val[idx] = char; }
+	string[]@ split(const string& in delim, bool full = true) { fetch(); return this.val.split(delim, full); }
+	string opImplConv() {
+		fetch();
+		return this.val;
+	}
+	private void fetch() {
+		if (!retrieved and !modified) retrieve();
+	}
+	bool opEquals(const string& in val) {
+		fetch();
+		return this.val == val;
+	}
+	int opCmp(const string& in val) {
+		fetch();
+		if (this.val == val) return 0;
+		return this.val < val ? -1 : 1;
+	}
+	string opAssign(const string& in val) {
+		modified = true;
+		return this.val = val;
+	}
+	string opAssign(database_string@ other) {
+		modified = true;
+		return this.val = other.text();
+	}
+	void opAssign(database_property@ other) {
+		database_string@ str = cast < database_string@ > (other);
+		if (@str != null) opAssign(str);
+		else opAssign(other.text());
+	}
+	string opAdd(const string& in val) {
+		fetch();
+		return this.val + val;
+	}
+	string opAddAssign(const string& in val) {
+		fetch();
+		if (val.length() > 0) modified = true;
+		return this.val += val;
+	}
+}
+class database_list : database_property {
+	private string[] val = {};
+	string delimiter = "\x1f"; // If you intend to change, make sure to do so before first commit and before first retrieve.
+	string get_type() property { return "BLOB"; }
+	database_list(const string& in column_name, string[]@ default_value) {
+		super(column_name);
+		val = default_value;
+		modified = true;
+	}
+	database_list(const string& in column_name) {
+		super(column_name);
+	}
+	database_list(database_list& other) {
+		super(other);
+		val = other;
+		delimiter = other.delimiter;
+	}
+	bool bind(sqlite3statement@ s, int idx) {
+		return s.bind_blob(idx, join(val, delimiter)) == SQLITE_OK;
+	}
+	bool retrieve(sqlite3statement@ s, int idx, sqlite3@ db) {
+		string tmp_val = s.column_blob(idx);
+		retrieved = db.get_last_error() == SQLITE_ROW;
+		if (retrieved and tmp_val != "") val = tmp_val.split(delimiter);
+		return retrieved;
+	}
+	string text() { return string(value); }
+	void insert_at(uint pos, const string& in v) { modified = true; value.insert_at(pos, v); }
+	void insert_last(const string& in v) { modified = true; value.insert_last(v); }
+	void remove_last() { modified = true; value.remove_last(); }
+	void remove_at(uint pos) { modified = true; value.remove_at(pos); }
+	void remove_range(uint start, uint count) { modified = true; value.remove_range(start, count); }
+	void reserve(uint count) { value.resize(count); }
+	void resize(uint count) { modified = true; value.resize(count); }
+	void reverse() { modified = true; value.reverse(); }
+	bool is_empty() { return value.is_empty(); }
+	uint length() { return value.length(); }
+	int find(const string& in v) { return value.find(v); }
+	int find(int start, const string& in v) { return value.find(start, v); }
+	string get_opIndex(int idx) property { return value[idx]; }
+	void set_opIndex(int idx, const string& in v) { modified = true; val[idx] = v; }
+	string[]@ opImplCast() {
+		if (!retrieved and !modified and !retrieve()) return {};
+		return @val;
+	}
+	private string[]@ get_value() property {
+		if (!retrieved and !modified) retrieve();
+		return @val;
+	}
+	bool opEquals(string[]@ val) {
+		return this.value == val;
+	}
+	string[]@ opAssign(string[]@ val) {
+		modified = true;
+		return this.val = val;
+	}
+	void opAssign(database_property@ other) {
+		opAssign(cast < database_list@ > (other).opImplCast());
+	}
+}
+class database_int : database_property {
+	private int64 val = 0;
+	bool autoincrementing;
+	string get_type() property { return "INTEGER"; }
+	database_int(database_int& other) {
+		super(other);
+		val = other;
+	}
+	database_int(const string& in column_name, int64 default_value) {
+		super(column_name);
+		val = default_value;
+		modified = true;
+	}
+	database_int(const string& in column_name, const string& in modifier) {
+		super(column_name);
+		if (modifier == "auto") autoincrementing = true;
+	}
+	database_int(const string& in column_name) {
+		super(column_name);
+	}
+	bool bind(sqlite3statement@ s, int idx) {
+		bool ret;
+		if (val > 0xffffffff)
+			ret = s.bind_int64(idx, val) == SQLITE_OK;
+		else
+			ret = s.bind_int(idx, val) == SQLITE_OK;
+		return ret;
+	}
+	bool retrieve(sqlite3statement@ s, int idx, sqlite3@ db) {
+		val = s.column_int64(idx);
+		retrieved = db.get_last_error() == SQLITE_ROW;
+		return retrieved;
+	}
+	void set_autoincrement_value(int64 v) {
+		if (!autoincrementing) return;
+		val = v;
+		retrieved = true;
+		modified = false;
+	}
+	string text() {
+		if (!retrieved and !modified and !retrieve()) return 0;
+		return val;
+	}
+	int64 opImplConv() {
+		fetch();
+		return val;
+	}
+	int64 get() {
+		fetch();
+		return val;
+	}
+	private void fetch() {
+		if (!retrieved and !modified) retrieve();
+	}
+	int64 opAssign(int64 val) {
+		modified = true;
+		return this.val = val;
+	}
+	void opAssign(database_property@ other) {
+		database_int@ n = cast < database_int@ > (other);
+		if (@n != null) opAssign(n.get());
+		else opAssign(parse_int(other.text()));
+	}
+	bool opEquals(int64 val) {
+		fetch();
+		return this.val == val;
+	}
+	int opCmp(int64 val) {
+		fetch();
+		if (this.val == val) return 0;
+		return this.val < val ? -1 : 1;
+	}
+	int64 opNeg() {
+		fetch();
+		return -val;
+	}
+	int64 opCom() {
+		fetch();
+		return ~val;
+	}
+	int64 opPreInc() {
+		fetch();
+		modified = true;
+		return ++val;
+	}
+	int64 opPostInc() {
+		fetch();
+		modified = true;
+		return val++;
+	}
+	int64 opPreDec() {
+		fetch();
+		modified = true;
+		return --val;
+	}
+	int64 opPostDec() {
+		fetch();
+		modified = true;
+		return val--;
+	}
+	int64 opAdd(int64 val) {
+		fetch();
+		return this.val + val;
+	}
+	int64 opAddAssign(int64 val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val += val;
+	}
+	int64 opSub(int64 val) {
+		fetch();
+		return this.val - val;
+	}
+	int64 opSubAssign(int64 val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val -= val;
+	}
+	int64 opMul(int64 val) {
+		fetch();
+		return this.val * val;
+	}
+	int64 opMulAssign(int64 val) {
+		fetch();
+		modified = true;
+		return this.val *= val;
+	}
+	int64 opDiv(int64 val) {
+		fetch();
+		return this.val / val;
+	}
+	int64 opDivAssign(int64 val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val /= val;
+	}
+	int64 opMod(int64 val) {
+		fetch();
+		return this.val % val;
+	}
+	int64 opModAssign(int64 val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val %= val;
+	}
+	int64 opPow(int64 val) {
+		fetch();
+		return this.val** val;
+	}
+	int64 opPowAssign(int64 val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val** = val;
+	}
+	int64 opAnd(int64 val) {
+		fetch();
+		return this.val & val;
+	}
+	int64 opAndAssign(int64 val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val &= val;
+	}
+	int64 opOr(int64 val) {
+		fetch();
+		return this.val | val;
+	}
+	int64 opOrAssign(int64 val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val |= val;
+	}
+	int64 opXor(int64 val) {
+		fetch();
+		return this.val ^ val;
+	}
+	int64 opXorAssign(int64 val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val ^= val;
+	}
+	int64 opShl(int64 val) {
+		fetch();
+		return this.val << val;
+	}
+	int64 opShlAssign(int64 val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val <<= val;
+	}
+	int64 opShr(int64 val) {
+		fetch();
+		return this.val >> val;
+	}
+	int64 opShrAssign(int64 val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val >>= val;
+	}
+	int64 opUShr(int64 val) {
+		fetch();
+		return this.val >>> val;
+	}
+	int64 opUShrAssign(int64 val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val >>>= val;
+	}
+}
+class database_double : database_property {
+	private double val = 0;
+	string get_type() property { return "FLOAT"; }
+	database_double(database_double& other) {
+		super(other);
+		val = other;
+	}
+	database_double(const string& in column_name, double default_value) {
+		super(column_name);
+		val = default_value;
+		modified = true;
+	}
+	database_double(const string& in column_name) {
+		super(column_name);
+	}
+	bool bind(sqlite3statement@ s, int idx) {
+		return s.bind_double(idx, val) == SQLITE_OK;
+	}
+	bool retrieve(sqlite3statement@ s, int idx, sqlite3@ db) {
+		val = s.column_double(idx);
+		retrieved = db.get_last_error() == SQLITE_ROW;
+		return retrieved;
+	}
+	string text() {
+		fetch();
+		return val;
+	}
+	string opImplConv() {
+		fetch();
+		return val;
+	}
+	double opImplConv() {
+		fetch();
+		return val;
+	}
+	double get() {
+		// TBC this absolutely shouldn't be needed (see opAssign below)
+		fetch();
+		return val;
+	}
+	private void fetch() {
+		if (!retrieved and !modified) retrieve();
+	}
+	double opAssign(double val) {
+		modified = true;
+		return this.val = val;
+	}
+	void opAssign(database_property@ other) {
+		database_double@ n = cast < database_double@ > (other);
+		if (@n != null) opAssign(n.get()); // Must use a custom get function here or else multiple opAssigns according to compiler.
+		else opAssign(parse_float(other.text()));
+	}
+	bool opEquals(double val) {
+		fetch();
+		return this.val == val;
+	}
+	int opCmp(double val) {
+		fetch();
+		if (this.val == val) return 0;
+		return this.val < val ? -1 : 1;
+	}
+	double opNeg() {
+		fetch();
+		return -val;
+	}
+	double opPreInc() {
+		fetch();
+		modified = true;
+		return ++val;
+	}
+	double opPostInc() {
+		fetch();
+		modified = true;
+		return val++;
+	}
+	double opPreDec() {
+		fetch();
+		modified = true;
+		return --val;
+	}
+	double opPostDec() {
+		fetch();
+		modified = true;
+		return val--;
+	}
+	double opAdd(double val) {
+		fetch();
+		return this.val + val;
+	}
+	double opAddAssign(double val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val += val;
+	}
+	double opSub(double val) {
+		fetch();
+		return this.val - val;
+	}
+	double opSubAssign(double val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val -= val;
+	}
+	double opMul(double val) {
+		fetch();
+		return this.val * val;
+	}
+	double opMulAssign(double val) {
+		fetch();
+		modified = true;
+		return this.val *= val;
+	}
+	double opDiv(double val) {
+		fetch();
+		return this.val / val;
+	}
+	double opDivAssign(double val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val /= val;
+	}
+	double opMod(double val) {
+		fetch();
+		return this.val % val;
+	}
+	double opModAssign(double val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val %= val;
+	}
+	double opPow(double val) {
+		fetch();
+		return this.val** val;
+	}
+	double opPowAssign(double val) {
+		fetch();
+		if (val != 0) modified = true;
+		return this.val** = val;
+	}
+}
+class database_bool : database_property {
+	private bool val;
+	string get_type() property { return "INT8"; }
+	database_bool(const string& in column_name, bool default_value) {
+		super(column_name);
+		val = default_value;
+		modified = true;
+	}
+	database_bool(const string& in column_name) {
+		super(column_name);
+	}
+	bool bind(sqlite3statement@ s, int idx) {
+		return s.bind_int(idx, val ? 1 : 0) == SQLITE_OK;
+	}
+	bool retrieve(sqlite3statement@ s, int idx, sqlite3@ db) {
+		val = s.column_int(idx) > 0;
+		retrieved = db.get_last_error() == SQLITE_ROW;
+		return retrieved;
+	}
+	string text() {
+		return get();
+	}
+	bool opImplConv() {
+		return get();
+	}
+	bool get() {
+		if (!retrieved and !modified) retrieve();
+		return val;
+	}
+	bool opAssign(bool val) {
+		modified = true;
+		return this.val = val;
+	}
+	void opAssign(database_property@ other) {
+		opAssign(cast < database_bool@ > (other).get());
+	}
+	bool opEquals(bool val) {
+		return get() == val;
+	}
+	bool opEquals(database_bool@ val) {
+		return get() == val;
+	}
 }

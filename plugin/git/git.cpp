@@ -13,17 +13,17 @@
 #include "../../src/nvgt_plugin.h"
 #include "git.h"
 
-static bool libgit2_inited=false;
+static bool libgit2_inited = false;
 static asIScriptEngine* g_ScriptEngine = NULL;
 
 int nvgt_git_default_match_callback(const char* path, const char* matched, void* payload) {
-	nvgt_git_repository* repo=(nvgt_git_repository*)payload;
-	if(!repo->match_callback) return 0;
-	asIScriptContext* ACtx=asGetActiveContext();
-	bool new_context=!ACtx||ACtx->PushState()<0;
-	asIScriptContext* ctx=new_context? g_ScriptEngine->RequestContext() : ACtx;
-	if(ctx->Prepare(repo->match_callback)) {
-		if(new_context) g_ScriptEngine->ReturnContext(ctx);
+	nvgt_git_repository* repo = (nvgt_git_repository*)payload;
+	if (!repo->match_callback) return 0;
+	asIScriptContext* ACtx = asGetActiveContext();
+	bool new_context = !ACtx || ACtx->PushState() < 0;
+	asIScriptContext* ctx = new_context ? g_ScriptEngine->RequestContext() : ACtx;
+	if (ctx->Prepare(repo->match_callback)) {
+		if (new_context) g_ScriptEngine->ReturnContext(ctx);
 		else ctx->PopState();
 		return GIT_EUSER;
 	}
@@ -32,257 +32,257 @@ int nvgt_git_default_match_callback(const char* path, const char* matched, void*
 	ctx->SetArgObject(1, repo);
 	ctx->SetArgObject(2, &path_str);
 	ctx->SetArgObject(3, &repo->match_callback_payload);
-	int ret=GIT_EUSER;
-	if(ctx->Execute()==asEXECUTION_FINISHED)
-		ret=ctx->GetReturnDWord();
-	if(new_context) g_ScriptEngine->ReturnContext(ctx);
+	int ret = GIT_EUSER;
+	if (ctx->Execute() == asEXECUTION_FINISHED)
+		ret = ctx->GetReturnDWord();
+	if (new_context) g_ScriptEngine->ReturnContext(ctx);
 	else ctx->PopState();
 	return ret;
 }
 int nvgt_git_changed_match_callback(const char* path, const char* matched, void* payload) {
-	git_repository* repo=(git_repository*)payload;
+	git_repository* repo = (git_repository*)payload;
 	unsigned int status;
-	if(git_status_file(&status, repo, path) < 0) return -1;
-	if((status&GIT_STATUS_WT_MODIFIED)||(status&GIT_STATUS_WT_NEW)) return 0;
+	if (git_status_file(&status, repo, path) < 0) return -1;
+	if ((status & GIT_STATUS_WT_MODIFIED) || (status & GIT_STATUS_WT_NEW)) return 0;
 	return 1;
 }
 inline git_strarray as_strarray2git_strarray(CScriptArray* as_array) {
 	git_strarray strarray;
-	strarray.count=as_array->GetSize();
-	strarray.strings=(char**)malloc(strarray.count*sizeof(char*));
-	for(int i=0; i<strarray.count; i++)
-		strarray.strings[i]=(char*)(*(std::string*)as_array->At(i)).c_str();
+	strarray.count = as_array->GetSize();
+	strarray.strings = (char**)malloc(strarray.count * sizeof(char*));
+	for (int i = 0; i < strarray.count; i++)
+		strarray.strings[i] = (char*)(*(std::string*)as_array->At(i)).c_str();
 	return strarray;
 }
 
 
 nvgt_git_repository::nvgt_git_repository() : repo(NULL), index(NULL), ref_count(1) {
-	if(!libgit2_inited) {
+	if (!libgit2_inited) {
 		git_libgit2_init();
-		libgit2_inited=true;
+		libgit2_inited = true;
 	}
 }
 void nvgt_git_repository::add_ref() {
 	asAtomicInc(ref_count);
 }
 void nvgt_git_repository::release() {
-	if(asAtomicDec(ref_count)<1) {
+	if (asAtomicDec(ref_count) < 1) {
 		close();
 		delete this;
 	}
 }
 int nvgt_git_repository::open(const std::string& path) {
-	if(repo) return GIT_EEXISTS;
-	int ret=git_repository_open(&repo, path.c_str());
-	if(ret==GIT_OK)
+	if (repo) return GIT_EEXISTS;
+	int ret = git_repository_open(&repo, path.c_str());
+	if (ret == GIT_OK)
 		git_repository_index(&index, repo);
 	return ret;
 }
 int nvgt_git_repository::create(const std::string& path) {
-	if(repo) return GIT_EEXISTS;
-	int ret=git_repository_init(&repo, path.c_str(), false);
-	if(ret==GIT_OK)
+	if (repo) return GIT_EEXISTS;
+	int ret = git_repository_init(&repo, path.c_str(), false);
+	if (ret == GIT_OK)
 		git_repository_index(&index, repo);
 	return ret;
 }
 bool nvgt_git_repository::close() {
-	if(!index&&!repo) return false;
-	if(index) git_index_free(index);
-	if(repo) git_repository_free(repo);
-	index=NULL;
-	repo=NULL;
+	if (!index && !repo) return false;
+	if (index) git_index_free(index);
+	if (repo) git_repository_free(repo);
+	index = NULL;
+	repo = NULL;
 	return true;
 }
 int nvgt_git_repository::add(const std::string& path) {
-	if(!index) return GIT_ERROR;
+	if (!index) return GIT_ERROR;
 	return git_index_add_bypath(index, path.c_str());
 }
 int nvgt_git_repository::add_all(CScriptArray* paths, int flags) {
-	if(!index||!paths) return GIT_ERROR;
-	git_strarray paths_list=as_strarray2git_strarray(paths);
-	int ret=git_index_add_all(index, &paths_list, flags, nvgt_git_changed_match_callback, repo);
+	if (!index || !paths) return GIT_ERROR;
+	git_strarray paths_list = as_strarray2git_strarray(paths);
+	int ret = git_index_add_all(index, &paths_list, flags, nvgt_git_changed_match_callback, repo);
 	free(paths_list.strings);
 	return ret;
 }
 int nvgt_git_repository::add_all_cb(CScriptArray* paths, int flags, asIScriptFunction* match_callback, const std::string& match_callback_payload) {
-	if(!index||!paths) return GIT_ERROR;
-	git_strarray paths_list=as_strarray2git_strarray(paths);
-	this->match_callback=match_callback;
-	this->match_callback_payload=match_callback_payload;
-	int ret=git_index_add_all(index, &paths_list, flags, this->match_callback? nvgt_git_default_match_callback : NULL, this);
+	if (!index || !paths) return GIT_ERROR;
+	git_strarray paths_list = as_strarray2git_strarray(paths);
+	this->match_callback = match_callback;
+	this->match_callback_payload = match_callback_payload;
+	int ret = git_index_add_all(index, &paths_list, flags, this->match_callback ? nvgt_git_default_match_callback : NULL, this);
 	match_callback->Release();
-	this->match_callback=NULL;
+	this->match_callback = NULL;
 	free(paths_list.strings);
 	return ret;
 }
 int nvgt_git_repository::remove(const std::string& path) {
-	if(!index) return GIT_ERROR;
+	if (!index) return GIT_ERROR;
 	return git_index_remove_bypath(index, path.c_str());
 }
 int nvgt_git_repository::remove_all(CScriptArray* paths) {
-	if(!index||!paths) return GIT_ERROR;
-	git_strarray paths_list=as_strarray2git_strarray(paths);
-	int ret=git_index_remove_all(index, &paths_list, nvgt_git_changed_match_callback, repo);
+	if (!index || !paths) return GIT_ERROR;
+	git_strarray paths_list = as_strarray2git_strarray(paths);
+	int ret = git_index_remove_all(index, &paths_list, nvgt_git_changed_match_callback, repo);
 	free(paths_list.strings);
 	return ret;
 }
 int nvgt_git_repository::remove_all_cb(CScriptArray* paths, asIScriptFunction* match_callback, const std::string& match_callback_payload) {
-	if(!index||!paths) return GIT_ERROR;
-	git_strarray paths_list=as_strarray2git_strarray(paths);
-	this->match_callback=match_callback;
-	this->match_callback_payload=match_callback_payload;
-	int ret=git_index_remove_all(index, &paths_list, this->match_callback? nvgt_git_default_match_callback : NULL, this);
+	if (!index || !paths) return GIT_ERROR;
+	git_strarray paths_list = as_strarray2git_strarray(paths);
+	this->match_callback = match_callback;
+	this->match_callback_payload = match_callback_payload;
+	int ret = git_index_remove_all(index, &paths_list, this->match_callback ? nvgt_git_default_match_callback : NULL, this);
 	match_callback->Release();
-	this->match_callback=NULL;
+	this->match_callback = NULL;
 	free(paths_list.strings);
 	return ret;
 }
 int nvgt_git_repository::update_all(CScriptArray* paths) {
-	if(!index||!paths) return GIT_ERROR;
-	git_strarray paths_list=as_strarray2git_strarray(paths);
-	int ret=git_index_update_all(index, &paths_list, nvgt_git_changed_match_callback, repo);
+	if (!index || !paths) return GIT_ERROR;
+	git_strarray paths_list = as_strarray2git_strarray(paths);
+	int ret = git_index_update_all(index, &paths_list, nvgt_git_changed_match_callback, repo);
 	free(paths_list.strings);
 	return ret;
 }
 int nvgt_git_repository::update_all_cb(CScriptArray* paths, asIScriptFunction* match_callback, const std::string& match_callback_payload) {
-	if(!index||!paths) return GIT_ERROR;
-	git_strarray paths_list=as_strarray2git_strarray(paths);
-	this->match_callback=match_callback;
-	this->match_callback_payload=match_callback_payload;
-	int ret=git_index_update_all(index, &paths_list, this->match_callback? nvgt_git_default_match_callback : NULL, this);
+	if (!index || !paths) return GIT_ERROR;
+	git_strarray paths_list = as_strarray2git_strarray(paths);
+	this->match_callback = match_callback;
+	this->match_callback_payload = match_callback_payload;
+	int ret = git_index_update_all(index, &paths_list, this->match_callback ? nvgt_git_default_match_callback : NULL, this);
 	match_callback->Release();
-	this->match_callback=NULL;
+	this->match_callback = NULL;
 	free(paths_list.strings);
 	return ret;
 }
 nvgt_git_repository_commit* nvgt_git_repository::commit(const std::string& author, const std::string& author_email, const std::string& committer, const std::string& committer_email, const std::string& message, const std::string& commit_ref) {
-	git_oid commit_oid,tree_oid;
-	git_tree *tree;
-	git_object *parent=NULL;
-	git_reference *ref=NULL;
-	git_signature *signature_author;
-	git_signature *signature_committer;
-	int r=git_revparse_ext(&parent, &ref, repo, commit_ref.c_str());
-	if(r!=GIT_OK&&r!=GIT_ENOTFOUND) return NULL;
-	if(git_index_write_tree(&tree_oid, index)) {
+	git_oid commit_oid, tree_oid;
+	git_tree* tree;
+	git_object* parent = NULL;
+	git_reference* ref = NULL;
+	git_signature* signature_author;
+	git_signature* signature_committer;
+	int r = git_revparse_ext(&parent, &ref, repo, commit_ref.c_str());
+	if (r != GIT_OK && r != GIT_ENOTFOUND) return NULL;
+	if (git_index_write_tree(&tree_oid, index)) {
 		git_object_free(parent);
 		git_reference_free(ref);
 		return NULL;
 	}
-	if(git_index_write(index)) {
+	if (git_index_write(index)) {
 		git_object_free(parent);
 		git_reference_free(ref);
 		return NULL;
 	}
-	if(git_tree_lookup(&tree, repo, &tree_oid)) {
+	if (git_tree_lookup(&tree, repo, &tree_oid)) {
 		git_object_free(parent);
 		git_reference_free(ref);
 		return NULL;
 	}
-	if(git_signature_now(&signature_author, author.c_str(), author_email.c_str())) {
+	if (git_signature_now(&signature_author, author.c_str(), author_email.c_str())) {
 		git_tree_free(tree);
 		git_object_free(parent);
 		git_reference_free(ref);
 		return NULL;
 	}
-	if(git_signature_now(&signature_committer, committer.c_str(), committer_email.c_str())) {
+	if (git_signature_now(&signature_committer, committer.c_str(), committer_email.c_str())) {
 		git_signature_free(signature_author);
 		git_tree_free(tree);
 		git_object_free(parent);
 		git_reference_free(ref);
 		return NULL;
 	}
-	git_buf clean_message=GIT_BUF_INIT;
+	git_buf clean_message = GIT_BUF_INIT;
 	git_message_prettify(&clean_message, message.c_str(), false, 0);
-	r=git_commit_create_v( &commit_oid, repo, commit_ref.c_str(), signature_author, signature_committer, NULL, clean_message.ptr? clean_message.ptr : message.c_str(), tree, parent? 1 : 0, parent);
+	r = git_commit_create_v(&commit_oid, repo, commit_ref.c_str(), signature_author, signature_committer, NULL, clean_message.ptr ? clean_message.ptr : message.c_str(), tree, parent ? 1 : 0, parent);
 	git_commit* commit;
-	nvgt_git_repository_commit* ret=NULL;
-	if(!r&&!git_commit_lookup(&commit, repo, &commit_oid)) ret=new nvgt_git_repository_commit(commit);
+	nvgt_git_repository_commit* ret = NULL;
+	if (!r && !git_commit_lookup(&commit, repo, &commit_oid)) ret = new nvgt_git_repository_commit(commit);
 	git_signature_free(signature_committer);
 	git_signature_free(signature_author);
 	git_tree_free(tree);
 	git_object_free(parent);
 	git_reference_free(ref);
-	if(clean_message.ptr) git_buf_dispose(&clean_message);
+	if (clean_message.ptr) git_buf_dispose(&clean_message);
 	return ret;
 }
 std::string nvgt_git_repository::commit_diff(nvgt_git_repository_commit* commit1, nvgt_git_repository_commit* commit2, unsigned int context_lines, unsigned int interhunk_lines, unsigned int flags, unsigned int format, CScriptArray* pathspec, const std::string& old_prefix, const std::string& new_prefix) {
-	if(!commit1||!commit2) return "";
-	git_tree *tree1=NULL, *tree2=NULL;
-	if(commit1&&git_commit_tree(&tree1, commit1->commit)) {
-		if(pathspec) pathspec->Release();
+	if (!commit1 || !commit2) return "";
+	git_tree* tree1 = NULL, * tree2 = NULL;
+	if (commit1 && git_commit_tree(&tree1, commit1->commit)) {
+		if (pathspec) pathspec->Release();
 		return "";
 	}
-	if(commit2&&git_commit_tree(&tree2, commit2->commit)) {
-		if(pathspec) pathspec->Release();
+	if (commit2 && git_commit_tree(&tree2, commit2->commit)) {
+		if (pathspec) pathspec->Release();
 		return "";
 	}
-	git_diff* diff=NULL;
-	git_diff_options opts=GIT_DIFF_OPTIONS_INIT;
-	if(pathspec&&pathspec->GetSize()>0)
-		opts.pathspec=as_strarray2git_strarray(pathspec);
-	opts.flags=flags;
-	opts.context_lines=context_lines;
-	opts.interhunk_lines=interhunk_lines;
-	opts.old_prefix=old_prefix.c_str();
-	opts.new_prefix=new_prefix.c_str();
-	if(git_diff_tree_to_tree(&diff, repo, tree1, tree2, &opts)) {
-		if(tree1) git_tree_free(tree1);
+	git_diff* diff = NULL;
+	git_diff_options opts = GIT_DIFF_OPTIONS_INIT;
+	if (pathspec && pathspec->GetSize() > 0)
+		opts.pathspec = as_strarray2git_strarray(pathspec);
+	opts.flags = flags;
+	opts.context_lines = context_lines;
+	opts.interhunk_lines = interhunk_lines;
+	opts.old_prefix = old_prefix.c_str();
+	opts.new_prefix = new_prefix.c_str();
+	if (git_diff_tree_to_tree(&diff, repo, tree1, tree2, &opts)) {
+		if (tree1) git_tree_free(tree1);
 		git_tree_free(tree2);
-		if(opts.pathspec.strings) free(opts.pathspec.strings);
+		if (opts.pathspec.strings) free(opts.pathspec.strings);
 		return "";
 	}
-	git_buf output=GIT_BUF_INIT;
+	git_buf output = GIT_BUF_INIT;
 	std::string ret;
-	if(!git_diff_to_buf(&output, diff, (git_diff_format_t)format))
-		ret=std::string(output.ptr, output.size);
+	if (!git_diff_to_buf(&output, diff, (git_diff_format_t)format))
+		ret = std::string(output.ptr, output.size);
 	git_buf_dispose(&output);
-	if(tree1) git_tree_free(tree1);
+	if (tree1) git_tree_free(tree1);
 	git_tree_free(tree2);
-	if(opts.pathspec.strings) free(opts.pathspec.strings);
+	if (opts.pathspec.strings) free(opts.pathspec.strings);
 	return ret;
 }
 nvgt_git_repository_commit* nvgt_git_repository::commit_lookup(const std::string& id) {
 	git_oid oid;
-	if(git_oid_fromstr(&oid, id.c_str())) return NULL;
+	if (git_oid_fromstr(&oid, id.c_str())) return NULL;
 	git_commit* c;
-	if(git_commit_lookup(&c, repo, &oid)) return NULL;
+	if (git_commit_lookup(&c, repo, &oid)) return NULL;
 	return new nvgt_git_repository_commit(c);
 }
 nvgt_git_repository_commit_iterator* nvgt_git_repository::commit_iterate(CScriptArray* path_filter, const std::string& author_filter, const std::string& message_filter, git_time_t min_time_filter, git_time_t max_time_filter, unsigned int start, unsigned int count) {
-	git_revwalk* w=NULL;
-	if(git_revwalk_new(&w, repo)) return NULL;
+	git_revwalk* w = NULL;
+	if (git_revwalk_new(&w, repo)) return NULL;
 	git_revwalk_push_head(w);
 	return new nvgt_git_repository_commit_iterator(w, path_filter, author_filter, message_filter, min_time_filter, max_time_filter, start, count);
 }
 nvgt_git_repository_entry* nvgt_git_repository::get_entry(unsigned int n) {
-	if(!index) return NULL;
-	const git_index_entry* entry=git_index_get_byindex(index, n);
-	if(!entry) return NULL;
+	if (!index) return NULL;
+	const git_index_entry* entry = git_index_get_byindex(index, n);
+	if (!entry) return NULL;
 	return new nvgt_git_repository_entry(entry);
 }
 nvgt_git_repository_entry* nvgt_git_repository::find_entry(const std::string& path) {
-	if(!index) return NULL;
+	if (!index) return NULL;
 	size_t pos;
-	if(git_index_find(&pos, index, path.c_str())!=GIT_OK) return NULL;
+	if (git_index_find(&pos, index, path.c_str()) != GIT_OK) return NULL;
 	return get_entry(pos);
 }
 int nvgt_git_repository::get_entry_count() {
-	if(!index) return GIT_ENOTFOUND;
+	if (!index) return GIT_ENOTFOUND;
 	return git_index_entrycount(index);
 }
 int nvgt_git_repository::get_is_empty() {
-	if(!repo) return GIT_ENOTFOUND;
+	if (!repo) return GIT_ENOTFOUND;
 	return git_repository_is_empty(repo);
 }
 const std::string nvgt_git_repository::get_path() {
-	if(!repo) return "";
-	const char* p=git_repository_path(repo);
+	if (!repo) return "";
+	const char* p = git_repository_path(repo);
 	return std::string(p, strlen(p));
 }
 const std::string nvgt_git_repository::get_workdir() {
-	if(!repo) return "";
-	const char* p=git_repository_workdir(repo);
+	if (!repo) return "";
+	const char* p = git_repository_workdir(repo);
 	return std::string(p, strlen(p));
 }
 nvgt_git_repository* new_git_repository() {
@@ -290,87 +290,87 @@ nvgt_git_repository* new_git_repository() {
 }
 
 void nvgt_git_repository_commit::get_signatures() {
-	if(committer!="") return;
-	const git_signature* sig_committer=git_commit_committer(commit);
-	if(sig_committer!=NULL) {
-		committer=sig_committer->name;
-		committer_email=sig_committer->email;
+	if (committer != "") return;
+	const git_signature* sig_committer = git_commit_committer(commit);
+	if (sig_committer != NULL) {
+		committer = sig_committer->name;
+		committer_email = sig_committer->email;
 	}
-	const git_signature* sig_author=git_commit_author(commit);
-	if(sig_author!=NULL) {
-		author=sig_author->name;
-		author_email=sig_author->email;
+	const git_signature* sig_author = git_commit_author(commit);
+	if (sig_author != NULL) {
+		author = sig_author->name;
+		author_email = sig_author->email;
 	}
 }
 nvgt_git_repository_commit* nvgt_git_repository_commit::get_parent(int idx) {
-	git_commit* c=NULL;
-	if(git_commit_parent(&c, commit, idx)!=GIT_OK) return NULL;
+	git_commit* c = NULL;
+	if (git_commit_parent(&c, commit, idx) != GIT_OK) return NULL;
 	return new nvgt_git_repository_commit(c);
 }
 bool nvgt_git_repository_commit_iterator::next() {
 	git_oid c_oid;
-	git_commit* c=NULL;
-	bool found_commit=false;
-	while(git_revwalk_next(&c_oid, walker)==GIT_OK) {
-		if(git_commit_lookup(&c, git_revwalk_repository(walker), &c_oid)!=GIT_OK) return false;
-		if(dopts.pathspec.count) {
-			int parents=git_commit_parentcount(c);
-			git_tree* tree1, *tree2;
-			if(parents==0) {
-				if(git_commit_tree(&tree2, c)) continue;
-				bool skip=false;
-				skip=git_pathspec_match_tree(NULL, tree2, GIT_PATHSPEC_NO_MATCH_ERROR, pspec);
+	git_commit* c = NULL;
+	bool found_commit = false;
+	while (git_revwalk_next(&c_oid, walker) == GIT_OK) {
+		if (git_commit_lookup(&c, git_revwalk_repository(walker), &c_oid) != GIT_OK) return false;
+		if (dopts.pathspec.count) {
+			int parents = git_commit_parentcount(c);
+			git_tree* tree1, * tree2;
+			if (parents == 0) {
+				if (git_commit_tree(&tree2, c)) continue;
+				bool skip = false;
+				skip = git_pathspec_match_tree(NULL, tree2, GIT_PATHSPEC_NO_MATCH_ERROR, pspec);
 				git_tree_free(tree2);
-				if(skip) continue;
+				if (skip) continue;
 			} else {
-				int unmatched=parents;
-				for(int i=0; i<parents; i++) {
+				int unmatched = parents;
+				for (int i = 0; i < parents; i++) {
 					git_commit* parent;
-					if(git_commit_parent(&parent, c, i)) continue;
+					if (git_commit_parent(&parent, c, i)) continue;
 					git_diff* diff;
-					if(git_commit_tree(&tree1, parent)) continue;
-					if(git_commit_tree(&tree2, c)) continue;
-					if(git_diff_tree_to_tree(&diff, git_commit_owner(c), tree1, tree2, &dopts)) continue;
-					int deltas=git_diff_num_deltas(diff);
+					if (git_commit_tree(&tree1, parent)) continue;
+					if (git_commit_tree(&tree2, c)) continue;
+					if (git_diff_tree_to_tree(&diff, git_commit_owner(c), tree1, tree2, &dopts)) continue;
+					int deltas = git_diff_num_deltas(diff);
 					git_diff_free(diff);
 					git_tree_free(tree1);
 					git_tree_free(tree2);
 					git_commit_free(parent);
-					if(deltas>0) unmatched--;
+					if (deltas > 0) unmatched--;
 				}
-				if(unmatched>0) continue;
+				if (unmatched > 0) continue;
 			}
 		}
-		const git_signature* sig=git_commit_author(c);
-		bool author_match=true;
-		if((min_time_filter>0||max_time_filter>0||author_filter!="")&&!sig) continue;
-		if(min_time_filter>0&&sig->when.time<min_time_filter||max_time_filter>0&&max_time_filter>min_time_filter&&sig->when.time>max_time_filter) continue;
-		if(author_filter!=""&&strstr(sig->name, author_filter.c_str())==NULL&&strstr(sig->email, author_filter.c_str())==NULL) author_match=false;
-		sig=git_commit_committer(c);
-		if(!sig&&author_filter!="") continue;
-		if(!author_match&&author_filter!=""&&strstr(sig->name, author_filter.c_str())==NULL&&strstr(sig->email, author_filter.c_str())==NULL) continue;
-		if(message_filter!=""&&strstr(git_commit_message(c), message_filter.c_str())==NULL) continue;
+		const git_signature* sig = git_commit_author(c);
+		bool author_match = true;
+		if ((min_time_filter > 0 || max_time_filter > 0 || author_filter != "") && !sig) continue;
+		if (min_time_filter > 0 && sig->when.time < min_time_filter || max_time_filter > 0 && max_time_filter > min_time_filter && sig->when.time > max_time_filter) continue;
+		if (author_filter != "" && strstr(sig->name, author_filter.c_str()) == NULL && strstr(sig->email, author_filter.c_str()) == NULL) author_match = false;
+		sig = git_commit_committer(c);
+		if (!sig && author_filter != "") continue;
+		if (!author_match && author_filter != "" && strstr(sig->name, author_filter.c_str()) == NULL && strstr(sig->email, author_filter.c_str()) == NULL) continue;
+		if (message_filter != "" && strstr(git_commit_message(c), message_filter.c_str()) == NULL) continue;
 		current_entry++;
-		if(current_entry<start) continue;
-		if(count>0&&inserted_entries+1>count) continue;
+		if (current_entry < start) continue;
+		if (count > 0 && inserted_entries + 1 > count) continue;
 		inserted_entries++;
-		found_commit=true;
+		found_commit = true;
 		break;
 	}
-	if(!found_commit) return false;
-	if(commit) commit->release();
-	commit=new nvgt_git_repository_commit(c);
+	if (!found_commit) return false;
+	if (commit) commit->release();
+	commit = new nvgt_git_repository_commit(c);
 	return true;
 }
 
 int git_last_error_class() {
-	const git_error* e=git_error_last();
-	if(!e) return GIT_ERROR_NONE;
+	const git_error* e = git_error_last();
+	if (!e) return GIT_ERROR_NONE;
 	return e->klass;
 }
 const std::string git_last_error_text() {
-	const git_error* e=git_error_last();
-	if(!e) return "";
+	const git_error* e = git_error_last();
+	if (!e) return "";
 	return std::string(e->message);
 }
 

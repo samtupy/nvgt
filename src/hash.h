@@ -15,4 +15,4 @@
 std::string sha256(const std::string& message, bool binary);
 
 class asIScriptEngine;
-void RegisterScriptHash(asIScriptEngine *engine);
+void RegisterScriptHash(asIScriptEngine* engine);

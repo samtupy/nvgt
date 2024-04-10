@@ -14,9 +14,9 @@
 */
 
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define VC_EXTRALEAN
-#include <windows.h>
+	#define WIN32_LEAN_AND_MEAN
+	#define VC_EXTRALEAN
+	#include <windows.h>
 #endif
 #include "window.h"
 #include "tts.h"
@@ -24,74 +24,74 @@
 #include <obfuscate.h>
 
 char* minitrim(char* data, unsigned long* bufsize, int bitrate, int channels) {
-	char* ptr=data;
-	if(!ptr||!bufsize||*bufsize%2!=0||*bufsize<1) return ptr;
-	short a=3072;
-	while(bitrate==16&&(ptr-data)<*bufsize) {
-		if(channels==2) {
-			short l = (((short)*ptr) << 8) | *(ptr+1);
-			short r = (((short)*(ptr+2)) << 8) | *(ptr+3);
-			if(l>-a&&l<a&&r>-a&&r<a)
-				ptr+=4;
+	char* ptr = data;
+	if (!ptr || !bufsize || *bufsize % 2 != 0 || *bufsize < 1) return ptr;
+	short a = 3072;
+	while (bitrate == 16 && (ptr - data) < *bufsize) {
+		if (channels == 2) {
+			short l = (((short) * ptr) << 8) | *(ptr + 1);
+			short r = (((short) * (ptr + 2)) << 8) | *(ptr + 3);
+			if (l > -a && l < a && r > -a && r < a)
+				ptr += 4;
 			else break;
-		} else if(channels==1) {
-			short s = (((short)*ptr) << 8) | *(ptr+1);
-			if(s>-a&&s<a)
-				ptr+=2;
+		} else if (channels == 1) {
+			short s = (((short) * ptr) << 8) | *(ptr + 1);
+			if (s > -a && s < a)
+				ptr += 2;
 			else break;
 		}
 	}
-	*bufsize-=(ptr-data);
+	*bufsize -= (ptr - data);
 	return ptr;
 }
 
 tts_voice::tts_voice(const std::string& builtin_voice_name) {
 	init_sound();
-	RefCount=1;
-	samprate=0;
-	bitrate=0;
-	channels=0;
-	destroyed=false;
+	RefCount = 1;
+	samprate = 0;
+	bitrate = 0;
+	channels = 0;
+	destroyed = false;
 	builtin_rate = 0;
 	builtin_volume = 0;
-	builtin_index = builtin_voice_name.size() > 0? 0 : -1;
+	builtin_index = builtin_voice_name.size() > 0 ? 0 : -1;
 	this->builtin_voice_name = builtin_voice_name;
 	#ifdef _WIN32
-		voice_index=-1;
-		inst=(blastspeak*)malloc(sizeof(blastspeak));
-		memset(inst, 0, sizeof(blastspeak));
-		if(!blastspeak_initialize(inst)) {
-			free(inst);
-			inst=NULL;
-		}
+	voice_index = -1;
+	inst = (blastspeak*)malloc(sizeof(blastspeak));
+	memset(inst, 0, sizeof(blastspeak));
+	if (!blastspeak_initialize(inst)) {
+		free(inst);
+		inst = NULL;
+	}
 	#else
-		voice_index = builtin_index;
+	voice_index = builtin_index;
 	#endif
-	audioout=0;
+	audioout = 0;
 }
 tts_voice::~tts_voice() {
 	//destroy();
 }
 void tts_voice::destroy() {
-	if(audioout) {
+	if (audioout) {
 		BASS_StreamFree(audioout);
-		audioout=0;
+		audioout = 0;
 	}
 	#ifdef _WIN32
-		if(destroyed||!inst) return;
-		blastspeak_destroy(inst);
-		if(inst) free(inst);
-		inst=NULL;
+	if (destroyed || !inst) return;
+	blastspeak_destroy(inst);
+	if (inst) free(inst);
+	inst = NULL;
 	#endif
-	destroyed=true;
-	voice_index=-1;
+	destroyed = true;
+	voice_index = -1;
 }
 void tts_voice::AddRef() {
 	asAtomicInc(RefCount);
 }
 void tts_voice::Release() {
-	if(asAtomicDec(RefCount)<1) {
-		if(!destroyed)
+	if (asAtomicDec(RefCount) < 1) {
+		if (!destroyed)
 			destroy();
 		delete this;
 	}
@@ -99,153 +99,151 @@ void tts_voice::Release() {
 bool tts_voice::speak(const std::string& text, bool interrupt) {
 	unsigned long bufsize;
 	char* data = NULL;
-	if(voice_index == builtin_index) {
-		if(samprate != 48000 || bitrate != 16 || channels != 2) {
+	if (voice_index == builtin_index) {
+		if (samprate != 48000 || bitrate != 16 || channels != 2) {
 			samprate = 48000;
 			bitrate = 16;
 			channels = 2;
-			if(audioout)
+			if (audioout)
 				BASS_StreamFree(audioout);
-			audioout=0;
+			audioout = 0;
 		}
 	}
 	#ifdef _WIN32
-		else {
-			if(!inst&&!refresh()) return FALSE;
-			data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
-			if(!data) return false;
-			if(!audioout||(inst->sample_rate!=samprate||inst->bits_per_sample!=bitrate||inst->channels!=channels)) {
-				samprate=inst->sample_rate;
-				bitrate=inst->bits_per_sample;
-				channels=inst->channels;
-				if(audioout)
-					BASS_StreamFree(audioout);
-				audioout=0;
-			}
+	else {
+		if (!inst && !refresh()) return FALSE;
+		data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
+		if (!data) return false;
+		if (!audioout || (inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels)) {
+			samprate = inst->sample_rate;
+			bitrate = inst->bits_per_sample;
+			channels = inst->channels;
+			if (audioout)
+				BASS_StreamFree(audioout);
+			audioout = 0;
 		}
+	}
 	#endif
-	if(voice_index == builtin_index && !text.empty()) {
+	if (voice_index == builtin_index && !text.empty()) {
 		int samples;
 		data = (char*) speech_gen(&samples, text.c_str(), NULL);
 		bufsize = samples * 4;
 	}
-	if(interrupt) {
-		if(audioout) BASS_ChannelPlay(audioout, true);
-		if(text.empty()) return true;
+	if (interrupt) {
+		if (audioout) BASS_ChannelPlay(audioout, true);
+		if (text.empty()) return true;
 	}
-	if(!data) return interrupt;
-	if(!audioout && !text.empty())
-		audioout=BASS_StreamCreate(samprate, channels, 0, STREAMPROC_PUSH, NULL);
-	char* ptr=minitrim(data, &bufsize, bitrate, channels);
-	int ret=BASS_StreamPutData(audioout, ptr, bufsize);
-	if(voice_index == builtin_index) free(data);
-	if(ret < 0)
+	if (!data) return interrupt;
+	if (!audioout && !text.empty())
+		audioout = BASS_StreamCreate(samprate, channels, 0, STREAMPROC_PUSH, NULL);
+	char* ptr = minitrim(data, &bufsize, bitrate, channels);
+	int ret = BASS_StreamPutData(audioout, ptr, bufsize);
+	if (voice_index == builtin_index) free(data);
+	if (ret < 0)
 		return false;
 	BASS_ChannelPlay(audioout, FALSE);
 	return true;
 }
 bool tts_voice::speak_to_file(const std::string& filename, const std::string& text) {
-	if(text==""||filename=="") {
+	if (text == "" || filename == "")
 		return false;
-	}
 	char* data;
 	unsigned long bufsize;
-	if(voice_index == builtin_index) {
-		if(samprate != 48000 || bitrate != 16 || channels != 2) {
+	if (voice_index == builtin_index) {
+		if (samprate != 48000 || bitrate != 16 || channels != 2) {
 			samprate = 48000;
 			bitrate = 16;
 			channels = 2;
-			if(audioout)
+			if (audioout)
 				BASS_StreamFree(audioout);
-			audioout=0;
+			audioout = 0;
 		}
 		int samples;
 		data = (char*)speech_gen(&samples, text.c_str(), NULL);
 		bufsize = samples * 4;
 	}
 	#ifdef _WIN32
-		else {
-			if(!inst&&!refresh()) return FALSE;
-			DWORD bufsize;
-			data=blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
-			if(!audioout||(inst->sample_rate!=samprate||inst->bits_per_sample!=bitrate||inst->channels!=channels)) {
-				samprate=inst->sample_rate;
-				bitrate=inst->bits_per_sample;
-				channels=inst->channels;
-				if(audioout)
-					BASS_StreamFree(audioout);
-				audioout=0;
-			}
+	else {
+		if (!inst && !refresh()) return FALSE;
+		DWORD bufsize;
+		data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
+		if (!audioout || (inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels)) {
+			samprate = inst->sample_rate;
+			bitrate = inst->bits_per_sample;
+			channels = inst->channels;
+			if (audioout)
+				BASS_StreamFree(audioout);
+			audioout = 0;
 		}
+	}
 	#endif
-	char* ptr=minitrim(data, &bufsize, bitrate, channels);
-	FILE* f=fopen(filename.c_str(), "wb");
-	if(!f)
+	char* ptr = minitrim(data, &bufsize, bitrate, channels);
+	FILE* f = fopen(filename.c_str(), "wb");
+	if (!f)
 		return false;
-	wav_header h=make_wav_header(44+bufsize, samprate, bitrate, channels);
+	wav_header h = make_wav_header(44 + bufsize, samprate, bitrate, channels);
 	fwrite(&h, 1, sizeof(wav_header), f);
 	fwrite(ptr, bufsize, 1, f);
 	fclose(f);
-	if(voice_index == builtin_index) free(data);
+	if (voice_index == builtin_index) free(data);
 	return true;
 }
 std::string tts_voice::speak_to_memory(const std::string& text) {
-	if(text.empty()) return "";
+	if (text.empty()) return "";
 	unsigned long bufsize;
 	char* data;
-	if(voice_index == builtin_index) {
-		if(samprate != 48000 || bitrate != 16 || channels != 2) {
+	if (voice_index == builtin_index) {
+		if (samprate != 48000 || bitrate != 16 || channels != 2) {
 			samprate = 48000;
 			bitrate = 16;
 			channels = 2;
-			if(audioout)
+			if (audioout)
 				BASS_StreamFree(audioout);
-			audioout=0;
+			audioout = 0;
 		}
 		int samples;
 		data = (char*)speech_gen(&samples, text.c_str(), NULL);
 		bufsize = samples * 2;
 	}
 	#ifdef _WIN32
-		else {
-			if(!inst&&!refresh()) return "";
-			data=blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
-			if(!audioout||(inst->sample_rate!=samprate||inst->bits_per_sample!=bitrate||inst->channels!=channels)) {
-				samprate=inst->sample_rate;
-				bitrate=inst->bits_per_sample;
-				channels=inst->channels;
-				if(audioout)
-					BASS_StreamFree(audioout);
-				audioout=0;
-			}
+	else {
+		if (!inst && !refresh()) return "";
+		data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
+		if (!audioout || (inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels)) {
+			samprate = inst->sample_rate;
+			bitrate = inst->bits_per_sample;
+			channels = inst->channels;
+			if (audioout)
+				BASS_StreamFree(audioout);
+			audioout = 0;
 		}
+	}
 	#endif
-	char* ptr=minitrim(data, &bufsize, bitrate, channels);
-	wav_header h=make_wav_header(44+bufsize, samprate, bitrate, channels);
+	char* ptr = minitrim(data, &bufsize, bitrate, channels);
+	wav_header h = make_wav_header(44 + bufsize, samprate, bitrate, channels);
 	std::string output((char*)&h, sizeof(wav_header));
 	output.append(ptr, bufsize);
-	if(voice_index == builtin_index) free(data);
+	if (voice_index == builtin_index) free(data);
 	return output;
 }
 bool tts_voice::speak_wait(const std::string& text, bool interrupt) {
-	if(!speak(text, interrupt))
+	if (!speak(text, interrupt))
 		return false;
-	while(BASS_ChannelIsActive(audioout)==BASS_ACTIVE_PLAYING) {
+	while (BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING)
 		wait(5);
-	}
 	return true;
 }
 bool tts_voice::stop() {
 	return speak("", true);
 }
 int tts_voice::get_rate() {
-	if(voice_index == builtin_index) return builtin_rate;
+	if (voice_index == builtin_index) return builtin_rate;
 	#ifdef _WIN32
-		if(!inst&&!refresh()) return 0;
-		long result;
-		if(!blastspeak_get_voice_rate(inst, &result))
-			return 0;
-		return result;
+	if (!inst && !refresh()) return 0;
+	long result;
+	if (!blastspeak_get_voice_rate(inst, &result))
+		return 0;
+	return result;
 	#endif
 	return 0;
 }
@@ -254,21 +252,21 @@ int tts_voice::get_pitch() {
 	return 0;
 }
 int tts_voice::get_volume() {
-	if(voice_index == builtin_index) return builtin_volume;
+	if (voice_index == builtin_index) return builtin_volume;
 	#ifdef _WIN32
-		if(!inst&&!refresh()) return 100;
-		long result;
-		if(!blastspeak_get_voice_volume(inst, &result))
-			return 0;
-		return result;
+	if (!inst && !refresh()) return 100;
+	long result;
+	if (!blastspeak_get_voice_volume(inst, &result))
+		return 0;
+	return result;
 	#endif
 	return 0;
 }
 void tts_voice::set_rate(int rate) {
-	if(voice_index == builtin_index) builtin_rate = rate;
+	if (voice_index == builtin_index) builtin_rate = rate;
 	#ifdef _WIN32
-		if(!inst&&!refresh()) return;
-		blastspeak_set_voice_rate(inst, rate);
+	if (!inst && !refresh()) return;
+	blastspeak_set_voice_rate(inst, rate);
 	#endif
 }
 void tts_voice::set_pitch(int pitch) {
@@ -276,82 +274,82 @@ void tts_voice::set_pitch(int pitch) {
 	return;
 }
 void tts_voice::set_volume(int volume) {
-	if(voice_index == builtin_index) builtin_volume = volume;
+	if (voice_index == builtin_index) builtin_volume = volume;
 	#ifdef _WIN32
-		if(!inst&&!refresh()) return;
-		blastspeak_set_voice_volume(inst, volume);
+	if (!inst && !refresh()) return;
+	blastspeak_set_voice_volume(inst, volume);
 	#endif
 }
 bool tts_voice::set_voice(int voice) {
-	if(voice == builtin_index) {
+	if (voice == builtin_index) {
 		voice_index = voice;
 		return true;
 	}
 	#ifdef _WIN32
-		if(!inst&&!refresh()) return FALSE;
-		if(blastspeak_set_voice(inst, voice - (builtin_index + 1))) {
-			voice_index=voice;
-			return true;
-		}
+	if (!inst && !refresh()) return FALSE;
+	if (blastspeak_set_voice(inst, voice - (builtin_index + 1))) {
+		voice_index = voice;
+		return true;
+	}
 	#endif
 	return false;
 }
 bool tts_voice::get_speaking() {
-	if(!audioout) return false;
-	return BASS_ChannelIsActive(audioout)==BASS_ACTIVE_PLAYING;
+	if (!audioout) return false;
+	return BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING;
 }
 CScriptArray* tts_voice::list_voices() {
-	asIScriptContext* ctx=asGetActiveContext();
-	asIScriptEngine* engine=ctx->GetEngine();
-	asITypeInfo* arrayType=engine->GetTypeInfoByDecl("array<string>");
-	CScriptArray* array=CScriptArray::Create(arrayType, builtin_index + 1);
-	if(builtin_index == 0) ((std::string*)(array->At(0)))->assign(builtin_voice_name);
+	asIScriptContext* ctx = asGetActiveContext();
+	asIScriptEngine* engine = ctx->GetEngine();
+	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
+	CScriptArray* array = CScriptArray::Create(arrayType, builtin_index + 1);
+	if (builtin_index == 0)((std::string*)(array->At(0)))->assign(builtin_voice_name);
 	#ifdef _WIN32
-		if(!inst&&!refresh())
-			return array;
-			array->Resize(array->GetSize() + inst->voice_count);
-		for(int i=0; i<inst->voice_count; i++) {
-			const char* result=blastspeak_get_voice_description(inst, i);
-			int array_idx = i + (builtin_index + 1);
-			if(result)
-				((std::string*)(array->At(array_idx)))->assign(result);
-			else
-				((std::string*)(array->At(array_idx)))->assign("");
-		}
+	if (!inst && !refresh())
+		return array;
+	array->Resize(array->GetSize() + inst->voice_count);
+	for (int i = 0; i < inst->voice_count; i++) {
+		const char* result = blastspeak_get_voice_description(inst, i);
+		int array_idx = i + (builtin_index + 1);
+		if (result)
+			((std::string*)(array->At(array_idx)))->assign(result);
+		else
+			((std::string*)(array->At(array_idx)))->assign("");
+	}
 	#endif
 	return array;
 }
 int tts_voice::get_voice_count() {
 	#ifdef _WIN32
-		if(!inst&&!refresh()) return builtin_index + 1;
-		return inst? inst->voice_count + (builtin_index + 1) : builtin_index + 1;
+	if (!inst && !refresh()) return builtin_index + 1;
+	return inst ? inst->voice_count + (builtin_index + 1) : builtin_index + 1;
 	#endif
 	return builtin_index + 1;
 }
 std::string tts_voice::get_voice_name(int index) {
-	if(index == builtin_index) return builtin_voice_name;
+	if (index == builtin_index) return builtin_voice_name;
 	#ifdef _WIN32
-		int c=get_voice_count();
-		if(!inst&&!refresh()) return "";
-		index -= (builtin_index + 1);
-		if(c<1||index<0||index>=c) return "";
-		const char* result=blastspeak_get_voice_description(inst, index);
-		if(result)
-			return std::string(result);
+	int c = get_voice_count();
+	if (!inst && !refresh()) return "";
+	index -= (builtin_index + 1);
+	if (c < 1 || index < 0 || index >= c) return "";
+	const char* result = blastspeak_get_voice_description(inst, index);
+	if (result)
+		return std::string(result);
 	#endif
 	return "";
 }
 bool tts_voice::refresh() {
 	destroy();
-	destroyed=false;
+	destroyed = false;
 	#ifdef _WIN32
-		inst=(blastspeak*)malloc(sizeof(blastspeak));
-		if(!blastspeak_initialize(inst)) {
-			free(inst);
-			destroyed=true;
-			inst=NULL;
-			return false;
-		}
+	inst = (blastspeak*)malloc(sizeof(blastspeak));
+	if (!blastspeak_initialize(inst)) {
+		free(inst);
+		destroyed = true;
+		inst = NULL;
+		return false;
+	}
 	#endif
 	return true;
 }

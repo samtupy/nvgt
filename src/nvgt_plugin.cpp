@@ -25,28 +25,28 @@ std::unordered_map<std::string, nvgt_plugin_entry*>* static_plugins = NULL; // C
 bool load_nvgt_plugin(const std::string& name, void* user) {
 	nvgt_plugin_entry* entry = NULL;
 	void* obj = NULL;
-	if(static_plugins && static_plugins->find(name) != static_plugins->end()) {
+	if (static_plugins && static_plugins->find(name) != static_plugins->end())
 		entry = (nvgt_plugin_entry*)(*static_plugins)[name];
-	} else {
+	else {
 		obj = SDL_LoadObject(name.c_str());
-		if(!obj) return false;
+		if (!obj) return false;
 		entry = (nvgt_plugin_entry*)SDL_LoadFunction(obj, "nvgt_plugin");
 	}
 	nvgt_plugin_shared* shared = (nvgt_plugin_shared*)malloc(sizeof(nvgt_plugin_shared));
 	prepare_plugin_shared(shared, g_ScriptEngine, user);
-	if(!entry || !entry(shared)) {
+	if (!entry || !entry(shared)) {
 		free(shared);
-		if(obj) SDL_UnloadObject(obj);
+		if (obj) SDL_UnloadObject(obj);
 		return false;
 	}
-	if(obj) loaded_plugins[name]=obj;
+	if (obj) loaded_plugins[name] = obj;
 	else loaded_plugins[name] = NULL;
 	free(shared);
 	return true;
 }
 
 bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e) {
-	if(!static_plugins) static_plugins = new std::unordered_map<std::string, nvgt_plugin_entry*>;
+	if (!static_plugins) static_plugins = new std::unordered_map<std::string, nvgt_plugin_entry*>;
 	static_plugins->insert(std::make_pair(name, e));
 	return true;
 }
@@ -54,13 +54,13 @@ bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e) {
 bool load_serialized_nvgt_plugins(FILE* f) {
 	unsigned short count;
 	fread(&count, 1, 2, f);
-	if(!count) return true;
-	for(int i=0; i < count; i++) {
+	if (!count) return true;
+	for (int i = 0; i < count; i++) {
 		unsigned char len;
 		fread(&len, 1, 1, f);
 		std::string name(len, '\0');
 		fread(&name[0], 1, len, f);
-		if(!load_nvgt_plugin(name)) {
+		if (!load_nvgt_plugin(name)) {
 			alert("Error", Poco::format("Unable to load %s, exiting.", name));
 			return false;
 		}
@@ -71,7 +71,7 @@ bool load_serialized_nvgt_plugins(FILE* f) {
 void serialize_nvgt_plugins(FILE* f) {
 	unsigned short count = loaded_plugins.size();
 	fwrite(&count, 1, 2, f);
-	for(const auto& i : loaded_plugins) {
+	for (const auto& i : loaded_plugins) {
 		const std::string& name = i.first;
 		unsigned char len = name.size();
 		fwrite(&len, 1, 1, f);
@@ -80,8 +80,8 @@ void serialize_nvgt_plugins(FILE* f) {
 }
 
 void unload_nvgt_plugins() {
-	for(const auto& i : loaded_plugins) {
-		if(i.second) SDL_UnloadObject(i.second);
+	for (const auto& i : loaded_plugins) {
+		if (i.second) SDL_UnloadObject(i.second);
 	}
 	loaded_plugins.clear();
 }

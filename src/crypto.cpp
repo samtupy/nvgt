@@ -17,30 +17,30 @@
 #include <obfuscate.h>
 #include <Poco/SHA2Engine.h>
 
-void string_pad(std::string& str, int blocksize=16) {
-	if(str.size()==0) return;
-	int remainder=16-(str.size()%16);
-	if(remainder==0) remainder=16;
-	str+=std::string(remainder, (char)remainder);
+void string_pad(std::string& str, int blocksize = 16) {
+	if (str.size() == 0) return;
+	int remainder = 16 - (str.size() % 16);
+	if (remainder == 0) remainder = 16;
+	str += std::string(remainder, (char)remainder);
 }
 void string_unpad(std::string& str) {
-	if(str.size()==0) return;
-	if(str[str.size()-1]>16||str[str.size()-1]>=str.size()) {
+	if (str.size() == 0) return;
+	if (str[str.size() - 1] > 16 || str[str.size() - 1] >= str.size()) {
 		str.resize(0);
 		return;
 	}
-	int new_size=str.size()-(str[str.size()-1]);
-	if(new_size<0) new_size=0;
+	int new_size = str.size() - (str[str.size() - 1]);
+	if (new_size < 0) new_size = 0;
 	str.resize(new_size);
 }
 std::string string_aes_encrypt(const std::string& original_text, std::string key) {
-	std::string text=original_text;
+	std::string text = original_text;
 	Poco::SHA2Engine hash;
 	hash.update(key);
-	const unsigned char* key_hash=hash.digest().data();
+	const unsigned char* key_hash = hash.digest().data();
 	unsigned char iv[16];
-	for(int i=0; i<16; i++)
-		iv[i]=key_hash[i*2]^(4*i+1);
+	for (int i = 0; i < 16; i++)
+		iv[i] = key_hash[i * 2] ^ (4 * i + 1);
 	AES_ctx crypt;
 	AES_init_ctx_iv(&crypt, key_hash, iv);
 	string_pad(text);
@@ -48,19 +48,19 @@ std::string string_aes_encrypt(const std::string& original_text, std::string key
 	return text;
 }
 std::string string_aes_encrypt_r(const std::string& text, std::string& key) {
-	std::string t=text;
+	std::string t = text;
 	string_aes_encrypt(t, key);
 	return t;
 }
 std::string string_aes_decrypt(const std::string& original_text, std::string key) {
-	if(original_text.size()%16!=0) return "";
-	std::string text=original_text;
+	if (original_text.size() % 16 != 0) return "";
+	std::string text = original_text;
 	Poco::SHA2Engine hash;
 	hash.update(key);
-	const unsigned char* key_hash=hash.digest().data();
+	const unsigned char* key_hash = hash.digest().data();
 	unsigned char iv[16];
-	for(int i=0; i<16; i++)
-		iv[i]=key_hash[i*2]^(4*i+1);
+	for (int i = 0; i < 16; i++)
+		iv[i] = key_hash[i * 2] ^ (4 * i + 1);
 	AES_ctx crypt;
 	AES_init_ctx_iv(&crypt, key_hash, iv);
 	AES_CBC_decrypt_buffer(&crypt, (uint8_t*)&text.front(), text.size());
@@ -68,20 +68,20 @@ std::string string_aes_decrypt(const std::string& original_text, std::string key
 	return text;
 }
 std::string string_aes_decrypt_r(const std::string& text, std::string& key) {
-	std::string t=text;
+	std::string t = text;
 	string_aes_decrypt(t, key);
 	return t;
 }
 
 std::string random_bytes(asUINT len) {
-	if(len<1) return "";
+	if (len < 1) return "";
 	std::string ret(len, '\0');
-	if(rng_get_bytes((unsigned char*)&ret[0], len)!=len)
+	if (rng_get_bytes((unsigned char*)&ret[0], len) != len)
 		return "";
 	return ret;
 }
 
-void RegisterScriptCrypto(asIScriptEngine *engine) {
+void RegisterScriptCrypto(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("string string_aes_encrypt(const string&in, string)"), asFUNCTION(string_aes_encrypt), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string string_aes_decrypt(const string&in, string)"), asFUNCTION(string_aes_decrypt), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string random_bytes(uint)"), asFUNCTION(random_bytes), asCALL_CDECL);

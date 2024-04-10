@@ -14,8 +14,8 @@
 #include <angelscript.h>
 #include <string>
 
-bool FileCopy(const std::string &source, const std::string &target, bool overwrite);
-bool FileMove(const std::string &source, const std::string &target);
-bool FileExists(const std::string &path);
-asINT64 FileGetSize(const std::string &path);
-void RegisterScriptFileSystemFunctions(asIScriptEngine *engine);
+bool FileCopy(const std::string& source, const std::string& target, bool overwrite);
+bool FileMove(const std::string& source, const std::string& target);
+bool FileExists(const std::string& path);
+asINT64 FileGetSize(const std::string& path);
+void RegisterScriptFileSystemFunctions(asIScriptEngine* engine);

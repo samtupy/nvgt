@@ -1,70 +1,57 @@
 /* Note that better methods for this probably exist in nvgt, keeping it for backwards compatibility.
-	This is an attempt to give bgt the ability to support easy conversion from 32 bit intigers to the 4 bytes but in a binary format. This could be used to access data from dll structures, to compress data instead of using string_to_number, or to access data from binary files. For example, you should be able to use this to parse a PCM wave header, etc.
-	Note: I can't promase that this will be 100 percent, but I will make it as close as possible to the real thing, such as what you could do in c++, python, or most every language accept bgt. All I'm saying is to not be surprised if I mess something up. Feel free to distribute or modify this code in any way shape or form you wish unless otherwise spesified, though credit would be apreciated if you use it.
+    This is an attempt to give bgt the ability to support easy conversion from 32 bit intigers to the 4 bytes but in a binary format. This could be used to access data from dll structures, to compress data instead of using string_to_number, or to access data from binary files. For example, you should be able to use this to parse a PCM wave header, etc.
+    Note: I can't promase that this will be 100 percent, but I will make it as close as possible to the real thing, such as what you could do in c++, python, or most every language accept bgt. All I'm saying is to not be surprised if I mess something up. Feel free to distribute or modify this code in any way shape or form you wish unless otherwise spesified, though credit would be apreciated if you use it.
 */
 
 //Just a couple of globals.
-uint8 int_to_byte_little_endian=0;
-uint8 int_to_byte_big_endian=1;
+uint8 int_to_byte_little_endian = 0;
+uint8 int_to_byte_big_endian = 1;
 
 //The following function will convert a 32bit intiger into a 4 byte string, or possibly smaller if spesified.
-string int_to_byte(int the_int, uint8 endian=int_to_byte_little_endian, int compress=4)
-{
-//Make a string to store the final result.
-string bin;
-//For compression.
-bool found_nonnull_char=false;
-//now for the bitwise conversions.
-for(uint i=0; i<4; i++)
-{
-uint8 char=the_int>>(24-i*8);
-//For compression we must set this variable to true if a nonnull character was found.
-if(char!=0) found_nonnull_char=true;
-//If compress is less than 4 and we have not found a nonnull char yet we won't add the byte if it is null.
-bool should_compress=compress<4 and !found_nonnull_char;
-if(!should_compress or should_compress and char!=0)
-{
-bin+=ascii_to_character(char);
-}
-}
-// if we are compressing and the length of the final string is less than the length we are attempting to compress to, we pad the start of the string with nulls.
-while(bin.length()<compress)
-bin="\0"+bin;
-//if we are using little endian, we have to reverse the final string.
-if(endian==int_to_byte_little_endian)
-{
-bin=string_reverse(bin);
-}
-return bin;
+string int_to_byte(int the_int, uint8 endian = int_to_byte_little_endian, int compress = 4) {
+	//Make a string to store the final result.
+	string bin;
+	//For compression.
+	bool found_nonnull_char = false;
+	//now for the bitwise conversions.
+	for (uint i = 0; i < 4; i++) {
+		uint8 char = the_int >> (24 - i * 8);
+		//For compression we must set this variable to true if a nonnull character was found.
+		if (char != 0) found_nonnull_char = true;
+		//If compress is less than 4 and we have not found a nonnull char yet we won't add the byte if it is null.
+		bool should_compress = compress < 4 and !found_nonnull_char;
+		if (!should_compress or should_compress and char != 0)
+			bin += ascii_to_character(char);
+	}
+	// if we are compressing and the length of the final string is less than the length we are attempting to compress to, we pad the start of the string with nulls.
+	while (bin.length() < compress)
+		bin = "\0" + bin;
+	//if we are using little endian, we have to reverse the final string.
+	if (endian == int_to_byte_little_endian)
+		bin = string_reverse(bin);
+	return bin;
 }
 
 //This function will convert 4 bytes from a string back into a 32 bit signed intiger. Some logic taken from https://stackoverflow.com/questions/5334268/using-bitwise-operators-in-c-to-change-4-chars-to-int
-int byte_to_int(string the_bytes, uint8 endian=int_to_byte_little_endian)
-{
-// return 0 if the length of the given string is greater than 4.
-if(the_bytes.length()>4)
-{
-return 0;
-}
-//If the length is less than 4, pad the string with nulls based on the endian.
-while(the_bytes.length()<4)
-{
-if(endian==int_to_byte_big_endian)
-the_bytes="\0"+the_bytes;
-else
-the_bytes+="\0";
-}
-//If we are using little endian, we must reverse the string.
-if(endian==int_to_byte_little_endian)
-{
-the_bytes=string_reverse(the_bytes);
-}
-//Lshift with bitwise.
-int the_int=0;
-for(uint i=0; i<4; i++)
-{
-uint8 char=character_to_ascii(the_bytes[i]);
-the_int|=char<<(24-i*8);
-}
-return the_int;
+int byte_to_int(string the_bytes, uint8 endian = int_to_byte_little_endian) {
+	// return 0 if the length of the given string is greater than 4.
+	if (the_bytes.length() > 4)
+		return 0;
+	//If the length is less than 4, pad the string with nulls based on the endian.
+	while (the_bytes.length() < 4) {
+		if (endian == int_to_byte_big_endian)
+			the_bytes = "\0" + the_bytes;
+		else
+			the_bytes += "\0";
+	}
+	//If we are using little endian, we must reverse the string.
+	if (endian == int_to_byte_little_endian)
+		the_bytes = string_reverse(the_bytes);
+	//Lshift with bitwise.
+	int the_int = 0;
+	for (uint i = 0; i < 4; i++) {
+		uint8 char = character_to_ascii(the_bytes[i]);
+		the_int |= char << (24 - i * 8);
+	}
+	return the_int;
 }

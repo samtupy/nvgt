@@ -10,13 +10,10 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-string generate_token(int token_length)
-{
-string token_sims="1234567890abcdefthijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-string final_token;
-for(uint i=0; i<token_length; i++)
-{
-final_token+=token_sims[random(0, token_sims.length()-1)];
-}
-return final_token;
+string generate_token(int token_length) {
+	string token_sims = "1234567890abcdefthijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	string final_token;
+	for (uint i = 0; i < token_length; i++)
+		final_token += token_sims[random(0, token_sims.length() - 1)];
+	return final_token;
 }

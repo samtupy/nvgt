@@ -11,10 +11,10 @@
 */
 
 #if defined(_WIN32)
-#define VC_EXTRALEAN
-#include <windows.h>
+	#define VC_EXTRALEAN
+	#include <windows.h>
 #else
-#include <cstring>
+	#include <cstring>
 #endif
 #include <SDL.h>
 #include <angelscript.h>
@@ -28,211 +28,221 @@
 
 static unsigned char g_KeysPressed[512];
 static unsigned char g_KeysRepeating[512];
-static const unsigned char* g_KeysDown=NULL;
-static int g_KeysDownArrayLen=0;
+static const unsigned char* g_KeysDown = NULL;
+static int g_KeysDownArrayLen = 0;
 static unsigned char g_KeysReleased[512];
 static unsigned char g_MouseButtonsPressed[32];
 static unsigned char g_MouseButtonsReleased[32];
-std::string g_UserInput="";
-int g_MouseX=0, g_MouseY=0, g_MouseZ=0;
-int g_MouseAbsX=0, g_MouseAbsY=0, g_MouseAbsZ=0;
-int g_MousePrevX=0, g_MousePrevY=0, g_MousePrevZ=0;
-bool g_KeyboardStateChange=false;
-static asITypeInfo* key_code_array_type=NULL;
+std::string g_UserInput = "";
+int g_MouseX = 0, g_MouseY = 0, g_MouseZ = 0;
+int g_MouseAbsX = 0, g_MouseAbsY = 0, g_MouseAbsZ = 0;
+int g_MousePrevX = 0, g_MousePrevY = 0, g_MousePrevZ = 0;
+bool g_KeyboardStateChange = false;
+static asITypeInfo* key_code_array_type = NULL;
 void InputInit() {
-	if(SDL_WasInit(0)&SDL_INIT_VIDEO) return;
+	if (SDL_WasInit(0)&SDL_INIT_VIDEO) return;
 	memset(g_KeysPressed, 0, 512);
 	memset(g_KeysRepeating, 0, 512);
 	memset(g_KeysReleased, 0, 512);
 	SDL_Init(SDL_INIT_VIDEO);
-	g_KeysDown=SDL_GetKeyboardState(&g_KeysDownArrayLen);
+	g_KeysDown = SDL_GetKeyboardState(&g_KeysDownArrayLen);
 }
 void InputDestroy() {
 	SDL_Quit();
-	g_KeysDown=NULL;
+	g_KeysDown = NULL;
 }
 void InputEvent(SDL_Event* evt) {
-	if(evt->type==SDL_KEYDOWN) {
-		if(!evt->key.repeat)
-			g_KeysPressed[evt->key.keysym.scancode]=1;
+	if (evt->type == SDL_KEYDOWN) {
+		if (!evt->key.repeat)
+			g_KeysPressed[evt->key.keysym.scancode] = 1;
 		else
-			g_KeysRepeating[evt->key.keysym.scancode]=1;
-		g_KeysReleased[evt->key.keysym.scancode]=0;
-		if(!evt->key.repeat)
-			g_KeyboardStateChange=true;
-	} else if(evt->type==SDL_KEYUP) {
-		g_KeysPressed[evt->key.keysym.scancode]=0;
-		g_KeysRepeating[evt->key.keysym.scancode]=0;
-		g_KeysReleased[evt->key.keysym.scancode]=1;
-		g_KeyboardStateChange=true;
-	} else if(evt->type==SDL_TEXTINPUT)
-		g_UserInput+=evt->text.text;
-	else if(evt->type==SDL_MOUSEMOTION) {
-		g_MouseAbsX=evt->motion.x;
-		g_MouseAbsY=evt->motion.y;
-	} else if(evt->type==SDL_MOUSEBUTTONDOWN) {
-		g_MouseButtonsPressed[evt->button.button]=1;
-		g_MouseButtonsReleased[evt->button.button]=0;
-	} else if(evt->type==SDL_MOUSEBUTTONUP) {
-		g_MouseButtonsPressed[evt->button.button]=0;
-		g_MouseButtonsReleased[evt->button.button]=1;
-	} else if(evt->type==SDL_MOUSEWHEEL)
-		g_MouseAbsZ+=evt->wheel.y;
+			g_KeysRepeating[evt->key.keysym.scancode] = 1;
+		g_KeysReleased[evt->key.keysym.scancode] = 0;
+		if (!evt->key.repeat)
+			g_KeyboardStateChange = true;
+	} else if (evt->type == SDL_KEYUP) {
+		g_KeysPressed[evt->key.keysym.scancode] = 0;
+		g_KeysRepeating[evt->key.keysym.scancode] = 0;
+		g_KeysReleased[evt->key.keysym.scancode] = 1;
+		g_KeyboardStateChange = true;
+	} else if (evt->type == SDL_TEXTINPUT)
+		g_UserInput += evt->text.text;
+	else if (evt->type == SDL_MOUSEMOTION) {
+		g_MouseAbsX = evt->motion.x;
+		g_MouseAbsY = evt->motion.y;
+	} else if (evt->type == SDL_MOUSEBUTTONDOWN) {
+		g_MouseButtonsPressed[evt->button.button] = 1;
+		g_MouseButtonsReleased[evt->button.button] = 0;
+	} else if (evt->type == SDL_MOUSEBUTTONUP) {
+		g_MouseButtonsPressed[evt->button.button] = 0;
+		g_MouseButtonsReleased[evt->button.button] = 1;
+	} else if (evt->type == SDL_MOUSEWHEEL)
+		g_MouseAbsZ += evt->wheel.y;
 }
 bool KeyPressed(unsigned int key) {
-	if(key>511) return false;
-	bool r=g_KeysPressed[key]==1;
-	g_KeysPressed[key]=0;
+	if (key > 511) return false;
+	bool r = g_KeysPressed[key] == 1;
+	g_KeysPressed[key] = 0;
 	return r;
 }
 bool KeyRepeating(unsigned int key) {
-	if(key>511) return false;
-	bool r=g_KeysPressed[key]==1||g_KeysRepeating[key]==1;
-	g_KeysPressed[key]=0;
-	g_KeysRepeating[key]=0;
+	if (key > 511) return false;
+	bool r = g_KeysPressed[key] == 1 || g_KeysRepeating[key] == 1;
+	g_KeysPressed[key] = 0;
+	g_KeysRepeating[key] = 0;
 	return r;
 }
 bool key_down(unsigned int key) {
-	if(key>511||!g_KeysDown) return false;
-	return g_KeysReleased[key]==0&&g_KeysDown[key]==1;
+	if (key > 511 || !g_KeysDown) return false;
+	return g_KeysReleased[key] == 0 && g_KeysDown[key] == 1;
 }
 bool KeyReleased(unsigned int key) {
-	if(key>511||!g_KeysDown) return false;
-	bool r=g_KeysReleased[key]==1;
-	if(r&&g_KeysDown[key]==1) return false;
-	g_KeysReleased[key]=0;
+	if (key > 511 || !g_KeysDown) return false;
+	bool r = g_KeysReleased[key] == 1;
+	if (r && g_KeysDown[key] == 1) return false;
+	g_KeysReleased[key] = 0;
 	return r;
 }
 bool key_up(unsigned int key) {
-	if(key>511||!g_KeysDown) return false;
-	return g_KeysDown[key]==0;
+	if (key > 511 || !g_KeysDown) return false;
+	return g_KeysDown[key] == 0;
 }
 bool insure_key_up(unsigned short key) {
-	if(key>511||!g_KeysDown) return false;
-	if(g_KeysDown[key]==1)
-		g_KeysReleased[key]=1;
+	if (key > 511 || !g_KeysDown) return false;
+	if (g_KeysDown[key] == 1)
+		g_KeysReleased[key] = 1;
 	else
 		return false;
 	return true;
 }
 CScriptArray* keys_pressed() {
-	asIScriptContext* ctx=asGetActiveContext();
-	asIScriptEngine* engine=ctx->GetEngine();
-	if(!key_code_array_type)
-		key_code_array_type=engine->GetTypeInfoByDecl("array<key_code>");
-	CScriptArray* array=CScriptArray::Create(key_code_array_type);
-	for(int i=0; i<512; i++) {
-		unsigned int k=(unsigned int)i;
-		if(KeyPressed(k))
+	asIScriptContext* ctx = asGetActiveContext();
+	asIScriptEngine* engine = ctx->GetEngine();
+	if (!key_code_array_type)
+		key_code_array_type = engine->GetTypeInfoByDecl("array<key_code>");
+	CScriptArray* array = CScriptArray::Create(key_code_array_type);
+	for (int i = 0; i < 512; i++) {
+		unsigned int k = (unsigned int)i;
+		if (KeyPressed(k))
 			array->InsertLast(&k);
 	}
 	return array;
 }
 CScriptArray* keys_down() {
-	asIScriptContext* ctx=asGetActiveContext();
-	asIScriptEngine* engine=ctx->GetEngine();
-	if(!key_code_array_type)
-		key_code_array_type=engine->GetTypeInfoByDecl("array<key_code>");
-	CScriptArray* array=CScriptArray::Create(key_code_array_type);
-	if(!g_KeysDown) return array;
-	for(int i=0; i<g_KeysDownArrayLen; i++) {
-		if(g_KeysDown[i]==1)
+	asIScriptContext* ctx = asGetActiveContext();
+	asIScriptEngine* engine = ctx->GetEngine();
+	if (!key_code_array_type)
+		key_code_array_type = engine->GetTypeInfoByDecl("array<key_code>");
+	CScriptArray* array = CScriptArray::Create(key_code_array_type);
+	if (!g_KeysDown) return array;
+	for (int i = 0; i < g_KeysDownArrayLen; i++) {
+		if (g_KeysDown[i] == 1)
 			array->InsertLast(&i);
 	}
 	return array;
 }
-int g_TotalKeysDownCache=-1;
+int g_TotalKeysDownCache = -1;
 int total_keys_down() {
-	if(!g_KeysDown) return 0;
-	if(!g_KeyboardStateChange&&g_TotalKeysDownCache>0) return g_TotalKeysDownCache;
-	int c=0;
-	for(int i=0; i<g_KeysDownArrayLen; i++) {
-		if(g_KeysDown[i]||g_KeysReleased[i])
+	if (!g_KeysDown) return 0;
+	if (!g_KeyboardStateChange && g_TotalKeysDownCache > 0) return g_TotalKeysDownCache;
+	int c = 0;
+	for (int i = 0; i < g_KeysDownArrayLen; i++) {
+		if (g_KeysDown[i] || g_KeysReleased[i])
 			c++;
 	}
-	g_KeyboardStateChange=false;
-	g_TotalKeysDownCache=c;
+	g_KeyboardStateChange = false;
+	g_TotalKeysDownCache = c;
 	return c;
 }
 CScriptArray* keys_released() {
-	asIScriptContext* ctx=asGetActiveContext();
-	asIScriptEngine* engine=ctx->GetEngine();
-	if(!key_code_array_type)
-		key_code_array_type=engine->GetTypeInfoByDecl("array<key_code>");
-	CScriptArray* array=CScriptArray::Create(key_code_array_type);
-	for(int i=0; i<g_KeysDownArrayLen; i++) {
-		if(KeyReleased(i))
+	asIScriptContext* ctx = asGetActiveContext();
+	asIScriptEngine* engine = ctx->GetEngine();
+	if (!key_code_array_type)
+		key_code_array_type = engine->GetTypeInfoByDecl("array<key_code>");
+	CScriptArray* array = CScriptArray::Create(key_code_array_type);
+	for (int i = 0; i < g_KeysDownArrayLen; i++) {
+		if (KeyReleased(i))
 			array->InsertLast(&i);
 	}
 	return array;
 }
 std::string get_characters() {
-	std::string tmp=g_UserInput;
-	g_UserInput="";
+	std::string tmp = g_UserInput;
+	g_UserInput = "";
 	return tmp;
 }
 bool MousePressed(unsigned char button) {
-	if(button>31) return false;
-	bool r=g_MouseButtonsPressed[button]==1;
-	g_MouseButtonsPressed[button]=0;
+	if (button > 31) return false;
+	bool r = g_MouseButtonsPressed[button] == 1;
+	g_MouseButtonsPressed[button] = 0;
 	return r;
 }
 bool mouse_down(unsigned char button) {
-	if(button>31) return false;
-	if(!g_KeysDown) return false;
-	return (SDL_GetMouseState(&g_MouseAbsX, &g_MouseAbsY)&SDL_BUTTON(button))!=0;
+	if (button > 31) return false;
+	if (!g_KeysDown) return false;
+	return (SDL_GetMouseState(&g_MouseAbsX, &g_MouseAbsY)&SDL_BUTTON(button)) != 0;
 }
 bool MouseReleased(unsigned char button) {
-	if(button>31) return false;
-	bool r=g_MouseButtonsReleased[button]==1;
-	g_MouseButtonsReleased[button]=0;
+	if (button > 31) return false;
+	bool r = g_MouseButtonsReleased[button] == 1;
+	g_MouseButtonsReleased[button] = 0;
 	return r;
 }
 bool mouse_up(unsigned char button) {
 	return !mouse_down(button);
 }
 void mouse_update() {
-	g_MouseX=g_MouseAbsX-g_MousePrevX;
-	g_MouseY=g_MouseAbsY-g_MousePrevY;
-	g_MouseZ=g_MouseAbsZ-g_MousePrevZ;
-	g_MousePrevX=g_MouseAbsX;
-	g_MousePrevY=g_MouseAbsY;
-	g_MousePrevZ=g_MouseAbsZ;
+	g_MouseX = g_MouseAbsX - g_MousePrevX;
+	g_MouseY = g_MouseAbsY - g_MousePrevY;
+	g_MouseZ = g_MouseAbsZ - g_MousePrevZ;
+	g_MousePrevX = g_MouseAbsX;
+	g_MousePrevY = g_MouseAbsY;
+	g_MousePrevZ = g_MouseAbsZ;
 }
 
-bool keyhook_active=true;
+bool keyhook_active = true;
 #ifdef _WIN32
 // Thanks Quentin Cosendey (Universal Speech) for this jaws keyboard hook code.
-static HHOOK hook=NULL;
-BOOL kh_caps_down=FALSE, kh_insert_down=FALSE;
+static HHOOK hook = NULL;
+BOOL kh_caps_down = FALSE, kh_insert_down = FALSE;
 static LRESULT kbHook(int code, WPARAM wp, LPARAM lp) {
 	if (code == HC_ACTION) {
-		int k=((KBDLLHOOKSTRUCT*)lp)->vkCode;
-		int s=((KBDLLHOOKSTRUCT*)lp)->scanCode;
-		if(k!=VK_CAPITAL&&k!=VK_INSERT&&(kh_caps_down||kh_insert_down||!SDL_GetKeyboardFocus()))
+		int k = ((KBDLLHOOKSTRUCT*)lp)->vkCode;
+		int s = ((KBDLLHOOKSTRUCT*)lp)->scanCode;
+		if (k != VK_CAPITAL && k != VK_INSERT && (kh_caps_down || kh_insert_down || !SDL_GetKeyboardFocus()))
 			return CallNextHookEx(hook, code, wp, lp);
-		int flags=((KBDLLHOOKSTRUCT*)lp)->flags;
-		BOOL pressed=(flags&(1<<7))==0;
-		DWORD kstate=SDL_GetModState();
-		switch(k) {
-		case VK_TAB : case VK_SPACE:
-			if(key_down(SDL_SCANCODE_INSERT)||key_down(SDL_SCANCODE_CAPSLOCK)||key_down(SDL_SCANCODE_LALT)||key_down(SDL_SCANCODE_RALT))
+		int flags = ((KBDLLHOOKSTRUCT*)lp)->flags;
+		BOOL pressed = (flags & (1 << 7)) == 0;
+		DWORD kstate = SDL_GetModState();
+		switch (k) {
+			case VK_TAB :
+			case VK_SPACE:
+				if (key_down(SDL_SCANCODE_INSERT) || key_down(SDL_SCANCODE_CAPSLOCK) || key_down(SDL_SCANCODE_LALT) || key_down(SDL_SCANCODE_RALT))
+					break;
+				return 0;
+			case VK_INSERT:
+				kh_insert_down = pressed;
 				break;
-			return 0;
-		case VK_INSERT:
-			kh_insert_down=pressed;
-			break;
-		case VK_CAPITAL:
-			kh_caps_down=pressed;
-			break;
-		case VK_NUMLOCK : case VK_LCONTROL : case VK_RCONTROL : case VK_LSHIFT : case VK_RSHIFT : case VK_LMENU : case VK_RMENU : case VK_LWIN : case VK_RWIN:
-			break;
-		case VK_PRIOR : case VK_NEXT:
-			if(kstate&KMOD_CTRL&&kstate&KMOD_ALT)
+			case VK_CAPITAL:
+				kh_caps_down = pressed;
 				break;
-			return 0;
-		default:
-			return 0;
+			case VK_NUMLOCK :
+			case VK_LCONTROL :
+			case VK_RCONTROL :
+			case VK_LSHIFT :
+			case VK_RSHIFT :
+			case VK_LMENU :
+			case VK_RMENU :
+			case VK_LWIN :
+			case VK_RWIN:
+				break;
+			case VK_PRIOR :
+			case VK_NEXT:
+				if (kstate & KMOD_CTRL && kstate & KMOD_ALT)
+					break;
+				return 0;
+			default:
+				return 0;
 		}
 	}
 	return CallNextHookEx(hook, code, wp, lp);
@@ -241,20 +251,20 @@ static LRESULT kbHook(int code, WPARAM wp, LPARAM lp) {
 void uninstall_keyhook();
 bool install_keyhook(bool allow_reinstall) {
 	#ifdef _WIN32
-	if(hook&&!allow_reinstall) return false;
-	if(hook) uninstall_keyhook();
-	if(hook) return true;
-	hook=SetWindowsHookEx( WH_KEYBOARD_LL, kbHook, GetModuleHandle(NULL), NULL);
-	return hook? true : false;
+	if (hook && !allow_reinstall) return false;
+	if (hook) uninstall_keyhook();
+	if (hook) return true;
+	hook = SetWindowsHookEx(WH_KEYBOARD_LL, kbHook, GetModuleHandle(NULL), NULL);
+	return hook ? true : false;
 	#else
 	return false;
 	#endif
 }
 void uninstall_keyhook() {
 	#ifdef _WIN32
-	if(!hook) return;
+	if (!hook) return;
 	UnhookWindowsHookEx(hook);
-	hook=NULL;
+	hook = NULL;
 	#endif
 }
 

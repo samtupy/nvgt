@@ -15,12 +15,12 @@
 #include <angelscript.h>
 #include <string>
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define VC_EXTRALEAN
-#include <windows.h>
+	#define WIN32_LEAN_AND_MEAN
+	#define VC_EXTRALEAN
+	#include <windows.h>
 #else
-typedef asBYTE BYTE;
-typedef asDWORD DWORD;
+	typedef asBYTE BYTE;
+	typedef asDWORD DWORD;
 #endif
 
 void RegisterScriptCrypto(asIScriptEngine* engine);

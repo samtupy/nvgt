@@ -15,22 +15,22 @@
 #define _O(s) s
 static asIScriptEngine* g_ScriptEngine = NULL;
 
-std::string stdstr(const char* val, size_t s=0) {
-	if(!val) return "";
-	if(s)
+std::string stdstr(const char* val, size_t s = 0) {
+	if (!val) return "";
+	if (s)
 		return std::string(val, s);
 	return std::string(val);
 }
 
-static bool sqlite_started=false;
+static bool sqlite_started = false;
 void init_sqlite() {
-	if(sqlite_started) return;
+	if (sqlite_started) return;
 	sqlite3_initialize();
 	sqlite3_auto_extension((void(*)(void))sqlite3_compress_init);
 	sqlite3_auto_extension((void(*)(void))sqlite3_eval_init);
 	sqlite3_auto_extension((void(*)(void))sqlite3_shathree_init);
 	sqlite3_auto_extension((void(*)(void))sqlite3_uuid_init);
-	sqlite_started=true;
+	sqlite_started = true;
 }
 
 sqlite3statement::sqlite3statement(sqlite3DB* p, sqlite3_stmt* s) : parent(p), statement(s), ref_count(1) {}
@@ -38,7 +38,7 @@ void sqlite3statement::add_ref() {
 	asAtomicInc(ref_count);
 }
 void sqlite3statement::release() {
-	if(asAtomicDec(ref_count)<1) {
+	if (asAtomicDec(ref_count) < 1) {
 		sqlite3_finalize(statement);
 		delete this;
 	}
@@ -49,14 +49,14 @@ std::string sqlite3statement::get_expanded_sql_statement() { return stdstr(sqlit
 std::string sqlite3statement::get_sql_statement() { return stdstr(sqlite3_sql(statement)); }
 int sqlite3statement::get_column_count() { return sqlite3_column_count(statement); }
 int sqlite3statement::get_bind_param_count() { return sqlite3_bind_parameter_count(statement); }
-int sqlite3statement::bind_blob(int index, const std::string& val, bool transient) { return sqlite3_bind_blob(statement, index, (void*)&val[0], val.size(), (transient? SQLITE_TRANSIENT : SQLITE_STATIC)); }
+int sqlite3statement::bind_blob(int index, const std::string& val, bool transient) { return sqlite3_bind_blob(statement, index, (void*)&val[0], val.size(), (transient ? SQLITE_TRANSIENT : SQLITE_STATIC)); }
 int sqlite3statement::bind_double(int index, double val) { return sqlite3_bind_double(statement, index, val); }
 int sqlite3statement::bind_int(int index, int val) { return sqlite3_bind_int(statement, index, val); }
 int sqlite3statement::bind_int64(int index, asINT64 val) { return sqlite3_bind_int64(statement, index, val); }
 int sqlite3statement::bind_null(int index) { return sqlite3_bind_null(statement, index); }
 int sqlite3statement::bind_param_index(const std::string& name) { return sqlite3_bind_parameter_index(statement, name.c_str()); }
 std::string sqlite3statement::bind_param_name(int index) { return stdstr(sqlite3_bind_parameter_name(statement, index)); }
-int sqlite3statement::bind_text(int index, const std::string& val, bool transient) { return sqlite3_bind_text(statement, index, val.c_str(), val.size(), (transient? SQLITE_TRANSIENT : SQLITE_STATIC)); }
+int sqlite3statement::bind_text(int index, const std::string& val, bool transient) { return sqlite3_bind_text(statement, index, val.c_str(), val.size(), (transient ? SQLITE_TRANSIENT : SQLITE_STATIC)); }
 int sqlite3statement::clear_bindings() { return sqlite3_clear_bindings(statement); }
 std::string sqlite3statement::column_blob(int index) { return stdstr((const char*)sqlite3_column_blob(statement, index), column_bytes(index)); }
 int sqlite3statement::column_bytes(int index) { return sqlite3_column_bytes(statement, index); }
@@ -73,23 +73,23 @@ void sqlite3context::add_ref() {
 	asAtomicInc(ref_count);
 }
 void sqlite3context::release() {
-	if(asAtomicDec(ref_count)<1)
+	if (asAtomicDec(ref_count) < 1)
 		delete this;
 }
-void sqlite3context::set_blob(const std::string& val, bool transient) { sqlite3_result_blob(c, (void*)&val[0], val.size(), (transient? SQLITE_TRANSIENT : SQLITE_STATIC)); }
+void sqlite3context::set_blob(const std::string& val, bool transient) { sqlite3_result_blob(c, (void*)&val[0], val.size(), (transient ? SQLITE_TRANSIENT : SQLITE_STATIC)); }
 void sqlite3context::set_double(double val) { sqlite3_result_double(c, val); }
 void sqlite3context::set_error(const std::string& errormsg, int errorcode) { sqlite3_result_error(c, errormsg.c_str(), errormsg.size()); sqlite3_result_error_code(c, errorcode); }
 void sqlite3context::set_int(int val) { sqlite3_result_int(c, val); }
 void sqlite3context::set_int64(asINT64 val) { sqlite3_result_int64(c, val); }
 void sqlite3context::set_null() { sqlite3_result_null(c); }
-void sqlite3context::set_text(const std::string& val, bool transient) { sqlite3_result_text(c, val.c_str(), val.size(), (transient? SQLITE_TRANSIENT : SQLITE_STATIC)); }
+void sqlite3context::set_text(const std::string& val, bool transient) { sqlite3_result_text(c, val.c_str(), val.size(), (transient ? SQLITE_TRANSIENT : SQLITE_STATIC)); }
 
 sqlite3value::sqlite3value(sqlite3_value* val) : ref_count(1), v(val) {}
 void sqlite3value::add_ref() {
 	asAtomicInc(ref_count);
 }
 void sqlite3value::release() {
-	if(asAtomicDec(ref_count)<1)
+	if (asAtomicDec(ref_count) < 1)
 		delete this;
 }
 std::string sqlite3value::get_blob() { return stdstr((const char*)sqlite3_value_blob(v), get_bytes()); }
@@ -104,37 +104,37 @@ std::string sqlite3value::get_text() { return stdstr((const char*)sqlite3_value_
 
 
 int sqlite_authorizer_callback(void* user_data, int action, const char* extra1, const char* extra2, const char* extra3, const char* extra4) {
-	sqlite3DB* db=(sqlite3DB*)user_data;
-	if(!db->authorizer) return SQLITE_ABORT;
-	asIScriptContext* ctx=g_ScriptEngine->RequestContext();
-	if(!ctx) return SQLITE_ABORT;
-	if(ctx->Prepare(db->authorizer)<0) {
+	sqlite3DB* db = (sqlite3DB*)user_data;
+	if (!db->authorizer) return SQLITE_ABORT;
+	asIScriptContext* ctx = g_ScriptEngine->RequestContext();
+	if (!ctx) return SQLITE_ABORT;
+	if (ctx->Prepare(db->authorizer) < 0) {
 		g_ScriptEngine->ReturnContext(ctx);
 		return SQLITE_ABORT;
 	}
-	std::string x1=(extra1?extra1:""), x2=(extra2?extra2:""), x3=(extra3?extra3:""), x4=(extra4?extra4:"");
+	std::string x1 = (extra1 ? extra1 : ""), x2 = (extra2 ? extra2 : ""), x3 = (extra3 ? extra3 : ""), x4 = (extra4 ? extra4 : "");
 	ctx->SetArgObject(0, &db->authorizer_user_data);
 	ctx->SetArgDWord(1, action);
 	ctx->SetArgObject(2, &x1);
 	ctx->SetArgObject(3, &x2);
 	ctx->SetArgObject(4, &x3);
 	ctx->SetArgObject(5, &x4);
-	if(ctx->Execute()!=asEXECUTION_FINISHED) {
+	if (ctx->Execute() != asEXECUTION_FINISHED) {
 		g_ScriptEngine->ReturnContext(ctx);
 		return SQLITE_ABORT;
 	}
-	int ret=ctx->GetReturnDWord();
+	int ret = ctx->GetReturnDWord();
 	g_ScriptEngine->ReturnContext(ctx);
 	return ret;
 }
 int sqlite3exec_callback(void* user, int colc, char** colvs, char** colns) {
-	if(!user) return SQLITE_OK;
-	CScriptArray* array=NULL;
-	CScriptArray* parent_array=(CScriptArray*)user;
-	parent_array->Resize(parent_array->GetSize()+1);
-	array=((CScriptArray*)(parent_array->At(parent_array->GetSize()-1)));
+	if (!user) return SQLITE_OK;
+	CScriptArray* array = NULL;
+	CScriptArray* parent_array = (CScriptArray*)user;
+	parent_array->Resize(parent_array->GetSize() + 1);
+	array = ((CScriptArray*)(parent_array->At(parent_array->GetSize() - 1)));
 	array->Resize(colc);
-	for(int i=0; i<colc; i++)
+	for (int i = 0; i < colc; i++)
 		((std::string*)(array->At(i)))->assign(stdstr(colvs[i]));
 	return SQLITE_OK;
 }
@@ -143,13 +143,13 @@ typedef struct {
 	std::string userdata;
 } sqlite3func;
 void sqlite3func_callback(sqlite3_context* sctx, int argc, sqlite3_value** argv) {
-	sqlite3func* f=(sqlite3func*)sqlite3_user_data(sctx);
-	asIScriptContext* ctx=g_ScriptEngine->RequestContext();
-	if(!ctx) {
+	sqlite3func* f = (sqlite3func*)sqlite3_user_data(sctx);
+	asIScriptContext* ctx = g_ScriptEngine->RequestContext();
+	if (!ctx) {
 		sqlite3_result_error(sctx, "Unable to acquire angelscript context", -1);
 		return;
 	}
-	if(ctx->Prepare(f->func)<0) {
+	if (ctx->Prepare(f->func) < 0) {
 		sqlite3_result_error(sctx, "Unable to prepare angelscript function", -1);
 		return;
 	}
@@ -165,21 +165,21 @@ void sqlite3DB::add_ref() {
 	asAtomicInc(ref_count);
 }
 void sqlite3DB::release() {
-	if(asAtomicDec(ref_count)<1) {
-		if(db) sqlite3_close_v2(db);
-		if(authorizer) authorizer->Release();
+	if (asAtomicDec(ref_count) < 1) {
+		if (db) sqlite3_close_v2(db);
+		if (authorizer) authorizer->Release();
 		delete this;
 	}
 }
 int sqlite3DB::close() {
-	int ret=-1;
-	if(authorizer) {
+	int ret = -1;
+	if (authorizer) {
 		authorizer->Release();
-		authorizer=NULL;
+		authorizer = NULL;
 	}
-	if(db) {
-		ret=sqlite3_close(db);
-		db=NULL;
+	if (db) {
+		ret = sqlite3_close(db);
+		db = NULL;
 	}
 	return ret;
 }
@@ -187,34 +187,34 @@ int sqlite3DB::open(const std::string& filename, int mode) {
 	return sqlite3_open_v2(filename.c_str(), &db, mode, NULL);
 }
 sqlite3statement* sqlite3DB::prepare(const std::string& statement, int* statement_tail) {
-	sqlite3_stmt* st=NULL;
-	const char* tail=NULL;
-	if(!db) return NULL;
-	int err=sqlite3_prepare_v2(db, statement.c_str(), statement.size(), &st, &tail);
-	sqlite3statement* ret=NULL;
-	if(st)
-		ret=new sqlite3statement(this, st);
-	if(tail&&statement_tail)
-		*statement_tail=(tail-statement.c_str());
+	sqlite3_stmt* st = NULL;
+	const char* tail = NULL;
+	if (!db) return NULL;
+	int err = sqlite3_prepare_v2(db, statement.c_str(), statement.size(), &st, &tail);
+	sqlite3statement* ret = NULL;
+	if (st)
+		ret = new sqlite3statement(this, st);
+	if (tail && statement_tail)
+		*statement_tail = (tail - statement.c_str());
 	return ret;
 }
 int sqlite3DB::execute(const std::string& statements, CScriptArray* results) {
-	return sqlite3_exec(db, statements.c_str(), (results? sqlite3exec_callback : NULL), results, NULL);
+	return sqlite3_exec(db, statements.c_str(), (results ? sqlite3exec_callback : NULL), results, NULL);
 }
-asINT64 sqlite3DB::get_rows_changed() { return db? sqlite3_changes(db) : 0; }
-asINT64 sqlite3DB::get_total_rows_changed() { return db? sqlite3_total_changes(db) : 0; }
-int sqlite3DB::limit(int id, int val) { return db? sqlite3_limit(db, id, val) : -1; }
+asINT64 sqlite3DB::get_rows_changed() { return db ? sqlite3_changes(db) : 0; }
+asINT64 sqlite3DB::get_total_rows_changed() { return db ? sqlite3_total_changes(db) : 0; }
+int sqlite3DB::limit(int id, int val) { return db ? sqlite3_limit(db, id, val) : -1; }
 int sqlite3DB::set_authorizer(asIScriptFunction* auth, const std::string& user_data) {
-	if(!db) return -1;
-	if(authorizer) authorizer->Release();
-	authorizer=auth;
-	authorizer_user_data=user_data;
-	return sqlite3_set_authorizer(db, (auth?sqlite_authorizer_callback : NULL), this);
+	if (!db) return -1;
+	if (authorizer) authorizer->Release();
+	authorizer = auth;
+	authorizer_user_data = user_data;
+	return sqlite3_set_authorizer(db, (auth ? sqlite_authorizer_callback : NULL), this);
 }
-asINT64 sqlite3DB::get_last_insert_rowid() { return db? sqlite3_last_insert_rowid(db) : 0; }
-void sqlite3DB::set_last_insert_rowid(asINT64 val) { if(db) sqlite3_set_last_insert_rowid(db, val); }
-int sqlite3DB::get_last_error() { return db? sqlite3_errcode(db) : -1; }
-std::string sqlite3DB::get_last_error_text() { return db? stdstr(sqlite3_errmsg(db)) : ""; }
+asINT64 sqlite3DB::get_last_insert_rowid() { return db ? sqlite3_last_insert_rowid(db) : 0; }
+void sqlite3DB::set_last_insert_rowid(asINT64 val) { if (db) sqlite3_set_last_insert_rowid(db, val); }
+int sqlite3DB::get_last_error() { return db ? sqlite3_errcode(db) : -1; }
+std::string sqlite3DB::get_last_error_text() { return db ? stdstr(sqlite3_errmsg(db)) : ""; }
 
 sqlite3DB* new_sqlite3() { return new sqlite3DB(); }
 sqlite3DB* new_sqlite3open(const std::string& filename, int mode) { return new sqlite3DB(filename, mode); }

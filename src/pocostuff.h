@@ -29,17 +29,17 @@ template <class T> inline void* angelscript_refcounted_create(bool keep = false)
 }
 template <class T> inline angelscript_refcounted<T>* angelscript_refcounted_get(void* obj) {
 	angelscript_refcounted<T>* rc = reinterpret_cast<angelscript_refcounted<T>*>(obj); // Since obj is the first member of the angelscript_refcounted structure, we should be able to cast this pointer to that structure's type to get the refcount.
-	if(rc->magic != 0x1234abcd) return NULL; // This pointer didn't originate from our factory.
+	if (rc->magic != 0x1234abcd) return NULL; // This pointer didn't originate from our factory.
 	return rc;
 }
 template <class T> void angelscript_refcounted_duplicate(void* obj) {
 	angelscript_refcounted<T>* rc = angelscript_refcounted_get<T>(obj);
-	if(rc) asAtomicInc(rc->refcount);
+	if (rc) asAtomicInc(rc->refcount);
 }
 template <class T> void angelscript_refcounted_release(void* obj) {
 	angelscript_refcounted<T>* rc = angelscript_refcounted_get<T>(obj);
-	if(!rc) return;
-	if(asAtomicDec(rc->refcount)<1) {
+	if (!rc) return;
+	if (asAtomicDec(rc->refcount) < 1) {
 		rc->obj.~T(); // Since we created the refcounted structure with malloc in order to manually call object's constructor, we need to manually call the destructor as well.
 		free(obj);
 	}

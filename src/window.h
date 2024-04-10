@@ -12,15 +12,15 @@
 
 #pragma once
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define VC_EXTRALEAN
-#include <windows.h>
-extern HWND g_OSWindowHandle;
+	#define WIN32_LEAN_AND_MEAN
+	#define VC_EXTRALEAN
+	#include <windows.h>
+	extern HWND g_OSWindowHandle;
 #elif defined(__APPLE__)
-typedef struct _NSWindow NSWindow;
-extern NSWindow* g_OSWindowHandle;
+	typedef struct _NSWindow NSWindow;
+	extern NSWindow* g_OSWindowHandle;
 #else
-extern void* g_OSWindowHandle;
+	extern void* g_OSWindowHandle;
 #endif
 #include <angelscript.h>
 #include <string>

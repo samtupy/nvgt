@@ -22,11 +22,11 @@ bool voice_over_speak(const std::string& message, bool interrupt) {
 }
 
 void voice_over_window_created() {
-	
+
 }
 
 void voice_over_speech_shutdown() {
-	
+
 }
 
 std::string apple_input_box(const std::string& title, const std::string& message, const std::string& default_value, bool secure, bool readonly) {

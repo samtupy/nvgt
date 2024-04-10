@@ -20,7 +20,7 @@
 #include <string>
 
 void timestuff_startup();
-asINT64 ticks(bool unsecure=false);
+asINT64 ticks(bool unsecure = false);
 
 class timer_queue;
 class timer_queue_item : public TimerEventInterface {
@@ -47,20 +47,28 @@ public:
 	timer_queue();
 	void add_ref();
 	void release();
-	void set(const std::string& id, asIScriptFunction* callback, const std::string& user_data, uint64_t timeout, bool repeating=false);
-	void set_dataless(const std::string& id, asIScriptFunction* callback, uint64_t timeout, bool repeating=false) { set(id, callback, "", timeout, repeating); }
+	void set(const std::string& id, asIScriptFunction* callback, const std::string& user_data, uint64_t timeout, bool repeating = false);
+	void set_dataless(const std::string& id, asIScriptFunction* callback, uint64_t timeout, bool repeating = false) {
+		set(id, callback, "", timeout, repeating);
+	}
 	uint64_t elapsed(const std::string& id);
 	uint64_t timeout(const std::string& id);
 	bool is_repeating(const std::string& id);
-	bool exists(const std::string& id) { return timer_objects.find(id)!=timer_objects.end(); }
+	bool exists(const std::string& id) {
+		return timer_objects.find(id) != timer_objects.end();
+	}
 	bool restart(const std::string& id);
 	bool set_timeout(const std::string& id, uint64_t timeout, bool repeating);
 	bool erase(const std::string& id);
 	void flush();
 	void reset();
-	void schedule(timer_queue_item* t, Tick delta) { return timers.schedule(t, delta); }
-	int size() { return timer_objects.size(); }
-	bool loop(int max_timers=0, int max_catchup=100);
+	void schedule(timer_queue_item* t, Tick delta) {
+		return timers.schedule(t, delta);
+	}
+	int size() {
+		return timer_objects.size();
+	}
+	bool loop(int max_timers = 0, int max_catchup = 100);
 };
 
 void RegisterScriptTimestuff(asIScriptEngine* engine);

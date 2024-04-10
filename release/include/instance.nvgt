@@ -13,7 +13,7 @@
 
 class instance {
 	private bool already_locked = false;
-	instance(const string&in app_id = "") {
+	instance(const string& in app_id = "") {
 		mtx_name = crc32("G_INSTANCE_" + app_id);
 		@mtx = named_mutex(mtx_name);
 		try {
@@ -22,10 +22,10 @@ class instance {
 	}
 	~instance() {
 		try { mtx.unlock(); } catch {} // If another process has locked this mutex, we shouldn't be able to unlock it from this end. We attempt to explicitly unlock because otherwise the operating system will need to do it on process cleanup sometimes a bit after exit.
-	@mtx=null;
+		@mtx = null;
 	}
 	bool get_is_already_running() property {
-		if(already_locked) return false; // On some platforms it is possible to double lock named mutexes, so we need to keep track of whether this instance object successfully locked the mutex upon creation. If it did, the process is not already running.
+		if (already_locked) return false; // On some platforms it is possible to double lock named mutexes, so we need to keep track of whether this instance object successfully locked the mutex upon creation. If it did, the process is not already running.
 		try {
 			return !mtx.try_lock(); // If a lock is successful, no other instance object is alive. So long as the mutex is locked by the same process that called this function, try_lock() will return true. Otherwise another instance object in another process has locked this mutex first.
 		} catch { // The process used to be running, now it is not and the mutex was abandoned. Take control and make a new one.
@@ -36,11 +36,11 @@ class instance {
 	}
 	void wait_until_standalone() {
 		try {
-		mtx.lock(); // If a lock is already held, this function will block forever until that lock is released E. another version of the process exits.
-	} catch { // The mutex becoming abandoned while waiting for it to unlock may throw an exception, recreate the mutex in that case.
-		@mtx = named_mutex(mtx_name);
-		try { mtx.try_lock(); } catch {} // It's one minor issue with the poco libraries that nvgt uses, they are just a bit exception centric for our wants on ocasion.
-	}
+			mtx.lock(); // If a lock is already held, this function will block forever until that lock is released E. another version of the process exits.
+		} catch { // The mutex becoming abandoned while waiting for it to unlock may throw an exception, recreate the mutex in that case.
+			@mtx = named_mutex(mtx_name);
+			try { mtx.try_lock(); } catch {} // It's one minor issue with the poco libraries that nvgt uses, they are just a bit exception centric for our wants on ocasion.
+		}
 	}
 	private named_mutex@ mtx;
 	private string mtx_name;

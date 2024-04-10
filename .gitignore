@@ -1,13 +1,18 @@
+# build/binary artifacts
 *.exe
 *.dll
 *.bin
 *.obj
 *.pdb
 *.lib
-tmp
+__pycache__
+
+# other intermediet build
 build/windev_path
 .sconsign.dblite
+*.orig
+
+# private user space and dependencies
 user/**
 !user/readme.md
-__pycache__
 windev

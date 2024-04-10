@@ -32,16 +32,16 @@ bool script_compiled();
 
 
 #ifndef MAX_PATH
-#define MAX_PATH 260
+	#define MAX_PATH 260
 #endif
 #ifndef _WIN32
-#ifndef BOOL
-typedef int BOOL;
-#define FALSE 0
-#define TRUE 1
-#endif
-typedef unsigned int DWORD;
-int Sleep(long msec);
-typedef char TCHAR;
-#define _T(x) x
+	#ifndef BOOL
+		typedef int BOOL;
+		#define FALSE 0
+		#define TRUE 1
+	#endif
+	typedef unsigned int DWORD;
+	int Sleep(long msec);
+	typedef char TCHAR;
+	#define _T(x) x
 #endif

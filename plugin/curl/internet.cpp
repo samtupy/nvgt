@@ -14,16 +14,16 @@
 #include <cstring>
 #include "internet.h"
 #ifndef NVGT_PLUGIN_STATIC
-#define THREAD_IMPLEMENTATION
+	#define THREAD_IMPLEMENTATION
 #endif
 #include <thread.h>
 
 std::string url_encode(const std::string& url) {
 	std::stringstream r;
-	for(int i=0; i<url.size(); i++) {
-		if(isalnum((unsigned char)url[i])||url[i]=='-'||url[i]=='.'||url[i]=='_'||url[i]=='~')
+	for (int i = 0; i < url.size(); i++) {
+		if (isalnum((unsigned char)url[i]) || url[i] == '-' || url[i] == '.' || url[i] == '_' || url[i] == '~')
 			r << url[i];
-		else if(url[i]==' ')
+		else if (url[i] == ' ')
 			r << "+";
 		else {
 			char tmp[4];
@@ -35,12 +35,12 @@ std::string url_encode(const std::string& url) {
 }
 std::string url_decode(const std::string& url) {
 	std::stringstream r;
-	for(int i=0; i<url.size(); i++) {
-		if(url[i]=='+') r << " ";
-		else if(url[i]=='%'&&i<url.size()-2) {
-			char ch=strtol(url.substr(i+1, 2).c_str(), NULL, 16);
+	for (int i = 0; i < url.size(); i++) {
+		if (url[i] == '+') r << " ";
+		else if (url[i] == '%' && i < url.size() - 2) {
+			char ch = strtol(url.substr(i + 1, 2).c_str(), NULL, 16);
 			r << ch;
-			i+=2;
+			i += 2;
 		} else r << url[i];
 	}
 	return r.str();
@@ -48,87 +48,87 @@ std::string url_decode(const std::string& url) {
 
 
 int internet_request_curl_debug(CURL* handle, curl_infotype type, char* data, size_t size, std::string* filename) {
-	FILE* f=fopen(filename->c_str(), "ab");
+	FILE* f = fopen(filename->c_str(), "ab");
 	fwrite(data, 1, size, f);
 	fputs("\r\n", f);
 	fclose(f);
 	return 0;
 }
 size_t internet_request_curl_progress(internet_request* req, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow) {
-	if(dlnow==0x150||dltotal==0x150) return 0;
-	req->bytes_downloaded=(double)dlnow;
-	req->download_size=(double)dltotal;
-	req->download_percent=(req->bytes_downloaded/req->download_size)*100.0;
-	req->bytes_uploaded=(double)ulnow;
-	req->upload_size=(double)ultotal;
-	req->download_percent=(req->bytes_downloaded/req->download_size)*100.0;
-	return req->abort_request? 1 : 0;
+	if (dlnow == 0x150 || dltotal == 0x150) return 0;
+	req->bytes_downloaded = (double)dlnow;
+	req->download_size = (double)dltotal;
+	req->download_percent = (req->bytes_downloaded / req->download_size) * 100.0;
+	req->bytes_uploaded = (double)ulnow;
+	req->upload_size = (double)ultotal;
+	req->download_percent = (req->bytes_downloaded / req->download_size) * 100.0;
+	return req->abort_request ? 1 : 0;
 }
-size_t internet_request_curl_write(void *ptr, size_t size, size_t nmemb, std::string* data) {
+size_t internet_request_curl_write(void* ptr, size_t size, size_t nmemb, std::string* data) {
 	data->append((char*) ptr, size * nmemb);
 	return size * nmemb;
 }
-size_t internet_request_curl_fwrite(void *ptr, size_t size, size_t nmemb, internet_request* req) {
-	if(!req)
+size_t internet_request_curl_fwrite(void* ptr, size_t size, size_t nmemb, internet_request* req) {
+	if (!req)
 		return 0;
-	if(!req->download_stream) {
-		if(req->path=="") {
+	if (!req->download_stream) {
+		if (req->path == "") {
 			req->response_body.append((char*) ptr, size * nmemb);
 			return size * nmemb;
 		}
-		req->download_stream=fopen(req->path.c_str(), "wb");
-		if(!req->download_stream)
+		req->download_stream = fopen(req->path.c_str(), "wb");
+		if (!req->download_stream)
 			return 0;
 	}
-	size_t res=fwrite(ptr, size, nmemb, req->download_stream);
+	size_t res = fwrite(ptr, size, nmemb, req->download_stream);
 	fflush(req->download_stream);
 	return res;
 }
-size_t internet_request_curl_read(void *ptr, size_t isize, size_t nmemb, internet_request* req) {
-	if(!req)
+size_t internet_request_curl_read(void* ptr, size_t isize, size_t nmemb, internet_request* req) {
+	if (!req)
 		return 0;
-	size_t size=isize*nmemb;
-	if(req->payload_cursor+size>=req->payload.size())
-		size=req->payload.size()-req->payload_cursor;
+	size_t size = isize * nmemb;
+	if (req->payload_cursor + size >= req->payload.size())
+		size = req->payload.size() - req->payload_cursor;
 	memcpy(ptr, &(req->payload[req->payload_cursor]), size);
-	req->payload_cursor+=size;
+	req->payload_cursor += size;
 	return size;
 }
 int internet_request_thread(void* raw_request) {
-	if(!raw_request)
+	if (!raw_request)
 		return 0;
-	internet_request* request=(internet_request*)raw_request;
+	internet_request* request = (internet_request*)raw_request;
 	CURL* curl = curl_easy_init();
-	if(curl) {
-		request->no_curl=false;
-		request->complete=false;
-		request->in_progress=true;
-		curl_slist* headers=NULL;
-		if(request->mail_to=="")
+	if (curl) {
+		request->no_curl = false;
+		request->complete = false;
+		request->in_progress = true;
+		curl_slist* headers = NULL;
+		if (request->mail_to == "")
 			curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-		if(request->debug_file!="") {
+		if (request->debug_file != "") {
 			curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
 			curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, internet_request_curl_debug);
 			curl_easy_setopt(curl, CURLOPT_DEBUGDATA, &request->debug_file);
 		}
 		curl_easy_setopt(curl, CURLOPT_URL, request->url.c_str());
-		bool ftp=request->url.substr(0, 6)=="ftp://"||request->url.substr(0, 7)=="ftps://";
-		if(request->auth_username!="")
+		bool ftp = request->url.substr(0, 6) == "ftp://" || request->url.substr(0, 7) == "ftps://";
+		if (request->auth_username != "")
 			curl_easy_setopt(curl, CURLOPT_USERNAME, request->auth_username.c_str());
-		if(request->auth_password!="")
+		if (request->auth_password != "")
 			curl_easy_setopt(curl, CURLOPT_PASSWORD, request->auth_password.c_str());
 		curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
-		if(!ftp) {
+		if (!ftp) {
 			curl_easy_setopt(curl, CURLOPT_USERAGENT, request->user_agent.c_str());
 			curl_easy_setopt(curl, CURLOPT_MAXREDIRS, request->max_redirects);
-			if(request->follow_redirects)
+			if (request->follow_redirects)
 				curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 			else
 				curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
 			curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
 		}
 		curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);
-		if(request->path=="") {
+		if (request->path == "") {
 			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, internet_request_curl_write);
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &request->response_body);
 		} else {
@@ -141,200 +141,200 @@ int internet_request_thread(void* raw_request) {
 		curl_easy_setopt(curl, CURLOPT_XFERINFODATA, request);
 		long proto;
 		curl_easy_getinfo(curl, CURLINFO_PROTOCOL, &proto);
-		curl_slist* mail_rcpt=NULL;
-		if(request->payload!="") {
-			if(request->mail_from==""&&request->mail_to==""&&!ftp) {
+		curl_slist* mail_rcpt = NULL;
+		if (request->payload != "") {
+			if (request->mail_from == "" && request->mail_to == "" && !ftp) {
 				curl_easy_setopt(curl, CURLOPT_POST, 1L);
 				curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)request->payload.size());
-				headers=curl_slist_append(headers, "Expect:");
+				headers = curl_slist_append(headers, "Expect:");
 			}
-			if(request->mail_from!="")
+			if (request->mail_from != "")
 				curl_easy_setopt(curl, CURLOPT_MAIL_FROM, request->mail_from.c_str());
-			if(request->mail_to!="") {
-				mail_rcpt=curl_slist_append(mail_rcpt, request->mail_to.c_str());
+			if (request->mail_to != "") {
+				mail_rcpt = curl_slist_append(mail_rcpt, request->mail_to.c_str());
 				curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, mail_rcpt);
 				curl_easy_setopt(curl, CURLOPT_UPLOAD, 1);
 				curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
 			}
 			curl_easy_setopt(curl, CURLOPT_READFUNCTION, internet_request_curl_read);
 			curl_easy_setopt(curl, CURLOPT_READDATA, request);
-			if(ftp) {
+			if (ftp) {
 				curl_easy_setopt(curl, CURLOPT_UPLOAD, 1);
 				curl_easy_setopt(curl, CURLOPT_INFILESIZE, request->payload.size());
 			}
 		}
-		for(auto h : request->headers) {
-			std::string header=h.first;
-			header+=": ";
-			header+=h.second;
-			headers=curl_slist_append(headers, header.c_str());
+		for (auto h : request->headers) {
+			std::string header = h.first;
+			header += ": ";
+			header += h.second;
+			headers = curl_slist_append(headers, header.c_str());
 		}
-		if(request->mail_to==""&&!ftp)
+		if (request->mail_to == "" && !ftp)
 			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-		else if(ftp&&request->url.substr(request->url.size()-1, 1)=="/")
+		else if (ftp && request->url.substr(request->url.size() - 1, 1) == "/")
 			curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "MLSD");
 		char* url;
 		curl_easy_perform(curl);
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &request->status_code);
 		curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME, &request->total_time);
 		curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &url);
-		if(url)
-			request->final_url=url;
+		if (url)
+			request->final_url = url;
 		curl_slist_free_all(headers);
-		if(mail_rcpt)
+		if (mail_rcpt)
 			curl_slist_free_all(mail_rcpt);
 		curl_easy_cleanup(curl);
 		curl = NULL;
-		request->complete=true;
-		request->in_progress=false;
-		if(request->download_stream) {
+		request->complete = true;
+		request->in_progress = false;
+		if (request->download_stream) {
 			fclose(request->download_stream);
-			request->download_stream=NULL;
+			request->download_stream = NULL;
 		}
 		return 0;
 	}
-	request->no_curl=true;
+	request->no_curl = true;
 	return 0;
 }
 
 void internet_request::initial_setup() {
-	curl=NULL;
-	no_curl=false;
-	complete=false;
-	in_progress=false;
-	abort_request=false;
-	bytes_downloaded=0;
-	download_size=0;
-	download_percent=0;
-	bytes_uploaded=0;
-	upload_size=0;
-	upload_percent=0;
-	follow_redirects=true;
-	keepalive=false;
-	max_redirects=50;
-	status_code=0;
-	total_time=0.0;
-	url="";
-	final_url="";
-	if(path!=""&&download_stream)
+	curl = NULL;
+	no_curl = false;
+	complete = false;
+	in_progress = false;
+	abort_request = false;
+	bytes_downloaded = 0;
+	download_size = 0;
+	download_percent = 0;
+	bytes_uploaded = 0;
+	upload_size = 0;
+	upload_percent = 0;
+	follow_redirects = true;
+	keepalive = false;
+	max_redirects = 50;
+	status_code = 0;
+	total_time = 0.0;
+	url = "";
+	final_url = "";
+	if (path != "" && download_stream)
 		fclose(download_stream);
-	download_stream=NULL;
-	path="";
-	auth_username="";
-	auth_password="";
-	mail_from="";
-	mail_to="";
+	download_stream = NULL;
+	path = "";
+	auth_username = "";
+	auth_password = "";
+	mail_from = "";
+	mail_to = "";
 	headers.clear();
-	payload="";
-	payload_cursor=0;
-	response_body="";
-	response_headers="";
-	debug_file="";
-	user_agent="curl/7.81.0 (gzip)";
+	payload = "";
+	payload_cursor = 0;
+	response_body = "";
+	response_headers = "";
+	debug_file = "";
+	user_agent = "curl/7.81.0 (gzip)";
 }
 internet_request::internet_request(const std::string& url, bool autoperform) {
-	RefCount=1;
+	RefCount = 1;
 	initial_setup();
-	this->url=url;
-	if(autoperform&&!perform())
-		no_curl=true;
+	this->url = url;
+	if (autoperform && !perform())
+		no_curl = true;
 }
 internet_request::internet_request(const std::string& url, const std::string& path, bool autoperform) {
 	initial_setup();
-	this->url=url;
-	this->path=path;
-	if(autoperform&&!perform())
-		no_curl=true;
-	RefCount=1;
+	this->url = url;
+	this->path = path;
+	if (autoperform && !perform())
+		no_curl = true;
+	RefCount = 1;
 }
 internet_request::internet_request(const std::string& url, const std::string& username, const std::string& password, bool autoperform) {
 	initial_setup();
-	this->url=url;
-	this->auth_username=username;
-	this->auth_password=password;
-	if(autoperform&&!perform())
-		no_curl=true;
-	RefCount=1;
+	this->url = url;
+	this->auth_username = username;
+	this->auth_password = password;
+	if (autoperform && !perform())
+		no_curl = true;
+	RefCount = 1;
 }
 void internet_request::AddRef() {
 	asAtomicInc(RefCount);
 }
 void internet_request::Release() {
-	if(asAtomicDec(RefCount)<1) {
-		abort_request=true;
+	if (asAtomicDec(RefCount) < 1) {
+		abort_request = true;
 		delete this;
 	}
 }
 bool internet_request::perform() {
-	if(in_progress)
+	if (in_progress)
 		return false;
-	if(complete) {
-		complete=false;
-		response_headers="";
-		response_body="";
-		payload_cursor=0;
+	if (complete) {
+		complete = false;
+		response_headers = "";
+		response_body = "";
+		payload_cursor = 0;
 	}
-	if(thread_create(internet_request_thread, this, THREAD_STACK_SIZE_DEFAULT)==NULL)
+	if (thread_create(internet_request_thread, this, THREAD_STACK_SIZE_DEFAULT) == NULL)
 		return false;
 	return true;
 }
 bool internet_request::perform(const std::string& URL) {
-	if(in_progress)
+	if (in_progress)
 		return false;
-	this->url=URL;
+	this->url = URL;
 	return perform();
 }
 bool internet_request::perform(const std::string& URL, const std::string& path) {
-	if(in_progress)
+	if (in_progress)
 		return false;
-	this->url=URL;
-	this->path=path;
+	this->url = URL;
+	this->path = path;
 	return perform();
 }
 bool internet_request::post(const std::string& URL, const std::string& payload, const std::string& path) {
-	if(in_progress)
+	if (in_progress)
 		return false;
-	this->url=URL;
-	this->payload=payload;
-	if(path!="")
-		this->path=path;
+	this->url = URL;
+	this->payload = payload;
+	if (path != "")
+		this->path = path;
 	return perform();
 }
 bool internet_request::mail(const std::string& URL, const std::string& from, const std::string& to, const std::string& payload) {
-	if(in_progress)
+	if (in_progress)
 		return false;
-	this->url=URL;
-	this->mail_from=from;
-	this->mail_to=to;
-	this->payload=payload;
+	this->url = URL;
+	this->mail_from = from;
+	this->mail_to = to;
+	this->payload = payload;
 	return perform();
 }
 void internet_request::set_url(const std::string& url) {
-	if(in_progress) return;
-	this->url=url;
+	if (in_progress) return;
+	this->url = url;
 }
 void internet_request::set_path(const std::string& path) {
-	if(in_progress) return;
-	this->path=path;
+	if (in_progress) return;
+	this->path = path;
 }
 void internet_request::set_authentication(std::string username, std::string password) {
-	if(in_progress) return;
+	if (in_progress) return;
 	this->auth_username.resize(0);
-	this->auth_username+=username;
+	this->auth_username += username;
 	this->auth_password.resize(0);
-	this->auth_password+=password;
+	this->auth_password += password;
 }
 void internet_request::set_payload(const std::string& payload) {
-	if(in_progress) return;
-	this->payload=payload;
+	if (in_progress) return;
+	this->payload = payload;
 }
 void internet_request::set_mail(const std::string& from, const std::string& to) {
-	if(in_progress) return;
-	this->mail_from=from;
-	this->mail_to=to;
+	if (in_progress) return;
+	this->mail_from = from;
+	this->mail_to = to;
 }
 void internet_request::reset() {
-	if(in_progress) return; // Temporary until implimentation of graceful thread shutdown mechonism.
+	if (in_progress) return; // Temporary until implimentation of graceful thread shutdown mechonism.
 	initial_setup();
 }
 

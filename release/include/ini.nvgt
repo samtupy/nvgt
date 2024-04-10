@@ -1,738 +1,629 @@
 /*
-	INI reader and writer
-	Started June 22 2020 Sam Tupy
+    INI reader and writer
+    Started June 22 2020 Sam Tupy
 
-	This is a class designed to read and write ini configuration files.
-	I can't promise that the specification will end up being followed to the letter, but I'll try. At this time, though the order of keys and sections will remain the same, the witespace, comment, and line structure of an externally created ini file may not remain in tact if that file is updated and rewritten using this include.
-	This code is provided as is with the hope that it will be useful. I entirely disclaim any and all responsibility for any and all types of damage, loss, or any other type of issue that may arise in any form resulting from the use of this source code.
-	license: zlib
+    This is a class designed to read and write ini configuration files.
+    I can't promise that the specification will end up being followed to the letter, but I'll try. At this time, though the order of keys and sections will remain the same, the witespace, comment, and line structure of an externally created ini file may not remain in tact if that file is updated and rewritten using this include.
+    This code is provided as is with the hope that it will be useful. I entirely disclaim any and all responsibility for any and all types of damage, loss, or any other type of issue that may arise in any form resulting from the use of this source code.
+    license: zlib
 */
 
-class ini
-{
-// class variables
-private ini_section@[] sections;
-private dictionary sections_dict;
-private string last_error;
-private int last_error_line;
-private string[] wildcard_sections; // When an INI file is loaded, the names of sections containing the * character are placed here for applications that wish to return a common value for different possible section names.
+class ini {
+	// class variables
+	private ini_section@[] sections;
+	private dictionary sections_dict;
+	private string last_error;
+	private int last_error_line;
+	private string[] wildcard_sections; // When an INI file is loaded, the names of sections containing the * character are placed here for applications that wish to return a common value for different possible section names.
 
-string loaded_filename; // Contains the filename of the currently loaded ini data.
+	string loaded_filename; // Contains the filename of the currently loaded ini data.
 
-// This constructor just takes an optional filename so you can load an ini file directly on object creation if you want. Note though that doing it this way makes it more difficult to instantly tell if there was a problem do to the lack of a return value, so you must then evaluate get_error_line()==0 to verify load success.
-ini(string filename="")
-{
-this.reset();
-if(filename!="")
-this.load(filename);
-}
+	// This constructor just takes an optional filename so you can load an ini file directly on object creation if you want. Note though that doing it this way makes it more difficult to instantly tell if there was a problem do to the lack of a return value, so you must then evaluate get_error_line()==0 to verify load success.
+	ini(string filename = "") {
+		this.reset();
+		if (filename != "")
+			this.load(filename);
+	}
 
-// Resets all variables to default, you can call this yourself and it is also called by loading functions to clear data from partially successful loads upon error. The make_blank_section argument is internal, and exists because the load_string function creates that section itself.
-void reset(bool make_blank_section=true)
-{
-this.sections.resize(0);
-this.sections_dict.delete_all();
-this.wildcard_sections.resize(0);
-this.last_error="";
-this.last_error_line=0;
-this.loaded_filename="";
-if(make_blank_section)
-this.sections.insert_last(ini_section(""));
-}
+	// Resets all variables to default, you can call this yourself and it is also called by loading functions to clear data from partially successful loads upon error. The make_blank_section argument is internal, and exists because the load_string function creates that section itself.
+	void reset(bool make_blank_section = true) {
+		this.sections.resize(0);
+		this.sections_dict.delete_all();
+		this.wildcard_sections.resize(0);
+		this.last_error = "";
+		this.last_error_line = 0;
+		this.loaded_filename = "";
+		if (make_blank_section)
+			this.sections.insert_last(ini_section(""));
+	}
 
-// Returns the last error message, almost always used if an ini file fails to load and you want to know why. This function also clears the error, so to figure out the line, call get_error_line() before calling this.
-string get_error_text()
-{
-if(this.last_error.length()==0) return "";
-string e=this.last_error;
-this.last_error="";
-this.last_error_line=0;
-return e;
-}
+	// Returns the last error message, almost always used if an ini file fails to load and you want to know why. This function also clears the error, so to figure out the line, call get_error_line() before calling this.
+	string get_error_text() {
+		if (this.last_error.length() == 0) return "";
+		string e = this.last_error;
+		this.last_error = "";
+		this.last_error_line = 0;
+		return e;
+	}
 
-// Return the line the last error took place on if applicable. This does not clear the error information, since one may wish to get the line number and the text which are in 2 different functions. So make sure to call this function before get_error_text() if the line number is something you're interested in retrieving. A return value of -1 means that this error is not associated with a line number, and 0 means there is no error in the first place.
-int get_error_line()
-{
-return this.last_error_line;
-}
+	// Return the line the last error took place on if applicable. This does not clear the error information, since one may wish to get the line number and the text which are in 2 different functions. So make sure to call this function before get_error_text() if the line number is something you're interested in retrieving. A return value of -1 means that this error is not associated with a line number, and 0 means there is no error in the first place.
+	int get_error_line() {
+		return this.last_error_line;
+	}
 
-// Internal convenience function
-private void set_error(string error, int line=-1)
-{
-last_error=error;
-last_error_line=line;
-}
+	// Internal convenience function
+	private void set_error(string error, int line = -1) {
+		last_error = error;
+		last_error_line = line;
+	}
 
-// Load an ini file
-bool load(string filename, bool robust=true)
-{
-if(!file_exists(filename))
-{
-this.set_error("nonexistent filename");
-return false;
-}
-file tmp;
-bool ok=tmp.open(filename, "rb");
-if(!ok)
-{
-this.set_error("open file failure, "+get_last_error_text());
-return false;
-}
-if(tmp.size<1)
-{
-this.set_error("empty file");
-return false;
-}
-bool success=this.load_string(tmp.read(), filename);
-tmp.close();
-if(robust and !success)
-file_copy(filename, filename+"_load_robust", true);
-return success;
-}
+	// Load an ini file
+	bool load(string filename, bool robust = true) {
+		if (!file_exists(filename)) {
+			this.set_error("nonexistent filename");
+			return false;
+		}
+		file tmp;
+		bool ok = tmp.open(filename, "rb");
+		if (!ok) {
+			this.set_error("open file failure, " + get_last_error_text());
+			return false;
+		}
+		if (tmp.size < 1) {
+			this.set_error("empty file");
+			return false;
+		}
+		bool success = this.load_string(tmp.read(), filename);
+		tmp.close();
+		if (robust and !success)
+			file_copy(filename, filename + "_load_robust", true);
+		return success;
+	}
 
-// This function loads ini data stored as a string, you can in fact read the code of the above function to verify how this works, doing it this way insures that ini data can come from any source, such as an encrypted string if need be. Expecting data with CRLF line endings.
-bool load_string(string data, const string&in filename="*")
-{
-// By the way, this is going to be very messy. I'll try to explain what I'm doing but I don't want there to be more comments than code here!
-this.reset(false);
-data.replace_this("\r\n\r\n", "\r\n \r\n");
-string[]@ ln=data.split("\r\n");
-ini_section@ tmp_section=ini_section(""); // handle to the temporary session currently being loaded, starting with sectionless keys at the top.
-for(uint i=0; i<ln.length(); i++)
-{
-string l=ln[i]; // for convenience
-if(l.length()==0 or l==" ")
-continue; // Blank line, skip it.
-// We need to deal with comments. We do this by searching for semicolon characters. If a backslash proceeds the semicolon, we ignore it and continue searching for semicolons until there are none left, at which case we have the position in the string the comment starts, so we can slice it off and possibly handle later.
-int semi_count=1;
-int comment_pos=string_contains(l, ";", semi_count);
-if(comment_pos==0)
-continue; // entire line is a comment
-while(comment_pos>-1 and l[comment_pos-1]=="\\")
-{
-semi_count+=1;
-comment_pos=string_contains(l, ";", semi_count);
-}
-if(comment_pos>-1)
-l=string_left(l, comment_pos); // slice the comment from the line, leaving us with what should just be configuration data.
-// Now figure out where the actual data begins and any user added whitespace ends.
-int line_start_pos=-1;
-for(uint j=0; j<l.length(); j++)
-{
-if(l[j]!=" " and l[j]!="\t")
-{
-line_start_pos=j;
-break;
-}
-}
-if(line_start_pos<0)
-continue; // This line is pointless and just contains whitespace!
-l.erase(0, line_start_pos); // Slice the witespace from the beginning of the line.
-// Now do the same for the end of the line.
-int line_end_pos=-1;
-for(uint j=l.length()-1; j>=0; j--)
-{
-if(l[j]==" " and (j>0 and (l[j-1]==" " or l[j-1]!="\\")))
-continue;
-line_end_pos=j;
-break;
-}
-if(line_end_pos!=-1)
-l.resize(line_end_pos+1);
-string identifier;
-string value;
-bool is_escape=false;
-int line_length=l.length(); // to avoid calling l.length() at every iteration of parsing loops.
-// Is this a section identifier? If so, add the tmp_session to the ini_sections array and start a new one since this means the previous section has finished loading.
-if(l[0]=="[")
-{
-// Lets make sure a right bracket even exists before performing more expensive parsing, because if it doesn't then this data is invalid.
-if(string_contains(l, "]", 1)<0)
-{
-this.reset();
-this.set_error("invalid section declaration", i+1);
-return false;
-}
-for(uint c=1; c<line_length; c++)
-{
-if(!is_escape and l[c]=="\\")
-{
-is_escape=true;
-continue;
-}
-if(INI_IS_VALID_IDENT_CHAR(l[c]) or l[c]==" " and c>0 and (INI_IS_VALID_IDENT_CHAR(l[c-1]) or is_escape))
-identifier+=l[c];
-else if(!is_escape and l[c]=="]")
-break;
-else
-{
-this.reset();
-this.set_error("invalid section identifier", i+1);
-return false;
-}
-if(is_escape)
-is_escape=false;
-}
-// So at this point string identifier contains the name of the new section, so add the previous one and start this one.
-this.sections.insert_last(tmp_section);
-if(tmp_section.name!="")
-{
-this.sections_dict.set(tmp_section.name, @tmp_section);
-if(tmp_section.name.find_first_of("*")>-1)
-this.wildcard_sections.insert_last(tmp_section.name);
-}
-@tmp_section=ini_section(identifier);
-continue; // Nothing else to do with this line.
-}
-// If we've reached this point, the only possibility is that this line is a key/value pair in the current section. As such, lets parse it!
-bool found_identifier=false;
-for(uint c=0; c<line_length; c++)
-{
-if(!is_escape and l[c]=="\\")
-{
-is_escape=true;
-continue;
-}
-if(!found_identifier)
-{
-if(INI_IS_VALID_IDENT_CHAR(l[c]) or l[c]==" " and c>0 and (INI_IS_VALID_IDENT_CHAR(l[c-1]) or is_escape))
-identifier+=l[c];
-else if(!is_escape and l[c]=="=")
-found_identifier=true;
-}
-else
-{
-if(value.length()==0 and l[c]==" " and !is_escape)
-continue;
-if(is_escape and l[c]!=" ")
-value+="\\"+l[c];
-else
-value+=l[c];
-}
-if(is_escape)
-is_escape=false;
-}
-// If an identifier was found, it's pretty safe to finally add the key to the section!
-if(found_identifier)
-tmp_section.set_string(identifier, value, true);
-else
-{
-this.reset();
-this.set_error("unparsable line", i+1);
-return false;
-}
-}
-// We're done loading, but we have to add the last section we loaded to the list of sections, as that has not been triggered by a new one being found.
-this.sections.insert_last(tmp_section);
-if(tmp_section.name!="")
-{
-this.sections_dict.set(tmp_section.name, @tmp_section);
-if(tmp_section.name.find_first_of("*")>-1) wildcard_sections.insert_last(tmp_section.name);
-}
-this.loaded_filename=filename;
-return true; // Load success!
-}
+	// This function loads ini data stored as a string, you can in fact read the code of the above function to verify how this works, doing it this way insures that ini data can come from any source, such as an encrypted string if need be. Expecting data with CRLF line endings.
+	bool load_string(string data, const string& in filename = "*") {
+		// By the way, this is going to be very messy. I'll try to explain what I'm doing but I don't want there to be more comments than code here!
+		this.reset(false);
+		data.replace_this("\r\n\r\n", "\r\n \r\n");
+		string[]@ ln = data.split("\r\n");
+		ini_section@ tmp_section = ini_section(""); // handle to the temporary session currently being loaded, starting with sectionless keys at the top.
+		for (uint i = 0; i < ln.length(); i++) {
+			string l = ln[i]; // for convenience
+			if (l.length() == 0 or l == " ")
+				continue; // Blank line, skip it.
+			// We need to deal with comments. We do this by searching for semicolon characters. If a backslash proceeds the semicolon, we ignore it and continue searching for semicolons until there are none left, at which case we have the position in the string the comment starts, so we can slice it off and possibly handle later.
+			int semi_count = 1;
+			int comment_pos = string_contains(l, ";", semi_count);
+			if (comment_pos == 0)
+				continue; // entire line is a comment
+			while (comment_pos > -1 and l[comment_pos - 1] == "\\") {
+				semi_count += 1;
+				comment_pos = string_contains(l, ";", semi_count);
+			}
+			if (comment_pos > -1)
+				l = string_left(l, comment_pos); // slice the comment from the line, leaving us with what should just be configuration data.
+			// Now figure out where the actual data begins and any user added whitespace ends.
+			int line_start_pos = -1;
+			for (uint j = 0; j < l.length(); j++) {
+				if (l[j] != " " and l[j] != "\t") {
+					line_start_pos = j;
+					break;
+				}
+			}
+			if (line_start_pos < 0)
+				continue; // This line is pointless and just contains whitespace!
+			l.erase(0, line_start_pos); // Slice the witespace from the beginning of the line.
+			// Now do the same for the end of the line.
+			int line_end_pos = -1;
+			for (uint j = l.length() - 1; j >= 0; j--) {
+				if (l[j] == " " and (j > 0 and (l[j - 1] == " " or l[j - 1] != "\\")))
+					continue;
+				line_end_pos = j;
+				break;
+			}
+			if (line_end_pos != -1)
+				l.resize(line_end_pos + 1);
+			string identifier;
+			string value;
+			bool is_escape = false;
+			int line_length = l.length(); // to avoid calling l.length() at every iteration of parsing loops.
+			// Is this a section identifier? If so, add the tmp_session to the ini_sections array and start a new one since this means the previous section has finished loading.
+			if (l[0] == "[") {
+				// Lets make sure a right bracket even exists before performing more expensive parsing, because if it doesn't then this data is invalid.
+				if (string_contains(l, "]", 1) < 0) {
+					this.reset();
+					this.set_error("invalid section declaration", i + 1);
+					return false;
+				}
+				for (uint c = 1; c < line_length; c++) {
+					if (!is_escape and l[c] == "\\") {
+						is_escape = true;
+						continue;
+					}
+					if (INI_IS_VALID_IDENT_CHAR(l[c]) or l[c] == " " and c > 0 and (INI_IS_VALID_IDENT_CHAR(l[c - 1]) or is_escape))
+						identifier += l[c];
+					else if (!is_escape and l[c] == "]")
+						break;
+					else {
+						this.reset();
+						this.set_error("invalid section identifier", i + 1);
+						return false;
+					}
+					if (is_escape)
+						is_escape = false;
+				}
+				// So at this point string identifier contains the name of the new section, so add the previous one and start this one.
+				this.sections.insert_last(tmp_section);
+				if (tmp_section.name != "") {
+					this.sections_dict.set(tmp_section.name, @tmp_section);
+					if (tmp_section.name.find_first_of("*") > -1)
+						this.wildcard_sections.insert_last(tmp_section.name);
+				}
+				@tmp_section = ini_section(identifier);
+				continue; // Nothing else to do with this line.
+			}
+			// If we've reached this point, the only possibility is that this line is a key/value pair in the current section. As such, lets parse it!
+			bool found_identifier = false;
+			for (uint c = 0; c < line_length; c++) {
+				if (!is_escape and l[c] == "\\") {
+					is_escape = true;
+					continue;
+				}
+				if (!found_identifier) {
+					if (INI_IS_VALID_IDENT_CHAR(l[c]) or l[c] == " " and c > 0 and (INI_IS_VALID_IDENT_CHAR(l[c - 1]) or is_escape))
+						identifier += l[c];
+					else if (!is_escape and l[c] == "=")
+						found_identifier = true;
+				} else {
+					if (value.length() == 0 and l[c] == " " and !is_escape)
+						continue;
+					if (is_escape and l[c] != " ")
+						value += "\\" + l[c];
+					else
+						value += l[c];
+				}
+				if (is_escape)
+					is_escape = false;
+			}
+			// If an identifier was found, it's pretty safe to finally add the key to the section!
+			if (found_identifier)
+				tmp_section.set_string(identifier, value, true);
+			else {
+				this.reset();
+				this.set_error("unparsable line", i + 1);
+				return false;
+			}
+		}
+		// We're done loading, but we have to add the last section we loaded to the list of sections, as that has not been triggered by a new one being found.
+		this.sections.insert_last(tmp_section);
+		if (tmp_section.name != "") {
+			this.sections_dict.set(tmp_section.name, @tmp_section);
+			if (tmp_section.name.find_first_of("*") > -1) wildcard_sections.insert_last(tmp_section.name);
+		}
+		this.loaded_filename = filename;
+		return true; // Load success!
+	}
 
-// Save everything currently loaded to a file. If indent is set to true, all keys in every named section will be proceeded with a tab character in the final output.
-bool save(string filename, bool indent=false)
-{
-string data=this.dump(indent);
-if(data.length()==0)
-return false; // save failure or no data!
-file tmp;
-bool ok=tmp.open(filename, "wb");
-if(!ok)
-{
-this.set_error("open file failure, "+get_last_error_text());
-return false;
-}
-if(tmp.write(data)<1)
-{
-this.set_error("file write failure, "+get_last_error_text());
-return false;
-}
-tmp.close();
-return true;
-}
+	// Save everything currently loaded to a file. If indent is set to true, all keys in every named section will be proceeded with a tab character in the final output.
+	bool save(string filename, bool indent = false) {
+		string data = this.dump(indent);
+		if (data.length() == 0)
+			return false; // save failure or no data!
+		file tmp;
+		bool ok = tmp.open(filename, "wb");
+		if (!ok) {
+			this.set_error("open file failure, " + get_last_error_text());
+			return false;
+		}
+		if (tmp.write(data) < 1) {
+			this.set_error("file write failure, " + get_last_error_text());
+			return false;
+		}
+		tmp.close();
+		return true;
+	}
 
-// This save function is similar to the one above, but it first performs a temporary backup of any existing data, then restores that backup if the saving fails. This is slower and should only be used when necissary, but should insure 0 data loss.
-bool save_robust(string filename, bool indent=false)
-{
-string data=this.dump(indent);
-if(data.length()==0)
-return false; // save failure or no data!
-if(file_exists(filename))
-{
-if(!file_copy(filename, filename+"_robust", true))
-return false; // Not safe to robust save!
-}
-file tmp;
-bool ok=tmp.open(filename, "wb");
-if(!ok)
-{
-if(file_exists(filename+"_robust"))
-{
-file_copy(filename+"_robust", filename, true);
-file_delete(filename+"_robust");
-}
-this.set_error("open file failure, "+get_last_error_text());
-return false;
-}
-if(tmp.write(data)<data.length())
-{
-this.set_error("file write failure, "+get_last_error_text());
-if(file_exists(filename+"_robust"))
-{
-file_copy(filename+"_robust", filename, true);
-file_delete(filename+"_robust");
-}
-return false;
-}
-tmp.close();
-file_delete(filename+"_robust");
-return true;
-}
+	// This save function is similar to the one above, but it first performs a temporary backup of any existing data, then restores that backup if the saving fails. This is slower and should only be used when necissary, but should insure 0 data loss.
+	bool save_robust(string filename, bool indent = false) {
+		string data = this.dump(indent);
+		if (data.length() == 0)
+			return false; // save failure or no data!
+		if (file_exists(filename)) {
+			if (!file_copy(filename, filename + "_robust", true))
+				return false; // Not safe to robust save!
+		}
+		file tmp;
+		bool ok = tmp.open(filename, "wb");
+		if (!ok) {
+			if (file_exists(filename + "_robust")) {
+				file_copy(filename + "_robust", filename, true);
+				file_delete(filename + "_robust");
+			}
+			this.set_error("open file failure, " + get_last_error_text());
+			return false;
+		}
+		if (tmp.write(data) < data.length()) {
+			this.set_error("file write failure, " + get_last_error_text());
+			if (file_exists(filename + "_robust")) {
+				file_copy(filename + "_robust", filename, true);
+				file_delete(filename + "_robust");
+			}
+			return false;
+		}
+		tmp.close();
+		file_delete(filename + "_robust");
+		return true;
+	}
 
-// Dump all loaded data into a string, such as what's used by the save function, or so that you can encrypt it, pack it or such things. Set indent to true to proceed all keys in every named section with a tab character.
-string dump(bool indent=false)
-{
-if(this.is_empty())
-return "";
-string result;
-for(uint i=0; i<this.sections.length(); i++)
-{
-if(i==0 and sections[0].keys.get_size()==0)
-continue;
-result+=this.sections[i].dump(indent)+"\r\n";
-}
-return result;
-}
+	// Dump all loaded data into a string, such as what's used by the save function, or so that you can encrypt it, pack it or such things. Set indent to true to proceed all keys in every named section with a tab character.
+	string dump(bool indent = false) {
+		if (this.is_empty())
+			return "";
+		string result;
+		for (uint i = 0; i < this.sections.length(); i++) {
+			if (i == 0 and sections[0].keys.get_size() == 0)
+				continue;
+			result += this.sections[i].dump(indent) + "\r\n";
+		}
+		return result;
+	}
 
-// Returns true if there is no data loaded into this ini object.
-bool is_empty()
-{
-return this.sections.length()<1 or this.sections.length()==1 and this.sections[0].keys.get_size()<1;
-}
+	// Returns true if there is no data loaded into this ini object.
+	bool is_empty() {
+		return this.sections.length() < 1 or this.sections.length() == 1 and this.sections[0].keys.get_size() < 1;
+	}
 
-// Internal convenience function.
-private ini_section@ get_section(const string&in name)
-{
-if(name.length()==0)
-return this.sections[0];
-ini_section@ tmp=null;
-if(!this.sections_dict.get(name, @tmp))
-return null;
-return tmp;
-}
+	// Internal convenience function.
+	private ini_section@ get_section(const string& in name) {
+		if (name.length() == 0)
+			return this.sections[0];
+		ini_section@ tmp = null;
+		if (!this.sections_dict.get(name, @tmp))
+			return null;
+		return tmp;
+	}
 
-// Returns true if the given section exists, false otherwise.
-bool section_exists(const string&in section)
-{
-return @this.get_section(section)!=null;
-}
+	// Returns true if the given section exists, false otherwise.
+	bool section_exists(const string& in section) {
+		return @this.get_section(section) != null;
+	}
 
-// Returns true if the given key exists, false otherwise. An error will be accessible from the error system if the given section doesn't exist.
-bool key_exists(const string&in section, const string&in key)
-{
-ini_section@ tmp=this.get_section(section);
-if(@tmp==null)
-{
-this.set_error("key exists error, nonexistent section");
-return false;
-}
-return tmp.keys.exists(key);
-}
+	// Returns true if the given key exists, false otherwise. An error will be accessible from the error system if the given section doesn't exist.
+	bool key_exists(const string& in section, const string& in key) {
+		ini_section@ tmp = this.get_section(section);
+		if (@tmp == null) {
+			this.set_error("key exists error, nonexistent section");
+			return false;
+		}
+		return tmp.keys.exists(key);
+	}
 
-// Creates a new section with the given name.
-bool create_section(const string&in section_name)
-{
-if(section_name.length()==0 or this.sections_dict.exists(section_name))
-{
-set_error("create section error, already exists");
-return false;
-}
-string result=INI_VERIFY_IDENT(section_name);
-if(result!="")
-{
-this.set_error("create section error, "+result);
-return false;
-}
-ini_section tmp(section_name);
-this.sections.insert_last(tmp);
-this.sections_dict.set(section_name, @tmp);
-if(section_name.find_first_of("*")>-1)
-wildcard_sections.insert_last(section_name);
-return true;
-}
+	// Creates a new section with the given name.
+	bool create_section(const string& in section_name) {
+		if (section_name.length() == 0 or this.sections_dict.exists(section_name)) {
+			set_error("create section error, already exists");
+			return false;
+		}
+		string result = INI_VERIFY_IDENT(section_name);
+		if (result != "") {
+			this.set_error("create section error, " + result);
+			return false;
+		}
+		ini_section tmp(section_name);
+		this.sections.insert_last(tmp);
+		this.sections_dict.set(section_name, @tmp);
+		if (section_name.find_first_of("*") > -1)
+			wildcard_sections.insert_last(section_name);
+		return true;
+	}
 
-// List all section names that exist. Set the include_blank_section argument to true if you wish to include the empty element at the beginning of the list for the keys that aren't in sections, for example for automatic data collection so you don't have to insert yourself when looping through. An empty array, of course, means that there are no available sections to list.
-string[]@ list_sections(bool include_blank_section=false)
-{
-string[] result;
-result.reserve(this.sections.length());
-for(uint i=!include_blank_section ? 1 : 0; i<this.sections.length(); i++)
-{
-result.insert_last(this.sections[i].name);
-}
-return result;
-}
+	// List all section names that exist. Set the include_blank_section argument to true if you wish to include the empty element at the beginning of the list for the keys that aren't in sections, for example for automatic data collection so you don't have to insert yourself when looping through. An empty array, of course, means that there are no available sections to list.
+	string[]@ list_sections(bool include_blank_section = false) {
+		string[] result;
+		result.reserve(this.sections.length());
+		for (uint i = !include_blank_section ? 1 : 0; i < this.sections.length(); i++)
+			result.insert_last(this.sections[i].name);
+		return result;
+	}
 
-// Returns all section names containing a wildcard identifier. This way if searching through a file containing many normal sections and a few wildcard sections, it is possible to query only the wildcards for faster lookup.
-const string[]@ list_wildcard_sections()
-{
-return wildcard_sections;
-}
+	// Returns all section names containing a wildcard identifier. This way if searching through a file containing many normal sections and a few wildcard sections, it is possible to query only the wildcards for faster lookup.
+	const string[]@ list_wildcard_sections() {
+		return wildcard_sections;
+	}
 
 
-// List all key names in a given section, pass a blank string for all sectionless keys as usual. An empty array means that the section is either blank or doesn't exist, the latter being able to be checked with the error system.
-string[]@ list_keys(const string&in section)
-{
-ini_section@ tmp=this.get_section(section);
-if(@tmp==null)
-{
-string[] empty;
-this.set_error("list keys error, nonexistent section");
-return empty;
-}
-return tmp.key_names;
-}
+	// List all key names in a given section, pass a blank string for all sectionless keys as usual. An empty array means that the section is either blank or doesn't exist, the latter being able to be checked with the error system.
+	string[]@ list_keys(const string& in section) {
+		ini_section@ tmp = this.get_section(section);
+		if (@tmp == null) {
+			string[] empty;
+			this.set_error("list keys error, nonexistent section");
+			return empty;
+		}
+		return tmp.key_names;
+	}
 
-// Deletes all keys from the given section without deleting the section itself. Returns false if the given section does not exist.
-bool clear_section(const string&in section)
-{
-ini_section@ tmp=this.get_section(section);
-if(@tmp==null)
-return false;
-tmp.key_names.resize(0);
-tmp.keys.delete_all();
-return true;
-}
+	// Deletes all keys from the given section without deleting the section itself. Returns false if the given section does not exist.
+	bool clear_section(const string& in section) {
+		ini_section@ tmp = this.get_section(section);
+		if (@tmp == null)
+			return false;
+		tmp.key_names.resize(0);
+		tmp.keys.delete_all();
+		return true;
+	}
 
-// Delete the given section, set the section argument to a blank string to delete all sectionless keys. Returns false if the given section does not exist.
-bool delete_section(const string&in section)
-{
-if(section.length()==0)
-{
-return this.clear_section("");
-}
-if(!this.section_exists(section))
-return false;
-for(uint i=0; i<this.sections.length(); i++)
-{
-if(this.sections[i].name==section)
-{
-this.sections.remove_at(i);
-i--;
-}
-}
-this.sections_dict.delete(section);
-return true;
-}
+	// Delete the given section, set the section argument to a blank string to delete all sectionless keys. Returns false if the given section does not exist.
+	bool delete_section(const string& in section) {
+		if (section.length() == 0)
+			return this.clear_section("");
+		if (!this.section_exists(section))
+			return false;
+		for (uint i = 0; i < this.sections.length(); i++) {
+			if (this.sections[i].name == section) {
+				this.sections.remove_at(i);
+				i--;
+			}
+		}
+		this.sections_dict.delete(section);
+		return true;
+	}
 
-// Delete a key from a given section, returns false and sets an error if the key you want to delete doesn't exist or if the key name is invalid.
-bool delete_key(const string&in section, const string&in key)
-{
-string result=this.section_key_verification(section, key, true);
-if(result!="")
-{
-this.set_error("delete key error, "+result);
-return false;
-}
-ini_section@ tmp=this.get_section(section);
-return tmp.delete_key(key);
-}
+	// Delete a key from a given section, returns false and sets an error if the key you want to delete doesn't exist or if the key name is invalid.
+	bool delete_key(const string& in section, const string& in key) {
+		string result = this.section_key_verification(section, key, true);
+		if (result != "") {
+			this.set_error("delete key error, " + result);
+			return false;
+		}
+		ini_section@ tmp = this.get_section(section);
+		return tmp.delete_key(key);
+	}
 
-// Internal convenience function.
-private string section_key_verification(const string&in section, const string&in key, bool check_existing=false)
-{
-ini_section@ tmp=this.get_section(section);
-if(@tmp==null)
-{
-return "nonexistent section";
-}
-string result=INI_VERIFY_IDENT(section);
-if(result!="")
-{
-return "with section, "+result;
-}
-result=INI_VERIFY_IDENT(key);
-if(result!="")
-{
-return "with key, "+result;
-}
-if(check_existing and !tmp.keys.exists(key))
-{
-return "nonexistent key";
-}
-return "";
-}
+	// Internal convenience function.
+	private string section_key_verification(const string& in section, const string& in key, bool check_existing = false) {
+		ini_section@ tmp = this.get_section(section);
+		if (@tmp == null)
+			return "nonexistent section";
+		string result = INI_VERIFY_IDENT(section);
+		if (result != "")
+			return "with section, " + result;
+		result = INI_VERIFY_IDENT(key);
+		if (result != "")
+			return "with key, " + result;
+		if (check_existing and !tmp.keys.exists(key))
+			return "nonexistent key";
+		return "";
+	}
 
-// Internal convenience function.
-ini_section@ get_section_verified(const string&in section, const string&in key, bool check_existing, const string&in verifying_function)
-{
-string result=!check_existing? this.section_key_verification(section, key) : "";
-if(result!="")
-{
-this.set_error(verifying_function+" error, "+result);
-return null;
-}
-ini_section@ tmp=this.get_section(section);
-if(check_existing and @tmp!=null and !tmp.keys.exists(key))
-{
-this.set_error(verifying_function+" error, nonexistent key");
-return null;
-}
-return tmp;
-}
+	// Internal convenience function.
+	ini_section@ get_section_verified(const string& in section, const string& in key, bool check_existing, const string& in verifying_function) {
+		string result = !check_existing ? this.section_key_verification(section, key) : "";
+		if (result != "") {
+			this.set_error(verifying_function + " error, " + result);
+			return null;
+		}
+		ini_section@ tmp = this.get_section(section);
+		if (check_existing and @tmp != null and !tmp.keys.exists(key)) {
+			this.set_error(verifying_function + " error, nonexistent key");
+			return null;
+		}
+		return tmp;
+	}
 
-// Set a string given a section name, a key and a value. All of the other setters will use this format. Keep the section name blank to have the key added at the top of the file with no section. If the key exists already, the value, of course, will be updated.
-bool set_string(const string&in section, const string&in key, const string&in value)
-{
-ini_section@ tmp=this.get_section_verified(section, key, false, "set string");
-if(@tmp!=null)
-tmp.set_string(key, value);
-return @tmp!=null;
-}
+	// Set a string given a section name, a key and a value. All of the other setters will use this format. Keep the section name blank to have the key added at the top of the file with no section. If the key exists already, the value, of course, will be updated.
+	bool set_string(const string& in section, const string& in key, const string& in value) {
+		ini_section@ tmp = this.get_section_verified(section, key, false, "set string");
+		if (@tmp != null)
+			tmp.set_string(key, value);
+		return @tmp != null;
+	}
 
-// Fetch a string given a section and key. All getters will use this format, and if one returns a default value (blank string, an int that equals 0, a boolean that equals false etc), and if you want to know whether the key actually existed, use the error checking system.
-string get_string(const string&in section, const string&in key, string default_value="")
-{
-ini_section@ tmp=this.get_section_verified(section, key, true, "get string");
-if(@tmp!=null)
-return tmp.get_string(key);
-else
-return default_value;
-}
+	// Fetch a string given a section and key. All getters will use this format, and if one returns a default value (blank string, an int that equals 0, a boolean that equals false etc), and if you want to know whether the key actually existed, use the error checking system.
+	string get_string(const string& in section, const string& in key, string default_value = "") {
+		ini_section@ tmp = this.get_section_verified(section, key, true, "get string");
+		if (@tmp != null)
+			return tmp.get_string(key);
+		else
+			return default_value;
+	}
 
-// Set a double.
-bool set_double(const string&in section, const string&in key, double value)
-{
-ini_section@ tmp=this.get_section_verified(section, key, false, "set double");
-if(@tmp!=null)
-tmp.set_string(key, value);
-return @tmp!=null;
-}
+	// Set a double.
+	bool set_double(const string& in section, const string& in key, double value) {
+		ini_section@ tmp = this.get_section_verified(section, key, false, "set double");
+		if (@tmp != null)
+			tmp.set_string(key, value);
+		return @tmp != null;
+	}
 
-// Fetch a double.
-double get_double(const string&in section, const string&in key, double default_value=0)
-{
-ini_section@ tmp=this.get_section_verified(section, key, true, "get double");
-if(@tmp!=null)
-return string_to_number(tmp.get_string(key));
-else
-return default_value;
-}
+	// Fetch a double.
+	double get_double(const string& in section, const string& in key, double default_value = 0) {
+		ini_section@ tmp = this.get_section_verified(section, key, true, "get double");
+		if (@tmp != null)
+			return string_to_number(tmp.get_string(key));
+		else
+			return default_value;
+	}
 
-// Set a boolean, we'll set the number 1 here for true.
-bool set_bool(const string&in section, const string&in key, bool value)
-{
-ini_section@ tmp=this.get_section_verified(section, key, false, "set bool");
-if(@tmp!=null)
-tmp.set_string(key, value ? 1 : 0);
-return @tmp!=null;
-}
+	// Set a boolean, we'll set the number 1 here for true.
+	bool set_bool(const string& in section, const string& in key, bool value) {
+		ini_section@ tmp = this.get_section_verified(section, key, false, "set bool");
+		if (@tmp != null)
+			tmp.set_string(key, value ? 1 : 0);
+		return @tmp != null;
+	}
 
-// Fetch a boolean. This function can handle the strings 1, t, true, on, enabled, and yes for true, or everything else for false.
-bool get_bool(const string&in section, const string&in key, bool default_value=false)
-{
-ini_section@ tmp=this.get_section_verified(section, key, true, "get bool");
-if(@tmp==null)
-return default_value;
-string[] is_true={"1", "t", "true", "on", "enabled", "yes"};
-string value=tmp.get_string(key);
-return is_true.find(string_to_lower_case(value))>-1;
-}
+	// Fetch a boolean. This function can handle the strings 1, t, true, on, enabled, and yes for true, or everything else for false.
+	bool get_bool(const string& in section, const string& in key, bool default_value = false) {
+		ini_section@ tmp = this.get_section_verified(section, key, true, "get bool");
+		if (@tmp == null)
+			return default_value;
+		string[] is_true = {"1", "t", "true", "on", "enabled", "yes"};
+		string value = tmp.get_string(key);
+		return is_true.find(string_to_lower_case(value)) > -1;
+	}
 
-// Set an array of strings, we will use camas as our delimiter.
-bool set_string_list(const string&in section, const string&in key, string[]@ value, string sep=",")
-{
-ini_section@ tmp=get_section_verified(section, key, false, "set string list");
-if(@tmp==null)
-return false;
-string raw_list;
-for(uint i=0; i<value.length(); i++)
-{
-string val=INI_ESCAPE_STRING(value[i]);
-if(val.length()==0)
-continue;
-raw_list+=val;
-if(i<value.length()-1)
-raw_list+=sep;
-}
-tmp.set_string(key, raw_list);
-return true;
-}
+	// Set an array of strings, we will use camas as our delimiter.
+	bool set_string_list(const string& in section, const string& in key, string[]@ value, string sep = ",") {
+		ini_section@ tmp = get_section_verified(section, key, false, "set string list");
+		if (@tmp == null)
+			return false;
+		string raw_list;
+		for (uint i = 0; i < value.length(); i++) {
+			string val = INI_ESCAPE_STRING(value[i]);
+			if (val.length() == 0)
+				continue;
+			raw_list += val;
+			if (i < value.length() - 1)
+				raw_list += sep;
+		}
+		tmp.set_string(key, raw_list);
+		return true;
+	}
 
-// Fetch an array of strings.
-string[]@ get_string_list(const string&in section, const string&in key)
-{
-string[] result;
-result.reserve(25);
-ini_section@ tmp=get_section_verified(section, key, true, "get string list");
-if(@tmp==null)
-{
-return result;
-}
-string raw=tmp.get_string(key, true)+","; // We add a cama here to avoid extra annoying code during parsing.
-int last_item_start_pos=0;
-for(uint c=0; c<raw.length(); c++)
-{
-if((raw[c]=="," or raw[c]==":") and (c<1 or raw[c-1]!="\\") or c==raw.length()-1)
-{
-int item_len=c-last_item_start_pos;
-string val=INI_UNESCAPE_STRING(string_mid(raw, last_item_start_pos+1, item_len));
-if(val!="")
-result.insert_last(val);
-last_item_start_pos=c+1;
-}
-}
-return result;
-}
+	// Fetch an array of strings.
+	string[]@ get_string_list(const string& in section, const string& in key) {
+		string[] result;
+		result.reserve(25);
+		ini_section@ tmp = get_section_verified(section, key, true, "get string list");
+		if (@tmp == null)
+			return result;
+		string raw = tmp.get_string(key, true) + ","; // We add a cama here to avoid extra annoying code during parsing.
+		int last_item_start_pos = 0;
+		for (uint c = 0; c < raw.length(); c++) {
+			if ((raw[c] == "," or raw[c] == ":") and (c < 1 or raw[c - 1] != "\\") or c == raw.length() - 1) {
+				int item_len = c - last_item_start_pos;
+				string val = INI_UNESCAPE_STRING(string_mid(raw, last_item_start_pos + 1, item_len));
+				if (val != "")
+					result.insert_last(val);
+				last_item_start_pos = c + 1;
+			}
+		}
+		return result;
+	}
 
-// Set an array of doubles. We're mostly just code copying here for these list functions as they are just barily not similar enough to make extra convenience functions worth it.
-bool set_double_list(const string&in section, const string&in key, double[]@ value, string sep=",")
-{
-ini_section@ tmp=get_section_verified(section, key, false, "set double list");
-if(@tmp==null)
-return false;
-string raw_list;
-for(uint i=0; i<value.length(); i++)
-{
-raw_list+=value[i];
-if(i<value.length()-1)
-raw_list+=sep;
-}
-tmp.set_string(key, raw_list);
-return true;
-}
+	// Set an array of doubles. We're mostly just code copying here for these list functions as they are just barily not similar enough to make extra convenience functions worth it.
+	bool set_double_list(const string& in section, const string& in key, double[]@ value, string sep = ",") {
+		ini_section@ tmp = get_section_verified(section, key, false, "set double list");
+		if (@tmp == null)
+			return false;
+		string raw_list;
+		for (uint i = 0; i < value.length(); i++) {
+			raw_list += value[i];
+			if (i < value.length() - 1)
+				raw_list += sep;
+		}
+		tmp.set_string(key, raw_list);
+		return true;
+	}
 
-// Fetch an array of doubles.
-double[]@ get_double_list(const string&in section, const string&in key)
-{
-double[] result;
-ini_section@ tmp=get_section_verified(section, key, true, "get double list");
-if(@tmp==null)
-{
-return result;
-}
-string raw=tmp.get_string(key, true)+",";
-int last_item_start_pos=0;
-for(uint c=0; c<raw.length(); c++)
-{
-if((raw[c]=="," or raw[c]==":") and (c<1 or raw[c-1]!="\\") or c==raw.length()-1)
-{
-int item_len=c-last_item_start_pos;
-result.insert_last(string_to_number(INI_UNESCAPE_STRING(string_mid(raw, last_item_start_pos+1, item_len))));
-last_item_start_pos=c+1;
-}
-}
-return result;
-}
+	// Fetch an array of doubles.
+	double[]@ get_double_list(const string& in section, const string& in key) {
+		double[] result;
+		ini_section@ tmp = get_section_verified(section, key, true, "get double list");
+		if (@tmp == null)
+			return result;
+		string raw = tmp.get_string(key, true) + ",";
+		int last_item_start_pos = 0;
+		for (uint c = 0; c < raw.length(); c++) {
+			if ((raw[c] == "," or raw[c] == ":") and (c < 1 or raw[c - 1] != "\\") or c == raw.length() - 1) {
+				int item_len = c - last_item_start_pos;
+				result.insert_last(string_to_number(INI_UNESCAPE_STRING(string_mid(raw, last_item_start_pos + 1, item_len))));
+				last_item_start_pos = c + 1;
+			}
+		}
+		return result;
+	}
 
-// Set an array of booleans.
-bool set_bool_list(const string&in section, const string&in key, bool[]@ value, string sep=",")
-{
-ini_section@ tmp=get_section_verified(section, key, false, "set bool list");
-if(@tmp==null)
-return false;
-string raw_list;
-for(uint i=0; i<value.length(); i++)
-{
-raw_list+=value[i] ? "1" : "0";
-if(i<value.length()-1)
-raw_list+=sep;
-}
-tmp.set_string(key, raw_list);
-return true;
-}
+	// Set an array of booleans.
+	bool set_bool_list(const string& in section, const string& in key, bool[]@ value, string sep = ",") {
+		ini_section@ tmp = get_section_verified(section, key, false, "set bool list");
+		if (@tmp == null)
+			return false;
+		string raw_list;
+		for (uint i = 0; i < value.length(); i++) {
+			raw_list += value[i] ? "1" : "0";
+			if (i < value.length() - 1)
+				raw_list += sep;
+		}
+		tmp.set_string(key, raw_list);
+		return true;
+	}
 
-// Fetch an array of bools.
-bool[]@ get_bool_list(const string&in section, const string&in key)
-{
-bool[] result;
-ini_section@ tmp=get_section_verified(section, key, true, "get bool list");
-if(@tmp==null)
-{
-return result;
-}
-string raw=tmp.get_string(key, true)+",";
-int last_item_start_pos=0;
-string[] is_true={"1", "t", "true", "on", "enabled", "yes"};
-for(uint c=0; c<raw.length(); c++)
-{
-if((raw[c]=="," or raw[c]==":") and (c<1 or raw[c-1]!="\\") or c==raw.length()-1)
-{
-int item_len=c-last_item_start_pos;
-result.insert_last(is_true.find(string_to_lower_case(INI_UNESCAPE_STRING(string_mid(raw, last_item_start_pos+1, item_len))))>-1);
-last_item_start_pos=c+1;
-}
-}
-return result;
-}
+	// Fetch an array of bools.
+	bool[]@ get_bool_list(const string& in section, const string& in key) {
+		bool[] result;
+		ini_section@ tmp = get_section_verified(section, key, true, "get bool list");
+		if (@tmp == null)
+			return result;
+		string raw = tmp.get_string(key, true) + ",";
+		int last_item_start_pos = 0;
+		string[] is_true = {"1", "t", "true", "on", "enabled", "yes"};
+		for (uint c = 0; c < raw.length(); c++) {
+			if ((raw[c] == "," or raw[c] == ":") and (c < 1 or raw[c - 1] != "\\") or c == raw.length() - 1) {
+				int item_len = c - last_item_start_pos;
+				result.insert_last(is_true.find(string_to_lower_case(INI_UNESCAPE_STRING(string_mid(raw, last_item_start_pos + 1, item_len)))) > -1);
+				last_item_start_pos = c + 1;
+			}
+		}
+		return result;
+	}
 
 }
 
 
 // ini_section: This is a very simple class that stores a section of an ini file including it's keys in memory for manipulation.
-class ini_section
-{
-// class variables
-string name; // If this is blank the section is to be written to the top of the file with no section header indicating all keys that don't reside in a section.
-string[] key_names; // Used so that the section stays ordered when being rewritten to the file.
-dictionary keys; // This dictionary contains all ini keys and raw string values contained in the section. Other datatypes such as int, double, bool will be converted upon value setting or retrieval.
+class ini_section {
+	// class variables
+	string name; // If this is blank the section is to be written to the top of the file with no section header indicating all keys that don't reside in a section.
+	string[] key_names; // Used so that the section stays ordered when being rewritten to the file.
+	dictionary keys; // This dictionary contains all ini keys and raw string values contained in the section. Other datatypes such as int, double, bool will be converted upon value setting or retrieval.
 
-// Constructor, this just names the section
-ini_section(string name)
-{
-this.name=name;
-}
+	// Constructor, this just names the section
+	ini_section(string name) {
+		this.name = name;
+	}
 
-// Add a raw string value to the section. If the key already exists, overwrite it in it's current place. This is the base function that is used to set all other datatypes, since they all end up as strings. The raw argument controls whether the string should be escaped before adding or whether this is raw data. It is mostly used internally and it is safe to keep it at false (the default) unless there is not a suitable datatype in this class for your situation and you're trying to write your own or something. Regardless only change the raw argument if you know what your doing.
-void set_string(const string&in key_name, string value, bool raw=false)
-{
-if(!this.keys.exists(key_name))
-this.key_names.insert_last(key_name);
-if(!raw)
-this.keys.set(key_name, INI_ESCAPE_STRING(value));
-else
-this.keys.set(key_name, value);
-}
+	// Add a raw string value to the section. If the key already exists, overwrite it in it's current place. This is the base function that is used to set all other datatypes, since they all end up as strings. The raw argument controls whether the string should be escaped before adding or whether this is raw data. It is mostly used internally and it is safe to keep it at false (the default) unless there is not a suitable datatype in this class for your situation and you're trying to write your own or something. Regardless only change the raw argument if you know what your doing.
+	void set_string(const string& in key_name, string value, bool raw = false) {
+		if (!this.keys.exists(key_name))
+			this.key_names.insert_last(key_name);
+		if (!raw)
+			this.keys.set(key_name, INI_ESCAPE_STRING(value));
+		else
+			this.keys.set(key_name, value);
+	}
 
-// Fetches the value of a key as a raw string if it exists, or blank if it either doesn't exist or the specified key has no value. The raw argument applies the same here as in the above function, if it is false (the default), the string will automatically be unescaped.
-string get_string(const string&in key_name, bool raw=false)
-{
-if(!this.keys.exists(key_name))
-return "";
-string result;
-if(!this.keys.get(key_name, result))
-return "";
-if(!raw)
-result=INI_UNESCAPE_STRING(result);
-return result;
-}
+	// Fetches the value of a key as a raw string if it exists, or blank if it either doesn't exist or the specified key has no value. The raw argument applies the same here as in the above function, if it is false (the default), the string will automatically be unescaped.
+	string get_string(const string& in key_name, bool raw = false) {
+		if (!this.keys.exists(key_name))
+			return "";
+		string result;
+		if (!this.keys.get(key_name, result))
+			return "";
+		if (!raw)
+			result = INI_UNESCAPE_STRING(result);
+		return result;
+	}
 
-// Delete a key.
-bool delete_key(const string&in key_name)
-{
-if(!this.keys.exists(key_name))
-return false;
-this.keys.delete(key_name);
-int idx=this.key_names.find(key_name);
-if(idx>-1)
-this.key_names.remove_at(idx);
-return true;
-}
+	// Delete a key.
+	bool delete_key(const string& in key_name) {
+		if (!this.keys.exists(key_name))
+			return false;
+		this.keys.delete(key_name);
+		int idx = this.key_names.find(key_name);
+		if (idx > -1)
+			this.key_names.remove_at(idx);
+		return true;
+	}
 
-// This function dumps the section and returns it as a string, with no section header if the name is blank. In future depending on need this may be rewritten to recreate comments and whitespace in the output based on the input. As of now, it supports simple key indenting if indent is set to true.
-string dump(bool indent=false)
-{
-string output=this.name!="" ? "["+this.name+"]\r\n" : "";
-for(uint i=0; i<key_names.length(); i++)
-{
-output+=(indent and this.name!="" ? "\t" : "")+key_names[i]+"="+this.get_string(key_names[i])+"\r\n";
-}
-return output;
-}
+	// This function dumps the section and returns it as a string, with no section header if the name is blank. In future depending on need this may be rewritten to recreate comments and whitespace in the output based on the input. As of now, it supports simple key indenting if indent is set to true.
+	string dump(bool indent = false) {
+		string output = this.name != "" ? "[" + this.name + "]\r\n" : "";
+		for (uint i = 0; i < key_names.length(); i++)
+			output += (indent and this.name != "" ? "\t" : "") + key_names[i] + "=" + this.get_string(key_names[i]) + "\r\n";
+		return output;
+	}
 
 }
 
@@ -740,67 +631,59 @@ return output;
 // The following are functions meant for internal use by the classes above.
 
 // Internal function used to check whether a character is a valid ini identifier char.
-bool INI_IS_VALID_IDENT_CHAR(const string&in char)
-{
-if(char.length()!=1)
-return false;
-uint c=character_to_ascii(char);
-return c>=48 and c<=57 or c>=65 and c<=90 or c>=97 and c<=122 or c==36 or c==39 or c==42 or c==45 or c==46 or c==58 or c==95 or c==126;
+bool INI_IS_VALID_IDENT_CHAR(const string& in char) {
+	if (char.length() != 1)
+		return false;
+	uint c = character_to_ascii(char);
+	return c >= 48 and c <= 57 or c >= 65 and c <= 90 or c >= 97 and c <= 122 or c == 36 or c == 39 or c == 42 or c == 45 or c == 46 or c == 58 or c == 95 or c == 126;
 }
 
 // Escape backslash, cama, colon and semicolon
-string INI_ESCAPE_STRING(string value)
-{
-value.replace_this("\\", "\\\\", true);
-value.replace_this(",", "\\,", true);
-value.replace_this(":", "\\:", true);
-value.replace_this(";", "\\;", true);
-return value;
+string INI_ESCAPE_STRING(string value) {
+	value.replace_this("\\", "\\\\", true);
+	value.replace_this(",", "\\,", true);
+	value.replace_this(":", "\\:", true);
+	value.replace_this(";", "\\;", true);
+	return value;
 }
 
 // Unescape backslash, cama, colon and semicolon
-string INI_UNESCAPE_STRING(string value)
-{
-value.replace_this("\\\\", "\\", true);
-value.replace_this("\\,", ",", true);
-value.replace_this("\\:", ":", true);
-value.replace_this("\\;", ";", true);
-return value;
+string INI_UNESCAPE_STRING(string value) {
+	value.replace_this("\\\\", "\\", true);
+	value.replace_this("\\,", ",", true);
+	value.replace_this("\\:", ":", true);
+	value.replace_this("\\;", ";", true);
+	return value;
 }
 
 // Verify an identifier to make sure keys and section names with invalid characters aren't permitted. A blank string returned means that the identifier is OK, anything else is error text.
-string INI_VERIFY_IDENT(const string&in identifier)
-{
-if(identifier.length()==0)
-return "";
-if(identifier.find("  ")>-1)
-return "unescaped spaces in identifier";
-int ident_length=identifier.length();
-for(uint c=0; c<ident_length; c++)
-{
-if(!INI_IS_VALID_IDENT_CHAR(identifier[c]) and c!="\\" and identifier[c]!=" ")
-return "invalid characters in identifier";
-}
-return "";
+string INI_VERIFY_IDENT(const string& in identifier) {
+	if (identifier.length() == 0)
+		return "";
+	if (identifier.find("  ") > -1)
+		return "unescaped spaces in identifier";
+	int ident_length = identifier.length();
+	for (uint c = 0; c < ident_length; c++) {
+		if (!INI_IS_VALID_IDENT_CHAR(identifier[c]) and c != "\\" and identifier[c] != " ")
+			return "invalid characters in identifier";
+	}
+	return "";
 }
 
 // This function splits a string by lines. We don't use string_split for this because string_split doesn't include blank lines, entirely throwing off any needed line number reporting.
-string[]@ get_lines(const string&in the_string)
-{
-string[] result;
-int line_start_pos=0;
-for(uint i=0; i<the_string.length(); i++)
-{
-if(the_string[i]=="\n" or i==the_string.length()-1)
-{
-string line=string_mid(the_string, line_start_pos+1, i+1-line_start_pos);
-if(string_right(line, 1)=="\n")
-line.resize(line.length()-1);
-if(string_right(line, 1)=="\r")
-line.resize(line.length()-1);
-result.insert_last(line);
-line_start_pos=i+1;
-}
-}
-return result;
+string[]@ get_lines(const string& in the_string) {
+	string[] result;
+	int line_start_pos = 0;
+	for (uint i = 0; i < the_string.length(); i++) {
+		if (the_string[i] == "\n" or i == the_string.length() - 1) {
+			string line = string_mid(the_string, line_start_pos + 1, i + 1 - line_start_pos);
+			if (string_right(line, 1) == "\n")
+				line.resize(line.length() - 1);
+			if (string_right(line, 1) == "\r")
+				line.resize(line.length() - 1);
+			result.insert_last(line);
+			line_start_pos = i + 1;
+		}
+	}
+	return result;
 }

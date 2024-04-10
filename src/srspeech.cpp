@@ -11,27 +11,27 @@
 */
 
 #ifdef _WIN32
-#include <windows.h>
-#include <Tolk.h>
+	#include <windows.h>
+	#include <Tolk.h>
 #elif defined(__APPLE__)
-#include "apple.h"
+	#include "apple.h"
 #endif
 #include <string>
 #include "srspeech.h"
 
-bool g_SRSpeechLoaded=false;
-bool g_SRSpeechAvailable=true;
+bool g_SRSpeechLoaded = false;
+bool g_SRSpeechAvailable = true;
 bool ScreenReaderLoad() {
 	#ifdef _WIN32
-	if(!g_SRSpeechAvailable) return false;
-	if(g_SRSpeechLoaded) return true;
+	if (!g_SRSpeechAvailable) return false;
+	if (g_SRSpeechLoaded) return true;
 	__try {
 		Tolk_Load();
-	} __except(1) {
-		g_SRSpeechAvailable=false;
+	} __except (1) {
+		g_SRSpeechAvailable = false;
 		return false;
 	}
-	g_SRSpeechLoaded=true;
+	g_SRSpeechLoaded = true;
 	return true;
 	#elif defined(__APPLE__)
 	return true; // Voice over or libraries to access it don't need loading.
@@ -41,32 +41,32 @@ bool ScreenReaderLoad() {
 }
 void ScreenReaderUnload() {
 	#ifdef _WIN32
-	if(!g_SRSpeechLoaded) return;
+	if (!g_SRSpeechLoaded) return;
 	Tolk_Unload();
-	g_SRSpeechLoaded=false;
+	g_SRSpeechLoaded = false;
 	#elif defined(__APPLE__)
 	voice_over_speech_shutdown(); // Really just stops a hacky thread intended to get speech event queuing working.
 	#endif
 }
 std::string ScreenReaderDetect() {
 	#ifdef _WIN32
-	if(!ScreenReaderLoad()) return "";
-	const wchar_t* srname=Tolk_DetectScreenReader();
-	if(srname==NULL)
+	if (!ScreenReaderLoad()) return "";
+	const wchar_t* srname = Tolk_DetectScreenReader();
+	if (srname == NULL)
 		return "";
 	char srnameA[64];
 	memset(srnameA, 0, 64);
 	WideCharToMultiByte(CP_UTF8, 0, srname, wcslen(srname), srnameA, 64, NULL, NULL);
 	return std::string(srnameA);
 	#elif defined(__APPLE__)
-	return voice_over_is_running()? "VoiceOver" : ""; // If we ever get a library on macos that can speak to multiple screen readers, we can talk about improving this.
+	return voice_over_is_running() ? "VoiceOver" : ""; // If we ever get a library on macos that can speak to multiple screen readers, we can talk about improving this.
 	#else
 	return "";
 	#endif
 }
 bool ScreenReaderHasSpeech() {
 	#ifdef _WIN32
-	if(!ScreenReaderLoad()) return false;
+	if (!ScreenReaderLoad()) return false;
 	return Tolk_HasSpeech();
 	#elif defined(__APPLE__)
 	return voice_over_is_running();
@@ -76,7 +76,7 @@ bool ScreenReaderHasSpeech() {
 }
 bool ScreenReaderHasBraille() {
 	#ifdef _WIN32
-	if(!ScreenReaderLoad()) return false;
+	if (!ScreenReaderLoad()) return false;
 	return Tolk_HasBraille();
 	#elif defined(__APPLE__)
 	return voice_over_is_running();
@@ -86,7 +86,7 @@ bool ScreenReaderHasBraille() {
 }
 bool ScreenReaderIsSpeaking() {
 	#ifdef _WIN32
-	if(!ScreenReaderLoad()) return false;
+	if (!ScreenReaderLoad()) return false;
 	return Tolk_IsSpeaking();
 	#else
 	return false;
@@ -94,10 +94,10 @@ bool ScreenReaderIsSpeaking() {
 }
 bool ScreenReaderOutput(std::string& text, bool interrupt) {
 	#ifdef _WIN32
-	if(!ScreenReaderLoad()) return false;
-	wchar_t* textW=(wchar_t*)malloc((text.size()*3)+2);
-	MultiByteToWideChar(CP_UTF8, 0, text.c_str(), text.size()+1, textW, text.size()+1);
-	bool r=Tolk_Output(textW, interrupt);
+	if (!ScreenReaderLoad()) return false;
+	wchar_t* textW = (wchar_t*)malloc((text.size() * 3) + 2);
+	MultiByteToWideChar(CP_UTF8, 0, text.c_str(), text.size() + 1, textW, text.size() + 1);
+	bool r = Tolk_Output(textW, interrupt);
 	free(textW);
 	return r;
 	#elif defined(__APPLE__)
@@ -108,10 +108,10 @@ bool ScreenReaderOutput(std::string& text, bool interrupt) {
 }
 bool ScreenReaderSpeak(std::string& text, bool interrupt) {
 	#ifdef _WIN32
-	if(!ScreenReaderLoad()) return false;
-	wchar_t* textW=(wchar_t*)malloc((text.size()*3)+2);
-	MultiByteToWideChar(CP_UTF8, 0, text.c_str(), text.size()+1, textW, text.size()+1);
-	bool r=Tolk_Speak(textW, interrupt);
+	if (!ScreenReaderLoad()) return false;
+	wchar_t* textW = (wchar_t*)malloc((text.size() * 3) + 2);
+	MultiByteToWideChar(CP_UTF8, 0, text.c_str(), text.size() + 1, textW, text.size() + 1);
+	bool r = Tolk_Speak(textW, interrupt);
 	free(textW);
 	return r;
 	#elif defined(__APPLE__)
@@ -122,10 +122,10 @@ bool ScreenReaderSpeak(std::string& text, bool interrupt) {
 }
 bool ScreenReaderBraille(std::string& text) {
 	#ifdef _WIN32
-	if(!ScreenReaderLoad()) return false;
-	wchar_t* textW=(wchar_t*)malloc((text.size()*3)+2);
-	MultiByteToWideChar(CP_UTF8, 0, text.c_str(), text.size()+1, textW, text.size()+1);
-	bool r=Tolk_Braille(textW);
+	if (!ScreenReaderLoad()) return false;
+	wchar_t* textW = (wchar_t*)malloc((text.size() * 3) + 2);
+	MultiByteToWideChar(CP_UTF8, 0, text.c_str(), text.size() + 1, textW, text.size() + 1);
+	bool r = Tolk_Braille(textW);
 	free(textW);
 	return r;
 	#else
@@ -134,7 +134,7 @@ bool ScreenReaderBraille(std::string& text) {
 }
 bool ScreenReaderSilence() {
 	#ifdef _WIN32
-	if(!ScreenReaderLoad()) return false;
+	if (!ScreenReaderLoad()) return false;
 	return Tolk_Silence();
 	#elif defined(__APPLE__)
 	return voice_over_speak("", true);

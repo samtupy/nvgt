@@ -36,7 +36,7 @@ typedef struct {
 	DWORD data_bytes; // Number of bytes in data. Number of samples * num_channels * sample byte size
 } wav_header;
 
-wav_header make_wav_header(DWORD filesize=0, DWORD samprate=44100, DWORD bitrate=16, short channels=2, short format=1);
+wav_header make_wav_header(DWORD filesize = 0, DWORD samprate = 44100, DWORD bitrate = 16, short channels = 2, short format = 1);
 
 #ifdef riffheader_impl
 // This function fills a wav_header structure with data and returns it. Please remember that the arguments passed to this function are *EXPECTED! to be correct, no verification is performed. So if you set your bitrate to something other than a multiple of 8, for example, this function's return value is then officially undefined.
@@ -44,29 +44,29 @@ wav_header make_wav_header(DWORD filesize=0, DWORD samprate=44100, DWORD bitrate
 extern "C" {
 #endif
 	wav_header make_wav_header(DWORD filesize, DWORD samprate, DWORD bitrate, short channels, short format) {
-		const char* riff="RIFF";
-		const char* wavefmt="WAVEfmt ";
-		const char* data="data";
+		const char* riff = "RIFF";
+		const char* wavefmt = "WAVEfmt ";
+		const char* data = "data";
 		wav_header h;
 		memset(&h, 0, sizeof(wav_header));
 		strncpy(h.riff_header, riff, 4);
-		if(filesize>0)
-			h.wav_size=filesize-8;
+		if (filesize > 0)
+			h.wav_size = filesize - 8;
 		else
-			h.wav_size=0;
+			h.wav_size = 0;
 		memcpy(h.wave_header, wavefmt, 8);
-		h.fmt_chunk_size=16;
-		h.audio_format=format;
-		h.num_channels=channels;
-		h.sample_rate=samprate;
-		h.byte_rate=samprate*channels*(bitrate/8);
-		h.sample_alignment=channels*(bitrate/8);
-		h.bit_depth=bitrate;
+		h.fmt_chunk_size = 16;
+		h.audio_format = format;
+		h.num_channels = channels;
+		h.sample_rate = samprate;
+		h.byte_rate = samprate * channels * (bitrate / 8);
+		h.sample_alignment = channels * (bitrate / 8);
+		h.bit_depth = bitrate;
 		strncpy(h.data_header, data, 4);
-		if(filesize>0)
-			h.data_bytes=filesize-sizeof(wav_header);
+		if (filesize > 0)
+			h.data_bytes = filesize - sizeof(wav_header);
 		else
-			h.data_bytes=0;
+			h.data_bytes = 0;
 		return h;
 	}
 	#ifdef __CPLUSPLUS

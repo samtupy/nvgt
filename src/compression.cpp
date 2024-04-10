@@ -28,7 +28,7 @@ std::string string_deflate(const std::string& str, int compressionlevel = Z_BEST
 		return "";
 
 	zs.next_in = (Bytef*)str.data();
-	zs.avail_in = str.size();   // set the z_stream's input
+	zs.avail_in = str.size(); // set the z_stream's input
 
 	int ret;
 	char outbuffer[32768];
@@ -43,13 +43,13 @@ std::string string_deflate(const std::string& str, int compressionlevel = Z_BEST
 
 		if (outstring.size() < zs.total_out) {
 			// append the block to the output string
-			outstring.append(outbuffer,  zs.total_out - outstring.size());
+			outstring.append(outbuffer, zs.total_out - outstring.size());
 		}
 	} while (ret == Z_OK);
 
 	deflateEnd(&zs);
 
-	if (ret != Z_STREAM_END) {  // an error occurred that was not EOF
+	if (ret != Z_STREAM_END) { // an error occurred that was not EOF
 		/*std::ostringstream oss;
 		oss << "Exception during zlib compression: (" << ret << ") " << zs.msg;
 		throw(std::runtime_error(oss.str()));
@@ -81,15 +81,14 @@ std::string string_inflate(const std::string& str) {
 
 		ret = inflate(&zs, 0);
 
-		if (outstring.size() < zs.total_out) {
-			outstring.append(outbuffer,  zs.total_out - outstring.size());
-		}
+		if (outstring.size() < zs.total_out)
+			outstring.append(outbuffer, zs.total_out - outstring.size());
 
 	} while (ret == Z_OK);
 
 	inflateEnd(&zs);
 
-	if (ret != Z_STREAM_END) {  // an error occurred that was not EOF
+	if (ret != Z_STREAM_END) { // an error occurred that was not EOF
 		/*std::ostringstream oss;
 		oss << "Exception during zlib decompression: (" << ret << ") "
 		<< zs.msg;
@@ -101,7 +100,7 @@ std::string string_inflate(const std::string& str) {
 	return outstring;
 }
 
-void RegisterScriptCompression(asIScriptEngine *engine) {
+void RegisterScriptCompression(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("string string_deflate(const string& in, int = 9)", asFUNCTION(string_deflate), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string string_inflate(const string& in)", asFUNCTION(string_inflate), asCALL_CDECL);
 }

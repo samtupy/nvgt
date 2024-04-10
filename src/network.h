@@ -14,10 +14,10 @@
 
 #include <enet/enet.h>
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+	#define WIN32_LEAN_AND_MEAN
+	#include <windows.h>
 #else
-#include <cstring>
+	#include <cstring>
 #endif
 #include <map>
 #include <unordered_map>
@@ -47,23 +47,43 @@ public:
 	network_event* request();
 	std::string get_peer_address(asQWORD peer_id);
 	unsigned int get_peer_average_round_trip_time(asQWORD peer_id);
-	bool send(asQWORD peer_id, const std::string& message, unsigned char channel, bool reliable=true);
-	bool send_reliable(asQWORD peer_id, const std::string& message, unsigned char channel) { return send(peer_id, message, channel); }
-	bool send_unreliable(asQWORD peer_id, const std::string& message, unsigned char channel) { return send(peer_id, message, channel, false); }
-	bool send_peer(asQWORD peer, const std::string& message, unsigned char channel, bool reliable=true);
-	bool send_reliable_peer(asQWORD peer, const std::string& message, unsigned char channel) { return send_peer(peer, message, channel); }
-	bool send_unreliable_peer(asQWORD peer, const std::string& message, unsigned char channel) { return send(peer, message, channel, false); }
+	bool send(asQWORD peer_id, const std::string& message, unsigned char channel, bool reliable = true);
+	bool send_reliable(asQWORD peer_id, const std::string& message, unsigned char channel) {
+		return send(peer_id, message, channel);
+	}
+	bool send_unreliable(asQWORD peer_id, const std::string& message, unsigned char channel) {
+		return send(peer_id, message, channel, false);
+	}
+	bool send_peer(asQWORD peer, const std::string& message, unsigned char channel, bool reliable = true);
+	bool send_reliable_peer(asQWORD peer, const std::string& message, unsigned char channel) {
+		return send_peer(peer, message, channel);
+	}
+	bool send_unreliable_peer(asQWORD peer, const std::string& message, unsigned char channel) {
+		return send(peer, message, channel, false);
+	}
 	bool disconnect_peer_softly(asQWORD peer_id);
 	bool disconnect_peer(asQWORD peer_id);
 	bool disconnect_peer_forcefully(asQWORD peer_id);
 	CScriptArray* list_peers();
 	bool set_bandwidth_limits(unsigned int incoming, unsigned int outgoing);
-	size_t get_connected_peers() { return host? host->connectedPeers  : -1; }
-	size_t get_bytes_received() { return host? host->totalReceivedData: -1; }
-	size_t get_bytes_sent() { return host? host->totalSentData: -1; }
-	size_t get_duplicate_peers() { return host? host->duplicatePeers  : -1; }
-	void set_duplicate_peers(size_t peers) { if(host) host->duplicatePeers=peers; }
-	bool active() { return host!=NULL; }
+	size_t get_connected_peers() {
+		return host ? host->connectedPeers : -1;
+	}
+	size_t get_bytes_received() {
+		return host ? host->totalReceivedData : -1;
+	}
+	size_t get_bytes_sent() {
+		return host ? host->totalSentData : -1;
+	}
+	size_t get_duplicate_peers() {
+		return host ? host->duplicatePeers : -1;
+	}
+	void set_duplicate_peers(size_t peers) {
+		if (host) host->duplicatePeers = peers;
+	}
+	bool active() {
+		return host != NULL;
+	}
 };
 class network_event {
 public:

@@ -23,7 +23,7 @@ typedef Poco::SharedPtr<std::istream> istrPtr;
 typedef Poco::SharedPtr<std::ostream> ostrPtr;
 typedef Poco::SharedPtr<std::iostream> iostrPtr;
 
-// The base datastream class. This wraps either an iostream or an istream/ostream into a Poco BinaryReader/Writer. This Poco class has functionality extremely similar to Angelscript's scriptfile addon accept that it works on streams, meaning that it can work on much more than files. We also wrap some other basics of std streams. 
+// The base datastream class. This wraps either an iostream or an istream/ostream into a Poco BinaryReader/Writer. This Poco class has functionality extremely similar to Angelscript's scriptfile addon accept that it works on streams, meaning that it can work on much more than files. We also wrap some other basics of std streams.
 class datastream;
 typedef void (datastream_close_callback)(datastream*);
 class datastream : public Poco::RefCountedObject {
@@ -35,19 +35,27 @@ class datastream : public Poco::RefCountedObject {
 	ostrPtr _ostr;
 	datastream* ds; // If this object was created from another angelscript object, holds a reference to it so we can keep all parent streams alive until the close or destruction of this object.
 	datastream_close_callback* close_cb; // Some advanced streams may allocate some extra user data that needs to be destroyed when a stream is closed, this is such a stream's opertunity to destroy that data.
-	public:
+public:
 	void* user; // Free for advanced streams to use.
 	bool no_close; // If set to true, the close function becomes a no-op for singleton streams like stdin/stdout.
 	bool binary; // If set to false, the template read/write functions will write formatted text output instead of binary data, used by default for console streams.
 	// Empty constructor (internal stream is nonexistent/closed).
 	datastream() : r(NULL), w(NULL), ds(NULL), user(NULL), close_cb(NULL), no_close(false), binary(true) {}
 	// Low level constructor (Allows passing separate shared pointers to input and output stream).
-	datastream(istrPtr istr, ostrPtr ostr, const std::string& encoding, int byteorder, datastream* obj) : r(NULL), w(NULL), ds(NULL), user(NULL), close_cb(NULL), no_close(false), binary(true) { open(istr, ostr, encoding, byteorder, obj); }
+	datastream(istrPtr istr, ostrPtr ostr, const std::string& encoding, int byteorder, datastream* obj) : r(NULL), w(NULL), ds(NULL), user(NULL), close_cb(NULL), no_close(false), binary(true) {
+		open(istr, ostr, encoding, byteorder, obj);
+	}
 	// Higher level constructor (Creates shared pointers for given std::ios pointer and has default arguments).
-	datastream(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = NULL) : r(NULL), w(NULL), ds(NULL), user(NULL), close_cb(NULL), no_close(false), binary(true) { open(stream, encoding, byteorder, obj); }
-	~datastream() { close(); }
+	datastream(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = NULL) : r(NULL), w(NULL), ds(NULL), user(NULL), close_cb(NULL), no_close(false), binary(true) {
+		open(stream, encoding, byteorder, obj);
+	}
+	~datastream() {
+		close();
+	}
 	bool open(istrPtr istr, ostrPtr ostr, const std::string& encoding, int byteorder, datastream* obj);
-	bool open(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = NULL) { return open(dynamic_cast<std::istream*>(stream), dynamic_cast<std::ostream*>(stream), encoding, byteorder, obj); }
+	bool open(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = NULL) {
+		return open(dynamic_cast<std::istream*>(stream), dynamic_cast<std::ostream*>(stream), encoding, byteorder, obj);
+	}
 	bool close(bool close_all = false);
 	std::ios* stream();
 	bool seek(unsigned long long offset);
@@ -69,17 +77,39 @@ class datastream : public Poco::RefCountedObject {
 	template<typename T> datastream& read(T& value);
 	template <typename T> T read();
 	template<typename T> datastream& write(T value);
-	inline bool good() { return _istr? _istr->good() : _ostr? _ostr->good() : false; }
-	inline bool eof() { return _istr? _istr->eof() : _ostr? _ostr->eof() : false; }
-	inline bool bad() { return _istr? _istr->bad() : _ostr? _ostr->bad() : false; }
-	inline bool fail() { return _istr? _istr->fail() : _ostr? _ostr->fail() : false; }
-	inline void set_close_callback(datastream_close_callback* cb) { close_cb = cb; }
-	inline bool close_all() { return close(true); }
-	inline bool active() { return r || w; }
-	inline int available() { return r? r->available() : -1; }
-	inline std::istream* get_istr() { return _istr.get(); }
-	inline std::ostream* get_ostr() { return _ostr.get(); }
-	inline std::iostream* get_iostr() { return _istr && dynamic_cast<std::iostream*>(_istr.get()) == dynamic_cast<std::iostream*>(_ostr.get())? dynamic_cast<std::iostream*>(_istr.get()) : NULL; }
+	inline bool good() {
+		return _istr ? _istr->good() : _ostr ? _ostr->good() : false;
+	}
+	inline bool eof() {
+		return _istr ? _istr->eof() : _ostr ? _ostr->eof() : false;
+	}
+	inline bool bad() {
+		return _istr ? _istr->bad() : _ostr ? _ostr->bad() : false;
+	}
+	inline bool fail() {
+		return _istr ? _istr->fail() : _ostr ? _ostr->fail() : false;
+	}
+	inline void set_close_callback(datastream_close_callback* cb) {
+		close_cb = cb;
+	}
+	inline bool close_all() {
+		return close(true);
+	}
+	inline bool active() {
+		return r || w;
+	}
+	inline int available() {
+		return r ? r->available() : -1;
+	}
+	inline std::istream* get_istr() {
+		return _istr.get();
+	}
+	inline std::ostream* get_ostr() {
+		return _ostr.get();
+	}
+	inline std::iostream* get_iostr() {
+		return _istr && dynamic_cast<std::iostream*>(_istr.get()) == dynamic_cast<std::iostream*>(_ostr.get()) ? dynamic_cast<std::iostream*>(_istr.get()) : NULL;
+	}
 };
 
 // These macros simply allow the registration of a stream with a bit less typing, since there are many streams and any amount of them may be registered later.

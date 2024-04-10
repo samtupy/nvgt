@@ -64,9 +64,9 @@ public:
 	bool set_pack_identifier(const std::string& ident);
 	bool open(const std::string& filename, pack_open_mode mode, bool memload);
 	bool close();
-	bool add_file(const std::string& disk_filename, const std::string& pack_filename, bool allow_replace=false);
-	bool add_memory(const std::string& pack_filename, unsigned char* data, unsigned int size, bool allow_replace=false);
-	bool add_memory(const std::string& pack_filename, const std::string& data, bool allow_replace=false);
+	bool add_file(const std::string& disk_filename, const std::string& pack_filename, bool allow_replace = false);
+	bool add_memory(const std::string& pack_filename, unsigned char* data, unsigned int size, bool allow_replace = false);
+	bool add_memory(const std::string& pack_filename, const std::string& data, bool allow_replace = false);
 	bool delete_file(const std::string& pack_filename);
 	bool file_exists(const std::string& pack_filename);
 	unsigned int get_file_name(int idx, char* buffer, unsigned int size);
@@ -75,24 +75,36 @@ public:
 	CScriptArray* list_files();
 	unsigned int get_file_size(const std::string& pack_filename);
 	unsigned int get_file_offset(const std::string& pack_filename);
-	unsigned int read_file(const std::string& pack_filename, unsigned int offset, unsigned char* buffer, unsigned int size, FILE* reader=NULL);
+	unsigned int read_file(const std::string& pack_filename, unsigned int offset, unsigned char* buffer, unsigned int size, FILE* reader = NULL);
 	std::string read_file_string(const std::string& pack_filename, unsigned int offset, unsigned int size);
 	bool raw_seek(int offset);
-	bool stream_close(pack_stream* stream, bool while_reading=false);
-	pack_stream* stream_open(const std::string& pack_filename, unsigned int offset=0);
-	unsigned int stream_pos(pack_stream* stream) { return stream->offset; }
+	bool stream_close(pack_stream* stream, bool while_reading = false);
+	pack_stream* stream_open(const std::string& pack_filename, unsigned int offset = 0);
+	unsigned int stream_pos(pack_stream* stream) {
+		return stream->offset;
+	}
 	unsigned int stream_read(pack_stream* stream, unsigned char* buffer, unsigned int size);
-	bool stream_seek(pack_stream* stream, unsigned int offset, int origen=SEEK_SET);
-	unsigned int stream_size(pack_stream* stream) { return stream->filesize; }
+	bool stream_seek(pack_stream* stream, unsigned int offset, int origen = SEEK_SET);
+	unsigned int stream_size(pack_stream* stream) {
+		return stream->filesize;
+	}
 	bool stream_close_script(unsigned int idx);
-	unsigned int stream_open_script(const std::string& pack_filename, unsigned int offset=0);
-	unsigned int stream_pos_script(unsigned int idx) { return pack_streams.find(idx)!=pack_streams.end()? pack_streams[idx]->offset : 0xffffffff; }
+	unsigned int stream_open_script(const std::string& pack_filename, unsigned int offset = 0);
+	unsigned int stream_pos_script(unsigned int idx) {
+		return pack_streams.find(idx) != pack_streams.end() ? pack_streams[idx]->offset : 0xffffffff;
+	}
 	unsigned int stream_read_script(unsigned int idx, unsigned char* buffer, unsigned int size);
 	std::string stream_read_string(unsigned int idx, unsigned int size);
-	bool stream_seek_script(unsigned int idx, unsigned int offset, int origen=SEEK_SET);
-	unsigned int stream_size_script(unsigned int idx) { return pack_streams.find(idx)!=pack_streams.end()? pack_streams[idx]->filesize : 0; }
-	unsigned int size() { return pack_items.size(); }
-	bool is_active() { return fptr||mptr; };
+	bool stream_seek_script(unsigned int idx, unsigned int offset, int origen = SEEK_SET);
+	unsigned int stream_size_script(unsigned int idx) {
+		return pack_streams.find(idx) != pack_streams.end() ? pack_streams[idx]->filesize : 0;
+	}
+	unsigned int size() {
+		return pack_items.size();
+	}
+	bool is_active() {
+		return fptr || mptr;
+	};
 };
 
 void RegisterScriptPack(asIScriptEngine* engine);

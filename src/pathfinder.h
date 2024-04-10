@@ -1,4 +1,4 @@
-/* 
+/*
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -18,7 +18,7 @@
 #include <algorithm>
 #include <vector>
 #ifdef _Win32
-#include <windows.h>
+	#include <windows.h>
 #endif
 #include <angelscript.h>
 #include <micropather.h>
@@ -34,11 +34,11 @@ public:
 	int x, y, z;
 };
 struct hashpoint_hash {
-	size_t operator()(const hashpoint &p) const {
+	size_t operator()(const hashpoint& p) const {
 		// Morton code hash function for 3D points with negative coordinate support provided by chat gpt.
 		// Translate the coordinates so that the minimum value is 0
-		const int min_xy = (p.x<p.y? p.x : p.y);
-		const int min_coord = min_xy<p.z? min_xy : p.z;
+		const int min_xy = (p.x < p.y ? p.x : p.y);
+		const int min_coord = min_xy < p.z ? min_xy : p.z;
 		const uint32_t x = static_cast<uint32_t>(p.x - min_coord);
 		const uint32_t y = static_cast<uint32_t>(p.y - min_coord);
 		const uint32_t z = static_cast<uint32_t>(p.z - min_coord);
@@ -48,17 +48,17 @@ struct hashpoint_hash {
 		uint32_t yy = y;
 		uint32_t zz = z;
 		xx = (xx | (xx << 16)) & 0x030000FF;
-		xx = (xx | (xx <<  8)) & 0x0300F00F;
-		xx = (xx | (xx <<  4)) & 0x030C30C3;
-		xx = (xx | (xx <<  2)) & 0x09249249;
+		xx = (xx | (xx << 8)) & 0x0300F00F;
+		xx = (xx | (xx << 4)) & 0x030C30C3;
+		xx = (xx | (xx << 2)) & 0x09249249;
 		yy = (yy | (yy << 16)) & 0x030000FF;
-		yy = (yy | (yy <<  8)) & 0x0300F00F;
-		yy = (yy | (yy <<  4)) & 0x030C30C3;
-		yy = (yy | (yy <<  2)) & 0x09249249;
+		yy = (yy | (yy << 8)) & 0x0300F00F;
+		yy = (yy | (yy << 4)) & 0x030C30C3;
+		yy = (yy | (yy << 2)) & 0x09249249;
 		zz = (zz | (zz << 16)) & 0x030000FF;
-		zz = (zz | (zz <<  8)) & 0x0300F00F;
-		zz = (zz | (zz <<  4)) & 0x030C30C3;
-		zz = (zz | (zz <<  2)) & 0x09249249;
+		zz = (zz | (zz << 8)) & 0x0300F00F;
+		zz = (zz | (zz << 4)) & 0x030C30C3;
+		zz = (zz | (zz << 2)) & 0x09249249;
 
 		// Combine the interleaved bits into a single hash value and add back the minimum coordinate value
 		const size_t hash_val = static_cast<size_t>((xx << 2) | (yy << 1) | zz);
@@ -66,7 +66,7 @@ struct hashpoint_hash {
 	}
 };
 struct hashpoint_equals {
-	bool operator()( const hashpoint& lhs, const hashpoint& rhs ) const {
+	bool operator()(const hashpoint& lhs, const hashpoint& rhs) const {
 		return (lhs.x == rhs.x) && (lhs.y == rhs.y) && (lhs.z == rhs.z);
 	}
 };
@@ -88,7 +88,7 @@ public:
 	int search_range;
 	float total_cost;
 	int start_x, start_y, start_z;
-	pathfinder(int size=1024, bool cache=true);
+	pathfinder(int size = 1024, bool cache = true);
 	void AddRef();
 	void Release();
 	void set_callback_function(asIScriptFunction* func);
@@ -99,7 +99,9 @@ public:
 	CScriptArray* find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny* data);
 	virtual float LeastCostEstimate(void* nodeStart, void* nodeEnd);
 	virtual void AdjacentCost(void* node, micropather::MPVector<micropather::StateCost>* neighbors);
-	virtual void PrintStateInfo(void* state) { return; }
+	virtual void PrintStateInfo(void* state) {
+		return;
+	}
 };
 typedef std::unordered_map<hashpoint, int, hashpoint_hash, hashpoint_equals> hashpoint_int_map;
 class staged_pathfinder : public micropather::Graph {
@@ -116,7 +118,7 @@ public:
 	bool allow_diagonals;
 	float total_cost;
 	int start_x, start_y, start_z;
-	staged_pathfinder(int size=1024);
+	staged_pathfinder(int size = 1024);
 	void AddRef();
 	void Release();
 	void set_callback_function(asIScriptFunction* func);
@@ -126,7 +128,9 @@ public:
 	CScriptArray* find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny* data);
 	virtual float LeastCostEstimate(void* nodeStart, void* nodeEnd);
 	virtual void AdjacentCost(void* node, micropather::MPVector<micropather::StateCost>* neighbors);
-	virtual void PrintStateInfo(void* state) { return; }
+	virtual void PrintStateInfo(void* state) {
+		return;
+	}
 };
 
 void RegisterScriptPathfinder(asIScriptEngine* engine);

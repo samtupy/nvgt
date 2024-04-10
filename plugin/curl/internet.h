@@ -52,23 +52,23 @@ public:
 	unsigned int payload_cursor;
 	FILE* download_stream; // Used if path is set.
 	std::map<std::string, std::string> headers;
-	internet_request() { RefCount=1; initial_setup(); }
-	internet_request(const std::string& url, bool autoperform=true);
-	internet_request(const std::string& url, const std::string& path, bool autoperform=true);
-	internet_request(const std::string& url, const std::string& auth_username, const std::string& auth_password, bool autoperform=true);
+	internet_request() { RefCount = 1; initial_setup(); }
+	internet_request(const std::string& url, bool autoperform = true);
+	internet_request(const std::string& url, const std::string& path, bool autoperform = true);
+	internet_request(const std::string& url, const std::string& auth_username, const std::string& auth_password, bool autoperform = true);
 	void AddRef();
 	void Release();
 	bool perform();
 	bool perform(const std::string& url);
 	bool perform(const std::string& url, const std::string& path);
-	bool post(const std::string& url, const std::string& payload, const std::string& path="");
+	bool post(const std::string& url, const std::string& payload, const std::string& path = "");
 	bool mail(const std::string& url, const std::string& from, const std::string& to, const std::string& payload);
 	void set_url(const std::string& url);
 	void set_path(const std::string& path);
 	void set_authentication(std::string username, std::string password);
 	void set_payload(const std::string& payload);
 	void set_mail(const std::string& from, const std::string& to);
-	void set_header(const std::string& key, const std::string& value="") { headers[key]=value; }
+	void set_header(const std::string& key, const std::string& value = "") { headers[key] = value; }
 	void reset();
 };
 

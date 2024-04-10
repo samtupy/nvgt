@@ -12,127 +12,110 @@
 
 tts_voice tts;
 string speechbuff;
-bool use_sr=true;
-string voicename="SR";
-audio_form@ tts_config_form=null;
+bool use_sr = true;
+string voicename = "SR";
+audio_form@ tts_config_form = null;
 
-bool speak(string text, bool interrupt=true, bool translate_text=true, bool braille=true)
-{
-speechbuff=text;
-if(text.length()>10000)
-{
-string tmp=text;
-while(tmp.length()>0)
-{
-uint pos=4096;
-while(pos>2048 and pos<tmp.length() and tmp[pos]!=" ") pos--;
-raw_speak(string_left(tmp, pos), interrupt and tmp.length()==text.length());
-tmp=string_trim_left(tmp, pos);
+bool speak(string text, bool interrupt = true, bool translate_text = true, bool braille = true) {
+	speechbuff = text;
+	if (text.length() > 10000) {
+		string tmp = text;
+		while (tmp.length() > 0) {
+			uint pos = 4096;
+			while (pos > 2048 and pos < tmp.length() and tmp[pos] != " ") pos--;
+			raw_speak(string_left(tmp, pos), interrupt and tmp.length() == text.length());
+			tmp = string_trim_left(tmp, pos);
+		}
+	} else
+		raw_speak(text, interrupt);
+	return true;
 }
+void raw_speak(string text, bool interrupt) {
+	if (interrupt and tts.speaking) tts.stop();
+	if (@tts_config_form != null) {
+		use_sr = tts_config_form.is_checked(0);
+		if (!use_sr) {
+			int voice = tts_config_form.get_list_position(1);
+			int rate = tts_config_form.get_slider(2);
+			int volume = tts_config_form.get_slider(3);
+			if (voice > -1 and tts.voice != voice) tts.set_voice(voice);
+			if (tts.rate != rate) tts.set_rate(rate);
+			if (tts.volume != volume) tts.set_volume(volume);
+		}
+	}
+	if (!use_sr or !screen_reader_has_speech())
+		tts.speak(text, interrupt);
+	else
+		screen_reader_speak(text, interrupt);
 }
-else
-raw_speak(text, interrupt);
-return true;
-}
-void raw_speak(string text, bool interrupt) 
-{
-if(interrupt and tts.speaking) tts.stop();
-if(@tts_config_form!=null)
-{
-use_sr=tts_config_form.is_checked(0);
-if(!use_sr)
-{
-int voice=tts_config_form.get_list_position(1);
-int rate=tts_config_form.get_slider(2);
-int volume=tts_config_form.get_slider(3);
-if(voice>-1 and tts.voice!=voice) tts.set_voice(voice);
-if(tts.rate!=rate) tts.set_rate(rate);
-if(tts.volume!=volume) tts.set_volume(volume);
-}
-}
-if(!use_sr or !screen_reader_has_speech())
-tts.speak(text, interrupt);
-else
-screen_reader_speak(text, interrupt);
-}
-void stop_speech()
-{
-screen_reader_silence();
-tts.stop();
+void stop_speech() {
+	screen_reader_silence();
+	tts.stop();
 }
 
-string tts_dump_config(tts_voice@ v)
-{
-string o;
-if(v.voice<0) return "default";
-else o=v.get_voice_name(v.voice)+"||";
-if(o=="||") o="default||";
-return o+v.rate+"||0||"+v.volume;
+string tts_dump_config(tts_voice@ v) {
+	string o;
+	if (v.voice < 0) return "default";
+	else o = v.get_voice_name(v.voice) + "||";
+	if (o == "||") o = "default||";
+	return o + v.rate + "||0||" + v.volume;
 }
-bool tts_load_config(string c, tts_voice@ v)
-{
-string[] args=c.split("||");
-if(args[0]=="default") return true;
-if(args.length()<4) return false;
-if(args[0]!="default")
-{
-string[]@ V=v.list_voices();
-int i=V.find(args[0]);
-if(i>-1) v.set_voice(i);
-}
-v.set_rate(parse_float(args[1]));
-v.set_volume(parse_float(args[3]));
-return true;
+bool tts_load_config(string c, tts_voice@ v) {
+	string[] args = c.split("||");
+	if (args[0] == "default") return true;
+	if (args.length() < 4) return false;
+	if (args[0] != "default") {
+		string[]@ V = v.list_voices();
+		int i = V.find(args[0]);
+		if (i > -1) v.set_voice(i);
+	}
+	v.set_rate(parse_float(args[1]));
+	v.set_volume(parse_float(args[3]));
+	return true;
 }
 
-void tts_config(tts_voice@ v, bool main_config=false)
-{
-bool orig_sr=use_sr;
-int orig_voice=v.voice;
-int orig_rate=v.rate;
-int orig_volume=v.volume;
-audio_form f;
-f.create_window("Text to speech configuration", false, true);
-int f_use_sr=f.create_checkbox("use screen reader when available", main_config and use_sr);
-if(!main_config)
-f.set_state(f_use_sr, true, main_config);
-int f_voices=f.create_list("Voice");
-int f_rate=f.create_slider("Rate", v.rate, -10, 10);
-int f_volume=f.create_slider("Volume", v.volume, 0, 100);
-int f_save=f.create_button("&Save settings", true);
-int f_cancel=f.create_button("Cancel", false, true);
-string[]@ voicenames=v.list_voices();
-for(uint i=0; i<voicenames.length(); i++)
-f.add_list_item(f_voices, voicenames[i]!=""? voicenames[i] : "Unknown voice "+(i+1));
-if(v.voice>-1)
-f.set_list_position(f_voices, v.voice);
-f.focus(main_config? 0 : 1);
-if(main_config) @tts_config_form=@f;
-while(true)
-{
-wait(5);
-f.monitor();
-if(f.is_pressed(f_cancel))
-{
-@tts_config_form=null;
-use_sr=orig_sr;
-if(v.voice!=orig_voice) v.set_voice(orig_voice);
-if(v.rate!=orig_rate) v.set_rate(orig_rate);
-if(v.volume!=orig_volume) v.set_volume(orig_volume);
-speak("Canceled");
-break;
-}
-else if(f.is_pressed(f_save))
-{
-if(!main_config)
-{
-v.set_voice(f.get_list_position(f_voices));
-v.set_rate(f.get_slider(f_rate));
-v.set_volume(f.get_slider(f_volume));
-}
-speak("Text to speech settings saved");
-break;
-}
-}
-@tts_config_form=null;
+void tts_config(tts_voice@ v, bool main_config = false) {
+	bool orig_sr = use_sr;
+	int orig_voice = v.voice;
+	int orig_rate = v.rate;
+	int orig_volume = v.volume;
+	audio_form f;
+	f.create_window("Text to speech configuration", false, true);
+	int f_use_sr = f.create_checkbox("use screen reader when available", main_config and use_sr);
+	if (!main_config)
+		f.set_state(f_use_sr, true, main_config);
+	int f_voices = f.create_list("Voice");
+	int f_rate = f.create_slider("Rate", v.rate, -10, 10);
+	int f_volume = f.create_slider("Volume", v.volume, 0, 100);
+	int f_save = f.create_button("&Save settings", true);
+	int f_cancel = f.create_button("Cancel", false, true);
+	string[]@ voicenames = v.list_voices();
+	for (uint i = 0; i < voicenames.length(); i++)
+		f.add_list_item(f_voices, voicenames[i] != "" ? voicenames[i] : "Unknown voice " + (i + 1));
+	if (v.voice > -1)
+		f.set_list_position(f_voices, v.voice);
+	f.focus(main_config ? 0 : 1);
+	if (main_config) @tts_config_form = @f;
+	while (true) {
+		wait(5);
+		f.monitor();
+		if (f.is_pressed(f_cancel)) {
+			@tts_config_form = null;
+			use_sr = orig_sr;
+			if (v.voice != orig_voice) v.set_voice(orig_voice);
+			if (v.rate != orig_rate) v.set_rate(orig_rate);
+			if (v.volume != orig_volume) v.set_volume(orig_volume);
+			speak("Canceled");
+			break;
+		} else if (f.is_pressed(f_save)) {
+			if (!main_config) {
+				v.set_voice(f.get_list_position(f_voices));
+				v.set_rate(f.get_slider(f_rate));
+				v.set_volume(f.get_slider(f_volume));
+			}
+			speak("Text to speech settings saved");
+			break;
+		}
+	}
+	@tts_config_form = null;
 }

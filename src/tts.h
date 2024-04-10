@@ -12,7 +12,7 @@
 
 #pragma once
 #ifdef _WIN32
-#include "blastspeak.h"
+	#include "blastspeak.h"
 #endif
 #include <speech.h>
 #include <string>
@@ -23,7 +23,7 @@
 class tts_voice {
 	int RefCount;
 	#ifdef _WIN32
-		blastspeak* inst;
+	blastspeak* inst;
 	#endif
 	bool destroyed;
 	HSTREAM audioout;
@@ -40,12 +40,16 @@ public:
 	void destroy();
 	void AddRef();
 	void Release();
-	bool speak(const std::string& text, bool interrupt=false);
+	bool speak(const std::string& text, bool interrupt = false);
 	bool speak_to_file(const std::string& filename, const std::string& text);
 	std::string speak_to_memory(const std::string& text);
-	bool speak_wait(const std::string& text, bool interrupt=false);
-	bool speak_interrupt(const std::string& text) { return speak(text, true); }
-	bool speak_interrupt_wait(const std::string& text) { return speak_wait(text, true); }
+	bool speak_wait(const std::string& text, bool interrupt = false);
+	bool speak_interrupt(const std::string& text) {
+		return speak(text, true);
+	}
+	bool speak_interrupt_wait(const std::string& text) {
+		return speak_wait(text, true);
+	}
 	int get_rate();
 	int get_pitch();
 	int get_volume();

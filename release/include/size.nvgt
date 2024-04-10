@@ -12,15 +12,15 @@
 */
 
 const uint64 KILOBYTES = 1024;
-const uint64 MEGABYTES = 1024 ** 2;
-const uint64 GIGABYTES = 1024 ** 3;
-const uint64 TERABYTES = uint64(1024) ** 4;
+const uint64 MEGABYTES = 1024 * * 2;
+const uint64 GIGABYTES = 1024 * * 3;
+const uint64 TERABYTES = uint64(1024)** 4;
 const string[] SIZE_TO_STRING_UNITS = {"B", "KB", "MB", "GB", "TB"};
 
 string size_to_string(uint64 size, uint8 round_place = 2) {
-	if(size < 1) return "1" + SIZE_TO_STRING_UNITS[0];
-	for(int8 i = SIZE_TO_STRING_UNITS.length() - 1; i >= 0; i--) {
-		if(size >= pow(1024, i) or i == 0) {
+	if (size < 1) return "1" + SIZE_TO_STRING_UNITS[0];
+	for (int8 i = SIZE_TO_STRING_UNITS.length() - 1; i >= 0; i--) {
+		if (size >= pow(1024, i) or i == 0) {
 			double rsize = round(size / pow(1024, i), round_place);
 			return rsize + SIZE_TO_STRING_UNITS[i];
 		}
