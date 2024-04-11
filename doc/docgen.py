@@ -8,6 +8,7 @@ import mistune
 import os
 
 html_base = "<html>\n<head>\n<title>{title}</title>\n</head>\n<body>\n{body}\n</body>\n</html>\n"
+liquid_base = "---\nlayout: default.liquid\ntitle: {title}\n---\n\n{body}"
 hhc_base = "<li><object type=\"text/sitemap\"><param name=\"Name\" value=\"{name}\"></object></li>\n"
 hhk_base = "<li><object type=\"text/sitemap\"><param name=\"Name\" value=\"{name}\"><param name=\"Local\" value=\"{path}\"></object></li>\n"
 md_nav_link = "[{text}]({url})"
@@ -229,9 +230,17 @@ def output_html_section(md_path, title):
 	if md_path == "nvgt.md": md_path = "index.html"
 	elif md_path.startswith("nvgt_"): md_path = md_path[5:]
 	if md_path.endswith(".md"): md_path = md_path[:-3] + ".html"
+	html_body = mistune.html(md)
 	f = open(os.path.join("html", md_path), "w", encoding = "utf8")
-	f.write(html_base.format(title = title, body = mistune.html(md)))
+	f.write(html_base.format(title = title, body = html_body))
 	f.close()
+	# The NVGT website is built using cobalt (a tiny static site generator that uses liquid templates), and an html version of the docs are hosted on that website. We want this version of the docs to use the liquid layout that the static site uses, so we simply create very basic .liquid files in the nvgt repo's web directory, if that exists.
+	liquid_path = md_path[:-5] + ".liquid"
+	if os.path.isdir(os.path.join("..", "web", "docs")):
+		f = open(os.path.join("..", "web", "docs", liquid_path), "w", encoding = "utf8")
+		f.write(liquid_base.format(title = title, body = html_body))
+		f.close()
+
 
 def main():
 	"""NVGT Documentation Generator."""
@@ -240,6 +249,8 @@ def main():
 	if not os.path.exists("chm"): os.mkdir("chm")
 	if not os.path.exists("html"): os.mkdir("html")
 	if not os.path.exists("md"): os.mkdir("md")
+	if os.path.exists(os.path.join("..", "web")):
+		if not os.path.exists(os.path.join("..", "web", "docs")): os.mkdir(os.path.join("..", "web", "docs"))
 	txt_output = open("nvgt.txt", "w", encoding = "UTF8")
 	hhc_output = open("chm/nvgt.hhc", "w")
 	hhc_output.write("<html>\n<head>\n</head>\n<body>\n<ul>\n")
