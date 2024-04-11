@@ -6,7 +6,7 @@ permalink: /blog
 
 # {{ collections.posts.title }}
 {{ collections.posts.description }}
-<a href="{{ collections.posts.rss }}">RSS</a>
+<a href="/{{ collections.posts.rss }}">RSS</a>
 ## posts
 {% for post in collections.posts.pages %}
 ### [{{ post.title }}]({{ post.permalink }})
