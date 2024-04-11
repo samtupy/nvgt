@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+{% if page.published_date %}
+<title>{{ page.title }} &ndash; {{ collections.posts.title }}</title>
+{% else %}
+<title>{{ page.title }} &ndash; {{ site.title }}</title>
+{% endif %}
+<style>
+details summary
+{
+cursor: pointer;
+}
+details summary > *
+{
+display: inline;
+}
+</style>
+</head>
+<body>
+<a href="#content">Skip to content</a>
+<div id="navigation"><nav>
+{% include "nav.liquid" %}
+</div></nav>
+<main><div id="content">
+{{ page.content }}
+</div></main>
+<footer><div id="footer">
+{% include "footer.liquid" %}
+</div></footer>
+</body>
+</html>
