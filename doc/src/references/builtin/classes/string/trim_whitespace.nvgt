@@ -1,0 +1,19 @@
+/**
+	Trims any and all whitespace from the beginning and end of a string.
+	string string::trim_whitespace();
+	## Returns:
+		string: the specified string, with any trailing/leading whitespace removed.
+	## Remarks:
+		Any and all whitespace, including the tab character and new lines, will be removed.
+*/
+
+// Example:
+void main() {
+	string text = input_box("String", "Enter a string");
+	if (text.is_empty()) {
+		alert("Info", "You didn't enter a string.");
+		exit();
+	}
+	string result = text.trim_whitespace();
+	alert("Trimmed string", result);
+}

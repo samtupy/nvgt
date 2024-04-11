@@ -1,0 +1,22 @@
+/**
+	Determines if a string starts with another string.
+	bool string::starts_with(string str);
+	## Arguments:
+		* string str: the string to look for.
+	## Returns:
+		bool: true if the string starts with the specified search, false if not.
+*/
+
+// Example:
+void main() {
+	string prefix = "abc";
+	string text = input_box("Test", "Enter a string");
+	if (text.is_empty()) {
+		alert("Info", "Nothing was entered.");
+		exit();
+	}
+	if (text.starts_with(prefix))
+		alert("Info", "The entered string starts with " + prefix);
+	else
+		alert("Info", "The entered string does not start with " + prefix);
+}

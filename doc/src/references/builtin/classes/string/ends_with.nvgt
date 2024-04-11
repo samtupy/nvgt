@@ -1,0 +1,22 @@
+/**
+	Determines if a string ends with another string.
+	bool string::ends_with(string str);
+	## Arguments:
+		* string str: the string to look for.
+	## Returns:
+		bool: true if the string ends with the specified search, false if not.
+*/
+
+// Example:
+void main() {
+	string suffix = "test";
+	string text = input_box("Test", "Enter a string");
+	if (text.is_empty()) {
+		alert("Info", "Nothing was entered.");
+		exit();
+	}
+	if (text.ends_with(suffix))
+		alert("Info", "The entered string ends with " + suffix);
+	else
+		alert("Info", "The entered string does not end with " + suffix);
+}
