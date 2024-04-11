@@ -7,50 +7,50 @@
   The following is a convenient listing of third party material that this application may use, the full text for each license can be found below the lists.
 
   ### ZLib licensed code
-   * Angelscript - AngelCode Scripting Library
-   * Blastspeak - SAPI5 text to speech library for windows
-   * bullet3 - physics library
-   * Micropather - n-dimensional AStar pathfinding library
-   * SDL - Simple DirectMedia Layer
-   * TINYEXPR - Tiny recursive descent parser and evaluation engine in C
-   * zlib - general purpose compression library
+   * [Angelscript - AngelCode Scripting Library](#zlib_angelscript)
+   * [Blastspeak - SAPI5 text to speech library for windows](#zlib_blastspeak)
+   * [bullet3 - physics library](#zlib_bullet3)
+   * [Micropather - n-dimensional AStar pathfinding library](#zlib_micropather)
+   * [SDL - Simple DirectMedia Layer](#zlib_sdl)
+   * [TINYEXPR - Tiny recursive descent parser and evaluation engine in C](#zlib_tinyexpr)
+   * [zlib - general purpose compression library](#zlib_zlib)
 
   ### Code in the public domain
-   * blastlibs - number to words routine written by Philip Bennefall
-   * pdjson - Public Domain JSON Parser for C
-   * rnd.h - random number generators written by Mattias Gustavsson
-   * speech.h - single header RSynth derivative maintained by Mattias Gustavsson
-   * SQLite - database engine
-   * tiny-AES-c
+   * [blastlibs - number to words routine written by Philip Bennefall](#PD_blastlibs)
+   * [pdjson - Public Domain JSON Parser for C](#PD_pdjson)
+   * [rnd.h - random number generators written by Mattias Gustavsson](#PD_rnd)
+   * [speech.h - single header RSynth derivative maintained by Mattias Gustavsson](#PD_rsynth)
+   * [SQLite - database engine](#PD_sqlite)
+   * [tiny-AES-c](#PD_TinyAES)
 
   ### Code released under the boost software license version 1.0
-   * POCO - Portable Components for c++
+   * [POCO - Portable Components for c++](#BSL_poco)
 
   ### Code released under an Apache 2.0 or similar license
-   * Steam Audio
+   * [Steam Audio](#apache_phonon)
 
   ### GNU (lesser/library/linking exception) general public licensed code (lgpl)
-   * NVDA controler client
-   * Tolk - screen reader library for windows
+   * [NVDA controler client](#LGPL_NVDA)
+   * [Tolk - screen reader library for windows](#LGPL_tolk)
 
   ### MIT licensed code
-   * cmp - msgpack serialization library
-   * enet library
-   * Hammerspoon's input box dialog extension for MacOS
-   * Ratas - hierarchical timer wheel
-   * unordered_dense - fast unordered map and sets for c++
-   * Zodiac's angelscript print function
+   * [cmp - msgpack serialization library](#MIT_cmp)
+   * [enet library](#MIT_enet)
+   * [Hammerspoon's input box dialog extension for MacOS](#MIT_hammerspoon)
+   * [Ratas - hierarchical timer wheel](#MIT_ratas)
+   * [unordered_dense - fast unordered map and sets for c++](#MIT_unordered_dense)
+   * [Zodiac's angelscript print function](#MIT_zodiac)
 
   ### BSD 2 or 3 clause licensed code
-   * Code from the FreeBSD Project
-   * double-conversion
-   * libopus - opus audio codec
-   * PCRE - Perl Compatible Regular Expressions
-   * wepoll - epoll support for Windows
+   * [Code from the FreeBSD Project](#BSD_bsd)
+   * [double-conversion](#BSD_double_conversion)
+   * [libopus - opus audio codec](#BSD_opus)
+   * [PCRE - Perl Compatible Regular Expressions](#BSD_PCRE)
+   * [wepoll - epoll support for Windows](#BSD_wepoll)
 
  ## ZLib licensed code
 
-  ### Angelscript - AngelCode Scripting Library
+  ### <a id="zlib_angelscript">Angelscript - AngelCode Scripting Library</a>
    Copyright (c) 2003-2023 Andreas Jonsson
 
    This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
@@ -69,7 +69,7 @@
    Andreas Jonsson
    andreas@angelcode.com
    
-  ### Blastspeak - SAPI5 text to speech library for windows
+  ### <a id="zlib_blastspeak">Blastspeak - SAPI5 text to speech library for windows</a>
    Copyright (c) 2019-2020 Philip Bennefall
 
    This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
@@ -82,7 +82,7 @@
 
    3. This notice may not be removed or altered from any source distribution.
    
-  ### bullet3 - physics library
+  ### <a id="zlib_bullet3">bullet3 - physics library</a>
    
    Copyright (c) 2003-2013 Gino van den Bergen / Erwin Coumans  http://bulletphysics.org
 
@@ -96,7 +96,7 @@
 
    3. This notice may not be removed or altered from any source distribution.
    
-  ### Micropather - n-dimensional AStar pathfinding library
+  ### <a id="zlib_micropather">Micropather - n-dimensional AStar pathfinding library</a>
    Copyright (c) 2000-2013 Lee Thomason (www.grinninglizard.com)
 
    This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
@@ -109,7 +109,7 @@
 
    3. This notice may not be removed or altered from any source distribution.
    
-  ### SDL - Simple DirectMedia Layer
+  ### <a id="zlib_sdl">SDL - Simple DirectMedia Layer</a>
    Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
    This software is provided 'as-is', without any express or implied warranty.  In no event will the authors be held liable for any damages arising from the use of this software.
@@ -122,7 +122,7 @@
 
    3. This notice may not be removed or altered from any source distribution.
    
-  ### TINYEXPR - Tiny recursive descent parser and evaluation engine in C
+  ### <a id="zlib_tinyexpr">TINYEXPR - Tiny recursive descent parser and evaluation engine in C</a>
    Copyright (c) 2015-2020 Lewis Van Winkle
 
    http://CodePlea.com
@@ -137,7 +137,7 @@
 
    3. This notice may not be removed or altered from any source distribution.
    
-  ### zlib - general purpose compression library
+  ### <a id="zlib_zlib">zlib - general purpose compression library</a>
    
    Copyright (C) 1995-2017 Jean-loup Gailly and Mark Adler
 
@@ -156,7 +156,7 @@
    
  ## Code in the public domain
 
-  ### blastlibs - number to words routine written by Philip Bennefall
+  ### <a id="PD_blastlibs">blastlibs - number to words routine written by Philip Bennefall</a>
    
    This is free and unencumbered software released into the public domain.
 
@@ -166,7 +166,7 @@
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    
-  ### pdjson - Public Domain JSON Parser for C
+  ### <a id="PD_pdjson">pdjson - Public Domain JSON Parser for C</a>
    
    This is free and unencumbered software released into the public domain.
 
@@ -176,7 +176,7 @@
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    
-  ### rnd.h - random number generators written by Mattias Gustavsson
+  ### <a id="PD_rnd">rnd.h - random number generators written by Mattias Gustavsson</a>
    
    This is free and unencumbered software released into the public domain.
 
@@ -186,7 +186,7 @@
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    
-  ### speech.h - single header RSynth derivative maintained by Mattias Gustavsson
+  ### <a id="PD_rsynth">speech.h - single header RSynth derivative maintained by Mattias Gustavsson</a>
    
    This is free and unencumbered software released into the public domain.
 
@@ -196,7 +196,7 @@
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    
-  ### SQLite - database engine
+  ### <a id="PD_sqlite">SQLite - database engine</a>
    
    The author disclaims copyright to this source code.  In place of a legal notice, here is a blessing:
 
@@ -204,7 +204,7 @@
    *   May you find forgiveness for yourself and forgive others.
    *   May you share freely, never taking more than you give.
    
-  ### tiny-AES-c
+  ### <a id="PD_TinyAES">tiny-AES-c</a>
    
    This is free and unencumbered software released into the public domain.
 
@@ -233,7 +233,7 @@
    
  ## Code released under the boost software license version 1.0
 
-  ### POCO - Portable Components for c++
+  ### <a id="BSL_poco">POCO - Portable Components for c++</a>
    Copyright (c) 2023, Applied Informatics Software Engineering GmbH.
 
    and Contributors.
@@ -246,7 +246,7 @@
    
  ## Code released under an Apache 2.0 or similar license
 
-  ### Steam Audio
+  ### <a id="apache_phonon">Steam Audio</a>
    Copyright 2017-2023 Valve Corporation.
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -263,7 +263,7 @@
    
  ## GNU (lesser/library/linking exception) general public licensed code (lgpl)
 
-  ### NVDA controler client
+  ### <a id="LGPL_NVDA">NVDA controler client</a>
    GNU Lesser General Public License
    =================================
 
@@ -759,7 +759,7 @@
 
    That's all there is to it!
    
-  ### Tolk - screen reader library for windows
+  ### <a id="LGPL_tolk">Tolk - screen reader library for windows</a>
    GNU Lesser General Public License
    =================================
 
@@ -926,7 +926,7 @@
    
  ## MIT licensed code
 
-  ### cmp - msgpack serialization library
+  ### <a id="MIT_cmp">cmp - msgpack serialization library</a>
    
    Copyright (c) 2020 Charles Gunyon
 
@@ -936,7 +936,7 @@
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    
-  ### enet library
+  ### <a id="MIT_enet">enet library</a>
    
    Copyright (c) 2002-2020 Lee Salzman
 
@@ -946,7 +946,7 @@
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    
-  ### Hammerspoon's input box dialog extension for MacOS
+  ### <a id="MIT_hammerspoon">Hammerspoon's input box dialog extension for MacOS</a>
    
    Copyright (c) 2017 Chris Hocking
 
@@ -956,7 +956,7 @@
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    
-  ### Ratas - hierarchical timer wheel
+  ### <a id="MIT_ratas">Ratas - hierarchical timer wheel</a>
    
    Copyright (c) 2016 Juho Snellman
 
@@ -966,7 +966,7 @@
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    
-  ### unordered_dense - fast unordered map and sets for c++
+  ### <a id="MIT_unordered_dense">unordered_dense - fast unordered map and sets for c++</a>
    
    Copyright (c) 2022-2023 Martin Leitner-Ankerl <martin.ankerl@gmail.com>
 
@@ -976,7 +976,7 @@
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    
-  ### Zodiac's angelscript print function
+  ### <a id="MIT_zodiac">Zodiac's angelscript print function</a>
    Copyright (c) 2021 SpehleonLP
 
    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -987,7 +987,7 @@
    
  ## BSD 2 or 3 clause licensed code
 
-  ### Code from the FreeBSD Project
+  ### <a id="BSD_bsd">Code from the FreeBSD Project</a>
    
    Copyright (c) 1983, 1993
    The Regents of the University of California.  All rights reserved.
@@ -1000,7 +1000,7 @@
 
    THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    
-  ### double-conversion
+  ### <a id="BSD_double_conversion">double-conversion</a>
    Copyright 2010 the V8 project authors. All rights reserved.
 
    Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
@@ -1013,7 +1013,7 @@
 
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    
-  ### libopus - opus audio codec
+  ### <a id="BSD_opus">libopus - opus audio codec</a>
    
    Copyright (c) 2010-2011 Xiph.Org Foundation, Skype Limited
       Written by Jean-Marc Valin and Koen Vos
@@ -1026,7 +1026,7 @@
 
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    
-  ### PCRE - Perl Compatible Regular Expressions
+  ### <a id="BSD_PCRE">PCRE - Perl Compatible Regular Expressions</a>
    
    Copyright (c) 1997-2014 University of Cambridge
    All rights reserved.
@@ -1046,7 +1046,7 @@
 
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    
-  ### wepoll - epoll support for Windows
+  ### <a id="BSD_wepoll">wepoll - epoll support for Windows</a>
    Copyright 2012-2020, Bert Belder <bertbelder@gmail.com>
 
    All rights reserved.

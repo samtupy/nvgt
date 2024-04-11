@@ -18,5 +18,8 @@ user/**
 windev
 
 # Tests
-tests/**
-!tests/*.nvgt
+test/**
+!test/*.nvgt
+
+# website builds
+web/_site

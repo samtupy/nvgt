@@ -29,8 +29,8 @@ for ltype in list(license_types):
 		f2 = open(fn, "r", encoding="UTF8")
 		ltext = f2.read().partition("\n")
 		f2.close()
-		summary += f"   * {ltext[0]}\n"
-		body += f"  ### {ltext[0]}\n   " + ltext[2].replace('\n##', '\n###').replace('\n', '\n   ').replace('\n   \n', '\n\n') + "\n"
+		summary += f"   * [{ltext[0]}](#{ltype}_{os.path.split(fn)[1][:-4]})\n"
+		body += f"  ### <a id=\"{ltype}_{os.path.split(fn)[1][:-4]}\">{ltext[0]}</a>\n   " + ltext[2].replace('\n##', '\n###').replace('\n', '\n   ').replace('\n   \n', '\n\n') + "\n"
 	summary += "\n"
 f.write(summary)
 f.write(body)
