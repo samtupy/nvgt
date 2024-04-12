@@ -26,6 +26,7 @@
 #include <bass_fx.h>
 #include <bassmix.h>
 #include <obfuscate.h>
+#include <Poco/UnicodeConverter.h>
 #include <phonon.h>
 #include "window.h" // wait
 #include "misc_functions.h" // range_convert
@@ -910,9 +911,16 @@ BOOL sound::load(const string& filename, pack* containing_pack, BOOL allow_prelo
 	}
 	if (!channel) {
 		pack_stream* stream = NULL;
-		if (!containing_pack || !containing_pack->is_active() || (stream = containing_pack->stream_open(filename, 0)) == NULL)
+		if (!containing_pack || !containing_pack->is_active() || (stream = containing_pack->stream_open(filename, 0)) == NULL) {
+			#ifdef WIN32
+			// aww I guess bass decided to contribute to the pain of the no UTF8 paths on windows rather than helping developers work around it like everyone else seems to do, so manually convert the UTF8 sound path to UTF16 here. Ugh ugh!
+			std::wstring filename_u;
+			Poco::UnicodeConverter::convert(filename, filename_u);
+			channel = BASS_StreamCreateFile(FALSE, filename_u.c_str(), 0, 0, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT | BASS_UNICODE);
+			#else
 			channel = BASS_StreamCreateFile(FALSE, filename.c_str(), 0, 0, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT);
-		else {
+			#endif
+		} else {
 			script_loading = TRUE;
 			BASS_FILEPROCS prox;
 			prox.close = bass_closeproc_pack;

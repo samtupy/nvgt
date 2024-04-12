@@ -1,6 +1,12 @@
 # Changelog
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
+## New as of 04/12/2024:
+* UTF8 fixes: sound.load, and compiled applications can now execute if they contain non-english characters in their filenames.
+* All code that I wish to share has been forked into what will hopefully be nvgt's long-standing repository which will eventually have it's privacy status switched to public!
+* NVGT now has a build system! I know it's not the fastest one around, but needing a  middleground between learning even more new things and using what I already know, I chose SCons purely because of the fermiliar pythonic environment and not needing to learn yet another new set of syntax rules. I'm just glad we're no longer building the engine using a series of shell scripts!
+* Added basic steam audio reverb integration! It needs a lot of work and is far from being production ready (seriously this could slow your game to a crawl until I'm done with this), but nevertheless it is still around for testing!
+
 ## New leading up to 02/20/2024:
 * NVGT now finally has a documentation structure!
 * Unifying the file object into stream classes.
