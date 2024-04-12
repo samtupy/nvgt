@@ -1,0 +1,19 @@
+/**
+	Reverses the raw bytes contained within a string.
+	string string::reverse_bytes();
+	## Returns:
+		string: A copy of the string with it's bytes reversed.
+	## Remarks:
+		If you want to reverse the characters within a string given an encoding such as UTF8, use the reverse method instead.
+*/
+
+// Example:
+void main() {
+	string raw = hex_to_string("1a2b3c4d");
+	raw = raw.reverse_bytes();
+	alert("reverse_bytes", string_to_hex(raw)); // Should show 4D3C2B1A.
+	// Lets make it clear how this function differs from string::reverse. We'll make a string of emojis and show the results of both methods.
+	string emojis = "🦟🦗🐜🐝🐞🦂🕷";
+	alert("emojis reversed propertly", emojis.reverse()); // string::reverse takes the UTF8 encoding into account.
+	alert("broken emojis", emojis.reverse_bytes()); // This string no longer contains valid character sequences, and so the emoticons will most certainly not show correctly. Aww you can see if you runn this example that it seems even string::reverse_bytes() can't quite get rid of mosquitos though... 😀
+}
