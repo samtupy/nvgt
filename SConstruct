@@ -18,7 +18,7 @@ else:
 	env.Append(LIBS = ["angelscript", "m", "iconv"])
 if env["PLATFORM"] == "darwin":
 	# homebrew paths, as well as paths for a folder called macosdev containing headers and pre-built libraries like bass and steam audio.
-	env.Append(CPPPATH = ["/opt/homebrew/include", "/opt/homebrew/include/bullet", "#macosdev/include"], LIBPATH = ["/opt/homebrew/lib", "#macosdev/lib"])
+	env.Append(CPPPATH = ["/opt/homebrew/include", "/opt/homebrew/include/bullet", "#macosdev/include"], CCFLAGS = ["-mmacosx-version-min=14.0"], LIBPATH = ["/opt/homebrew/lib", "#macosdev/lib"])
 env.Append(CPPDEFINES = ["POCO_STATIC"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#lib"])
 VariantDir("build/obj_src", "src", duplicate = 0)
@@ -47,7 +47,7 @@ elif env["PLATFORM"] == "darwin":
 	env["FRAMEWORKPREFIX"] = "-weak_framework"
 	env.Append(FRAMEWORKS = ["CoreAudio",  "CoreFoundation", "CoreHaptics", "CoreVideo", "AudioToolbox", "AppKit", "IOKit", "Carbon", "Cocoa", "ForceFeedback", "GameController", "QuartzCore"])
 	env.Append(LIBS = ["objc"])
-	env.Append(LINKFLAGS = ["-Wl,-rpath,'.'"])
+	env.Append(LINKFLAGS = ["-Wl,-rpath,'.'", "-mmacosx-version-min=14.0"])
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
 		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
