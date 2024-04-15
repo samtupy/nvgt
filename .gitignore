@@ -5,6 +5,10 @@
 *.obj
 *.pdb
 *.lib
+*.a
+*.o
+*.os
+*.dylib
 __pycache__
 
 # other intermediet build
@@ -15,6 +19,7 @@ build/windev_path
 # private user space and dependencies
 user/**
 !user/readme.md
+macosdev
 windev
 
 # Tests

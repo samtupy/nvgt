@@ -1,6 +1,6 @@
 Import("env")
 
-scriptarray = env.Object("scriptarray", "#plugin/ASAddon/scriptarray.cpp")
+scriptarray = env.SharedObject("scriptarray", "#plugin/ASAddon/scriptarray.cpp")
 if ARGUMENTS.get("no_shared_plugins", "0") == "0":
 	env.SharedLibrary("#release/lib/git2nvgt", ["git.cpp", scriptarray], LIBS = ["git2"])
 static = env.Object("git_static", "git.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "git2nvgt")])

@@ -14,8 +14,11 @@ if env["PLATFORM"] == "win32":
 	env.Append(LIBS = ["tolk", "angelscript64"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
 else:
-	env.Append(CCFLAGS = ["-std=c++20"])
-	env.Append(LIBS = ["angelscript"])
+	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-O2"])
+	env.Append(LIBS = ["angelscript", "m", "iconv"])
+if env["PLATFORM"] == "darwin":
+	# homebrew paths, as well as paths for a folder called macosdev containing headers and pre-built libraries like bass and steam audio.
+	env.Append(CPPPATH = ["/opt/homebrew/include", "/opt/homebrew/include/bullet", "#macosdev/include"], LIBPATH = ["/opt/homebrew/lib", "#macosdev/lib"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["ASAddon", "dep", "lib"])
 env["CPPDEFINES"] = ["POCO_STATIC"]
 VariantDir("build/obj_src", "src", duplicate = 0)
@@ -34,10 +37,17 @@ for s in Glob("plugin/*/_SConscript"):
 env.Append(LIBS = static_plugins)
 
 # nvgt itself
-env.Append(LIBS = ["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "enet", "opus", "phonon", "bass", "bass_fx", "bassmix", "git2", "SDL2", "SDL2main"])
+sources = Glob("build/obj_src/*.cpp")
+env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoFoundation", "PocoJSON", "PocoNet", "PocoZip"], "enet", "opus", "phonon", "bass", "bass_fx", "bassmix", "SDL2", "SDL2main"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB", "/SUBSYSTEM:WINDOWS", "/LTCG", "/OPT:REF", "/OPT:ICF", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll", "/delayload:Tolk.dll"])
+elif env["PLATFORM"] == "darwin":
+	sources.append("build/obj_src/macos.mm")
+	env["FRAMEWORKPREFIX"] = "-weak_framework"
+	env.Append(FRAMEWORKS = ["CoreAudio",  "CoreFoundation", "CoreHaptics", "CoreVideo", "AudioToolbox", "AppKit", "IOKit", "Carbon", "Cocoa", "ForceFeedback", "GameController", "QuartzCore"])
+	env.Append(LIBS = ["objc"])
+	env.Append(LINKFLAGS = ["-Wl,-rpath,'.'"])
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
 		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
@@ -45,7 +55,7 @@ if ARGUMENTS.get("no_user", "0") == "0":
 		SConscript("user/_SConscript", exports = {"plugin_env": plugin_env, "nvgt_env": env})
 SConscript("ASAddon/_SConscript", variant_dir = "build/obj_ASAddon", duplicate = 0, exports = "env")
 SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, exports = "env")
-env.Program("release/nvgt", Glob("build/obj_src/*.cpp"))
+env.Program("release/nvgt", sources)
 
 # stubs
 if ARGUMENTS.get("no_stubs", "0") == "0":
@@ -56,7 +66,10 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	VariantDir("build/obj_stub", "src", duplicate = 0)
 	stub_env = env.Clone(CPPDEFINES = list(env["CPPDEFINES"]) + ["NVGT_STUB"], PROGSUFFIX = ".bin")
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
+	# Todo: Can we make this use one list of sources E. the sources variable above? This scons issue where one must provide the variant_dir when specifying sources is why we are not right now.
 	stub_objects = stub_env.Object(Glob("build/obj_stub/*.cpp"))
+	if env["PLATFORM"] == "darwin":
+		stub_objects.append(stub_env.Object("build/obj_stub/macos.mm"))
 	stub_env.Program(f"release/nvgt_{stub_platform}", stub_objects)
 	# on windows, we should have a version of the Angelscript library without the compiler, allowing for slightly smaller executables.
 	if env["PLATFORM"] == "win32":

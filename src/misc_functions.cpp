@@ -35,7 +35,7 @@
 #include <sstream>
 #include <angelscript.h>
 #include <scriptarray.h>
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include <tinyexpr.h>
 #include <dbgtools.h>
 #include "nvgt.h"

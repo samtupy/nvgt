@@ -241,7 +241,7 @@ void phonon_dsp(void* buffer, DWORD length, float x, float y, float z, sound& s)
 		reflect_params.irSize = 88200;
 		iplReflectionEffectApply(s.reflection_effect, &reflect_params, &mono_inbuffer, &reflections_outbuffer, NULL);
 		// spacialize reflections
-		// IPLCoordinateSpace3{IPLVector3(1, 0, 0), IPLVector3(0, 0, 1), IPLVector3(0, 1, 0), IPLVector3(s.x, s.y, s.z)}
+		// IPLCoordinateSpace3{IPLVector3{1, 0, 0}, IPLVector3{0, 0, 1}, IPLVector3{0, 1, 0}, IPLVector3{s.x, s.y, s.z}}
 		IPLAmbisonicsDecodeEffectParams dec_params{1, phonon_hrtf_reflections, s.env->sim_inputs.listener, IPL_TRUE};
 		iplAmbisonicsDecodeEffectApply(s.reflection_decode_effect, &dec_params, &reflections_outbuffer, &reflections_downmix_buffer);
 		iplAudioBufferMix(phonon_context, &reflections_downmix_buffer, &outbuffer);
@@ -769,7 +769,7 @@ bool sound_environment::attach(sound_base* s) {
 	inputs.directFlags = IPLDirectSimulationFlags(IPL_DIRECTSIMULATIONFLAGS_DISTANCEATTENUATION | IPL_DIRECTSIMULATIONFLAGS_AIRABSORPTION | IPL_DIRECTSIMULATIONFLAGS_OCCLUSION | IPL_DIRECTSIMULATIONFLAGS_TRANSMISSION);
 	inputs.distanceAttenuationModel = IPLDistanceAttenuationModel{IPL_DISTANCEATTENUATIONTYPE_DEFAULT};
 	inputs.airAbsorptionModel = IPLAirAbsorptionModel{IPL_AIRABSORPTIONTYPE_DEFAULT};
-	inputs.source = IPLCoordinateSpace3{IPLVector3(1, 0, 0), IPLVector3(0, 0, 1), IPLVector3(0, 1, 0), IPLVector3(s->x, s->y, s->z)};
+	inputs.source = IPLCoordinateSpace3{IPLVector3{1, 0, 0}, IPLVector3{0, 0, 1}, IPLVector3{0, 1, 0}, IPLVector3{s->x, s->y, s->z}};
 	inputs.occlusionType = IPL_OCCLUSIONTYPE_RAYCAST;
 	iplSourceSetInputs(s->source, IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS), &inputs);
 	iplSourceAdd(s->source, sim);
@@ -815,10 +815,10 @@ void sound_environment::update() {
 		scene_needs_commit = false;
 	}
 	if (listener_modified) {
-		sim_inputs.listener.right = IPLVector3(1, 0, 0);
-		sim_inputs.listener.up = IPLVector3(0, 0, 1);
-		sim_inputs.listener.ahead = IPLVector3(sin(listener_rotation), cos(listener_rotation), 0);
-		sim_inputs.listener.origin = IPLVector3(listener_x, listener_y, listener_z);
+		sim_inputs.listener.right = IPLVector3{1, 0, 0};
+		sim_inputs.listener.up = IPLVector3{0, 0, 1};
+		sim_inputs.listener.ahead = IPLVector3{sin(listener_rotation), cos(listener_rotation), 0};
+		sim_inputs.listener.origin = IPLVector3{listener_x, listener_y, listener_z};
 		iplSimulatorSetSharedInputs(sim, IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS), &sim_inputs);
 		listener_modified = false;
 	}
@@ -826,10 +826,10 @@ void sound_environment::update() {
 	iplSimulatorRunReflections(sim);
 }
 void sound_environment::set_listener(float x, float y, float z, float rotation) {
-	sim_inputs.listener.right = IPLVector3(1, 0, 0);
-	sim_inputs.listener.up = IPLVector3(0, 0, 1);
-	sim_inputs.listener.ahead = IPLVector3(sin(rotation), cos(rotation), 0);
-	sim_inputs.listener.origin = IPLVector3(x, y, z);
+	sim_inputs.listener.right = IPLVector3{1, 0, 0};
+	sim_inputs.listener.up = IPLVector3{0, 0, 1};
+	sim_inputs.listener.ahead = IPLVector3{sin(rotation), cos(rotation), 0};
+	sim_inputs.listener.origin = IPLVector3{x, y, z};
 	iplSimulatorSetSharedInputs(sim, IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS), &sim_inputs);
 }
 
@@ -1213,7 +1213,7 @@ BOOL sound_base::set_position(float listener_x, float listener_y, float listener
 		inputs.directFlags = IPLDirectSimulationFlags(IPL_DIRECTSIMULATIONFLAGS_DISTANCEATTENUATION | IPL_DIRECTSIMULATIONFLAGS_AIRABSORPTION | IPL_DIRECTSIMULATIONFLAGS_OCCLUSION | IPL_DIRECTSIMULATIONFLAGS_TRANSMISSION);
 		inputs.distanceAttenuationModel = IPLDistanceAttenuationModel{IPL_DISTANCEATTENUATIONTYPE_DEFAULT};
 		inputs.airAbsorptionModel = IPLAirAbsorptionModel{IPL_AIRABSORPTIONTYPE_DEFAULT};
-		inputs.source = IPLCoordinateSpace3{IPLVector3(1, 0, 0), IPLVector3(0, 0, 1), IPLVector3(0, 1, 0), IPLVector3(sound_x, sound_y, sound_z)};
+		inputs.source = IPLCoordinateSpace3{IPLVector3{1, 0, 0}, IPLVector3{0, 0, 1}, IPLVector3{0, 1, 0}, IPLVector3{sound_x, sound_y, sound_z}};
 		inputs.occlusionType = IPL_OCCLUSIONTYPE_RAYCAST;
 		iplSourceSetInputs(source, IPL_SIMULATIONFLAGS_DIRECT, &inputs);
 		iplSourceSetInputs(source, IPL_SIMULATIONFLAGS_REFLECTIONS, &inputs);

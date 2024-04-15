@@ -14,7 +14,7 @@
 #include <string>
 #include <unordered_map>
 #include <Poco/Format.h>
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include "misc_functions.h"
 #include "nvgt.h"
 #include "nvgt_plugin.h"

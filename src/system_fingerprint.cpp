@@ -19,7 +19,7 @@
 	#include <intrin.h>
 	#include <iphlpapi.h>
 #endif
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 unsigned short hashMacAddress(PIP_ADAPTER_INFO info) {
 	unsigned short hash = 0;

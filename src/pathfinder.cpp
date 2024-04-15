@@ -156,7 +156,8 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	for (int i = 0; i < path.size(); i++) {
 		int x, y, z;
 		decode_state(path[i], &x, &y, &z);
-		Vector3 v(x, y, z);
+		Vector3 v;
+		v.setValue(x, y, z);
 		array->InsertLast(&v);
 	}
 	return array;

@@ -21,7 +21,7 @@
 #define NVGT_LOAD_STATIC_PLUGINS
 #include <Poco/Environment.h>
 #include <Poco/Path.h>
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include <angelscript.h> // the library
 #include "angelscript.h" // nvgt's angelscript implementation
 #include "input.h"

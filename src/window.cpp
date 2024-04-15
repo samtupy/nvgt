@@ -24,8 +24,8 @@
 	#include <shellapi.h>
 	_COM_SMARTPTR_TYPEDEF(ITaskbarList3, __uuidof(ITaskbarList3));
 #endif
-#include <SDL.h>
-#include <SDL_syswm.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_syswm.h>
 #include <thread.h>
 #include <string>
 #include <vector>
@@ -41,7 +41,7 @@ SDL_Window* g_WindowHandle = 0;
 #ifdef _WIN32
 	HWND g_OSWindowHandle = NULL;
 #elif defined(__APPLE__)
-	#include "macos.h"
+	#include "apple.h"
 	NSWindow* g_OSWindowHandle = NULL;
 #else
 	void* g_OSWindowHandle = NULL;

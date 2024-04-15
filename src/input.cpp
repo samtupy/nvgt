@@ -16,7 +16,7 @@
 #else
 	#include <cstring>
 #endif
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include <angelscript.h>
 #include <scriptarray.h>
 #include <obfuscate.h>

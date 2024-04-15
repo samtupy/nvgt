@@ -23,7 +23,7 @@
 #include <Poco/Glob.h>
 #include <Poco/Path.h>
 #include <Poco/zlib.h>
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include "bullet3.h"
 #include "compression.h"
 #include "crypto.h"

@@ -14,7 +14,7 @@
 #include <obfuscate.h>
 #include <scriptarray.h>
 #include <scriptdictionary.h>
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include "library.h"
 #include "nvgt.h" // g_ScriptEngine, NVGT_SUBSYSTEM_DLLCALL
 #include "serialize.h" // g_StringTypeid.

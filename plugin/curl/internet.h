@@ -14,7 +14,7 @@
 #include <string>
 #include <map>
 #include <vector>
-#include <curl.h>
+#include <curl/curl.h>
 #include "../../src/nvgt_plugin.h"
 
 class internet_request {
