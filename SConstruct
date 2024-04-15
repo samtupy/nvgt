@@ -7,11 +7,9 @@ import os, multiprocessing
 
 # setup
 env = Environment()
-VariantDir("build/obj_src", "src", duplicate = 0)
 env.SetOption("num_jobs", multiprocessing.cpu_count())
 if env["PLATFORM"] == "win32":
-	from build import windev
-	windev.set_windev_paths(env)
+	SConscript("build/windev_sconscript", exports = ["env"])
 	env.Append(CCFLAGS = ["/EHsc", "/J", "/std:c++20", "/GF", "/Zc:inline", "/O2"])
 	env.Append(LIBS = ["tolk", "angelscript64"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
@@ -20,6 +18,7 @@ else:
 	env.Append(LIBS = ["angelscript"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["ASAddon", "dep", "lib"])
 env["CPPDEFINES"] = ["POCO_STATIC"]
+VariantDir("build/obj_src", "src", duplicate = 0)
 
 # plugins
 plugin_env = env.Clone()
