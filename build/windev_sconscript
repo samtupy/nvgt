@@ -3,7 +3,7 @@ import os
 
 def set_windev_paths(env, windev_path = "windev"):
 	found = False
-	if not os.path.isdir(windev_path):
+	if not os.path.isdir("../" + windev_path):
 		try: windev_path = open("windev_path").read()
 		except: return
 	else:
