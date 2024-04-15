@@ -2,8 +2,8 @@
 // Copyright (C) 2022-2024 Sam Tupy
 // license: zlib (see license.md in the root of the nvgt distrobution)
 
-#pragma platform linux
-#pragma stub c
+#pragma platform mac
+#pragma plugin nvgt_curl
 #include "form.nvgt"
 #include "simple_speak.nvgt"
 void main() {

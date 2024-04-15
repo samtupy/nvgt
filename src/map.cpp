@@ -23,6 +23,7 @@
 static asIScriptContext* fcallback_ctx = NULL;
 
 // At least some versions of bullet3 apparently don't have an init constructor for vectors that takes coordinate arguments.
+// Update: It turns out that clang with c++20 is more strict about using braces to construct a structure of values, I learned that after doing the following which now should be undone when possible.
 inline Vector3 VECTOR3(float x, float y, float z) {
 	Vector3 v;
 	v.setValue(x, y, z);

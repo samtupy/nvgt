@@ -348,16 +348,8 @@ int ConfigureEngine(asIScriptEngine* engine) {
 }
 #ifndef NVGT_STUB
 int CompileScript(asIScriptEngine* engine, const char* scriptFile) {
-	char global_include[MAX_PATH];
-	memset(global_include, 0, MAX_PATH);
-	const char* fn = GetExecutableFilename();
-	const char* dir = strrchr(fn, '\\');
-	if (dir == NULL) dir = strrchr(fn, '/');
-	if (dir) {
-		strncpy(global_include, fn, dir - fn);
-		strcat(global_include, "\\include\\");
-		g_IncludeDirs.push_back(global_include);
-	}
+	Poco::Path global_include(Poco::Path(Poco::Path::self()).parent().append("include"));
+	g_IncludeDirs.push_back(global_include.toString());
 	CScriptBuilder builder;
 	builder.SetIncludeCallback(IncludeCallback, 0);
 	builder.SetPragmaCallback(PragmaCallback, 0);

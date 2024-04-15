@@ -28,7 +28,16 @@ bool load_nvgt_plugin(const std::string& name, void* user) {
 	if (static_plugins && static_plugins->find(name) != static_plugins->end())
 		entry = (nvgt_plugin_entry*)(*static_plugins)[name];
 	else {
-		obj = SDL_LoadObject(name.c_str());
+		std::string dllname = name;
+		#ifdef _WIN32
+			dllname += ".dll";
+		#elif defined(__APPLE__)
+			dllname += ".dylib";
+		#else
+			dllname += ".so";
+		#endif
+		obj = SDL_LoadObject(dllname.c_str());
+		if(!obj) obj = SDL_LoadObject(Poco::format("lib%s", dllname).c_str());
 		if (!obj) return false;
 		entry = (nvgt_plugin_entry*)SDL_LoadFunction(obj, "nvgt_plugin");
 	}

@@ -2,6 +2,7 @@
 // Copyright (C) 2022-2024 Sam Tupy
 // license: zlib (see license.md in the root of the nvgt distrobution)
 
+#include "instance.nvgt"
 instance i("testapp");
 void main() {
 	show_window("test");

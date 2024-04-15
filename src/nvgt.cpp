@@ -149,10 +149,14 @@ int main(int argc, char** argv) {
 	fread(&size, 4, 1, f);
 	size ^= NVGT_BYTECODE_NUMBER_XOR;
 	#else
+	int stsize;
 	fseek(f, -4, SEEK_END);
+	fread(&stsize, 4, 1, f);
+	fseek(f, stsize, SEEK_SET);
+	if (!load_serialized_nvgt_plugins(f))
+		return 1;
 	fread(&size, 4, 1, f);
 	size ^= NVGT_BYTECODE_NUMBER_XOR;
-	fseek(f, -(size + 4), SEEK_END);
 	#endif
 	unsigned char* code = (unsigned char*)malloc(size);
 	fread(code, sizeof(char), size, f);
@@ -257,11 +261,10 @@ int main(int argc, char** argv) {
 			return 1;
 		}
 		int wsize = bcsize ^ NVGT_BYTECODE_NUMBER_XOR;
-		if (g_platform == "windows")
-			fwrite(&wsize, 1, 4, f);
+		fwrite(&wsize, 1, 4, f);
 		fwrite(code, 1, bcsize, f);
 		if (g_platform == "linux" || g_platform == "mac")
-			fwrite(&wsize, 1, 4, f);
+			fwrite(&size, 1, 4, f);
 		fclose(f);
 		snprintf(msg, 1024, "%s build succeeded in %lldms, saved to %s", (g_debug ? "Debug" : "Release"), (long long int)(ticks() - timer), final_scriptname);
 		message(msg, "Success!");
