@@ -19,8 +19,8 @@ else:
 if env["PLATFORM"] == "darwin":
 	# homebrew paths, as well as paths for a folder called macosdev containing headers and pre-built libraries like bass and steam audio.
 	env.Append(CPPPATH = ["/opt/homebrew/include", "/opt/homebrew/include/bullet", "#macosdev/include"], LIBPATH = ["/opt/homebrew/lib", "#macosdev/lib"])
-env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["ASAddon", "dep", "lib"])
-env["CPPDEFINES"] = ["POCO_STATIC"]
+env.Append(CPPDEFINES = ["POCO_STATIC"])
+env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#lib"])
 VariantDir("build/obj_src", "src", duplicate = 0)
 
 # plugins
@@ -38,7 +38,7 @@ env.Append(LIBS = static_plugins)
 
 # nvgt itself
 sources = Glob("build/obj_src/*.cpp")
-env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoFoundation", "PocoJSON", "PocoNet", "PocoZip"], "enet", "opus", "phonon", "bass", "bass_fx", "bassmix", "SDL2", "SDL2main"])
+env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoFoundation", "PocoJSON", "PocoNet", "PocoZip"], "enet", "phonon", "bass", "bass_fx", "bassmix", "SDL2", "SDL2main"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB", "/SUBSYSTEM:WINDOWS", "/LTCG", "/OPT:REF", "/OPT:ICF", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll", "/delayload:Tolk.dll"])

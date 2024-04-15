@@ -117,7 +117,14 @@ typedef bool nvgt_plugin_entry(nvgt_plugin_shared*);
 		#define XCONCAT(x, y) CONCAT(x, y) // Yes both CONCAT functions are needed for correct macro expansion below.
 		#define plugin_main bool XCONCAT(nvgt_plugin_, NVGT_PLUGIN_STATIC)
 	#else
-		#define plugin_main extern "C" __declspec(dllexport) bool nvgt_plugin
+		#ifdef _WIN32
+			#define plugin_export __declspec(dllexport)
+		#elif defined(__GNUC__)
+			#define plugin_export __attribute__((visibility ("default")))
+		#else
+			#define plugin_export
+		#endif
+		#define plugin_main extern "C" plugin_export bool nvgt_plugin
 	#endif
 #endif
 // Pass a pointer to an nvgt_plugin_shared structure to this function, making Angelscript available for use in any file that includes nvgt_plugin.h after calling this function.
