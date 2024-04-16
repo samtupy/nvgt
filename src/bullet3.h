@@ -13,7 +13,7 @@
 #pragma once
 
 #include <angelscript.h>
-#include "Bullet3Common/b3Vector3.h"
+#include <bullet/Bullet3Common/b3Vector3.h>
 typedef b3Vector3 Vector3;
 
 void RegisterScriptBullet3(asIScriptEngine* engine);

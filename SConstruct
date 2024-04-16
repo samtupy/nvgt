@@ -10,15 +10,20 @@ env = Environment()
 env.SetOption("num_jobs", multiprocessing.cpu_count())
 if env["PLATFORM"] == "win32":
 	SConscript("build/windev_sconscript", exports = ["env"])
-	env.Append(CCFLAGS = ["/EHsc", "/J", "/std:c++20", "/GF", "/Zc:inline", "/O2"])
+	env.Append(CCFLAGS = ["/EHsc", "/J", "/std:c++17", "/GF", "/Zc:inline", "/O2"])
 	env.Append(LIBS = ["tolk", "angelscript64"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
 else:
-	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-O2"])
-	env.Append(LIBS = ["angelscript", "m", "iconv"])
+	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++17", "-fpermissive", "-O2", "-Wno-narrowing", "-Wno-int-to-pointer-cast",  "-Wno-unused-result"])
+	env.Append(LIBS = ["angelscript", "m"])
 if env["PLATFORM"] == "darwin":
 	# homebrew paths, as well as paths for a folder called macosdev containing headers and pre-built libraries like bass and steam audio.
-	env.Append(CPPPATH = ["/opt/homebrew/include", "/opt/homebrew/include/bullet", "#macosdev/include"], CCFLAGS = ["-mmacosx-version-min=14.0"], LIBPATH = ["/opt/homebrew/lib", "#macosdev/lib"])
+	env.Append(CPPPATH = ["/opt/homebrew/include", "#macosdev/include"], CCFLAGS = ["-mmacosx-version-min=14.0"], LIBPATH = ["/opt/homebrew/lib", "#macosdev/lib"])
+elif env["PLATFORM"] == "posix":
+	# Same custom directory here accept called lindev for now, we enable the gold linker to silence seemingly pointless warnings about symbols in the bass libraries, and we add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
+	env.Append(CPPPATH = ["/usr/local/include", "#lindev/include"], LIBPATH = ["/usr/local/lib", "#lindev/lib"], LINKFLAGS = ["-fuse-ld=gold"])
+	# Fix as soon as possible, but currently compiling shared plugins doesn't work on linux apparently because things like Poco didn't get compiled with the -fPIC option. Joy.
+	ARGUMENTS["no_shared_plugins"] = 1
 env.Append(CPPDEFINES = ["POCO_STATIC"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#lib"])
 VariantDir("build/obj_src", "src", duplicate = 0)
@@ -28,6 +33,8 @@ plugin_env = env.Clone()
 if env["PLATFORM"] == "win32":
 	plugin_env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"])
 	plugin_env["no_import_lib"] = 1
+elif env["PLATFORM"] == "posix":
+	plugin_env.Append(LINKFLAGS = ["-fPIC"])
 static_plugins = []
 for s in Glob("plugin/*/_SConscript"):
 	plugname = str(s).split(os.path.sep)[1]
@@ -48,6 +55,8 @@ elif env["PLATFORM"] == "darwin":
 	env.Append(FRAMEWORKS = ["CoreAudio",  "CoreFoundation", "CoreHaptics", "CoreVideo", "AudioToolbox", "AppKit", "IOKit", "Carbon", "Cocoa", "ForceFeedback", "GameController", "QuartzCore"])
 	env.Append(LIBS = ["objc"])
 	env.Append(LINKFLAGS = ["-Wl,-rpath,'.'", "-mmacosx-version-min=14.0"])
+elif env["PLATFORM"] == "posix":
+	env.Append(LINKFLAGS = ["-Wl,-rpath,'lib'"])
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
 		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
@@ -62,6 +71,7 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	stub_platform = "" # This detection will likely need to be improved as we get more platforms working.
 	if env["PLATFORM"] == "win32": stub_platform = "windows"
 	elif env["PLATFORM"] == "darwin": stub_platform = "mac"
+	elif env["PLATFORM"] == "posix": stub_platform = "linux"
 	else: stub_platform = env["PLATFORM"]
 	VariantDir("build/obj_stub", "src", duplicate = 0)
 	stub_env = env.Clone(CPPDEFINES = list(env["CPPDEFINES"]) + ["NVGT_STUB"], PROGSUFFIX = ".bin")
