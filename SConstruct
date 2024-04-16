@@ -47,7 +47,7 @@ env.Append(LIBS = static_plugins)
 
 # nvgt itself
 sources = Glob("build/obj_src/*.cpp")
-env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoFoundation", "PocoJSON", "PocoNet", "PocoZip"], "phonon", "bass", "bass_fx", "bassmix", "SDL2", "SDL2main"])
+env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoFoundation", "PocoJSON", "PocoNet", "PocoZip"], "phonon", "bass", "bass_fx", "bassmix", "SDL2main"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB", "/SUBSYSTEM:WINDOWS", "/LTCG", "/OPT:REF", "/OPT:ICF", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll", "/delayload:Tolk.dll"])
