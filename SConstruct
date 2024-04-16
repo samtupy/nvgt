@@ -11,6 +11,7 @@ env.SetOption("num_jobs", multiprocessing.cpu_count())
 if env["PLATFORM"] == "win32":
 	SConscript("build/windev_sconscript", exports = ["env"])
 	env.Append(CCFLAGS = ["/EHsc", "/J", "/std:c++17", "/GF", "/Zc:inline", "/O2"])
+	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
 	env.Append(LIBS = ["tolk", "enet", "angelscript64", "SDL2"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
 else:
@@ -19,9 +20,9 @@ if env["PLATFORM"] == "darwin":
 	# homebrew paths, as well as paths for a folder called macosdev containing headers and pre-built libraries like bass and steam audio.
 	env.Append(CPPPATH = ["/opt/homebrew/include", "#macosdev/include"], CCFLAGS = ["-mmacosx-version-min=14.0"], LIBPATH = ["/opt/homebrew/lib", "#macosdev/lib"], LIBS = ["angelscript", "enet", "SDL2"])
 elif env["PLATFORM"] == "posix":
-	# Same custom directory here accept called lindev for now, we enable the gold linker to silence seemingly pointless warnings about symbols in the bass libraries and we also strip the resulting binaries, and we add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
+	# Same custom directory here accept called lindev for now, we enable the gold linker to silence seemingly pointless warnings about symbols in the bass libraries, we also strip the resulting binaries, and we add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
 	env.Append(CPPPATH = ["/usr/local/include", "#lindev/include"], LIBPATH = ["/usr/local/lib", "#lindev/lib"], LINKFLAGS = ["-fuse-ld=gold", "-s"])
-	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic one.
+	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
 	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL2.a"])
 env.Append(CPPDEFINES = ["POCO_STATIC"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#lib"])
@@ -29,11 +30,6 @@ VariantDir("build/obj_src", "src", duplicate = 0)
 
 # plugins
 plugin_env = env.Clone()
-if env["PLATFORM"] == "win32":
-	plugin_env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"])
-	plugin_env["no_import_lib"] = 1
-elif env["PLATFORM"] == "posix":
-	plugin_env.Append(LINKFLAGS = ["-fPIC"])
 static_plugins = []
 for s in Glob("plugin/*/_SConscript"):
 	plugname = str(s).split(os.path.sep)[1]
@@ -47,7 +43,7 @@ sources = Glob("build/obj_src/*.cpp")
 env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoFoundation", "PocoJSON", "PocoNet", "PocoZip"], "phonon", "bass", "bass_fx", "bassmix", "SDL2main"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
-	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB", "/SUBSYSTEM:WINDOWS", "/LTCG", "/OPT:REF", "/OPT:ICF", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll", "/delayload:Tolk.dll"])
+	env.Append(LINKFLAGS = ["/SUBSYSTEM:WINDOWS", "/OPT:REF", "/OPT:ICF", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll", "/delayload:Tolk.dll"])
 elif env["PLATFORM"] == "darwin":
 	sources.append("build/obj_src/macos.mm")
 	env["FRAMEWORKPREFIX"] = "-weak_framework"
@@ -73,7 +69,8 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	elif env["PLATFORM"] == "posix": stub_platform = "linux"
 	else: stub_platform = env["PLATFORM"]
 	VariantDir("build/obj_stub", "src", duplicate = 0)
-	stub_env = env.Clone(CPPDEFINES = list(env["CPPDEFINES"]) + ["NVGT_STUB"], PROGSUFFIX = ".bin")
+	stub_env = env.Clone(PROGSUFFIX = ".bin")
+	stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
 	# Todo: Can we make this use one list of sources E. the sources variable above? This scons issue where one must provide the variant_dir when specifying sources is why we are not right now.
 	stub_objects = stub_env.Object(Glob("build/obj_stub/*.cpp"))

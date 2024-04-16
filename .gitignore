@@ -4,6 +4,7 @@
 *.bin
 *.obj
 *.pdb
+*.exp
 *.lib
 *.a
 *.o
@@ -19,6 +20,7 @@ build/windev_path
 # private user space and dependencies
 user/**
 !user/readme.md
+lindev
 macosdev
 windev
 
