@@ -14,18 +14,15 @@ if env["PLATFORM"] == "win32":
 	env.Append(LIBS = ["tolk", "enet", "angelscript64", "SDL2"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
 else:
-	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++17", "-fpermissive", "-O2", "-Wno-narrowing", "-Wno-int-to-pointer-cast",  "-Wno-unused-result"])
-	env.Append(LIBS = ["m"])
+	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++17", "-fpermissive", "-O2", "-Wno-narrowing", "-Wno-int-to-pointer-cast",  "-Wno-unused-result"], LIBS = ["m"])
 if env["PLATFORM"] == "darwin":
 	# homebrew paths, as well as paths for a folder called macosdev containing headers and pre-built libraries like bass and steam audio.
 	env.Append(CPPPATH = ["/opt/homebrew/include", "#macosdev/include"], CCFLAGS = ["-mmacosx-version-min=14.0"], LIBPATH = ["/opt/homebrew/lib", "#macosdev/lib"], LIBS = ["angelscript", "enet", "SDL2"])
 elif env["PLATFORM"] == "posix":
-	# Same custom directory here accept called lindev for now, we enable the gold linker to silence seemingly pointless warnings about symbols in the bass libraries, and we add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
-	env.Append(CPPPATH = ["/usr/local/include", "#lindev/include"], LIBPATH = ["/usr/local/lib", "#lindev/lib"], LINKFLAGS = ["-fuse-ld=gold"])
+	# Same custom directory here accept called lindev for now, we enable the gold linker to silence seemingly pointless warnings about symbols in the bass libraries and we also strip the resulting binaries, and we add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
+	env.Append(CPPPATH = ["/usr/local/include", "#lindev/include"], LIBPATH = ["/usr/local/lib", "#lindev/lib"], LINKFLAGS = ["-fuse-ld=gold", "-s"])
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic one.
 	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL2.a"])
-	# Fix as soon as possible, but currently compiling shared plugins doesn't work on linux apparently because things like Poco didn't get compiled with the -fPIC option. Joy.
-	ARGUMENTS["no_shared_plugins"] = 1
 env.Append(CPPDEFINES = ["POCO_STATIC"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#lib"])
 VariantDir("build/obj_src", "src", duplicate = 0)

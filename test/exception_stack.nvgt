@@ -14,7 +14,7 @@ void main() {
 	try {
 		exc();
 	} catch {
-		alert(get_exception_info(), get_call_stack());
+		alert(get_exception_info(), last_exception_call_stack);
 	}
 	alert("test", "main end");
 }

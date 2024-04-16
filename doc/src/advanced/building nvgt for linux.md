@@ -29,13 +29,11 @@ cd SDL_Build
 cmake ../SDL
 cmake --build .
 sudo cmake --install .
-cp sdl2-config /usr/bin
-chmod +x /usr/bin/sdl2-config
 
 cd deps
 git clone https://github.com/pocoproject/poco
 cd poco
-./configure --static --no-tests --no-samples
+./configure --static --no-tests --no-samples --cflags=-fPIC
 make -s -j2
 ```
 
