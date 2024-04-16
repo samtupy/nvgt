@@ -271,6 +271,7 @@ void RegisterSqlite3(asIScriptEngine* engine) {
 
 plugin_main(nvgt_plugin_shared* shared) {
 	prepare_plugin(shared);
+	g_ScriptEngine = shared->script_engine;
 	RegisterSqlite3(shared->script_engine);
 	return true;
 }
