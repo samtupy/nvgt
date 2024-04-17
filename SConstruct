@@ -77,7 +77,6 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	elif env["PLATFORM"] == "posix": stub_platform = "linux"
 	else: stub_platform = env["PLATFORM"]
 	VariantDir("build/obj_stub", "src", duplicate = 0)
-	stubs = []
 	stub_env = env.Clone(PROGSUFFIX = ".bin")
 	stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
