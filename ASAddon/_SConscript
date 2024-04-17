@@ -5,4 +5,4 @@
 
 Import("env")
 
-env.StaticLibrary("#lib/ASAddon", [Glob("src/*.cpp")], CPPPATH = [env["CPPPATH"], "include"], CPPDEFINES = ["_LIB", ("AS_WRITE_OPS", "1"), "AS_USE_STLNAMES"])
+env.StaticLibrary("#build/lib/ASAddon", [Glob("src/*.cpp")], CPPPATH = [env["CPPPATH"], "include"], CPPDEFINES = ["_LIB", ("AS_WRITE_OPS", "1"), "AS_USE_STLNAMES"])

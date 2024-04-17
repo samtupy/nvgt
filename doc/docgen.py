@@ -7,7 +7,7 @@ import json
 import mistune
 import os
 
-html_base = "<html>\n<head>\n<title>{title}</title>\n</head>\n<body>\n{body}\n</body>\n</html>\n"
+html_base = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>{title}</title>\n</head>\n<body>\n{body}\n</body>\n</html>\n"
 liquid_base = "---\nlayout: default.liquid\ntitle: {title}\n---\n\n{body}"
 hhc_base = "<li><object type=\"text/sitemap\"><param name=\"Name\" value=\"{name}\"></object></li>\n"
 hhk_base = "<li><object type=\"text/sitemap\"><param name=\"Name\" value=\"{name}\"><param name=\"Local\" value=\"{path}\"></object></li>\n"
@@ -19,7 +19,7 @@ def make_topicname(path):
 		print(f"titlecase_topicname can't find {path}, skipping.\n")
 		return ""
 	if path.endswith("+.md"):
-		return open(path, "r").readline().strip("# \n") # The topic name is determined from the first line of such a file.
+		return open(path, "r", encoding = "UTF8").readline().strip("# \n") # The topic name is determined from the first line of such a file.
 	else:
 		name = os.path.split(path)[1].lstrip("!_") # The topic name is determined by removing any prepended punctuation characters then titlecasing the result in some cases.
 		if os.path.isfile(path): name = os.path.splitext(name)[0]
@@ -30,7 +30,7 @@ def make_topicname(path):
 def list_topics_via_index(tree, root):
 	"""Parses a given .index.json file and fills the tree with topic paths and descriptions."""
 	try:
-		index = json.load(open(os.path.join(root, ".index.json"), "r"))
+		index = json.load(open(os.path.join(root, ".index.json"), "r", encoding = "UTF8"))
 	except json.JSONDecodeError:
 		print(f"Unable to parse {root}/.index.json!\n")
 		return
@@ -158,7 +158,7 @@ def process_topic(tree, path, indent):
 	chm = make_chm_filename(path)
 	if chm:
 		try: #Todo: cleanup next line, particularly figure out how to get rid of the <pre><code> replacements.
-			open(os.path.join("chm", chm), "w").write(html_base.format(title = tree[path]["name"], body = mistune.html(markdown).replace("<p><code>", "<pre><code>").replace("</code></p>", "</code></pre>").replace("!!!", "#")))
+			open(os.path.join("chm", chm), "w", encoding = "UTF8").write(html_base.format(title = tree[path]["name"], body = mistune.html(markdown).replace("<p><code>", "<pre><code>").replace("</code></p>", "</code></pre>").replace("!!!", "#")))
 		except Exception as e: print(f"Error creating {chm}, {e}\n")
 	# hacking around no number signs within markdown code blocks.
 	markdown = markdown.replace("!!!", "&#35;")
@@ -277,7 +277,7 @@ def main():
 	hhp_output.close()
 	# Todo: Make the following more generic, for example if someone doesn't have windows installed on the C drive.
 	if os.path.isfile("C:\\Program Files (x86)\\HTML Help Workshop\\hhc.exe"):
-		os.system("\"C:\\Program Files (x86)\\HTML Help Workshop\\hhc.exe\" chm\\nvgt.hhp")
+		os.system("\"C:\\Program Files (x86)\\HTML Help Workshop\\hhc.exe\" chm\\nvgt.hhp>nul")
 		if os.path.isfile(os.path.join("chm", "nvgt.chm")):
 			if os.path.isfile("nvgt.chm"): os.remove("nvgt.chm")
 			os.rename(os.path.join("chm", "nvgt.chm"), "nvgt.chm")

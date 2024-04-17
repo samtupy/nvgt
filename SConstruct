@@ -7,6 +7,7 @@ import os, multiprocessing
 
 # setup
 env = Environment()
+SConscript("build/upx_sconscript", exports = ["env"])
 env.SetOption("num_jobs", multiprocessing.cpu_count())
 if env["PLATFORM"] == "win32":
 	SConscript("build/windev_sconscript", exports = ["env"])
@@ -25,7 +26,7 @@ elif env["PLATFORM"] == "posix":
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
 	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL2.a"])
 env.Append(CPPDEFINES = ["POCO_STATIC"])
-env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#lib"])
+env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 VariantDir("build/obj_src", "src", duplicate = 0)
 
 # plugins
@@ -62,6 +63,13 @@ SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, expo
 env.Program("release/nvgt", sources)
 
 # stubs
+def fix_windows_stub(target, source, env):
+	"""On windows, we replace the first 2 bytes of a stub with 'NV' to stop some sort of antivirus scan upon script compile that makes it take a bit longer."""
+	for t in target:
+		with open(str(t), "rb+") as f:
+			f.seek(0)
+			f.write(b"NV")
+			f.close()
 if ARGUMENTS.get("no_stubs", "0") == "0":
 	stub_platform = "" # This detection will likely need to be improved as we get more platforms working.
 	if env["PLATFORM"] == "win32": stub_platform = "windows"
@@ -69,6 +77,7 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	elif env["PLATFORM"] == "posix": stub_platform = "linux"
 	else: stub_platform = env["PLATFORM"]
 	VariantDir("build/obj_stub", "src", duplicate = 0)
+	stubs = []
 	stub_env = env.Clone(PROGSUFFIX = ".bin")
 	stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
@@ -76,12 +85,19 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	stub_objects = stub_env.Object(Glob("build/obj_stub/*.cpp"))
 	if env["PLATFORM"] == "darwin":
 		stub_objects.append(stub_env.Object("build/obj_stub/macos.mm"))
-	stub_env.Program(f"release/nvgt_{stub_platform}", stub_objects)
+	stub = stub_env.Program(f"release/nvgt_{stub_platform}", stub_objects)
+	if "upx" in env:
+		stub_u = stub_env.UPX(f"release/nvgt_{stub_platform}_upx.bin", stub)
 	# on windows, we should have a version of the Angelscript library without the compiler, allowing for slightly smaller executables.
 	if env["PLATFORM"] == "win32":
+		stub_env.AddPostAction(stub, fix_windows_stub)
+		if "upx" in env: stub_env.AddPostAction(stub_u, fix_windows_stub)
 		stublibs = list(stub_env["LIBS"])
 		if "angelscript64" in stublibs:
 			stublibs.remove("angelscript64")
 			stublibs.append("angelscript64nc")
-			stub_env.Program(f"release/nvgt_{stub_platform}_nc", stub_objects, LIBS = stublibs)
-
+			stub_nc = stub_env.Program(f"release/nvgt_{stub_platform}_nc", stub_objects, LIBS = stublibs)
+			stub_env.AddPostAction(stub_nc, fix_windows_stub)
+			if "upx" in env:
+				stub_nc_u = stub_env.UPX(f"release/nvgt_{stub_platform}_nc_upx.bin", stub_nc)
+				stub_env.AddPostAction(stub_nc_u, fix_windows_stub)
