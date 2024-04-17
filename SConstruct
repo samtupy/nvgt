@@ -35,7 +35,7 @@ static_plugins = []
 for s in Glob("plugin/*/_SConscript"):
 	plugname = str(s).split(os.path.sep)[1]
 	if ARGUMENTS.get(f"no_{plugname}_plugin", "0") == "1": continue
-	plug = SConscript(s, variant_dir = f"build/obj_plugin/{plugname}", duplicate = 0, exports = {"env": plugin_env})
+	plug = SConscript(s, variant_dir = f"build/obj_plugin/{plugname}", duplicate = 0, exports = {"env": plugin_env, "nvgt_env": env})
 	if plug: static_plugins.append(plug)
 env.Append(LIBS = static_plugins)
 

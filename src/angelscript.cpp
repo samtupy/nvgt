@@ -348,7 +348,7 @@ int ConfigureEngine(asIScriptEngine* engine) {
 }
 #ifndef NVGT_STUB
 int CompileScript(asIScriptEngine* engine, const char* scriptFile) {
-	Poco::Path global_include(Poco::Path(Poco::Path::self()).parent().append("include"));
+	Path global_include(Path(Path::self()).parent().append("include"));
 	g_IncludeDirs.push_back(global_include.toString());
 	CScriptBuilder builder;
 	builder.SetIncludeCallback(IncludeCallback, 0);

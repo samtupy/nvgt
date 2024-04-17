@@ -12,17 +12,19 @@
 
 #ifdef _WIN32
 	#include <windows.h>
-	#include <direct.h>
 	#include <locale.h>
 #else
 	#include <time.h>
 	#include <unistd.h>
 #endif
-#define NVGT_LOAD_STATIC_PLUGINS
+#include <angelscript.h> // the library
 #include <Poco/Environment.h>
 #include <Poco/Path.h>
+#include <Poco/UnicodeConverter.h>
 #include <SDL2/SDL.h>
-#include <angelscript.h> // the library
+#include "filesystem.h"
+#include "scriptarray.h"
+#define NVGT_LOAD_STATIC_PLUGINS
 #include "angelscript.h" // nvgt's angelscript implementation
 #include "input.h"
 #include "misc_functions.h"
@@ -35,8 +37,6 @@
 #include "sound.h"
 #include "srspeech.h"
 #include "timestuff.h"
-#include "scriptarray.h"
-#include "filesystem.h"
 
 
 using namespace std;
@@ -66,42 +66,28 @@ const char* GetExecutableFilename() {
 }
 
 int main(int argc, char** argv) {
-	//Todo: needs serious rewrite.
+	//Todo: entry point needs serious rewrite, use less c and more c++ while keeping the code cleaner. Was written a couple years ago towards beginning of the project and has always worked enough to not get serious attention drawn towards it which would result in the cleanup.
 	g_argc = argc;
 	bool skip_arg = true;
 	#ifdef NVGT_STUB
-	skip_arg = false;
+		skip_arg = false;
 	#endif
 	#ifdef _WIN32
-	setlocale(LC_ALL, ".UTF8");
-	srand(GetTickCount());
-	const char* cmdline = GetCommandLineA();
-	const char* cmdline2 = NULL;
-	bool instring = false;
-	timestuff_startup();
-	for (int i = 0; cmdline[i]; i++) {
-		if (cmdline[i] == '\"') instring = !instring;
-		if (!instring && cmdline[i] == ' ' && cmdline[i + 1]) {
-			if (cmdline[i + 1] == ' ') continue;
-			if (skip_arg) {
-				skip_arg = false;
-				continue;
-			}
-			cmdline2 = cmdline + i + 1;
-			break;
-		}
-	}
-	if (cmdline2) g_command_line = cmdline2;
-	else g_command_line = "";
-	#else
+		setlocale(LC_ALL, ".UTF8");
+		timestuff_startup();
+		wstring dir_u;
+		Poco::UnicodeConverter::convert(Poco::Path(Poco::Path::self()).parent().append("lib").toString(), dir_u);
+		SetDllDirectoryW(dir_u.c_str());
+	#endif
+	srand(ticks()); // Random bits of NVGT if not it's components might use the c rand function.
+	// Build command line arguments into a single string for backwards compatibility with bgt's COMMAND_LINE property.
 	for (int i = (skip_arg ? 2 : 1); i < argc; i++) {
 		bool space = strchr(argv[i], ' ') != NULL;
 		if (space) g_command_line += "\"";
 		g_command_line += argv[i];
 		if (space) g_command_line += "\"";
-		if (i < argc) g_command_line += " ";
+		if (i < argc -1) g_command_line += " ";
 	}
-	#endif
 	char* scriptfile = NULL;
 	int mode = 0;
 	#ifndef NVGT_STUB
@@ -183,10 +169,11 @@ int main(int argc, char** argv) {
 		#elif defined(__linux__)
 		if (g_platform == "auto") g_platform = "linux";
 		#elif defined(__APPLE__)
-		if (g_platform == "auto") g_platform = "mac";
+		if (g_platform == "auto") g_platform = "mac"; // Todo: detect difference between IOS and macos (need to look up the correct macros).
 		#else
 		return 1;
 		#endif
+		// See all this nasty looking c? Not good, convert it!
 		char msg[1024];
 		char final_scriptname[MAX_PATH];
 		memset(final_scriptname, 0, MAX_PATH);
