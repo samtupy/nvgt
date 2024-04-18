@@ -7,6 +7,8 @@ import os, multiprocessing
 
 # setup
 env = Environment()
+Decider('content-timestamp')
+env.Alias("install", "c:/nvgt")
 SConscript("build/upx_sconscript", exports = ["env"])
 env.SetOption("num_jobs", multiprocessing.cpu_count())
 if env["PLATFORM"] == "win32":
@@ -60,7 +62,8 @@ if ARGUMENTS.get("no_user", "0") == "0":
 		SConscript("user/_SConscript", exports = {"plugin_env": plugin_env, "nvgt_env": env})
 SConscript("ASAddon/_SConscript", variant_dir = "build/obj_ASAddon", duplicate = 0, exports = "env")
 SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, exports = "env")
-env.Program("release/nvgt", sources)
+nvgt = env.Program("release/nvgt", sources)
+if env["PLATFORM"] == "win32": env.Install("c:/nvgt", nvgt)
 
 # stubs
 def fix_windows_stub(target, source, env):
@@ -85,8 +88,10 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	if env["PLATFORM"] == "darwin":
 		stub_objects.append(stub_env.Object("build/obj_stub/macos.mm"))
 	stub = stub_env.Program(f"release/nvgt_{stub_platform}", stub_objects)
+	if env["PLATFORM"] == "win32": env.Install("c:/nvgt", stub)
 	if "upx" in env:
 		stub_u = stub_env.UPX(f"release/nvgt_{stub_platform}_upx.bin", stub)
+		if env["PLATFORM"] == "win32": env.Install("c:/nvgt", stub_u)
 	# on windows, we should have a version of the Angelscript library without the compiler, allowing for slightly smaller executables.
 	if env["PLATFORM"] == "win32":
 		stub_env.AddPostAction(stub, fix_windows_stub)
@@ -97,6 +102,8 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 			stublibs.append("angelscript64nc")
 			stub_nc = stub_env.Program(f"release/nvgt_{stub_platform}_nc", stub_objects, LIBS = stublibs)
 			stub_env.AddPostAction(stub_nc, fix_windows_stub)
+			env.Install("c:/nvgt", stub_nc)
 			if "upx" in env:
 				stub_nc_u = stub_env.UPX(f"release/nvgt_{stub_platform}_nc_upx.bin", stub_nc)
 				stub_env.AddPostAction(stub_nc_u, fix_windows_stub)
+				env.Install("c:/nvgt", stub_nc_u)
