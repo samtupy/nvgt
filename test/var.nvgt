@@ -8,6 +8,7 @@ void main() {
 	alert("test", 1 + v2);
 	v = v + 5;
 	v -= 3;
+	v--;
 	alert("test", v);
 	v = var("testing?");
 	alert("test", string(v));
