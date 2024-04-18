@@ -72,4 +72,4 @@ public:
 	void reset();
 };
 
-void RegisterInternet(asIScriptEngine* engine);
+void RegisterInternetPlugin(asIScriptEngine* engine);

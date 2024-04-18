@@ -3,7 +3,8 @@
 // license: zlib (see license.md in the root of the nvgt distrobution)
 
 void main() {
-	string u = url_encode("https://samtupy.com/test.php");
+	string u = url_encode("https://samtupy.com/test.php?arg1=this is a test&arg2=um!lol!");
+	clipboard_set_text(u);
 	alert("test", u);
 	alert("test", url_decode(u));
 }

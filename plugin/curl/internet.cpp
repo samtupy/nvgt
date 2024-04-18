@@ -351,9 +351,10 @@ internet_request* Script_internet_request_Factory_u_u_p(const std::string& url, 
 	return new internet_request(url, username, password, autoperform);
 }
 
-void RegisterInternet(asIScriptEngine* engine) {
-	engine->RegisterGlobalFunction("string url_encode(const string &in)", asFUNCTION(url_encode), asCALL_CDECL);
-	engine->RegisterGlobalFunction("string url_decode(const string &in)", asFUNCTION(url_decode), asCALL_CDECL);
+void RegisterInternetPlugin(asIScriptEngine* engine) {
+	// url_encode and url_decode now exist directly within nvgt, following 2 functions may be removed.
+	engine->RegisterGlobalFunction("string url_encode_legacy(const string &in)", asFUNCTION(url_encode), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string url_decode_legacy(const string &in)", asFUNCTION(url_decode), asCALL_CDECL);
 	engine->RegisterObjectType("internet_request", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("internet_request", asBEHAVE_FACTORY, "internet_request @i()", asFUNCTION(Script_internet_request_Factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("internet_request", asBEHAVE_FACTORY, "internet_request @i(const string &in, bool = true)", asFUNCTION(Script_internet_request_Factory_u), asCALL_CDECL);
@@ -398,6 +399,6 @@ void RegisterInternet(asIScriptEngine* engine) {
 
 plugin_main(nvgt_plugin_shared* shared) {
 	prepare_plugin(shared);
-	RegisterInternet(shared->script_engine);
+	RegisterInternetPlugin(shared->script_engine);
 	return true;
 }

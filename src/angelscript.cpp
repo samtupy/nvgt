@@ -30,6 +30,7 @@
 #include "datastreams.h"
 #include "hash.h"
 #include "input.h"
+#include "internet.h"
 #include "library.h"
 #include "map.h"
 #include "misc_functions.h"
@@ -305,8 +306,7 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	RegisterScriptHash(engine);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_INPUT);
 	RegisterInput(engine);
-	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
-	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_NET);
+	RegisterInternet(engine);
 	RegisterScriptLibrary(engine);
 	RegisterScriptMap(engine);
 	RegisterMiscFunctions(engine);
