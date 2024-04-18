@@ -1,0 +1,20 @@
+/**
+	Encodes a string as base32.
+	string string_base32_encode(string the_data);
+	## Arguments:
+		* string the_data: The data that is to be encoded.
+	## Returns:
+		String: The encoded string on success or an empty string on failure.
+	## Remarks:
+		You can learn more about the base32 format [here](https://en.wikipedia.org/wiki/Base32).
+*/
+
+// Example:
+void main() {
+	string text = input_box("Text", "Enter the text to encode.");
+	if (text.is_empty()) {
+		alert("Error", "You did not type any text.");
+		exit();
+	}
+	alert("Info", string_base32_encode(text));
+}

@@ -1,0 +1,14 @@
+/**
+	Return the character that corresponds to the given ascii value.
+	string ascii_to_character(uint8 ascii);
+	## Arguments:
+		* uint8 ascii: the ascii value to convert.
+	## Returns:
+		string: the character for the given ascii value.
+*/
+
+// Example:
+void main() {
+	uint8 ascii = parse_int(input_box("ASCII value", "Enter the ascii value to convert."));
+	alert("Info", ascii + " has a value of " + ascii_to_character(ascii));
+}

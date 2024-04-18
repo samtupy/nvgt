@@ -1,0 +1,15 @@
+/**
+	Generates a true or false value pseudorandomly.
+	bool random_bool(int percent = 50);
+	## Arguments:
+		* int percent = 50: the likelyhood (as a percent from 0-100) of generating a true value. Defaults to 50.
+	## Returns:
+		bool: either true or false.
+	## Remarks;
+		Note that this function is a pseudorandom number generator. To lern more, click [here](https://en.wikipedia.org/wiki/Pseudorandom_number_generator).
+*/
+
+// Example:
+void main() {
+	alert("Example", random_bool() ? "true" : "false");
+}

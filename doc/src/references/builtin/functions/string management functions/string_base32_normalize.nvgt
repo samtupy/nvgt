@@ -1,0 +1,21 @@
+/**
+	Normalize a string to conform to the base32 spec.
+	string string_base32_normalize(string the_data);
+	## Arguments:
+		string the_data: the string to normalize.
+	## Returns:
+		string: the normalized string.
+	## Remarks:
+		The primary thing this function does is to skip sepeerators, convert all letters to uppercase, and make sure the length is a multiple of 8.
+		To learn more about base32, click [here](https://en.wikipedia.org/wiki/Base32).
+*/
+
+// Example:
+void main() {
+	string text = input_box("Text", "Enter the text to normalize.");
+	if (text.is_empty()) {
+		alert("Error", "You didn't type anything.");
+		exit();
+	}
+	alert("Info", string_base32_normalize(text));
+}

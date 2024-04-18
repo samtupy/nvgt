@@ -1,0 +1,22 @@
+/**
+	Return the ascii value for the given character.
+	uint8 character_to_ascii(string character);
+	## Arguments:
+		* string character: the character to convert.
+	## Returns:
+		uint8: the ascii value for the given character.
+*/
+
+// Example:
+void main() {
+	string character = input_box("Character", "Enter a character to convert");
+	if (character.is_empty()) {
+		alert("Error", "You did not type anything.");
+		exit();
+	}
+	if (character.length() != 1) { // The user typed more than one character.
+		alert("Error", "You must only type a single character.");
+		exit();
+	}
+	alert("Info", character + " has an ascii value of " + character_to_ascii(character));
+}

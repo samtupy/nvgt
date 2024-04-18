@@ -1,0 +1,18 @@
+/**
+	Completely shut down your application.
+	void exit();
+*/
+
+// Example:
+void main() {
+	show_window("Example");
+	screen_reader_output("Press escape to exit.", true);
+	while (true) {
+		wait(5);
+		if (key_pressed(KEY_ESCAPE)) {
+			screen_reader_output("Goodbye.", true);
+			wait(500);
+			exit();
+		}
+	}
+}

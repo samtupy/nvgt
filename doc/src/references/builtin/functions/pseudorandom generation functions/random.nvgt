@@ -1,0 +1,16 @@
+/**
+	Generates a pseudorandom number given a range.
+	int random(int min, int max);
+	## Arguments:
+		* int min: the minimum possible number to generate.
+		* int max: the maximum possible number to generate.
+	## Returns:
+		int: a random number in the given range.
+	## Remarks:
+		Note that this function is a pseudorandom number generator. To lern more, click [here](https://en.wikipedia.org/wiki/Pseudorandom_number_generator).
+*/
+
+// Example:
+void main() {
+	alert("Example", random(1, 100));
+}

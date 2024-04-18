@@ -1,0 +1,16 @@
+/**
+	Generates a random ascii character.
+	string random_character(string min_ascii, string max_ascii);
+	## Arguments:
+		* string min_ascii: the minimum possible ascii character to be generated.
+		* string max_ascii: the maximum possible ascii character.
+	## Returns:
+		string: a random ascii character in the given range.
+	## Remarks:
+		Note that this function uses a pseudorandom number generator. To lern more, click [here](https://en.wikipedia.org/wiki/Pseudorandom_number_generator).
+*/
+
+// Example:
+void main() {
+	alert("Your random character is", random_character("a", "z"));
+}
