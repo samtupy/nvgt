@@ -1,0 +1,22 @@
+/**
+	Returns the total number of keys that are currently held down.
+	int total_keys_down();
+	## Returns:
+		int: the number of keys currently held down.
+*/
+
+// Example:
+void main() {
+	int check_time = 1000, orig_ticks = ticks();
+	show_window("Example");
+	while (true) {
+		wait(5);
+		if ((ticks() - orig_ticks) >= check_time) {
+			orig_ticks = ticks();
+			int key_count  = total_keys_down();
+			screen_reader_output(key_count + " " + (key_count == 1 ? "key is" : "keys are") + " currently held down.", true);
+		}
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}
