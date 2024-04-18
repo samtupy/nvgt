@@ -1,0 +1,22 @@
+/**
+	Determine if a particular key was just released.
+	bool key_released(uint key);
+	## Arguments:
+		* uint key: the key to check.
+	## Returns:
+		bool: true if the key was just released, false otherwise.
+	## Remarks:
+		For a complete list of keys that can be passed to this function, see input constants.
+*/
+
+// Example:
+void main() {
+	show_window("Example");
+	while (true) {
+		wait(5);
+		if (key_released(KEY_SPACE))
+			screen_reader_output("you just released the space key", true);
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}

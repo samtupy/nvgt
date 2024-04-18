@@ -1,0 +1,22 @@
+/**
+	Determine if a particular key is pressed.
+	bool key_pressed(uint key);
+	## Arguments:
+		* uint key: the key to check.
+	## Returns:
+		bool: true if the key was just pressed, false otherwise.
+	## Remarks:
+		For a complete list of keys that can be passed to this function, see input constants.
+*/
+
+// Example:
+void main() {
+	show_window("Example");
+	while (true) {
+		wait(5);
+		if (key_pressed(KEY_SPACE))
+			screen_reader_output("You just pressed space!", true);
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}

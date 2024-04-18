@@ -1,0 +1,25 @@
+/**
+	Determine if a particular key is up.
+	bool key_up(uint key);
+	## Arguments:
+		* uint key: the key to check.
+	## Returns:
+		bool: true if the key is up, false otherwise.
+	## Remarks:
+		For a complete list of keys that can be passed to this function, see input constants.
+*/
+
+// Example:
+void main() {
+	int last_spoken = ticks(); // Speak periodically to avoid overwhemling the user (or their screen reader).
+	show_window("Example");
+	while (true) {
+		wait(5);
+		if (key_up(KEY_SPACE) && (ticks() - last_spoken) >= 500) {
+			last_spoken = ticks();
+			screen_reader_output("space is up", true);
+		}
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}
