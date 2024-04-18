@@ -2,7 +2,7 @@
 	Determine if a particular key was just released.
 	bool key_released(uint key);
 	## Arguments:
-		uint key: the key to check.
+		* uint key: the key to check.
 	## Returns:
 		bool: true if the key was just released, false otherwise.
 	## Remarks:

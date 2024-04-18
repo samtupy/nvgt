@@ -2,7 +2,7 @@
 	Determine if a particular key is up.
 	bool key_up(uint key);
 	## Arguments:
-		uint key: the key to check.
+		* uint key: the key to check.
 	## Returns:
 		bool: true if the key is up, false otherwise.
 	## Remarks:

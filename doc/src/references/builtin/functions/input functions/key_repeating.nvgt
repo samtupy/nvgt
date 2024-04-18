@@ -2,7 +2,7 @@
 	Determine if a particular key is repeating (i.e. it's being held, but wasn't just pressed).
 	bool key_repeating(uint key);
 	## Arguments:
-		uint key: the key to check.
+		* uint key: the key to check.
 	## Returns:
 		bool: true if the key is repeating, false otherwise.
 	## Remarks:

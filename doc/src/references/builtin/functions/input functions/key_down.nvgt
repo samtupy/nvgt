@@ -2,7 +2,7 @@
 	Determine if a particular key is held down.
 	bool key_down(uint key);
 	## Arguments:
-		uint key: the key to check.
+		* uint key: the key to check.
 	## Returns:
 		bool: true if the key is down at all, false otherwise.
 	## Remarks:

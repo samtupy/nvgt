@@ -2,7 +2,7 @@
 	Determine if a particular key is pressed.
 	bool key_pressed(uint key);
 	## Arguments:
-		uint key: the key to check.
+		* uint key: the key to check.
 	## Returns:
 		bool: true if the key was just pressed, false otherwise.
 	## Remarks:
