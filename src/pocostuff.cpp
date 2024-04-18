@@ -282,6 +282,14 @@ template<typename T> T poco_var_add(poco_shared<Dynamic::Var>* var, const T& val
 template<typename T> T poco_var_add_r(poco_shared<Dynamic::Var>* var, const T& val) {
 	return val + var->ptr->template convert<T>();
 }
+poco_shared<Dynamic::Var>* poco_var_inc(poco_shared<Dynamic::Var>* var) {
+	var->ptr->operator++();
+	return var;
+}
+poco_shared<Dynamic::Var>* poco_var_dec(poco_shared<Dynamic::Var>* var) {
+	var->ptr->operator--();
+	return var;
+}
 template<typename T> T poco_var_sub_assign(poco_shared<Dynamic::Var>* var, const T& val) {
 	var->ptr->template operator-=<T>(val);
 	return var->ptr->template convert<T>();
@@ -539,6 +547,8 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("var", asBEHAVE_ADDREF, "void f()", asMETHOD(poco_shared<Dynamic::Var>, duplicate), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("var", asBEHAVE_RELEASE, "void f()", asMETHOD(poco_shared<Dynamic::Var>, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod("var", "var& opAssign(const var&in)", asFUNCTION(poco_var_assign_var), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("var", "var& opPostInc()", asFUNCTION(poco_var_inc), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("var", "var& opPostDec()", asFUNCTION(poco_var_dec), asCALL_CDECL_OBJFIRST);
 	RegisterPocoVarType<int>(engine, "int");
 	RegisterPocoVarType<unsigned int>(engine, "uint");
 	RegisterPocoVarType<short>(engine, "int16");
