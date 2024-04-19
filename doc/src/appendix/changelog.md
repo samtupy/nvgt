@@ -1,7 +1,8 @@
 # Changelog
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
-## New as of 04/12/2024:
+## New as of 04/18/2024:
+* The var type now has PostEnc and PostDec operators.
 * UTF8 fixes: sound.load, and compiled applications can now execute if they contain non-english characters in their filenames.
 * All code that I wish to share has been forked into what will hopefully be nvgt's long-standing repository which will eventually have it's privacy status switched to public!
 * NVGT now has a build system! I know it's not the fastest one around, but needing a  middleground between learning even more new things and using what I already know, I chose SCons purely because of the fermiliar pythonic environment and not needing to learn yet another new set of syntax rules. I'm just glad we're no longer building the engine using a series of shell scripts!

@@ -53,10 +53,11 @@ sudo make install
 
 cd deps
 git clone https://github.com/bulletphysics/bullet3
+cd bullet3
+./build_cmake_pybullet_double.sh
+cd cmake_build
+sudo camke --install .
 ```
-
-## Note
-NVGT only uses Bullet3 for its header files at the time of writing; all you must do is clone the repository.
 
 ```bash
 cd deps
@@ -69,8 +70,11 @@ cmake --build .
 sudo cmake --install .
 ```
 
-## Next steps
-* Build angelscript addons by running `nvgt/dep/add_on/build.sh`
-* Then build misc deps by running `nvgt/dep/minideps/_build.sh`
-To Compile builtin sqlite to object code: `cd nvgt/dep/sqlite3; gcc -D SQLITE_CORE *.c -c`
-* Then to finally finish the build, run `nvgt/build.sh`!
+You will need scons, which you can get by running pip3 install scons.
+
+# finally...
+cd to the root of the nvgt repository and extract https://nvgt.gg/lindev.tar.gz to a lindev folder there.
+
+scons -s
+
+Enjoy!
