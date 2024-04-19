@@ -4,7 +4,8 @@ I have no idea what I'm doing here!
 Assuming xcode and homebrew are installed:
 
 ```bash
-brew install autoconf automake libgit2 libtool openssl sdl2
+pip3 install scons
+brew install autoconf automake libgit2 libtool openssl sdl2 bullet
 
 mkdir deps
 git clone https://github.com/codecat/angelscript-mirror
@@ -37,4 +38,7 @@ cd build
 cmake ..
 cmake --build .
 sudo cmake --install .
+
+cd nvgt
+scons -s
 ```

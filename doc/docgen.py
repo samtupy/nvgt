@@ -21,7 +21,7 @@ def make_topicname(path):
 	if path.endswith("+.md"):
 		return open(path, "r", encoding = "UTF8").readline().strip("# \n") # The topic name is determined from the first line of such a file.
 	else:
-		name = os.path.split(path)[1].lstrip("!_") # The topic name is determined by removing any prepended punctuation characters then titlecasing the result in some cases.
+		name = os.path.split(path)[1].lstrip("!-_") # The topic name is determined by removing any prepended punctuation characters then titlecasing the result in some cases.
 		if os.path.isfile(path): name = os.path.splitext(name)[0]
 		if not path.endswith(".nvgt") and name.islower(): name = name.title()
 		if name.endswith("@"): name = name[:-1]
