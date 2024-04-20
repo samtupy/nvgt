@@ -664,7 +664,7 @@ sound_environment::sound_environment() : ref_count(1), sim_inputs({}), scene_nee
 	simulation_settings.flags = IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS);
 	simulation_settings.sceneType = IPL_SCENETYPE_DEFAULT;
 	simulation_settings.reflectionType = IPL_REFLECTIONEFFECTTYPE_CONVOLUTION;
-	simulation_settings.maxNumRays = 4096;
+	simulation_settings.maxNumRays = 2048;
 	simulation_settings.numDiffuseSamples = 128;
 	simulation_settings.maxDuration = 2.0f;
 	simulation_settings.maxOrder = 2;
@@ -676,7 +676,7 @@ sound_environment::sound_environment() : ref_count(1), sim_inputs({}), scene_nee
 	IPLSceneSettings scene_settings{};
 	scene_settings.type = IPL_SCENETYPE_DEFAULT;
 	iplSceneCreate(phonon_context, &scene_settings, &scene);
-	sim_inputs.numRays = 4096;
+	sim_inputs.numRays = 2048;
 	sim_inputs.numBounces = 32;
 	sim_inputs.duration = 2.0f;
 	sim_inputs.order = 2;
@@ -845,7 +845,9 @@ void sound_environment::background_update() {
 		sim_inputs.listener.ahead = IPLVector3{sin(listener_rotation), cos(listener_rotation), 0};
 		sim_inputs.listener.origin = IPLVector3{listener_x, listener_y, listener_z};
 		iplSimulatorSetSharedInputs(sim, IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS), &sim_inputs);
+		iplSimulatorCommit(sim);
 		listener_modified = false;
+		iplSimulatorRunReflections(sim);
 	}
 	iplSimulatorRunReflections(sim);
 }
@@ -854,11 +856,7 @@ void sound_environment::set_listener(float x, float y, float z, float rotation) 
 	listener_y = y;
 	listener_z = z;
 	listener_rotation = rotation;
-	sim_inputs.listener.right = IPLVector3{1, 0, 0};
-	sim_inputs.listener.up = IPLVector3{0, 0, 1};
-	sim_inputs.listener.ahead = IPLVector3{sin(listener_rotation), cos(listener_rotation), 0};
-	sim_inputs.listener.origin = IPLVector3{listener_x, listener_y, listener_z};
-	iplSimulatorSetSharedInputs(sim, IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS), &sim_inputs);
+	listener_modified = true;
 }
 
 
@@ -1241,8 +1239,7 @@ BOOL sound_base::set_position(float listener_x, float listener_y, float listener
 		inputs.airAbsorptionModel = IPLAirAbsorptionModel{IPL_AIRABSORPTIONTYPE_DEFAULT};
 		inputs.source = IPLCoordinateSpace3{IPLVector3{1, 0, 0}, IPLVector3{0, 0, 1}, IPLVector3{0, 1, 0}, IPLVector3{sound_x, sound_y, sound_z}};
 		inputs.occlusionType = IPL_OCCLUSIONTYPE_RAYCAST;
-		iplSourceSetInputs(source, IPL_SIMULATIONFLAGS_DIRECT, &inputs);
-		iplSourceSetInputs(source, IPL_SIMULATIONFLAGS_REFLECTIONS, &inputs);
+		iplSourceSetInputs(source, IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS), &inputs);
 		iplSimulatorCommit(env->sim);
 	}
 	return TRUE;

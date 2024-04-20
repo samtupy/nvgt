@@ -78,6 +78,7 @@ public:
 	IPLSimulationSharedInputs sim_inputs;
 	float listener_x, listener_y, listener_z, listener_rotation;
 	bool listener_modified;
+	Poco::Event listener_modifying;
 	thread_ptr_t env_thread;
 	Poco::Mutex env_thread_sim_running;
 	sound_environment();
