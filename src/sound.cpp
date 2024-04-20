@@ -180,7 +180,7 @@ void basic_positioning_dsp(void* buffer, DWORD length, float x, float y, float z
 }
 
 // Uses steam audio to position the sound and add other effects to it such as reverb and occlusion. Sorry if this is a bit messy, this function has seen some evolution to say the least as different things were tested and so as to not break compatibility with existing code, this should probably be cleaned up as time goes on.
-void phonon_dsp(void* buffer, DWORD length, float x, float y, float z, sound& s) {
+void phonon_dsp(void* buffer, DWORD length, float x, float y, float z, sound_base& s) {
 	if (!buffer || length < 2 || !hrtf || !s.hrtf_effect)
 		return;
 	float blend = (fabs(x * s.pan_step) + fabs(y * s.pan_step) + fabs(z * s.pan_step)) / 3;
@@ -189,19 +189,19 @@ void phonon_dsp(void* buffer, DWORD length, float x, float y, float z, sound& s)
 	if (blend < 0.0)
 		blend = 0.0;
 	// Todo: Maybe we should allocate these differently?
-	static thread_local float in_left[hrtf_framesize * 2], in_right[hrtf_framesize * 2], out_left[hrtf_framesize * 2], out_right[hrtf_framesize * 2], tmp_mono[hrtf_framesize * 2], in_mono[hrtf_framesize * 2], reflections1[hrtf_framesize * 2], reflections2[hrtf_framesize * 2], reflections3[hrtf_framesize * 2], reflections4[hrtf_framesize * 2], reflections_downmix_left[hrtf_framesize * 2], reflections_downmix_right[hrtf_framesize * 2];
+	static thread_local float in_left[hrtf_framesize * 2], in_right[hrtf_framesize * 2], out_left[hrtf_framesize * 2], out_right[hrtf_framesize * 2], tmp_mono[hrtf_framesize * 2], in_mono[hrtf_framesize * 2], reflections1[hrtf_framesize * 2], reflections2[hrtf_framesize * 2], reflections3[hrtf_framesize * 2], reflections4[hrtf_framesize * 2], reflections5[hrtf_framesize * 2], reflections6[hrtf_framesize * 2], reflections7[hrtf_framesize * 2], reflections8[hrtf_framesize * 2], reflections9[hrtf_framesize * 2], reflections_downmix_left[hrtf_framesize * 2], reflections_downmix_right[hrtf_framesize * 2];
 	float* in_data[] = {in_left, in_right};
 	float* out_data[] = {out_left, out_right};
 	float* tmp_mono_data[] = {tmp_mono};
 	float* in_mono_data[] = {in_mono};
-	float* reflections_data[] = {reflections1, reflections2, reflections3, reflections4};
+	float* reflections_data[] = {reflections1, reflections2, reflections3, reflections4, reflections5, reflections6, reflections7, reflections8, reflections9};
 	float* reflections_downmix_data[] = {reflections_downmix_left, reflections_downmix_right};
 	int samples = length / sizeof(float) / 2;
 	IPLAudioBuffer inbuffer {2, samples, in_data };
 	IPLAudioBuffer outbuffer {2, samples, out_data };
 	IPLAudioBuffer mono_tmp_buffer {1, samples, tmp_mono_data};
 	IPLAudioBuffer mono_inbuffer {1, samples, in_mono_data};
-	IPLAudioBuffer reflections_outbuffer{ 4, samples, reflections_data };
+	IPLAudioBuffer reflections_outbuffer{ 9, samples, reflections_data };
 	IPLAudioBuffer reflections_downmix_buffer {2, samples, reflections_downmix_data};
 	if (!s.env) {
 		// simple distance rolloff in the case of no set sound_environment
@@ -224,9 +224,9 @@ void phonon_dsp(void* buffer, DWORD length, float x, float y, float z, sound& s)
 		dir_params.flags = IPLDirectEffectFlags(IPL_DIRECTEFFECTFLAGS_APPLYDISTANCEATTENUATION | IPL_DIRECTEFFECTFLAGS_APPLYAIRABSORPTION | IPL_DIRECTEFFECTFLAGS_APPLYOCCLUSION);
 		iplDirectEffectApply(s.direct_effect, &dir_params, &mono_inbuffer, &mono_tmp_buffer);
 	}
-	if (x != 0 || y != 0 || z != 0) {
+	if ((x != 0 || y != 0 || z != 0) && s.hrtf_effect) {
 		IPLBinauralEffectParams effect_args{};
-		effect_args.direction = iplCalculateRelativeDirection(phonon_context, IPLVector3{s.x, s.y, s.z}, IPLVector3{s.listener_x, s.listener_y, s.listener_z}, IPLVector3{sin(s.rotation), cos(s.rotation), 0}, IPLVector3{0, 0, 1});
+		effect_args.direction = iplCalculateRelativeDirection(phonon_context, IPLVector3{s.x, s.y, s.z}, s.env? IPLVector3{s.env->listener_x, s.env->listener_y, s.env->listener_z} : IPLVector3{s.listener_x, s.listener_y, s.listener_z}, s.env? IPLVector3{sin(s.env->listener_rotation), cos(s.env->listener_rotation), 0} : IPLVector3{sin(s.rotation), cos(s.rotation), 0}, IPLVector3{0, 0, 1});
 		effect_args.interpolation = IPL_HRTFINTERPOLATION_BILINEAR;
 		effect_args.spatialBlend = blend;
 		effect_args.hrtf = phonon_hrtf;
@@ -237,12 +237,12 @@ void phonon_dsp(void* buffer, DWORD length, float x, float y, float z, sound& s)
 	}
 	if (s.env) { // reflections
 		IPLReflectionEffectParams reflect_params = src_out.reflections;
-		reflect_params.numChannels = 4;
+		reflect_params.numChannels = 9;
 		reflect_params.irSize = 88200;
 		iplReflectionEffectApply(s.reflection_effect, &reflect_params, &mono_inbuffer, &reflections_outbuffer, NULL);
 		// spacialize reflections
 		// IPLCoordinateSpace3{IPLVector3{1, 0, 0}, IPLVector3{0, 0, 1}, IPLVector3{0, 1, 0}, IPLVector3{s.x, s.y, s.z}}
-		IPLAmbisonicsDecodeEffectParams dec_params{1, phonon_hrtf_reflections, s.env->sim_inputs.listener, IPL_TRUE};
+		IPLAmbisonicsDecodeEffectParams dec_params{2, phonon_hrtf_reflections, s.env->sim_inputs.listener, IPL_TRUE};
 		iplAmbisonicsDecodeEffectApply(s.reflection_decode_effect, &dec_params, &reflections_outbuffer, &reflections_downmix_buffer);
 		iplAudioBufferMix(phonon_context, &reflections_downmix_buffer, &outbuffer);
 	}
@@ -252,7 +252,7 @@ void phonon_dsp(void* buffer, DWORD length, float x, float y, float z, sound& s)
 void CALLBACK positioning_dsp(HDSP handle, DWORD channel, void* buffer, DWORD length, void* user) {
 	if (!buffer || length < 1 || !user)
 		return;
-	sound* s = (sound*)user;
+	sound_base* s = (sound_base*)user;
 	float x = s->x - s->listener_x;
 	float y = s->y - s->listener_y;
 	float z = s->z - s->listener_z;
@@ -652,8 +652,10 @@ void sound_preloads_clean() {
 
 int sound_environment_thread(void* args) {
 	sound_environment* e = (sound_environment*)args;
-	while (e->ref_count > 0)
-		e->update();
+	while (e->ref_count > 0) {
+		e->background_update();
+	}
+	e->_detach_all();
 	return 0;
 }
 sound_environment::sound_environment() : ref_count(1), sim_inputs({}), scene_needs_commit(false), listener_modified(false) {
@@ -665,19 +667,19 @@ sound_environment::sound_environment() : ref_count(1), sim_inputs({}), scene_nee
 	simulation_settings.maxNumRays = 4096;
 	simulation_settings.numDiffuseSamples = 128;
 	simulation_settings.maxDuration = 2.0f;
-	simulation_settings.maxOrder = 1;
-	simulation_settings.maxNumSources = 16;
-	simulation_settings.numThreads = 4;
+	simulation_settings.maxOrder = 2;
+	simulation_settings.maxNumSources = 64;
+	simulation_settings.numThreads = 16;
 	simulation_settings.samplingRate = phonon_audio_settings.samplingRate;
 	simulation_settings.frameSize = phonon_audio_settings.frameSize;
 	iplSimulatorCreate(phonon_context, &simulation_settings, &sim);
 	IPLSceneSettings scene_settings{};
 	scene_settings.type = IPL_SCENETYPE_DEFAULT;
 	iplSceneCreate(phonon_context, &scene_settings, &scene);
-	sim_inputs.numRays = 2048;
+	sim_inputs.numRays = 4096;
 	sim_inputs.numBounces = 32;
 	sim_inputs.duration = 2.0f;
-	sim_inputs.order = 1;
+	sim_inputs.order = 2;
 	sim_inputs.irradianceMinDistance = 1.0f;
 	add_material("air", 0, 0, 0, 0, 1, 1, 1);
 	add_material("generic", 0.10f, 0.20f, 0.30f, 0.05f, 0.100f, 0.050f, 0.030f);
@@ -693,10 +695,11 @@ sound_environment::sound_environment() : ref_count(1), sim_inputs({}), scene_nee
 	add_material("rock", 0.13f, 0.20f, 0.24f, 0.05f, 0.015f, 0.002f, 0.001f);
 	iplSimulatorSetScene(sim, scene);
 	iplSimulatorCommit(sim);
-	//thread_create(sound_environment_thread, this, THREAD_STACK_SIZE_DEFAULT);
+	env_thread = thread_create(sound_environment_thread, this, THREAD_STACK_SIZE_DEFAULT);
 }
 sound_environment::~sound_environment() {
-	for (sound_base* s : attached) detach(s);
+	asAtomicDec(ref_count); // ref_count < 0 shuts down thread.
+	thread_join(env_thread);
 	iplSceneRelease(&scene);
 	iplSimulatorRelease(&sim);
 }
@@ -704,7 +707,9 @@ void sound_environment::add_ref() {
 	asAtomicInc(ref_count);
 }
 void sound_environment::release() {
-	if (asAtomicDec(ref_count) < 1) delete this;
+	if (asAtomicDec(ref_count) < 1) {
+		delete this;
+	}
 }
 bool sound_environment::add_material(const std::string& name, float absorption_low, float absorption_mid, float absorption_high, float scattering, float transmission_low, float transmission_mid, float transmission_high, bool replace_if_existing) {
 	if (!replace_if_existing && materials.find(name) != materials.end()) return false;
@@ -755,10 +760,10 @@ bool sound_environment::attach(sound_base* s) {
 	if (!s || s->env) return false;
 	IPLDirectEffectSettings direct_effect_settings{1};
 	iplDirectEffectCreate(phonon_context, &phonon_audio_settings, &direct_effect_settings, &s->direct_effect);
-	IPLReflectionEffectSettings reflection_effect_settings{IPL_REFLECTIONEFFECTTYPE_CONVOLUTION, 88200, 4};
+	IPLReflectionEffectSettings reflection_effect_settings{IPL_REFLECTIONEFFECTTYPE_CONVOLUTION, 88200, 9};
 	iplReflectionEffectCreate(phonon_context, &phonon_audio_settings, &reflection_effect_settings, &s->reflection_effect);
 	IPLAmbisonicsDecodeEffectSettings dec_settings{};
-	dec_settings.maxOrder = 1;
+	dec_settings.maxOrder = 2;
 	dec_settings.hrtf = phonon_hrtf_reflections;
 	dec_settings.speakerLayout = IPLSpeakerLayout{IPL_SPEAKERLAYOUTTYPE_STEREO};
 	iplAmbisonicsDecodeEffectCreate(phonon_context, &phonon_audio_settings, &dec_settings, &s->reflection_decode_effect);
@@ -779,8 +784,7 @@ bool sound_environment::attach(sound_base* s) {
 	attached.push_back(s);
 	return true;
 }
-bool sound_environment::detach(sound_base* s) {
-	if (!s || s->env != this) return false;
+bool sound_environment::_detach(sound_base* s) {
 	iplSourceRemove(s->source, sim);
 	iplSimulatorCommit(sim);
 	iplAmbisonicsDecodeEffectRelease(&s->reflection_decode_effect);
@@ -791,16 +795,29 @@ bool sound_environment::detach(sound_base* s) {
 	s->reflection_decode_effect = NULL;
 	s->reflection_effect = NULL;
 	s->direct_effect = NULL;
-	if (ref_count > 0) this->release(); // Possible for this to be called from destructor, thus this extra check.
 	s->env = NULL;
 	// Todo: Consider switching to some sort of map for faster removal?
 	auto it = std::find(attached.begin(), attached.end(), s);
 	if (it != attached.end()) attached.erase(it);
+	if (ref_count > 0) s->env_detaching.set();
+	return true;
+}
+void sound_environment::_detach_all() {
+	for (sound_base* s : attached) _detach(s);
+}
+bool sound_environment::detach(sound_base* s) {
+	if (!s || s->env != this) return false;
+	s->env = NULL;
+	detaching.push_back(s);
+	s->env_detaching.wait();
+	if (ref_count > 0) this->release();
 	return true;
 }
 mixer* sound_environment::new_mixer() {
 	mixer* s = new mixer();
+	s->use_hrtf = true;
 	attach(s);
+	if (!s->pos_effect) s->pos_effect = BASS_ChannelSetDSP(s->channel, positioning_dsp, s, 0	);
 	return s;
 }
 sound* sound_environment::new_sound() {
@@ -809,6 +826,14 @@ sound* sound_environment::new_sound() {
 	return s;
 }
 void sound_environment::update() {
+	iplSimulatorRunDirect(sim);
+}
+void sound_environment::background_update() {
+	for (sound_base* s : detaching) {
+		_detach(s);
+		if (ref_count < 1) return;
+	}
+	detaching.clear();
 	if (scene_needs_commit) {
 		iplSceneCommit(scene);
 		iplSimulatorCommit(sim);
@@ -822,14 +847,17 @@ void sound_environment::update() {
 		iplSimulatorSetSharedInputs(sim, IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS), &sim_inputs);
 		listener_modified = false;
 	}
-	iplSimulatorRunDirect(sim);
 	iplSimulatorRunReflections(sim);
 }
 void sound_environment::set_listener(float x, float y, float z, float rotation) {
+	listener_x = x;
+	listener_y = y;
+	listener_z = z;
+	listener_rotation = rotation;
 	sim_inputs.listener.right = IPLVector3{1, 0, 0};
 	sim_inputs.listener.up = IPLVector3{0, 0, 1};
-	sim_inputs.listener.ahead = IPLVector3{sin(rotation), cos(rotation), 0};
-	sim_inputs.listener.origin = IPLVector3{x, y, z};
+	sim_inputs.listener.ahead = IPLVector3{sin(listener_rotation), cos(listener_rotation), 0};
+	sim_inputs.listener.origin = IPLVector3{listener_x, listener_y, listener_z};
 	iplSimulatorSetSharedInputs(sim, IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS), &sim_inputs);
 }
 
@@ -1196,17 +1224,15 @@ BOOL sound_base::set_position(float listener_x, float listener_y, float listener
 	this->rotation = rotation;
 	this->pan_step = pan_step;
 	this->volume_step = volume_step;
-	if (output_mixer) {
-		if (x == listener_x && y == listener_y && z == listener_z && !env) {
-			if (pos_effect) {
-				BASS_ChannelRemoveDSP(output_mixer->channel, pos_effect);
-				if (hrtf_effect)
-					iplBinauralEffectReset(hrtf_effect);
-				pos_effect = 0;
-			}
-		} else if (!pos_effect)
-			pos_effect = BASS_ChannelSetDSP(output_mixer->channel, positioning_dsp, this, 0);
-	}
+	if (x == listener_x && y == listener_y && z == listener_z && !env) {
+		if (pos_effect) {
+			BASS_ChannelRemoveDSP(output_mixer? output_mixer->channel : channel, pos_effect);
+			if (hrtf_effect)
+				iplBinauralEffectReset(hrtf_effect);
+			pos_effect = 0;
+		}
+	} else if (!pos_effect)
+		pos_effect = BASS_ChannelSetDSP(output_mixer? output_mixer->channel : channel, positioning_dsp, this, 0);
 	if (source) {
 		IPLSimulationInputs inputs{};
 		inputs.flags = IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS);
@@ -1487,6 +1513,9 @@ mixer::mixer(mixer* parent, BOOL for_single_sound, BOOL for_decode, BOOL floatin
 		else
 			parent_mixer = NULL;
 	}
+	output_mixer = NULL;
+	hrtf_effect = NULL;
+	pos_effect = NULL;
 }
 
 mixer::~mixer() {
@@ -2052,6 +2081,7 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("sound", "void set_volume(float) property", asMETHOD(sound, set_volume_alt), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool slide_volume(float, uint)", asMETHOD(sound, slide_volume_alt), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool set_fx(const string &in, int = 0) const", asMETHOD(mixer, set_fx), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "bool set_position(float, float, float, float, float, float, float, float, float)", asMETHOD(mixer, set_position), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool set_mixer(mixer@ = null) const", asMETHOD(mixer, set_mixer), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool get_sliding() const property", asMETHOD(mixer, is_sliding), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool get_pan_sliding() const property", asMETHOD(mixer, is_pan_sliding), asCALL_THISCALL);

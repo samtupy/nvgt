@@ -156,6 +156,8 @@ int main(int argc, char** argv) {
 		if (ExecuteScript(engine, scriptfile) < 0) {
 			ShowAngelscriptMessages();
 			ScreenReaderUnload();
+			InputDestroy();
+			engine->ShutDownAndRelease();
 			return 1;
 		}
 		g_shutting_down = true;

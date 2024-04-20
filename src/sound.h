@@ -20,6 +20,8 @@
 #include <bass.h>
 #include <bass_fx.h>
 #include <phonon.h>
+#include <Poco/Event.h>
+#include <Poco/Mutex.h>
 #include <thread.h>
 #include <verblib.h>
 #include "misc_functions.h"
@@ -35,7 +37,7 @@ typedef struct {
 	unsigned char* data;
 	DWORD size;
 	int ref;
-	QWORD t;
+	unsigned long long t; // Time since preload was last used, stored using ticks().
 	std::string fn;
 } sound_preload;
 
@@ -66,14 +68,18 @@ class sound_base;
 class sound_environment {
 	IPLScene scene;
 	std::vector<sound_base*> attached;
+	std::vector<sound_base*> detaching;
 	std::unordered_map<std::string, IPLMaterial> materials;
 	bool scene_needs_commit = false;
+	bool _detach(sound_base* s);
 public:
 	int ref_count;
 	IPLSimulator sim;
 	IPLSimulationSharedInputs sim_inputs;
 	float listener_x, listener_y, listener_z, listener_rotation;
 	bool listener_modified;
+	thread_ptr_t env_thread;
+	Poco::Mutex env_thread_sim_running;
 	sound_environment();
 	~sound_environment();
 	void add_ref();
@@ -84,7 +90,9 @@ public:
 	sound* new_sound();
 	bool attach(sound_base* s);
 	bool detach(sound_base* s);
+	void _detach_all();
 	void update();
+	void background_update(); // Runs on an internal thread, where as update is called by the user.
 	void set_listener(float x, float y, float z, float rotation);
 };
 
@@ -98,6 +106,7 @@ public:
 	IPLDirectEffect direct_effect;
 	IPLReflectionEffect reflection_effect;
 	IPLAmbisonicsDecodeEffect reflection_decode_effect;
+	Poco::Event env_detaching;
 	HDSP pos_effect;
 	mixer* output_mixer;
 	mixer* parent_mixer;
