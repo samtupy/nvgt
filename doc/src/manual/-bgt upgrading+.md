@@ -1,5 +1,5 @@
 # Upgrading from bgt
-Since for a while this is where most people who have heard of NVGT will likely start, we will begin by describing the relationship between NVGT and BGT, and more importantly the steps required to upgrade a BGT project to an NVGT one. If you have not heard of BGT and/or are completely new to game development, you can probably skip this and move to the frehs start topic.
+Since for a while this is where most people who have heard of NVGT will likely start, we will begin by describing the relationship between NVGT and BGT, and more importantly the steps required to upgrade a BGT project to an NVGT one. If you have not heard of BGT or are completely new to game development and are wondering how NVGT can help you, you can probably skip this and move to the fresh start topic.
 
 BGT stands for the Blastbay Gaming Toolkit, and is what initially enspired NVGT to be created after BGT was made into abandonware.
 

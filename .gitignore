@@ -16,6 +16,7 @@ __pycache__
 build/windev_path
 .sconsign.dblite
 *.orig
+release/lib/3rd_party_licenses.html
 
 # private user space and dependencies
 user/**
