@@ -62,7 +62,7 @@ if ARGUMENTS.get("no_user", "0") == "0":
 		SConscript("user/_SConscript", exports = {"plugin_env": plugin_env, "nvgt_env": env})
 SConscript("ASAddon/_SConscript", variant_dir = "build/obj_ASAddon", duplicate = 0, exports = "env")
 SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, exports = "env")
-nvgt = env.Program("release/nvgt", sources)
+nvgt = env.Program("release/nvgt", sources, PDB = "#build/debug/nvgt.pdb")
 if env["PLATFORM"] == "win32": env.Install("c:/nvgt", nvgt)
 
 # stubs
