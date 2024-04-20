@@ -116,3 +116,40 @@ Changes were roughly untracked before this time, but there is a rather large lis
 * Partially recoded pack streaming system to hopefully reduce sound crashes.
 * Various random speed improvements and fixes.
 
+## New as of 06/30/2022:
+* Fixes a few speed issues with includes.
+* adds ini.list_wildcard_sections().
+
+## New as of 06/02/2022:
+* Mostly works on making sound/pack more threadsafe.
+* Make ini loading robust.
+* Documents thread lock functions.
+
+## New as of 05/26/2022:
+* Documentation and test for include/music.nvgt.
+* Updated readme a bit.
+* Working on sound callbacks.
+* Enabled bass_asyncfile for faster sound playback.
+
+## New as of 05/22/2022:
+* Updated INI.
+
+## New as of 05/21/2022:
+* sound.set_length() for streaming sounds.
+
+## New as of 05/15/2022:
+* Fixed run function regarding filenames with spaces.
+* FTP uploads.
+* MLSD directory listings with internet_request.
+
+## New as of 05/08/2022:
+* Bullet3 vectors.
+* size_to_string updates.
+* Other misc.
+
+## New as of 04/26/2022:
+* Sound preloading.
+* byteshift encryption.
+* timer_queue.exists and timer_queue.is_repeating.
+* Minor speed improvements.
+
