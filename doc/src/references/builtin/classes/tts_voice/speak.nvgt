@@ -1,0 +1,16 @@
+/**
+	Speak a string of text through the currently active TTS voice.
+	bool tts_voice::speak(string  text, bool interrupt = false);
+	## Arguments:
+		* string text: the text to be spoken.
+		* bool interrupt = false: whether or not to interrupt the previously speaking speech to speak the new string.
+	## Returns:
+		bool: true if speech was successful, false otherwise.
+*/
+
+// Example:
+void main() {
+	tts_voice v;
+	v.speak("Hello, world!");
+	while (v.speaking) {}
+}

@@ -1,5 +1,5 @@
 // Logger class taken pretty much directly from bgt for games that need to use it, very few modifications here.
-// Copyright (C) 2010-2014 Blastbay Studios, zlib like license
+// Copyright (C) 2010-2014 Blastbay Studios, zlib-Like license
 
 class logger {
 

@@ -12,5 +12,5 @@
 
 // Example:
 void main() {
-	alert("Your random character is", random_character("a", "z"));
+	alert("Your random alphabetical character is", random_character("a", "z"));
 }

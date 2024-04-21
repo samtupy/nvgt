@@ -7,8 +7,8 @@ void main() {
 	show_window("test");
 	while (!key_down(KEY_ESCAPE)) {
 		wait(5);
-		if (key_pressed(KEY_NUMPADENTER)) v.speak_interrupt("NPEnter");
-		if (key_pressed(KEY_NUMPAD5)) v.speak_interrupt("NP5");
+		if (key_pressed(KEY_NUMPAD_ENTER)) v.speak_interrupt("NPEnter");
+		if (key_pressed(KEY_NUMPAD_5)) v.speak_interrupt("NP5");
 	}
 
 }

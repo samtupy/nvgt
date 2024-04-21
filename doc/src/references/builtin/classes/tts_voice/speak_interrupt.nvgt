@@ -1,0 +1,21 @@
+/**
+	Speaks a string (forcefully interrupting) through the currently active text-to-speech voice.
+	bool tts_voice::speak_interrupt(string  text);
+	## Arguments:
+		* string text: the text to speak.
+	## Returns:
+		bool: true if the speech was generated successfully, false otherwise.
+*/
+
+// Example:
+void main() {
+	int orig_ticks = ticks();
+	tts_voice v;
+	v.speak("This is an incredibly long string that will eventually get cut off by a much worse one.");
+	while (v.speaking) {
+		if ((ticks() - orig_ticks) > 250)
+			break;
+	}
+	v.speak_interrupt("You have been interrupted!");
+	while (v.speaking) {}
+}

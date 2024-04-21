@@ -144,8 +144,7 @@ bool tts_voice::speak(const std::string& text, bool interrupt) {
 	return true;
 }
 bool tts_voice::speak_to_file(const std::string& filename, const std::string& text) {
-	if (text == "" || filename == "")
-		return false;
+	if (text == "" || filename == "") return false;
 	char* data;
 	unsigned long bufsize;
 	if (voice_index == builtin_index) {
@@ -178,8 +177,7 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 	#endif
 	char* ptr = minitrim(data, &bufsize, bitrate, channels);
 	FILE* f = fopen(filename.c_str(), "wb");
-	if (!f)
-		return false;
+	if (!f) return false;
 	wav_header h = make_wav_header(44 + bufsize, samprate, bitrate, channels);
 	fwrite(&h, 1, sizeof(wav_header), f);
 	fwrite(ptr, bufsize, 1, f);

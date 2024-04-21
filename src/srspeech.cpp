@@ -52,8 +52,7 @@ std::string ScreenReaderDetect() {
 	#ifdef _WIN32
 	if (!ScreenReaderLoad()) return "";
 	const wchar_t* srname = Tolk_DetectScreenReader();
-	if (srname == NULL)
-		return "";
+	if (srname == NULL) return "";
 	char srnameA[64];
 	memset(srnameA, 0, 64);
 	WideCharToMultiByte(CP_UTF8, 0, srname, wcslen(srname), srnameA, 64, NULL, NULL);

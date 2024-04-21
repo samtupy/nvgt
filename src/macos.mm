@@ -20,7 +20,7 @@ extern NSWindow* g_OSWindowHandle; // Voice over speech unfortunately only works
 bool voice_over_announce(const std::string& message) {
 	if (!g_OSWindowHandle) return false;
 	NSString* nsmsg = [NSString stringWithUTF8String:message.c_str()];
-	NSAccessibilityPostNotificationWithUserInfo(g_OSWindowHandle, NSAccessibilityAnnouncementRequestedNotification, @ {NSAccessibilityAnnouncementKey: nsmsg, NSAccessibilityPriorityKey: @(NSAccessibilityPriorityHigh)});
+	NSAccessibilityPostNotificationWithUserInfo(g_OSWindowHandle, NSAccessibilityAnnouncementRequestedNotification, @{NSAccessibilityAnnouncementKey: nsmsg, NSAccessibilityPriorityKey: @(NSAccessibilityPriorityHigh)});
 	return [NSApp keyWindow] == g_OSWindowHandle;
 }
 

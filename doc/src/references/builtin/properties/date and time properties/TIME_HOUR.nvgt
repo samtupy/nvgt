@@ -5,5 +5,5 @@
 
 // Example:
 void main() {
-	alert("Example", "It is currently " + TIME_HOUR);
+	alert("Example", "It is currently " + TIME_HOUR + ":00");
 }

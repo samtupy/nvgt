@@ -1,0 +1,27 @@
+/**
+	Outputs a string of text through the currently active TTS voice to a wave file.
+	bool tts_voice::speak_to_file(string filename, string text);
+	## Arguments:
+		* string filename: the filename to write to.
+		* string text: the text to synthesize.
+	## Returns:
+		bool: true if synthesis was successful and the file was written, false otherwise.
+*/
+
+// Example:
+void main() {
+	// This is actually quite broken currently, it only ever writes  a 4 KB wav file. I think the problem is probably in speaking to memory in general, also see test/speak_to_file.nvgt.
+	string filename = input_box("Filename", "Enter the name of the file to save to (without the .wav extension).");
+	if (filename.is_empty()) {
+		alert("Error", "You didn't type a filename.");
+		exit();
+	}
+	string text = input_box("Text", "Enter the text to synthesize.");
+	if (text.is_empty()) {
+		alert("Error", "You didn't type any text.");
+		exit();
+	}
+	tts_voice v;
+	v.speak_to_file(filename + ".wav", text);
+	alert("Info", "Done!");
+}
