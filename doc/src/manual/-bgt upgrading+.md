@@ -3,7 +3,7 @@ Since for a while this is where most people who have heard of NVGT will likely s
 
 BGT stands for the Blastbay Gaming Toolkit, and is what initially enspired NVGT to be created after BGT was made into abandonware.
 
-It is important to note that NVGT is not officially endorsed by BGT's developers and contributers, and NVGT is not in any way derived from BGT's source code. The only shared assets between NVGT and BGT are some of BGT's include files such as the audio_form and sound_pool used by many bgt games, and which are released under a zlib license.
+It is important to note that NVGT is not officially endorsed by BGT's developers and contributers, and NVGT is not in any way derived from BGT's source code. The only shared assets between NVGT and BGT are some of BGT's include files such as the audio_form and sound_pool used by many bgt games, which are released under a zlib license.
 
 our goal is to make the transission as seemless as possible from BGT to NVGT, but here are some things you should know when porting an existing BGT game.
 

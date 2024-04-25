@@ -14,35 +14,38 @@
 #include <Poco/Format.h>
 
 // Not sure if this should be in another header, if I use this for more than Poco I may consider it. I'm so tired of trying to decide whether to register angelscript types as value or reference. I'm always turned away from reference types because well, the classes I want to wrap have no reference counter. Look maybe this could have been done with c++ multiple inheritance or something, but my brain is tired of learning new concepts for the moment and so hopefully this is portable enough to make better later. Following are methods for attaching a reference counter to any class for registration with angelscript as a reference type.
-template <class T> struct angelscript_refcounted {
-	T obj;
-	int magic; // Verification encase a pointer of the objects type tries to get passed to the script, if this value doesn't match in memory we can return null or something, or even better create one of these structures so that the object could be supported?
+struct angelscript_refcounted {
 	int refcount;
-	bool keep; // If this is set to true then the release function shouldn't destroy the object upon 0 refcount.
+	int magic; // Verification encase a pointer of the objects type tries to get passed to the script, if this value doesn't match in memory we can return null or something, or even better create one of these structures so that the object could be supported?
 };
-template <class T> inline void* angelscript_refcounted_create(bool keep = false) {
-	angelscript_refcounted<T>* rc = (angelscript_refcounted<T>*) malloc(sizeof(angelscript_refcounted<T>)); // We don't use the new operator here because we don't want the constructor of the containing object to fire until the user's factory function.
+template <class T> inline void* angelscript_refcounted_create() {
+	angelscript_refcounted* rc = (angelscript_refcounted*) malloc(sizeof(angelscript_refcounted) + sizeof(T)); // We don't use the new operator here because we don't want the constructor of the containing object to fire until the user's factory function.
 	rc->refcount = 1;
-	rc-> keep = keep;
 	rc->magic = 0x1234abcd;
-	return &rc->obj;
+	return (char*)rc + sizeof(angelscript_refcounted);
 }
-template <class T> inline angelscript_refcounted<T>* angelscript_refcounted_get(void* obj) {
-	angelscript_refcounted<T>* rc = reinterpret_cast<angelscript_refcounted<T>*>(obj); // Since obj is the first member of the angelscript_refcounted structure, we should be able to cast this pointer to that structure's type to get the refcount.
+inline angelscript_refcounted* angelscript_refcounted_get(void* obj) {
+	angelscript_refcounted* rc = reinterpret_cast<angelscript_refcounted*>((char*)obj - sizeof(angelscript_refcounted));
 	if (rc->magic != 0x1234abcd) return NULL; // This pointer didn't originate from our factory.
 	return rc;
 }
 template <class T> void angelscript_refcounted_duplicate(void* obj) {
-	angelscript_refcounted<T>* rc = angelscript_refcounted_get<T>(obj);
+	angelscript_refcounted* rc = angelscript_refcounted_get(obj);
 	if (rc) asAtomicInc(rc->refcount);
 }
-template <class T> void angelscript_refcounted_release(void* obj) {
-	angelscript_refcounted<T>* rc = angelscript_refcounted_get<T>(obj);
+template <class T> void angelscript_refcounted_release(T* obj) {
+	angelscript_refcounted* rc = angelscript_refcounted_get(obj);
 	if (!rc) return;
 	if (asAtomicDec(rc->refcount) < 1) {
-		rc->obj.~T(); // Since we created the refcounted structure with malloc in order to manually call object's constructor, we need to manually call the destructor as well.
-		free(obj);
+		obj->~T(); // Since we created the refcounted structure with malloc in order to manually call object's constructor, we need to manually call the destructor as well.
+		free(rc);
 	}
+}
+template <class T1, class T2> T2* angelscript_refcounted_refcast(T1* obj) {
+	T2* obj_casted = dynamic_cast<T2>(obj);
+	if (!obj_casted) return NULL;
+	angelscript_refcounted_duplicate(obj);
+	return obj_casted;
 }
 template <class T> inline void angelscript_refcounted_register(asIScriptEngine* engine, const char* type, const char* parent = NULL) {
 	engine->RegisterObjectType(type, 0, asOBJ_REF);
