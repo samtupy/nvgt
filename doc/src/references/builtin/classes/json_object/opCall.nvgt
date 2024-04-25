@@ -1,0 +1,22 @@
+/**
+	Get a value out of a JSON object using a query.
+	var@ json_object::opCall(string query);
+	## Arguments:
+		* string query: the JSON query (see the remarks section for details).
+	## Returns:
+		var@: a handle to the object, null if not found.
+	## Remarks:
+		Queries are formatted like so:
+		> first_field.subfield.subfield
+		It can be as nested as you like.
+		This method also works on json_array's, and you access array indexes just with their raw numbers, like so:
+		> world.players.0
+*/
+
+// Example:
+void main() {
+	string data = """{"countries":{"us":["Colorado", "Kansas", "Minnesota"]}}""";
+	json_object@ o = parse_json(data);
+	string locations = o("countries.us");
+	alert("My favorite states are", locations);
+}

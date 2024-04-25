@@ -1,0 +1,13 @@
+/**
+	Clears the JSON array completely.
+	void json_array::clear();
+*/
+
+// Example:
+void main() {
+	string data = "[1, 2, 3, 4, 5]";
+	json_array@ arr = parse_json(data);
+	alert("Before being cleared", arr.stringify());
+	arr.clear();
+	alert("After being cleared", arr.stringify());
+}

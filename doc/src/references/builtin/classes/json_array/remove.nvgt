@@ -1,0 +1,15 @@
+/**
+	Remove a value from the JSON array given an index.
+	void json_array::remove(uint index);
+	## Arguments:
+		* uint index: the index of the value to remove.
+*/
+
+// Example:
+void main() {
+	string data = """[47, 4, 584, 43, 8483]""";
+	json_array@ arr = parse_json(data);
+	alert("Initial", arr.stringify());
+	arr.remove(2);
+	alert("After removal", arr.stringify());
+}

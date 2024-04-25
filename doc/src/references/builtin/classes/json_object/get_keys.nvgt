@@ -1,0 +1,16 @@
+/**
+	Get a list of all the keys in the JSON object.
+	string[]@ json_object::get_keys();
+	## Returns:
+		string[]@: a handle to an array of strings containing all the keys of the JSON object.
+	## Remarks:
+		Note that this function isn't recursive, you only get the keys for the object you're running this function on, not any child objects.
+*/
+
+// Example:
+void main() {
+	string data = """{"thing": 1, "other_thing": "test", "another": true}""";
+	json_object@ o = parse_json(data);
+	string[]@ keys = o.get_keys();
+	alert("The keys are", join(keys, ", "));
+}

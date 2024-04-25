@@ -1,0 +1,15 @@
+/**
+	Resize a grid to the given width and height.
+	void grid::resize(uint width, uint height);
+	## Arguments:
+		* uint width: the width you want to resize the grid to.
+		* uint height: the height you want to resize the grid to.
+*/
+
+// Example:
+void main() {
+	grid<int> g(5, 5);
+	alert("Original width and height", g.width() + ", " + g.height());
+	g.resize(random(1, 100), random(1, 100));
+	alert("New width and height", g.width() + ", " + g.height());
+}

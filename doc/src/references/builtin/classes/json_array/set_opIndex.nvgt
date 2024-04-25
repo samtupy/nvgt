@@ -1,0 +1,14 @@
+/**
+	Set a value in the JSON array at a particular position.
+	void json_array::set_opIndex(uint index, var@ value) property;
+	## Arguments:
+		* uint index: the index to insert the item at.
+		* var@ value: the value to set.
+*/
+
+// Example:
+void main() {
+	json_array@ arr = parse_json("[]");
+	arr[0] = "meow";
+	alert("Info", "Cats say " + arr[0]);
+}

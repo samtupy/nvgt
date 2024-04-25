@@ -1,0 +1,15 @@
+/**
+	Get a value out of the JSON object with literal syntax, for example `json["key"]`.
+	var@ json_object::get_opIndex(string key) property;
+	## Arguments:
+		* string key: the key of the object to get.
+	## Returns:
+		var@: a handle to the object, or null if not found.
+*/
+
+// Example:
+void main() {
+	string data = """{"name": "Quin", "age": 18}""";
+	json_object@ o = parse_json(data);
+	alert("Info", o["name"] + " is " + o["age"]);
+}

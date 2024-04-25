@@ -1,0 +1,12 @@
+/**
+	Returns the current height of the grid.
+	uint grid::height();
+	## Returns:
+		uint: the height  of the grid.
+*/
+
+// Example:
+void main() {
+	grid<int> g(random(1, 10), random(1, 10));
+	alert("Grid height is", g.height());
+}

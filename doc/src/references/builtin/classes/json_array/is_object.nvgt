@@ -1,0 +1,15 @@
+/**
+	Determine if the value at the given index is a JSON object.
+	bool json_array::is_object(uint index);
+	## Arguments:
+		* uint index: the position of the item.
+	## Returns:
+		bool: true if the value at the specified index is a JSON object, false otherwise.
+*/
+
+// Example:
+void main() {
+	json_array@ arr = parse_json("""[{}, {}, "test", {}]""");
+	alert("Info", "Position 0 " + (arr.is_object(0) ? "is an object" : "is not an object"));
+	alert("Info", "Position 2 " + (arr.is_object(2) ? "is an object": "is not an object"));
+}

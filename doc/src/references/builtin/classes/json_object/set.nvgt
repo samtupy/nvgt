@@ -1,0 +1,14 @@
+/**
+	Set a value in a JSON object.
+	void json_object::set(string key, var@ value);
+	## Arguments:
+		* string key: the key to give the value.
+		* var@ value: a handle to the value to be set.
+*/
+
+// Example:
+void main() {
+	json_object@ o = parse_json("{}");;
+	o.set("nvgt_user", true);
+	alert("Info", (bool(o["nvgt_user"]) ? "You are an NVGT user" : "You are not a regular NVGT user"));
+}

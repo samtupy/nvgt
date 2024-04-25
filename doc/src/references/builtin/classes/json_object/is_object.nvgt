@@ -1,0 +1,15 @@
+/**
+	Determine if the value with the given key is a JSON object or not.
+	bool json_object::is_object(string key);
+	## Arguments:
+		* string key: the key to query.
+	## Returns:
+		bool: true if the value with the specified key is a JSON object, false otherwise.
+*/
+
+// Example:
+void main() {
+	string data = """{"json_object": {}}""";
+	json_object@ o = parse_json(data);
+	alert("Info", o.is_object("json_object") ? "Object" : "Non-object");
+}

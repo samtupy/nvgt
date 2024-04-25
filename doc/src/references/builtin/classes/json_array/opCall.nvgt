@@ -1,0 +1,20 @@
+/**
+	Get a value out of a JSON array using a query.
+	var@ json_array::opCall(string query);
+	## Arguments:
+		* string query: the JSON query (see the remarks section for details).
+	## Returns:
+		var@: a handle to the object, or null if it couldn't be found.
+	## Remarks:
+		Queries are formatted like so, using key names and indexes seperated with ".":
+		> world.player.0
+		It can be as nested as you like.
+*/
+
+// Example:
+void main() {
+	string data = """[[["Colorado", "Kansas", "Minnesota"]]]""";
+	json_array@ arr = parse_json(data);
+	string location = arr("0.0.0");
+	alert("My favorite state is", location);
+}

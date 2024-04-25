@@ -592,7 +592,7 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("json_array", "var@ get_opIndex(uint) property", asMETHOD(poco_json_array, get), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "void set_opIndex(uint, const var&in) property", asMETHOD(poco_json_array, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "void add(var@)", asMETHOD(poco_json_array, add), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_array", "var@ opCall(uint)", asMETHOD(poco_json_array, query), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "var@ opCall(const string&in) const", asMETHOD(poco_json_array, query), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "string stringify(int indent = 0, int step = -1)", asMETHOD(poco_json_array, stringify), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "uint length()", asMETHOD(JSON::Array, size), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
 	engine->RegisterObjectMethod("json_array", "uint size()", asMETHOD(JSON::Array, size), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);

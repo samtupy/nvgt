@@ -1,0 +1,16 @@
+/**
+	Get a value out of the JSON arraywith literal syntax, for example `arr[2]`.
+	var@ json_array::get_opIndex(uint index) property;
+	## Arguments:
+		* uint index: the index of the value to get.
+	## Returns:
+		var@: a handle to the object, or null if not found.
+*/
+
+// Example:
+void main() {
+	json_array@ cats = parse_json("""["Athena", "Willow", "Punk", "Franky", "Yoda", "Waffles"]""");
+	alert("The third cat is", cats[2]);
+	for (uint i = 0; i < cats.size(); i++)
+		alert("Awww", "Hi " + cats[i]);
+}

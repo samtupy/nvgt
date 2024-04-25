@@ -1,0 +1,13 @@
+/**
+	Clears the JSON object completely.
+	void json_object::clear();
+*/
+
+// Example:
+void main() {
+	string data = """{"numbers": [1, 2, 3, 4, 5]}""";
+	json_object@ o = parse_json(data);
+	alert("Before being cleared", o.stringify());
+	o.clear();
+	alert("After being cleared", o.stringify());
+}

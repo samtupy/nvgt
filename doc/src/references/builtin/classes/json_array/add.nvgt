@@ -1,0 +1,14 @@
+/**
+	Add a value to the end of a JSON array.
+	void json_array::add(var@ value);
+	## Arguments:
+		* var@ value: a handle to the value to be set.
+*/
+
+// Example:
+void main() {
+	json_array@ arr = parse_json("[]");;
+	for (uint i = 0; i < 5; i++)
+		arr.add(random(1, 100));
+	alert("Filled array", arr.stringify());
+}

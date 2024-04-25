@@ -1,0 +1,18 @@
+/**
+	Return the size of the JSON array.
+	uint json_array::size();
+*/
+
+// Example:
+void main() {
+	string data = "[";
+	for (int i = 0; i < random(10, 20); i++)
+		data += i + ", ";
+	// Strip off the trailing comma and space character, as they'll make the JSON throw a syntax error.
+	data.erase(data.length() - 1);
+	data.erase(data.length() - 1);
+	data += "]";
+	clipboard_set_text(data);
+	json_array@ arr = parse_json(data);
+	alert("Info", "The JSON array contains " + arr.size() + " items");
+}

@@ -1,0 +1,15 @@
+/**
+	Remove a value from the JSON object given a key.
+	void json_object::remove(string key);
+	## Arguments:
+		* string key: the key of the value to remove.
+*/
+
+// Example:
+void main() {
+	string data = """{"name": "Quin"}""";
+	json_object@ o = parse_json(data);
+	alert("Initial", o.stringify());
+	o.remove("name");
+	alert("After removal", o.stringify());
+}

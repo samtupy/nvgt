@@ -1,0 +1,13 @@
+/**
+	Return the size of the JSON object.
+	uint json_object::size();
+	## Remarks:
+		Note that this function returns the number of top-level keys; it's not recursive.
+*/
+
+// Example:
+void main() {
+	string data = """{"numbers": [1, 2, 3, 4, 5]}""";
+	json_object@ o = parse_json(data);
+	alert("Info", "The json object's size is " + o.size());
+}

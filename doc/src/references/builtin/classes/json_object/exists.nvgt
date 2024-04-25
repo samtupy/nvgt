@@ -1,0 +1,15 @@
+/**
+	Determine if a key exists in the JSON object.
+	bool json_object::exists(string key);
+	## Arguments:
+		* string: the key to search for.
+	## Returns:
+		bool: true if the key exists, false if not.
+*/
+
+// Example:
+void main() {
+	string data = """{"engine": "NVGT"}""";
+	json_object@ o = parse_json(data);
+	alert("Info", (o.exists("engine") ? "The key exists" : "The key does not exist"));
+}

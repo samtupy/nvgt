@@ -1,0 +1,12 @@
+/**
+	Determine if the JSON array is empty.
+	const bool json_array::empty;
+*/
+
+// Example:
+void main() {
+	json_array@ arr = parse_json("[]");
+	json_array@ arr2 = parse_json("[1, 2, 3]");
+	alert("First is empty", arr.empty ? "true" : "false");
+	alert("Second is empty", arr2.empty ? "true" : "false");
+}

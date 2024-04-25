@@ -1,0 +1,12 @@
+/**
+	Returns the current width of the grid.
+	uint grid::width();
+	## Returns:
+		uint: the width of the grid.
+*/
+
+// Example:
+void main() {
+	grid<int> g(random(1, 10), random(1, 10));
+	alert("Grid width is", g.width());
+}

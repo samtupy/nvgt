@@ -1,0 +1,16 @@
+/**
+	Return the JSON array as a string.
+	string json_array::stringify(int indent = 0, int step = -1);
+	## Arguments:
+		* int indent = 0: specifies how many spaces to use to indent the JSON. If 0, no indentation or formatting is performed.
+		* int step = -1: the outwards indentation step, for example setting it to two would cause your outdents to only be two spaces. -1 (the default) keeps it how it is, normally you don't need to use this parameter.
+	## Returns:
+		string: the JSON array as a string.
+*/
+
+// Example:
+void main() {
+	string data = """["Apple", "Banana", "Orange", "Lemon"]""";
+	json_array@ arr = parse_json(data);
+	alert("JSON array", arr.stringify(4));
+}

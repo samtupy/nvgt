@@ -1,0 +1,15 @@
+/**
+	Determine if the value with the given key is null.
+	bool json_object::is_null(string key);
+	## Arguments:
+		* string key: the key to query.
+	## Returns:
+		bool: true if the value with the specified key is null.
+*/
+
+// Example:
+void main() {
+	string data = """{"brain": null}""";
+	json_object@ o = parse_json(data);
+	alert("Info", o.is_null("brain") ? "null" : "nonull");
+}

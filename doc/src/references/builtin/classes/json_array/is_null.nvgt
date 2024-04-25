@@ -1,0 +1,15 @@
+/**
+	Determine if the value at the given index is null.
+	bool json_array::is_null(uint index);
+	## Arguments:
+		* uint index: the position of the item.
+	## Returns:
+		bool: true if the value at the specified index is null, false otherwise.
+*/
+
+// Example:
+void main() {
+	json_array@ arr = parse_json("[1, 2, null, 4]");
+	alert("Info", "Index 1 " + (arr.is_null(1) ? " is null": " is not null"));
+	alert("Info", "Index 2 " + (arr.is_null(2) ? " is null": " is not null"));
+}

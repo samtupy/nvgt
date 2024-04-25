@@ -1,0 +1,14 @@
+/**
+	Set a value in the JSON object with a particular key.
+	void json_object::set_opIndex(string key, var@ value) property;
+	## Arguments:
+		* string key: the key of the object.
+		* var@ value: the value to set.
+*/
+
+// Example:
+void main() {
+	json_object@ o = parse_json("{}");
+	o["name"] = "Quin";
+	alert("Hi", "I am " + o["name"]);
+}

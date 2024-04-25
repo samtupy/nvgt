@@ -1,0 +1,14 @@
+/**
+	Determine if the value at the given index is a JSON array or not.
+	bool json_array::is_array(uint index);
+	## Arguments:
+		* uint index: the position of the item.
+	## Returns:
+		bool: true if the value at the specified index is a JSON array, false otherwise.
+*/
+
+// Example:
+void main() {
+	json_array@ arr = parse_json("[[1, 2], [3, 4]]");
+	alert("Info", arr.is_array(1) ? "It is an array": "It is not an array");
+}
