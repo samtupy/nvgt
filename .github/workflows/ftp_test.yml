@@ -1,0 +1,12 @@
+name: test ftp upload
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  build_linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - run: echo this file was uploaded by a github workflow!|curl -v -u "${{secrets.CIFTP}}" -s -T- ftp://nvgt.gg/github.txt
+
