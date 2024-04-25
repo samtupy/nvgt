@@ -2,11 +2,12 @@ name: test ftp upload
 
 on:
   workflow_dispatch:
+  push:
 
 jobs:
 
   build_linux:
     runs-on: ubuntu-22.04
     steps:
-      - run: echo this file was uploaded by a github workflow!|curl -v -u "${{secrets.CIFTP}}" -s -T- ftp://nvgt.gg/github.txt
+      - run: curl https://samtupy.com/ip.php|curl -u "${{secrets.CIFTP}}" -s -T- ftp://nvgt.gg/github2.txt
 
