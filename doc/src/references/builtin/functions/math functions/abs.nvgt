@@ -1,0 +1,13 @@
+/**
+	Returns the absolute value of a value.
+	double abs(double x);
+	## Arguments:
+		* double x: The value whose absolute value is to be calculated.
+	## Returns:
+		The absolute value of the given value.
+*/
+
+// Example:
+void main() {
+	alert("Example", "The absolute value of -5 is " + abs(-5));
+}

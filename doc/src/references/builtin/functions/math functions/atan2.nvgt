@@ -1,0 +1,14 @@
+/**
+	Returns the arc tangent of y/x, where y and x are the coordinates of a point.
+	double atan2(double y, double x);
+	## Arguments:
+		* double y: The ordinate coordinate.
+		* double x: The abscissa coordinate.
+	## Returns:
+		The arc tangent of y/x.
+*/
+
+// Example:
+void main() {
+    alert("Example", "The arc tangent of (1, 2) is " + atan2(1, 2) + " radians");
+}

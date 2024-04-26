@@ -1,0 +1,13 @@
+/**
+	Returns the arc tangent of a value in radians.
+	double atan(double x);
+	## Arguments:
+		* double x: The value whose arc tangent is to be calculated.
+	## Returns:
+		The arc tangent of the given value.
+*/
+
+// Example:
+void main() {
+    alert("Example", "The arc tangent of 1 is " + atan(1) + " radians");
+}

@@ -1,0 +1,14 @@
+/**
+	Returns the value of a number rounded to the nearest integer.
+	double round(double n, int p);
+	## Arguments:
+		* double n: The number to be rounded.
+		* int p: The number of decimal places to round to.
+	## Returns:
+		The value of the number rounded to the nearest integer.
+*/
+
+// Example:
+void main() {
+	alert("Example", "Rounding 3.14159 to 2 decimal places gives " + round(3.14159, 2));
+}

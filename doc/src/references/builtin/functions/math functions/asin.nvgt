@@ -1,0 +1,13 @@
+/**
+	Returns the arc sine of a value in radians.
+	double asin(double x);
+	## Arguments:
+		* double x: The value whose arc sine is to be calculated.
+	## Returns:
+		The arc sine of the given value.
+*/
+
+// Example:
+void main() {
+    alert("Example", "The arc sine of 0.5 is " + asin(0.5) + " radians");
+}

@@ -1,0 +1,13 @@
+/**
+	Returns the natural logarithm (base e) of a value.
+	double log(double x);
+	## Arguments:
+		* double x: The value whose natural logarithm is to be calculated.
+	## Returns:
+		The natural logarithm of the given value.
+*/
+
+// Example:
+void main() {
+    alert("Example", "The natural logarithm of 10 is " + log(10));
+}

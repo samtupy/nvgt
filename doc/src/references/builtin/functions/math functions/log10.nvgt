@@ -1,0 +1,13 @@
+/**
+	Returns the base 10 logarithm of a value.
+	double log10(double x);
+	## Arguments:
+		* double x: The value whose base 10 logarithm is to be calculated.
+	## Returns:
+		The base 10 logarithm of the given value.
+*/
+
+// Example:
+void main() {
+    alert("Example", "The base 10 logarithm of 100 is " + log10(100));
+}

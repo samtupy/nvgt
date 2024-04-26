@@ -1,0 +1,13 @@
+/**
+	Returns the arc cosine of a value in radians.
+	double acos(double x);
+	## Arguments:
+		* double x: The value whose arc cosine is to be calculated.
+	## Returns:
+		The arc cosine of the given value.
+*/
+
+// Example:
+void main() {
+    alert("Example", "The arc cosine of 0.5 is " + acos(0.5) + " radians");
+}

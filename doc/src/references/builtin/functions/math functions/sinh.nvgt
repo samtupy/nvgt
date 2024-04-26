@@ -1,0 +1,13 @@
+/**
+	Returns the hyperbolic sine of a value.
+	double sinh(double x);
+	## Arguments:
+		* double x: The value whose hyperbolic sine is to be calculated.
+	## Returns:
+		The hyperbolic sine of the given value.
+*/
+
+// Example:
+void main() {
+    alert("Example", "The hyperbolic sine of 2 is " + sinh(2));
+}

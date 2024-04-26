@@ -1,0 +1,13 @@
+/**
+	Returns the smallest integer greater than or equal to a value.
+	double ceil(double x);
+	## Arguments:
+		* double x: The value whose ceiling is to be calculated.
+	## Returns:
+		The smallest integer greater than or equal to x.
+*/
+
+// Example:
+void main() {
+	alert("Example", "The ceiling of 3.14 is " + ceil(3.14));
+}

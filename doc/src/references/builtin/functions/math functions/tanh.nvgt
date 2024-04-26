@@ -1,0 +1,13 @@
+/**
+	Returns the hyperbolic tangent of a value.
+	double tanh(double x);
+	## Arguments:
+		* double x: The value whose hyperbolic tangent is to be calculated.
+	## Returns:
+		The hyperbolic tangent of the given value.
+*/
+
+// Example:
+void main() {
+    alert("Example", "The hyperbolic tangent of 2 is " + tanh(2));
+}

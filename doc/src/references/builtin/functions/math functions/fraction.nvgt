@@ -1,0 +1,13 @@
+/**
+	Returns the fractional part of a value.
+	double fraction(double x);
+	## Arguments:
+		* double x: The value whose fractional part is to be extracted.
+	## Returns:
+		The fractional part of the given value.
+*/
+
+// Example:
+void main() {
+	alert("Example", "The fractional part of 3.75 is " + fraction(3.75));
+}

@@ -7,7 +7,7 @@
 
 // Example:
 void main() {
-	json_array@ arr = parse_json("[]");;
+	json_array@ arr = parse_json("[]");
 	for (uint i = 0; i < 5; i++)
 		arr.add(random(1, 100));
 	alert("Filled array", arr.stringify());

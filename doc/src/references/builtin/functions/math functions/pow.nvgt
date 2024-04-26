@@ -1,0 +1,14 @@
+/**
+	Returns x raised to the power of y.
+	double pow(double x, double y);
+	## Arguments:
+		* double x: The base.
+		* double y: The exponent.
+	## Returns:
+		x raised to the power of y.
+*/
+
+// Example:
+void main() {
+    alert("Example", "2 raised to the power of 3 is " + pow(2, 3));
+}

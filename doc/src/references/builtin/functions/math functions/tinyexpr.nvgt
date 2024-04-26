@@ -1,0 +1,15 @@
+/**
+	Evaluate a mathematical expression using the tinyexpr library.
+	double tinyexpr(string expression);
+	## Arguments:
+		* string expression: the expression to evaluate.
+	## Returns:
+		double: the result of the expression.
+*/
+
+// Example:
+void main() {
+	string expression = input_box("Expression", "Enter expression to evaluate");
+	if (expression.is_empty()) exit();
+	alert("Result", expression + "= " + tinyexpr(expression));
+}

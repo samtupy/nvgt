@@ -1,0 +1,13 @@
+/**
+	Returns the square root of a value.
+	double sqrt(double x);
+	## Arguments:
+		* double x: The value whose square root is to be calculated.
+	## Returns:
+		The square root of the given value.
+*/
+
+// Example:
+void main() {
+	alert("Example", "The square root of 16 is " + sqrt(16));
+}

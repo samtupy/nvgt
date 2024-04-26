@@ -1,0 +1,13 @@
+/**
+	Returns the largest integer less than or equal to a value.
+	double floor(double x);
+	## Arguments:
+		* double x: The value whose floor is to be calculated.
+	## Returns:
+		The largest integer less than or equal to x.
+*/
+
+// Example:
+void main() {
+	alert("Example", "The floor of 3.14 is " + floor(3.14));
+}

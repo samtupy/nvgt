@@ -1,0 +1,13 @@
+/**
+	Returns the hyperbolic cosine of a value.
+	double cosh(double x);
+	## Arguments:
+		* double x: The value whose hyperbolic cosine is to be calculated.
+	## Returns:
+		The hyperbolic cosine of the given value.
+*/
+
+// Example:
+void main() {
+    alert("Example", "The hyperbolic cosine of 2 is " + cosh(2));
+}
