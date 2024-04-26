@@ -24,7 +24,7 @@ function setup_enet {
 	cd enet
 	autoreconf -vfi
 	./configure
-	make -j16
+	make -j$(nsysctl -n hw.ncpu)
 	sudo make install
 	cd ..
 	echo Enet installed.
