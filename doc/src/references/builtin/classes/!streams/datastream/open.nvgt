@@ -1,0 +1,24 @@
+/**
+	Open a datastream, connecting it to a source or another stream depending on type.
+	bool open(...);
+	## Arguments:
+		Same as in the constructor for the datastream you wish to open (see remarks).
+	## Returns:
+		bool: Returns true if the stream could be opened, false otherwise.
+	## Remarks:
+		Most datastreams can be closed and then reopened, or can be created in an uninitialized state meaning they must be opened to begin with.
+		All datastreams can be constructed in an already initialized/opened state, and the constructors that allow this for each stream will contain the exact same arguments as that streams associated open() function, and each streams constructor topics is where such arguments are documented.
+		For example, the true signature for the open function on the default datastream class is bool open(string initial_data = "", string encoding = "", datastream_byteorder byteorder = STREAM_BYTE_ORDER_NATIVE) while the signature of the open function for the file datastream is bool open(string filename, string mode, string encoding = "", datastream_byte_order byteorder = STREAM_BYTE_ORDER_NATIVE).
+		As mentioned in the top level datastreams topic, the encoding and byteorder arguments are present in each stream and thus will not be redocumented for each one.
+		For all streams, this function will call the associated close() function prior to opening the requested resource if the stream is already active at this time. If it turns out that users do not desire this behaviour, it may be made optional or could get removed in the future.
+*/
+
+// Example:
+void main() {
+	datastream ds;
+	if (!ds.open("this is a demonstration")) {
+		alert("Oh no", "Maybe this could happen for a file but it should never happen for a basic datastream!");
+		exit();
+	}
+	alert("example", ds.read()); // Will display "this is a demonstration".
+}

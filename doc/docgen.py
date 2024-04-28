@@ -80,7 +80,7 @@ def make_topic_map():
 def make_slug(path):
 	"""Used for html and markdown filenames, returns a filename safe slug derived from the given path which is expected to be valid."""
 	# Todo: Should we use something like python-slugify? In the end I'm not sure are topic names require that.
-	return os.path.splitext(path)[0].replace(os.path.sep, "_").replace(" ", "_").replace("+", "").replace("(", "").replace(")", "").replace(".", "_").replace("!", "").replace("@", "")
+	return os.path.splitext(path)[0].replace(os.path.sep, "_").replace(" ", "_").replace("+", "").replace("(", "").replace(")", "").replace(".", "_").replace("!", "").replace("@", "").replace("-", "")
 
 def make_chm_filename(path):
 	"""Derive a temporary html filename from a topic path for the creation of a .chm file. Path is expected to be valid."""
@@ -165,6 +165,13 @@ def process_topic(tree, path, indent):
 	# output the markdown of the topic.
 	md_file, heading_indent = get_markdown_document(tree, path)
 	if md_file is not None:
+		# Check if this is the first topic in a category who's heading has just been written. If it is and if the markdown we are handling also begins with a heading that is the same name as the category, delete the duplicate heading from the markdown we are about to print.
+		parent_cat = os.path.split(path)[0]
+		if "category_heading" in tree[parent_cat]:
+			del(tree[parent_cat]["category_heading"])
+			if markdown[:len(tree[parent_cat]["name"]) + 32].lstrip("\n\t# ").lower().startswith(tree[parent_cat]["name"].lower()):
+				markdown = "\n" + markdown[1:].partition("\n")[2]
+				heading_indent -= 1
 		# fix heading levels in the document.
 		heading = "#" * heading_indent
 		markdown = markdown.replace("\n#", "\n" + heading)
@@ -187,6 +194,7 @@ def output_documentation_section(tree, path, txt_output_file, hhc_output_file, h
 	md_output_file, heading_indent = get_markdown_document(tree, path)
 	if path != "src" and "topics" in tree[path]:
 		md_output_file.write(("#" * heading_indent) + " " + tree[path]["name"] + "\n")
+		tree[path]["category_heading"] = True # edgecase: Sometimes the first topic in a category will begin with a heading with the same name of the category, thus creating a double heading that we don't want. Mark the fact that a category was hidden so that the first processed topic in the category can avoid printing such a double heading.
 		txt_output_file.write(("\t" * (indent -1)) + tree[path]["name"] + ":\n")
 		hhc_output_file.write(hhc_base.format(name = tree[path]["name"]) + "<ul>\n")
 	md_extra_newline = False

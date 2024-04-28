@@ -1,0 +1,38 @@
+/**
+	The base class for all datastreams, this stream can read and write to an internal string buffer maintained by the class if constructed directly. Any other datastream can also be cast to the "datastream" type to facilitate passing datastreams of any type throughout the application, and thus any child datastreams such as encoders, file sources or any others will contain the functions listed here as they are derived from the datastream class.
+	1. datastream();
+	2. datastream(string initial_data = "", string encoding = "", datastream_byte_order byteorder = STREAM_BYTE_ORDER_NATIVE);
+	## Arguments (2):
+		* string initial_data = "": The initial contents of this stream derived from a string.
+		* string encoding = "": The text encoding used to read or write strings to this stream (see remarks), this argument appears in all non-empty child datastream constructors.
+		* datastream_byte_order byteorder = STREAM_BYTE_ORDER_NATIVE: The byte order to read or write binary data to this stream using (see remarks), this argument appears in all non-empty child datastream constructors.
+	## Remarks:
+		If this class is directly instanciated, the effect is basically that the string class gets wrapped with streaming functions. The default datastream class will create an internal string object, and any data passed into the initial_data parameter will be copied to that internal string. Then, the read/write functions on the stream will do their work on the internal string object held by the datastream class, which can be read or retrieved in full at any time. Internally, this wraps the std::stringstream class in c++.
+		It must be noted, however, that this is the parent class for all other datastreams in nvgt. This means that any child datastream such as the file class can be cast to a generic datastream handle. In this case, the read/write functions for the casted handle will perform the function of the child stream which has been casted instead of on an internal string. This is the same for any other parent/child class relationship in programming, but it was mentioned here to avoid any confusion between the default datastream implementation and a datastream handle casted from a different stream.
+		The encoding argument, present in nearly all child datastream  constructors, controls what encoding if any strings should be converted to from UTF8 as they are written to the stream with the write_string() function or << operator while the binary property on the stream is set to true, as well as what encoding to convert from when reading them with read_string() or the >> operator. If set to an empty string (the default), strings are left in UTF8 when writing, and already expected to be in UTF8 in a stream when reading from it.
+		The byteorder argument, again present in nearly all child datastream constructors, controls what endianness is used when reading/writing binary data from/to a stream, that is the read_int/write_float/similar functions when the binary property on the stream is set to true. When a value takes more than one byte, the endianness or byte order controls whether the bytes of that value are read/written from left to right or right to left, or in proper terms whether the most significant byte of the value should be written first. The values that can be accepted here are:
+		* STREAM_BYTE_ORDER_NATIVE (default): The byte order used by the system the script is running on.
+		* STREAM_BYTE_ORDER_BIG_ENDIAN: The most significant byte is read/written first.
+		* STREAM_BYTE_ORDER_NETWORK: Same as STREAM_BYTE_ORDER_BIG_ENDIAN, provided because this is indeed a very common name for the big endian byte order as it is typically used for data transmission.
+		* STREAM_BYTE_ORDER_LITTLE_ENDIAN: The most significant byte is read/written last.
+		Usually, you can leave the byteorder value at the default for most streams. However in some situations where you are transmitting binary data between systems running on different architectures, it may be better to set the transmitting and receiving streams of such an application to a common byte order that is not system native.
+		Though this was mentioned above, it's worth reiterating once more that all other stream types contain all of the functions listed in this base datastream class unless otherwise noted, and thus are not documented multiple times in child classes.
+*/
+
+// Example:
+void main() {
+	datastream ds1("This is a demonstration.");
+	alert("example", ds1.read()); // Will display "This is a demonstration."
+	datastream ds2;
+	ds2.write("Hello there, ");
+	ds2.write("good bye.");
+	ds2.seek(0);
+	alert("example", ds2.read()); // Will display "Hello there, good bye."
+	// The following shows how this datastream can be used as an area to store encoded data.
+	datastream encoded;
+	hex_encoder h(encoded); // We attach the encoded datastream to a hex encoder.
+	h.write("I am a hex string"); // "I am a hex string" in hex is written to the datastream object called encoded.
+	h.close();
+	encoded.seek(0);
+	alert("example", hex_decoder(encoded).read()); // We attach a hex_decoder to the encoded datastream and read from it, thus this will display "I am a hex string".
+}
