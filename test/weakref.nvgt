@@ -5,7 +5,7 @@
 class test {
 	string str = "bla";
 	test(string s) {
-		str = s;
+		this.str = s;
 	}
 }
 weakref<test>[] t;

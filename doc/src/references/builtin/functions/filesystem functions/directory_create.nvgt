@@ -1,0 +1,22 @@
+/**
+	Creates a directory if it doesn't already exist.
+	bool directory_create(string directory);
+	## Arguments:
+		* string directory: path to the directory to create (can be nested, relative or absolute).
+	## Returns:
+		true if the directory was successfully created or already exists, false otherwise.
+*/
+
+// Example:
+void main() {
+	if (directory_exists("test")) {
+		alert("Info", "The test directory already exists; nothing to do");
+		exit();
+	}
+	if (directory_create("test")) {
+		alert("Info", "Directory created. Deleting...");
+		alert("Info", directory_delete("test") ? "Success": "Fail");
+	}
+	else
+		alert("Error", "Couldn't create the directory.");
+}
