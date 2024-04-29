@@ -183,7 +183,7 @@ std::string datastream::read_line() {
 bool datastream::can_write() {
 	// Todo: Cache whether most of the logic in this function needs to be performed so it doesn't happen on consequtive writes.
 	if (!w) return false;
-	if (r && w) _ostr->seekp(_istr->tellg()); // Make sure that read and write pointers are in sync.
+	// if (r && w) _ostr->seekp(_istr->tellg()); // Make sure that read and write pointers are in sync.
 	if (r && r->eof()) _istr->clear(); // Should we seek here or something?
 	return true;
 }
@@ -192,6 +192,7 @@ unsigned int datastream::write(const std::string& data) {
 	std::streamsize pos = _ostr->tellp();
 	try {
 		w->writeRaw(data);
+	if (r && w) _istr->seekg(_ostr->tellp()); // Make sure that read and write pointers are in sync.
 	} catch (std::exception) {
 		return long(_ostr->tellp()) - pos;
 	}
@@ -551,6 +552,10 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->RegisterEnum("compression_method");
 	engine->RegisterEnumValue("compression_method", "COMPRESSION_METHOD_ZLIB", DeflatingStreamBuf::STREAM_ZLIB);
 	engine->RegisterEnumValue("compression_method", "COMPRESSION_METHOD_GZIP", DeflatingStreamBuf::STREAM_GZIP);
+	engine->RegisterEnum("datastream_byte_order");
+	engine->RegisterEnumValue("datastream_byte_order", "STREAM_BYTE_ORDER_BIG_ENDIAN", BinaryReader::BIG_ENDIAN_BYTE_ORDER);
+	engine->RegisterEnumValue("datastream_byte_order", "STREAM_BYTE_ORDER_NETWORK", BinaryReader::NETWORK_BYTE_ORDER);
+	engine->RegisterEnumValue("datastream_byte_order", "STREAM_BYTE_ORDER_LITTLE_ENDIAN", BinaryReader::LITTLE_ENDIAN_BYTE_ORDER);
 	engine->SetDefaultNamespace("spec");
 	engine->RegisterGlobalProperty("const string NEWLINE_DEFAULT", (void*)&LineEnding::NEWLINE_DEFAULT);
 	engine->RegisterGlobalProperty("const string NEWLINE_CR", (void*)&LineEnding::NEWLINE_CR);
@@ -558,8 +563,8 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty("const string NEWLINE_LF", (void*)&LineEnding::NEWLINE_LF);
 	engine->SetDefaultNamespace("");
 	RegisterDatastreamType<std::stringstream, datastream_factory_none>(engine, "datastream");
-	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in = \"\", const string&in encoding = \"\", int byteorder = 1)", asFUNCTION(stringstream_factory), asCALL_CDECL);
-	engine->RegisterObjectMethod("datastream", "bool open(const string&in = \"\", const string&in encoding = \"\", int byteorder = 1)", asFUNCTION(stringstream_open), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in = \"\", const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_factory), asCALL_CDECL);
+	engine->RegisterObjectMethod("datastream", "bool open(const string&in = \"\", const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_open), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datastream", "string str()", asFUNCTION(stringstream_str), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_TERMINAL);
 	engine->RegisterGlobalFunction("datastream@ get_cin() property", asFUNCTION(get_cin), asCALL_CDECL);
