@@ -1,0 +1,23 @@
+/**
+	Close a datastream, freeing any associated resources and leaving the datastream in an inactive state.
+	bool close(bool close_connected = false);
+	## arguments:
+		* bool close_connected = false: Whether to also close any streams that are connected to this one (see remarks).
+	## Returns:
+		bool: true on success, false on failure such as if the stream is already closed.
+	## Remarks:
+		Generally it is best to call this function when you are done working with any stream, particularly when dealing with files, encoders, or any stream that is opened in write mode. In reality there are a few streams, such as the default datastream class, where it is OK to not call the close method.
+		The reason that it is sometimes OK to not call the close function on a stream when you are done with it is because this function is automatically called in the internal destructor for any datastream, meaning when any datastream object is destroyed, it's close method will be called. For some streams like the default datastream class which is just wrapping a string, this is fine (you don't close a string, after all), but in many cases you will want to close a stream at a certain time before it is destroyed. For example closing an encoding stream may write a few final characters to a connected file stream as it is closing, meaning that the close method on the encoder must be called prior to the close function on the stream connected to it, something which you may not have control of when objects are getting destructed.
+		The close_connected argument controls whether to also close any streams that are connected to the stream that close is being called on. For the default datastream class that wraps a string or for any other datastream that doesn't connect to another one, this argument has no effect.
+*/
+
+// Example:
+void main() {
+	datastream ds;
+	ds.close();
+	alert("example", ds.active); // Will display false, as the stream is no longer active.
+	alert("example", ds.write("this is a test")); // Will return 0 instead of a positive number of bytes written as the stream is not opened.
+	ds.open();
+	alert("example", ds.write("this is a test")); // Now returns 14, as expected.
+	// Calling the close method a final time is not required for this example because it uses an instance of the default datastream class. It will be taken care of when the script exits.
+}
