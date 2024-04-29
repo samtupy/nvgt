@@ -2,6 +2,8 @@ name: website update
 
 on:
   workflow_dispatch:
+  push:
+    paths: ['./doc/**', './web/**']
 
 jobs:
   web_update:
@@ -17,11 +19,11 @@ jobs:
         cd ..
         python3 docgen.py
         cd ..
-        wget -O - https://github.com/cobalt-org/cobalt.rs/releases/download/v0.19.2/cobalt-v0.19.2-x86_64-unknown-linux-gnu.tar.gz|tar -xzf - ./cobalt
+        wget -q -O - https://github.com/cobalt-org/cobalt.rs/releases/download/v0.19.2/cobalt-v0.19.2-x86_64-unknown-linux-gnu.tar.gz|tar -xzf - ./cobalt
         cd web
         ../cobalt build
         cd _site
         tar -czf ../../_site.tar.gz *
         cd ../..
         curl -u "${{secrets.CIFTP}}" -s -T _site.tar.gz ftp://nvgt.gg/_site.tar.gz
-
+        curl -s -H "x-auth: ${{secrets.CIPHP}}" https://nvgt.gg/ci/website_update.php
