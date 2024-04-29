@@ -3,7 +3,9 @@ name: website update
 on:
   workflow_dispatch:
   push:
-    paths: ['./doc/**', './web/**']
+    paths:
+      - ./doc/**
+      - ./web/**
 
 jobs:
   web_update:
