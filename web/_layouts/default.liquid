@@ -19,11 +19,12 @@ display: inline;
 </style>
 </head>
 <body>
-<a href="#content">Skip to content</a>
+<a href="#content-anchor">Skip to content</a>
 <div id="navigation"><nav>
 {% include "nav.liquid" %}
 </div></nav>
 <main><div id="content">
+<div id="content-anchor"></div>
 {{ page.content }}
 </div></main>
 <footer><div id="footer">

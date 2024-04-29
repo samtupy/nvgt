@@ -172,6 +172,7 @@ def process_topic(tree, path, indent):
 			if markdown[:len(tree[parent_cat]["name"]) + 32].lstrip("\n\t# ").lower().startswith(tree[parent_cat]["name"].lower()):
 				markdown = "\n" + markdown[1:].partition("\n")[2]
 				heading_indent -= 1
+				indent -= 1
 		# fix heading levels in the document.
 		heading = "#" * heading_indent
 		markdown = markdown.replace("\n#", "\n" + heading)
@@ -244,7 +245,6 @@ def output_html_section(md_path, title):
 	f.close()
 	# The NVGT website is built using cobalt (a tiny static site generator that uses liquid templates), and an html version of the docs are hosted on that website. We want this version of the docs to use the liquid layout that the static site uses, so we simply create very basic .liquid files in the nvgt repo's web directory, if that exists.
 	liquid_path = md_path[:-5] + ".liquid"
-	if liquid_path == "index.liquid": liquid_path = "index_staging.liquid" # remove this line once we don't want to hide docs index on the website.
 	if os.path.isdir(os.path.join("..", "web", "docs")):
 		f = open(os.path.join("..", "web", "docs", liquid_path), "w", encoding = "utf8")
 		f.write(liquid_base.format(title = title, body = html_body))
