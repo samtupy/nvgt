@@ -12,8 +12,8 @@
 */
 
 const uint64 KILOBYTES = 1024;
-const uint64 MEGABYTES = 1024 * * 2;
-const uint64 GIGABYTES = 1024 * * 3;
+const uint64 MEGABYTES = 1024 ** 2;
+const uint64 GIGABYTES = 1024 ** 3;
 const uint64 TERABYTES = uint64(1024)** 4;
 const string[] SIZE_TO_STRING_UNITS = {"B", "KB", "MB", "GB", "TB"};
 
