@@ -1,11 +1,11 @@
 name: website update
 
 on:
-  workflow_dispatch:
   push:
     paths:
-      - ./doc/**
-      - ./web/**
+      - 'doc/**'
+      - 'web/**'
+  workflow_dispatch:
 
 jobs:
   web_update:
