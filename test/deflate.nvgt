@@ -9,6 +9,6 @@ void main() {
 	try {
 		string_inflate("oh snap!");
 	} catch {
-		alert("oops", "inflation failed " + getExceptionInfo());
+		alert("oops", "inflation failed " + get_exception_info());
 	}
 }
