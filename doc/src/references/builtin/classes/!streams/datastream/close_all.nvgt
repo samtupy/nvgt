@@ -1,0 +1,17 @@
+/**
+	Close a datastream as well as any that are connected to it.
+	bool close_all();
+	## Returns:
+		bool: true if the stream and any connected to it could be closed, false otherwise.
+	## Remarks:
+		This is exactly the same thing as calling the close method with the close_connected boolean argument set to true. On the default datastream class it will have no effect besides freeing the internal string, however you can look at the example below to see a case where there is an effect by calling close_all().
+*/
+
+// Example:
+void main() {
+	datastream ds;
+	hex_encoder h(ds);
+	h.write("hi");
+	h.close_all(); // Will also close the datastream called ds because it is connected to the hex encoder.
+	alert("example", ds.active); // Will display false, indicating that calling h.close_all() also caused ds.close() to implicitly be called.
+}
