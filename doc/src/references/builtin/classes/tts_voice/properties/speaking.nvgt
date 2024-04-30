@@ -1,0 +1,12 @@
+/**
+	Is the tts_voice currently speaking?
+	bool tts_voice::speaking;
+*/
+
+// Example:
+void main() {
+	tts_voice v;
+	v.speak("Hello there! This is a very long string that will hopefully be spoken for at least a couple seconds");
+	wait(500);
+	alert("Example", v.speaking ? "The TTS voice is currently speaking. Press OK to stop it" : "The TTS voice is not currently speaking");
+}

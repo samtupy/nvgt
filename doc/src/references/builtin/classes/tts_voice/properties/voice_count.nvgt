@@ -1,0 +1,10 @@
+/**
+	Represents the total number of available tex-to-speech voices on your system.
+	int tts_voice::voice_count;
+*/
+
+// Example:
+void main() {
+	tts_voice v;
+	alert("Your system has", v.voice_count + " text-to-speech " + (v.voice_count == 1 ? "voice" : "voices"));
+}

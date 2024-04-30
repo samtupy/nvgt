@@ -1,0 +1,12 @@
+/**
+	The number of the currently selected voice.
+	int tts_voice::voice;
+*/
+
+// Example:
+void main() {
+	tts_voice v;
+	alert("Current voice index", v.voice);
+	v.set_voice(0);
+	alert("Current voice index", v.voice);
+}

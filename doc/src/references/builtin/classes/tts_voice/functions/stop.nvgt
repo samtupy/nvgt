@@ -1,0 +1,14 @@
+/**
+	Stop the TTS voice, if currently speaking.
+	bool tts_voice::stop();
+	## Returns:
+		bool: true if the voice was successfully stopped, false otherwise.
+*/
+
+// Example:
+void main() {
+	tts_voice v;
+	v.speak("Hello there!");
+	wait(500);
+	v.stop();
+}

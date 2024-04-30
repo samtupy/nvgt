@@ -1,0 +1,18 @@
+/**
+	Get the name of a voice at a particular index.
+	string tts_voice::get_voice_name(int index);
+	## Parameters:
+		* int index: the index of the voice to get the name of.
+	## Returns:
+		string: the name of the voice.
+*/
+
+// Example:
+void main() {
+	tts_voice v;
+	if (v.voice_count < 1) {
+		alert("Oh no", "Your system does not appear to have any TTS voices.");
+		exit();
+	}
+	alert("The first voice on your system is", v.get_voice_name(0));
+}

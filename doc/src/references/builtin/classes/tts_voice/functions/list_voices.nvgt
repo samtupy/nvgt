@@ -1,0 +1,13 @@
+/**
+	List all the available voices of the tts_voice object.
+	string[]@ tts_voice::list_voices();
+	## Returns:
+		string[]@: a handle to an array containing all the voice names (as strings).
+*/
+
+// Example:
+void main() {
+	tts_voice v;
+	string[]@ voices = v.list_voices();
+	alert("Your available text-to-speech voices are", join(voices, ", "));
+}
