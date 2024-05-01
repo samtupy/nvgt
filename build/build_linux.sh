@@ -113,7 +113,7 @@ function main {
 	cd deps
 	
 	# Insure required packages are installed for building.
-	sudo apt install build-essential gcc g++ make autoconf libtool python3 python3-pip -y
+	sudo apt install build-essential gcc g++ make cmake autoconf libtool python3 python3-pip libsystemd-dev -y
 	
 	setup_angelscript
 	setup_bullet
