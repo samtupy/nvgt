@@ -1512,7 +1512,7 @@ mixer::mixer(mixer* parent, BOOL for_single_sound, BOOL for_decode, BOOL floatin
 	}
 	output_mixer = NULL;
 	hrtf_effect = NULL;
-	pos_effect = NULL;
+	pos_effect = 0;
 }
 
 mixer::~mixer() {

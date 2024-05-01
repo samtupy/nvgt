@@ -294,10 +294,10 @@ template <class T, datastream_factory_type factory> void RegisterDatastreamType(
 	RegisterDatastreamReadwrite<double>(engine, classname, "double");
 	RegisterDatastreamReadwrite<std::string>(engine, classname, "string");
 	engine->RegisterObjectProperty(classname.c_str(), "bool binary", asOFFSET(datastream, binary));
-	engine->RegisterObjectMethod(classname.c_str(), "bool get_good() property", asMETHOD(datastream, good), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool get_bad() property", asMETHOD(datastream, bad), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool get_fail() property", asMETHOD(datastream, fail), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool get_eof() property", asMETHOD(datastream, eof), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool get_good() const property", asMETHOD(datastream, good), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool get_bad() const property", asMETHOD(datastream, bad), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool get_fail() const property", asMETHOD(datastream, fail), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool get_eof() const property", asMETHOD(datastream, eof), asCALL_THISCALL);
 }
 
 // While the below gets repetitive, it makes actually registering most intermediet stream types far easier in the end. The below template functions can handle the basic registration of any generic stream that connects to another one, including those that take a couple of arguments. The angelscript registration functions include factories and open functions for such streams, meaning that only custom functions on streams need to be registered.
