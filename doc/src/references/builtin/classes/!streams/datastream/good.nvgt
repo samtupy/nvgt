@@ -1,0 +1,14 @@
+/**
+	This property will be true when a datastream is ready to read or write, such as when the active property is true and the end of file has not been reached.
+	const bool good;
+	## Remarks:
+		This property is specifically true so long as the stream is opened and the eof, fail, and bad properties all return false.
+*/
+
+// Example:
+void main() {
+	datastream ds("hello");
+	alert("example", ds.good); // Will display true because there is data to read.
+	ds.read();
+	alert("example", ds.good); // Will now display false because the end of file has been reached, ds.eof is true now.
+}

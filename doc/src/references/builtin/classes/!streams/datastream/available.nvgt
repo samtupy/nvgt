@@ -1,0 +1,14 @@
+/**
+	This property returns the number of bytes immedietly available to be read from a stream.
+	const int available;
+	## Remarks:
+		This property may not be implemented in all streams, for example decoders. If it is unavailable, it will return 0.
+*/
+
+// Example:
+void main() {
+	datastream ds("example");
+	alert("example", ds.available); // Displays 7.
+	ds.read(2);
+	alert("example", ds.available); // Now shows 5, as 2 of the 7 bytes have been read.
+}
