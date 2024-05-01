@@ -1,0 +1,8 @@
+Import("env")
+
+if ARGUMENTS.get("no_shared_plugins", "0") == "0":
+	env.SharedLibrary("#release/lib/systemd_notify", ["sd_notify.cpp"], LIBS = ["systemd"] if env["PLATFORM"] == "posix" else [])
+static = env.Object("sd_notify_static", "sd_notify.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "systemd_notify")])
+static = env.StaticLibrary("#build/lib/systemd_notify", [static])
+if env["PLATFORM"] == "posix": static = [static, "systemd"]
+Return("static")

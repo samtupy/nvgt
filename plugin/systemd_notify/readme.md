@@ -1,0 +1,4 @@
+# sd_notify wrapper
+This is one of the simplest fully working plugins in NVGT. It shows how to register a single function with NVGT using the plugin system, moreover, a function that is only available on one platform. On other platforms, the function is a no-op but the plugin will still compile. This allows angelscript code that uses the plugin to compile on one platform with the function registered while it runs on another.
+
+In particular, this plugin wraps the sd_notify linux function which can be useful if you are writing a systemd service. On windows you can include the plugin and compile your game, this function will do nothing. On linux though, values will be sent to systemd as described in [the sd_notify man page](https://man7.org/linux/man-pages/man3/sd_notify.3.html) when this function is called.
