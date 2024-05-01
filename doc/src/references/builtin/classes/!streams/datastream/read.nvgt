@@ -1,0 +1,19 @@
+/**
+	Read raw bytes from a stream.
+	string read(uint amount = 0);
+	## Arguments:
+		* uint amount = 0: The number of bytes to read, or 0 to read the entire stream.
+	## Returns:
+		string: The data that was read from the stream or an empty string on failure.
+	## Remarks:
+		If the length of the string returned by this function is less than the number of bytes requested in the amount argument, either the end of the stream was reached or there was an error. You can check what happened by evaluating the fail or eof properties on the stream.
+		This is the lowest level method of reading from a stream. All other reading functions either read a certain datatype or come with some condition, for example this should not be confused with the read_string function which does not take a byte amount argument, but which instead either reads a binary number denoting the length of a string before reading that number of bytes or reads a single word from the stream based on the state of the stream's binary flag. If you want direct control over the read operation, use this function.
+		Typically it is only useful to call this function if the good property on the stream is true, therefor you can query the stream's good property in a loop to see if you should continue reading data if you are trying to perform some sort of buffered reading of a stream.
+*/
+
+// Example:
+void main() {
+	datastream ds("Hello there, I am a string wrapped in a sstream!");
+	alert("example", ds.read(6)); // Will display Hello followed by a space.
+	alert("example", ds.read()); // Will display there, I am a string wrapped in a sstream!
+}

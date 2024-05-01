@@ -1,3 +1,4 @@
+# escape_unicode
 Determines the amount of escaping that occurs in JSON parsing.
 
 `bool json_array::escape_unicode;`

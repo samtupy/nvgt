@@ -1,0 +1,14 @@
+/**
+	This property will be true on a stream when it has no more data to read.
+	const bool eof;
+*/
+
+// Example:
+void main() {
+	datastream ds("hello");
+	alert("example", ds.eof); // Will show false because we always start at the beginning of a default datastream, thus there is data to read.
+	ds.read();
+	alert("example", ds.eof); // Will now show true because any further .read calls will fail as we have reached the end of the stream.
+	ds.seek(3);
+	alert("example", ds.eof); // Will again show false because we are no longer at the end of the stream.
+}

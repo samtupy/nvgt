@@ -17,6 +17,7 @@
 		* STREAM_BYTE_ORDER_LITTLE_ENDIAN: The most significant byte is read/written last.
 		Usually, you can leave the byteorder value at the default for most streams. However in some situations where you are transmitting binary data between systems running on different architectures, it may be better to set the transmitting and receiving streams of such an application to a common byte order that is not system native.
 		Though this was mentioned above, it's worth reiterating once more that all other stream types contain all of the functions listed in this base datastream class unless otherwise noted, and thus are not documented multiple times in child classes.
+		If an initial_data argument is provided when constructing a datastream, the stream will be set at the beginning, ready to read the initial data rather than at the end. If you wish to append more data to the datastream after it is constructed, you should call the seek_end() method on it first.
 */
 
 // Example:

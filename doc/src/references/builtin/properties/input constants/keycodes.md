@@ -1,3 +1,4 @@
+# keycodes
 This is a complete list of possible keycodes in NVGT, as well as a short description of what they are.
 
 ## Letter keys
