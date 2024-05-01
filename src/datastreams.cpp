@@ -553,6 +553,7 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("compression_method", "COMPRESSION_METHOD_ZLIB", DeflatingStreamBuf::STREAM_ZLIB);
 	engine->RegisterEnumValue("compression_method", "COMPRESSION_METHOD_GZIP", DeflatingStreamBuf::STREAM_GZIP);
 	engine->RegisterEnum("datastream_byte_order");
+	engine->RegisterEnumValue("datastream_byte_order", "STREAM_BYTE_ORDER_NATIVE", BinaryReader::NATIVE_BYTE_ORDER);
 	engine->RegisterEnumValue("datastream_byte_order", "STREAM_BYTE_ORDER_BIG_ENDIAN", BinaryReader::BIG_ENDIAN_BYTE_ORDER);
 	engine->RegisterEnumValue("datastream_byte_order", "STREAM_BYTE_ORDER_NETWORK", BinaryReader::NETWORK_BYTE_ORDER);
 	engine->RegisterEnumValue("datastream_byte_order", "STREAM_BYTE_ORDER_LITTLE_ENDIAN", BinaryReader::LITTLE_ENDIAN_BYTE_ORDER);
