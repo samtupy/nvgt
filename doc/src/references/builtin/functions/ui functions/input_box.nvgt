@@ -1,0 +1,21 @@
+/**
+	Displays a dialog to the user consisting of an input field, an OK button and a cancel button.
+	string input_box(string title, string text, string default_text = "", uint64 flags = 0);
+	## Arguments:
+		* string title: the title of the input box.
+		* string text: the text to display above the text field.
+		* string default_text = "": the contents to populate the text box with by default.
+		* uint64 flags = 0: a combination of flags, see message_box_flags for more information.
+	## Returns:
+		string: the text that the user typed.
+*/
+
+// Example:
+void main() {
+	string name = input_box("Name", "What is your name?", "John Doe");
+	if (name.is_empty()) {
+		alert("Error", "You didn't type a name, unidentified person!");
+		exit();
+	}
+	alert("Hi", name + "!");
+}

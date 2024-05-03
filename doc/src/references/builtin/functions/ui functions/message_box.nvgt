@@ -1,0 +1,20 @@
+/**
+	Displays a customizable message box.
+	int message_box(string title, string text, string[]@ buttons, uint flags = 0);
+	## Arguments:
+		* string title: the title of the message box.
+		* string text: the text of the message box.
+		* string[]@ buttons: a string array of button names, see remarks for more info.
+		* uint flags = 0: a combination of flags (see message_box_flags for more information).
+	## Returns:
+		int: the number of the button that was pressed, according to its position in the buttons array.
+	## Remarks:
+		Notes on button syntax:
+		* A grave character (`) prepending button text is default enter key.
+		* A tilda character (~) before text means default cancel.
+*/
+
+// Example:
+void main() {
+	message_box("Hello there", "I am a message box with two buttons", {"`OK", "~Cancel"});
+}

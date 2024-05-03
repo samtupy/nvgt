@@ -1,0 +1,17 @@
+/**
+	Display a yes/no dialog box to the user.
+	int question(string title, string text, bool can_cancel = false, uint flags = 0);
+	## Arguments:
+		* string title: the title of the dialog.
+		* string text: the text of the dialog.
+		* bool can_cancel = false: determines if a cancel button is present alongside the other buttons.
+		* uint flags = 0: a combination of flags (see message_box_flags for more information).
+	## Returns:
+		int: the number of the button that was pressed (1 for yes, 2 for no).
+*/
+
+// Example:
+void main() {
+	int res = question("Hello there", "Do you like pizza?");
+	alert("Info", "You clicked " + (res == 1 ? "yes" : "no"));
+}

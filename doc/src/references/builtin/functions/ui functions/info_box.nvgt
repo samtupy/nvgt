@@ -1,0 +1,16 @@
+/**
+	Displays a dialog to the user consisting of a read-only text field and a close button.
+	bool info_box(string title, string label, string text, uint64 flags = 0);
+	## Arguments:
+		* string title: the title of the dialog.
+		* string label: the text to display above the text field.
+		* string text: the text to display in the text field.
+		* uint64 flags = 0: a combination of flags, see message_box_flags for more information.
+	## Returns:
+		bool: true if the user pressed the close button, false otherwise.
+*/
+
+// Example:
+void main() {
+	info_box("Test", "Information", "this is a\r\nlong string\r\nthat can be split\r\nacross lines");
+}

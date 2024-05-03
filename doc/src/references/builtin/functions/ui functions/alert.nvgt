@@ -1,0 +1,17 @@
+/**
+	Display a message box with an OK button to the user.
+	int alert(string title, string text, bool can_cancel = false, uint flags = 0);
+	## Arguments:
+		* string title: the title of the dialog.
+		* string text: the text of the dialog.
+		* bool can_cancel = false: determines if a cancel button is present.
+		* uint flags = 0: a combination of flags (see message_box_flags for more information).
+	## Returns:
+		int: the number of the button that was pressed, either OK or cancel.
+*/
+
+// Example:
+void main() {
+	alert("Hello", "I am a standard alert");
+	alert("Hi", "And I'm a cancelable one", true);
+}
