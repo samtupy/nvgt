@@ -556,7 +556,7 @@ class database_int : database_property {
 	int64 opPowAssign(int64 val) {
 		fetch();
 		if (val != 0) modified = true;
-		return this.val** = val;
+		return this.val **= val;
 	}
 	int64 opAnd(int64 val) {
 		fetch();
@@ -750,7 +750,7 @@ class database_double : database_property {
 	double opPowAssign(double val) {
 		fetch();
 		if (val != 0) modified = true;
-		return this.val** = val;
+		return this.val **= val;
 	}
 }
 class database_bool : database_property {
