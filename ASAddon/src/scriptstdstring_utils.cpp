@@ -39,13 +39,19 @@ static CScriptArray *StringSplit(const string &delim, bool full, const string &s
 		array->InsertLast((void*)&str);
 		return array;
 	}
-	array->Reserve(str.size()/(delim.size()*4));
+	asUINT reserved = str.size() * 0.05; // Sam: Not sure how to predict how many elements we should initially reserve as each string could be different. Does it matter?
+	array->Reserve(reserved);
 
 	// Find the existence of the delimiter in the input string
 	size_t pos = 0, prev = 0;
 	asUINT count = 0;
 	while((pos = (full? str.find(delim, prev) : str.find_first_of(delim, prev))) != string::npos )
 	{
+		if (count > reserved)
+		{
+			reserved *= 8;
+			array->Reserve(reserved);
+		}
 		// Add the part to the array
 		array->Resize(array->GetSize()+1);
 		((string*)array->At(count))->assign(&str[prev], pos-prev);
