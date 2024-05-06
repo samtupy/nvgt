@@ -27,7 +27,7 @@ elif env["PLATFORM"] == "posix":
 	env.Append(CPPPATH = ["/usr/local/include", "#lindev/include"], LIBPATH = ["/usr/local/lib", "#lindev/lib"], LINKFLAGS = ["-fuse-ld=gold", "-s"])
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
 	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL2.a"])
-env.Append(CPPDEFINES = ["POCO_STATIC"])
+env.Append(CPPDEFINES = ["POCO_STATIC", "NDEBUG"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 VariantDir("build/obj_src", "src", duplicate = 0)
 
