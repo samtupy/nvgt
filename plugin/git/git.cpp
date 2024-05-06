@@ -376,6 +376,7 @@ const std::string git_last_error_text() {
 
 
 void RegisterGit(asIScriptEngine* engine) {
+	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GIT);
 	engine->RegisterObjectType("git_repository", 0, asOBJ_REF);
 	engine->RegisterFuncdef("int git_repository_match_callback(git_repository@, const string&in, const string&in)");
 	engine->RegisterObjectType("git_repository_entry", 0, asOBJ_REF);
