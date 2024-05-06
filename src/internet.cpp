@@ -19,6 +19,7 @@
 #include "datastreams.h"
 #include "internet.h"
 #include "nvgt.h"
+#include "pocostuff.h" // angelscript_refcounted
 
 using namespace std;
 using namespace Poco;
@@ -38,14 +39,31 @@ string url_decode(const string& url, bool plus_as_space) {
 template <class T> void generic_construct(T* mem) { new (mem) T(); }
 template <class T> void generic_copy_construct(T* mem, const T& other) { new (mem) T(other); }
 template <class T> void generic_destruct(T* mem) { mem->~T(); }
+template <class T, typename... A> void* generic_factory(A... args) {
+	return new(angelscript_refcounted_create<T>()) T(args...);
+}
 
-template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, const string& type, bool make_class = false) {
-	if (make_class) {
-		engine->RegisterObjectType(type.c_str(), sizeof(T), asOBJ_VALUE | asGetTypeTraits<T>());
-		engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(generic_construct<T>), asCALL_CDECL_OBJFIRST);
-		engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_CONSTRUCT, format("void f(const %s&in)", type).c_str(), asFUNCTION(generic_copy_construct<T>), asCALL_CDECL_OBJFIRST);
-		engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_DESTRUCT, "void f()", asFUNCTION(generic_destruct<T>), asCALL_CDECL_OBJFIRST);
-	}
+// We will need to wrap any functions that handle std iostreams.
+template <class T> bool message_header_write(MessageHeader* h, datastream* ds) {
+	if (!ds || !ds->get_ostr()) return false;
+	try {
+		h->write(*ds->get_ostr());
+	} catch (Exception&) { return false; }
+	return true;
+}
+template <class T> bool message_header_read(MessageHeader* h, datastream* ds) {
+	if (!ds || !ds->get_istr()) return false;
+	try {
+		h->read(*ds->get_istr());
+	} catch (Exception&) { return false; }
+	return true;
+}
+
+template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, const string& type) {
+	angelscript_refcounted_register<T>(engine, type.c_str());
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f()", type).c_str(), asFUNCTION(generic_factory<T>), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const %s&in)", type, type).c_str(), asFUNCTION((generic_factory<T, const T&>)), asCALL_CDECL);
+	engine->RegisterObjectMethod(type.c_str(), format("%s& opAssign(const %s&in)", type, type).c_str(), asMETHODPR(T, operator=, (const T&), T&), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_opIndex(const string&in) const property", asMETHOD(T, operator[]), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_opIndex(const string&in, const string&in) property", asMETHOD(T, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set(const string&in, const string&in)", asMETHOD(T, set), asCALL_THISCALL);
@@ -57,11 +75,29 @@ template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, con
 	engine->RegisterObjectMethod(type.c_str(), "void erase(const string&in)", asMETHOD(T, erase), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void clear()", asMETHOD(T, clear), asCALL_THISCALL);
 }
+template <class T, class P> void RegisterMessageHeader(asIScriptEngine* engine, const string& type, const string& parent) {
+	RegisterNameValueCollection<T>(engine, type);
+	engine->RegisterObjectMethod(parent.c_str(), format("%s@ opCast()", type).c_str(), asFUNCTION((angelscript_refcounted_refcast<P, T>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), format("%s@ opImplCast()", parent).c_str(), asFUNCTION((angelscript_refcounted_refcast<T, P>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool write(datastream@) const", asFUNCTION(message_header_write<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool read(datastream@)", asFUNCTION(message_header_read<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_auto_decode() const property", asMETHOD(T, getAutoDecode), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_auto_decode(bool) property", asMETHOD(T, setAutoDecode), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "string get_decoded(const string&in, const string&in = \"\")", asMETHODPR(T, getDecoded, (const std::string&, const std::string&) const, std::string), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int get_field_limit() const property", asMETHOD(T, getFieldLimit), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_field_limit(int) property", asMETHOD(T, setFieldLimit), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int get_name_length_limit() const property", asMETHOD(T, getNameLengthLimit), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_name_length_limit(int) property", asMETHOD(T, setNameLengthLimit), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int get_value_length_limit() const property", asMETHOD(T, getValueLengthLimit), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_value_length_limit(int) property", asMETHOD(T, setValueLengthLimit), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool has_token(const string&in, const string&in)", asMETHOD(T, hasToken), asCALL_THISCALL);
+}
 
 void RegisterInternet(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
 	engine->RegisterGlobalFunction(_O("string url_encode(const string&in, const string&in = \"\")"), asFUNCTION(url_encode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string url_decode(const string&in, bool = true)"), asFUNCTION(url_decode), asCALL_CDECL);
-	RegisterNameValueCollection<NameValueCollection>(engine, "name_value_collection", true);
+	RegisterNameValueCollection<NameValueCollection>(engine, "name_value_collection");
+	RegisterMessageHeader<MessageHeader, NameValueCollection>(engine, "internet_message_header", "name_value_collection");
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_NET);
 }

@@ -42,9 +42,9 @@ template <class T> void angelscript_refcounted_release(T* obj) {
 	}
 }
 template <class T1, class T2> T2* angelscript_refcounted_refcast(T1* obj) {
-	T2* obj_casted = dynamic_cast<T2>(obj);
+	T2* obj_casted = dynamic_cast<T2*>(obj);
 	if (!obj_casted) return NULL;
-	angelscript_refcounted_duplicate(obj);
+	angelscript_refcounted_duplicate<T2>(obj);
 	return obj_casted;
 }
 template <class T> inline void angelscript_refcounted_register(asIScriptEngine* engine, const char* type, const char* parent = NULL) {
