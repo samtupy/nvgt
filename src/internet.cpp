@@ -15,6 +15,9 @@
 #include <Poco/Format.h>
 #include <Poco/URI.h>
 #include <Poco/URIStreamOpener.h>
+#include <Poco/Net/HTTPMessage.h>
+#include <Poco/Net/HTTPResponse.h>
+#include <Poco/Net/HTTPRequest.h>
 #include <Poco/Net/MessageHeader.h>
 #include "datastreams.h"
 #include "internet.h"
@@ -92,12 +95,58 @@ template <class T, class P> void RegisterMessageHeader(asIScriptEngine* engine, 
 	engine->RegisterObjectMethod(type.c_str(), "void set_value_length_limit(int) property", asMETHOD(T, setValueLengthLimit), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool has_token(const string&in, const string&in)", asMETHOD(T, hasToken), asCALL_THISCALL);
 }
+template <class T, class P> void RegisterHTTPMessage(asIScriptEngine* engine, const string& type, const string& parent) {
+	RegisterMessageHeader<T, P>(engine, type, parent);
+	engine->RegisterObjectMethod(type.c_str(), "void set_version(const string&in) property", asMETHOD(T, setVersion), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const string& get_version() const property", asMETHOD(T, getVersion), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_content_length(int64) property", asMETHOD(T, setContentLength64), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int64 get_content_length() const property", asMETHOD(T, getContentLength64), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_has_content_length() const property", asMETHOD(T, hasContentLength), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_transfer_encoding(const string&in) property", asMETHOD(T, setTransferEncoding), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "string get_transfer_encoding() const property", asMETHOD(T, getTransferEncoding), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_chunked_transfer_encoding(bool) property", asMETHOD(T, setChunkedTransferEncoding), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_chunked_transfer_encoding() const property", asMETHOD(T, getChunkedTransferEncoding), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_content_type(const string&in) property", asMETHODPR(T, setContentType, (const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "string get_content_type() const property", asMETHOD(T, getContentType), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_keep_alive(bool) property", asMETHOD(T, setKeepAlive), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_keep_alive() const property", asMETHOD(T, getKeepAlive), asCALL_THISCALL);
+}
+template <class T, class P> void RegisterHTTPRequest(asIScriptEngine* engine, const string& type, const string& parent) {
+	RegisterHTTPMessage<T, P>(engine, type, parent);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, const string&in, const string&in = HTTP_1_1)", type).c_str(), asFUNCTION((generic_factory<T, const string&, const string&, const string&>)), asCALL_CDECL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_method(const string&in) property", asMETHOD(T, setMethod), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const string& get_method() const property", asMETHOD(T, getMethod), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_uri(const string&in) property", asMETHOD(T, setURI), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const string& get_uri() const property", asMETHOD(T, getURI), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_host(const string&in) property", asMETHODPR(T, setHost, (const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_host(const string&in, uint16) property", asMETHODPR(T, setHost, (const string&, UInt16), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const string& get_host() const property", asMETHOD(T, getHost), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_cookies(const name_value_collection&)", asMETHOD(T, setCookies), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void get_cookies(name_value_collection&) const", asMETHOD(T, getCookies), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_has_credentials() const property", asMETHOD(T, hasCredentials), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void get_credentials(string&, string&) const", asMETHODPR(T, getCredentials, (string&, string&) const, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_credentials(const string&in, const string&in)", asMETHODPR(T, setCredentials, (const string&, const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void remove_credentials()", asMETHOD(T, removeCredentials), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_expect_continue() const property", asMETHOD(T, getExpectContinue), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_expect_continue(bool) property", asMETHOD(T, setExpectContinue), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_has_proxy_credentials() const property", asMETHOD(T, hasProxyCredentials), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void get_proxy_credentials(string&, string&) const", asMETHOD(T, getProxyCredentials), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_proxy_credentials(const string&in, const string&in)", asMETHOD(T, setProxyCredentials), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void remove_proxy_credentials()", asMETHOD(T, removeProxyCredentials), asCALL_THISCALL);
+}
 
 void RegisterInternet(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
+	engine->RegisterGlobalProperty("const string HTTP_1_0", (void*)&HTTPMessage::HTTP_1_0);
+	engine->RegisterGlobalProperty("const string HTTP_1_1", (void*)&HTTPMessage::HTTP_1_1);
+	engine->RegisterGlobalProperty("const string HTTP_IDENTITY_TRANSFER_ENCODING", (void*)&HTTPMessage::IDENTITY_TRANSFER_ENCODING);
+	engine->RegisterGlobalProperty("const string HTTP_CHUNKED_TRANSFER_ENCODING", (void*)&HTTPMessage::CHUNKED_TRANSFER_ENCODING);
+	engine->RegisterGlobalProperty("const int HTTP_UNKNOWN_CONTENT_LENGTH", (void*)&HTTPMessage::UNKNOWN_CONTENT_LENGTH);
+	engine->RegisterGlobalProperty("const string HTTP_UNKNOWN_CONTENT_TYPE", (void*)&HTTPMessage::UNKNOWN_CONTENT_TYPE);
 	engine->RegisterGlobalFunction(_O("string url_encode(const string&in, const string&in = \"\")"), asFUNCTION(url_encode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string url_decode(const string&in, bool = true)"), asFUNCTION(url_decode), asCALL_CDECL);
 	RegisterNameValueCollection<NameValueCollection>(engine, "name_value_collection");
 	RegisterMessageHeader<MessageHeader, NameValueCollection>(engine, "internet_message_header", "name_value_collection");
+	RegisterHTTPRequest<HTTPRequest, MessageHeader>(engine, "http_request", "internet_message_header");
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_NET);
 }
