@@ -1,5 +1,6 @@
 [
 	["references.md", "API References"],
 	["builtin", "Builtin Script API"],
-	["include", "Bundled Includes API"]
+	["include", "Bundled Includes API"],
+	["plugin", "Plugins"]
 ]

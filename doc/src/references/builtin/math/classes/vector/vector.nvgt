@@ -1,0 +1,19 @@
+/**
+	A class containing x, y and z coordinates, usually used to represent a 3d point in space.
+	1. vector();
+	2. vector(float x, float y, float z = 0.0);
+	## Arguments (2):
+		* float x: The initial x point or coordinate this vector represents.
+		* float y: The initial y point or coordinate this vector represents.
+		* float z = 0.0: The initial z point or coordinate this vector represents, defaulted to 0 because it may not be needed in some 2d applications.
+	## Remarks:
+		An advantage with vectors is that they contain basic addition and scaling operators.
+*/
+
+// Example:
+void main() {
+	vector v1(5, 5, 5);
+	vector v2(10, 10, 0);
+	vector v3 = v1 + v2;
+	alert("example", "the new vector is "+v3.x + ", " + v3.y + ", " + v3.z); // will show that the vector is 15, 15, 5.
+}

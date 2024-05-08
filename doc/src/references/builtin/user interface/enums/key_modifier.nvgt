@@ -1,0 +1,32 @@
+/**
+	This is a complete list of supported key modifiers and their descriptions. These are registered in the key_modifier enum, so you can use that type to pass any value listed here around.
+	* KEYMOD_NONE: no modifier.
+	* KEYMOD_LSHIFT: left shift key.
+	* KEYMOD_RSHIFT: right shift key.
+	* KEYMOD_LCTRL: left control key.
+	* KEYMOD_RCTRL: right control key.
+	* KEYMOD_LALT: left alt key.
+	* KEYMOD_RALT: right alt key.
+	* KEYMOD_LGUI: left windows/command/super key (depending on platform).
+	* KEYMOD_RGUI: right windows/command/super key (depends on platform).
+	* KEYMOD_NUM: numlock key.
+	* KEYMOD_CAPS: capslock key.
+	* KEYMOD_MODE: input switch mode (only on certain keyboards).
+	* KEYMOD_SCROLL: scroll lock key.
+	* KEYMOD_CTRL: either control key.
+	* KEYMOD_SHIFT: either shift key.
+	* KEYMOD_ALT: either alt key.
+	* KEYMOD_GUI: either windows/command/super key.
+*/
+
+// Example:
+void main() {
+	show_window("Example");
+	wait(50); // Give the screen readers enough time to speak the window title before speaking.
+	screen_reader_output("Press alt+f4 to close this window.", true);
+	while (true) {
+		wait(5);
+		if (keyboard_modifiers & KEYMOD_ALT > 0 && key_pressed(KEY_F4))
+			exit();
+	}
+}

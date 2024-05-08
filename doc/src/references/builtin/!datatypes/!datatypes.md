@@ -1,0 +1,2 @@
+# Datatypes
+In this documentation, we consider a datatype to be any class or primative that typically stores one value. While such a datatype could contain a pointer/handle to a more complex type that may store many values (in which case the handle itself is the single value the datetype contains), the types documented here do not directly contain more than one piece of data be that a string of text, a dynamically typed handle or just a simple number.
