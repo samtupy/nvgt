@@ -1,0 +1,15 @@
+/**
+	Load the specified URL.
+	bool sound::load_url(string url);
+	## Arguments:
+		* string url: the URL to load (should be the direct link to a sound or stream).
+	## Returns:
+		Bool: True if the URL was successfully loaded; false otherwise.
+*/
+
+// Example:
+void main() {
+	sound s;
+	bool success = s.load_url("https://example.com/my_sound.mp3");
+	alert("Result", "The sound was " + (success == false? "not " : "") + "successfully loaded.");
+}

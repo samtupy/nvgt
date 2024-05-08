@@ -1,14 +1,14 @@
 /**
 	Closes an opened sound, making the sound object available to be reloaded with a new one.
-	bool close();
+	bool sound::close();
 	## Returns:
 		bool: true if the sound could be closed, false otherwise for example if there is no sound opened.
 */
 
 // Example:
-	void main() {
-		sound s;
-		s.load("C:/windows/media/ding.wav");
-		alert("example", s.close()); // Will display true since a sound was previously opened.
-		alert("example", s.close()); // Will now display false since the previous operation freed the sound object of any attached sound.
-	}
+void main() {
+	sound s;
+	s.load("C:/windows/media/ding.wav");
+	alert("example", s.close()); // Will display true since a sound was previously opened.
+	alert("example", s.close()); // Will now display false since the previous operation freed the sound object of any attached sound.
+}
