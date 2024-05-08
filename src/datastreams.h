@@ -19,10 +19,6 @@
 #include <Poco/RefCountedObject.h>
 #include <Poco/SharedPtr.h>
 
-typedef Poco::SharedPtr<std::istream> istrPtr;
-typedef Poco::SharedPtr<std::ostream> ostrPtr;
-typedef Poco::SharedPtr<std::iostream> iostrPtr;
-
 // The base datastream class. This wraps either an iostream or an istream/ostream into a Poco BinaryReader/Writer. This Poco class has functionality extremely similar to Angelscript's scriptfile addon accept that it works on streams, meaning that it can work on much more than files. We also wrap some other basics of std streams.
 class datastream;
 typedef void (datastream_close_callback)(datastream*);
@@ -30,9 +26,8 @@ class datastream : public Poco::RefCountedObject {
 	// We access these first 2 properties so much that we will give them short names.
 	Poco::BinaryReader* r;
 	Poco::BinaryWriter* w;
-	// We hold on to these shared pointers soley to keep the internal istream and ostream objects alive for the binary reader/writer at least until this object dies, other than that it's actually annoying to need these.
-	istrPtr _istr;
-	ostrPtr _ostr;
+	std::istream* _istr;
+	std::ostream* _ostr;
 	datastream* ds; // If this object was created from another angelscript object, holds a reference to it so we can keep all parent streams alive until the close or destruction of this object.
 	datastream_close_callback* close_cb; // Some advanced streams may allocate some extra user data that needs to be destroyed when a stream is closed, this is such a stream's opertunity to destroy that data.
 public:
@@ -42,7 +37,7 @@ public:
 	// Empty constructor (internal stream is nonexistent/closed).
 	datastream() : r(NULL), w(NULL), ds(NULL), user(NULL), close_cb(NULL), no_close(false), binary(true) {}
 	// Low level constructor (Allows passing separate shared pointers to input and output stream).
-	datastream(istrPtr istr, ostrPtr ostr, const std::string& encoding, int byteorder, datastream* obj) : r(NULL), w(NULL), ds(NULL), user(NULL), close_cb(NULL), no_close(false), binary(true) {
+	datastream(std::istream* istr, std::ostream* ostr, const std::string& encoding, int byteorder, datastream* obj) : r(NULL), w(NULL), ds(NULL), user(NULL), close_cb(NULL), no_close(false), binary(true) {
 		open(istr, ostr, encoding, byteorder, obj);
 	}
 	// Higher level constructor (Creates shared pointers for given std::ios pointer and has default arguments).
@@ -52,7 +47,7 @@ public:
 	~datastream() {
 		close();
 	}
-	bool open(istrPtr istr, ostrPtr ostr, const std::string& encoding, int byteorder, datastream* obj);
+	bool open(std::istream* istr, std::ostream* ostr, const std::string& encoding, int byteorder, datastream* obj);
 	bool open(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = NULL) {
 		return open(dynamic_cast<std::istream*>(stream), dynamic_cast<std::ostream*>(stream), encoding, byteorder, obj);
 	}
@@ -102,13 +97,13 @@ public:
 		return r ? r->available() : -1;
 	}
 	inline std::istream* get_istr() {
-		return _istr.get();
+		return _istr;
 	}
 	inline std::ostream* get_ostr() {
-		return _ostr.get();
+		return _ostr;
 	}
 	inline std::iostream* get_iostr() {
-		return _istr && dynamic_cast<std::iostream*>(_istr.get()) == dynamic_cast<std::iostream*>(_ostr.get()) ? dynamic_cast<std::iostream*>(_istr.get()) : NULL;
+		return _istr && dynamic_cast<std::iostream*>(_istr) == dynamic_cast<std::iostream*>(_ostr) ? dynamic_cast<std::iostream*>(_istr) : NULL;
 	}
 };
 

@@ -15,10 +15,17 @@
 #include <Poco/Format.h>
 #include <Poco/URI.h>
 #include <Poco/URIStreamOpener.h>
+#include <Poco/Net/AcceptCertificateHandler.h>
+#include <Poco/Net/Context.h>
+#include <Poco/Net/HTTPClientSession.h>
 #include <Poco/Net/HTTPMessage.h>
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/Net/HTTPRequest.h>
+#include <Poco/Net/HTTPSClientSession.h>
 #include <Poco/Net/MessageHeader.h>
+#include <Poco/Net/SSLManager.h>
+#include <scriptarray.h>
+#include <scriptdictionary.h>
 #include "datastreams.h"
 #include "internet.h"
 #include "nvgt.h"
@@ -60,6 +67,16 @@ template <class T> bool message_header_read(MessageHeader* h, datastream* ds) {
 		h->read(*ds->get_istr());
 	} catch (Exception&) { return false; }
 	return true;
+}
+template<class T> datastream* http_client_send_request(T* s, HTTPRequest& req, f_streamargs) {
+	datastream* ds = new datastream(&s->sendRequest(req), p_streamargs);
+	ds->no_close = true;
+	return ds;
+}
+template<class T> datastream* http_client_receive_response(T* s, HTTPResponse& response, f_streamargs) {
+	datastream* ds = new datastream(&s->receiveResponse(response), p_streamargs);
+	ds->no_close = true;
+	return ds;
 }
 
 template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, const string& type) {
@@ -134,19 +151,77 @@ template <class T, class P> void RegisterHTTPRequest(asIScriptEngine* engine, co
 	engine->RegisterObjectMethod(type.c_str(), "void set_proxy_credentials(const string&in, const string&in)", asMETHOD(T, setProxyCredentials), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void remove_proxy_credentials()", asMETHOD(T, removeProxyCredentials), asCALL_THISCALL);
 }
+template <class T, class P> void RegisterHTTPResponse(asIScriptEngine* engine, const string& type, const string& parent) {
+	RegisterHTTPMessage<T, P>(engine, type, parent);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(http_status)", type).c_str(), asFUNCTION((generic_factory<T, HTTPResponse::HTTPStatus>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(http_status, const string&in)", type).c_str(), asFUNCTION((generic_factory<T, HTTPResponse::HTTPStatus, const string&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, http_status, const string&in)", type).c_str(), asFUNCTION((generic_factory<T, const string&, HTTPResponse::HTTPStatus, const string&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, http_status)", type).c_str(), asFUNCTION((generic_factory<T, const string&, HTTPResponse::HTTPStatus>)), asCALL_CDECL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_status(http_status) property", asMETHODPR(T, setStatus, (HTTPResponse::HTTPStatus), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "http_status get_status() const property", asMETHOD(T, getStatus), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_status(const string&in)", asMETHODPR(T, setStatus, (const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_reason(const string&in) property", asMETHOD(T, setReason), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const string& get_reason() const property", asMETHOD(T, getReason), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_status_and_reason(http_status, const string&in)", asMETHODPR(T, setStatusAndReason, (HTTPResponse::HTTPStatus, const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_status_and_reason(http_status)", asMETHODPR(T, setStatusAndReason, (HTTPResponse::HTTPStatus), void), asCALL_THISCALL);
+}
+template <class T> void RegisterHTTPSession(asIScriptEngine* engine, const string& type) {
+	angelscript_refcounted_register<T>(engine, type.c_str());
+	engine->RegisterObjectMethod(type.c_str(), "void set_keep_alive(bool) property", asMETHOD(T, setKeepAlive), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_keep_alive() const property", asMETHOD(T, getKeepAlive), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_connected() const property", asMETHOD(T, connected), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void abort()", asMETHOD(T, abort), asCALL_THISCALL);
+}
+template <class T> void RegisterHTTPClientSession(asIScriptEngine* engine, const string& type) {
+	RegisterHTTPSession<T>(engine, type);
+	if constexpr(std::is_same<T, HTTPSClientSession>::value) engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, uint16 = 443)", type).c_str(), asFUNCTION((generic_factory<T, const string&, UInt16>)), asCALL_CDECL);
+	else engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, uint16 = 80)", type).c_str(), asFUNCTION((generic_factory<T, const string&, UInt16>)), asCALL_CDECL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_host(const string&in) property", asMETHOD(T, setHost), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const string& get_host() const property", asMETHOD(T, getHost), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_port(uint16) property", asMETHOD(T, setPort), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "uint16 get_port() const property", asMETHOD(T, getPort), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "datastream@ send_request(http_request&, const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(http_client_send_request<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "datastream@ receive_response(http_response&, const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(http_client_receive_response<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool peek_response(http_response&)", asMETHOD(T, peekResponse), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void flush_request()", asMETHOD(T, flushRequest), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void reset()", asMETHOD(T, reset), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_secure() const property", asMETHOD(T, secure), asCALL_THISCALL);
+}
 
 void RegisterInternet(asIScriptEngine* engine) {
+	SSLManager::instance().initializeClient(NULL, new AcceptCertificateHandler(false), new Context(Context::TLS_CLIENT_USE, ""));
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
+	map<string, int> http_statuses({
+		{"HTTP_CONTINUE", 100}, {"HTTP_SWITCHING_PROTOCOLS", 101}, {"HTTP_PROCESSING", 102}, {"HTTP_OK", 200}, {"HTTP_CREATED", 201}, {"HTTP_ACCEPTED", 202}, {"HTTP_NONAUTHORITATIVE", 203}, {"HTTP_NO_CONTENT", 204}, {"HTTP_RESET_CONTENT", 205}, {"HTTP_PARTIAL_CONTENT", 206}, {"HTTP_MULTI_STATUS", 207}, {"HTTP_ALREADY_REPORTED", 208}, {"HTTP_IM_USED", 226},
+		{"HTTP_MULTIPLE_CHOICES", 300}, {"HTTP_MOVED_PERMANENTLY", 301}, {"HTTP_FOUND", 302}, {"HTTP_SEE_OTHER", 303}, {"HTTP_NOT_MODIFIED", 304}, {"HTTP_USE_PROXY", 305}, {"HTTP_TEMPORARY_REDIRECT", 307}, {"HTTP_PERMANENT_REDIRECT", 308},
+		{"HTTP_BAD_REQUEST", 400}, {"HTTP_UNAUTHORIZED", 401}, {"HTTP_PAYMENT_REQUIRED", 402}, {"HTTP_FORBIDDEN", 403}, {"HTTP_NOT_FOUND", 404}, {"HTTP_METHOD_NOT_ALLOWED", 405}, {"HTTP_NOT_ACCEPTABLE", 406}, {"HTTP_PROXY_AUTHENTICATION_REQUIRED", 407}, {"HTTP_REQUEST_TIMEOUT", 408}, {"HTTP_CONFLICT", 409}, {"HTTP_GONE", 410}, {"HTTP_LENGTH_REQUIRED", 411}, {"HTTP_PRECONDITION_FAILED", 412}, {"HTTP_REQUEST_ENTITY_TOO_LARGE", 413}, {"HTTP_REQUEST_URI_TOO_LONG", 414}, {"HTTP_UNSUPPORTED_MEDIA_TYPE", 415}, {"HTTP_REQUESTED_RANGE_NOT_SATISFIABLE", 416}, {"HTTP_EXPECTATION_FAILED", 417}, {"HTTP_IM_A_TEAPOT", 418}, {"HTTP_ENCHANCE_YOUR_CALM", 420}, {"HTTP_MISDIRECTED_REQUEST", 421}, {"HTTP_UNPROCESSABLE_ENTITY", 422}, {"HTTP_LOCKED", 423}, {"HTTP_FAILED_DEPENDENCY", 424}, {"HTTP_TOO_EARLY", 425}, {"HTTP_UPGRADE_REQUIRED", 426}, {"HTTP_PRECONDITION_REQUIRED", 428}, {"HTTP_TOO_MANY_REQUESTS", 429}, {"HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE", 431}, {"HTTP_UNAVAILABLE_FOR_LEGAL_REASONS", 451},
+		{"HTTP_INTERNAL_SERVER_ERROR", 500}, {"HTTP_NOT_IMPLEMENTED", 501}, {"HTTP_BAD_GATEWAY", 502}, {"HTTP_SERVICE_UNAVAILABLE", 503}, {"HTTP_GATEWAY_TIMEOUT", 504}, {"HTTP_VERSION_NOT_SUPPORTED", 505}, {"HTTP_VARIANT_ALSO_NEGOTIATES", 506}, {"HTTP_INSUFFICIENT_STORAGE", 507}, {"HTTP_LOOP_DETECTED", 508}, {"HTTP_NOT_EXTENDED", 510}, {"HTTP_NETWORK_AUTHENTICATION_REQUIRED", 511}
+	});
+	engine->RegisterEnum("http_status");
+	for (const auto& k : http_statuses) engine->RegisterEnumValue("http_status", k.first.c_str(), k.second);
+	engine->RegisterGlobalFunction("string http_status_reason(http_status)", asFUNCTION(HTTPResponse::getReasonForStatus), asCALL_CDECL);
 	engine->RegisterGlobalProperty("const string HTTP_1_0", (void*)&HTTPMessage::HTTP_1_0);
 	engine->RegisterGlobalProperty("const string HTTP_1_1", (void*)&HTTPMessage::HTTP_1_1);
 	engine->RegisterGlobalProperty("const string HTTP_IDENTITY_TRANSFER_ENCODING", (void*)&HTTPMessage::IDENTITY_TRANSFER_ENCODING);
 	engine->RegisterGlobalProperty("const string HTTP_CHUNKED_TRANSFER_ENCODING", (void*)&HTTPMessage::CHUNKED_TRANSFER_ENCODING);
 	engine->RegisterGlobalProperty("const int HTTP_UNKNOWN_CONTENT_LENGTH", (void*)&HTTPMessage::UNKNOWN_CONTENT_LENGTH);
 	engine->RegisterGlobalProperty("const string HTTP_UNKNOWN_CONTENT_TYPE", (void*)&HTTPMessage::UNKNOWN_CONTENT_TYPE);
+	engine->RegisterGlobalProperty("const string HTTP_GET", (void*)&HTTPRequest::HTTP_GET);
+	engine->RegisterGlobalProperty("const string HTTP_POST", (void*)&HTTPRequest::HTTP_POST);
+	engine->RegisterGlobalProperty("const string HTTP_HEAD", (void*)&HTTPRequest::HTTP_HEAD);
+	engine->RegisterGlobalProperty("const string HTTP_PUT", (void*)&HTTPRequest::HTTP_PUT);
+	engine->RegisterGlobalProperty("const string HTTP_DELETE", (void*)&HTTPRequest::HTTP_DELETE);
+	engine->RegisterGlobalProperty("const string HTTP_PATCH", (void*)&HTTPRequest::HTTP_PATCH);
+	engine->RegisterGlobalProperty("const string HTTP_OPTIONS", (void*)&HTTPRequest::HTTP_OPTIONS);
 	engine->RegisterGlobalFunction(_O("string url_encode(const string&in, const string&in = \"\")"), asFUNCTION(url_encode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string url_decode(const string&in, bool = true)"), asFUNCTION(url_decode), asCALL_CDECL);
 	RegisterNameValueCollection<NameValueCollection>(engine, "name_value_collection");
 	RegisterMessageHeader<MessageHeader, NameValueCollection>(engine, "internet_message_header", "name_value_collection");
 	RegisterHTTPRequest<HTTPRequest, MessageHeader>(engine, "http_request", "internet_message_header");
+	RegisterHTTPResponse<HTTPResponse, MessageHeader>(engine, "http_response", "internet_message_header");
+	RegisterHTTPClientSession<HTTPClientSession>(engine, "http_client");
+	RegisterHTTPClientSession<HTTPSClientSession>(engine, "https_client");
+	engine->RegisterObjectMethod("http_client", "https_client@ opCast()", asFUNCTION((angelscript_refcounted_refcast<HTTPClientSession, HTTPSClientSession>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("https_client", "http_client@ opImplCast()", asFUNCTION((angelscript_refcounted_refcast<HTTPSClientSession, HTTPClientSession>)), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_NET);
 }

@@ -32,7 +32,6 @@
 #include <Poco/NullStream.h>
 #include <Poco/RandomStream.h>
 #include <Poco/RefCountedObject.h>
-#include <Poco/SharedPtr.h>
 #include <Poco/StreamCopier.h>
 #include <Poco/TeeStream.h>
 #include <Poco/TextEncoding.h>
@@ -49,7 +48,7 @@ datastream* ds_cout = NULL;
 datastream* ds_cin = NULL;
 datastream* ds_cerr = NULL;
 
-bool datastream::open(istrPtr istr, ostrPtr ostr, const std::string& encoding, int byteorder, datastream* obj) {
+bool datastream::open(std::istream* istr, std::ostream* ostr, const std::string& encoding, int byteorder, datastream* obj) {
 	if (no_close) return false; // This stream cannot be reopened.
 	if (r || w) close();
 	if (!istr && !ostr) return false;
@@ -76,9 +75,12 @@ bool datastream::close(bool close_all) {
 	if (w) delete w;
 	r = NULL;
 	w = NULL;
-	bool is_iostr = _istr && dynamic_cast<std::iostream*>(_istr.get()) != NULL;
+	// Sometimes _istr and _ostr could be set to the same object when dealing with an iostream, thus insure we don't call delete twice on the same stream. Mainly only allow _ostr to be deleted if either _istr isn't present or we are not dealing with an iostream.
+	bool is_iostr = _istr && dynamic_cast<std::iostream*>(_istr) != NULL || _ostr && dynamic_cast<std::iostream*>(_ostr) != NULL;
+	if (_istr) delete _istr;
+	if (_ostr && (!_istr || !is_iostr)) delete _ostr;
 	_istr = NULL;
-	if (!is_iostr) _ostr = NULL;
+	_ostr = NULL;
 	if (ds) {
 		if (close_all) ds->close(close_all);
 		ds->release();
@@ -89,8 +91,8 @@ bool datastream::close(bool close_all) {
 }
 std::ios* datastream::stream() {
 	// Returns the opened stream so that we can get relatively easy access to it's functionality that goes beyond read/write. We can return one value here because even though we have both istr and ostr pointers, either they will be equal, or one will be null and if not this class is being used in an undefined circumstance.
-	if (_istr) return _istr.get();
-	else return _ostr.get();
+	if (_istr) return _istr;
+	else return _ostr;
 }
 bool datastream::seek(unsigned long long offset) {
 	if (!r && !w) return false;
@@ -303,7 +305,7 @@ template <class T, datastream_factory_type factory> void RegisterDatastreamType(
 // While the below gets repetitive, it makes actually registering most intermediet stream types far easier in the end. The below template functions can handle the basic registration of any generic stream that connects to another one, including those that take a couple of arguments. The angelscript registration functions include factories and open functions for such streams, meaning that only custom functions on streams need to be registered.
 template <class T, class S> bool connect_stream_open(datastream* ds, datastream* ds_connect, f_streamargs) {
 	if (!ds_connect) return false;
-	SharedPtr<S> stream;
+	S* stream;
 	if constexpr(std::is_same<S, std::istream>::value) {
 		if (!ds_connect->get_istr()) return false;
 		stream = new T(*ds_connect->get_istr());
@@ -331,7 +333,7 @@ template <class T, class S, datastream_factory_type factory> void RegisterDatast
 }
 template <class T, class S, typename A1> bool connect_stream_open(datastream* ds, datastream* ds_connect, A1 arg1, f_streamargs) {
 	if (!ds_connect) return false;
-	SharedPtr<S> stream;
+	S* stream;
 	if constexpr(std::is_same<S, std::istream>::value) {
 		if (!ds_connect->get_istr()) return false;
 		stream = new T(*ds_connect->get_istr(), arg1);
@@ -359,7 +361,7 @@ template <class T, class S, typename A1, datastream_factory_type factory> void R
 }
 template <class T, class S, typename A1, typename A2> bool connect_stream_open(datastream* ds, datastream* ds_connect, A1 arg1, A2 arg2, f_streamargs) {
 	if (!ds_connect) return false;
-	SharedPtr<S> stream;
+	S* stream;
 	if constexpr(std::is_same<S, std::istream>::value) {
 		if (!ds_connect->get_istr()) return false;
 		stream = new T(*ds_connect->get_istr(), arg1, arg2);
@@ -399,7 +401,7 @@ bool file_stream_open(datastream* ds, const std::string& path, const std::string
 	}
 	if ((m & std::ios::in) == 0 && (m & std::ios::out) == 0) return false; // invalid mode.
 	try {
-		iostrPtr iostr = new FileStream(path, m);
+		std::iostream* iostr = new FileStream(path, m);
 		return ds->open((m & std::ios::in) != 0 ? iostr : NULL, (m & std::ios::out) != 0 ? iostr : NULL, p_streamargs, NULL);
 	} catch (FileException& e) {
 		return false; // Todo: get_last_error or similar.
@@ -417,8 +419,7 @@ unsigned long long file_stream_size(datastream* ds) {
 
 // stringstream.
 bool stringstream_open(datastream* ds, const std::string& initial = "", f_streamargs) {
-	iostrPtr iostr = new std::stringstream(initial);
-	return ds->open(iostr, iostr, p_streamargs, NULL);
+	return ds->open(new std::stringstream(initial), p_streamargs, NULL);
 }
 datastream* stringstream_factory(const std::string& initial = "", const std::string& encoding = "", int byteorder = BinaryReader::NATIVE_BYTE_ORDER) {
 	datastream* ds = new datastream();
