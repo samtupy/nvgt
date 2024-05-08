@@ -11,7 +11,7 @@
 
 // Example:
 void main() {
-	int last_spoken = ticks(); // Speak periodically to avoid overwhemling the user (or their screen reader).
+	int last_spoken = ticks(); // Speak periodically to avoid overwhelming the user (or their screen reader).
 	show_window("Example");
 	while (true) {
 		wait(5);
