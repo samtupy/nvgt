@@ -1,0 +1,11 @@
+/**
+	Represents the current minute of the datetime object.
+	uint datetime::minute;
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set_time(12, 47, 19);
+	alert("The current minute of the datetime object is", d.minute);
+}

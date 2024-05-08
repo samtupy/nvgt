@@ -1,0 +1,11 @@
+/**
+	Represents the current hour of the datetime object.
+	uint datetime::hour;
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set_time(12, 47, 19);
+	alert("The current hour of the datetime object is", d.hour);
+}

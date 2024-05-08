@@ -1,0 +1,11 @@
+/**
+	Represents the current second of the datetime object.
+	uint datetime::second;
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set_time(12, 47, 19);
+	alert("The current second of the datetime object is", d.second);
+}

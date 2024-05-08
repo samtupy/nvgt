@@ -1,0 +1,17 @@
+/**
+	Set the current date of the datetime object.
+	bool datetime::set_date(uint year, uint month, uint day);
+	## Arguments:
+		* uint year: the year to set.
+		* uint month: the month to set.
+		* uint day: the day to set.
+	## Returns:
+		bool: true if the date was successfully set, false otherwise.
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set_date(2024, 9, 2);
+	alert("The current date of the datetime object is", d.year + "/" + d.month + "/" + d.day);
+}

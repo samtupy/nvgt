@@ -1,0 +1,17 @@
+/**
+	Set the current time of the datetime object.
+	bool datetime::set_time(uint hour, uint minute, uint second);
+	## Arguments:
+		* uint hour: the hour to set.
+		* uint minute: the minute to set.
+		* uint second: the second to set.
+	## Returns:
+		bool: true if the time was successfully set, false otherwise.
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set_time(13, 53, 39);
+	alert("The current time of the datetime object is", d.hour + ":" + d.minute + ":" + d.second);
+}

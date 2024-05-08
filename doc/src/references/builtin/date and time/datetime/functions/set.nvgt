@@ -1,0 +1,20 @@
+/**
+	Set the date and time of the datetime object.
+	bool datetime::set(uint year, uint month, uint day, uint hour, uint minute, uint second);
+	## Arguments:
+		* uint year: the year to set.
+		* uint month: the month to set.
+		* uint day: the day to set.
+		* uint hour: the hour to set.
+		* uint minute: the minute to set.
+		* uint second: the second to set.
+	## Returns:
+		bool: true if the values were successfully set, false otherwise.
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set(2024, 3, 9, 1, 24, 49);
+	alert("The datetime object is currently set to", d.year + "/" + d.month + "/" + d.day + ", " + d.hour + ":" + d.minute + ":" + d.second);
+}

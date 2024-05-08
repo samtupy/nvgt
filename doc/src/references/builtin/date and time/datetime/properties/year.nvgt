@@ -1,0 +1,11 @@
+/**
+	Represents the current year of the datetime object.
+	uint datetime::year;
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set_date(2024, 5, 8);
+	alert("The datetime's current year is", d.year);
+}

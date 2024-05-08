@@ -1,0 +1,11 @@
+/**
+	Represents the current month of the datetime object.
+	uint datetime::month;
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set_date(2024, 5, 8);
+	alert("The datetime's current month is", d.month);
+}
