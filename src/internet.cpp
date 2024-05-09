@@ -49,9 +49,6 @@ string url_decode(const string& url, bool plus_as_space) {
 template <class T> void generic_construct(T* mem) { new (mem) T(); }
 template <class T> void generic_copy_construct(T* mem, const T& other) { new (mem) T(other); }
 template <class T> void generic_destruct(T* mem) { mem->~T(); }
-template <class T, typename... A> void* generic_factory(A... args) {
-	return new(angelscript_refcounted_create<T>()) T(args...);
-}
 
 // We will need to wrap any functions that handle std iostreams.
 template <class T> bool message_header_write(MessageHeader* h, datastream* ds) {
@@ -81,8 +78,8 @@ template<class T> datastream* http_client_receive_response(T* s, HTTPResponse& r
 
 template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, const string& type) {
 	angelscript_refcounted_register<T>(engine, type.c_str());
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f()", type).c_str(), asFUNCTION(generic_factory<T>), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const %s&in)", type, type).c_str(), asFUNCTION((generic_factory<T, const T&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f()", type).c_str(), asFUNCTION(angelscript_refcounted_factory<T>), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const %s&in)", type, type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const T&>)), asCALL_CDECL);
 	engine->RegisterObjectMethod(type.c_str(), format("%s& opAssign(const %s&in)", type, type).c_str(), asMETHODPR(T, operator=, (const T&), T&), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_opIndex(const string&in) const property", asMETHOD(T, operator[]), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_opIndex(const string&in, const string&in) property", asMETHOD(T, set), asCALL_THISCALL);
@@ -130,7 +127,7 @@ template <class T, class P> void RegisterHTTPMessage(asIScriptEngine* engine, co
 }
 template <class T, class P> void RegisterHTTPRequest(asIScriptEngine* engine, const string& type, const string& parent) {
 	RegisterHTTPMessage<T, P>(engine, type, parent);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, const string&in, const string&in = HTTP_1_1)", type).c_str(), asFUNCTION((generic_factory<T, const string&, const string&, const string&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, const string&in, const string&in = HTTP_1_1)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, const string&, const string&>)), asCALL_CDECL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_method(const string&in) property", asMETHOD(T, setMethod), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_method() const property", asMETHOD(T, getMethod), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_uri(const string&in) property", asMETHOD(T, setURI), asCALL_THISCALL);
@@ -153,10 +150,10 @@ template <class T, class P> void RegisterHTTPRequest(asIScriptEngine* engine, co
 }
 template <class T, class P> void RegisterHTTPResponse(asIScriptEngine* engine, const string& type, const string& parent) {
 	RegisterHTTPMessage<T, P>(engine, type, parent);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(http_status)", type).c_str(), asFUNCTION((generic_factory<T, HTTPResponse::HTTPStatus>)), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(http_status, const string&in)", type).c_str(), asFUNCTION((generic_factory<T, HTTPResponse::HTTPStatus, const string&>)), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, http_status, const string&in)", type).c_str(), asFUNCTION((generic_factory<T, const string&, HTTPResponse::HTTPStatus, const string&>)), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, http_status)", type).c_str(), asFUNCTION((generic_factory<T, const string&, HTTPResponse::HTTPStatus>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(http_status)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, HTTPResponse::HTTPStatus>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(http_status, const string&in)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, HTTPResponse::HTTPStatus, const string&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, http_status, const string&in)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, HTTPResponse::HTTPStatus, const string&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, http_status)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, HTTPResponse::HTTPStatus>)), asCALL_CDECL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_status(http_status) property", asMETHODPR(T, setStatus, (HTTPResponse::HTTPStatus), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "http_status get_status() const property", asMETHOD(T, getStatus), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_status(const string&in)", asMETHODPR(T, setStatus, (const string&), void), asCALL_THISCALL);
@@ -174,8 +171,8 @@ template <class T> void RegisterHTTPSession(asIScriptEngine* engine, const strin
 }
 template <class T> void RegisterHTTPClientSession(asIScriptEngine* engine, const string& type) {
 	RegisterHTTPSession<T>(engine, type);
-	if constexpr(std::is_same<T, HTTPSClientSession>::value) engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, uint16 = 443)", type).c_str(), asFUNCTION((generic_factory<T, const string&, UInt16>)), asCALL_CDECL);
-	else engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, uint16 = 80)", type).c_str(), asFUNCTION((generic_factory<T, const string&, UInt16>)), asCALL_CDECL);
+	if constexpr(std::is_same<T, HTTPSClientSession>::value) engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, uint16 = 443)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, UInt16>)), asCALL_CDECL);
+	else engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, uint16 = 80)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, UInt16>)), asCALL_CDECL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_host(const string&in) property", asMETHOD(T, setHost), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_host() const property", asMETHOD(T, getHost), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_port(uint16) property", asMETHOD(T, setPort), asCALL_THISCALL);

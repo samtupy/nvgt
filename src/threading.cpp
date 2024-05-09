@@ -12,6 +12,7 @@
 
 #include <string>
 #include <type_traits>
+#include <Poco/Event.h>
 #include <Poco/Format.h>
 #include <Poco/Mutex.h>
 #include <Poco/NamedMutex.h>
@@ -77,27 +78,6 @@ void thread_begin(Thread* thread, asIScriptFunction* func, CScriptDictionary* ar
 	thread->start(script_thread, e);
 }
 
-Thread* thread_factory() {
-	return new (angelscript_refcounted_create<Thread>()) Thread();
-}
-Thread* thread_named_factory(const std::string& name) {
-	return new (angelscript_refcounted_create<Thread>()) Thread(name);
-}
-void* mutex_factory() {
-	return new (angelscript_refcounted_create<Mutex>()) Mutex();
-}
-void* fast_mutex_factory() {
-	return new (angelscript_refcounted_create<FastMutex>()) FastMutex();
-}
-void* spinlock_mutex_factory() {
-	return new (angelscript_refcounted_create<SpinlockMutex>()) SpinlockMutex();
-}
-void* named_mutex_factory(const std::string& name) {
-	return new (angelscript_refcounted_create<NamedMutex>()) NamedMutex(name);
-}
-void* rw_lock_factory() {
-	return new (angelscript_refcounted_create<RWLock>()) RWLock();
-}
 template <class T> void scoped_lock_construct(void* mem, T* mutex) {
 	new (mem) ScopedLockWithUnlock<T>(*mutex);
 }
@@ -125,11 +105,11 @@ void scoped_read_rw_lock_destruct(ScopedReadRWLock* mem) {
 void scoped_write_rw_lock_destruct(ScopedWriteRWLock* mem) {
 	mem->~ScopedWriteRWLock();
 }
-template <class T> void RegisterMutexType(asIScriptEngine* engine, const std::string& type, void* factory) {
+template <class T> void RegisterMutexType(asIScriptEngine* engine, const std::string& type) {
 	angelscript_refcounted_register<T>(engine, type.c_str());
-	if constexpr(std::is_same<T, NamedMutex>::value) engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ m(const string&in)", type).c_str(), asFUNCTION(factory), asCALL_CDECL);
+	if constexpr(std::is_same<T, NamedMutex>::value) engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ m(const string&in)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const std::string&>)), asCALL_CDECL);
 	else {
-		engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ m()", type).c_str(), asFUNCTION(factory), asCALL_CDECL);
+		engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ m()", type).c_str(), asFUNCTION(angelscript_refcounted_factory<T>), asCALL_CDECL);
 		engine->RegisterObjectMethod(type.c_str(), _O("void lock(uint)"), asMETHODPR(T, lock, (long), void), asCALL_THISCALL);
 		engine->RegisterObjectMethod(type.c_str(), _O("bool try_lock(uint)"), asMETHODPR(T, tryLock, (long), bool), asCALL_THISCALL);
 	}
@@ -157,8 +137,8 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool thread_sleep(uint)"), asFUNCTION(Thread::trySleep), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("thread@+ get_thread_current() property"), asFUNCTION(Thread::current), asCALL_CDECL);
 	engine->RegisterFuncdef(_O("void thread_callback(dictionary@)"));
-	engine->RegisterObjectBehaviour(_O("thread"), asBEHAVE_FACTORY, _O("thread@ t()"), asFUNCTION(thread_factory), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(_O("thread"), asBEHAVE_FACTORY, _O("thread@ t(const string&in)"), asFUNCTION(thread_named_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(_O("thread"), asBEHAVE_FACTORY, _O("thread@ t()"), asFUNCTION(angelscript_refcounted_factory<Thread>), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(_O("thread"), asBEHAVE_FACTORY, _O("thread@ t(const string&in)"), asFUNCTION((angelscript_refcounted_factory<Thread, const std::string&>)), asCALL_CDECL);
 	engine->RegisterObjectMethod(_O("thread"), _O("int get_id() const property"), asMETHOD(Thread, id), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("thread"), _O("void set_priority(thread_priority) property"), asMETHOD(Thread, setPriority), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("thread"), _O("thread_priority get_priority() const property"), asMETHOD(Thread, getPriority), asCALL_THISCALL);
@@ -169,12 +149,12 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("thread"), _O("bool get_running() const property"), asMETHOD(Thread, isRunning), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("thread"), _O("void start(thread_callback@, dictionary@ = null)"), asFUNCTION(thread_begin), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("thread"), _O("void wake_up()"), asMETHOD(Thread, wakeUp), asCALL_THISCALL);
-	RegisterMutexType<Mutex>(engine, "mutex", (void*)mutex_factory);
-	RegisterMutexType<FastMutex>(engine, "fast_mutex", (void*)fast_mutex_factory);
-	RegisterMutexType<NamedMutex>(engine, "named_mutex", (void*)named_mutex_factory);
-	RegisterMutexType<NamedMutex>(engine, "spinlock_mutex", (void*)spinlock_mutex_factory);
+	RegisterMutexType<Mutex>(engine, "mutex");
+	RegisterMutexType<FastMutex>(engine, "fast_mutex");
+	RegisterMutexType<NamedMutex>(engine, "named_mutex");
+	RegisterMutexType<NamedMutex>(engine, "spinlock_mutex");
 	angelscript_refcounted_register<RWLock>(engine, "rw_lock");
-	engine->RegisterObjectBehaviour(_O("rw_lock"), asBEHAVE_FACTORY, _O("rw_lock@ l()"), asFUNCTION(rw_lock_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(_O("rw_lock"), asBEHAVE_FACTORY, _O("rw_lock@ l()"), asFUNCTION(angelscript_refcounted_factory<RWLock>), asCALL_CDECL);
 	engine->RegisterObjectMethod(_O("rw_lock"), _O("void read_lock()"), asMETHOD(RWLock, readLock), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("rw_lock"), _O("bool try_read_lock()"), asMETHOD(RWLock, tryReadLock), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("rw_lock"), _O("void write_lock()"), asMETHOD(RWLock, writeLock), asCALL_THISCALL);
@@ -189,4 +169,14 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterObjectType("rw_write_lock", sizeof(ScopedWriteRWLock), asOBJ_VALUE | asGetTypeTraits<ScopedWriteRWLock>());
 	engine->RegisterObjectBehaviour("rw_write_lock", asBEHAVE_CONSTRUCT, "void f(rw_lock@)", asFUNCTION(scoped_write_rw_lock_construct), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("rw_write_lock", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(scoped_write_rw_lock_destruct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterEnum("thread_event_type");
+	engine->RegisterEnumValue("thread_event_type", "THREAD_EVENT_MANUAL_RESET", Event::EVENT_MANUALRESET);
+	engine->RegisterEnumValue("thread_event_type", "THREAD_EVENT_AUTO_RESET", Event::EVENT_MANUALRESET);
+	angelscript_refcounted_register<Event>(engine, "thread_event");
+	engine->RegisterObjectBehaviour("thread_event", asBEHAVE_FACTORY, "thread_event@ e(thread_event_type = THREAD_EVENT_AUTO_RESET)", asFUNCTION(angelscript_refcounted_factory<Event>), asCALL_CDECL);
+	engine->RegisterObjectMethod(_O("thread_event"), _O("void set()"), asMETHOD(Event, set), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("thread_event"), _O("void wait()"), asMETHODPR(Event, wait, (), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("thread_event"), _O("void wait(uint)"), asMETHODPR(Event, wait, (long), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("thread_event"), _O("bool try_wait(uint)"), asMETHOD(Event, tryWait), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("thread_event"), _O("void reset()"), asMETHOD(Event, reset), asCALL_THISCALL);
 }
