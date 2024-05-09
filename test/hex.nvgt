@@ -1,8 +1,0 @@
-// NonVisual Gaming Toolkit (NVGT)
-// Copyright (C) 2022-2024 Sam Tupy
-// license: zlib (see license.md in the root of the nvgt distrobution)
-
-void main() {
-	string h = string_to_hex(string_aes_encrypt("this is a test", "itsasecret"));
-	alert(h, string_aes_decrypt(hex_to_string(h), "itsasecret"));
-}

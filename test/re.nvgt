@@ -1,9 +1,0 @@
-// NonVisual Gaming Toolkit (NVGT)
-// Copyright (C) 2022-2024 Sam Tupy
-// license: zlib (see license.md in the root of the nvgt distrobution)
-
-void main() {
-	bool m = regexp_search("hello this is a test", "\\d");
-	alert("test", m ? "matched" : "not matched");
-	alert("test", regexp_replace("this is 1 huge test of 3 numbers", "\\d", "the"));
-}
