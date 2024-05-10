@@ -5,11 +5,13 @@
 void main() {
 	name_value_collection n;
 	n["test"] = "haha";
-	internet_message_header n2;
+	internet_message_header n2({{"key1", "value1"}, {"key2", "value2"}});
 	n2["test"] = "haha2";
 	n2.add("test", "haha3");
 	n2["key"] = 123;
 	n = n2;
+	alert("name1", n.name_at(1));
+	alert("value2", n.value_at(2));
 	alert("test", n["test"]);
 	datastream@ ds = datastream();
 	if(n2.write(ds)) alert("test", ds.str());

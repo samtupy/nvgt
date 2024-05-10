@@ -76,10 +76,37 @@ template<class T> datastream* http_client_receive_response(T* s, HTTPResponse& r
 	return ds;
 }
 
+// Some functions for name_value_collection and derivatives that we can't directly wrap.
+template <class T> T* name_value_collection_list_factory(asBYTE* buffer) {
+	// This is the first time I've written a repeating list factory wrapper for use with Angelscript, so it is heavily based on the example in asAddon/src/scriptdictionary.cpp but omitting the reference type checks.
+	T* nvc = new(angelscript_refcounted_create<T>()) T();
+	asUINT length = *(asUINT*)buffer;
+	buffer += 4;
+	while (length--) {
+		if (asPWORD(buffer) & 0x3)
+			buffer += 4 - (asPWORD(buffer) & 0x3); // No idea if we need this while only working with strings.
+		std::string name = *(std::string*) buffer;
+		buffer += sizeof(std::string);
+		std::string value = *(std::string*) buffer;
+		buffer += sizeof(std::string);
+		nvc->add(name, value);
+	}
+	return nvc;
+}
+template <class T> const string& name_value_collection_name_at(T* nvc, unsigned int index) {
+	if (index >= nvc->size()) throw RangeException(format("index %u into name_value_collection out of bounds (contains %z elements)", index, nvc->size()));
+	return (nvc->begin() + index)->first;
+}
+template <class T> const string& name_value_collection_value_at(T* nvc, unsigned int index) {
+	if (index >= nvc->size()) throw RangeException(format("index %u into name_value_collection out of bounds (contains %z elements)", index, nvc->size()));
+	return (nvc->begin() + index)->second;
+}
+
 template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, const string& type) {
 	angelscript_refcounted_register<T>(engine, type.c_str());
 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f()", type).c_str(), asFUNCTION(angelscript_refcounted_factory<T>), asCALL_CDECL);
 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const %s&in)", type, type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const T&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_LIST_FACTORY, format("%s@ f(int&in) {repeat {string, string}}", type).c_str(), asFUNCTION(name_value_collection_list_factory<T>), asCALL_CDECL);
 	engine->RegisterObjectMethod(type.c_str(), format("%s& opAssign(const %s&in)", type, type).c_str(), asMETHODPR(T, operator=, (const T&), T&), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_opIndex(const string&in) const property", asMETHOD(T, operator[]), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_opIndex(const string&in, const string&in) property", asMETHOD(T, set), asCALL_THISCALL);
@@ -91,6 +118,8 @@ template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, con
 	engine->RegisterObjectMethod(type.c_str(), "uint64 size() const", asMETHOD(T, size), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void erase(const string&in)", asMETHOD(T, erase), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void clear()", asMETHOD(T, clear), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const string& name_at(uint)", asFUNCTION(name_value_collection_name_at<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "const string& value_at(uint)", asFUNCTION(name_value_collection_value_at<T>), asCALL_CDECL_OBJFIRST);
 }
 template <class T, class P> void RegisterMessageHeader(asIScriptEngine* engine, const string& type, const string& parent) {
 	RegisterNameValueCollection<T>(engine, type);
