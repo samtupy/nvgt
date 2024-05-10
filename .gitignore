@@ -25,11 +25,6 @@ lindev
 macosdev
 windev
 
-# Tests
-test/quick/**
-!test/quick/*.nvgt
-test/tmp/**
-
 # website builds
 web/_site
 web/docs

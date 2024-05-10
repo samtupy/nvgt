@@ -1,0 +1,7 @@
+case/**
+!case/*.nvgt
+
+quick/**
+!quick/*.nvgt
+
+tmp/**

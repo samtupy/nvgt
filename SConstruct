@@ -42,13 +42,13 @@ for s in Glob("plugin/*/_SConscript"):
 env.Append(LIBS = static_plugins)
 
 # nvgt itself
-sources = Glob("build/obj_src/*.cpp")
+sources = [str(i)[4:] for i in Glob("src/*.cpp")]
 env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoNetSSLWinMT", "PocoUtilMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoCrypto", "PocoFoundation", "PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoZip", "crypto", "ssl"], "phonon", "bass", "bass_fx", "bassmix", "SDL2main"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(LINKFLAGS = ["/SUBSYSTEM:WINDOWS", "/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll", "/delayload:Tolk.dll"])
 elif env["PLATFORM"] == "darwin":
-	sources.append("build/obj_src/macos.mm")
+	sources.append("macos.mm")
 	env["FRAMEWORKPREFIX"] = "-weak_framework"
 	env.Append(FRAMEWORKS = ["CoreAudio",  "CoreFoundation", "CoreHaptics", "CoreVideo", "AudioToolbox", "AppKit", "IOKit", "Carbon", "Cocoa", "ForceFeedback", "GameController", "QuartzCore"])
 	env.Append(LIBS = ["objc"])
@@ -62,7 +62,7 @@ if ARGUMENTS.get("no_user", "0") == "0":
 		SConscript("user/_SConscript", exports = {"plugin_env": plugin_env, "nvgt_env": env})
 SConscript("ASAddon/_SConscript", variant_dir = "build/obj_ASAddon", duplicate = 0, exports = "env")
 SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, exports = "env")
-nvgt = env.Program("release/nvgt", sources, PDB = "#build/debug/nvgt.pdb")
+nvgt = env.Program("release/nvgt", [os.path.join("build/obj_src", s) for s in sources], PDB = "#build/debug/nvgt.pdb")
 if env["PLATFORM"] == "win32": env.Install("c:/nvgt", nvgt)
 
 # stubs
@@ -73,6 +73,7 @@ def fix_windows_stub(target, source, env):
 			f.seek(0)
 			f.write(b"NV")
 			f.close()
+
 if ARGUMENTS.get("no_stubs", "0") == "0":
 	stub_platform = "" # This detection will likely need to be improved as we get more platforms working.
 	if env["PLATFORM"] == "win32": stub_platform = "windows"
@@ -83,10 +84,7 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	stub_env = env.Clone(PROGSUFFIX = ".bin")
 	stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
-	# Todo: Can we make this use one list of sources E. the sources variable above? This scons issue where one must provide the variant_dir when specifying sources is why we are not right now.
-	stub_objects = stub_env.Object(Glob("build/obj_stub/*.cpp"))
-	if env["PLATFORM"] == "darwin":
-		stub_objects.append(stub_env.Object("build/obj_stub/macos.mm"))
+	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources])
 	stub = stub_env.Program(f"release/nvgt_{stub_platform}", stub_objects)
 	if env["PLATFORM"] == "win32": env.Install("c:/nvgt", stub)
 	if "upx" in env:
