@@ -74,7 +74,7 @@ sudo cmake --install .
 
 You will need scons, which you can get by running pip3 install scons.
 
-# finally...
+## Finally...
 cd to the root of the nvgt repository and extract https://nvgt.gg/lindev.tar.gz to a lindev folder there.
 
 scons -s
