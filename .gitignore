@@ -26,8 +26,9 @@ macosdev
 windev
 
 # Tests
-test/**
-!test/*.nvgt
+test/quick/**
+!test/quick/*.nvgt
+test/tmp/**
 
 # website builds
 web/_site

@@ -16,9 +16,11 @@
 #include <Poco/Format.h>
 #include <Poco/Mutex.h>
 #include <Poco/NamedMutex.h>
+#include <Poco/Runnable.h>
 #include <Poco/RWLock.h>
 #include <Poco/ScopedLock.h>
 #include <Poco/Thread.h>
+#include <Poco/ThreadPool.h>
 #include <angelscript.h>
 #include <scriptdictionary.h>
 #include <obfuscate.h>
@@ -27,55 +29,46 @@
 #include "threading.h"
 using namespace Poco;
 
-typedef struct {
+// Poco does support starting a thread by directly passing a function pointer and user data, but things like Poco's ThreadPool do not support this and so instead we opt to inherit from their Runnable class which is more unified and which works with all of Poco's multithreading mechanisms.
+class script_runnable : public Runnable {
 	asIScriptFunction* func;
 	CScriptDictionary* args;
-	Thread* thread;
-} script_thread_extra;
-void script_thread(void* extra) {
-	script_thread_extra* e = (script_thread_extra*)extra;
-	Thread* thread = e->thread;
-	asIScriptFunction* func = e->func;
-	CScriptDictionary* args = e->args;
-	free(e);
-	if (!func) {
-		angelscript_refcounted_release<Thread>(thread);
-		return;
+	Thread* thread; // May be null if started from a ThreadPool.
+public:
+	script_runnable(asIScriptFunction* func, CScriptDictionary* args, Thread* thread = nullptr) : func(func), args(args), thread(thread) {}
+	void run() {
+		int execution_result = asEXECUTION_FINISHED;
+		if (!func) goto finish;
+		asIScriptContext* ctx = g_ScriptEngine->CreateContext();
+		if (!ctx) goto finish;
+		if (ctx->Prepare(func) < 0) goto finish;
+		if (ctx->SetArgObject(0, args) < 0) goto finish;
+		execution_result = ctx->Execute(); // Todo: Work out what we want to do with exceptions or errors that take place in threads.
+		finish:
+			if (ctx && !g_shutting_down) ctx->Release(); // We only do this when the engine is not shutting down because the angelscript could get partially destroyed on the main thread before this point in the shutdown case.
+			if (thread) angelscript_refcounted_release<Thread>(thread);
+			asThreadCleanup();
+			delete this; // Poco wants us to keep these Runnable objects alive as long as the thread is running, meaning we must delete ourself from within the thread to avoid some other sort of cleanup machinery.
+			return;
 	}
-	asIScriptContext* ctx = g_ScriptEngine->CreateContext();
-	if (!ctx) {
-		angelscript_refcounted_release<Thread>(thread);
-		return;
-	}
-	if (ctx->Prepare(func) < 0) {
-		ctx->Release();
-		angelscript_refcounted_release<Thread>(thread);
-		return;
-	}
-	if (ctx->SetArgObject(0, args) < 0) {
-		ctx->Release();
-		angelscript_refcounted_release<Thread>(thread);
-		return;
-	}
-	if (ctx->Execute() != asEXECUTION_FINISHED) {
-		ctx->Release();
-		angelscript_refcounted_release<Thread>(thread);
-		return;
-	}
-	ctx->Release();
-	asThreadCleanup();
-	angelscript_refcounted_release<Thread>(thread);
-	return;
-}
+};
 
 void thread_begin(Thread* thread, asIScriptFunction* func, CScriptDictionary* args) {
 	if (!func) return;
-	script_thread_extra* e = (script_thread_extra*)malloc(sizeof(script_thread_extra));
-	e->func = func;
-	e->thread = thread;
-	e->args = args;
 	angelscript_refcounted_duplicate<Thread>(thread);
-	thread->start(script_thread, e);
+	thread->start(*new script_runnable(func, args, thread));
+}
+void pooled_thread_begin(ThreadPool* pool, asIScriptFunction* func, CScriptDictionary* args) {
+	if (func) pool->start(*new script_runnable(func, args));
+}
+void pooled_thread_begin(ThreadPool* pool, asIScriptFunction* func, CScriptDictionary* args, const std::string& name) {
+	if (func) pool->start(*new script_runnable(func, args), name);
+}
+void pooled_thread_begin(ThreadPool* pool, asIScriptFunction* func, CScriptDictionary* args, Thread::Priority priority) {
+	if (func) pool->startWithPriority(priority, *new script_runnable(func, args));
+}
+void pooled_thread_begin(ThreadPool* pool, asIScriptFunction* func, CScriptDictionary* args, const std::string& name, Thread::Priority priority) {
+	if (func) pool->startWithPriority(priority, *new script_runnable(func, args), name);
 }
 
 template <class T> void scoped_lock_construct(void* mem, T* mutex) {
@@ -105,6 +98,8 @@ void scoped_read_rw_lock_destruct(ScopedReadRWLock* mem) {
 void scoped_write_rw_lock_destruct(ScopedWriteRWLock* mem) {
 	mem->~ScopedWriteRWLock();
 }
+
+
 template <class T> void RegisterMutexType(asIScriptEngine* engine, const std::string& type) {
 	angelscript_refcounted_register<T>(engine, type.c_str());
 	if constexpr(std::is_same<T, NamedMutex>::value) engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ m(const string&in)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const std::string&>)), asCALL_CDECL);
@@ -122,7 +117,6 @@ template <class T> void RegisterMutexType(asIScriptEngine* engine, const std::st
 	engine->RegisterObjectBehaviour(format("%s_lock", type).c_str(), asBEHAVE_DESTRUCT, "void f()", asFUNCTION(scoped_lock_destruct<T>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(format("%s_lock", type).c_str(), _O("void unlock()"), asMETHOD(ScopedLockWithUnlock<T>, unlock), asCALL_THISCALL);
 }
-
 
 void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterEnum("thread_priority");
@@ -171,12 +165,30 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("rw_write_lock", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(scoped_write_rw_lock_destruct), asCALL_CDECL_OBJFIRST);
 	engine->RegisterEnum("thread_event_type");
 	engine->RegisterEnumValue("thread_event_type", "THREAD_EVENT_MANUAL_RESET", Event::EVENT_MANUALRESET);
-	engine->RegisterEnumValue("thread_event_type", "THREAD_EVENT_AUTO_RESET", Event::EVENT_MANUALRESET);
+	engine->RegisterEnumValue("thread_event_type", "THREAD_EVENT_AUTO_RESET", Event::EVENT_AUTORESET);
 	angelscript_refcounted_register<Event>(engine, "thread_event");
-	engine->RegisterObjectBehaviour("thread_event", asBEHAVE_FACTORY, "thread_event@ e(thread_event_type = THREAD_EVENT_AUTO_RESET)", asFUNCTION(angelscript_refcounted_factory<Event>), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("thread_event", asBEHAVE_FACTORY, "thread_event@ e(thread_event_type = THREAD_EVENT_AUTO_RESET)", asFUNCTION((angelscript_refcounted_factory<Event, Event::EventType>)), asCALL_CDECL);
 	engine->RegisterObjectMethod(_O("thread_event"), _O("void set()"), asMETHOD(Event, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("thread_event"), _O("void wait()"), asMETHODPR(Event, wait, (), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("thread_event"), _O("void wait(uint)"), asMETHODPR(Event, wait, (long), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("thread_event"), _O("bool try_wait(uint)"), asMETHOD(Event, tryWait), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("thread_event"), _O("void reset()"), asMETHOD(Event, reset), asCALL_THISCALL);
+	angelscript_refcounted_register<ThreadPool>(engine, "thread_pool");
+	engine->RegisterObjectBehaviour("thread_pool", asBEHAVE_FACTORY, format("thread_pool@ p(int = 2, int = 16, int = 60, int = %d)", POCO_THREAD_STACK_SIZE).c_str(), asFUNCTION((angelscript_refcounted_factory<ThreadPool, int, int, int, int>)), asCALL_CDECL);
+	engine->RegisterObjectMethod("thread_pool", "void add_capacity(int)", asMETHOD(ThreadPool, addCapacity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("thread_pool", "int get_capacity() const property", asMETHOD(ThreadPool, capacity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("thread_pool", "void set_stack_size(int) property", asMETHOD(ThreadPool, setStackSize), asCALL_THISCALL);
+	engine->RegisterObjectMethod("thread_pool", "int get_stack_size() const property", asMETHOD(ThreadPool, getStackSize), asCALL_THISCALL);
+	engine->RegisterObjectMethod("thread_pool", "int get_used() const property", asMETHOD(ThreadPool, used), asCALL_THISCALL);
+	engine->RegisterObjectMethod("thread_pool", "int get_allocated() const property", asMETHOD(ThreadPool, allocated), asCALL_THISCALL);
+	engine->RegisterObjectMethod("thread_pool", "int get_available() const property", asMETHOD(ThreadPool, available), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("thread_pool"), _O("void start(thread_callback@, dictionary@ = null)"), asFUNCTIONPR(pooled_thread_begin, (ThreadPool*, asIScriptFunction*, CScriptDictionary*), void), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("thread_pool"), _O("void start(thread_callback@, dictionary@, thread_priority)"), asFUNCTIONPR(pooled_thread_begin, (ThreadPool*, asIScriptFunction*, CScriptDictionary*, Thread::Priority), void), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("thread_pool"), _O("void start(thread_callback@, dictionary@, const string&in)"), asFUNCTIONPR(pooled_thread_begin, (ThreadPool*, asIScriptFunction*, CScriptDictionary*, const std::string&), void), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("thread_pool"), _O("void start(thread_callback@, dictionary@, const string&in, thread_priority)"), asFUNCTIONPR(pooled_thread_begin, (ThreadPool*, asIScriptFunction*, CScriptDictionary*, const std::string&, Thread::Priority), void), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("thread_pool", "void stop_all()", asMETHOD(ThreadPool, stopAll), asCALL_THISCALL);
+	engine->RegisterObjectMethod("thread_pool", "void join_all()", asMETHOD(ThreadPool, joinAll), asCALL_THISCALL);
+	engine->RegisterObjectMethod("thread_pool", "void collect()", asMETHOD(ThreadPool, collect), asCALL_THISCALL);
+	engine->RegisterObjectMethod("thread_pool", "const string& get_name() const property", asMETHOD(ThreadPool, name), asCALL_THISCALL);
+	engine->RegisterGlobalFunction(_O("thread_pool& get_thread_pool_default() property"), asFUNCTION(ThreadPool::defaultPool), asCALL_CDECL);
 }

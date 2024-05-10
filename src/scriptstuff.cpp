@@ -17,7 +17,6 @@
 #include <map>
 #include <vector>
 #ifdef _WIN32
-	//#define WIN32_LEAN_AND_MEAN
 	#include <windows.h>
 #endif
 #include <obfuscate.h>
@@ -25,6 +24,8 @@
 #include <scriptany.h>
 #include <scriptarray.h>
 #include <scriptdictionary.h>
+#include <scripthelper.h>
+#include "datastreams.h"
 #include "nvgt.h"
 #include "scriptstuff.h"
 #include "timestuff.h"
@@ -225,6 +226,12 @@ std::string get_script_executable() {
 }
 std::string get_function_signature(asIScriptFunction* function, int type_id) {
 	return function->GetDeclaration();
+}
+void dump_angelscript_engine_configuration(datastream* output) {
+	#ifndef NVGT_STUB
+		if (!output || !output->get_ostr()) return;
+		WriteConfigToStream(g_ScriptEngine, *output->get_ostr());
+	#endif
 }
 
 class script_function;
@@ -743,5 +750,6 @@ void RegisterScriptstuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("void release_exclusive_lock()", asFUNCTION(asReleaseExclusiveLock), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void acquire_shared_lock()", asFUNCTION(asAcquireSharedLock), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void release_shared_lock()", asFUNCTION(asReleaseSharedLock), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void script_dump_engine_configuration(datastream@+)", asFUNCTION(dump_angelscript_engine_configuration), asCALL_CDECL);
 	RegisterScripting(engine);
 }
