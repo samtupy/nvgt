@@ -1,0 +1,20 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	tts_voice v;
+	v.set_voice(0);
+	//v.speak_to_file("speak_to_file.wav", "This is another stupid tts test where we speak this to a file. I wonder if it'll work on the first try");
+	sound s;
+	string audio = v.speak_to_memory("file created!");
+	file f;
+	f.open("speak_to_file.wav", "wb");
+	f.write(audio);
+	f.close();
+	if (!s.push_memory(audio, true)) {
+		alert("test", audio.length());
+		return;
+	}
+	s.play_wait();
+}

@@ -1,0 +1,12 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+#pragma plugin nvgt_curl
+void main() {
+	internet_request i;
+	i.post("https://samtupy.com/post_test.php", "stuff=this is a test!");
+	while (!i.complete)
+		wait(5);
+	alert(i.status_code, i.response_body);
+}

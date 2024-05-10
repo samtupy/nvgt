@@ -1,0 +1,9 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	alert("test", string_to_hex("This is a test of this thing"));
+	string t = string_base64_encode("Hello there");
+	alert("test", string_base64_decode(t));
+}

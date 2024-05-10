@@ -1,0 +1,21 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	datastream datastring;
+	datastream@ f = duplicating_writer(base64_encoder(hex_encoder(file("datastreams_binary.txt", "w")))) + file("datastreams_binary2.txt", "w") + datastring;
+	int16 val1 = 1, val2 = 2, val3 = 3, val4 = 4;
+	string s1 = "hello", s2 = "bye";
+	f << val1 << val2 << val3 << val4 << s1 << s2;
+	f.close();
+	duplicating_reader@ rnd = duplicating_reader(random_reader()) + datastring;
+	rnd.read(16); // There are now 16 random characters at the end of datastring.
+	alert("test", datastring.str().length());
+	int16 rval1, rval2, rval3, rval4;
+	string rs1, rs2;
+	@f = base64_decoder(hex_decoder(file("datastreams_binary.txt", "r")));
+	f >> rval1 >> rval2 >> rval3 >> rval4 >> rs1 >> rs2;
+	f.close();
+	alert(rs1, rval1 + " " + rval2 + " " + rval3 + " " + rval4 + " " + rs2);
+}

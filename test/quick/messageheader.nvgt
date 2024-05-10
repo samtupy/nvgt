@@ -1,0 +1,25 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	name_value_collection n;
+	n["test"] = "haha";
+	internet_message_header n2;
+	n2["test"] = "haha2";
+	n2.add("test", "haha3");
+	n2["key"] = 123;
+	n = n2;
+	alert("test", n["test"]);
+	datastream@ ds = datastream();
+	if(n2.write(ds)) alert("test", ds.str());
+	ds.seek(0);
+	internet_message_header h;
+	if(h.read(ds)) alert("test", h["key"]);
+	@ds = datastream();
+	http_request req("GET", "/test.txt");
+	req.host = "nvgt.gg";
+	internet_message_header@ mh = req;
+	mh.write(ds);
+	alert("test", ds.str());
+}

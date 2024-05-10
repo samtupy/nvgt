@@ -1,0 +1,31 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+tts_voice v;
+void func(dictionary@ args) {
+	uint64 t = ticks();
+	uint64 time = t;
+	while (true) {
+		uint64 t2 = ticks();
+		if (t2 - t > 30000)
+			return;
+		if (t2 - time > 2000) {
+			time = t2;
+			v.speak_interrupt("test");
+		}
+		yield();
+	}
+}
+
+void main() {
+	show_window("test");
+	create_coroutine(func, null);
+	while (!key_down(KEY_ESCAPE)) {
+		wait(5);
+		if (key_pressed(KEY_SPACE)) v.speak_interrupt("bla");
+		if (key_pressed(KEY_RETURN)) alert("oops", "interrupted!");
+		yield();
+	}
+	exit();
+}

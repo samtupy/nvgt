@@ -1,0 +1,14 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+class object {
+	int var = 0;
+	object(int v = random_seed()) {
+		var = v;
+	}
+}
+void main() {
+	object o;
+	alert("test", o.var);
+}

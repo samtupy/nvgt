@@ -1,0 +1,20 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	string r = packet("fixstring", 1, 2, 3, 6168, 32.3, "last_fixstring");
+	alert("test", r.length());
+	file f;
+	f.open("packet.dat", "wb");
+	f.write(r);
+	f.close();
+	string r1;
+	int[] r2(4);
+	uint size = r.unpacket(0, r1, r2[0], r2[1], r2[2], r2[3]);
+	alert(r1 + " " + size, string(r2));
+	double r3 = 0;
+	string r4;
+	size = r.unpacket(size, r3, r4);
+	alert(size, r3 + " " + r4);
+}

@@ -1,0 +1,9 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	string t = string_base64_encode("Hi\r\nThis is a string containing newlines and spaces.");
+	alert(t, string_base64_decode(t));
+	alert("test", string_base64_decode(string_base64_encode("\0\0\0\r\n\t ")) == "\0\0\0\r\n\t ");
+}

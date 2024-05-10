@@ -1,0 +1,27 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	show_window("TOTP test");
+	string key = input_box("key", "enter secret setup key (the default can be entered into an authenticator app to see this working)", "NVGT TOTP TEST SETUP AUTH KEY");
+	if (key == "") return;
+	key = string_base32_decode(string_base32_normalize(key));
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (key_repeating(KEY_SPACE)) {
+			string code = HOTP(key, TIME_STAMP / 30, 6); // function returns an unsigned integer.
+			while (code.length() < 6) code.insert(0, "0"); // deal with the case where the first digits in the code are 0 and cannot be represented by an integer.
+			if (keyboard_modifiers & KEYMOD_SHIFT == 0) { // Only execute this code if shift is not held down
+				// All we're doing here is inserting spaces between the digits for easy annunciation by a screen reader.
+				for (uint i = 0; i < code.length() - 1; i++) {
+					code.insert(i + 1, " ");
+					i++;
+				}
+				// Then for the heck of it, we'll show how long the code is valid for too. This still happens only if shift is not pressed, with the effect that pressing space gives extra info and shift+space speaks the raw unformatted code.
+				code += " for " + (29 - TIME_STAMP % 30) + " more seconds"; // We use 29 not 30 because otherwise codes would last for 1 to 30 seconds instead of 0 to 29, bad rounding/decimal dropping.
+			}
+			screen_reader_speak(code, true);
+		}
+	}
+}

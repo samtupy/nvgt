@@ -1,0 +1,56 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+int c = 0, d = 0, l = 0;
+fast_mutex c_mutex; // comment out the mutex.lock/unlock lines, then start many threads and spam c, and at best the number will get messed up, at worst you could experience crashes or memory violations.
+fast_mutex d_mutex; // To test scoped locks.
+rw_lock rwlock;
+thread_event app_shutdown(THREAD_EVENT_MANUAL_RESET);
+int threads_running = 0;
+void my_thread(dictionary@ args) {
+	for (uint i = 0; i < 10; i++) {
+		screen_reader_speak(i + " " + thread_current.name, true);
+		for (int j = 0; j < 10; j++) {
+			if (app_shutdown.try_wait(50)) { i = 11; break; }
+			c_mutex.lock();
+			fast_mutex_lock l(d_mutex);
+			c++;
+			d++;
+			c_mutex.unlock();
+			l.unlock();
+			rwlock.write_lock();
+			::l++;
+			rwlock.unlock();
+		}
+	}
+	fast_mutex_lock l(d_mutex);
+	threads_running--;
+}
+void main() {
+	show_window("test");
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (key_pressed(KEY_C)) {
+			c_mutex.lock();
+			screen_reader_speak(c, true);
+			c_mutex.unlock();
+		}
+		if (key_pressed(KEY_D)) {
+			fast_mutex_lock l(d_mutex); // will automatically unlock when scope exits.
+			screen_reader_speak(d, true);
+		}
+		if (key_down(KEY_L)) {
+			rw_read_lock ls(rwlock); // Similar to above will unlock when rw_read_lock object destroys.
+			screen_reader_speak(l, true);
+		}
+		if (key_pressed(KEY_SPACE)) {
+			if (keyboard_modifiers & KEYMOD_SHIFT != 0) thread_pool_default.start(my_thread);
+				else thread("t").start(my_thread);
+				fast_mutex_lock l(d_mutex);
+				threads_running++;
+			}
+	}
+	app_shutdown.set();
+	while (threads_running > 0) wait(5);
+}

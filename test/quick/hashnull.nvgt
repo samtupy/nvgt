@@ -1,0 +1,8 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+#include "bgt_compat.nvgt"
+void main() {
+	alert("test", string_hash("this\0is a test!\0", 2, false));
+}

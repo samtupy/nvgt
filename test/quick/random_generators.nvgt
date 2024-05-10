@@ -1,0 +1,14 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	random_pcg pcg;
+	alert("test", string(pcg.next()));
+	random_well well;
+	alert("test", well.range(-20, 20));
+	random_gamerand gr;
+	alert("test", gr.nextf());
+	random_xorshift xr;
+	alert("test", xr.next());
+}

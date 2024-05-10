@@ -1,0 +1,10 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	datetime u(1970, 1, 1, 0, 0, 0);
+	datetime n;
+	uint64 ts = n - u;
+	alert("test", ts);
+}

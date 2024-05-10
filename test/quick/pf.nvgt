@@ -1,0 +1,31 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+int count = 0;
+int pfc(int x, int y, int z, string d) {
+	count++;
+	if (x < 0 or y < 0 or z < 0) return 10;
+	if (z != 0 and z != 10) {
+		if (x != 12 or y != 12) return 10;
+		return 0;
+	}
+	if (x > 1 and x<9 and y>1 and y < 9) return 10;
+	return 3;
+}
+void main() {
+	pathfinder pf;
+	pf.allow_diagonals = true;
+	//pf.search_range=30;
+	pf.set_callback_function(pfc);
+	uint64 t = ticks();
+	vector[]@ path = pf.find(1, 1, 0, 0, 0, 10, "");
+	alert("test", path.length() + " in " + (ticks() - t) + "ms, " + pf.total_cost + ", " + count + " calls");
+	t = ticks();
+	@path = pf.find(1, 1, 0, 50, 50, 10, "");
+	alert("test", path.length() + " in " + (ticks() - t) + "ms, " + pf.total_cost);
+	string r;
+	for (uint i = 0; i < path.length(); i++)
+		r += path[i].x + " " + path[i].y + " " + path[i].z + "\r\n";
+	clipboard_set_text(r);
+}

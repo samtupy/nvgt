@@ -1,0 +1,11 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	vector[] l;
+	uint64 t = ticks();
+	for (uint i = 0; i < 40; i++)
+		l.insert_last(vector(random(-2, 2), random(-4, 4), random(-16, 16)));
+	alert("test", ticks() - t);
+}
