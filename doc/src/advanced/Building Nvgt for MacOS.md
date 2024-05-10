@@ -1,4 +1,6 @@
 # Rough notes for building on macOS
+Note that there is now a script in the build folder of the [GitHub repo](https://github.com/samtupy/nvgt) that does much of this work for you. It attempts to run as portably as possible. Otherwise, below are some slightly out of date instructions, though they should still work.
+
 I have no idea what I'm doing here!
 
 Assuming xcode and homebrew are installed:

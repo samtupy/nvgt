@@ -1,4 +1,6 @@
 # Building NVGT on linux
+Note now that there is a script to build NVGT on Linux (tested on Debian). It tends to build pretty portably so you can run it basically anywhere, and it will do much of the required downloading etc. Otherwise if you wish to build manually, some slightly older instructions are below.
+
 Please keep in mind that this is a very very rough draft, I've only done this once before when I built nvgt's server components for stw. This will attempt to describe, even for a user who doesn't use linux much, how to build nvgt at least on Ubuntu 22.04 LTS.
 
 ## tools
