@@ -1,0 +1,62 @@
+---
+layout: default.liquid
+title: Pseudorandom Generation
+---
+
+<h1>Pseudorandom Generation</h1>
+<h2>Classes</h2>
+<h2>Functions</h2>
+<h3>random</h3>
+<p>Generates a pseudorandom number given a range.</p>
+<p>int random(int min, int max);</p>
+<h4>Arguments:</h4>
+<ul>
+<li><p>int min: the minimum possible number to generate.</p>
+</li>
+<li><p>int max: the maximum possible number to generate.</p>
+</li>
+</ul>
+<h4>Returns:</h4>
+<p>int: a random number in the given range.</p>
+<h4>Remarks:</h4>
+<p>Note that this function is a pseudorandom number generator. To lern more, click <a href="https://en.wikipedia.org/wiki/Pseudorandom_number_generator">here</a>.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	alert(&quot;Example&quot;, random(1, 100));
+}
+</code></pre>
+<h3>random_bool</h3>
+<p>Generates a true or false value pseudorandomly.</p>
+<p>bool random_bool(int percent = 50);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>int percent = 50: the likelyhood (as a percent from 0-100) of generating a true value. Defaults to 50.</li>
+</ul>
+<h4>Returns:</h4>
+<p>bool: either true or false.</p>
+<h4>Remarks;</h4>
+<p>Note that this function is a pseudorandom number generator. To lern more, click <a href="https://en.wikipedia.org/wiki/Pseudorandom_number_generator">here</a>.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	alert(&quot;Example&quot;, random_bool() ? &quot;true&quot; : &quot;false&quot;);
+}
+</code></pre>
+<h3>random_character</h3>
+<p>Generates a random ascii character.</p>
+<p>string random_character(string min_ascii, string max_ascii);</p>
+<h4>Arguments:</h4>
+<ul>
+<li><p>string min_ascii: the minimum possible ascii character to be generated.</p>
+</li>
+<li><p>string max_ascii: the maximum possible ascii character.</p>
+</li>
+</ul>
+<h4>Returns:</h4>
+<p>string: a random ascii character in the given range.</p>
+<h4>Remarks:</h4>
+<p>Note that this function uses a pseudorandom number generator. To lern more, click <a href="https://en.wikipedia.org/wiki/Pseudorandom_number_generator">here</a>.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	alert(&quot;Your random alphabetical character is&quot;, random_character(&quot;a&quot;, &quot;z&quot;));
+}
+</code></pre>

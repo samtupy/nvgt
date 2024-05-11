@@ -1,0 +1,390 @@
+---
+layout: default.liquid
+title: NVGT Documentation
+---
+
+<h1>introduction to the Nonvisual Gaming Toolkit</h1>
+<p>Thank you for downloading the Nonvisual Gaming Toolkit (NVGT) by Sam Tupy Productions and contributers. We hope you find the time that you invest in this engine to be worthwhile!</p>
+<p>The NVGT documentation contains:</p>
+<ul>
+<li>The NVGT user manual; containing everything from programming resources to general tutorials to example games,</li>
+<li>API references; Class/function references that specify exactly how to use each feature of the engine,</li>
+<li>Advanced topics; Documentation on the c++ side of the NVGT engine including how to build the engine from source, modify it's security functions, write documentation for the engine and more,</li>
+<li>Appendix; data tables that don't fit in the API references, miscellaneous topics, attributions and license agreements.</li>
+</ul>
+<h1>NVGT User Manual</h1>
+<h2>Getting Started</h2>
+<p>Welcome to the Nonvisual Gaming Toolkit! This user manual contains all of the information you will need to get up and running using this powerful engine! whether you are new at programming, someone who used to create games using the Blastbay Game Toolkit or an advanced programmer who just wants an easy, no-hassle method of creating games, you're sure to find what you need in this manual to not only get up and running, but to also develop some confidence in it's usage.</p>
+<h2>Upgrading from bgt</h2>
+<p>Since for a while this is where most people who have heard of NVGT will likely start, we will begin by describing the relationship between NVGT and BGT, and more importantly the steps required to upgrade a BGT project to an NVGT one. If you have not heard of BGT or are completely new to game development and are wondering how NVGT can help you, you can probably skip this and move to the fresh start topic.</p>
+<p>BGT stands for the Blastbay Gaming Toolkit, and is what initially enspired NVGT to be created after BGT was made into abandonware.</p>
+<p>It is important to note that NVGT is not officially endorsed by BGT's developers and contributers, and NVGT is not in any way derived from BGT's source code. The only shared assets between NVGT and BGT are some of BGT's include files such as the audio_form and sound_pool used by many bgt games, which are released under a zlib license.</p>
+<p>our goal is to make the transission as seemless as possible from BGT to NVGT, but here are some things you should know when porting an existing BGT game.</p>
+<ul>
+<li>Always <code>#include &quot;bgt_compat.nvgt&quot;</code> as this includes a lot of aliases to other functions. Using built-in functions may improve performance so this is more or less a stop-gap to get you up and running quickly; however if you wish for your code to just run, bgt_compat will certainly be of use.</li>
+<li>When refering to an array's length, pass length as a method call and not as a property. ,For example, you would use <code>array.length();</code> rather than <code>a.length;</code>.</li>
+<li>stream() is not included in NVGT, so change all stream calls to load() instead.</li>
+<li>load() contains a second optional argument to pass a pack file. set_sound_storage() is no longer used for the moment. However, you can set sound_pool.pack_file to a pack handle to get a similar effect.</li>
+<li>The Angelscript syntax for naming arguments in function calls has changed. func(arg, arg, arg=value); must now become func(arg, arg, arg:value);</li>
+<li>Take care to check any method calls using the tts_voice object as a few methods such as set_voice have changed from their BGT counterparts.</li>
+<li>When splitting a string, matching against \r\n is advised as BGT handles this differently. This will result in not having spurious line breaks at the ends of split text.</li>
+<li>The settings object has been crafted as a ghost object. That is, it will not actually load or write any data from the registry. If you use the registry, consider using a data or ini file instead.</li>
+<li>The joystick object is also a ghost object and does not currently function.</li>
+<li>The calendar object has been renamed to datetime.</li>
+<li>There is a type called <code>var</code> in the engine now, so you may need to be careful if your project contains any variables named var.</li>
+</ul>
+<h2>Fresh start</h2>
+<p>This is the starting point for anyone who is interested in game development and who has found this engine, but who does not have much experience with programming concepts or the history of older game engines that are similar to this one.</p>
+<h1>API References</h1>
+<p>This section contains several complete class and function API references that allow the creation of games and other applications. To see examples of how any of these objects or functions work together with any great detail, you should look in the NVGT User Manual instead of the API references. However if you are trying to find the name of a specific function or browse the complete list of what this engine has to offer, you have come to the right place!</p>
+<h2>Builtin Script API</h2>
+<p><a href="references_builtin_containers.html">Containers</a>
+<a href="references_builtin_datatypes.html">Datatypes</a>
+<a href="references_builtin_streams.html">Streams</a>
+<a href="references_builtin_audio.html">Audio</a>
+<a href="references_builtin_data_manipulation.html">Data Manipulation</a>
+<a href="references_builtin_date_and_time.html">Date And Time</a>
+<a href="references_builtin_environment.html">Environment</a>
+<a href="references_builtin_filesystem.html">Filesystem</a>
+<a href="references_builtin_JSON.html">JSON</a>
+<a href="references_builtin_math.html">Math</a>
+<a href="references_builtin_profiling_and_debugging.html">Profiling And Debugging</a>
+<a href="references_builtin_pseudorandom_generation.html">Pseudorandom Generation</a>
+<a href="references_builtin_security.html">Security</a>
+<a href="references_builtin_texttospeech.html">Text-To-Speech</a>
+<a href="references_builtin_user_interface.html">User Interface</a></p>
+<h2>Bundled Includes API</h2>
+<p><a href="references_include.html">Bundled Includes API</a></p>
+<h2>Plugins</h2>
+<p><a href="references_plugin_git2nvgt.html">Git2Nvgt</a>
+<a href="references_plugin_nvgt_curl.html">Nvgt_Curl</a>
+<a href="references_plugin_nvgt_sqlite.html">Nvgt_Sqlite</a></p>
+<h1>Advanced Topics for C++ Developers</h1>
+<p>This section contains information that is useful for anyone who wishes to interact in any way with NVGT's source code. Whether someone wants to perform a simple sourcecode build, develop an NVGT plugin dll, learn how to contribute to the engine or just learn about how NVGT works internally, you'll find such information here. The topics that will be discussed here will generally not be applicable for those who just want to develop games using NVGT using the installer downloaded from nvgt.gg.</p>
+<h2>Building NVGT on linux</h2>
+<p>Note now that there is a script to build NVGT on Linux (tested on Debian). It tends to build pretty portably so you can run it basically anywhere, and it will do much of the required downloading etc. Otherwise if you wish to build manually, some slightly older instructions are below.</p>
+<p>Please keep in mind that this is a very very rough draft, I've only done this once before when I built nvgt's server components for stw. This will attempt to describe, even for a user who doesn't use linux much, how to build nvgt at least on Ubuntu 22.04 LTS.</p>
+<h3>tools</h3>
+<p>You will need the GNU compiler collection / GNU make / a few other tools. You can see if you already have these on your installation by running <code>gcc</code>, <code>g++</code>, <code>make</code>. If this fails, run <code>sudo apt install build-essential gcc g++ make autoconf libtool</code>.</p>
+<h3>commands</h3>
+<pre><code class="language-bash">mkdir deps &amp;&amp; cd deps
+git clone https://github.com/codecat/angelscript-mirror
+cd deps/angelscript-mirror/sdk/angelscript/projects/gnuc
+make
+sudo make install
+
+sudo apt install libssl-dev libcurl4-openssl-dev libopus-dev libsdl2-dev
+sudo apt remove libsdl2-dev
+</code></pre>
+<h3>Note</h3>
+<p>The first command installs a version of SDL that is too old, but still installs loads of deps. Now we will build sdl.</p>
+<p><code>cd deps</code></p>
+<p>Before continuing, download sdl into a folder called SDL.</p>
+<pre><code class="language-bash">mkdir SDL_Build
+cd SDL_Build
+cmake ../SDL
+cmake --build .
+sudo cmake --install .
+
+cd deps
+git clone https://github.com/pocoproject/poco
+cd poco
+./configure --static --no-tests --no-samples --cflags=-fPIC
+make -s -j2
+</code></pre>
+<h3>Note</h3>
+<p>The 2 in <code>make -j2</code> is how many CPU cores you would like to use when building. Change this to the number of CPU cores you would like to use. If you do not know how many cores your system has, you can use the <code>lscpu</code> command on many distrobutions to check.</p>
+<pre><code class="language-bash">sudo make install
+
+cd deps
+git clone https://github.com/lsalzman/enet
+cd enet
+autoreconf -vfi
+./configure
+make
+sudo make install
+
+cd deps
+git clone https://github.com/bulletphysics/bullet3
+cd bullet3
+./build_cmake_pybullet_double.sh
+cd cmake_build
+sudo camke --install .
+</code></pre>
+<pre><code class="language-bash">cd deps
+git clone https://github.com/libgit2/libgit2
+cd libgit2
+mkdir build
+cd build
+cmake ..
+cmake --build .
+sudo cmake --install .
+</code></pre>
+<p>You will need scons, which you can get by running pip3 install scons.</p>
+<h3>Finally...</h3>
+<p>cd to the root of the nvgt repository and extract https://nvgt.gg/lindev.tar.gz to a lindev folder there.</p>
+<p>scons -s</p>
+<p>Enjoy!</p>
+<h2>Rough notes for building on macOS</h2>
+<p>Note that there is now a script in the build folder of the <a href="https://github.com/samtupy/nvgt">GitHub repo</a> that does much of this work for you. It attempts to run as portably as possible. Otherwise, below are some slightly out of date instructions, though they should still work.</p>
+<p>I have no idea what I'm doing here!</p>
+<p>Assuming xcode and homebrew are installed:</p>
+<pre><code class="language-bash">pip3 install scons
+brew install autoconf automake libgit2 libtool openssl sdl2 bullet
+
+mkdir deps
+git clone https://github.com/codecat/angelscript-mirror
+cd &quot;angelscript-mirror/sdk/angelscript/projects/cmake&quot;
+mkdir build; cd build
+cmake ..
+cmake --build .
+sudo cmake --install .
+
+cd deps
+git clone https://github.com/lsalzman/enet
+cd enet
+autoreconf -vfi
+./configure
+make
+sudo make install
+
+cd deps
+git clone https://github.com/pocoproject/poco
+cd poco
+./configure --static --no-tests --no-samples
+make -s -j&lt;n&gt; where &lt;n&gt; is number of CPU cores to use
+sudo make install
+
+cd deps
+git clone https://github.com/libgit2/libgit2
+cd libgit2
+mkdir build
+cd build
+cmake ..
+cmake --build .
+sudo cmake --install .
+
+cd nvgt
+scons -s
+</code></pre>
+<h2>Notes on NVGT's documentation generator</h2>
+<h3>format of the src directory</h3>
+<ul>
+<li>topics may be in .md or .nvgt format at this time. When NVGT becomes a c++ library as well, we may add ability to perform basic parsing of .h files.</li>
+<li>Directories are subsections and can be nested.</li>
+<li>Sections and subsections, starting at NVGTRepoRoot/doc/src, are scanned for topics with the following rules in mind:<ul>
+<li>If a .index.json file exists, this file is loaded and parsed to create the topic list. The json is a list containing either strings or 2-element lists. If a string, just indicates a topic filename. If a list, the first element is a topic filename string and the second is a topic display name string if the topic filename isn't adiquit.</li>
+<li>If a .index.json file does not exist, topics/subsections are loaded in alphabetical order. A topic C will appear before a subsection F.</li>
+<li>Unless a .index.json file specifies a topic display name, the topic filename minus the extension is used as the topic name. If the extension is .md, pythons .title() function is called on the topic basename to create the display name. Otherwise it is assumed that the topic basename.nvgt is an nvgt function name and the topic filename is used as the topic display name. Punctuation characters at the beginning of the display name are removed to provide for more flexible sorting. A subsection !C will show before a subsection F, but !C will display C thus allowing for multiple sorting levels without a .index.json file.</li>
+<li>If there is a .MDRoot file present in a directory, the contents of that directory are output in new markdown/html documents instead of being appended to the main/parent documents, and a link to the new document is appended to the parent one.</li>
+<li>If a topic filename contains an @ character right before the extension, that document is treated as a new markdown root document in the final output instead of being appended to the main/parent document, this is just a way to invoque the same as above but for a single file.</li>
+<li>If a topic filename contains a + before the extension, the first line in the file minus markdown heading indicators will be used as the topic display name instead of a titlecased topic filename.</li>
+</ul>
+</li>
+<li>.nvgt files contain embedded markdown within comments. Most markdown sintax is the same, accept that nvgt's docgen script replaces single line breaks with double lines so that each line is a markdown paragraph. Start a docgen comment with /<strong>, and start a docgen comment with the above mentioned linefeed behavior disabled with /</strong>.</li>
+<li>Another embedded markdown comment within .nvgt files is the &quot;// example:&quot; comment, which will be replaced with &quot;## example&quot; in markdown.</li>
+<li>When parsing a .nvgt file, a &quot;# topicname&quot; markdown directive is added to the top of the output to avoid this redundant step in example functions.</li>
+<li>The docgen program creates a .chm file which requires parsing this markdown into html, and there may be reasons for removing embedded markdown indentation anyway. This resulted in an indentation rule where tabs are stripped from the document when passed to the python markdown package, spaces are not and can be used for things like nested lists.</li>
+<li>If the very first topic in any category begins with a heading with the same name as the containing category, the heading name is stripped from the markdown and html output of the documentation, and the heading indentation of that topic is set to that of the parent category. This allows one to easily create intro sections for categories without creating duplicate headings with the same name. The heading is stripped after the single html/chm version of that topic is printed, as such a heading should remain in the chm documentation.</li>
+</ul>
+<h3>Installing the Microsoft HTML help compiler</h3>
+<p>Because of it's simple format and easy distrobution, we still prefer to generate the NVGT documentation as a .chm file (compressed HTML help). Unfortunately, the link to the html help workshop installer has been broken by Microsoft for a couple of years now. Fortunately, the installer for this program was archived from Microsoft's official website by the wayback machine. Until we get a better link, you should be able to <a href="http://web.archive.org/web/20200312222543/http://download.microsoft.com/download/0/A/9/0A939EF6-E31C-430F-A3DF-DFAE7960D564/htmlhelp.exe">download it here</a>, though it should be noted that only those wishing to rebuild nvgt's documentation from source will need this program.</p>
+<h1>Appendix</h1>
+<p>This section contains miscellaneous documents such as license agreements, lists of static information, etc.</p>
+<h2>Changelog</h2>
+<p>This document lists all major changes that have taken place in NVGT since we started keeping track.</p>
+<h3>New as of 04/18/2024:</h3>
+<ul>
+<li>The var type now has PostEnc and PostDec operators.</li>
+<li>UTF8 fixes: sound.load, and compiled applications can now execute if they contain non-english characters in their filenames.</li>
+<li>All code that I wish to share has been forked into what will hopefully be nvgt's long-standing repository which will eventually have it's privacy status switched to public!</li>
+<li>NVGT now has a build system! I know it's not the fastest one around, but needing a  middleground between learning even more new things and using what I already know, I chose SCons purely because of the fermiliar pythonic environment and not needing to learn yet another new set of syntax rules. I'm just glad we're no longer building the engine using a series of shell scripts!</li>
+<li>Added basic steam audio reverb integration! It needs a lot of work and is far from being production ready (seriously this could slow your game to a crawl until I'm done with this), but nevertheless it is still around for testing!</li>
+</ul>
+<h3>New leading up to 02/20/2024:</h3>
+<ul>
+<li>NVGT now finally has a documentation structure!</li>
+<li>Unifying the file object into stream classes.</li>
+</ul>
+<h3>New as of 01/06/2024:</h3>
+<ul>
+<li>Misc sound system improvements (including the ability to set the pitch of a sound as low as 5).</li>
+<li>Fix memory leak.</li>
+<li>Remove sound_environment class for now.</li>
+<li>Should load bassflac.dll and bassopus.dll if present</li>
+<li>JSON Support.</li>
+<li>Better multithreading support with more primatives.</li>
+<li>More functions in the string class.</li>
+<li>New methods of operating system detection.</li>
+<li>Instance class removed from engine and replaced with include/instance.nvgt which wraps a named_mutex.</li>
+<li>Regular expressions now use PCRE2 via poco including lower level regexp class.</li>
+<li>Alert and question now use SDL message boxes (not sure what I think of this).</li>
+<li>Other misc changes.</li>
+</ul>
+<h3>Note for changes before 01/06/2024:</h3>
+<p>Changes were roughly untracked before this time, but there is a rather large list of somewhat sorted changes below as commited to nvgt_bin (a repository where the NVGT testers could access and test NVGT). These are sorted by month where possible to make them easier to sort, but keep in mind that commits to nvgt_bin usually occurred all at once so that building NVGT was easier for all platforms. As such, expect these lists (while somewhat sorted) to become rather large! Additionally, some of these changes may be ambiguous due to being based off of nvgt_bin's commit messages only. At this time, it was assumed anyone using this engine had direct contact with Sam to ask questions.</p>
+<h3>New as of 12/10/2023:</h3>
+<ul>
+<li>Using more poco libraries including basic json implementation.</li>
+<li>Improvements to the sound crash.</li>
+<li>Fixes instances where the engine was not handling UTF8 properly.</li>
+<li>Performance increases such as updated hashmap and making network object faster.</li>
+<li>First and probably unstable implementation of a plugin system.</li>
+<li>Attempts to improve 3d pathfinding.</li>
+<li>Example of subscripting.</li>
+<li>More misc changes.</li>
+</ul>
+<h3>New as of 07/24/2023:</h3>
+<ul>
+<li>Switch to sdl2 for keyboard/windowing (new key_repeating / get_preferred_locales() / urlopen() functions as a result).</li>
+<li>Switch random number generators (see random_* classes).</li>
+<li>Fixed random_get/set_state().</li>
+<li>Now using Poco c++ libraries for various encode/decode/hash operations as well as better TIMEZONE_* properties and more (thus dropped cppcodec).</li>
+<li>UTF8 support.</li>
+<li>Multithreading support including mutex class.</li>
+<li>Library object.</li>
+<li>Basic msgpack support (see packet and string.unpacket functions).</li>
+<li>md5/sha1/sha224/sha384 hashing added as well as HOTP function (see TOTP.nvgt example).</li>
+<li>libgit2 support.</li>
+<li>Bytecode compression (#pragma bytecode_compression 0-9).</li>
+<li>Multiple windows stubs including Enigma Virtual Box.</li>
+<li>Reduced sound crashes</li>
+<li>Resolved a tts_voice crash.</li>
+<li>More misc.</li>
+</ul>
+<h3>New as of 04/24/2023:</h3>
+<ul>
+<li>Improvements to db_props include.</li>
+<li>New system information functions for custom system fingerprint or error tracking.</li>
+<li>Improvements to coordinate_map.</li>
+<li>Subscripting can now compile to bytecode.</li>
+<li>Fixed vector devision scaling operators.</li>
+<li>Improved reliability of timer queue.</li>
+<li>Many more minor bugfixes.</li>
+</ul>
+<h3>New as of 02/22/2023:</h3>
+<ul>
+<li>Fixes major rotation issue</li>
+<li>Sqlite has more functions.</li>
+<li>db_props updated.</li>
+<li>Minor readme updates.</li>
+<li>scriptstuff reference issue fixes.</li>
+<li>Pathfinder micro speed improvement.</li>
+<li>file_hard_link and file_hard_link_count.</li>
+<li>More.</li>
+</ul>
+<h3>New as of 01/17/2023:</h3>
+<ul>
+<li>Sans speech and windowing, NVGT runs on Linux!</li>
+<li>Updated Bass/SteamAudio.</li>
+<li>SQLite3 wrapper.</li>
+<li>Improvements to subscript execution.</li>
+</ul>
+<h3>New as of 10/21/2022:</h3>
+<ul>
+<li>Script_module and script_function classes.</li>
+<li>Reduced sound crash.</li>
+<li>speed improvements and more.</li>
+</ul>
+<h3>New as of 09/20/2022:</h3>
+<ul>
+<li>Updated sound docs.</li>
+<li>Added sound_default_mixer property.</li>
+</ul>
+<h3>New as of 09/09/2022:</h3>
+<ul>
+<li>If you call the wait() function with long duration, the window no longer hangs.</li>
+<li>Fix string_hash() issue.</li>
+<li>Updated some BGT to NVGT gotchas.</li>
+</ul>
+<h3>New as of 09/08/2022:</h3>
+<ul>
+<li>Fixes string_split().</li>
+</ul>
+<h3>New as of 09/07/2022:</h3>
+<ul>
+<li>Upgrades SteamAudio to 4.11.</li>
+<li>Reduces sound crash.</li>
+</ul>
+<h3>New as of 09/02/2022:</h3>
+<ul>
+<li>Fixed bug in crypto.</li>
+<li>Sound crash now much more rare.</li>
+<li>String coordinate_map_area::type replaced with any@ coordinate_map_area::primary_data.</li>
+<li>Other misc.</li>
+</ul>
+<h3>New as of 08/20/2022:</h3>
+<ul>
+<li>print() function should now be lowercase again.</li>
+<li>Many very minor fixes and improvements.</li>
+</ul>
+<h3>New as of 07/01/2022:</h3>
+<ul>
+<li>Partially recoded pack streaming system to hopefully reduce sound crashes.</li>
+<li>Various random speed improvements and fixes.</li>
+</ul>
+<h3>New as of 06/30/2022:</h3>
+<ul>
+<li>Fixes a few speed issues with includes.</li>
+<li>adds ini.list_wildcard_sections().</li>
+</ul>
+<h3>New as of 06/02/2022:</h3>
+<ul>
+<li>Mostly works on making sound/pack more threadsafe.</li>
+<li>Make ini loading robust.</li>
+<li>Documents thread lock functions.</li>
+</ul>
+<h3>New as of 05/26/2022:</h3>
+<ul>
+<li>Documentation and test for include/music.nvgt.</li>
+<li>Updated readme a bit.</li>
+<li>Working on sound callbacks.</li>
+<li>Enabled bass_asyncfile for faster sound playback.</li>
+</ul>
+<h3>New as of 05/22/2022:</h3>
+<ul>
+<li>Updated INI.</li>
+</ul>
+<h3>New as of 05/21/2022:</h3>
+<ul>
+<li>sound.set_length() for streaming sounds.</li>
+</ul>
+<h3>New as of 05/15/2022:</h3>
+<ul>
+<li>Fixed run function regarding filenames with spaces.</li>
+<li>FTP uploads.</li>
+<li>MLSD directory listings with internet_request.</li>
+</ul>
+<h3>New as of 05/08/2022:</h3>
+<ul>
+<li>Bullet3 vectors.</li>
+<li>size_to_string updates.</li>
+<li>Other misc.</li>
+</ul>
+<h3>New as of 04/26/2022:</h3>
+<ul>
+<li>Sound preloading.</li>
+<li>byteshift encryption.</li>
+<li>timer_queue.exists and timer_queue.is_repeating.</li>
+<li>Minor speed improvements.</li>
+</ul>
+<h2>Contributors</h2>
+<p>This file contains the names of anyone who has helped contribute to the NVGT engine in any significant way along with short descriptions of how these people have contributed. For a list of third party code used in the engine, you can view the Third Party Licenses topic. A huge thanks goes out to everyone listed here!</p>
+<ul>
+<li><a href="https://github.com/braillescreen">Patric W</a>: some docs, build scripts, beta testing, and miscellaneous organization.</li>
+<li><a href="https://github.com/thequinbox">Quin G</a>: responsible for a growing number of API references documentation topics, beta testing.</li>
+<li>Beta testers including but not limited to Patric Wilson, Quin G, Steven D, Lucas Brown, Liam Erven, DJWolfy, Lukáš Hosnedl, Heaven Games, Pragma and Day Garwood, without the valuable feedback and suggestions provided by these people NVGT would have never gotten this far.</li>
+<li>Last but not least, nothing is worth maintaining or developing without users, and so thank you to everyone who uses this engine and gives it their feedback, time and attention!</li>
+</ul>
+<h2>License Agreement</h2>
+<p>NVGT - NonVisual Gaming Toolkit</p>
+<p>Copyright (c) 2022-2024 Sam Tupy</p>
+<p><a href="https://nvgt.gg">nvgt.gg</a></p>
+<p>This software is provided &quot;as-is&quot;, without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.</p>
+<p>Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:</p>
+<ol>
+<li>The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.</li>
+<li>Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.</li>
+<li>This notice may not be removed or altered from any source distribution.</li>
+</ol>
+<p><a href="appendix_third_party_code_attributions.html">Third Party Code Attributions</a></p>

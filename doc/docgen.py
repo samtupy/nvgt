@@ -245,8 +245,8 @@ def output_html_section(md_path, title):
 	f.close()
 	# The NVGT website is built using cobalt (a tiny static site generator that uses liquid templates), and an html version of the docs are hosted on that website. We want this version of the docs to use the liquid layout that the static site uses, so we simply create very basic .liquid files in the nvgt repo's web directory, if that exists.
 	liquid_path = md_path[:-5] + ".liquid"
-	if os.path.isdir(os.path.join("..", "web", "docs")):
-		f = open(os.path.join("..", "web", "docs", liquid_path), "w", encoding = "utf8")
+	if os.path.isdir(os.path.join("..", "web", "src", "docs")):
+		f = open(os.path.join("..", "web", "src", "docs", liquid_path), "w", encoding = "utf8")
 		f.write(liquid_base.format(title = title, body = html_body))
 		f.close()
 
@@ -259,7 +259,7 @@ def main():
 	if not os.path.exists("html"): os.mkdir("html")
 	if not os.path.exists("md"): os.mkdir("md")
 	if os.path.exists(os.path.join("..", "web")):
-		if not os.path.exists(os.path.join("..", "web", "docs")): os.mkdir(os.path.join("..", "web", "docs"))
+		if not os.path.exists(os.path.join("..", "web", "src", "docs")): os.makedirs(os.path.join("..", "web", "src", "docs"))
 	txt_output = open("nvgt.txt", "w", encoding = "UTF8")
 	hhc_output = open("chm/nvgt.hhc", "w")
 	hhc_output.write("<html>\n<head>\n</head>\n<body>\n<ul>\n")

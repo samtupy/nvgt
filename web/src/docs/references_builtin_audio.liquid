@@ -1,0 +1,58 @@
+---
+layout: default.liquid
+title: Audio
+---
+
+<h1>Audio</h1>
+<h2>Classes</h2>
+<h3>Sound</h3>
+<h4>Methods</h4>
+<h5>close</h5>
+<p>Closes an opened sound, making the sound object available to be reloaded with a new one.</p>
+<p>bool sound::close();</p>
+<h6>Returns:</h6>
+<p>bool: true if the sound could be closed, false otherwise for example if there is no sound opened.</p>
+<h6>Example:</h6>
+<pre><code>void main() {
+	sound s;
+	s.load(&quot;C:/windows/media/ding.wav&quot;);
+	alert(&quot;example&quot;, s.close()); // Will display true since a sound was previously opened.
+	alert(&quot;example&quot;, s.close()); // Will now display false since the previous operation freed the sound object of any attached sound.
+}
+</code></pre>
+<h5>load_url</h5>
+<p>Load the specified URL.</p>
+<p>bool sound::load_url(string url);</p>
+<h6>Arguments:</h6>
+<ul>
+<li>string url: the URL to load (should be the direct link to a sound or stream).</li>
+</ul>
+<h6>Returns:</h6>
+<p>Bool: True if the URL was successfully loaded; false otherwise.</p>
+<h6>Example:</h6>
+<pre><code>void main() {
+	sound s;
+	bool success = s.load_url(&quot;https://example.com/my_sound.mp3&quot;);
+	alert(&quot;Result&quot;, &quot;The sound was &quot; + (success == false? &quot;not &quot; : &quot;&quot;) + &quot;successfully loaded.&quot;);
+}
+</code></pre>
+<h2>Functions</h2>
+<h3>get_sound_output_devices</h3>
+<p>Return an array of strings listing all output sound devices on the system.</p>
+<p>string[]@ get_sound_output_devices();</p>
+<h4>Returns:</h4>
+<p>string[]@: A handle to an array listing all available output devices.</p>
+<h4>Remarks:</h4>
+<p>After listing devices with this function, you can set the sound_output_device global engine property to whatever index in the returned array contains the name of the device you want to set.</p>
+<p>This list will always include a no sound device. If you don't want the user to be able to select it, feel free to not allow them to move their cursor to that item or not add it to your menus etc, but remember to pay attention to the index difference this may create when setting the sound_output_device property, namely just remember that setting sound_output_device = 0 will set the system to no sound, and setting the device to 1 will always be the first real device in the system, or the default device at least on windows.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	string[]@ devices = get_sound_output_devices();
+	devices.remove_at(0); // Don't allow the user to select no sound.
+	alert(&quot;devices&quot;, &quot;The following devices are installed on your system: &quot; + join(devices, &quot;, &quot;));
+}
+</code></pre>
+<h2>Global Properties</h2>
+<h3>sound_global_hrtf</h3>
+<p>Controls weather to use steam audio's functionality. If this property is set to false, the sound_environment class will be quite useless and sounds will use very basic panning.</p>
+<p>Changes take nearly instant effect from the time this property is changed.</p>

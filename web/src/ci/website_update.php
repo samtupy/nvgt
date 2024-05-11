@@ -5,5 +5,5 @@ echo `rm -r ../blog`;
 echo `rm -r ../docs`;
 echo `rm -r *`; // We even delete ourself!
 // Now load the updated site and undo anything we just deleted.
-echo `tar -xzf ../../ci/_site.tar.gz -C ..`;
+echo `tar -xzf ../../ci/public_html.tar.gz -C ..`;
 ?>

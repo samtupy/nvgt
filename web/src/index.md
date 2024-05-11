@@ -1,6 +1,7 @@
 ---
 layout: default.liquid
 title: Home
+permalink: /
 ---
 
 # Welcome to the homepage of the Nonvisual Gaming Toolkit!

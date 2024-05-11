@@ -1,0 +1,33 @@
+---
+layout: default.liquid
+title: Profiling And Debugging
+---
+
+<h1>Profiling And Debugging</h1>
+<h2>Functions</h2>
+<h3>debug_message</h3>
+<p>debug_message</p>
+<p>void debug_message(string message);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>Message: The message to send as a debug message.</li>
+</ul>
+<h4>Example:</h4>
+<pre><code>void main() {
+	debug_message(&quot;NVGT debug_message test&quot;);
+}
+</code></pre>
+<h3>is_debugger_present</h3>
+<p>Determines if your app is being ran through a debugger.</p>
+<p>bool is_debugger_present();</p>
+<h4>Returns:</h4>
+<p>bool: true if a debugger is present, false otherwise.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	bool present = is_debugger_present();
+	if (present)
+		alert(&quot;Info&quot;, &quot;A debugger is present.&quot;);
+	else
+		alert(&quot;Info&quot;, &quot;A debugger is not present.&quot;);
+}
+</code></pre>

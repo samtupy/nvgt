@@ -1,0 +1,78 @@
+---
+layout: default.liquid
+title: Containers
+---
+
+<h1>Containers</h1>
+<p>In this documentation, we consider a container to be any generic class that has the primary purpose of storing more than one value.</p>
+<h2>Array</h2>
+<h2>Dictionary</h2>
+<h2>Grid</h2>
+<h3>Methods</h3>
+<h4>height</h4>
+<p>Returns the current height of the grid.</p>
+<p>uint grid::height();</p>
+<h5>Returns:</h5>
+<p>uint: the height  of the grid.</p>
+<h5>Example:</h5>
+<pre><code>void main() {
+	grid&lt;int&gt; g(random(1, 10), random(1, 10));
+	alert(&quot;Grid height is&quot;, g.height());
+}
+</code></pre>
+<h4>resize</h4>
+<p>Resize a grid to the given width and height.</p>
+<p>void grid::resize(uint width, uint height);</p>
+<h5>Arguments:</h5>
+<ul>
+<li><p>uint width: the width you want to resize the grid to.</p>
+</li>
+<li><p>uint height: the height you want to resize the grid to.</p>
+</li>
+</ul>
+<h5>Example:</h5>
+<pre><code>void main() {
+	grid&lt;int&gt; g(5, 5);
+	alert(&quot;Original width and height&quot;, g.width() + &quot;, &quot; + g.height());
+	g.resize(random(1, 100), random(1, 100));
+	alert(&quot;New width and height&quot;, g.width() + &quot;, &quot; + g.height());
+}
+</code></pre>
+<h4>width</h4>
+<p>Returns the current width of the grid.</p>
+<p>uint grid::width();</p>
+<h5>Returns:</h5>
+<p>uint: the width of the grid.</p>
+<h5>Example:</h5>
+<pre><code>void main() {
+	grid&lt;int&gt; g(random(1, 10), random(1, 10));
+	alert(&quot;Grid width is&quot;, g.width());
+}
+</code></pre>
+<h3>Operators</h3>
+<h4>opIndex</h4>
+<p>Get or set the value of a grid cell given an x and a y.</p>
+<p>T grid::opIndex(uint row, uint column);</p>
+<h5>Arguments:</h5>
+<ul>
+<li><p>uint row: the row (x value) to check.</p>
+</li>
+<li><p>uint column: the column (y value) to check.</p>
+</li>
+</ul>
+<h5>Returns:</h5>
+<p><T>: the value at the given position.</p>
+<h5>Remarks:</h5>
+<p>This function can throw index out of bounds errors, exactly like arrays can, so be careful.</p>
+<h5>Example:</h5>
+<pre><code>void main() {
+	grid&lt;int&gt; the_grid;
+	the_grid.resize(5, 5);
+	for (uint i = 0; i &lt; 5; i++) {
+		for (uint j = 0; j &lt; 5; j++) {
+			the_grid[i, j] = random(1, 100);
+		}
+	}
+	alert(&quot;Info&quot;, &quot;The center is &quot; + the_grid[2, 2]);
+}
+</code></pre>

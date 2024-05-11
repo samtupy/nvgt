@@ -1,0 +1,738 @@
+---
+layout: default.liquid
+title: User Interface
+---
+
+<h1>User Interface</h1>
+<p>This section contains all functions that involve directly interacting with the user, be that by showing a window, checking the state of a key, or placing data onto the users clipboard. These handle generic input such as from the keyboard, and also generic output such as an alert box.</p>
+<h2>Window management notes:</h2>
+<ul>
+<li>You can only have one NVGT window showing at a time.</li>
+<li>without an nvgt window, there is no way to capture keyboard and mouse input from the user.</li>
+<li>It is strongly advised to always put <code>wait(5);</code> in your main loops. This prevents your game from hogging the CPU, and also prevents weird bugs with the game window sometimes freezing etc.</li>
+</ul>
+<h2>Enums</h2>
+<h3>key_code</h3>
+<p>This is a complete list of possible keycodes in NVGT, as well as a short description of what they are. These are registered in the key_code enum, meaning you can use this type to pass any value listed here around though it is also safe to use integers.</p>
+<h4>Letter keys</h4>
+<ul>
+<li>KEY_UNKNOWN: unknown.</li>
+<li>KEY_A: the A key.</li>
+<li>KEY_B: the B key.</li>
+<li>KEY_C: the C key.</li>
+<li>KEY_D: the D key.</li>
+<li>KEY_E: the E key.</li>
+<li>KEY_F: the F key.</li>
+<li>KEY_G: the G key.</li>
+<li>KEY_H: the H key.</li>
+<li>KEY_I: the I key.</li>
+<li>KEY_J: the J key.</li>
+<li>KEY_K: the K key.</li>
+<li>KEY_L: the L key.</li>
+<li>KEY_M: the M key.</li>
+<li>KEY_N: the N key.</li>
+<li>KEY_O: the O key.</li>
+<li>KEY_P: the P key.</li>
+<li>KEY_Q: the Q key.</li>
+<li>KEY_R: the R key.</li>
+<li>KEY_S: the S key.</li>
+<li>KEY_T: the T key.</li>
+<li>KEY_U: the U key.</li>
+<li>KEY_V: the V key.</li>
+<li>KEY_W: the W key.</li>
+<li>KEY_X: the X key.</li>
+<li>KEY_Y: the Y key.</li>
+<li>KEY_Z: the Z key.</li>
+</ul>
+<h4>Number keys</h4>
+<ul>
+<li>KEY_1: the 1 key.</li>
+<li>KEY_2: the 2 key.</li>
+<li>KEY_3: the 3 key.</li>
+<li>KEY_4: the 4 key.</li>
+<li>KEY_5: the 5 key.</li>
+<li>KEY_6: the 6 key.</li>
+<li>KEY_7: the 7 key.</li>
+<li>KEY_8: the 8 key.</li>
+<li>KEY_9: the 9 key.</li>
+<li>KEY_0: the 0 key.</li>
+</ul>
+<h4>Special keys</h4>
+<ul>
+<li>KEY_RETURN: the Return (or enter) key.</li>
+<li>KEY_ESCAPE: the Escape key.</li>
+<li>KEY_BACK: the Backspace key.</li>
+<li>KEY_TAB: the Tab key.</li>
+<li>KEY_SPACE: the Space key.</li>
+<li>KEY_MINUS: the Minus (dash) key.</li>
+<li>KEY_EQUALS: the Equals key.</li>
+<li>KEY_LEFTBRACKET: the Left Bracket key.</li>
+<li>KEY_RIGHTBRACKET: the Right Bracket key.</li>
+<li>KEY_BACKSLASH: the Backslash key.</li>
+<li>KEY_NONUSHASH: the Non-US Hash key.</li>
+<li>KEY_SEMICOLON: the Semicolon key.</li>
+<li>KEY_APOSTROPHE: the Apostrophe key.</li>
+<li>KEY_GRAVE: the Grave key.</li>
+<li>KEY_COMMA: the Comma key.</li>
+<li>KEY_PERIOD: the Period key.</li>
+<li>KEY_SLASH: the Slash key.</li>
+<li>KEY_CAPSLOCK: the Caps Lock key.</li>
+</ul>
+<h4>Function keys</h4>
+<ul>
+<li>KEY_F1: the F1 key.</li>
+<li>KEY_F2: the F2 key.</li>
+<li>KEY_F3: the F3 key.</li>
+<li>KEY_F4: the F4 key.</li>
+<li>KEY_F5: the F5 key.</li>
+<li>KEY_F6: the F6 key.</li>
+<li>KEY_F7: the F7 key.</li>
+<li>KEY_F8: the F8 key.</li>
+<li>KEY_F9: the F9 key.</li>
+<li>KEY_F10: the F10 key.</li>
+<li>KEY_F11: the F11 key.</li>
+<li>KEY_F12: the F12 key.</li>
+</ul>
+<h4>Arrow keys</h4>
+<ul>
+<li>KEY_RIGHT: the Right Arrow key.</li>
+<li>KEY_LEFT: the Left Arrow key.</li>
+<li>KEY_DOWN: the Down Arrow key.</li>
+<li>KEY_UP: the Up Arrow key.</li>
+</ul>
+<h4>Numpad keys</h4>
+<ul>
+<li>KEY_NUMLOCKCLEAR: the Num Lock key.</li>
+<li>KEY_NUMPAD_DIVIDE: the numpad divide key.</li>
+<li>KEY_NUMPAD_MULTIPLY: the numpad multiply key.</li>
+<li>KEY_NUMPAD_MINUS: the numpad minus key.</li>
+<li>KEY_NUMPAD_PLUS: the numpad plus key.</li>
+<li>KEY_NUMPAD_ENTER: the numpad enter key.</li>
+<li>KEY_NUMPAD_1: the Numpad 1 key.</li>
+<li>KEY_NUMPAD_2: the Numpad 2 key.</li>
+<li>KEY_NUMPAD_3: the Numpad 3 key.</li>
+<li>KEY_NUMPAD_4: the Numpad 4 key.</li>
+<li>KEY_NUMPAD_5: the Numpad 5 key.</li>
+<li>KEY_NUMPAD_6: the Numpad 6 key.</li>
+<li>KEY_NUMPAD_7: the Numpad 7 key.</li>
+<li>KEY_NUMPAD_8: the Numpad 8 key.</li>
+<li>KEY_NUMPAD_9: the Numpad 9 key.</li>
+<li>KEY_NUMPAD_0: the Numpad 0 key.</li>
+<li>KEY_NUMPAD_PERIOD: the Numpad Period key.</li>
+</ul>
+<h4>Modifier keys</h4>
+<ul>
+<li>KEY_LCTRL: the Left Control key.</li>
+<li>KEY_LSHIFT: the Left Shift key.</li>
+<li>KEY_LALT: the Left Alt key.</li>
+<li>KEY_LGUI: the left windows/command/super key (depending on platform).</li>
+<li>KEY_RCTRL: the Right Control key.</li>
+<li>KEY_RSHIFT: the Right Shift key.</li>
+<li>KEY_RALT: the Right Alt key.</li>
+<li>KEY_RGUI: the right windows/command/super key (depending on platform).</li>
+</ul>
+<h4>Miscellaneous keys</h4>
+<ul>
+<li>KEY_MODE: the Mode key.</li>
+<li>KEY_APPLICATION: the Application key.</li>
+<li>KEY_POWER: the Power key.</li>
+<li>KEY_PRINTSCREEN: the Print Screen key.</li>
+<li>KEY_SCROLLLOCK: the Scroll Lock key.</li>
+<li>KEY_PAUSE: the Pause key.</li>
+<li>KEY_INSERT: the Insert key.</li>
+<li>KEY_HOME: the Home key.</li>
+<li>KEY_PAGEUP: the Page Up key.</li>
+<li>KEY_DELETE: the Delete key.</li>
+<li>KEY_END: the End key.</li>
+<li>KEY_PAGEDOWN: the Page Down key.</li>
+</ul>
+<h4>Media keys</h4>
+<ul>
+<li>KEY_MUTE: the Mute key.</li>
+<li>KEY_VOLUMEUP: the Volume Up key.</li>
+<li>KEY_VOLUMEDOWN: the Volume Down key.</li>
+<li>KEY_AUDIONEXT: the Audio Next key.</li>
+<li>KEY_AUDIOPREV: the Audio Previous key.</li>
+<li>KEY_AUDIOSTOP: the Audio Stop key.</li>
+<li>KEY_AUDIOPLAY: the Audio Play key.</li>
+<li>KEY_AUDIOMUTE: the Audio Mute key.</li>
+<li>KEY_MEDIASELECT: the Media Select key.</li>
+</ul>
+<h4>Browser and Application keys</h4>
+<ul>
+<li>KEY_WWW: the WWW key.</li>
+<li>KEY_MAIL: the Mail key.</li>
+<li>KEY_CALCULATOR: the Calculator key.</li>
+<li>KEY_COMPUTER: the Computer key.</li>
+<li>KEY_AC_SEARCH: the AC Search key.</li>
+<li>KEY_AC_HOME: the AC Home key.</li>
+<li>KEY_AC_BACK: the AC Back key.</li>
+<li>KEY_AC_FORWARD: the AC Forward key.</li>
+<li>KEY_AC_STOP: the AC Stop key.</li>
+<li>KEY_AC_REFRESH: the AC Refresh key.</li>
+<li>KEY_AC_BOOKMARKS: the AC Bookmarks key.</li>
+</ul>
+<h4>Additional keys</h4>
+<ul>
+<li>KEY_BRIGHTNESSDOWN: the Brightness Down key.</li>
+<li>KEY_BRIGHTNESSUP: the Brightness Up key.</li>
+<li>KEY_DISPLAYSWITCH: the Display Switch key.</li>
+<li>KEY_KBDILLUMTOGGLE: the Keyboard Illumination Toggle key.</li>
+<li>KEY_KBDILLUMDOWN: the Keyboard Illumination Down key.</li>
+<li>KEY_KBDILLUMUP: the Keyboard Illumination Up key.</li>
+<li>KEY_EJECT: the Eject key.</li>
+<li>KEY_SLEEP: the Sleep key.</li>
+<li>KEY_APP1: the Application 1 key.</li>
+<li>KEY_APP2: the Application 2 key.</li>
+<li>KEY_AUDIOREWIND: the Audio Rewind key.</li>
+<li>KEY_AUDIOFASTFORWARD: the Audio Fast Forward key.</li>
+<li>KEY_SOFTLEFT: the Soft Left key.</li>
+<li>KEY_SOFTRIGHT: the Soft Right key.</li>
+<li>KEY_CALL: the Call key.</li>
+<li>KEY_ENDCALL: the End Call key.</li>
+<li>KEY_AC_SEARCH: the AC Search key.</li>
+<li>KEY_AC_HOME: the AC Home key.</li>
+<li>KEY_AC_BACK: the AC Back key.</li>
+<li>KEY_AC_FORWARD: the AC Forward key.</li>
+<li>KEY_AC_STOP: the AC Stop key.</li>
+<li>KEY_AC_REFRESH: the AC Refresh key.</li>
+<li>KEY_AC_BOOKMARKS: the AC Bookmarks key.</li>
+</ul>
+<h3>key_modifier</h3>
+<p>This is a complete list of supported key modifiers and their descriptions. These are registered in the key_modifier enum, so you can use that type to pass any value listed here around.</p>
+<ul>
+<li><p>KEYMOD_NONE: no modifier.</p>
+</li>
+<li><p>KEYMOD_LSHIFT: left shift key.</p>
+</li>
+<li><p>KEYMOD_RSHIFT: right shift key.</p>
+</li>
+<li><p>KEYMOD_LCTRL: left control key.</p>
+</li>
+<li><p>KEYMOD_RCTRL: right control key.</p>
+</li>
+<li><p>KEYMOD_LALT: left alt key.</p>
+</li>
+<li><p>KEYMOD_RALT: right alt key.</p>
+</li>
+<li><p>KEYMOD_LGUI: left windows/command/super key (depending on platform).</p>
+</li>
+<li><p>KEYMOD_RGUI: right windows/command/super key (depends on platform).</p>
+</li>
+<li><p>KEYMOD_NUM: numlock key.</p>
+</li>
+<li><p>KEYMOD_CAPS: capslock key.</p>
+</li>
+<li><p>KEYMOD_MODE: input switch mode (only on certain keyboards).</p>
+</li>
+<li><p>KEYMOD_SCROLL: scroll lock key.</p>
+</li>
+<li><p>KEYMOD_CTRL: either control key.</p>
+</li>
+<li><p>KEYMOD_SHIFT: either shift key.</p>
+</li>
+<li><p>KEYMOD_ALT: either alt key.</p>
+</li>
+<li><p>KEYMOD_GUI: either windows/command/super key.</p>
+</li>
+</ul>
+<h4>Example:</h4>
+<pre><code>void main() {
+	show_window(&quot;Example&quot;);
+	wait(50); // Give the screen readers enough time to speak the window title before speaking.
+	screen_reader_output(&quot;Press alt+f4 to close this window.&quot;, true);
+	while (true) {
+		wait(5);
+		if (keyboard_modifiers &amp; KEYMOD_ALT &gt; 0 &amp;&amp; key_pressed(KEY_F4))
+			exit();
+	}
+}
+</code></pre>
+<h3>message_box_flags</h3>
+<p>This is an enumeration of possible flags to be passed to the message_box(), alert(), question(), and similar functions.</p>
+<ul>
+<li>MESSAGE_BOX_ERROR: the message box should act like an error dialog.</li>
+<li>MESSAGE_BOX_WARNING: the message box should act like a warning dialog.</li>
+<li>MESSAGE_BOX_INFORMATION: the message box should act like an informative dialog.</li>
+<li>MESSAGE_BOX_BUTTONS_LEFT_TO_RIGHT: arrange the buttons in the dialog from left to right.</li>
+<li>MESSAGE_BOX_BUTTONS_RIGHT_TO_LEFT: arrange the buttons from right-to-left in the message box.</li>
+</ul>
+<h2>Functions</h2>
+<h3>alert</h3>
+<p>Display a message box with an OK button to the user.</p>
+<p>int alert(string title, string text, bool can_cancel = false, uint flags = 0);</p>
+<h4>Arguments:</h4>
+<ul>
+<li><p>string title: the title of the dialog.</p>
+</li>
+<li><p>string text: the text of the dialog.</p>
+</li>
+<li><p>bool can_cancel = false: determines if a cancel button is present.</p>
+</li>
+<li><p>uint flags = 0: a combination of flags (see message_box_flags for more information).</p>
+</li>
+</ul>
+<h4>Returns:</h4>
+<p>int: the number of the button that was pressed, either OK or cancel.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	alert(&quot;Hello&quot;, &quot;I am a standard alert&quot;);
+	alert(&quot;Hi&quot;, &quot;And I'm a cancelable one&quot;, true);
+}
+</code></pre>
+<h3>clipboard_get_text</h3>
+<p>Returns the text currently on the user's clipboard.</p>
+<p>string clipboard_get_text();</p>
+<h4>Returns:</h4>
+<p>The text on the user's clipboard, as UTF_8.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	string text = clipboard_get_text();
+	if (text == &quot;&quot;)
+		alert(&quot;Info&quot;, &quot;Your clipboard is empty&quot;);
+	else
+		if (text.length() &gt; 1024)
+			alert(&quot;Info&quot;, &quot;Your clipboard contains a long string. It is &quot; + text.length() + &quot; characters&quot;);
+		else
+			alert(&quot;Info&quot;, &quot;Your clipboard contains &quot; + text);
+}
+</code></pre>
+<h3>clipboard_set_raw_text</h3>
+<p>Sets the text on the user's clipboard, using the system encoding.</p>
+<p>bool clipboard_set_raw_text(string text);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>string text: the text to copy, assumed to be in the system's encoding.</li>
+</ul>
+<h4>Returns:</h4>
+<p>Bool: true on success, false on failure.</p>
+<h4>Remarks:</h4>
+<p>To copy UTF-8 textt, see clipboard_set_text().</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	string text = input_box(&quot;Text&quot;, &quot;Enter the text to copy.&quot;);
+	clipboard_set_raw_text(text);
+	if (text == &quot;&quot;)
+		alert(&quot;Info&quot;, &quot;Your clipboard has been cleared.&quot;);
+	else
+		alert(&quot;Info&quot;, &quot;Text coppied&quot;);
+}
+</code></pre>
+<h3>clipboard_set_text</h3>
+<p>Sets the text on the user's clipboard.</p>
+<p>bool clipboard_set_text(string text);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>string text: the text to copy, assumed to be UTF_8.</li>
+</ul>
+<h4>Returns:</h4>
+<p>Bool: true on success, false on failure.</p>
+<h4>Remarks:</h4>
+<p>To copy text in the system encoding, see clipboard_set_raw_text().</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	string text = input_box(&quot;Text&quot;, &quot;Enter the text to copy.&quot;);
+	clipboard_set_text(text);
+	if (text == &quot;&quot;)
+		alert(&quot;Info&quot;, &quot;Your clipboard has been cleared.&quot;);
+	else
+		alert(&quot;Info&quot;, &quot;Text coppied&quot;);
+}
+</code></pre>
+<h3>destroy_window</h3>
+<p>Destroys the currently shown window, if it exists.</p>
+<p>bool destroy_window();</p>
+<h4>Returns:</h4>
+<p>bool: true if the window was successfully destroyed, false otherwise.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	alert(&quot;Info&quot;, &quot;Pressing SPACE will destroy the window&quot;);
+	show_window(&quot;Example&quot;);
+	while (true) {
+		wait(5); // Don't hog all the CPU time.
+		if (key_pressed(KEY_SPACE)) {
+			destroy_window();
+			wait(2000); // Simulate doing things while the window isn't active.
+			exit();
+		}
+	}
+}
+</code></pre>
+<h3>exit</h3>
+<p>Completely shut down your application.</p>
+<p>void exit();</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	show_window(&quot;Example&quot;);
+	screen_reader_output(&quot;Press escape to exit.&quot;, true);
+	while (true) {
+		wait(5);
+		if (key_pressed(KEY_ESCAPE)) {
+			screen_reader_output(&quot;Goodbye.&quot;, true);
+			wait(500);
+			exit();
+		}
+	}
+}
+</code></pre>
+<h3>info_box</h3>
+<p>Displays a dialog to the user consisting of a read-only text field and a close button.</p>
+<p>bool info_box(string title, string label, string text, uint64 flags = 0);</p>
+<h4>Arguments:</h4>
+<ul>
+<li><p>string title: the title of the dialog.</p>
+</li>
+<li><p>string label: the text to display above the text field.</p>
+</li>
+<li><p>string text: the text to display in the text field.</p>
+</li>
+<li><p>uint64 flags = 0: a combination of flags, see message_box_flags for more information.</p>
+</li>
+</ul>
+<h4>Returns:</h4>
+<p>bool: true if the user pressed the close button, false otherwise.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	info_box(&quot;Test&quot;, &quot;Information&quot;, &quot;this is a\r\nlong string\r\nthat can be split\r\nacross lines&quot;);
+}
+</code></pre>
+<h3>input_box</h3>
+<p>Displays a dialog to the user consisting of an input field, an OK button and a cancel button.</p>
+<p>string input_box(string title, string text, string default_text = &quot;&quot;, uint64 flags = 0);</p>
+<h4>Arguments:</h4>
+<ul>
+<li><p>string title: the title of the input box.</p>
+</li>
+<li><p>string text: the text to display above the text field.</p>
+</li>
+<li><p>string default_text = &quot;&quot;: the contents to populate the text box with by default.</p>
+</li>
+<li><p>uint64 flags = 0: a combination of flags, see message_box_flags for more information.</p>
+</li>
+</ul>
+<h4>Returns:</h4>
+<p>string: the text that the user typed.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	string name = input_box(&quot;Name&quot;, &quot;What is your name?&quot;, &quot;John Doe&quot;);
+	if (name.is_empty()) {
+		alert(&quot;Error&quot;, &quot;You didn't type a name, unidentified person!&quot;);
+		exit();
+	}
+	alert(&quot;Hi&quot;, name + &quot;!&quot;);
+}
+</code></pre>
+<h3>install_keyhook</h3>
+<p>Attempts to install NVGT's JAWS keyhook.</p>
+<p>bool install_keyhook(bool allow_reinstall = true);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>bool allow_reinstall = true: whether or not this function will reinstall the hook on subsequent calls.</li>
+</ul>
+<h4>Returns:</h4>
+<p>bool: true if the keyhook was successfully installed, false otherwise.</p>
+<h4>Remarks:</h4>
+<p>This keyhook allows NVGT games to properly capture keyboard input while the JAWS for Windows screen reader is running.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	bool success = install_keyhook();
+	if (success) {
+		alert(&quot;Info&quot;, &quot;The keyhook was successfully installed!&quot;);
+		uninstall_keyhook();
+	}
+	else
+		alert(&quot;Info&quot;, &quot;The keyhook was not successfully installed.&quot;);
+}
+</code></pre>
+<h3>is_window_active</h3>
+<p>Determines if your game's window is active (i.e. has the keyboard focus).</p>
+<p>bool is_window_active();</p>
+<h4>Returns:</h4>
+<p>bool: true if your game window has the keyboard focus, false if not.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	show_window(&quot;Test&quot;);
+	wait(1000); // Give the user time to alt+tab away if they so choose.
+	bool active = is_window_active();
+	if (active)
+		alert(&quot;Info&quot;, &quot;Your game window is active.&quot;);
+	else
+		alert(&quot;Info&quot;, &quot;Your game window is not active.&quot;);
+}
+</code></pre>
+<h3>key_down</h3>
+<p>Determine if a particular key is held down.</p>
+<p>bool key_down(uint key);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>uint key: the key to check.</li>
+</ul>
+<h4>Returns:</h4>
+<p>bool: true if the key is down at all, false otherwise.</p>
+<h4>Remarks:</h4>
+<p>For a complete list of keys that can be passed to this function, see input constants.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	show_window(&quot;Example&quot;);
+	while (true) {
+		wait(5);
+		if (key_down(KEY_SPACE))
+			screen_reader_output(&quot;space&quot;, true);
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}
+</code></pre>
+<h3>key_pressed</h3>
+<p>Determine if a particular key is pressed.</p>
+<p>bool key_pressed(uint key);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>uint key: the key to check.</li>
+</ul>
+<h4>Returns:</h4>
+<p>bool: true if the key was just pressed, false otherwise.</p>
+<h4>Remarks:</h4>
+<p>For a complete list of keys that can be passed to this function, see input constants.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	show_window(&quot;Example&quot;);
+	while (true) {
+		wait(5);
+		if (key_pressed(KEY_SPACE))
+			screen_reader_output(&quot;You just pressed space!&quot;, true);
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}
+</code></pre>
+<h3>key_released</h3>
+<p>Determine if a particular key was just released.</p>
+<p>bool key_released(uint key);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>uint key: the key to check.</li>
+</ul>
+<h4>Returns:</h4>
+<p>bool: true if the key was just released, false otherwise.</p>
+<h4>Remarks:</h4>
+<p>For a complete list of keys that can be passed to this function, see input constants.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	show_window(&quot;Example&quot;);
+	while (true) {
+		wait(5);
+		if (key_released(KEY_SPACE))
+			screen_reader_output(&quot;you just released the space key&quot;, true);
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}
+</code></pre>
+<h3>key_repeating</h3>
+<p>Determine if a particular key is repeating (i.e. it's being held, but wasn't just pressed).</p>
+<p>bool key_repeating(uint key);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>uint key: the key to check.</li>
+</ul>
+<h4>Returns:</h4>
+<p>bool: true if the key is repeating, false otherwise.</p>
+<h4>Remarks:</h4>
+<p>For a complete list of keys that can be passed to this function, see input constants.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	show_window(&quot;Example&quot;);
+	while (true) {
+		wait(5);
+		if (key_repeating(KEY_SPACE))
+			screen_reader_output(&quot;space&quot;, true);
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}
+</code></pre>
+<h3>key_up</h3>
+<p>Determine if a particular key is up.</p>
+<p>bool key_up(uint key);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>uint key: the key to check.</li>
+</ul>
+<h4>Returns:</h4>
+<p>bool: true if the key is up, false otherwise.</p>
+<h4>Remarks:</h4>
+<p>For a complete list of keys that can be passed to this function, see input constants.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	int last_spoken = ticks(); // Speak periodically to avoid overwhelming the user (or their screen reader).
+	show_window(&quot;Example&quot;);
+	while (true) {
+		wait(5);
+		if (key_up(KEY_SPACE) &amp;&amp; (ticks() - last_spoken) &gt;= 500) {
+			last_spoken = ticks();
+			screen_reader_output(&quot;space is up&quot;, true);
+		}
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}
+</code></pre>
+<p>Returns a handle to an array of keys that are held down.</p>
+<p><code>uint[]@ keys_down();</code></p>
+<h4>Returns:</h4>
+<p>uint[]@: a handle to an array containing keys that are held down.</p>
+<h4>Remarks:</h4>
+<p>For a complete list of keys that can be returned by this function, see input constants.</p>
+<p>Returns a handle to an array of keys that were just pressed.</p>
+<p><code>uint[]@ keys_pressed();</code></p>
+<h4>Returns:</h4>
+<p>uint[]@: a handle to an array containing keycodes that were just pressed.</p>
+<h4>Remarks:</h4>
+<p>For a complete list of keys that can be returned by this function, see input constants.</p>
+<p>Returns a handle to an array of keys that were just released.</p>
+<p><code>uint[]@ keys_released();</code></p>
+<h4>Returns:</h4>
+<p>uint[]@: a handle to an array containing keycodes that were just released.</p>
+<h4>Remarks:</h4>
+<p>For a complete list of keys that can be returned by this function, see input constants.</p>
+<h3>message_box</h3>
+<p>Displays a customizable message box.</p>
+<p>int message_box(string title, string text, string[]@ buttons, uint flags = 0);</p>
+<h4>Arguments:</h4>
+<ul>
+<li><p>string title: the title of the message box.</p>
+</li>
+<li><p>string text: the text of the message box.</p>
+</li>
+<li><p>string[]@ buttons: a string array of button names, see remarks for more info.</p>
+</li>
+<li><p>uint flags = 0: a combination of flags (see message_box_flags for more information).</p>
+</li>
+</ul>
+<h4>Returns:</h4>
+<p>int: the number of the button that was pressed, according to its position in the buttons array.</p>
+<h4>Remarks:</h4>
+<p>Notes on button syntax:</p>
+<ul>
+<li><p>A grave character (`) prepending button text is default enter key.</p>
+</li>
+<li><p>A tilda character (~) before text means default cancel.</p>
+</li>
+</ul>
+<h4>Example:</h4>
+<pre><code>void main() {
+	message_box(&quot;Hello there&quot;, &quot;I am a message box with two buttons&quot;, {&quot;`OK&quot;, &quot;~Cancel&quot;});
+}
+</code></pre>
+<h3>question</h3>
+<p>Display a yes/no dialog box to the user.</p>
+<p>int question(string title, string text, bool can_cancel = false, uint flags = 0);</p>
+<h4>Arguments:</h4>
+<ul>
+<li><p>string title: the title of the dialog.</p>
+</li>
+<li><p>string text: the text of the dialog.</p>
+</li>
+<li><p>bool can_cancel = false: determines if a cancel button is present alongside the other buttons.</p>
+</li>
+<li><p>uint flags = 0: a combination of flags (see message_box_flags for more information).</p>
+</li>
+</ul>
+<h4>Returns:</h4>
+<p>int: the number of the button that was pressed (1 for yes, 2 for no).</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	int res = question(&quot;Hello there&quot;, &quot;Do you like pizza?&quot;);
+	alert(&quot;Info&quot;, &quot;You clicked &quot; + (res == 1 ? &quot;yes&quot; : &quot;no&quot;));
+}
+</code></pre>
+<h3>show_window</h3>
+<p>Shows a window with the specified title.</p>
+<p>bool show_window(string title);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>string title: the title of the window.</li>
+</ul>
+<h4>Returns:</h4>
+<p>bool: true if window creation was successful, false otherwise.</p>
+<h4>Remarks:</h4>
+<p>This window doesn't do any event processing by default. As such, you have to create a loop in order to keep it alive.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	alert(&quot;Info&quot;, &quot;Press escape to close the window.&quot;);
+	show_window(&quot;Example&quot;);
+	while (true) {
+		wait(5); // Don't hog all the CPU.
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}
+</code></pre>
+<h3>total_keys_down</h3>
+<p>Returns the total number of keys that are currently held down.</p>
+<p>int total_keys_down();</p>
+<h4>Returns:</h4>
+<p>int: the number of keys currently held down.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	int check_time = 1000, orig_ticks = ticks();
+	show_window(&quot;Example&quot;);
+	while (true) {
+		wait(5);
+		if ((ticks() - orig_ticks) &gt;= check_time) {
+			orig_ticks = ticks();
+			int key_count  = total_keys_down();
+			screen_reader_output(key_count + &quot; &quot; + (key_count == 1 ? &quot;key is&quot; : &quot;keys are&quot;) + &quot; currently held down.&quot;, true);
+		}
+		if (key_pressed(KEY_ESCAPE))
+			exit();
+	}
+}
+</code></pre>
+<h3>uninstall_keyhook</h3>
+<p>Uninstall's NVGT's JAWS keyhook.</p>
+<p>void uninstall_keyhook();</p>
+<h4>Remarks:</h4>
+<p>This keyhook allows NVGT games to properly capture keyboard input while the JAWS for Windows screen reader is running.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	install_keyhook();
+	alert(&quot;Info&quot;, &quot;Keyhook installed. Uninstalling...&quot;);
+	uninstall_keyhook();
+	alert(&quot;Done&quot;, &quot;Keyhook uninstalled.&quot;);
+}
+</code></pre>
+<h3>urlopen</h3>
+<p>Opens the specified URL in the appropriate application, for example an https:// link in your web browser, or a tt://link in TeamTalk.</p>
+<p>bool urlopen(string url);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>string url: The URL to open.</li>
+</ul>
+<h4>Returns:</h4>
+<p>bool: true if the URl was successfully opened, false otherwise.</p>
+<h4>Remarks:</h4>
+<p>What application this function opens depends on what the user has set on their system; there's no way for you to control it.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	urlopen(&quot;https://nvgt.gg&quot;);
+}
+</code></pre>
+<h3>wait</h3>
+<p>Waits for a specified number of milliseconds.</p>
+<p>void wait(int milliseconds);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>int milliseconds: the number of milliseconds to wait for.</li>
+</ul>
+<h4>Remarks:</h4>
+<p>This function blocks the thread it's ran from, meaning no other work can happen on that thread until the wait period is over.</p>
+<p>It is strongly advised to always put <code>wait(5);</code> in your main loops. This prevents your game from hogging the CPU, and also prevents weird bugs with the game window.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	alert(&quot;Info&quot;, &quot;Once you press OK, I will wait for 2000 milliseconds (2 seconds).&quot;);
+	wait(2000);
+	alert(&quot;Info&quot;, &quot;2000 milliseconds passed!&quot;);
+}
+</code></pre>

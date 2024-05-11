@@ -1,0 +1,181 @@
+---
+layout: default.liquid
+title: Environment
+---
+
+<h1>Environment</h1>
+<p>In this reference, the environment section specifically refers to the script/system environment that your program is being run on. Examples could include the current line number in the nvgt script being compiled, the operating system being run on or fetching the value of a shell environment variable.</p>
+<h2>Functions</h2>
+<h3>chdir</h3>
+<p>Change the current working directory.</p>
+<p>bool chdir(const string&amp;in new_directory);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>new_directory: The directory you'd like to change into. Note that this directory must already exist.</li>
+</ul>
+<h4>Returns:</h4>
+<p>True if NVGT could set the current working directory to the specified directory; false otherwise.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	string directory = input_box(&quot;Chdir Test&quot;, &quot;Enter a valid path to a directory: &quot;);
+	// Could we switch to it?
+	if (chdir (directory))
+		alert(&quot;Success&quot;, &quot;That directory is valid and could be switch to.&quot;);
+	else 
+		alert(&quot;Failure&quot;, &quot;The directory could not be switched to. Check that you have typed the name correctly and that the directory exists.&quot;);
+}
+</code></pre>
+<h3>cwdir</h3>
+<p>Check the current working directory.</p>
+<p>string cwdir();</p>
+<h4>Returns:</h4>
+<p>A string containing the current working directory.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	alert(&quot;Current Working Directory&quot;, cwdir());
+}
+</code></pre>
+<h3>environment_variable_exists</h3>
+<p>Check if the given environment variable exists.</p>
+<p>bool environment_variable_exists(string name);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>string name: the name of the environment variable to check.</li>
+</ul>
+<h4>Returns:</h4>
+<p>bool: true if the variable exists, false if not.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	bool exists = environment_variable_exists(&quot;PATH&quot;);
+	if (exists)
+		alert(&quot;Info&quot;, &quot;The PATH variable exists.&quot;);
+	else
+		alert(&quot;Info&quot;, &quot;The PATH variable does not exist.&quot;);
+}
+</code></pre>
+<h3>expand_environment_variables</h3>
+<p>Expand environment variables.</p>
+<p>string expand_environment_variables(string variables);</p>
+<h4>Arguments:</h4>
+<ul>
+<li>string variables: A string containing the variable(s) you wish to expand.</li>
+</ul>
+<h4>Returns:</h4>
+<p>The expanded environment variable(s) if successful or an empty string if not.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	// The end goal here is to obtain the user's home directory on the running system if possible. This logic happens in a below function; here we just display the result.
+	alert(&quot;Result&quot;, get_home_directory());
+}
+string get_home_directory() {
+	if (system_is_windows) return expand_environment_variables(&quot;%USERPROFILE%&quot;);
+	else if (system_is_unix) return expand_environment_variables(&quot;$HOME&quot;);
+	else return &quot;Unknown&quot;;
+}
+</code></pre>
+<h3>get_preferred_locales</h3>
+<p>Get a list of the user's preferred locales.</p>
+<p>string[]@ get_preferred_locales();</p>
+<h4>Returns:</h4>
+<p>string[]@: a handle to an array containing the locale names (as strings).</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	string[]@ locales = get_preferred_locales();
+	string result; // To be shown to the user.
+	for (uint i = 0; i &lt; locales.length(); i++)
+		result += locales[i] + &quot;,\n&quot;;
+	// Strip off the trailing comma and new line.
+	result.trim_whitespace_right_this();
+	result.erase(result.length() - 1);
+	alert(&quot;Info&quot;, &quot;The locales on your system are: &quot; + result);
+}
+</code></pre>
+<h3>process_get_pid</h3>
+<p>Get the PID of your NVGT application.</p>
+<p>uint64 process_get_pid();</p>
+<h4>Returns:</h4>
+<p>uint64: the PID of the process.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	alert(&quot;Info&quot;, &quot;The PID of this process is &quot; + process_get_pid());
+}
+</code></pre>
+<h3>system_get_uptime</h3>
+<p>Get the uptime of the user's system (in seconds).</p>
+<p>double system_get_uptime();</p>
+<h4>Returns:</h4>
+<p>double: the uptime (in seconds) of the system.</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	double uptime = system_get_uptime();
+	alert(&quot;Info&quot;, &quot;Your system has been up for &quot; + uptime + &quot; seconds.&quot;);
+}
+</code></pre>
+<h3>write_environment_variable</h3>
+<p>Write to an environment variable.</p>
+<p>void write_environment_variable(string variable, string value);</p>
+<h4>Arguments:</h4>
+<ul>
+<li><p>string variable: The environment variable you wish to write to.</p>
+</li>
+<li><p>string value: The value you wish to write to this variable.</p>
+</li>
+</ul>
+<h4>Example:</h4>
+<pre><code>void main() {
+	write_environment_variable(&quot;NVGT_Test_for_docs&quot;, &quot;Testing&quot;);
+	alert(&quot;Result&quot;, read_environment_variable(&quot;NVGT_Test_for_docs&quot;));
+}
+</code></pre>
+<h2>Global Properties</h2>
+<h3>COMMAND_LINE</h3>
+<p>COMMAND_LINE returns anything that is passed as command line arguments. Note that it returns anything after the application name, and keep in mind that you will have to parse the output yourself (basic example below).</p>
+<p>const string COMMAND_LINE;</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	const string[]@ arguments = COMMAND_LINE.split(&quot; &quot;);
+	// Did we get any arguments?
+	if (arguments[0] == &quot;&quot;)
+		alert(&quot;Command Line&quot;, &quot;No arguments provided.&quot;);
+	else
+		alert(&quot;Command Line&quot;, &quot;The first argument is &quot; + arguments[0]);
+}
+</code></pre>
+<h3>PLATFORM_ARCHITECTURE</h3>
+<p>This property returns a string containing the current platform architecture, such as &quot;AMD64&quot;.</p>
+<p>const string PLATFORM_ARCHITECTURE;</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	alert(&quot;Your current Platform architecture is&quot;, PLATFORM_ARCHITECTURE);
+}
+</code></pre>
+<h3>PROCESSOR_COUNT</h3>
+<p>This property returns the number of processors on your system. Note that this returns the number of threads, not physical cores.</p>
+<p>const uint PROCESSOR_COUNT;</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	alert(&quot;Processor Threads Count&quot;, PROCESSOR_COUNT);
+}
+</code></pre>
+<h3>system_is_unix</h3>
+<p>This property is true if the application is running on a unix operating system, which in regards to NVGT's platforms is almost everything other than windows.</p>
+<p>const bool system_is_unix;</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	if(system_is_unix)
+		alert(&quot;example&quot;, &quot;This application is running on a unix operating system!&quot;);
+	else
+		alert(&quot;example&quot;, &quot;This application is probably running on windows, or in any case not a unix operating system&quot;);
+}
+</code></pre>
+<h3>system_is_windows</h3>
+<p>This property is true if the application is running on a windows operating system.</p>
+<p>const bool system_is_windows;</p>
+<h4>Example:</h4>
+<pre><code>void main() {
+	if(system_is_windows)
+		alert(&quot;example&quot;, &quot;This application is running on windows!&quot;);
+	else
+		alert(&quot;example&quot;, &quot;This application is not running on windows.&quot;);
+}
+</code></pre>
