@@ -26,5 +26,5 @@ macosdev
 windev
 
 # website builds
-web/_site
-web/docs
+web/public_html
+web/src/docs

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 {% if page.published_date -%}
 <title>{{ page.title }} &ndash; {{ collections.posts.title }}</title>
-{% else %}
+{%- else -%}
 <title>{{ page.title }} &ndash; {{ site.title }}</title>
 {%- endif %}
 <style>
@@ -24,11 +24,11 @@ display: inline;
 {%- assign permalink = "/" | append: page.permalink -%}
 <ul class="links" style="list-style-type:none;">
 {% for item in site.data.nav -%}
-{%- assign item_with_index = item[0] | append: "/index.html" %}
-{%- if permalink == item[0] or permalink == item_with_index -%}
-<li><a href="{{ item[0] }}" aria-current="page">{{ item[1] }}</a></li>
+{%- assign item_with_index = item[1] | append: "/index.html" %}
+{%- if permalink == item[1] or permalink == item_with_index -%}
+<li><a href="{{ item[1] }}" aria-current="page">{{ item[0] }}</a></li>
 {% else -%}
-<li><a href="{{ item[0] }}">{{ item[1] }}</a></li>
+<li><a href="{{ item[1] }}">{{ item[0] }}</a></li>
 {% endif %}
 {%- endfor -%}
 </ul>
