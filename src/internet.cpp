@@ -17,6 +17,7 @@
 #include <Poco/URIStreamOpener.h>
 #include <Poco/Net/AcceptCertificateHandler.h>
 #include <Poco/Net/Context.h>
+#include <Poco/Net/FTPClientSession.h>
 #include <Poco/Net/HTTPClientSession.h>
 #include <Poco/Net/HTTPMessage.h>
 #include <Poco/Net/HTTPResponse.h>
@@ -72,6 +73,21 @@ template<class T> datastream* http_client_send_request(T* s, HTTPRequest& req, f
 }
 template<class T> datastream* http_client_receive_response(T* s, HTTPResponse& response, f_streamargs) {
 	datastream* ds = new datastream(&s->receiveResponse(response), p_streamargs);
+	ds->no_close = true;
+	return ds;
+}
+template<class T> datastream* ftp_client_begin_download(T* s, const std::string& path, f_streamargs) {
+	datastream* ds = new datastream(&s->beginDownload(path), p_streamargs);
+	ds->no_close = true;
+	return ds;
+}
+template<class T> datastream* ftp_client_begin_upload(T* s, const std::string& path, f_streamargs) {
+	datastream* ds = new datastream(&s->beginUpload(path), p_streamargs);
+	ds->no_close = true;
+	return ds;
+}
+template<class T> datastream* ftp_client_begin_list(T* s, const std::string& path, bool extended, f_streamargs) {
+	datastream* ds = new datastream(&s->beginList(path, extended), p_streamargs);
 	ds->no_close = true;
 	return ds;
 }
@@ -213,6 +229,40 @@ template <class T> void RegisterHTTPClientSession(asIScriptEngine* engine, const
 	engine->RegisterObjectMethod(type.c_str(), "void reset()", asMETHOD(T, reset), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_secure() const property", asMETHOD(T, secure), asCALL_THISCALL);
 }
+template <class T> void RegisterFTPClientSession(asIScriptEngine* engine, const std::string& type) {
+	angelscript_refcounted_register<T>(engine, type.c_str());
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(uint16 = 0)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, UInt16>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, uint16 = 21, const string&in = \"\", const string&in = \"\", uint16 = 0)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, UInt16, const string&, const string&, UInt16>)), asCALL_CDECL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_passive(bool, bool = true)", asMETHOD(T, setPassive), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_passive() const property", asMETHOD(T, getPassive), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void open(const string&in, uint16, const string&in = \"\", const string&in = \"\")", asMETHOD(T, open), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void login(const string&in, const string&in)", asMETHOD(T, login), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void logout()", asMETHOD(T, logout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void close()", asMETHOD(T, close), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "string system_type()", asMETHOD(T, systemType), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_file_type(ftp_file_type)", asMETHOD(T, setFileType), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "ftp_file_type get_file_type() const property", asMETHOD(T, getFileType), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_working_directory(const string&in)", asMETHOD(T, setWorkingDirectory), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "string get_working_directory()", asMETHOD(T, getWorkingDirectory), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void cdup()", asMETHOD(T, cdup), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void rename(const string&in, const string&in)", asMETHOD(T, rename), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void remove(const string&in)", asMETHOD(T, remove), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void create_directory(const string&in)", asMETHOD(T, createDirectory), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void remove_directory(const string&in)", asMETHOD(T, removeDirectory), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "datastream@ begin_download(const string&in, const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(ftp_client_begin_download<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void end_download()", asMETHOD(T, endDownload), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "datastream@ begin_upload(const string&in, const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(ftp_client_begin_upload<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void end_upload()", asMETHOD(T, endUpload), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "datastream@ begin_list(const string&in = \"\", bool = false, const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(ftp_client_begin_list<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void end_list()", asMETHOD(T, endList), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void abort()", asMETHOD(T, abort), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int send_command(const string&in, string&)", asMETHODPR(T, sendCommand, (const string&, string&), int), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int send_command(const string&in, const string&in, string&)", asMETHODPR(T, sendCommand, (const string&, const string&, string&), int), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_is_open() const property", asMETHOD(T, isOpen), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_is_logged_in() const property", asMETHOD(T, isLoggedIn), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_is_secure() const property", asMETHOD(T, isSecure), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const string& get_welcome_message() const property", asMETHOD(T, welcomeMessage), asCALL_THISCALL);
+}
 
 void RegisterInternet(asIScriptEngine* engine) {
 	SSLManager::instance().initializeClient(NULL, new AcceptCertificateHandler(false), new Context(Context::TLS_CLIENT_USE, ""));
@@ -239,15 +289,19 @@ void RegisterInternet(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty("const string HTTP_DELETE", (void*)&HTTPRequest::HTTP_DELETE);
 	engine->RegisterGlobalProperty("const string HTTP_PATCH", (void*)&HTTPRequest::HTTP_PATCH);
 	engine->RegisterGlobalProperty("const string HTTP_OPTIONS", (void*)&HTTPRequest::HTTP_OPTIONS);
+	engine->RegisterEnum("ftp_file_type");
+	engine->RegisterEnumValue("ftp_file_type", "FTP_FILE_TYPE_TEXT", FTPClientSession::TYPE_TEXT);
+	engine->RegisterEnumValue("ftp_file_type", "FTP_FILE_TYPE_BINARY", FTPClientSession::TYPE_BINARY);
 	engine->RegisterGlobalFunction(_O("string url_encode(const string&in, const string&in = \"\")"), asFUNCTION(url_encode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string url_decode(const string&in, bool = true)"), asFUNCTION(url_decode), asCALL_CDECL);
 	RegisterNameValueCollection<NameValueCollection>(engine, "name_value_collection");
 	RegisterMessageHeader<MessageHeader, NameValueCollection>(engine, "internet_message_header", "name_value_collection");
 	RegisterHTTPRequest<HTTPRequest, MessageHeader>(engine, "http_request", "internet_message_header");
 	RegisterHTTPResponse<HTTPResponse, MessageHeader>(engine, "http_response", "internet_message_header");
+	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_NET);
 	RegisterHTTPClientSession<HTTPClientSession>(engine, "http_client");
 	RegisterHTTPClientSession<HTTPSClientSession>(engine, "https_client");
 	engine->RegisterObjectMethod("http_client", "https_client@ opCast()", asFUNCTION((angelscript_refcounted_refcast<HTTPClientSession, HTTPSClientSession>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("https_client", "http_client@ opImplCast()", asFUNCTION((angelscript_refcounted_refcast<HTTPSClientSession, HTTPClientSession>)), asCALL_CDECL_OBJFIRST);
-	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_NET);
+	RegisterFTPClientSession<FTPClientSession>(engine, "ftp_client");
 }

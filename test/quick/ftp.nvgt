@@ -1,0 +1,17 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	ftp_client ftp;
+	ftp.open("nvgt.gg", 21, "ci_artifacts", "you didn't think you'd actually get that password here did you?");
+	datastream@ ds = ftp.begin_list("/", true);
+	string lst = ds.read();
+	ftp.end_list();
+	alert("test", lst);
+	ftp.set_file_type(FTP_FILE_TYPE_BINARY);
+	duplicating_reader(ftp.begin_download("public_html.tar.gz")).add(file("ftp_public_html.tar.gz", "wb")).read();
+	ftp.end_download();
+	alert("test", "download complete");
+	ftp.close();
+}
