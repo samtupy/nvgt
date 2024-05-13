@@ -27,7 +27,7 @@
 #include "misc_functions.h"
 #include "pack.h"
 
-BOOL init_sound(DWORD dev = -1);
+BOOL init_sound(unsigned int dev = -1);
 BOOL shutdown_sound();
 
 class sound;
@@ -35,7 +35,7 @@ class mixer;
 
 typedef struct {
 	unsigned char* data;
-	DWORD size;
+	unsigned int size;
 	int ref;
 	unsigned long long t; // Time since preload was last used, stored using ticks().
 	std::string fn;
@@ -49,13 +49,13 @@ typedef struct {
 
 typedef struct hstream_entry {
 	hstream_entry* p;
-	DWORD channel;
+	unsigned int channel;
 	hstream_entry* n;
 } hstream_entry;
 
 typedef struct {
 	HFX hfx;
-	DWORD type;
+	unsigned int type;
 	char id[32];
 } mixer_effect;
 
@@ -126,7 +126,7 @@ public:
 	float rotation;
 	float pan_step;
 	float volume_step;
-	DWORD channel;
+	unsigned int channel;
 	hstream_entry* store_channel;
 	sound_base() : env(NULL), source(NULL), direct_effect(NULL), reflection_effect(NULL), reflection_decode_effect(NULL) {}
 	virtual void AddRef();
@@ -138,7 +138,7 @@ public:
 };
 
 class sound : public sound_base {
-	char loaded_filename[MAX_PATH];
+	std::string loaded_filename;
 	float pitch;
 	float length;
 public:
@@ -153,7 +153,7 @@ public:
 	thread_mutex_t close_mutex;
 	std::vector<BYTE> push_prebuff;
 	std::string* memstream;
-	DWORD memstream_size;
+	unsigned int memstream_size;
 	DWORD memstream_pos;
 	bool memstream_legacy_encrypt;
 	sound();
@@ -161,12 +161,12 @@ public:
 	void Release();
 	BOOL load(const std::string& filename, pack* containing_pack = NULL, BOOL allow_preloads = TRUE);
 	BOOL load_script(asIScriptFunction* close, asIScriptFunction* len, asIScriptFunction* read, asIScriptFunction* seek, const std::string& data, const std::string& preload_filename = "");
-	BOOL load_memstream(std::string& data, DWORD size, const std::string& preload_filename = "", bool legacy_encrypt = false);
+	BOOL load_memstream(std::string& data, unsigned int size, const std::string& preload_filename = "", bool legacy_encrypt = false);
 	BOOL load_url(const std::string& url);
 	BOOL stream(const std::string& filename, pack* containing_pack = NULL) {
 		return load(filename, containing_pack, FALSE);
 	}
-	BOOL push_memory(unsigned char* buffer, DWORD length, BOOL stream_end = FALSE, int pcm_rate = 0, int pcm_chans = 0);
+	BOOL push_memory(unsigned char* buffer, unsigned int length, BOOL stream_end = FALSE, int pcm_rate = 0, int pcm_chans = 0);
 	BOOL push_string(const std::string& buffer, BOOL stream_end = FALSE, int pcm_rate = 0, int pcm_chans = 0);
 	BOOL postload(const std::string& filename = std::string(""));
 	BOOL close();
@@ -199,17 +199,17 @@ public:
 	float get_pitch_alt();
 	float get_volume_alt();
 	BOOL set_pan(float pan);
-	BOOL slide_pan(float pan, DWORD time);
+	BOOL slide_pan(float pan, unsigned int time);
 	BOOL set_pitch(float pitch);
-	BOOL slide_pitch(float pitch, DWORD time);
+	BOOL slide_pitch(float pitch, unsigned int time);
 	BOOL set_volume(float volume);
-	BOOL slide_volume(float volume, DWORD time);
+	BOOL slide_volume(float volume, unsigned int time);
 	BOOL set_pan_alt(float pan);
-	BOOL slide_pan_alt(float pan, DWORD time);
+	BOOL slide_pan_alt(float pan, unsigned int time);
 	BOOL set_pitch_alt(float pitch);
-	BOOL slide_pitch_alt(float pitch, DWORD time);
+	BOOL slide_pitch_alt(float pitch, unsigned int time);
 	BOOL set_volume_alt(float volume);
-	BOOL slide_volume_alt(float volume, DWORD time);
+	BOOL slide_volume_alt(float volume, unsigned int time);
 };
 
 class mixer : public sound_base {
@@ -242,30 +242,30 @@ public:
 	float get_pitch_alt();
 	float get_volume_alt();
 	BOOL set_pan(float pan);
-	BOOL slide_pan(float pan, DWORD time);
+	BOOL slide_pan(float pan, unsigned int time);
 	BOOL set_pitch(float pitch);
-	BOOL slide_pitch(float pitch, DWORD time);
+	BOOL slide_pitch(float pitch, unsigned int time);
 	BOOL set_volume(float volume);
-	BOOL slide_volume(float volume, DWORD time);
+	BOOL slide_volume(float volume, unsigned int time);
 	BOOL set_pan_alt(float pan);
-	BOOL slide_pan_alt(float pan, DWORD time);
+	BOOL slide_pan_alt(float pan, unsigned int time);
 	BOOL set_pitch_alt(float pitch);
-	BOOL slide_pitch_alt(float pitch, DWORD time);
+	BOOL slide_pitch_alt(float pitch, unsigned int time);
 	BOOL set_volume_alt(float volume);
-	BOOL slide_volume_alt(float volume, DWORD time);
+	BOOL slide_volume_alt(float volume, unsigned int time);
 };
 
 
 float get_master_volume();
 BOOL set_master_volume(float volume);
-DWORD get_input_device();
-DWORD get_input_device_count();
-DWORD get_input_device_name(DWORD device, char* buffer, DWORD bufsize);
-BOOL set_input_device(DWORD device);
-DWORD get_output_device();
-DWORD get_output_device_count();
-DWORD get_output_device_name(DWORD device, char* buffer, DWORD bufsize);
-BOOL set_output_device(DWORD device);
+unsigned int get_input_device();
+unsigned int get_input_device_count();
+unsigned int get_input_device_name(unsigned int device, char* buffer, unsigned int bufsize);
+BOOL set_input_device(unsigned int device);
+unsigned int get_output_device();
+unsigned int get_output_device_count();
+unsigned int get_output_device_name(unsigned int device, char* buffer, unsigned int bufsize);
+BOOL set_output_device(unsigned int device);
 BOOL get_global_hrtf();
 BOOL set_global_hrtf(BOOL enable);
 

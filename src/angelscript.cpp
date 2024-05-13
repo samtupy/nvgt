@@ -21,6 +21,7 @@
 #include <Poco/Exception.h>
 #include <Poco/File.h>
 #include <Poco/Glob.h>
+#include <Poco/Mutex.h>
 #include <Poco/Path.h>
 #include <Poco/zlib.h>
 #include <SDL2/SDL.h>
@@ -78,12 +79,11 @@ asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* /*param*
 void ReturnContextCallback(asIScriptEngine* engine, asIScriptContext* ctx, void* /*param*/);
 void ExceptionHandlerCallback(asIScriptContext* ctx, void* obj);
 
-CContextMgr* g_ctxMgr = 0;
-int g_bcCompressionLevel = 9;
-
 using namespace std;
 using namespace Poco;
 
+CContextMgr* g_ctxMgr = nullptr;
+int g_bcCompressionLevel = 9;
 string g_last_exception_callstack;
 string g_compiled_basename;
 
@@ -176,6 +176,7 @@ public:
 };
 
 vector<asIScriptContext*> g_ctxPool;
+Mutex g_ctxPoolMutex;
 vector<string> g_IncludeDirs;
 string g_scriptMessagesWarn;
 string g_scriptMessagesErr;
@@ -497,10 +498,16 @@ int PragmaCallback(const string& pragmaText, CScriptBuilder& builder, void* /*us
 
 asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* /*param*/) {
 	asIScriptContext* ctx = 0;
-	if (g_ctxPool.size()) {
-		ctx = g_ctxPool.back();
-		g_ctxPool.pop_back();
-	} else {
+	int pool_size = 0;
+	{
+		ScopedLock<Mutex> l(g_ctxPoolMutex);
+		pool_size = g_ctxPool.size();
+		if (pool_size) {
+			ctx = g_ctxPool.back();
+			g_ctxPool.pop_back();
+		}
+	}
+	if (!pool_size) {
 		ctx = engine->CreateContext();
 		ctx->SetExceptionCallback(asFUNCTION(ExceptionHandlerCallback), NULL, asCALL_CDECL);
 		ctx->SetLineCallback(asFUNCTION(profiler_callback), NULL, asCALL_CDECL);
@@ -509,6 +516,7 @@ asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* /*param*
 }
 void ReturnContextCallback(asIScriptEngine* engine, asIScriptContext* ctx, void* /*param*/) {
 	ctx->Unprepare();
+	ScopedLock<Mutex> l(g_ctxPoolMutex);
 	g_ctxPool.push_back(ctx);
 }
 void ExceptionHandlerCallback(asIScriptContext* ctx, void* obj) {

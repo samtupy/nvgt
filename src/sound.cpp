@@ -63,7 +63,7 @@ static IPLHRTF phonon_hrtf_reflections = NULL;
 static thread_mutex_t preload_mutex;
 
 hstream_entry* last_channel = NULL;
-hstream_entry* register_hstream(DWORD channel) {
+hstream_entry* register_hstream(unsigned int channel) {
 	if (!channel) return NULL;
 	hstream_entry* e = (hstream_entry*)malloc(sizeof(hstream_entry));
 	e->p = last_channel;
@@ -92,7 +92,7 @@ BOOL sound_available() {
 	return init_sound();
 	#endif
 }
-BOOL init_sound(DWORD dev) {
+BOOL init_sound(unsigned int dev) {
 	if (sound_initialized)
 		return TRUE;
 	BASS_SetConfig(BASS_CONFIG_DEV_DEFAULT, TRUE);
@@ -156,7 +156,7 @@ public:
 };
 
 // no hrtf positional dsp
-void basic_positioning_dsp(void* buffer, DWORD length, float x, float y, float z, float pan_step, float volume_step) {
+void basic_positioning_dsp(void* buffer, unsigned int length, float x, float y, float z, float pan_step, float volume_step) {
 	if (!buffer || length < 2)
 		return;
 	float volume = 1.0 - (floorf(sqrtf(pow(fabs(x), 2) + pow(fabs(y), 2) + pow(fabs(z), 2)))) / (125.0 / volume_step);
@@ -180,7 +180,7 @@ void basic_positioning_dsp(void* buffer, DWORD length, float x, float y, float z
 }
 
 // Uses steam audio to position the sound and add other effects to it such as reverb and occlusion. Sorry if this is a bit messy, this function has seen some evolution to say the least as different things were tested and so as to not break compatibility with existing code, this should probably be cleaned up as time goes on.
-void phonon_dsp(void* buffer, DWORD length, float x, float y, float z, sound_base& s) {
+void phonon_dsp(void* buffer, unsigned int length, float x, float y, float z, sound_base& s) {
 	if (!buffer || length < 2 || !hrtf || !s.hrtf_effect)
 		return;
 	float blend = (fabs(x * s.pan_step) + fabs(y * s.pan_step) + fabs(z * s.pan_step)) / 3;
@@ -283,16 +283,8 @@ void CALLBACK positioning_dsp(HDSP handle, DWORD channel, void* buffer, DWORD le
 		basic_positioning_dsp(buffer, length, x, y, z, s->pan_step, s->volume_step);
 }
 
-
-std::unordered_map<DWORD, asIScriptContext*> callback_contexts;
-asIScriptContext* callback_context = NULL;
-asIScriptContext* get_callback_context() {
-	if (!callback_context)
-		callback_context = g_ScriptEngine->RequestContext();
-	return callback_context;
-}
-
 // Bass fileprocs
+// pack
 void CALLBACK bass_closeproc_pack(void* user) {
 	if (!user)
 		return;
@@ -302,32 +294,6 @@ void CALLBACK bass_closeproc_pack(void* user) {
 	snd.p->stream_close(snd.s);
 	free(user);
 }
-void CALLBACK bass_closeproc_push(void* user) {
-	return;
-}
-void CALLBACK bass_closeproc_script(void* user) {
-	if (!user)
-		return;
-	sound* s = (sound*)user;
-	if (!s->close_callback)
-		return;
-	asIScriptContext* ctx = get_callback_context();
-	#ifdef SOUND_DEBUG
-	FILE* f = fopen("bdbg.log", "ab");
-	fputs("close\r\n", f);
-	fclose(f);
-	#endif
-	if (!ctx || ctx->Prepare(s->close_callback) < 0)
-		return;
-	ctx->SetArgObject(0, &s->callback_data);
-	ctx->Execute();
-	#ifdef SOUND_DEBUG
-	f = fopen("bdbg.log", "ab");
-	fputs("close done\r\n", f);
-	fclose(f);
-	#endif
-	asThreadCleanup();
-}
 QWORD CALLBACK bass_lenproc_pack(void* user) {
 	if (!user)
 		return 0xffffffff;
@@ -335,36 +301,6 @@ QWORD CALLBACK bass_lenproc_pack(void* user) {
 	if (!snd.p || !snd.p->next_stream_idx)
 		return 0xffffffff;
 	return snd.p->stream_size(snd.s);
-}
-QWORD CALLBACK bass_lenproc_push(void* user) {
-	sound* s = (sound*) user;
-	if (s->memstream && s->memstream_size == s->memstream->size())
-		return s->memstream_size;
-	return 0;
-}
-QWORD CALLBACK bass_lenproc_script(void* user) {
-	if (!user)
-		return 0;
-	sound* s = (sound*)user;
-	if (!s->len_callback)
-		return 0;
-	asIScriptContext* ctx = get_callback_context();
-	#ifdef SOUND_DEBUG
-	FILE* f = fopen("bdbg.log", "ab");
-	fputs("len\r\n", f);
-	fclose(f);
-	#endif
-	if (!ctx || ctx->Prepare(s->len_callback) < 0)
-		return 0;
-	ctx->SetArgObject(0, &s->callback_data);
-	ctx->Execute();
-	DWORD ret = ctx->GetReturnDWord();
-	#ifdef SOUND_DEBUG
-	f = fopen("bdbg.log", "ab");
-	fputs("len done\r\n", f);
-	fclose(f);
-	#endif
-	return ret;
 }
 DWORD CALLBACK bass_readproc_pack(void* buffer, DWORD length, void* user) {
 	if (!user)
@@ -381,6 +317,24 @@ DWORD CALLBACK bass_readproc_pack(void* buffer, DWORD length, void* user) {
 		thread_mutex_unlock(&snd->snd->close_mutex);
 	//if(ret==0) ret=-1;
 	return ret;
+}
+BOOL CALLBACK bass_seekproc_pack(QWORD offset, void* user) {
+	if (!user)
+		return FALSE;
+	packed_sound* snd = (packed_sound*)user;
+	if (!snd->p || !snd->p->next_stream_idx)
+		return FALSE;
+	return snd->p->stream_seek(snd->s, offset, SEEK_SET);
+}
+// push
+void CALLBACK bass_closeproc_push(void* user) {
+	return;
+}
+QWORD CALLBACK bass_lenproc_push(void* user) {
+	sound* s = (sound*) user;
+	if (s->memstream && s->memstream_size == s->memstream->size())
+		return s->memstream_size;
+	return 0;
 }
 DWORD CALLBACK bass_readproc_push(void* buffer, DWORD length, void* user) {
 	if (!buffer || !user)
@@ -447,62 +401,6 @@ DWORD CALLBACK bass_readproc_push(void* buffer, DWORD length, void* user) {
 	thread_mutex_unlock(&s->close_mutex);
 	return length;
 }
-DWORD CALLBACK bass_readproc_script(void* buffer, DWORD length, void* user) {
-	if (!user)
-		return -1;
-	sound* s = (sound*)user;
-	if (!s->read_callback)
-		return -1;
-	asIScriptContext* ctx = g_ScriptEngine->CreateContext();
-	#ifdef SOUND_DEBUG
-	FILE* f = fopen("bdbg.log", "ab");
-	fputs("read\r\n", f);
-	fclose(f);
-	#endif
-	if (!ctx || !s->read_callback || ctx->Prepare(s->read_callback) < 0) {
-		ctx->Release();
-		return -1;
-	}
-	std::string* data = new std::string("");
-	ctx->SetArgObject(0, data);
-	ctx->SetArgDWord(1, length);
-	ctx->SetArgObject(2, &s->callback_data);
-	if (!s->script_loading && !s->output_mixer) {
-		ctx->Release();
-		return -1;
-	}
-	#ifdef SOUND_DEBUG
-	f = fopen("bdbg.log", "ab");
-	fputs("read execute\r\n", f);
-	fclose(f);
-	#endif
-	ctx->Execute();
-	#ifdef SOUND_DEBUG
-	f = fopen("bdbg.log", "ab");
-	fputs("read executed\r\n", f);
-	fclose(f);
-	#endif
-	int ret = ctx->GetReturnDWord();
-	#ifdef SOUND_DEBUG
-	f = fopen("bdbg.log", "ab");
-	fputs("read done\r\n", f);
-	fclose(f);
-	#endif
-	ctx->Release();
-	if (data->size() > length) data->resize(length);
-	if (data->size() > 0)
-		memcpy(buffer, data->c_str(), data->size());
-	delete data;
-	return ret;
-}
-BOOL CALLBACK bass_seekproc_pack(QWORD offset, void* user) {
-	if (!user)
-		return FALSE;
-	packed_sound* snd = (packed_sound*)user;
-	if (!snd->p || !snd->p->next_stream_idx)
-		return FALSE;
-	return snd->p->stream_seek(snd->s, offset, SEEK_SET);
-}
 BOOL CALLBACK bass_seekproc_push(QWORD offset, void* user) {
 	sound* s = (sound*) user;
 	if (s->memstream) {
@@ -513,29 +411,85 @@ BOOL CALLBACK bass_seekproc_push(QWORD offset, void* user) {
 	}
 	return FALSE;
 }
+// script
+void CALLBACK bass_closeproc_script(void* user) {
+	if (!user)
+		return;
+	sound* s = (sound*)user;
+	if (!s->close_callback)
+		return;
+	asIScriptContext* ctx = g_ScriptEngine->RequestContext();
+	if (!ctx) return;
+	if (ctx->Prepare(s->close_callback) < 0)
+		goto finish;
+	if (ctx->SetArgObject(0, &s->callback_data) < 0)
+		goto finish;
+	ctx->Execute();
+	finish:
+		g_ScriptEngine->ReturnContext(ctx);
+		asThreadCleanup();
+}
+QWORD CALLBACK bass_lenproc_script(void* user) {
+	if (!user)
+		return 0;
+	sound* s = (sound*)user;
+	unsigned long long ret = 0;
+	if (!s->len_callback)
+		return 0;
+	asIScriptContext* ctx = g_ScriptEngine->RequestContext();
+	if (!ctx) return 0;
+	if (!ctx || ctx->Prepare(s->len_callback) < 0)
+		goto finish;
+	if (ctx->SetArgObject(0, &s->callback_data) < 0)
+		goto finish;
+	if (ctx->Execute() != asEXECUTION_FINISHED)
+		goto finish;
+	ret = ctx->GetReturnDWord();
+	finish:
+		g_ScriptEngine->ReturnContext(ctx);
+		asThreadCleanup();
+		return ret;
+}
+DWORD CALLBACK bass_readproc_script(void* buffer, DWORD length, void* user) {
+	if (!user)
+		return -1;
+	sound* s = (sound*)user;
+	int ret = -1;
+	std::string data;
+	if (!s->read_callback)
+		return -1;
+	asIScriptContext* ctx = g_ScriptEngine->RequestContext();
+	if (!ctx) return -1;
+	if (ctx->Prepare(s->read_callback) < 0) goto finish;
+	if (ctx->SetArgObject(0, &data) < 0 || ctx->SetArgDWord(1, length) < 0 || ctx->SetArgObject(2, &s->callback_data) < 0)
+		goto finish;
+	if (ctx->Execute() != asEXECUTION_FINISHED) goto finish;
+	ret = ctx->GetReturnDWord();
+	if (data.size() > length) data.resize(length);
+	if (data.size() > 0)
+		memcpy(buffer, &data[0], data.size());
+	finish:
+		g_ScriptEngine->ReturnContext(ctx);
+		asThreadCleanup();
+	return ret;
+}
 BOOL CALLBACK bass_seekproc_script(QWORD offset, void* user) {
 	if (!user)
-		return FALSE;
+		return false;
 	sound* s = (sound*)user;
+	bool ret = false;
 	if (!s->seek_callback)
-		return FALSE;
-	asIScriptContext* ctx = get_callback_context();
-	#ifdef SOUND_DEBUG
-	FILE* f = fopen("bdbg.log", "ab");
-	fputs("seek\r\n", f);
-	fclose(f);
-	#endif
-	if (!ctx || !s->seek_callback || ctx->Prepare(s->seek_callback) < 0)
-		return FALSE;
-	ctx->SetArgDWord(0, offset);
-	ctx->SetArgObject(1, &s->callback_data);
-	ctx->Execute();
-	BOOL ret = ctx->GetReturnByte();
-	#ifdef SOUND_DEBUG
-	f = fopen("bdbg.log", "ab");
-	fputs("seek done\r\n", f);
-	fclose(f);
-	#endif
+		return false;
+	asIScriptContext* ctx = g_ScriptEngine->RequestContext();
+	if (!ctx) return false;
+	if (ctx->Prepare(s->seek_callback) < 0)
+		goto finish;
+	if (ctx->SetArgDWord(0, offset) < 0 || ctx->SetArgObject(1, &s->callback_data) < 0) goto finish;
+	if (ctx->Execute() != asEXECUTION_FINISHED) goto finish;
+	ret = ctx->GetReturnByte();
+	finish:
+		g_ScriptEngine->ReturnContext(ctx);
+		asThreadCleanup();
 	return ret;
 }
 
@@ -864,7 +818,6 @@ sound::sound() {
 	RefCount = 1;
 	channel = 0;
 	memset(&channel_info, 0, sizeof(BASS_CHANNELINFO));
-	memset(loaded_filename, 0, MAX_PATH);
 	pitch = 1.0;
 	length = 0.0;
 	x = 0.0;
@@ -1014,7 +967,7 @@ BOOL sound::load_script(asIScriptFunction* close, asIScriptFunction* len, asIScr
 	return postload(preload_filename != "" ? preload_filename : "script_stream");
 }
 
-BOOL sound::load_memstream(string& data, DWORD size, const std::string& preload_filename, bool legacy_encrypt) {
+BOOL sound::load_memstream(string& data, unsigned int size, const std::string& preload_filename, bool legacy_encrypt) {
 	if (!sound_initialized)
 		init_sound();
 	if (!sound_initialized)
@@ -1058,10 +1011,10 @@ BOOL sound::load_url(const string& url) {
 	return postload(url);
 }
 
-BOOL sound::push_memory(unsigned char* buffer, DWORD length, BOOL stream_end, int pcm_rate, int pcm_chans) {
+BOOL sound::push_memory(unsigned char* buffer, unsigned int length, BOOL stream_end, int pcm_rate, int pcm_chans) {
 	if (!sound_initialized || !stream_end && length < 1)
 		return FALSE;
-	if (loaded_filename[0] != 0) {
+	if (loaded_filename != "") {
 		if (length > 0)
 			close();
 		else
@@ -1113,10 +1066,7 @@ BOOL sound::postload(const string& filename) {
 	if (!channel)
 		return FALSE;
 	BASS_ChannelGetInfo(channel, &channel_info);
-	if (filename != "")
-		strncpy(loaded_filename, filename.c_str(), MAX_PATH);
-	else
-		memset(loaded_filename, 0, MAX_PATH);
+	loaded_filename = filename;
 	if (hrtf && !hrtf_effect) {
 		IPLBinauralEffectSettings effect_settings{};
 		effect_settings.hrtf = phonon_hrtf;
@@ -1166,7 +1116,7 @@ BOOL sound::close() {
 		thread_mutex_unlock(&close_mutex);
 		length = 0;
 		memset(&channel_info, 0, sizeof(BASS_CHANNELINFO));
-		//memset(loaded_filename, 0, MAX_PATH);
+		loaded_filename = "";
 		push_prebuff.clear();
 		memstream = NULL;
 		memstream_size = 0;
@@ -1249,7 +1199,7 @@ BOOL sound_base::set_position(float listener_x, float listener_y, float listener
 BOOL sound::play() {
 	if (!channel)
 		return FALSE;
-	if (loaded_filename[0] != 0 && is_playing())
+	if (loaded_filename != "" && is_playing())
 		return FALSE;
 	if (BASS_ChannelIsActive(channel) != BASS_ACTIVE_PLAYING)
 		BASS_Mixer_ChannelSetPosition(channel, 0, BASS_POS_BYTE);
@@ -1340,7 +1290,7 @@ float sound::get_length() {
 		return -1;
 	if (length > 0) return length / 1000.0;
 	QWORD length;
-	if (loaded_filename[0] != 0)
+	if (loaded_filename != "")
 		length = BASS_ChannelGetLength(channel, BASS_POS_BYTE);
 	else
 		length = BASS_ChannelGetData(channel, NULL, BASS_DATA_AVAILABLE);
@@ -1418,14 +1368,14 @@ BOOL sound::set_pan_alt(float pan) {
 	return set_pan(pan / 100);
 }
 
-BOOL sound::slide_pan(float pan, DWORD time) {
+BOOL sound::slide_pan(float pan, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (pan < -1.0 || pan > 1.0)
 		return FALSE;
 	return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_PAN, pan, time);
 }
-BOOL sound::slide_pan_alt(float pan, DWORD time) {
+BOOL sound::slide_pan_alt(float pan, unsigned int time) {
 	return slide_pan(pan / 100, time);
 }
 
@@ -1442,13 +1392,13 @@ BOOL sound::set_pitch_alt(float pitch) {
 	return set_pitch(pitch / 100);
 }
 
-BOOL sound::slide_pitch(float pitch, DWORD time) {
+BOOL sound::slide_pitch(float pitch, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (pitch < 0.05 || pitch > 5.0) return false;
 	return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_FREQ, channel_info.freq * pitch, time);
 }
-BOOL sound::slide_pitch_alt(float pitch, DWORD time) {
+BOOL sound::slide_pitch_alt(float pitch, unsigned int time) {
 	return slide_pitch(pitch / 100, time);
 }
 
@@ -1466,7 +1416,7 @@ BOOL sound::set_volume_alt(float volume) {
 	return set_volume((volume + 100) / 100);
 }
 
-BOOL sound::slide_volume(float volume, DWORD time) {
+BOOL sound::slide_volume(float volume, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (volume < 0.0 || volume > 1.0)
@@ -1476,7 +1426,7 @@ BOOL sound::slide_volume(float volume, DWORD time) {
 	else
 		return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_VOL, volume, time);
 }
-BOOL sound::slide_volume_alt(float volume, DWORD time) {
+BOOL sound::slide_volume_alt(float volume, unsigned int time) {
 	return slide_volume((volume + 100) / 100, time);
 }
 
@@ -1721,7 +1671,7 @@ int mixer::set_fx(std::string& fx, int idx) {
 		return -1;
 	int id_idx = get_effect_index(e.id);
 	if (id_idx == -1 && idx >= 0 && idx < effects.size()) {
-		for (DWORD i = idx; i < effects.size(); i++) {
+		for (unsigned int i = idx; i < effects.size(); i++) {
 			if (effects[i].hfx)
 				BASS_FXSetPriority(effects[i].hfx, i + 1);
 		}
@@ -1817,14 +1767,14 @@ BOOL mixer::set_pan_alt(float pan) {
 	return set_pan(pan / 100);
 }
 
-BOOL mixer::slide_pan(float pan, DWORD time) {
+BOOL mixer::slide_pan(float pan, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (pan < -1.0 || pan > 1.0)
 		return FALSE;
 	return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_PAN, pan, time);
 }
-BOOL mixer::slide_pan_alt(float pan, DWORD time) {
+BOOL mixer::slide_pan_alt(float pan, unsigned int time) {
 	return slide_pan(pan / 100, time);
 }
 
@@ -1839,14 +1789,14 @@ BOOL mixer::set_pitch_alt(float pitch) {
 	return set_pitch(pitch / 100);
 }
 
-BOOL mixer::slide_pitch(float pitch, DWORD time) {
+BOOL mixer::slide_pitch(float pitch, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (pitch < 0.05 || pitch > 5.0)
 		return FALSE;
 	return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_FREQ, 44100 * pitch, time);
 }
-BOOL mixer::slide_pitch_alt(float pitch, DWORD time) {
+BOOL mixer::slide_pitch_alt(float pitch, unsigned int time) {
 	return slide_pitch(pitch / 100, time);
 }
 
@@ -1861,14 +1811,14 @@ BOOL mixer::set_volume_alt(float volume) {
 	return set_volume((volume + 100) / 100);
 }
 
-BOOL mixer::slide_volume(float volume, DWORD time) {
+BOOL mixer::slide_volume(float volume, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (volume < 0.0 || volume > 1.0)
 		return FALSE;
 	return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_VOL, volume, time);
 }
-BOOL mixer::slide_volume_alt(float volume, DWORD time) {
+BOOL mixer::slide_volume_alt(float volume, unsigned int time) {
 	return slide_volume((volume + 100) / 100, time);
 }
 
@@ -1892,12 +1842,12 @@ BOOL set_master_volume_r(float volume) {
 	volume /= 100.0;
 	return set_master_volume(volume + 1.0);
 }
-DWORD get_input_device() {
+unsigned int get_input_device() {
 	if (!sound_initialized)
 		init_sound();
 	return BASS_RecordGetDevice();
 }
-DWORD get_input_device_count() {
+unsigned int get_input_device_count() {
 	if (!sound_initialized)
 		init_sound();
 	BASS_DEVICEINFO inf;
@@ -1908,7 +1858,7 @@ DWORD get_input_device_count() {
 	}
 	return count;
 }
-DWORD get_input_device_name(DWORD device, char* buffer, DWORD bufsize) {
+unsigned int get_input_device_name(unsigned int device, char* buffer, unsigned int bufsize) {
 	if (!sound_initialized)
 		init_sound();
 	BASS_DEVICEINFO i;
@@ -1927,26 +1877,26 @@ CScriptArray* list_input_devices() {
 	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
 	CScriptArray* array = CScriptArray::Create(arrayType, count);
 	for (int i = 0; i < count; i++) {
-		char devname[MAX_PATH];
-		int r = get_input_device_name(i, devname, MAX_PATH);
+		char devname[512];
+		int r = get_input_device_name(i, devname, 512);
 		devname[r] = 0;
 		((string*)(array->At(i)))->assign(devname);
 	}
 	return array;
 }
-BOOL set_input_device(DWORD device) {
+BOOL set_input_device(unsigned int device) {
 	if (!sound_initialized)
 		init_sound();
 	if (!BASS_RecordInit(device))
 		return FALSE;
 	return BASS_RecordSetDevice(device);
 }
-DWORD get_output_device() {
+unsigned int get_output_device() {
 	if (!sound_initialized)
 		init_sound();
 	return BASS_GetDevice();
 }
-DWORD get_output_device_count() {
+unsigned int get_output_device_count() {
 	if (!sound_initialized)
 		init_sound();
 	BASS_DEVICEINFO inf;
@@ -1955,7 +1905,7 @@ DWORD get_output_device_count() {
 		count++;
 	return count;
 }
-DWORD get_output_device_name(DWORD device, char* buffer, DWORD bufsize) {
+unsigned int get_output_device_name(unsigned int device, char* buffer, unsigned int bufsize) {
 	if (!sound_initialized)
 		init_sound();
 	BASS_DEVICEINFO i;
@@ -1974,14 +1924,14 @@ CScriptArray* list_output_devices() {
 	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
 	CScriptArray* array = CScriptArray::Create(arrayType, count);
 	for (int i = 0; i < count; i++) {
-		char devname[MAX_PATH];
-		int r = get_output_device_name(i, devname, MAX_PATH);
+		char devname[512];
+		int r = get_output_device_name(i, devname, 512);
 		devname[r] = 0;
 		((string*)(array->At(i)))->assign(devname);
 	}
 	return array;
 }
-BOOL set_output_device(DWORD device) {
+BOOL set_output_device(unsigned int device) {
 	if (!sound_initialized)
 		init_sound(device);
 	else

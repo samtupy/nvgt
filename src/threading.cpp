@@ -38,14 +38,15 @@ public:
 	script_runnable(asIScriptFunction* func, CScriptDictionary* args, Thread* thread = nullptr) : func(func), args(args), thread(thread) {}
 	void run() {
 		int execution_result = asEXECUTION_FINISHED;
+		asIScriptContext* ctx = nullptr;
 		if (!func) goto finish;
-		asIScriptContext* ctx = g_ScriptEngine->CreateContext();
+		ctx = g_ScriptEngine->RequestContext();
 		if (!ctx) goto finish;
 		if (ctx->Prepare(func) < 0) goto finish;
 		if (ctx->SetArgObject(0, args) < 0) goto finish;
 		execution_result = ctx->Execute(); // Todo: Work out what we want to do with exceptions or errors that take place in threads.
 		finish:
-			if (ctx && !g_shutting_down) ctx->Release(); // We only do this when the engine is not shutting down because the angelscript could get partially destroyed on the main thread before this point in the shutdown case.
+			if (ctx && !g_shutting_down) g_ScriptEngine->ReturnContext(ctx); // We only do this when the engine is not shutting down because the angelscript could get partially destroyed on the main thread before this point in the shutdown case.
 			if (thread) angelscript_refcounted_release<Thread>(thread);
 			asThreadCleanup();
 			delete this; // Poco wants us to keep these Runnable objects alive as long as the thread is running, meaning we must delete ourself from within the thread to avoid some other sort of cleanup machinery.

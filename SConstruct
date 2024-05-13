@@ -43,7 +43,7 @@ env.Append(LIBS = static_plugins)
 
 # nvgt itself
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
-env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoNetSSLWinMT", "PocoUtilMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoCrypto", "PocoFoundation", "PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoZip", "crypto", "ssl"], "phonon", "bass", "bass_fx", "bassmix", "SDL2main"])
+env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoNetSSLWinMT", "PocoUtilMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoXML", "PocoZip", "PocoFoundation", "crypto", "ssl"], "phonon", "bass", "bass_fx", "bassmix", "SDL2main"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(LINKFLAGS = ["/SUBSYSTEM:WINDOWS", "/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll", "/delayload:Tolk.dll"])

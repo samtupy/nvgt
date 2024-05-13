@@ -337,6 +337,11 @@ template <class T, class S> datastream* connect_stream_factory(datastream* ds_co
 	if (!connect_stream_open<T, S>(ds, ds_connect, p_streamargs)) throw InvalidArgumentException("Unable to attach given stream");
 	return ds;
 }
+template <class T, datastream_factory_type factory, class S> void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classname) {
+	RegisterDatastreamType<T, factory>(engine, classname);
+	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(datastream@, const string&in = \"\", int byteorder = 1)", classname).c_str(), asFUNCTIONPR((connect_stream_factory<T, S>), (datastream*, const std::string&, int), datastream*), asCALL_CDECL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool open(datastream@, const string&in = \"\", int byteorder = 1)", asFUNCTIONPR((connect_stream_open<T, S>), (datastream*, datastream*, const std::string&, int), bool), asCALL_CDECL_OBJFIRST);
+}
 template <class T, class S, typename... Args> bool connect_stream_open(datastream* ds, datastream* ds_connect, Args... args, f_streamargs) {
 	if (!ds_connect) return false;
 	S* stream;
@@ -360,13 +365,15 @@ template <class T, class S, typename... Args> datastream* connect_stream_factory
 	if (!connect_stream_open<T, S, Args...>(ds, ds_connect, args..., p_streamargs)) throw InvalidArgumentException("Unable to attach given stream");
 	return ds;
 }
-template <class T, datastream_factory_type factory, class S, typename... Args> void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classname, const std::string& arg_types = "") {
+template <class T, datastream_factory_type factory, class S, typename... Args> void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classname, const std::string& arg_types) {
 	RegisterDatastreamType<T, factory>(engine, classname);
-	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(datastream@, %sconst string&in = \"\", int byteorder = 1)", classname, arg_types != ""? arg_types + ", " : "").c_str(), asFUNCTIONPR((connect_stream_factory<T, S, Args...>), (datastream*, Args..., const std::string&, int), datastream*), asCALL_CDECL);
-	engine->RegisterObjectMethod(classname.c_str(), format("bool open(datastream@, %sconst string&in = \"\", int byteorder = 1)", arg_types != ""? arg_types + ", " : "").c_str(), asFUNCTIONPR((connect_stream_open<T, S, Args...>), (datastream*, datastream*, Args..., const std::string&, int), bool), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(datastream@, %s, const string&in = \"\", int byteorder = 1)", classname, arg_types).c_str(), asFUNCTIONPR((connect_stream_factory<T, S, Args...>), (datastream*, Args..., const std::string&, int), datastream*), asCALL_CDECL);
+	engine->RegisterObjectMethod(classname.c_str(), format("bool open(datastream@, %s, const string&in = \"\", int byteorder = 1)", arg_types).c_str(), asFUNCTIONPR((connect_stream_open<T, S, Args...>), (datastream*, datastream*, Args..., const std::string&, int), bool), asCALL_CDECL_OBJFIRST);
 }
-template <class T, typename... Args> void RegisterInputDatastreamType(asIScriptEngine* engine, const std::string& classname, const std::string& arg_types = "") { RegisterDatastreamType<T, datastream_factory_closed, std::istream, Args...>(engine, classname, arg_types); }
-template <class T, typename... Args> void RegisterOutputDatastreamType(asIScriptEngine* engine, const std::string& classname, const std::string& arg_types = "") { RegisterDatastreamType<T, datastream_factory_closed, std::ostream, Args...>(engine, classname, arg_types); }
+template <class T> void RegisterInputDatastreamType(asIScriptEngine* engine, const std::string& classname) { RegisterDatastreamType<T, datastream_factory_closed, std::istream>(engine, classname); }
+template <class T> void RegisterOutputDatastreamType(asIScriptEngine* engine, const std::string& classname) { RegisterDatastreamType<T, datastream_factory_closed, std::ostream>(engine, classname); }
+template <class T, typename... Args> void RegisterInputDatastreamType(asIScriptEngine* engine, const std::string& classname, const std::string& arg_types) { RegisterDatastreamType<T, datastream_factory_closed, std::istream, Args...>(engine, classname, arg_types); }
+template <class T, typename... Args> void RegisterOutputDatastreamType(asIScriptEngine* engine, const std::string& classname, const std::string& arg_types) { RegisterDatastreamType<T, datastream_factory_closed, std::ostream, Args...>(engine, classname, arg_types); }
 
 // In regards to additional Angelscript function registration, we shall use asCALL_CDECL_OBJFIRST to avoid actually modifying or deriving from classes.
 // FileStream

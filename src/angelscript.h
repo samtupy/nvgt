@@ -21,12 +21,12 @@ extern std::vector<asIScriptContext*> g_ctxPool;
 
 void ShowAngelscriptMessages();
 int ConfigureEngine(asIScriptEngine* engine);
+int ExecuteScript(asIScriptEngine* engine, const char* scriptFile);
 #ifndef NVGT_STUB
 	int               CompileScript(asIScriptEngine* engine, const char* scriptFile);
 	int SaveCompiledScript(asIScriptEngine* engine, const unsigned char** output);
 #endif
 int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size);
-int ExecuteScript(asIScriptEngine* engine, const char* scriptFile);
 void MessageCallback(const asSMessageInfo* msg, void* param);
 asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* param);
 void ReturnContextCallback(asIScriptEngine* engine, asIScriptContext* ctx, void* param);

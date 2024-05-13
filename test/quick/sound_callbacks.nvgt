@@ -16,8 +16,9 @@ class soundstream {
 	uint sound_len(string u) {
 		return f.size;
 	}
-	void sound_read(string& out buffer, uint l, string u) {
+	int sound_read(string& out buffer, uint l, string u) {
 		buffer = f.read(l);
+		return buffer.length();
 	}
 	bool sound_seek(uint o, string u) {
 		f.seek(o);

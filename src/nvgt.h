@@ -31,9 +31,6 @@ void message(const std::string& text, const std::string& header);
 bool script_compiled();
 
 
-#ifndef MAX_PATH
-	#define MAX_PATH 260
-#endif
 #ifndef _WIN32
 	#ifndef BOOL
 		typedef int BOOL;
@@ -42,6 +39,4 @@ bool script_compiled();
 	#endif
 	typedef unsigned int DWORD;
 	int Sleep(long msec);
-	typedef char TCHAR;
-	#define _T(x) x
 #endif
