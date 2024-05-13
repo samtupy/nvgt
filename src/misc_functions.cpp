@@ -464,4 +464,8 @@ void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("refstring"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(refstring, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("refstring"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(refstring, Release), asCALL_THISCALL);
 	engine->RegisterObjectProperty(_O("refstring"), _O("string str"), asOFFSET(refstring, str));
+	engine->RegisterGlobalFunction(_O("uint64 memory_allocate(uint64)"), asFUNCTION(malloc), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 memory_allocate_units(uint64, uint64)"), asFUNCTION(calloc), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 memory_reallocate(uint64, uint64)"), asFUNCTION(realloc), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void memory_free(uint64)"), asFUNCTION(free), asCALL_CDECL);
 }

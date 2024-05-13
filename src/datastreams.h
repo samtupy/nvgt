@@ -35,20 +35,20 @@ public:
 	bool no_close; // If set to true, the close function becomes a no-op for singleton streams like stdin/stdout.
 	bool binary; // If set to false, the template read/write functions will write formatted text output instead of binary data, used by default for console streams.
 	// Empty constructor (internal stream is nonexistent/closed).
-	datastream() : r(NULL), w(NULL), ds(NULL), user(NULL), close_cb(NULL), no_close(false), binary(true) {}
+	datastream() : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true) {}
 	// Low level constructor (Allows passing separate shared pointers to input and output stream).
-	datastream(std::istream* istr, std::ostream* ostr, const std::string& encoding, int byteorder, datastream* obj) : r(NULL), w(NULL), ds(NULL), user(NULL), close_cb(NULL), no_close(false), binary(true) {
+	datastream(std::istream* istr, std::ostream* ostr, const std::string& encoding, int byteorder, datastream* obj) : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true) {
 		open(istr, ostr, encoding, byteorder, obj);
 	}
 	// Higher level constructor (Creates shared pointers for given std::ios pointer and has default arguments).
-	datastream(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = NULL) : r(NULL), w(NULL), ds(NULL), user(NULL), close_cb(NULL), no_close(false), binary(true) {
+	datastream(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = nullptr) : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true) {
 		open(stream, encoding, byteorder, obj);
 	}
 	~datastream() {
 		close();
 	}
 	bool open(std::istream* istr, std::ostream* ostr, const std::string& encoding, int byteorder, datastream* obj);
-	bool open(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = NULL) {
+	bool open(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = nullptr) {
 		return open(dynamic_cast<std::istream*>(stream), dynamic_cast<std::ostream*>(stream), encoding, byteorder, obj);
 	}
 	bool close(bool close_all = false);
@@ -103,7 +103,7 @@ public:
 		return _ostr;
 	}
 	inline std::iostream* get_iostr() {
-		return _istr && dynamic_cast<std::iostream*>(_istr) == dynamic_cast<std::iostream*>(_ostr) ? dynamic_cast<std::iostream*>(_istr) : NULL;
+		return _istr && dynamic_cast<std::iostream*>(_istr) == dynamic_cast<std::iostream*>(_ostr) ? dynamic_cast<std::iostream*>(_istr) : nullptr;
 	}
 };
 
