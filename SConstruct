@@ -9,10 +9,10 @@ import os, multiprocessing
 env = Environment()
 Decider('content-timestamp')
 env.Alias("install", "c:/nvgt")
-SConscript("build/upx_sconscript", exports = ["env"])
+SConscript("build/upx_sconscript.py", exports = ["env"])
 env.SetOption("num_jobs", multiprocessing.cpu_count())
 if env["PLATFORM"] == "win32":
-	SConscript("build/windev_sconscript", exports = ["env"])
+	SConscript("build/windev_sconscript.py", exports = ["env"])
 	env.Append(CCFLAGS = ["/EHsc", "/J", "/std:c++17", "/GF", "/Zc:inline", "/O2"])
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
 	env.Append(LIBS = ["tolk", "enet", "angelscript64", "SDL2"])
@@ -34,7 +34,7 @@ VariantDir("build/obj_src", "src", duplicate = 0)
 # plugins
 plugin_env = env.Clone()
 static_plugins = []
-for s in Glob("plugin/*/_SConscript"):
+for s in Glob("plugin/*/_SConscript") + Glob("plugin/*/SConscript"):
 	plugname = str(s).split(os.path.sep)[1]
 	if ARGUMENTS.get(f"no_{plugname}_plugin", "0") == "1": continue
 	plug = SConscript(s, variant_dir = f"build/obj_plugin/{plugname}", duplicate = 0, exports = {"env": plugin_env, "nvgt_env": env})
@@ -58,8 +58,10 @@ elif env["PLATFORM"] == "posix":
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
 		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
-	if os.path.isfile("user/_SConscript"):
-		SConscript("user/_SConscript", exports = {"plugin_env": plugin_env, "nvgt_env": env})
+	for s in ["_SConscript", "SConscript"]:
+		if os.path.isfile(f"user/{s}"):
+			SConscript(f"user/{s}", exports = {"plugin_env": plugin_env, "nvgt_env": env})
+			break # only execute one script from here
 SConscript("ASAddon/_SConscript", variant_dir = "build/obj_ASAddon", duplicate = 0, exports = "env")
 SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, exports = "env")
 nvgt = env.Program("release/nvgt", [os.path.join("build/obj_src", s) for s in sources], PDB = "#build/debug/nvgt.pdb")
