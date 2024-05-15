@@ -44,7 +44,7 @@ class async_result : public RefCountedObject, public Runnable {
 	Event progress; // Public so that some functions in this object can be called directly from Angelscript such as wait and tryWait.
 		async_result(asITypeInfo* t) : value(nullptr), subtype(t), subtypeid(subtype->GetSubTypeId()), progress(Event::EVENT_MANUALRESET), task(nullptr), ctx(nullptr) {}
 		~async_result() {
-			if (task) delete task;
+			if (task) angelscript_refcounted_release<Thread>(task);
 			release_value_args();
 			if (value) {
 				if (subtypeid & asTYPEID_MASK_OBJECT) subtype->GetEngine()->ReleaseScriptObject(*(void**)value, subtype->GetSubType());
@@ -82,6 +82,7 @@ class async_result : public RefCountedObject, public Runnable {
 				engine->ReturnContext(ctx);
 				return false;
 			}
+			asIScriptContext* defCtx = nullptr; // We may need an extra context if we are required to evaluate expressions for default arguments.
 			for (unsigned int i = 0; i < func->GetParamCount(); i++) {
 				// In this context, param will be the argument as being received by the calling function and arg will be the argument as being passed to this async::call function.
 				int param_typeid, arg_typeid;
@@ -101,6 +102,12 @@ class async_result : public RefCountedObject, public Runnable {
 						return false;
 					}
 					// We must initialize the default arguments ourselves.
+					if (!defCtx) defCtx = engine->RequestContext();
+					if (!defCtx) {
+						aCtx->SetException("Cannot attain context to evaluate default async call argument expressions");
+						engine->ReturnContext(ctx);
+						return false;
+					}
 					param_type = engine->GetTypeInfoById(param_typeid);
 					if (param_typeid & asTYPEID_MASK_OBJECT && !(param_typeid & asTYPEID_OBJHANDLE)) {
 						// Create a copy of the object.
@@ -113,7 +120,7 @@ class async_result : public RefCountedObject, public Runnable {
 						value_args[obj] = param_type;
 						*(void**)ctx->GetAddressOfArg(i) = obj;
 					}
-					success = ExecuteString(engine, format("return %s;", std::string(param_default)).c_str(), *(void**)ctx->GetAddressOfArg(i), param_typeid);
+					success = ExecuteString(engine, format("return %s;", std::string(param_default)).c_str(), *(void**)ctx->GetAddressOfArg(i), param_typeid, nullptr, defCtx);
 					if (success < 0) {
 						aCtx->SetException(format("Angelscript error %d while setting default argument %u in async call to %s", success, i + 1, std::string(func->GetDeclaration())).c_str());
 						engine->ReturnContext(ctx);
@@ -148,15 +155,17 @@ class async_result : public RefCountedObject, public Runnable {
 					return false;
 				}
 			}
+			if (defCtx) engine->ReturnContext(defCtx);
 			// Finally our context is actually prepared, something which will take place in the thread we're about to spin up.
 			duplicate();
 			try {
 				if (pool) pool->start(*this);
 				else {
-					task = new Thread();
+					task = angelscript_refcounted_factory<Thread>();
 					task->start(*this);
 				}
 			} catch(...) {
+				engine->ReturnContext(ctx);
 				release();
 				throw;
 			}

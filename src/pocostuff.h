@@ -54,6 +54,6 @@ template <class T> inline void angelscript_refcounted_register(asIScriptEngine* 
 }
 
 // This is a template constructor that generally stops one from needing to create factory functions for each object that uses this angelscript_refcounted mechanism.
-template <class T, typename... A> void* angelscript_refcounted_factory(A... args) { return new(angelscript_refcounted_create<T>()) T(args...); }
+template <class T, typename... A> T* angelscript_refcounted_factory(A... args) { return new(angelscript_refcounted_create<T>()) T(args...); }
 
 void RegisterPocostuff(asIScriptEngine* engine);
