@@ -1,0 +1,4 @@
+void main() {
+	int joysticks = joystick_count;
+	screen_reader_speak("Your system has " + joysticks + " " + (joysticks == 1 ? "joystick" : "joysticks") + " connected", true);
+}

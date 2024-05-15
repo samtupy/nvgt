@@ -18,7 +18,6 @@
 #endif
 #include <SDL2/SDL.h>
 #include <angelscript.h>
-#include <scriptarray.h>
 #include <obfuscate.h>
 #include <sstream>
 #include <string>
@@ -200,6 +199,57 @@ void mouse_update() {
 	g_MousePrevZ = g_MouseAbsZ;
 }
 
+int joystick_count(bool only_active = true) {
+	int total_joysticks = SDL_NumJoysticks();
+	if (!only_active) return total_joysticks;
+	int ret = 0;
+	for (int i = 0; i < total_joysticks; i++) {
+		if (SDL_IsGameController(i))
+			ret++;
+	}
+	return ret;
+}
+
+joystick::joystick() {
+	if (joystick_count() > 0)
+		stick = SDL_GameControllerOpen(0);
+}
+joystick::~joystick() {
+	SDL_GameControllerClose(stick);
+}
+
+unsigned int joystick::type() const {
+	return SDL_GameControllerGetType(stick);
+}
+unsigned int joystick::power_level() const {
+	return SDL_JoystickCurrentPowerLevel(SDL_GameControllerGetJoystick(stick));
+}
+std::string joystick::name() const {
+	return SDL_GameControllerName(stick);
+}
+bool joystick::active() const {
+	return SDL_GameControllerGetAttached(stick);
+}
+bool joystick::has_led() const {
+	return SDL_GameControllerHasLED(stick);
+}
+bool joystick::can_vibrate() const {
+	return SDL_GameControllerHasRumble(stick);
+}
+bool joystick::can_vibrate_triggers() const {
+	return SDL_GameControllerHasRumbleTriggers(stick);
+}
+
+bool joystick::set_led(unsigned char red, unsigned char green, unsigned char blue) {
+	return SDL_GameControllerSetLED(stick, red, green, blue);
+}
+bool joystick::vibrate(unsigned short low_frequency, unsigned short high_frequency, int duration) {
+	return SDL_GameControllerRumble(stick, low_frequency, high_frequency, duration);
+}
+bool joystick::vibrate_triggers(unsigned short left, unsigned short right, int duration) {
+	return SDL_GameControllerRumbleTriggers(stick, left, right, duration);
+}
+
 bool keyhook_active = true;
 #ifdef _WIN32
 // Thanks Quentin Cosendey (Universal Speech) for this jaws keyboard hook code.
@@ -271,6 +321,10 @@ void uninstall_keyhook() {
 void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnum(_O("key_modifier"));
 	engine->RegisterEnum(_O("key_code"));
+	engine->RegisterEnum(_O("joystick_type"));
+	engine->RegisterEnum(_O("joystick_bind_type"));
+	engine->RegisterEnum(_O("joystick_power_level"));
+	engine->RegisterEnum(_O("joystick_control_type"));
 	engine->RegisterGlobalFunction(_O("bool key_pressed(uint)"), asFUNCTION(KeyPressed), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_repeating(uint)"), asFUNCTION(KeyRepeating), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_down(uint)"), asFUNCTION(key_down), asCALL_CDECL);
@@ -566,4 +620,51 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("key_code", "KEY_SOFTRIGHT", SDL_SCANCODE_SOFTRIGHT);
 	engine->RegisterEnumValue("key_code", "KEY_CALL", SDL_SCANCODE_CALL);
 	engine->RegisterEnumValue("key_code", "KEY_ENDCALL", SDL_SCANCODE_ENDCALL);
-}
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_UNKNOWN", SDL_CONTROLLER_TYPE_UNKNOWN);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_XBOX360", SDL_CONTROLLER_TYPE_XBOX360);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_XBOX1", SDL_CONTROLLER_TYPE_XBOXONE);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_PS3", SDL_CONTROLLER_TYPE_PS3);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_PS4", SDL_CONTROLLER_TYPE_PS4);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_NINTENDO_SWITCH_PRO", SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_PRO);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_VIRTUAL", SDL_CONTROLLER_TYPE_VIRTUAL);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_PS5", SDL_CONTROLLER_TYPE_PS5);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_AMAZON_LUNA", SDL_CONTROLLER_TYPE_AMAZON_LUNA);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_GOOGLE_STADIA", SDL_CONTROLLER_TYPE_GOOGLE_STADIA);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_NVIDIA_SHIELD", SDL_CONTROLLER_TYPE_NVIDIA_SHIELD);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_NINTENDO_SWITCH_JOYCON_LEFT", SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_JOYCON_LEFT);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT", SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_NINTENDO_SWITCH_JOYCON_PAIR", SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_JOYCON_PAIR);
+	engine->RegisterEnumValue("joystick_bind_type", "JOYSTICK_BIND_TYPE_NONE", SDL_CONTROLLER_BINDTYPE_NONE);
+	engine->RegisterEnumValue("joystick_bind_type", "JOYSTICK_BIND_TYPE_BUTTON", SDL_CONTROLLER_BINDTYPE_BUTTON);
+	engine->RegisterEnumValue("joystick_bind_type", "JOYSTICK_BIND_TYPE_AXIS", SDL_CONTROLLER_BINDTYPE_AXIS);
+	engine->RegisterEnumValue("joystick_bind_type", "JOYSTICK_BIND_TYPE_HAT", SDL_CONTROLLER_BINDTYPE_HAT);
+	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_UNKNOWN", SDL_JOYSTICK_POWER_UNKNOWN);
+	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_EMPTY", SDL_JOYSTICK_POWER_EMPTY);
+	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_LOW", SDL_JOYSTICK_POWER_LOW);
+	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_MEDIUM", SDL_JOYSTICK_POWER_MEDIUM);
+	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_FULL", SDL_JOYSTICK_POWER_FULL);
+	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_WIRED", SDL_JOYSTICK_POWER_WIRED);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_INVALID", SDL_CONTROLLER_BUTTON_INVALID);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_A", SDL_CONTROLLER_BUTTON_A);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_B", SDL_CONTROLLER_BUTTON_B);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_X", SDL_CONTROLLER_BUTTON_X);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_Y", SDL_CONTROLLER_BUTTON_Y);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_BACK", SDL_CONTROLLER_BUTTON_BACK);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_GUIDE", SDL_CONTROLLER_BUTTON_GUIDE);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_START", SDL_CONTROLLER_BUTTON_START);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_LEFT_STICK", SDL_CONTROLLER_BUTTON_LEFTSTICK);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_RIGHT_STICK", SDL_CONTROLLER_BUTTON_RIGHTSTICK);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_LEFT_SHOULDER", SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_RIGHT_SHOULDER", SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_DPAD_UP", SDL_CONTROLLER_BUTTON_DPAD_UP);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_DPAD_DOWN", SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_DPAD_LEFT", SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_DPAD_RIGHT", SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_MISC", SDL_CONTROLLER_BUTTON_MISC1);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_PADDLE1", SDL_CONTROLLER_BUTTON_PADDLE1);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_PADDLE2", SDL_CONTROLLER_BUTTON_PADDLE2);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_PADDLE3", SDL_CONTROLLER_BUTTON_PADDLE3);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_PADDLE4", SDL_CONTROLLER_BUTTON_PADDLE4);
+	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_TOUCHPAD", SDL_CONTROLLER_BUTTON_TOUCHPAD);
+	engine->RegisterGlobalFunction("int joystick_count(bool = true)", asFUNCTION(joystick_count), asCALL_CDECL);
+};

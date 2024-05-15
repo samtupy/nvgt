@@ -11,11 +11,86 @@
 */
 
 #pragma once
+
 #include <string>
 #include <angelscript.h>
+#include <scriptarray.h>
+#include <Poco/RefCountedObject.h>
+
 union SDL_Event;
 extern std::string g_UserInput;
 extern bool keyhook_active;
+
+class joystick : Poco::RefCountedObject {
+	SDL_GameController* stick;
+
+public:
+	unsigned int type() const;
+	unsigned int power_level() const;
+	bool has_led() const;
+	bool can_vibrate() const;
+	bool can_vibrate_triggers() const;
+	unsigned int buttons() const;
+	unsigned int sliders() const;
+	unsigned int povs() const;
+	std::string name() const;
+	bool active() const;
+	int preferred_joystick() const;
+	unsigned int x() const;
+	unsigned int y() const;
+	unsigned int z() const;
+	unsigned int r_x() const;
+	unsigned int r_y() const;
+	unsigned int r_z() const;
+	unsigned int slider_1() const;
+	unsigned int slider_2() const;
+	unsigned int pov_1() const;
+	unsigned int pov_2() const;
+	unsigned int pov_3() const;
+	unsigned int pov_4() const;
+	unsigned int v_x() const;
+	unsigned int v_y() const;
+	unsigned int v_z() const;
+	unsigned int vr_x() const;
+	unsigned int vr_y() const;
+	unsigned int vr_z() const;
+	unsigned int v_slider_1() const;
+	unsigned int v_slider_2() const;
+	unsigned int a_x() const;
+	unsigned int a_y() const;
+	unsigned int a_z() const;
+	unsigned int ar_x() const;
+	unsigned int ar_y() const;
+	unsigned int ar_z() const;
+	unsigned int a_slider_1() const;
+	unsigned int a_slider_2() const;
+	unsigned int f_x() const;
+	unsigned int f_y() const;
+	unsigned int f_z() const;
+	unsigned int fr_x() const;
+	unsigned int fr_y() const;
+	unsigned int fr_z() const;
+	unsigned int f_slider_1() const;
+	unsigned int f_slider_2() const;
+
+	joystick();
+	~joystick();
+	bool button_down(int button);
+	bool button_pressed(int button);
+	bool button_released(int button);
+	bool button_up(int button);
+	CScriptArray* buttons_down();
+	CScriptArray* buttons_pressed();
+	CScriptArray* buttons_released();
+	CScriptArray* buttons_up();
+	CScriptArray* list_joysticks();
+	bool pov_centered(int pov);
+	bool set_led(unsigned char red, unsigned char green, unsigned char blue);
+	bool vibrate(unsigned short low_frequency, unsigned short high_frequency, int duration);
+	bool vibrate_triggers(unsigned short left, unsigned short right, int duration);
+	bool refresh_joystick_list();
+	bool set(int index);
+};
 
 void InputInit();
 void InputDestroy();

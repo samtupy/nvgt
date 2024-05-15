@@ -1,5 +1,5 @@
 # key_code
-This is a complete list of possible keycodes in NVGT, as well as a short description of what they are. These are registered in the key_code enum, meaning you can use this type to pass any value listed here around though it is also safe to use integers.
+This is a complete list of possible keycodes in NVGT, as well as a short description of what they are. These are registered in the key_code enum, meaning you can use this type to pass any value listed here around though it is also safe to use unsigned integers.
 
 ## Letter keys
 * KEY_UNKNOWN: unknown.
