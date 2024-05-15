@@ -14,7 +14,7 @@
 #pragma platform linux
 void main() {
 	if (PLATFORM.lower() == "linux")
-		systemd_notify("This is simply a test");
+		systemd_notify("WATCHDOG=1"); // Only useful within a systemd service.
 	else
 		alert("Info", "This example only works on Linux");
 }
