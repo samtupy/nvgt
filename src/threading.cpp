@@ -116,12 +116,12 @@ class async_result : public RefCountedObject, public Runnable {
 					if (success >= 0) 				value_args[obj] = arg_type;
 					else engine->ReleaseScriptObject(obj, arg_type);
 				} else if (arg_typeid & asTYPEID_VOID) success = ctx->SetArgAddress(i, nullptr);
-				else if (arg_typeid & asTYPEID_BOOL || arg_typeid & asTYPEID_INT8 || arg_typeid & asTYPEID_UINT8) success = ctx->SetArgByte(i, gen->GetArgByte(i + 2));
-				else if (arg_typeid & asTYPEID_INT16 || arg_typeid & asTYPEID_UINT16) success = ctx->SetArgWord(i, gen->GetArgWord(i + 2));
-				else if (arg_typeid & asTYPEID_INT32 || arg_typeid & asTYPEID_UINT32) success = ctx->SetArgDWord(i, gen->GetArgDWord(i + 2));
-				else if (arg_typeid & asTYPEID_INT64 || arg_typeid & asTYPEID_UINT64) success = ctx->SetArgQWord(i, gen->GetArgQWord(i + 2));
-				else if (arg_typeid & asTYPEID_FLOAT) success = ctx->SetArgFloat(i, gen->GetArgFloat(i + 2));
-				else if (arg_typeid & asTYPEID_DOUBLE) success = ctx->SetArgDouble(i, gen->GetArgDouble(i + 2));
+				else if (arg_typeid == asTYPEID_BOOL || arg_typeid == asTYPEID_INT8 || arg_typeid == asTYPEID_UINT8) success = ctx->SetArgByte(i, gen->GetArgByte(i + 2));
+				else if (arg_typeid == asTYPEID_INT16 || arg_typeid == asTYPEID_UINT16) success = ctx->SetArgWord(i, gen->GetArgWord(i + 2));
+				else if (arg_typeid == asTYPEID_INT32 || arg_typeid == asTYPEID_UINT32) success = ctx->SetArgDWord(i, gen->GetArgDWord(i + 2));
+				else if (arg_typeid == asTYPEID_INT64 || arg_typeid == asTYPEID_UINT64) success = ctx->SetArgQWord(i, gen->GetArgQWord(i + 2));
+				else if (arg_typeid == asTYPEID_FLOAT) success = ctx->SetArgFloat(i, gen->GetArgFloat(i + 2));
+				else if (arg_typeid == asTYPEID_DOUBLE) success = ctx->SetArgDouble(i, gen->GetArgDouble(i + 2));
 				if (success < 0) {
 					aCtx->SetException(format("Angelscript error %d while setting argument %u in async call to %s", success, i + 1, std::string(func->GetDeclaration())).c_str());
 					engine->ReturnContext(ctx);
@@ -147,7 +147,7 @@ class async_result : public RefCountedObject, public Runnable {
 			if (result == asEXECUTION_ABORTED) exception = "function call aborted";
 			else if (result == asEXECUTION_SUSPENDED) exception = "function call suspended";
 			else if (result == asEXECUTION_EXCEPTION) exception = ctx->GetExceptionString();
-			else if (result == asEXECUTION_FINISHED) {
+			else if (result == asEXECUTION_FINISHED && subtypeid != asTYPEID_VOID) {
 				// Looking at and being heavily enspired from the scriptgrid addon as I write this.
 				if (subtypeid & asTYPEID_MASK_OBJECT) value = malloc(sizeof(asPWORD));
 				else value = malloc(ctx->GetEngine()->GetSizeOfPrimitiveType(subtypeid));

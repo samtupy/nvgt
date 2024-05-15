@@ -10,10 +10,19 @@ string url_retrieve(string host, const string&in uri) {
 	datastream@ ds = http.receive_response(resp);
 	return ds.read();
 }
+// One unfortunate thing is that we must define funcdefs to call methods in classes, not sure how to fix that yet.
+funcdef void r_void_uint(uint);
 void main() {
+	// url_get
 	async<string> r(url_retrieve, "samtupy.com", "/ip.php");
 	r.wait();
 	alert("test", r.value);
+	// exception
+	string[] test_array;
+	async<void> exctest(r_void_uint(test_array.remove_at), 0);
+	exctest.wait();
+	alert(exctest.failed, exctest.exception);
+	// question
 	async<int>@ q = async<int>(question, "test", "Exit program?");
 	sound s;
 	s.load("C:\\windows\\media\\ding.wav");
