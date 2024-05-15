@@ -1,7 +1,7 @@
 /**
 	A template class that allows one to very easily call any function in nvgt on another thread and fetch that function's return value after the call has complete.
-	1. async<T>();
-	2. async<T>(?&in function, ?&in arg1 = null, ?&in arg2 = null, ...);
+	1. async\<T\>();
+	2. async\<T\>(?&in function, ?&in arg1 = null, ?&in arg2 = null, ...);
 	## Template arguments:
 		* T: The return type of the function being called.
 	## Arguments (2):
@@ -12,7 +12,7 @@
 	## Remarks:
 		Generally speaking, this is the most convenient method of applying multithreading to your nvgt application. While lower level methods of dealing with threads require the programmer to create functions with specific signatures that usually don't allow for return values, this class allows you to quite transparently call any function in the application from a function in your script to the alert box built into NVGT on another thread while still maintaining the return value of such a function for later retrieval.
 		For ease of use, the constructor of this class actually calls the function provided and passes the given arguments to it. Therefor, the standard use case for this class is to create an instance of it, then to first call instance.wait() or instance.try_wait(ms) before retrieving the instance.value variable when the function's return value is needed, after either instance.wait() returns or after instance.try_wait() returns true.
-		The one drawback that makes this class look a little less pretty is that if you wish to call functions that are part of a class, you must create funcdefs for the signature of the function you want to call, then wrap the object's function in an instance of the funcdef. For example if a class contained a function bool load(string filename), you must declare funcdef void my_void_funcdef(string); and if you then had an instance of such a class called my_object, you must initialize the async object like async<bool>(my_void_funcdef(my_object.load), "my_file.txt"); however it is a relatively minor drawback.
+		The one drawback that makes this class look a little less pretty is that if you wish to call functions that are part of a class, you must create funcdefs for the signature of the function you want to call, then wrap the object's function in an instance of the funcdef. For example if a class contained a function bool load(string filename), you must declare funcdef void my_void_funcdef(string); and if you then had an instance of such a class called my_object, you must initialize the async object like async\<bool\>(my_void_funcdef(my_object.load), "my_file.txt"); however it is a relatively minor drawback.
 		Be aware that this class can throw exceptions if you do not pass arguments to the function correctly, this is because the function call happens completely at runtime rather than being prepared at compilation time like the rest of the script.
 */
 

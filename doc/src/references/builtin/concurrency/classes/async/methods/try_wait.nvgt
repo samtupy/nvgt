@@ -1,0 +1,24 @@
+/**
+	Wait a given number of millisecondss for an async call to complete.
+	bool try_wait(uint milliseconds);
+	## Arguments:
+		* uint milliseconds: The amount of time to wait, may be 0 to not wait at all.
+	## Returns:
+		bool: True if the async call has finished, or false if it is still running after the given number of milliseconds has expired.
+	## Remarks:
+		If you try waiting for 50ms but the async call finishes in 10ms, the try_wait call will only block for 10 out of the 50ms requested. In short, any blocking try_wait call is canceled prematurely with the try_wait function returning true if the call finishes while try_wait is in the middle of executing.
+		If the function has already finished executing or if this async object is not connected to a function (thus nothing to wait for), try_wait() will immedietly return true without waiting or blocking at all regardless of arguments.
+		Similar to the async::wait function, you should be careful using this method in the same thread that show_window was called or if you do, make sure to call it with tiny durations and intersperce standard nvgt wait(5) or similar calls in your loops so that window messages and events continue to be handled.
+*/
+
+// Example:
+void main() {
+	// Pan a sound around while an alert box shows, no window.
+	async<int> call(alert, "hi", "press ok to exit");
+	sound s;
+	s.load("c:/windows/media/ding.wav");
+	s.play_looped();
+	while (!call.try_wait(40)) { // We'll use the blocking provided by try_wait for our timer.
+		s.pan += random(-3, 3);
+	}
+}

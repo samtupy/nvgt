@@ -1,0 +1,15 @@
+/**
+	A string describing any exception that took place during an async function call.
+	const string exception;
+	## Remarks:
+		If there has been no error or if the async object has no attached function call, a blank string will be returned.
+*/
+
+// Example:
+funcdef void return_void_taking_uint(uint);
+void main() {
+	string[] my_empty_array;
+	async<void> result(return_void_taking_uint(my_empty_array.remove_at), 0); // We are calling my_empty_array.remove_at(0) on another thread, sure to cause an exception because the array is empty.
+	result.wait();
+	alert("test", result.exception);
+}

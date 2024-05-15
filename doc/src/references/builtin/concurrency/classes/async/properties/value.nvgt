@@ -4,7 +4,7 @@
 	## Remarks:
 		Remember that this class is a template type, so T will adapt to whatever type was being used when the async object was constructed.
 		If a value is not yet available, the wait function will be internally called upon first access to this property, meaning that accessing this property could cause your program to block until data is available. You are meant to call the wait/try_wait functions or check the complete property first before accessing this.
-		If an async object is initialized with the default constructor meaning it has no function attached, for example async<string> result; accessing result.value will throw an exception because no data will ever be available in this context.
+		If an async object is initialized with the default constructor meaning it has no function attached, for example async\<string\> result; accessing result.value will throw an exception because no data will ever be available in this context.
 */
 
 // Example:
