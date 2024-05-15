@@ -18,6 +18,7 @@
 	#include <unistd.h>
 #endif
 #include <angelscript.h> // the library
+#include <Poco/Util/Application.h>
 #include <Poco/Environment.h>
 #include <Poco/Path.h>
 #include <Poco/UnicodeConverter.h>
@@ -65,8 +66,19 @@ const char* GetExecutableFilename() {
 	return g_exe_path;
 }
 
+class nvgt_application : public Poco::Util::Application {
+	public:
+		nvgt_application() {}
+	protected:
+		void initialize(Poco::Util::Application& self) {
+			loadConfiguration();
+			Application::initialize(self);
+		}
+};
+
 int main(int argc, char** argv) {
 	//Todo: entry point needs serious rewrite, use less c and more c++ while keeping the code cleaner. Was written a couple years ago towards beginning of the project and has always worked enough to not get serious attention drawn towards it which would result in the cleanup.
+	nvgt_application app;
 	g_argc = argc;
 	bool skip_arg = true;
 	#ifdef NVGT_STUB
@@ -273,16 +285,6 @@ void message(const std::string& text, const std::string& header) {
 	printf("%s", tmp.c_str());
 	#endif
 }
-
-// To make building stubs easier, we put this here so that theoretically only angelscript.cpp and nvgt.cpp need to be rebuilt when making stubs.
-bool script_compiled() {
-	#ifdef NVGT_STUB
-	return true;
-	#else
-	return false;
-	#endif
-}
-
 
 #ifndef _WIN32
 int Sleep(long msec) {

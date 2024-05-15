@@ -28,7 +28,6 @@ extern bool g_make_console;
 
 const char* GetExecutableFilename();
 void message(const std::string& text, const std::string& header);
-bool script_compiled();
 
 
 #ifndef _WIN32

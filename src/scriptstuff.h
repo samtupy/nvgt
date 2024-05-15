@@ -15,6 +15,7 @@
 #include <string>
 #include <angelscript.h>
 
+bool script_compiled();
 void profiler_callback(asIScriptContext* ctx, void* obj);
 extern int g_GCMode;
 void garbage_collect_action();

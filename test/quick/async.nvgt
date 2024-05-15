@@ -1,0 +1,27 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+string url_retrieve(string host, const string&in uri) {
+	http_request req(HTTP_GET, uri);
+	http_response resp;
+	https_client http(host);
+	http.send_request(req);
+	datastream@ ds = http.receive_response(resp);
+	return ds.read();
+}
+void main() {
+	async<string> r(url_retrieve, "samtupy.com", "/ip.php");
+	r.wait();
+	alert("test", r.value);
+	async<int>@ q = async<int>(question, "test", "Exit program?");
+	sound s;
+	s.load("C:\\windows\\media\\ding.wav");
+	s.play_looped();
+	while(true) {
+		bool result = q.try_wait(5);
+		if (!result) continue;
+		if (q.value == 1) exit();
+		else @q = async<int>(question, "test", "now exit program?");
+	}
+}

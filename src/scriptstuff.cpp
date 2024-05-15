@@ -20,6 +20,7 @@
 	#include <windows.h>
 #endif
 #include <obfuscate.h>
+#include <Poco/format.h>
 #include <thread.h>
 #include <scriptany.h>
 #include <scriptarray.h>
@@ -224,8 +225,26 @@ int get_script_current_line() {
 std::string get_script_executable() {
 	return std::string(GetExecutableFilename());
 }
-std::string get_function_signature(asIScriptFunction* function, int type_id) {
-	return function->GetDeclaration();
+std::string get_function_signature(void* function, int type_id) {
+	asIScriptContext* ctx = asGetActiveContext();
+	asIScriptEngine* engine = ctx? ctx->GetEngine() : g_ScriptEngine;
+	asITypeInfo* t = engine->GetTypeInfoById(type_id);
+	asIScriptFunction* sig = t->GetFuncdefSignature();
+	if (!sig) {
+		ctx->SetException("not a function");
+		return "";
+	}
+	if (type_id & asTYPEID_OBJHANDLE)
+		return (*(asIScriptFunction**)function)->GetDeclaration();
+	else
+		return sig->GetDeclaration();
+}
+bool script_compiled() {
+	#ifdef NVGT_STUB
+	return true;
+	#else
+	return false;
+	#endif
 }
 void dump_angelscript_engine_configuration(datastream* output) {
 	#ifndef NVGT_STUB

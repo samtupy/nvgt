@@ -382,7 +382,7 @@ bool pack::file_exists(const string& pack_filename) {
 	return pack_items.find(pack_filename) != pack_items.end();
 }
 
-unsigned int pack::get_file_name(int idx, TCHAR* buffer, unsigned int size) {
+unsigned int pack::get_file_name(int idx, char* buffer, unsigned int size) {
 	if (idx < 0 || idx >= pack_filenames.size())
 		return 0;
 	if (!buffer || size <= pack_filenames[idx].size())

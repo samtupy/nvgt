@@ -2,9 +2,18 @@
 // Copyright (C) 2022-2024 Sam Tupy
 // license: zlib (see license.md in the root of the nvgt distrobution)
 
-void func() {
+class test {
+	void func() {
+		alert("t", "t");
+	}
+}
+void gfunc(string arg) {
 	alert("t", "t");
 }
+funcdef void f();
 void main() {
-	alert("test", get_function_signature(func));
+	test t;
+	alert("test", get_function_signature(f(t.func)));
+	alert("test", get_function_signature(gfunc));
+	alert("test", get_function_signature("lol too bad we can't just make this compilation error"));
 }
