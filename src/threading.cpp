@@ -58,7 +58,7 @@ class async_result : public RefCountedObject, public Runnable {
 				return *(void**)value;
 			else return value;
 		}
-		const std::string& get_exception() { return exception; }
+		std::string get_exception() { return progress.tryWait(0)? exception : ""; }
 		bool call(asIScriptGeneric* gen, ThreadPool* pool = nullptr) {
 			asIScriptContext* aCtx = asGetActiveContext();
 			asIScriptEngine* engine = aCtx->GetEngine();
@@ -72,7 +72,7 @@ class async_result : public RefCountedObject, public Runnable {
 			if (func_typeid & asTYPEID_OBJHANDLE) func = *(asIScriptFunction**)gen->GetArgAddress(1);
 			else func = (asIScriptFunction*)gen->GetArgAddress(1);
 			if (func->GetReturnTypeId() != subtypeid) {
-				aCtx->SetException(format("return type of %s is incompatible with async result type %s", std::string(func->GetDeclaration()), std::string(engine->GetTypeInfoById(subtypeid)->GetName())).c_str());
+				aCtx->SetException(format("return type of %s is incompatible with async result type %s", std::string(func->GetDeclaration()), std::string(engine->GetTypeDeclaration(subtypeid))).c_str());
 				return false;
 			}
 			ctx = engine->RequestContext();
@@ -174,7 +174,7 @@ class async_result : public RefCountedObject, public Runnable {
 			value_args.clear();
 		}
 		bool complete() { return ctx && progress.tryWait(0); }
-		bool failed() { return exception != ""; }
+		bool failed() { return progress.tryWait(0) && exception != ""; }
 };
 async_result* async_unprepared_factory(asITypeInfo* type) { return new async_result(type); }
 void async_factory(asIScriptGeneric* gen) {
@@ -355,7 +355,7 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("async<T>", "const T& get_value() property", asMETHOD(async_result, get_value), asCALL_THISCALL);
 	engine->RegisterObjectMethod("async<T>", "bool get_complete() const property", asMETHOD(async_result, complete), asCALL_THISCALL);
 	engine->RegisterObjectMethod("async<T>", "bool get_failed() const property", asMETHOD(async_result, failed), asCALL_THISCALL);
-	engine->RegisterObjectMethod("async<T>", "const string& get_exception() const property", asMETHOD(async_result, get_exception), asCALL_THISCALL);
+	engine->RegisterObjectMethod("async<T>", "string get_exception() const property", asMETHOD(async_result, get_exception), asCALL_THISCALL);
 	engine->RegisterObjectMethod("async<T>", "void wait()", asMETHOD(Event, wait), asCALL_THISCALL, 0, asOFFSET(async_result, progress), false);
 	engine->RegisterObjectMethod("async<T>", "bool try_wait(uint)", asMETHOD(Event, tryWait), asCALL_THISCALL, 0, asOFFSET(async_result, progress), false);
 }

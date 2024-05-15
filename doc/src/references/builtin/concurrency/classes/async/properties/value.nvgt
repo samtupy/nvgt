@@ -1,0 +1,17 @@
+/**
+	Contains the return value of a successful async function call.
+	const T& value;
+	## Remarks:
+		Remember that this class is a template type, so T will adapt to whatever type was being used when the async object was constructed.
+		If a value is not yet available, the wait function will be internally called upon first access to this property, meaning that accessing this property could cause your program to block until data is available. You are meant to call the wait/try_wait functions or check the complete property first before accessing this.
+		If an async object is initialized with the default constructor meaning it has no function attached, for example async<string> result; accessing result.value will throw an exception because no data will ever be available in this context.
+*/
+
+// Example:
+void main() {
+	// Lets demonstrate the edge cases mentioned above as most examples in the documentation for this class show off this property being used normally.
+	async<string> result1(input_box, "type text", "enter a value", "");
+	alert("test", result1.value); // The main thread will block until result1.value is available. Be careful!
+	async<sound@> result2; // This is not connected to a function, maybe the object could be reassigned to a result later.
+	sound@ s = result2.value; // Will throw an exception!
+}

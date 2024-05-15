@@ -28,8 +28,7 @@ void main() {
 	s.load("C:\\windows\\media\\ding.wav");
 	s.play_looped();
 	while(true) {
-		bool result = q.try_wait(5);
-		if (!result) continue;
+		if (!q.try_wait(5)) continue;
 		if (q.value == 1) exit();
 		else @q = async<int>(question, "test", "now exit program?");
 	}

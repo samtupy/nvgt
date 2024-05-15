@@ -1,0 +1,22 @@
+/**
+	Immedietly shows whether an async function call has completed, meaning that either a result is available or that there has been an error.
+	const bool complete;
+	## Remarks:
+		This is the best and prettiest looking method of checking whether an async call has completed or not without blocking. You can also call the try_wait() function with an argument of 0 for a similar effect, though this looks nicer and takes any uninitialized state of the object into account.
+		Usually this will be used when a loop has some other sort of waiting logic, such as the global nvgt wait() function we are all fermiliar with.
+*/
+
+// Example:
+void main() {
+	sound s; // Press space to play even while alert box is opened.
+	s.load("c:/windows/media/ding.wav");
+	async<int> call(alert, "test", "press ok to exit"); // May need to alt+tab to it, window is shown after.
+	show_window("example"); // Shown after alert because otherwise alert will be child of the window.
+	while(!call.complete) {
+		wait(5);
+		if (key_pressed(KEY_SPACE)) {
+			s.stop();
+			s.play();
+		}
+	}
+}
