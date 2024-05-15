@@ -1,0 +1,18 @@
+/**
+	Returns true if an async function call has thrown an exception.
+	const bool failed;
+	## Remarks:
+		This is a shorthand version of executing the expression (async.try_wait(0) and async.exception != ""), provided for syntactical ease.
+*/
+
+// Example
+string throw_exception_randomly() {
+	if (random_bool(50)) throw("oh no!");
+	return "yo yo";
+}
+void main() {
+	async<string> result(throw_exception_randomly);
+	result.wait();
+	if (result.failed) alert("oops", result.exception);
+	else alert("success", result.value);
+}

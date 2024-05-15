@@ -10,7 +10,7 @@
 // Example:
 void main() {
 	// Lets demonstrate the edge cases mentioned above as most examples in the documentation for this class show off this property being used normally.
-	async<string> result1(input_box, "type text", "enter a value", "");
+	async<string> result1(input_box, "type text", "enter a value");
 	alert("test", result1.value); // The main thread will block until result1.value is available. Be careful!
 	async<sound@> result2; // This is not connected to a function, maybe the object could be reassigned to a result later.
 	sound@ s = result2.value; // Will throw an exception!

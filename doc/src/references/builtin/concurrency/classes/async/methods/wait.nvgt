@@ -9,7 +9,7 @@
 
 // Example:
 void main() {
-	async<string> result(input_box, "name", "please enter your name", "unnamed");
+	async<string> result(input_box, "name", "please enter your name");
 	result.wait(); // Input_box creates a dialog on it's own thread so the remark about windowing doesn't apply in this situation.
 	alert("test", "hello " + result.value); // May not focus automatically because from a different thread than the input box.
 }

@@ -24,6 +24,7 @@
 #include <Poco/ThreadPool.h>
 #include <angelscript.h>
 #include <scriptdictionary.h>
+#include <scripthelper.h>
 #include <obfuscate.h>
 #include "nvgt.h"
 #include "pocostuff.h"
@@ -84,22 +85,41 @@ class async_result : public RefCountedObject, public Runnable {
 			for (unsigned int i = 0; i < func->GetParamCount(); i++) {
 				// In this context, param will be the argument as being received by the calling function and arg will be the argument as being passed to this async::call function.
 				int param_typeid, arg_typeid;
+				asITypeInfo*param_type, * arg_type;
 				asDWORD param_flags, arg_flags;
 				const char* param_default;
-				asITypeInfo* arg_type;
 				int success = func->GetParam(i, &param_typeid, &param_flags, nullptr, &param_default);
 				if (success < 0) {
 					aCtx->SetException(format("Angelscript error %d while setting art %u of async call to %s", success, i, std::string(func->GetDeclaration())).c_str());
 					engine->ReturnContext(ctx);
 					return false;
 				}
-				if (gen->GetArgCount() -2 <= i || param_default && gen->GetArgTypeId(i + 2) == asTYPEID_VOID) {
+				if (gen->GetArgCount() -2 <= i || param_default) {
 					if (!param_default) {
 						aCtx->SetException("Not enough arguments");
 						engine->ReturnContext(ctx);
 						return false;
 					}
-					break;
+					// We must initialize the default arguments ourselves.
+					param_type = engine->GetTypeInfoById(param_typeid);
+					if (param_typeid & asTYPEID_MASK_OBJECT && !(param_typeid & asTYPEID_OBJHANDLE)) {
+						// Create a copy of the object.
+						void* obj = engine->CreateScriptObject(param_type);
+						if (!obj) {
+							aCtx->SetException(format("Cannot create empty object for default assign of argument %u of async function call", i + 1).c_str());
+							engine->ReturnContext(ctx);
+							return false;
+						}
+						value_args[obj] = param_type;
+						*(void**)ctx->GetAddressOfArg(i) = obj;
+					}
+					success = ExecuteString(engine, format("return %s;", std::string(param_default)).c_str(), *(void**)ctx->GetAddressOfArg(i), param_typeid);
+					if (success < 0) {
+						aCtx->SetException(format("Angelscript error %d while setting default argument %u in async call to %s", success, i + 1, std::string(func->GetDeclaration())).c_str());
+						engine->ReturnContext(ctx);
+						return false;
+					}
+					continue;
 				}
 				arg_typeid = gen->GetArgTypeId(i +2);
 				arg_type = engine->GetTypeInfoById(arg_typeid);
@@ -349,7 +369,12 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("thread_pool& get_thread_pool_default() property"), asFUNCTION(ThreadPool::defaultPool), asCALL_CDECL);
 	engine->RegisterObjectType("async<class T>", 0, asOBJ_REF | asOBJ_TEMPLATE);
 	engine->RegisterObjectBehaviour("async<T>", asBEHAVE_FACTORY, "async<T>@ f(int&in)", asFUNCTION(async_unprepared_factory), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("async<T>", asBEHAVE_FACTORY, "async<T>@ f(int&in, ?&in, ?&in = null, ?&in = null, ?&in = null, ?&in = null, ?&in = null, ?&in = null, ?&in = null, ?&in = null, ?&in = null, ?&in = null)", asFUNCTION(async_factory), asCALL_GENERIC);
+	std::string filler; // It would seem for now that the best way is to register as many factories as we support number of arguments+1, for a couple of reasons too long to explain in a comment.
+	for (int i = 0; i < 16; i++) {
+		filler += "const ?&in";
+		engine->RegisterObjectBehaviour("async<T>", asBEHAVE_FACTORY, std::string(std::string("async<T>@ f(int&in, ") + filler + ")").c_str(), asFUNCTION(async_factory), asCALL_GENERIC);
+		filler += ", ";
+	}
 	engine->RegisterObjectBehaviour("async<T>", asBEHAVE_ADDREF, "void f()", asMETHODPR(async_result, duplicate, () const, void), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("async<T>", asBEHAVE_RELEASE, "void f()", asMETHODPR(async_result, release, () const, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("async<T>", "const T& get_value() property", asMETHOD(async_result, get_value), asCALL_THISCALL);
