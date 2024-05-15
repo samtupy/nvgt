@@ -230,6 +230,11 @@ std::string joystick::name() const {
 bool joystick::active() const {
 	return SDL_GameControllerGetAttached(stick);
 }
+std::string joystick::serial() const {
+	const char* serial = SDL_GameControllerGetSerial(stick);
+	if (serial == nullptr) return "";
+	return std::string(serial);
+}
 bool joystick::has_led() const {
 	return SDL_GameControllerHasLED(stick);
 }
@@ -238,6 +243,9 @@ bool joystick::can_vibrate() const {
 }
 bool joystick::can_vibrate_triggers() const {
 	return SDL_GameControllerHasRumbleTriggers(stick);
+}
+int joystick::touchpads() const {
+	return SDL_GameControllerGetNumTouchpads(stick);
 }
 
 bool joystick::set_led(unsigned char red, unsigned char green, unsigned char blue) {

@@ -1,0 +1,20 @@
+/**
+	Wrapper for the sd_notify Linux function which can be useful if you are writing a systemd service. On Windows you can include this plugin and compile your game, this function will do nothing. On Linux though, values will be sent to systemd as described in the sd_notify man page (see remarks) when this function is called.
+	int systemd_notify(string state);
+	## Arguments:
+		* string state: the message to send to systemd.
+	## Returns:
+		int: the value returned by sd_notify.
+	## Remarks:
+		For more information about systemd, see its man page: https://man7.org/linux/man-pages/man3/sd_notify.3.html
+*/
+
+// Example:
+#pragma plugin systemd_notify
+#pragma platform linux
+void main() {
+	if (PLATFORM.lower() == "linux")
+		systemd_notify("This is simply a test");
+	else
+		alert("Info", "This example only works on Linux");
+}

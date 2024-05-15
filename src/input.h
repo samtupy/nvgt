@@ -30,11 +30,13 @@ public:
 	bool has_led() const;
 	bool can_vibrate() const;
 	bool can_vibrate_triggers() const;
+	int touchpads() const;
 	unsigned int buttons() const;
 	unsigned int sliders() const;
 	unsigned int povs() const;
 	std::string name() const;
 	bool active() const;
+	std::string joystick::serial() const;
 	int preferred_joystick() const;
 	unsigned int x() const;
 	unsigned int y() const;
