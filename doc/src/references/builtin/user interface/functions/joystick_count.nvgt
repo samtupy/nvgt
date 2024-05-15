@@ -1,0 +1,14 @@
+/**
+	Retrieves the number of joysticks currently connected to the system.
+	int joystick_count(bool only_active = true);
+	## Arguments:
+		* bool only_active = true: if set to false, this function will include devices that may not be valid/active joysticks, but identify themselves as joystick devices.
+	## Returns:
+		int: the number of joysticks currently connected to the system.
+*/
+
+// Example:
+void main() {
+	int joysticks = joystick_count();
+	alert("Your system currently has", joysticks + " " + (joysticks == 1 ? "joystick" : "joysticks") + " connected");
+}
