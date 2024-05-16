@@ -156,8 +156,8 @@ class async_result : public RefCountedObject, public Runnable {
 				}
 			}
 			if (defCtx) engine->ReturnContext(defCtx);
-			// Finally our context is actually prepared, something which will take place in the thread we're about to spin up.
-			duplicate();
+			// Finally our context is actually prepared for execution, which will take place in the thread we're about to spin up.
+			duplicate(); // Insure that this object won't get destroyed while the function is executing encase the user chose not to keep a handle to the async_result.
 			try {
 				if (pool) pool->start(*this);
 				else {

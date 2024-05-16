@@ -36,7 +36,7 @@ public:
 	unsigned int povs() const;
 	std::string name() const;
 	bool active() const;
-	std::string joystick::serial() const;
+	std::string serial() const;
 	int preferred_joystick() const;
 	unsigned int x() const;
 	unsigned int y() const;
