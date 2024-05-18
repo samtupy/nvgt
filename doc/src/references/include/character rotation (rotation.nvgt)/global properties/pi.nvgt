@@ -1,0 +1,11 @@
+/**
+	Holds 32 digits of PI.
+	const double pi;
+*/
+
+// Example:
+#include "rotation.nvgt"
+
+void main() {
+	alert("32 digits of PI is", pi);
+}

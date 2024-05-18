@@ -1,0 +1,17 @@
+/**
+	Returns the number of items in the array.
+	1. uint array::length();
+	2. uint array::size();
+	## Returns:
+		uint: the number of items in the array.
+	## Remarks:
+		This value is equal to the number of items in the array + 1.
+*/
+
+// Example:
+void main() {
+	int[] items;
+	for (uint i = 0; i < random(1, 10); i++)
+		items.insert_last(i);
+	alert("The array contains", items.length() + " " + (items.length() == 1 ? "item" : "items"));
+}

@@ -1,0 +1,18 @@
+/**
+	Get the distance between two points on the x axis.
+	double get_1d_distance(double x1, double x2);
+	## Arguments:
+		* double x1: the first point.
+		* double x2: the second point.
+	## Returns:
+		double: the distance between the two points on the x axis.
+*/
+
+// Example:
+#include "rotation.nvgt"
+
+void main() {
+	double x1 = 2.0;
+	double x2 = 6.8;
+	alert("The distance between " + x1 + " and " + x2 + " is", get_1d_distance(x1, x2));
+}

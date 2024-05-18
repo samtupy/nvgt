@@ -1,0 +1,15 @@
+/**
+	Calculate the radians value for a given angle in degrees.
+	double calculate_theta(double deg);
+	## Arguments:
+		* double deg: the angle to convert, in degrees.
+	## Returns:
+		double: the specified angle in radians.
+*/
+
+// Example:
+#include "rotation.nvgt"
+
+void main() {
+	alert("Info", "45 degrees in radians is " + calculate_theta(45));
+}

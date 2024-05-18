@@ -1,0 +1,24 @@
+/**
+	Get the distance between two x/y/z points.
+	double get_3d_distance(double x1, double y1, double z1, double x2, double y2, double z2);
+	## Arguments:
+		* double x1: the first x point.
+		* double y1: the first y point.
+		* double z1: the first z point.
+		* double x2: the second x point.
+		* double y2: the second y point.
+		* double z2: the second z point.
+	## Returns:
+		double: the distance between the two points.
+	## Remarks:
+		This function uses the Euclidean distance formula, meaning it will return the possible closest distance bhetween the two points.
+*/
+
+// Example:
+#include "rotation.nvgt"
+
+void main() {
+	double x1 = 2.0, y1 = 0.3, z1 = 0.0;
+	double x2 = 6.8, y2 = 9.45, z2 = 1.942;
+	alert("The distance between (" + x1 + ", " + y1 + ", " + z1 + ") and (" + x2 + ", " + y2 + ", " + z2 + ") is", get_2d_distance(x1, y1, x2, y2));
+}

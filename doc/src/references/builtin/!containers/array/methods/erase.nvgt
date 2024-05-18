@@ -1,0 +1,14 @@
+/**
+	Remove an item from the array at a particular index.
+	void array::erase(uint index);
+	## Arguments:
+		* uint index: the index of the item to delete.
+*/
+
+// Example:
+void main() {
+	string[] items = {"this", "is", "a", "test"};
+	alert("The list currently contains", join(items, ", "));
+	items.erase(random(0, 2));
+	alert("The list currently contains", join(items, ", "));
+}

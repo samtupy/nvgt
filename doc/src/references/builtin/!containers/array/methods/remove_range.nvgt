@@ -1,0 +1,15 @@
+/**
+	Removes a group of items from an array, starting at a given  position and removing the specified number of items after it.
+	void array::remove_range(uint start, uint count);
+	## Arguments:
+		* uint start: the index to start removing at.
+		* uint count: the number of items to remove.
+*/
+
+// Example:
+void main() {
+	string[] items = {"there", "are", "a", "few", "items", "that","will", "disappear"};
+	alert("The array currently is", join(items, ", "));
+	items.remove_range(1, 3);
+	alert("The array is now", join(items, ", "));
+}

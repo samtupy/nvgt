@@ -1,0 +1,18 @@
+/**
+	Determine whether or not the array is empty.
+	1. bool array::empty();
+	2. bool array::is_empty();
+	## Returns:
+		bool: true if the array is empty, false if not.
+	## Remarks:
+		This method is functionally equivalent to `array.length() == 0`.
+*/
+
+// Example:
+void main() {
+	string[] items;
+	bool insert = random_bool();
+	if (insert)
+		items.insert_last(1);
+	alert("The array is", items.empty() ? "empty" : "not empty");
+}

@@ -1,0 +1,12 @@
+/**
+	Reverses the array, so the last item becomes the first and vice versa.
+	void array::reverse();
+*/
+
+// Example:
+void main() {
+	string[] items = {"This", "is", "a", "test"};
+	alert("The array is currently", join(items, ", "));
+	items.reverse();
+	alert("The reversed array is", join(items, ", "));
+}
