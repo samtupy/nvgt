@@ -37,7 +37,8 @@ int g_MouseX = 0, g_MouseY = 0, g_MouseZ = 0;
 int g_MouseAbsX = 0, g_MouseAbsY = 0, g_MouseAbsZ = 0;
 int g_MousePrevX = 0, g_MousePrevY = 0, g_MousePrevZ = 0;
 bool g_KeyboardStateChange = false;
-static asITypeInfo* key_code_array_type = NULL;
+static asITypeInfo* key_code_array_type = nullptr;
+static asITypeInfo* joystick_mapping_array_type = nullptr;
 void InputInit() {
 	if (SDL_WasInit(0)&SDL_INIT_VIDEO) return;
 	memset(g_KeysPressed, 0, 512);
@@ -208,6 +209,19 @@ int joystick_count(bool only_active = true) {
 			ret++;
 	}
 	return ret;
+}
+CScriptArray* joystick_mappings() {
+	asIScriptContext* ctx = asGetActiveContext();
+	asIScriptEngine* engine = ctx->GetEngine();
+	if (!joystick_mapping_array_type)
+		joystick_mapping_array_type = engine->GetTypeInfoByDecl("array<string>@");
+	CScriptArray* array = CScriptArray::Create(joystick_mapping_array_type);
+	int num_mappings = SDL_GameControllerNumMappings();
+	for (int i = 0; i < num_mappings; i++) {
+		std::string mapping = SDL_GameControllerMappingForIndex(i);
+		array->InsertLast(&mapping);
+	}
+	return array;
 }
 
 joystick::joystick() {
@@ -675,4 +689,9 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_PADDLE4", SDL_CONTROLLER_BUTTON_PADDLE4);
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_TOUCHPAD", SDL_CONTROLLER_BUTTON_TOUCHPAD);
 	engine->RegisterGlobalFunction("int joystick_count(bool = true)", asFUNCTION(joystick_count), asCALL_CDECL);
-};
+	engine->RegisterGlobalFunction("array<string>@ joystick_mappings()", asFUNCTION(joystick_mappings), asCALL_CDECL);
+	/* engine->RegisterObjectType("joystick", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("joystick", asBEHAVE_ADDREF, "void f()", asMETHODPR(joystick, duplicate, () const, void), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("async<T>", asBEHAVE_RELEASE, "void f()", asMETHODPR(async_result, release, () const, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool get_has_LED() const property", asFUNCTION(SDL_GameControllerHasLED), asCALL_CDECL_OBJFIRST, 0, asOFFSET(joystick, stick), false); */
+}

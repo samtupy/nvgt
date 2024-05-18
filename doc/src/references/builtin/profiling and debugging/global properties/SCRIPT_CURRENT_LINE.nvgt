@@ -1,0 +1,9 @@
+/**
+	Returns the current line in your script as it's executing.
+	string SCRIPT_CURRENT_LINE;
+*/
+
+// Example:
+void main() {
+	alert("The current line is", SCRIPT_CURRENT_LINE);
+}

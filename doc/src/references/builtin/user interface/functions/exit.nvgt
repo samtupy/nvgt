@@ -1,6 +1,8 @@
 /**
-	Completely shut down your application.
-	void exit();
+	Completely shut down your application, returning a particular exit code to your operating system in the process.
+	void exit(int exit_code = 0);
+	## Arguments:
+		* int exit_code = 0: the exit code to return to your operating system.
 */
 
 // Example:

@@ -551,7 +551,7 @@ class database_int : database_property {
 	}
 	int64 opPow(int64 val) {
 		fetch();
-		return this.val** val;
+		return this.val ** val;
 	}
 	int64 opPowAssign(int64 val) {
 		fetch();

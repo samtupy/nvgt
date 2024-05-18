@@ -1,0 +1,17 @@
+/**
+	Determines if an instance of the application is already running.
+	bool instance::is_already_running;
+*/
+
+// Example:
+#include "instance.nvgt"
+
+void main() {
+	instance example("instance_checker_example");
+	if (example.is_already_running) {
+		alert("Info", "The script is already running.");
+		exit();
+	}
+	alert("Info", "After you press OK, you'll have 15 seconds to run this script again to see the result");
+	wait(15000);
+}

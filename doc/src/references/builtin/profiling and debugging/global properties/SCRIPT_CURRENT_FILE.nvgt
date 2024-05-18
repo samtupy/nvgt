@@ -1,0 +1,9 @@
+/**
+	Returns the current file your script is running form.
+	string SCRIPT_CURRENT_FILE;
+*/
+
+// Example:
+void main() {
+	alert("Your script is contained in", SCRIPT_CURRENT_FILE);
+}

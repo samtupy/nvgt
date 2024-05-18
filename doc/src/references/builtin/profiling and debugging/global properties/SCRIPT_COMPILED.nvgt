@@ -1,0 +1,9 @@
+/**
+	Determine if the game is being ran from a compiled executable or not.
+	bool SCRIPT_COMPILED;
+*/
+
+// Example:
+void main() {
+	alert("Example", SCRIPT_COMPILED ? "The script is currently compiled" : "The script is not currently compiled");
+}
