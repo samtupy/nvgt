@@ -1,0 +1,18 @@
+/**
+	Get the name/path of the source file where the exception occured.
+	string get_exception_file();
+	## Returns:
+		string: the name/path of the file where the exception was thrown.
+*/
+
+// Example:
+void main() {
+	try {
+		// Throw an index-out-of-bounds error.
+		string[] arr = {"a", "test"};
+		string item = arr[2];
+	}
+	catch {
+		alert("Exception file path", get_exception_file());
+	}
+}

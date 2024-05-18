@@ -1,0 +1,19 @@
+/**
+	Returns the call stack of the currently thrown exception.
+	string last_exception_call_stack;
+	## Remarks:
+		In the context of a catch block, it's better to use this property over `get_call_stack()`. In a catch block, `get_call_stack()` will return the callstack where you are in the try statement, as opposed to the call stack that actually caused the exception being caught.
+*/
+
+// Example:
+void test1() {test2();}
+void test2() {throw("I am an exception");}
+
+void main() {
+	try {
+		test1();
+	}
+	catch {
+		alert("Call stack", last_exception_call_stack);
+	}
+}

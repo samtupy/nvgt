@@ -1,0 +1,13 @@
+/**
+	Throws an exception with a particular message.
+	void throw(string msg);
+	## Arguments:
+		* string msg: the message to include in your exception.
+	## Remarks:
+		This is presently slightly limited, the only value of the exception you can set is the message. There are plans to expand this in the future.
+*/
+
+// Example:
+void main() {
+	throw("Something went horribly wrong");
+}

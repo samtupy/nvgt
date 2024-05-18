@@ -1,0 +1,18 @@
+/**
+	Get the Angelscript function signature of the function that threw the exception.
+	string get_exception_function();
+	## Returns:
+		string: the Angelscript function signature of the throwing function.
+*/
+
+// Example:
+void main() {
+	try {
+		// Throw an index-out-of-bounds error.
+		string[] arr = {"a", "test"};
+		string item = arr[2];
+	}
+	catch {
+		alert("Exception function signature", get_exception_function());
+	}
+}

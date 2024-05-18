@@ -1,0 +1,18 @@
+/**
+	Get informative information about an exception, for example "index-out-of-bounds".
+	string get_exception_info();
+	## Returns:
+		string: information about the exception currently being caught.
+*/
+
+// Example:
+void main() {
+	try {
+		// Throw an index-out-of-bounds error.
+		string[] arr = {"a", "test"};
+		string item = arr[2];
+	}
+	catch {
+		alert("Exception info", get_exception_info());
+	}
+}

@@ -1,0 +1,18 @@
+/**
+	Get the line an exception occured on.
+	int get_exception_line();
+	## Returns:
+		int: the line number the exception occured on.
+*/
+
+// Example:
+void main() {
+	try {
+		// Throw an index-out-of-bounds error.
+		string[] arr = {"a", "test"};
+		string item = arr[2];
+	}
+	catch {
+		alert("Exception line", get_exception_line());
+	}
+}

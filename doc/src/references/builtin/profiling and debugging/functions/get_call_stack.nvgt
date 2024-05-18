@@ -1,0 +1,21 @@
+/**
+	Get the call stack (list of functions called) at the current point in time in your script.
+	string get_call_stack();
+	## Returns:
+		string: a formatted list of the call stack.
+	## Remarks:
+		In the context of a catch block, it's better to use the `last_exception_call_stack` property. If you use `get_call_stack()`, you'll get the callstack where you are in the try statement, as opposed to the call stack that actually caused the exception being caught.
+*/
+
+// Example:
+
+// Define some example functions.
+void test1() {test2();}
+void test2() {test3();}
+void test3() {
+	alert("Call stack", get_call_stack());
+}
+
+void main() {
+	test1();
+}
