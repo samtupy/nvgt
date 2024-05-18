@@ -417,5 +417,5 @@ void RegisterScriptMap(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("coordinate_map"), _O("coordinate_map_area@[]@ get_areas(float, float, float, float = 0.0, coordinate_map_filter_callback@ = null, int64=0, int64=0) const"), asMETHOD(coordinate_map, get_areas_script), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("coordinate_map"), _O("coordinate_map_area@[]@ get_areas(float, float, float, float, float, float, float = 0.0, coordinate_map_filter_callback@ = null, int64=0, int64=0) const"), asMETHOD(coordinate_map, get_areas_in_range_script), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("coordinate_map"), _O("coordinate_map_area@ get_area(float, float, float, int = -1, float = 0.0, coordinate_map_filter_callback@ = null, int64=0, int64=0) const"), asMETHOD(coordinate_map, get_area), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("coordinate_map"), _O("void reset() const"), asMETHOD(coordinate_map, reset), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("coordinate_map"), _O("void reset()"), asMETHOD(coordinate_map, reset), asCALL_THISCALL);
 }

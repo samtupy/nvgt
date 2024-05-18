@@ -161,7 +161,6 @@ def process_topic(tree, path, indent):
 			open(os.path.join("chm", chm), "w", encoding = "UTF8").write(html_base.format(title = tree[path]["name"], body = mistune.html(markdown).replace("<p><code>", "<pre><code>").replace("</code></p>", "</code></pre>").replace("!!!", "#")))
 		except Exception as e: print(f"Error creating {chm}, {e}\n")
 	# hacking around no number signs within markdown code blocks.
-	markdown = markdown.replace("!!!", "&#35;")
 	# output the markdown of the topic.
 	md_file, heading_indent = get_markdown_document(tree, path)
 	if md_file is not None:
@@ -170,13 +169,13 @@ def process_topic(tree, path, indent):
 		if "category_heading" in tree[parent_cat]:
 			del(tree[parent_cat]["category_heading"])
 			if markdown[:len(tree[parent_cat]["name"]) + 32].lstrip("\n\t# ").lower().startswith(tree[parent_cat]["name"].lower()):
-				markdown = "\n" + markdown[1:].partition("\n")[2]
+				markdown = "\n" + markdown[1:].partition("\n")[2].replace("!!!", "#")
 				heading_indent -= 1
 				indent -= 1
 		# fix heading levels in the document.
 		heading = "#" * heading_indent
 		markdown = markdown.replace("\n#", "\n" + heading)
-		md_file.write(f"{markdown[1:]}\n\n")
+		md_file.write(f"{markdown[1:].replace('!!!', '#')}\n\n")
 	# Now we prepare to return the plain text/indented version of the document.
 	tab_indent = "\t" * indent
 	tab_heading_indent = "\t" * (indent -1)
@@ -187,7 +186,7 @@ def process_topic(tree, path, indent):
 			lines[i] == "```"
 			continue # Lines that are equal to "```" will not be included in the output.
 		if l.lstrip("\t").startswith("#"): lines[i] = tab_heading_indent + l.strip("\t#: ") + ":"
-		else: lines[i] = tab_indent + l.replace("&#35;", "#")
+		else: lines[i] = tab_indent + l.replace("!!!", "#")
 	return "\n".join([i for i in lines if i != "```"]) + "\n\n"
 
 def output_documentation_section(tree, path, txt_output_file, hhc_output_file, hhk_output_file, indent = 0):

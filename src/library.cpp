@@ -173,6 +173,6 @@ void RegisterScriptLibrary(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("library"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(library, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("bool load(const string&in)"), asMETHOD(library, load), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("bool unload()"), asMETHOD(library, load), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("library"), _O("bool get_active() property"), asMETHOD(library, is_active), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("library"), _O("bool get_active() const property"), asMETHOD(library, is_active), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("dictionary@ call(const string&in, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null)"), asFUNCTION(library_call_generic), asCALL_GENERIC);
 }

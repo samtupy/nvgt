@@ -77,7 +77,7 @@ void RegisterScriptBullet3(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("vector", "vector opDiv(float) const", asFUNCTION(Vector3OpDivN), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("vector", "float length() const", asMETHOD(Vector3, length), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "float dot() const", asMETHOD(Vector3, dot), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector &normalize() const", asMETHOD(Vector3, normalize), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector& normalize()", asMETHOD(Vector3, normalize), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "vector normalized() const", asMETHOD(Vector3, normalized), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "vector rotate(const vector&in, const float) const", asMETHOD(Vector3, rotate), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "float angle(const vector&in) const", asMETHOD(Vector3, angle), asCALL_THISCALL);

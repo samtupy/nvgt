@@ -328,11 +328,11 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectProperty(_O("timer_queue"), _O("const string failures"), asOFFSET(timer_queue, failures));
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("void set(const string&in, timer_callback@, const string&in, uint64, bool = false)"), asMETHOD(timer_queue, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("void set(const string&in, timer_callback@, uint64, bool = false)"), asMETHOD(timer_queue, set_dataless), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint64 elapsed(const string&in)"), asMETHOD(timer_queue, elapsed), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint64 timeout(const string&in)"), asMETHOD(timer_queue, timeout), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool exists(const string&in)"), asMETHOD(timer_queue, exists), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint64 elapsed(const string&in) const"), asMETHOD(timer_queue, elapsed), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint64 timeout(const string&in) const"), asMETHOD(timer_queue, timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool exists(const string&in) const"), asMETHOD(timer_queue, exists), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool restart(const string&in)"), asMETHOD(timer_queue, restart), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool is_repeating(const string&in)"), asMETHOD(timer_queue, is_repeating), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool is_repeating(const string&in) const"), asMETHOD(timer_queue, is_repeating), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool set_timeout(const string&in, uint64, bool = false)"), asMETHOD(timer_queue, set_timeout), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool delete(const string&in)"), asMETHOD(timer_queue, erase), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("void flush()"), asMETHOD(timer_queue, flush), asCALL_THISCALL);
