@@ -1,0 +1,17 @@
+/**
+	Test if the text matches the specified regular expression.
+	bool regexp_match(string text, string pattern);
+	## Arguments:
+		* string text: the text to compare against the regular expression.
+		* string pattern: the regular expression to match.
+	## Returns:
+		bool: true if the text matches the given regular expression, false otherwise.
+	## Remarks:
+		To learn more about regular expressions, visit: https://en.wikipedia.org/wiki/Regular_expression
+*/
+
+// Example:
+void main() {
+	bool match = regexp_match("Test", "^[a-zA-Z]+$");
+	alert("the regular expression", match ? "matches" : "does not match");
+}

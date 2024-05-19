@@ -1,0 +1,16 @@
+/**
+	Return an array of strings listing all input sound devices on the system.
+	string[]@ get_sound_input_devices();
+	## Returns:
+		string[]@: A handle to an array listing all available input devices.
+	## Remarks:
+		After listing devices with this function, you can set the sound_input_device global engine property to whatever index in the returned array contains the name of the device you want to set.
+		This list will always include a no sound device. If you don't want the user to be able to select it, feel free to not allow them to move their cursor to that item or not add it to your menus etc, but remember to pay attention to the index difference this may create when setting the sound_output_device property, namely just remember that setting sound_output_device = 0 will set the system to no sound, and setting the device to 1 will always be the first real device in the system, or the default device at least on windows.
+*/
+
+// Example:
+void main() {
+	string[]@ devices = get_sound_input_devices();
+	devices.remove_at(0); // Don't allow the user to select no sound.
+	alert("devices", "The following devices are installed on your system: " + join(devices, ", "));
+}

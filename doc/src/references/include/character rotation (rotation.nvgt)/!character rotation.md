@@ -1,4 +1,4 @@
-# Object Rotation
+# character rotation
 This include contains functions for moving a rotating character in a 2d or 3d game.
 
 ## Disclaimer:
