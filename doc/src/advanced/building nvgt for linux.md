@@ -1,5 +1,32 @@
 # Building NVGT on linux
-Note now that there is a script to build NVGT on Linux (tested on Debian). It tends to build pretty portably so you can run it basically anywhere, and it will do much of the required downloading etc. Otherwise if you wish to build manually, some slightly older instructions are below.
+
+## Building with the `build_linux.sh` script
+There is a [script to build NVGT on Linux](https://github.com/samtupy/nvgt/blob/main/build/build_linux.sh) (tested on Debian and Ubuntu). It tends to build pretty portably so you can run it basically anywhere, and it will attempt to successfully download all required dependencies and build them for you. The result will be a fully built NVGT.
+
+Internally, this script is used within our GitHub Actions to make builds of NVGT. It is also used within our local testing environments.
+
+This script can be ran in two modes:
+* Adding `ci` as an argument causes the dependencies to be downloaded in the current working directory inside a `deps` folder (useful if you already are working from within NVGT).
+* If `ci` is not present, the script will assume NVGT is not downloaded and will clone NVGT before attempting to build it.
+
+### Example of Running the script with the `ci` argument
+It is assumed you are in a freshly-cloned NVGT, so that your working directory ends with `nvgt`.
+```
+chmod +x build/build_linux.sh
+./build/build_linux.sh ci
+```
+
+It will then attempt to download all required packages and build NVGT. This will take some time.
+
+### Example of Running the script without the `ci` argument
+Insure you are in a working directory where you are okay with the script making a few folders; in particular `deps` and `nvgt`. This is where all of the downloading, building, etc. will occur. The below example assumes that build_linux.sh is in the same directory, but it does not assume NVGT is already downloaded.
+```
+chmod +x build_linux.sh
+./build_linux.sh
+```
+
+## Building NVGT manually
+If you wish to build manually, some slightly older instructions are below.
 
 Please keep in mind that this is a very very rough draft, I've only done this once before when I built nvgt's server components for stw. This will attempt to describe, even for a user who doesn't use linux much, how to build nvgt at least on Ubuntu 22.04 LTS.
 
