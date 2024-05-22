@@ -1,5 +1,5 @@
 #  introduction to the Nonvisual Gaming Toolkit
-Thank you for downloading the Nonvisual Gaming Toolkit (NVGT) by Sam Tupy Productions and contributers. We hope you find the time that you invest in this engine to be worthwhile!
+Thank you for downloading the Nonvisual Gaming Toolkit (NVGT) by Sam Tupy Productions and contributors. We hope you find the time that you invest in this engine to be worthwhile!
 
 The NVGT documentation contains:
 * The NVGT user manual; containing everything from programming resources to general tutorials to example games,
