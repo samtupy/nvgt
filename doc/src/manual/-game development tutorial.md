@@ -60,6 +60,8 @@ This is a multiline comment
 Lorem ipsum
 Dolor sit amet
 */
+```
+
 ### include scripts
 The truth about programming, as with anything, is that organization is the most important thing. Always remember this: reading code is more difficult than writing it.
 As a programmer, your highest-priority task is to get the code working. But arguably just as important is to keep it working.
