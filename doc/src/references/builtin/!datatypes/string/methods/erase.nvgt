@@ -1,0 +1,19 @@
+/**
+	Remove a portion of a string, starting at a given index.
+	void string::erase(uint pos, int count = -1);
+	## Arguments:
+		* uint pos: the position to start erasing from.
+		* int count = -1: the number of characters to erase after the specified index. If -1, erases all characters starting at the given pos until the end of the string.
+*/
+
+// Example:
+void main() {
+	string text = input_box("String", "enter at least a 3-character string.");
+	if (text.length() < 3) {
+		alert("Info", "Your string must be at least three characters.");
+		exit(1);
+	}
+	alert("Before removal, the string is", text);
+	text.erase(2);
+	alert("After removal, the string is", text);
+}

@@ -1,0 +1,14 @@
+/**
+	Resize a string to a particular size (in bytes).
+	void string::resize(uint new_size);
+	## Arguments:
+		* uint new_size: the new size of the string (in bytes).
+*/
+
+// Example:
+void main() {
+	string test = "abcdef";
+	alert("The string is", test.length() + " characters");
+	test.resize(3);
+	alert("The string is", test.length() + " characters");
+}

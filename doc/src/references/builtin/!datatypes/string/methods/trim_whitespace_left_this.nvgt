@@ -1,0 +1,19 @@
+/**
+	Trims any and all whitespace from the left side of a string, returning a reference to it.
+	string& string::trim_whitespace_left();
+	## Returns:
+		string&: a two-way reference to the specified string, with the whitespace removed from the left side.
+	## Remarks:
+		Any and all whitespace, including the tab character and new lines, will be removed.
+*/
+
+// Example:
+void main() {
+	string text = input_box("String", "Enter a string");
+	if (text.empty()) {
+		alert("Info", "You didn't enter a string.");
+		exit();
+	}
+	text = text.trim_whitespace_left();
+	alert("Trimmed string", text);
+}

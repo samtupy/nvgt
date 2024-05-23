@@ -1,0 +1,15 @@
+/**
+	Splits a string into an array at a given delimiter.
+	string[]@ string::split(string delimiter);
+	## Arguments:
+		* string delimiter: the delimiter to split at.
+	## Returns:
+		string[]@: a handle to an array containing each part of the split string.
+*/
+
+// Example:
+void main() {
+	string test = "welcome to the example";
+	string[]@ parts = test.split(" ");
+	alert("Parts", join(parts, ", "));
+}

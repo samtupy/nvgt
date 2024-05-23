@@ -1,0 +1,25 @@
+/**
+	Checks whether a string contains only alphabetical characters and nothing else.
+	bool string::is_alphabetic(string encoding = "UTF8");
+	## Arguments:
+		* string encoding = "UTF8": The encoding to check against, with the UTF8 encoding being cached for speed.
+	## Returns:
+		bool: true if the input string contains only alphabetic characters, false otherwise.
+	## Remarks:
+		This function only returns true if the string contains only alphabetical characters in the given encoding. If a single other non-alphabetical character is encountered, this function will return false.
+		If this function is called on a string that contains data that is not in the specified encoding, the results are undefined.
+*/
+
+// example:
+void main() {
+	alert("example", "aabdslf".is_alphabetic()); // Should show true.
+	string input = input_box("example", "enter a string");
+	if(input.empty()) {
+		alert("Info", "You must type a string.");
+		exit(1);
+	}
+	if(input.is_alphabetic())
+		alert("example", "you typed a string that contains only alphabetical characters");
+	else
+		alert("example", "this string contains more than just alphabetical characters");
+}

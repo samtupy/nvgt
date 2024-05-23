@@ -1,0 +1,17 @@
+/**
+	Converts a string to lowercase.
+	string& string::lower();
+	## Returns:
+		string&: a reference to the specified string in lowercase.
+*/
+
+// Example:
+void main() {
+	string text = input_box("Text", "Enter the text to convert to lowercase.");
+	if (text.empty()) {
+		alert("Info", "You typed a blank string.");
+		exit(1);
+	}
+	text = text.lower_this();
+	alert("Your string lowercased is", text);
+}

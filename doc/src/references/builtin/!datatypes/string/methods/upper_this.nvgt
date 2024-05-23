@@ -1,0 +1,17 @@
+/**
+	Converts a string to uppercase.
+	string& string::upper();
+	## Returns:
+		string&: a reference to the specified string in uppercase.
+*/
+
+// Example:
+void main() {
+	string text = input_box("Text", "Enter the text to convert to uppercase.");
+	if (text.empty()) {
+		alert("Info", "You typed a blank string.");
+		exit(1);
+	}
+	text = text.upper_this();
+	alert("Your string uppercased is", text);
+}

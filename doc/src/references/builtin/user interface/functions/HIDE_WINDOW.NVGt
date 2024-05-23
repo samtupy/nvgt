@@ -16,8 +16,7 @@ void main() {
 		if (key_pressed(KEY_SPACE)) {
 			hide_window();
 			wait(1000);
-			// If we don't make it show an alert the window never comes back, at least in current bin commit. Investigate.
-			alert("", (show_window("Example") ? "Success" : "fail"));
+			show_window("Example");
 		}
 		if (key_pressed(KEY_ESCAPE))
 			exit();
