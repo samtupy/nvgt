@@ -1,12 +1,12 @@
 # regexp_options
 This enum holds various constants that can be passed to the regular expression classes in order to change their behavior.
 
-Note: portions of this file were Copied from POCO header files.
-
 ## Notes:
+portions of this file were Copied from POCO header files.
 * Options marked [ctor] can be passed to the constructor of regexp objects.
 * Options marked [match] can be passed to match, extract, split and subst.
 * Options marked [subst] can be passed to subst.
+
 See the PCRE documentation for more information.
 
 ## Constants:
