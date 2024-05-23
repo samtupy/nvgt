@@ -6,6 +6,7 @@
 import json
 import mistune
 import os
+import shutil
 
 html_base = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>{title}</title>\n</head>\n<body>\n{body}\n</body>\n</html>\n"
 liquid_base = "---\nlayout: default.liquid\ntitle: {title}\n---\n\n{body}"
@@ -288,6 +289,7 @@ def main():
 		if os.path.isfile(os.path.join("chm", "nvgt.chm")):
 			if os.path.isfile("nvgt.chm"): os.remove("nvgt.chm")
 			os.rename(os.path.join("chm", "nvgt.chm"), "nvgt.chm")
+			if os.path.isdir(os.path.join("..", "web", "src", "docs")): shutil.copy("nvgt.chm", os.path.join("..", "web", "src", "docs"))
 
 if __name__ == "__main__":
 	main()
