@@ -205,7 +205,7 @@ def output_documentation_section(tree, path, txt_output_file, hhc_output_file, h
 	md_extra_newline = False
 	md_next_root = None
 	md_nav_last_was_subsection = False # Edgecase: When traversing out of a subsection then directly into a new subsection with a different MDRoot, print a heading.
-	for t in tree[path]["topics"]:
+	for idx, t in enumerate(tree[path]["topics"]):
 		if md_extra_newline:
 			md_output_file.write("\n")
 			md_extra_newline = False
@@ -214,7 +214,10 @@ def output_documentation_section(tree, path, txt_output_file, hhc_output_file, h
 			md_nav_last_was_subsection = False
 			if "markdown" in tree[t]: # Markdown root document, print a navigation link.
 				md_next_root, next_indent = get_markdown_document(tree, t)
-				if md_next_root: md_output_file.write(md_nav_link.format(url = os.path.split(md_next_root.name)[1], text = tree[t]["name"]) + "\n")
+				if md_next_root:
+					# If the element before or after this one is also a link, prepend "* " to the links to make a markdown list.
+					if idx > 0 and "markdown" in tree[tree[path]["topics"][idx -1]] or idx < len(tree[path]["topics"]) -1 and "markdown" in tree[tree[path]["topics"][idx+1]]: md_output_file.write("* ");
+					md_output_file.write(md_nav_link.format(url = os.path.split(md_next_root.name)[1], text = tree[t]["name"]) + "\n")
 			if os.path.isfile(os.path.join("chm", make_chm_filename(t))):
 				hhc_output_file.write(hhk_base.format(name = tree[t]["name"], path = make_chm_filename(t))) # hhk_base string template should work here.
 				hhk_output_file.write(hhk_base.format(name = tree[t]["name"], path = make_chm_filename(t)))
@@ -222,7 +225,9 @@ def output_documentation_section(tree, path, txt_output_file, hhc_output_file, h
 			if "markdown" in tree[t]: # Markdown root document, print a navigation link.
 				if md_nav_last_was_subsection: md_output_file.write(("#" * heading_indent) + "# " + tree[t]["name"] + "\n")
 				md_next_root, next_indent = get_markdown_document(tree, t)
-				if md_next_root: md_output_file.write(md_nav_link.format(url = os.path.split(md_next_root.name)[1], text = tree[t]["name"]) + "\n")
+				if md_next_root:
+					if idx > 0 and "markdown" in tree[tree[path]["topics"][idx -1]] or idx < len(tree[path]["topics"]) -1 and "markdown" in tree[tree[path]["topics"][idx+1]]: md_output_file.write("* ");
+					md_output_file.write(md_nav_link.format(url = os.path.split(md_next_root.name)[1], text = tree[t]["name"]) + "\n")
 				md_nav_last_was_subsection = False
 			elif md_next_root: # end of nav block, in this case md_next_root was set by the previous iteration of this loop where as the subsection we are dealing with doesn't contain one.
 				md_extra_newline = True
