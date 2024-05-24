@@ -6,7 +6,7 @@ To someone who has never programmed before, the development of games might seem 
 
 There are many things that need to be considered carefully in the development of a game. One of the most curious is programming; very quickly, programming stops aligning with real-world concepts. The precise instructions and rigid syntactic rules are often the bane of a new programmer's existence.
 
-As you learn more, you begin to "speak" programming more intuitively. You will eventually realize that programming languages are nothing more than a readable abstraction over common paradigms: variables, functions, conditions, loops, data structures, and many more. Start thinking of programming as a new way to think and construct new ideas, rather than a way of expressing already-imagined thoughts and ideas.
+As you learn, you will begin to "speak" programming more intuitively. You will eventually realize that programming languages are nothing more than a readable abstraction over common paradigms: variables, functions, conditions, loops, data structures, and many more. Start thinking of programming as a new way to think and construct new ideas, rather than a way of expressing already-imagined thoughts and ideas.
 
 And if you don't understand these paradigms yet, don't worry - reading this manual, my hope is that you will learn to make games with nvgt, but I have a secondary goal: by the end of this text, I hope that you will also be confident with programming in general, as well!
 
@@ -65,6 +65,7 @@ It's very possible to write scripts without a main function. These are sometimes
 There's something interesting which nvgt can do with this script: not only can you run it, but you can also pack it into an exe file, ready to be shared with whoever you wish to have it. The advantage is that the exe will obfuscate your code and protect it from bad actors, which is especially useful for multiplayer projects!
 
 Not just that, but anyone can run your game if you compile it, whether or not they have nvgt installed on their computers.
+
 It's easy to do: when you've selected your script in windows explorer, don't run it. Instead, press the applications key (alternatively shift+f10 if you don't have one of those) and a "compile script (release)" option should appear.
 
 Click it, and a new file should appear next to the script: hello.exe.
@@ -87,6 +88,7 @@ Sometimes, you might want to document what a particularly complex bit of code do
 For these reasons and more, programming languages usually have some way of keeping some notes in your code that they will not attempt to execute.
 
 These are usually called comments, and nvgt has three types of them:
+
 The single-line comment is written with a //, and looks like this:
 ```
 // Hello!
@@ -102,11 +104,13 @@ Dolor sit amet
 ```
 Lastly, the end-of-line comment is sort of like a single-line comment, but goes after a line of code. For example:
 ```
-int drink_price=5 // should this be able to store fractional values?
+int drink_price=5; // should this be able to store fractional values?
 ```
 
 As well as documenting your code, comments (especially multi-line ones) can be used to surround code which temporarily doesn't need to be run, or is broken for some reason.
+
 This is called "commenting out" code. Code which is commented out will be ignored by the compiler, just like regular textual comments.
+
 Example:
 ```
 void main(){
@@ -150,6 +154,7 @@ void main(){
     speak("Hello from the NVGTT speech include!');
 }
 ```
+
 ### variables
 If you know about variables in algebra, then you will have a similar concept in your head to those in programming. They are, at their core, names of data.
 
@@ -267,8 +272,74 @@ Another 1 bit, worth 4. Let's add it, for a total of 100.
 
 Then, a 0 bit, worth 2, and another 1 bit, worth 1. Adding the last 1 bit, we have our final total, 101.
 
-This is all you need to know about unsigned binary representation. Now that we have that knowledge, let's explore something a little bit more interesting: it's called two's complement, and it's how ints represent negative values!
-[except, I still need to write it; come back later[
+This is all you need to know about unsigned binary representation.
+#### string variables
+The easiest and most reliable way to think about string variables is that they are text. "hello" is a string, "this is a test" is a string, and "1" is a string (this is confusing but you'll soon know what I mean).
+
+We have actually seen string variables before. When we were making our hello world program, we used two of them for the title and text parameter to the alert function.
+
+Now knowing about variables and their identifiers, you can probably see why we used quotes (") around them, and why that is necessary.
+
+If we hadn't, "hello, world!" would've ended up being interpreted as two function parameters, the variable identifiers hello and world, neither of which existed in the program.
+
+NVGT would not have liked this at all; in fact, it would've thrown numerous errors our  way in response.
+
+So, quotes must enclose strings to let NVGT know that it should ignore the text inside - the computer doesn't need to know that it's text, only that it's data like text, which it can then show to the user for them to interpret. It's almost, if not quite,  like delivering letters: you don't know or care about the information in a letter (and if you did, then your manager probably needs to talk to you!) but the letter's recipient does. In the same way, NVGT will happily place text in quotes in strings, which can then be passed to functions, put into variables, or concatenated onto other variables or strings.
+
+In this case, it was assigning them to the title and text variables, arguments of the alert function.
+
+String variables are created using a similar syntax to the int variable we just saw:
+```
+string name = "Rory";
+```
+You can also create a string with multiple words:
+```
+string message = "How are you today?";
+```
+Or even a string with non-ascii characters:
+```
+string message2 = "Hello, and 你好 👋";
+```
+Just like integer variables, strings also have operations which can be performed on them. By far, the most common is concatenation.
+
+Concatenation is the process of stringing strings together. The + symbol is used for this, and compound assignment with += is also supported.
+
+Let's see how it works:
+```
+string sentence = "The quick brown fox";
+message += " jumps over the lazy dog";
+```
+To give you some familiarity with string concatenation, let's go over a fulle example. Copy this into an NVGT script, and run it:
+```
+#include "speech.nvgt"
+void main(){
+    int a = 1;
+    int b = 2;
+    string c = "1";
+    int d = 2;
+    string result1 = a + b;
+    string result2 = c + d;
+    speak("a + b is " + result1);
+    speak("c + d is " + result2);
+}
+```
+The output should be:
+
+a + b is 3
+
+c + d is 12
+
+Is that what you expected?
+
+What's happening here is called casting, specifically implicit or automatic casting. In programming, casting means converting some value of one type (int) to another type (string).
+
+When we calculate result1, we perform addition on a + b (1 + 2) and get 3, which makes sense.
+
+But when we calculate result2, NVGT automatically converts d, an int, into a string, making it "2", so it can be concatenated.
+
+It then ignores the data inside, and just adds it together. So, instead of having 1 + 2, you get "1" + "2" - which is just two pieces of data combined together into one string, making "12".
+
+This is why strings are so useful: they can hold any data in a text-like form, and then the meaning of that data can be interpreted by something else. In this case, it is output to our screen readers, and we can interpret it; the sound waves by themselves do not hold any semantic information.
 
 ### conditionals
 not written
@@ -281,7 +352,7 @@ The return value is so named because it gives some critical piece of information
 
 Let's use baking a cake as an example: in the process of baking a cake (simplifying greatly) you put the batter in the oven. The oven cooks the cake, and then you open it up and take a cooked cake out.
 
-You can't do something else related to baking a cake while the oven is baking, because you don't have the cake: the oven does. In the same vein, only one function can be running at once, and we say that function is currently executing.
+You can't do something else related to baking a cake while the oven is baking, because you don't have the cake: the oven does. In the same vein, only one function can be running at oncea, and we say that function is currently executing.
 
 When a function ends, execution returns to the function from which it was called, just like taking the cake back out of the oven. It returns, along with execution, whatever is specified using a return statement (discussed shortly).
 * arrays/lists
