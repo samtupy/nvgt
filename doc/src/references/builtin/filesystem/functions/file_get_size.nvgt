@@ -1,0 +1,13 @@
+/**
+	Get the size of a file (in bytes).
+	int64 file_get_size(string filename);
+	## Arguments:
+		* string filename: the name/path of the file to get the size of.
+	## Returns:
+		int64: the size of the file (in bytes).
+*/
+
+// Example:
+void main() {
+	alert("file_get.size.nvgt is", file_get_size("file_get_size.nvgt") + " bytes");
+}

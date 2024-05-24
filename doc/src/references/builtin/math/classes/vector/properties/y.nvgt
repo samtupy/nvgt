@@ -1,0 +1,10 @@
+/**
+	Represents the y coordinate of the vector.
+	float vector::y;
+*/
+
+// Example:
+void main() {
+	vector v(2.9, 19.2);
+	alert("The y value of the vector is", round(v.y, 2));
+}

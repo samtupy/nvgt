@@ -1,11 +1,11 @@
 /**
 	Get or set the value of a grid cell given an x and a y.
-	T grid::opIndex(uint row, uint column);
+	T& grid::opIndex(uint row, uint column);
 	## Arguments:
 		* uint row: the row (x value) to check.
 		* uint column: the column (y value) to check.
 	## Returns:
-		<T>: the value at the given position.
+		T&: a reference to the value at the given position. It is of whatever type your grid holds.
 	## Remarks:
 		This function can throw index out of bounds errors, exactly like arrays can, so be careful.
 */

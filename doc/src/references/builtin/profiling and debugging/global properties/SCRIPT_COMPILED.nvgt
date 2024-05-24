@@ -1,5 +1,5 @@
 /**
-	Determine if the game is being ran from a compiled executable or not.
+	Determine if the script is compiled or not. I.e., are you running from source?
 	bool SCRIPT_COMPILED;
 */
 

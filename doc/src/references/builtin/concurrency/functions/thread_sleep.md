@@ -10,4 +10,4 @@ Sleeps the thread it was called from, but can be interrupted.
 bool: true if the thread slept for the full duration, false if it was interrupted by `thread.wake_up`.
 
 ## Remarks:
-This function should only be called from within threads created within your script.
+This function should only be called in the context of threads created within your script.

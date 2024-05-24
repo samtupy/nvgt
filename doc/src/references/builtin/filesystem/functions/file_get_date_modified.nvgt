@@ -1,0 +1,16 @@
+/**
+	Get a datetime object representing the modification date of a particula file.
+	datetime file_get_date_modified(string filename);
+	## Arguments:
+		* string filename; the name of the file to check.
+	## Returns:
+		datetime: an initialized datetime object, with all its fields set to the modification date of the file.
+	## Remarks:
+		The date returned is in UTC, not your local timezone.
+*/
+
+// Example:
+void main() {
+	datetime dt = file_get_date_modified("file_get_date_modified.nvgt");
+	alert("file_get_date_modified.nvgt was modified on", dt.year + "-" + dt.month + "-" + dt.day + ", " + dt.hour +":" + dt.minute + ":" + dt.second);
+}

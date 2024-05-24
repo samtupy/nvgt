@@ -1,0 +1,20 @@
+/**
+	This type is escentially just a more convenient 2d array. One place it's super useful is when representing a game board.
+	1. grid();
+	2. grid(uint width, uint height);
+	3. grid({repeat {repeat_same T}});
+	## Arguments (2):
+		* uint width: the width of the grid.
+		* uint height: the height of the grid.
+	## Remarks:
+		One of the things that makes this class especially convenient is its opIndex overload. It's possible to index into a grid like:
+		`my_grid[1, 2];`
+		to access the value at (1, 2) on your grid.
+*/
+
+// Example:
+void main() {
+	grid<bool> game_board(10, 10); // a 10x10 grid of booleans.
+	game_board[4, 4] = true; // set the center of the board to true.
+	alert("The center of the board is", game_board[4, 4]);
+}

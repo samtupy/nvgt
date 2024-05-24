@@ -1,10 +1,11 @@
 /**
 	A class containing x, y and z coordinates, usually used to represent a 3d point in space.
 	1. vector();
-	2. vector(float x, float y, float z = 0.0);
-	## Arguments (2):
+	2. vector(const vector& in vec);
+	3. vector(float x, float y = 0.0, float z = 0.0);
+	## Arguments (3):
 		* float x: The initial x point or coordinate this vector represents.
-		* float y: The initial y point or coordinate this vector represents.
+		* float y = 0.0: The initial y point or coordinate this vector represents.
 		* float z = 0.0: The initial z point or coordinate this vector represents, defaulted to 0 because it may not be needed in some 2d applications.
 	## Remarks:
 		An advantage with vectors is that they contain basic addition and scaling operators.

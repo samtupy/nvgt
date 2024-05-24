@@ -1,0 +1,10 @@
+/**
+	Represents the z coordinate of the vector.
+	float vector::z;
+*/
+
+// Example:
+void main() {
+	vector v(2.9, 19.2, 4.1);
+	alert("The z value of the vector is", round(v.z, 2));
+}

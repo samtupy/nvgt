@@ -8,7 +8,7 @@ void main() {
 		alert("error", "couldn't init client!");
 		exit();
 	}
-	if (!n.connect("localhost", 23456)) {
+	if (n.connect("localhost", 23456) == 0) {
 		alert("error", "can't connect!");
 		exit();
 	}

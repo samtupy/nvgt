@@ -1,0 +1,14 @@
+/**
+	Overloads the = operator, allowing you to assign a vector to another, already existing one.
+	vector& opAssign(const vector &in other);
+	## Arguments:
+		const vector& in other: the vector to assign to.
+*/
+
+// Example:
+void main() {
+	vector v1;
+	vector v2(1.2, 2.3, 9.3);
+	v1 = v2;
+	alert("The first vector =", "(" + round(v1.x, 2) + ", " + round(v1.y, 2) + ", " + round(v1.z, 2) + ")");
+}
