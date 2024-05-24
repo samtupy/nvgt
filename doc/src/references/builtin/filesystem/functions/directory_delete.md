@@ -1,3 +1,4 @@
+# directory_delete
 Deletes a directory.
 
 `bool directory_delete(string directory);`
@@ -6,4 +7,4 @@ Deletes a directory.
 * string directory: the directory to delete.
 
 ## Returns:
-true if the directory was successfully deleted, false otherwise.
+bool: true if the directory was successfully deleted, false otherwise.
