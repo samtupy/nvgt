@@ -2,7 +2,7 @@
 This enum holds various constants that can be passed to the regular expression classes in order to change their behavior.
 
 ## Notes:
-portions of this file were Copied from POCO header files.
+Portions of this regexp_options documentation were Copied from POCO header files.
 * Options marked [ctor] can be passed to the constructor of regexp objects.
 * Options marked [match] can be passed to match, extract, split and subst.
 * Options marked [subst] can be passed to subst.

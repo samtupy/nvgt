@@ -1,0 +1,17 @@
+/**
+	Return the next random number from the generator with in a minimum and maximum range.
+	int range(int min, int max);
+	## Arguments:
+		* int min: The minimum number that could be generated (inclusive).
+		* int max: The maximum number that could be generated (inclusive).
+	## Returns:
+		int: A random number within the given range.
+	## Remarks:
+		This function always works using 32 bit integers regardless of the generator used.
+*/
+
+// Example:
+void main() {
+	random_xorshift r;
+	alert("info", r.range(1, 10));
+}

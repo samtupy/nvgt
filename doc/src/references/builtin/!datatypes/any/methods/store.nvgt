@@ -1,0 +1,18 @@
+/**
+	Store a new value in an any object, replacing an existing one.
+	void store(?&in value);
+	## Arguments:
+		* ?&in value: The value that should be stored (can be any type).
+*/
+
+// Example:
+void main() {
+	int number;
+	string text;
+	any example;
+	example.store("hello");
+	example.retrieve(text); // Check the return value of the retrieve function for success if you are not certain of what type is stored.
+	example.store(42); // The previous text value has now been deleted.
+	example.retrieve(number);
+	alert(text, number);
+}

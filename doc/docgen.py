@@ -154,7 +154,7 @@ def process_topic(tree, path, indent):
 	data = open(path, "r", encoding = "UTF8").read()
 	markdown = "\n"
 	if path.endswith(".nvgt"): markdown += parse_nvgt_markdown(tree, path, data)
-	else: markdown += data.replace("\t", "") # Todo: This won't work if a .md file contains a code fragment, get rid of markdown indents more dynamically.
+	else: markdown += data
 	# Print the html which will be used for the .chm file.
 	chm = make_chm_filename(path)
 	if chm:

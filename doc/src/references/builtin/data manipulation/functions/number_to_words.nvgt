@@ -6,6 +6,8 @@
 		* bool include_and = true: whether or not to include the word "and" in the output.
 	## Returns:
 		string: the specified number, converted to a readable string.
+	## Remarks:
+		At this time, this function only produces English results.
 */
 
 // Example:

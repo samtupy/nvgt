@@ -1,0 +1,20 @@
+/**
+	Returns 4 or 8 random bytes from the operating system usually used for seeding random number generators.
+	1. uint random_seed();
+	2. uint64 random_seed64();
+	## Returns (1):
+		uint: A 4 byte random number.
+	## Returns (2):
+		uint64: An 8 byte random number.
+	## Remarks:
+		A more detailed description on seeding random number generators is in the documentation for the random_interface::seed function.
+		To retrieve the random bytes in the first place, this function uses cryptographic APIs on windows and /dev/urandom on unix.
+*/
+
+// Example:
+void main() {
+	uint seed = random_seed();
+	alert("32 bit seed", seed);
+	uint64 seed64 = random_seed64();
+	alert("64 bit seed", seed64);
+}
