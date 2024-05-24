@@ -1,0 +1,12 @@
+/**
+	Return the next random floatingpoint number from the generator.
+	float nextf();
+	## Returns:
+		float: The next random float (between 0.0 and 1.0).
+*/
+
+// Example:
+void main() {
+	random_gamerand r;
+	alert("info", r.nextf());
+}

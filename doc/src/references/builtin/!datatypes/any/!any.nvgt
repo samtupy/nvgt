@@ -1,0 +1,36 @@
+/**
+	A class that can hold one object of any type, most similar to a dictionary in terms of usage but with only one value and thus no keys.
+	1. any();
+	2. any(?&in value);
+	## Arguments (2):
+		* ?&in value: The default value stored in this object.
+	## Remarks:
+		Though NVGT uses Angelscript which is a statically typed scripting language, there are sometimes ocasions when one may not know the type of value that could be stored in a variable, or may want to create a function that can accept an argument of any type. While this isn't the only way to do so, the any object provides a safe way to acomplish this task, possibly the safest / least restrictive of all available such options. There should be no type that this object can't store.
+		The biggest downside to this class is simply that storing and retrieving values from it is just as bulky as the usual way of doing so from dictionary objects. That is, when retrieving a value one must first create a variable then call the any::retrieve() method passing a reference to that variable.
+		something to note is that the constructor of this class is not marked explicit, meaning that if you create a function that takes an any object as it's argument, the user would then be able to directly pass any type to that argument of your function without any extra work.
+		Again just like with dictionaries, there is no way to determine the type of a stored value. Instead if one wants to print the value contained within one of these variables, they must carefully attempt the retrieval with different types until it succeeds where the value can then be printed.
+*/
+
+// Example:
+// Lets create a version of the join function that accepts an array of any objects and supports numbers, strings, and vectors.
+string anyjoin(any@[]@ args, const string&in delimiter) {
+	if (@args == null) return ""; // Nobody should ever be passing the null keyword to this function, but if they do this line prevents an exception.
+	string[] args_as_strings;
+	for (uint i = 0; i < args.length() && args[i] != null; i++) {
+		// We must attempt retrieving each type we wish to support.
+		int64 arg_int;
+		double arg_double;
+		string arg_string;
+		vector arg_vector;
+		if (args[i].retrieve(arg_string)) args_as_strings.insert_last(arg_string);
+		else if (args[i].retrieve(arg_vector)) args_as_strings.insert_last("(%0, %1, %2)".format(arg_vector.x, arg_vector.y, arg_vector.z));
+		else if (args[i].retrieve(arg_double)) args_as_strings.insert_last(arg_double);
+		else if (args[i].retrieve(arg_int)) args_as_strings.insert_last(arg_int);
+		else args_as_strings.insert_last("<unknown type>");
+	}
+	return join(args_as_strings, delimiter);
+}
+void main() {
+	string result = anyjoin({"the player has", 5, "lives, has", 32.97, "percent health, and is at", vector(10, 15, 0)}, " ");
+	alert("example", result);
+}

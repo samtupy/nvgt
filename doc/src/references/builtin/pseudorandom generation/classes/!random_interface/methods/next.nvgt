@@ -1,0 +1,12 @@
+/**
+	Return the next random number from the generator.
+	uint next();
+	## Returns:
+		uint or uint64 depending on generator: The next random number (can be any supported by the integer type used).
+*/
+
+// Example:
+void main() {
+	random_pcg r;
+	alert("info", r.next());
+}

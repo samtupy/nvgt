@@ -41,7 +41,7 @@ plugin_main(nvgt_plugin_shared* shared) {
 ```
 
 ### picking it apart
-We shall forgo any specific comments or teaching about the c++ language itself here, but instead will focus on the plugin aspect itself.
+We shall forgo any general comments or teaching about the c++ language itself here, but instead will just focus on the bits of code that specifically involve the plugin interface.
 
 The first thing that you probably noticed was this include directive which includes "../../src/nvgt_plugin.h". Why there? While this will be described later, the gist is that NVGT's build setup already has some infrastructure set up to build plugins. NVGT's github repository has a plugin folder, and in there are folders for each plugin. This example is using such a structure. We will talk more in detail about this later, but for now it is enough to know that nvgt_plugin.h does not include anything else in nvgt's source tree, and can be safely copy pasted where ever you feel is best for your particular project (though we do recommend building plugins with NVGT's workspace).
 

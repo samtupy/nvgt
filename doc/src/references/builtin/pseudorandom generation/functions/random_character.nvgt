@@ -7,6 +7,7 @@
 	## Returns:
 		string: a random ascii character in the given range.
 	## Remarks:
+		If you pass a string with more than one byte in it to either of the arguments in this function, only the first byte is used.
 		Note that this function uses a pseudorandom number generator. To lern more, click [here](https://en.wikipedia.org/wiki/Pseudorandom_number_generator).
 */
 

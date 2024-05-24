@@ -1,0 +1,36 @@
+/**
+	A class that can hold an extra reference to a handle of any type.
+	1. ref();
+	2. ref(const ?&in handle);
+	## Arguments (2):
+		* const ?&in handle: The handle that this ref object should store at construction.
+	## Remarks:
+		In Angelscript, a handle is the simplest method of pointing multiple variables at a single object, or passing an object to a function without copying it in memory. If you know any c++, it is sort of like a c++ shared pointer. You can only create a handle to a complex object, and a few built-in NVGT objects do not support them such as the random number generators because they are registered as value types. Describing handles much further is beyond the scope of this reference chapter, but you can [learn more about handles from the Angelscript documentation](https://www.angelcode.com/angelscript/sdk/docs/manual/doc_script_handle.html) including why a few complex objects in NVGT don't support them.
+		Usually handles must be typed to the object they are pointing at, for example I could create a variable called `dictionary@ d;~ to create an empty handle to a dictionary object.
+		The type restriction on handles is almost always perfectly ok, however in a few super rare cases it can become bothersome or could make a coding task more tedious. The ref object is a workaround for that. Where ever typed handles can be used to point to an object, a ref object could point to it as well.
+		Unlike normal typed handles, one must cast a ref object back to the type it is storing in order to actually call methods or access properties of the stored type.
+		The = (assignment) operator is supported which causes the ref object to point to the value supplied, and the == (equality) operator is supported to compare whether a ref object and either another ref object or typed handle are pointing to the same actual object.
+*/
+
+// Example:
+// Lets create a function that can set the volume of either a mixer or a sound object.
+void set_volume(ref@ obj, int volume) {
+	mixer@ m = cast<mixer@>(obj);
+	if (@m != null) {
+		m.set_volume(volume);
+		return;
+	}
+	sound@ s = cast<sound@>(obj);
+	if (@s != null) s.set_volume(volume);
+}
+void main() {
+	sound my_sound;
+	my_sound.load("c:\\windows\\media\\ding.wav");
+	mixer mix;
+	my_sound.set_mixer(mix);
+	set_volume(mix, -5);
+	alert("mixer volume", mix.volume);
+	set_volume(my_sound, -10);
+	alert("sound volume", my_sound.volume);
+	my_sound.close();
+}

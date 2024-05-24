@@ -1,0 +1,23 @@
+/**
+	Seed the random number generator with a new startingpoint value.
+	void seed(uint new_seed = random_seed());
+	arguments:
+		* uint new_seed = random_seed(): The seed to use (may be uint64 depending on generator, if so will default to random_seed64).
+	## Remarks:
+		All pseudorandom number generators typically need to start from one tiny bit of real-world randomness or obscure value to properly get going.
+		By default, nvgt's random number generators are seeded by reading 4 random bytes from the operating system using it's provided API to do so. If you call this seed() function with no arguments, the rng will be re-seeded with a new random seed.
+		However, particularly when dealing with game recordings or online play, it can be useful to take control of the random number generator and cause it to replay values. This can be done by setting the seed of an RNG to a predetermined and reused value. This is because the rng is guaranteed to return the same set of numbers for a given seed, as the seed serves as the starting point for the RNG.
+		A common method for example may be to fetch the value of the ticks() or random_seed() function yourself, store the result in a variable, and use that variable to seed an rng. If you want someone else on the network to generate the same numbers for your online game, you need only to transmit that same stored ticks() or random_seed() value over the wire and have the receiver also seed the rng to that value. Now both clients are using the same seed, and from that point they will generate random numbers that are the same, so long as of course one end of the party doesn't somehow jump the gun and generate a random number that the other end does not, as now the clients would be out of sync. This is exactly why these random_xxx classes were provided, because it may be needed to generate different random numbers on each client while insuring that some special numbers (such as enemy spawns) always remain the same. Just create multiple random_xxx instances and share the seed with one while doing whatever you want with the other.
+*/
+
+// Example:
+	void main() {
+		uint seed = random_seed();
+		random_well r(seed);
+		int num = r.range(1, 100);
+		alert("example", "the number is " + num);
+		r.seed(seed); // Restore our original seed from before generating the number.
+		alert("The new number will still be " + num, r.range(1, 100));
+		r.seed(); // internally choose a random seed.
+		alert("unknown number", r.range(1, 100));
+}
