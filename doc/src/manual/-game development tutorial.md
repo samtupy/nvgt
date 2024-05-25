@@ -389,6 +389,7 @@ void main(){
     state = !state;
     speak("Flipped, state is: " + state);
 }
+```
 This shows how to declare a bool: it's fairly similar to other variables. Unlike strings, the values true or false do not need to be put in quotes, despite the fact that they are not variables in the traditional sense. These variables are actually consts, which means you can never accidentally overwrite their values; trying will yield an error.
 
 That's all we'll learn about variables for now. We'll come back to them later on, but for our calculator project, this is all that we'll need to know.
