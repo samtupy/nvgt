@@ -1,0 +1,28 @@
+/**
+	Creates a window to show audio form controls.
+	1. void audio_form::create_window();
+	2. void audio_form::create_window(string window_title, bool change_screen_title = true, bool say_dialog = true, bool silent = false);
+	## Arguments (2):
+		* string window_title: the title of the window.
+		* bool change_screen_title = true: whether or not the main window's title should be set as well.
+		* bool say_dialog = true: whether or not the window should be reported as a dialog (in the context of the audio form).
+		* bool silent = false: should this window be shown silently?
+*/
+
+// Example:
+#include "form.nvgt"
+#include "speech.nvgt"
+
+void main() {
+	audio_form f;
+	f.create_window("Test");
+	wait(50); // Give screen readers time to speak the window title.
+	int f_exit = f.create_button("exit");
+	f.focus(f_exit);
+	while (true) {
+		wait(5);
+		f.monitor();
+		if (f.is_pressed(f_exit))
+			exit();
+	}
+}

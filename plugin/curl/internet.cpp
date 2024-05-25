@@ -353,9 +353,8 @@ internet_request* Script_internet_request_Factory_u_u_p(const std::string& url, 
 
 void RegisterInternetPlugin(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_NET);
-	// url_encode and url_decode now exist directly within nvgt, following 2 functions may be removed.
-	engine->RegisterGlobalFunction("string url_encode_legacy(const string &in)", asFUNCTION(url_encode), asCALL_CDECL);
-	engine->RegisterGlobalFunction("string url_decode_legacy(const string &in)", asFUNCTION(url_decode), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string curl_encode(const string& in)", asFUNCTION(url_encode), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string curl_decode(const string& in)", asFUNCTION(url_decode), asCALL_CDECL);
 	engine->RegisterObjectType("internet_request", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("internet_request", asBEHAVE_FACTORY, "internet_request @i()", asFUNCTION(Script_internet_request_Factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("internet_request", asBEHAVE_FACTORY, "internet_request @i(const string &in, bool = true)", asFUNCTION(Script_internet_request_Factory_u), asCALL_CDECL);
