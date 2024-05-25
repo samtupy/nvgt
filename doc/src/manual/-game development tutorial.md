@@ -164,7 +164,9 @@ In this section we will learn about how to make some simple variables, and how t
 #### integers (ints) and unsigned integers (uints)
 In NVGT, there are two main types of numbers, integers and floating-point numbers.
 
-The easiest to understand is an integer, otherwise known as a discrete number. Here are some examples of declaring the two kinds of integers:
+The easiest to understand is an integer, otherwise known as a discrete number. We'll learn about those first, then move on to floats, the type we will make the most use of in our calculator project.
+
+Here are some examples of declaring the two kinds of integers:
 ```
 int x = 3;
 x = -3;
@@ -273,8 +275,37 @@ Another 1 bit, worth 4. Let's add it, for a total of 100.
 Then, a 0 bit, worth 2, and another 1 bit, worth 1. Adding the last 1 bit, we have our final total, 101.
 
 This is all you need to know about unsigned binary representation.
+
+#### float variables
+
+The main difference between ints and floats is that floats can store fractional values, whereas ints are restricted to exclusively whole numbers. Although they do come with some drawbacks, this makes floats more suitable for tasks where a high level of precision is needed. They are also useful for dealing with imprecise, but extremely large, numbers.
+
+There are two main types of floats in nvgt: float and double.
+
+Float is a 32-bit (or single-precision) variable, and double is a 64-bit variant which can store a greater number of decimal digits and higher exponents.
+
+In most cases, you should be okay to use a double, but this is not always required and is often not a good choice anyway.
+
+The inner workings of floats are beyond the scope of this tutorial, but it's enough to know that computers don't think about fractional values like we do: the concept of decimal does not exist to them.
+
+Instead, they use a binary representation, called the IEEE754 standard.
+
+You cannot rely on floats storing a number perfectly. Sometimes, the IEEE754 standard has no exact representation for a number, and its closest equivalent must be used instead.
+
+To demonstrate this, run this script. The result should be 1.21, but it isn't.
+```
+#include "speech.nvgt"
+void main(){
+    double result = 1.1 * 1.1;
+    screen_reader_speak(result, false); // implicit cast from double to string
+}
+```
+As you  can see, the value is very close, but not quite right. We even used the double type, with 64 bits of precision, but it wasn't enough.
+
+There are several ways to get around this, but we don't need to worry about them for this project, so let's learn about another very useful type of variable: strings!
+
 #### string variables
-The easiest and most reliable way to think about string variables is that they are text. "hello" is a string, "this is a test" is a string, and "1" is a string (this is confusing but you'll soon know what I mean).
+The easiest and most reliable way to think about string variables is that they are text. "hello" is a string, "this is a test" is a string, and "1" is a string (this last one is confusing but will be explained shortly).
 
 We have actually seen string variables before. When we were making our hello world program, we used two of them for the title and text parameter to the alert function.
 
@@ -284,7 +315,11 @@ If we hadn't, "hello, world!" would've ended up being interpreted as two functio
 
 NVGT would not have liked this at all; in fact, it would've thrown numerous errors our  way in response.
 
-So, quotes must enclose strings to let NVGT know that it should ignore the text inside - the computer doesn't need to know that it's text, only that it's data like text, which it can then show to the user for them to interpret. It's almost, if not quite,  like delivering letters: you don't know or care about the information in a letter (and if you did, then your manager probably needs to talk to you!) but the letter's recipient does. In the same way, NVGT will happily place text in quotes in strings, which can then be passed to functions, put into variables, or concatenated onto other variables or strings.
+So, quotes must enclose strings to let NVGT know that it should ignore the text inside - the computer doesn't need to know that it's text, only that it's data like text, which it can then show to the user for them to interpret.
+
+It's almost, if not quite,  like delivering letters: you don't know or care about the information in a letter (and if you did, then your manager probably needs to talk to you!) but the letter's recipient does.
+
+In the same way, NVGT will happily place text in quotes in strings, which can then be passed to functions, put into variables, or concatenated onto other variables or strings.
 
 In this case, it was assigning them to the title and text variables, arguments of the alert function.
 
@@ -341,8 +376,97 @@ It then ignores the data inside, and just adds it together. So, instead of havin
 
 This is why strings are so useful: they can hold any data in a text-like form, and then the meaning of that data can be interpreted by something else. In this case, it is output to our screen readers, and we can interpret it; the sound waves by themselves do not hold any semantic information.
 
-### conditionals
-not written
+#### boolean variables (bool)
+Leading up to a powerful idea called conditionals, boolean variables are another fundamental datatype in programming, and are usually present in some form in programming languages.
+
+Named in honour of the mathematician and logician George Boole, the variables can store only two possible values: true or false - or 1 or 0, on or off, yes or no.
+
+They are extremely powerful and there are quite a few things you can do with them, but most of them don't really make sense without conditionals. Still, we can give a basic example, using not (!), a logical operator:
+```
+void main(){
+    bool state = true;
+    speak("State is: " + state);
+    state = !state;
+    speak("Flipped, state is: " + state);
+}
+This shows how to declare a bool: it's fairly similar to other variables. Unlike strings, the values true or false do not need to be put in quotes, despite the fact that they are not variables in the traditional sense. These variables are actually consts, which means you can never accidentally overwrite their values; trying will yield an error.
+
+That's all we'll learn about variables for now. We'll come back to them later on, but for our calculator project, this is all that we'll need to know.
+
+### conditionals and the if statement
+The if statement is perhaps one of the most overwhelmingly useful pieces of code. Its ubiquity is almost unparalleled and a variation of it can be found in just about every programming language in use today.
+
+Say you want to run some code, but only if a specific thing is true - the if statement is what you use. Let's give a full example:
+```
+#include "speech.nvgt"
+void main(){
+    int dice = random(1, 6);
+    if(dice == 1)
+        speak("Wow, you got " + dice + "! That's super lucky!");
+    else if(dice < 4 )
+        speak("You got " + dice + " - that's still pretty lucky, but aim for a 1 next time!");
+    else
+        speak("Ah, better luck next time. You got a " + dice + ".");
+}
+```
+This small dice game is very simple. Roll a dice, and see how low a number you can get.
+
+There are three options: you get a 1 (the luckiest roll), 2 or 3 (the 2nd luckiest), or 4-6 (which means you lose).
+
+We can express these three options using the "if", "else if", and "else" statements. They work like this:
+if(conditional)
+statement/block
+else if(conditional)
+statement/block
+else if(conditional)
+statement/block
+else
+statement/block
+
+But what is a conditional?
+A condition is any value that returns either true or false. This can be something which is already a bool variable, or the result of a comparison operator.
+There are six comparison operators in nvgt, each of which takes two values and returns true or false based on their relationship.
+| Operator | Purpose                                              | Opposite |
+|----------|------------------------------------------------------|----------|
+| ==       | Checks if two values are exactly equal               | !=       |
+| !=       | Checks if two values are not exactly equal           | ==       |
+| <=       | Checks if a value is less than or equal to another   | >        |
+| >=       | Checks if a value is greater than or equal to another| <        |
+| >        | Checks if a value is greater than another            | <=       |
+| <        | Checks if a value is less than another               | >=       |
+
+There are also four logical operators which work on bools, one of which we explored in the section on booleans. They are:
+* && (and) returns true if the bools on the left and right are both true, but not neither or just one
+* || (or) returns true if either or both of the bools on the left or right are true
+* ^^ (xor) returns true only if one of the left and right bools is true, but not neither or both
+* ! (not) returns the opposite of the bool on the right (it takes only one bool and nothing on the left)
+
+Using these comparison operators and logical operators is how one creates conditionals to use in if statements, though remember that bools themselves can already be used directly.
+
+This is all a lot of information at once, so here's a full example to demonstrate:
+```
+#include "speech.nvgt"
+void main(){
+    int your_level = 5;
+    int monster_level=10;
+    int your_xp=50;
+    bool alive=true;
+    if(alive)
+        speak("You are alive!");
+    if(monster_level>your_level){
+        speak("The monster is higher level than you, so it kills you!");
+        alive=false;
+    }
+    if(!alive)
+        speak("You are no longer alive!");
+    if(your_level*10==your_xp)
+        speak("Your level is equal to a tenth of your experience points.");
+}   
+```
+This example demonstrates an important distinction: if statements which use a block instead of a single statement need to have the block surrounded by braces.
+
+Where a block might be used, a single statement can usually be used as well; the exception is functions, which must always use a block, whether or not it is a single line.
+
 ### loops
 not written
 ### functions
