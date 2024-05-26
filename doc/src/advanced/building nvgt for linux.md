@@ -5,6 +5,8 @@ There is a [script to build NVGT on Linux](https://github.com/samtupy/nvgt/blob/
 
 Internally, this script is used within our GitHub Actions to make builds of NVGT. It is also used within our local testing environments.
 
+Note that this script will currently only run on systems where apt is installed, and does not support any other package managers.
+
 This script can be ran in two modes:
 * Adding `ci` as an argument causes the dependencies to be downloaded in the current working directory inside a `deps` folder (useful if you already are working from within NVGT).
 * If `ci` is not present, the script will assume NVGT is not downloaded and will clone NVGT before attempting to build it.

@@ -1,7 +1,7 @@
-# Rough notes for building on macOS
+# Notes for building on macOS
 
 ## Building with the `build_macos.sh` script
-There is a [script to build NVGT on macOS](https://github.com/samtupy/nvgt/blob/main/build/build_macos.sh). It will build pretty portably so you can run it basically anywhere (assuming you have Homebrew). It will attempt to successfully download all required dependencies and build them for you. The result will be a fully built NVGT.
+There is a [script to build NVGT on macOS](https://github.com/samtupy/nvgt/blob/main/build/build_macos.sh). It will build pretty portably so you can run it basically anywhere (assuming you have Homebrew and the Xcode command line tools). It will attempt to successfully download all required dependencies and build them for you. The result will be a fully built NVGT.
 
 Internally, this script is used within our GitHub Actions to make builds of NVGT. It is also used within our local testing environments.
 
