@@ -1,5 +1,5 @@
 # is_pressed
-Determine if a particular bittpm was just pressed.
+Determine if a particular button was just pressed.
 
 `bool audio_form::is_pressed(int control_index);`
 
