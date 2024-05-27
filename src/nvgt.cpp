@@ -10,6 +10,9 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include <iostream>
+#include <sstream>
+#define SDL_MAIN_HANDLED // We do actually use SDL_main, but see below near the bottom of the file.
 #ifdef _WIN32
 	#include <windows.h>
 	#include <locale.h>
@@ -19,6 +22,8 @@
 #endif
 #include <angelscript.h> // the library
 #include <Poco/Util/Application.h>
+#include <Poco/Util/HelpFormatter.h>
+#include <Poco/Util/OptionSet.h>
 #include <Poco/Environment.h>
 #include <Poco/Path.h>
 #include <Poco/UnicodeConverter.h>
@@ -38,252 +43,168 @@
 #include "sound.h"
 #include "srspeech.h"
 #include "timestuff.h"
+#include "UI.h" // message
+#include "version.h"
 
 
 using namespace std;
-
-CScriptArray* g_commandLineArgs = 0;
-int g_argc = 0;
-char** g_argv = 0;
-bool g_debug = false;
-asIScriptEngine* g_ScriptEngine = NULL;
-std::string g_command_line;
-int g_LastError;
-int g_retcode = 0;
-char g_exe_path[MAX_PATH];
-bool g_initialising_globals = true;
-bool g_shutting_down = false;
-std::string g_stub = "";
-std::string g_platform = "auto";
-bool g_make_console = false;
-
-const char* GetExecutableFilename() {
-	if (g_exe_path[0] != 0)
-		return g_exe_path;
-	memset(g_exe_path, 0, MAX_PATH);
-	std::string p = Poco::Path::self();
-	strcpy(g_exe_path, p.c_str());
-	return g_exe_path;
-}
+using namespace Poco;
+using namespace Poco::Util;
 
 class nvgt_application : public Poco::Util::Application {
+		enum run_mode {NVGT_RUN, NVGT_COMPILE, NVGT_HELP, NVGT_VERSIONINFO};
+		run_mode mode;
 	public:
-		nvgt_application() {}
+		nvgt_application() : mode(NVGT_RUN) {
+			setUnixOptions(true);
+			#ifdef NVGT_STUB
+				stopOptionsProcessing(); // The command line is completely controled by the scripter in the case of a compiled executable.
+			#endif
+		}
 	protected:
-		void initialize(Poco::Util::Application& self) {
+		void initialize(Application& self) {
 			loadConfiguration();
 			Application::initialize(self);
+			#ifdef _WIN32
+				setlocale(LC_ALL, ".UTF8");
+				timestuff_startup();
+				wstring dir_u;
+				UnicodeConverter::convert(Path(config().getString("application.dir")).append("lib").toString(), dir_u);
+				SetDllDirectoryW(dir_u.c_str());
+			#endif
+			srand(ticks()); // Random bits of NVGT if not it's components might use the c rand function.
+			#if defined(NVGT_WIN_APP) || defined(NVGT_STUB)
+				config().setString("application.gui", "");
+			#endif
+		}
+		void setupCommandLineProperty(const vector<string>& argv, int offset = 0) {
+			// Prepare the COMMAND_LINE property used by scripts by combining all arguments into one string, for bgt backwards compatibility.
+			for (unsigned int i = offset; i < argv.size(); i++) {
+				g_CommandLine += argv[i];
+				if (i < argv.size() -1) g_CommandLine += " ";
+			}
+			g_ScriptEngine = asCreateScriptEngine();
+			if (!g_ScriptEngine || ConfigureEngine(g_ScriptEngine) < 0) throw ApplicationException("unable to initialize script engine");
+		}
+		#ifndef NVGT_STUB
+		void defineOptions(OptionSet& options) {
+			Application::defineOptions(options);
+			options.addOption(Option("compile", "c", "compile script in release mode").group("compiletype"));
+			options.addOption(Option("compile-debug", "C", "compile script in debug mode").group("compiletype"));
+			options.addOption(Option("quiet", "q", "do not output anything upon successful compilation").binding("application.quiet").group("quiet"));
+			options.addOption(Option("QUIET", "Q", "do not output anything (work in progress), error status must be determined by process exit code (intended for automation)").binding("application.QUIET").group("quiet"));
+			options.addOption(Option("debug", "d", "run with the Angelscript debugger").binding("application.as_debug"));
+			options.addOption(Option("include", "i", "include an aditional script similar to the #include directive", false, "script", true).repeatable(true));
+			options.addOption(Option("include-directory", "I", "add an aditional directory to the search path for included scripts", false, "directory", true).repeatable(true));
+			options.addOption(Option("version", "V", "print version information and exit"));
+			options.addOption(Option("help", "h", "display available command line options"));
+		}
+		void handleOption(const std::string& name, const std::string& value) {
+			Application::handleOption(name, value);
+			if (name == "help") {
+				mode = NVGT_HELP;
+				stopOptionsProcessing();
+			} else if (name == "version") {
+				mode = NVGT_VERSIONINFO;
+				stopOptionsProcessing();
+			} else if (name == "compile" || name == "compile-debug") {
+				mode = NVGT_COMPILE;
+				g_debug = name == "compile-debug";
+			} else if (name == "include-directory") g_IncludeDirs.push_back(value);
+			else if (name == "include") g_IncludeScripts.push_back(value);
+		}
+		void displayHelp() {
+			HelpFormatter hf(options());
+			hf.setUnixStyle(true);
+			hf.setIndent(4); // Visually appealing vs. accessibility and usability. The latter wins.
+			hf.setCommand(commandName());
+			hf.setUsage("[options] script [-- arg1 arg2 ...]");
+			hf.setHeader("NonVisual Gaming Toolkit (NVGT) - available command line arguments");
+			hf.setFooter("A script file is required.");
+			#ifndef NVGT_WIN_APP
+				hf.format(cout);
+			#else
+				stringstream ss;
+				hf.format(ss);
+				message(ss.str(), "help");
+			#endif
+		}
+		virtual int main(const std::vector<std::string>& args) override {
+			if (mode == NVGT_HELP) {
+				displayHelp();
+				return Application::EXIT_OK;
+			} else if (mode == NVGT_VERSIONINFO) {
+				string ver = format("NVGT (NonVisual Gaming Toolkit) version %s, built on %s for %s %s", NVGT_VERSION, NVGT_VERSION_BUILD_TIME, Environment::osName(), Environment::osArchitecture());
+				#ifdef NVGT_WIN_APP
+					message(ver, "version information");
+				#else
+					cout << ver << endl;
+				#endif
+				return Application::EXIT_OK;
+			} else if (args.size() < 1) {
+				std::cout << commandName() << ": error, no input files." << std::endl << "type " << commandName() << " --help for usage instructions" << std::endl;
+				return Application::EXIT_USAGE;
+			}
+			string scriptfile = args[0];
+			setupCommandLineProperty(args, 1);
+			if (CompileScript(g_ScriptEngine, scriptfile.c_str()) < 0) {
+				ShowAngelscriptMessages();
+				return Application::EXIT_DATAERR;
+			}
+			#if !defined(NVGT_STUB) && !defined(NVGT_WIN_APP)
+				if (config().hasOption("application.as_debug")) InitializeDebugger(g_ScriptEngine);
+			#elif defined(NVGT_WIN_APP)
+				if (config().hasOption("application.as_debug")) {
+					message("please use the command line version of nvgt if you wish to invoque the debugger", "error");
+					return Application::EXIT_CONFIG;
+				}
+			#endif
+			if (mode == NVGT_RUN && ExecuteScript(g_ScriptEngine, scriptfile.c_str()) < 0 || mode == NVGT_COMPILE && CompileExecutable(g_ScriptEngine, scriptfile)) {
+				ShowAngelscriptMessages();
+				return Application::EXIT_SOFTWARE;
+			}
+			return Application::EXIT_OK;
+		}
+		#else
+		virtual int main(const std::vector<std::string>& args) override {
+			setupCommandLineProperty(args);
+			if (LoadCompiledExecutable(g_ScriptEngine) < 0 || ExecuteScript(g_ScriptEngine, commandName().c_str()) < 0) {
+				ShowAngelscriptMessages();
+				return Application::EXIT_DATAERR;
+			}
+			return Application::EXIT_OK;
+		}
+		#endif
+		void uninitialize() {
+			g_shutting_down = true;
+			Application::uninitialize();
+			ScreenReaderUnload();
+			InputDestroy();
+			if (g_ScriptEngine) g_ScriptEngine->ShutDownAndRelease();
+			g_ScriptEngine = nullptr;
 		}
 };
 
-int main(int argc, char** argv) {
-	//Todo: entry point needs serious rewrite, use less c and more c++ while keeping the code cleaner. Was written a couple years ago towards beginning of the project and has always worked enough to not get serious attention drawn towards it which would result in the cleanup.
-	nvgt_application app;
-	g_argc = argc;
-	bool skip_arg = true;
-	#ifdef NVGT_STUB
-		skip_arg = false;
-	#endif
-	#ifdef _WIN32
-		setlocale(LC_ALL, ".UTF8");
-		timestuff_startup();
-		wstring dir_u;
-		Poco::UnicodeConverter::convert(Poco::Path(Poco::Path::self()).parent().append("lib").toString(), dir_u);
-		SetDllDirectoryW(dir_u.c_str());
-	#endif
-	srand(ticks()); // Random bits of NVGT if not it's components might use the c rand function.
-	// Build command line arguments into a single string for backwards compatibility with bgt's COMMAND_LINE property.
-	for (int i = (skip_arg ? 2 : 1); i < argc; i++) {
-		bool space = strchr(argv[i], ' ') != NULL;
-		if (space) g_command_line += "\"";
-		g_command_line += argv[i];
-		if (space) g_command_line += "\"";
-		if (i < argc -1) g_command_line += " ";
-	}
-	char* scriptfile = NULL;
-	int mode = 0;
-	#ifndef NVGT_STUB
-	if (argc < 2)
-		return 0;
-	if (strcmp(argv[1], "-c") == 0) mode = 1;
-	else if (strcmp(argv[1], "-C") == 0) mode = 2;
-	if (mode == 0)
-		scriptfile = argv[1];
-	else
-		scriptfile = argv[2];
-	#endif
-	asIScriptEngine* engine = asCreateScriptEngine();
-	if (!engine) {
-		ShowAngelscriptMessages();
-		return 1;
-	}
-	g_ScriptEngine = engine;
-	if (ConfigureEngine(engine) < 0) {
-		ShowAngelscriptMessages();
-		return 1;
-	}
-	#ifndef NVGT_STUB
-	asINT64 timer = ticks();
-	g_debug = mode != 1;
-	if (!g_debug)
-		engine->SetEngineProperty(asEP_BUILD_WITHOUT_LINE_CUES, true);
-	if (CompileScript(engine, scriptfile) < 0) {
-		ShowAngelscriptMessages();
-		return 1;
-	}
-	#else
-	const char* fn = GetExecutableFilename();
-	int loc = 0;
-	int size = 0;
-	FILE* f = fopen(fn, "rb");
-	#ifdef _WIN32
-	fseek(f, 56, SEEK_SET);
-	fread(&loc, 4, 1, f);
-	if (loc == 0)
-		return 1;
-	fseek(f, loc, SEEK_SET);
-	if (!load_serialized_nvgt_plugins(f))
-		return 1;
-	fread(&size, 4, 1, f);
-	size ^= NVGT_BYTECODE_NUMBER_XOR;
-	#else
-	int stsize;
-	fseek(f, -4, SEEK_END);
-	fread(&stsize, 4, 1, f);
-	fseek(f, stsize, SEEK_SET);
-	if (!load_serialized_nvgt_plugins(f))
-		return 1;
-	fread(&size, 4, 1, f);
-	size ^= NVGT_BYTECODE_NUMBER_XOR;
-	#endif
-	unsigned char* code = (unsigned char*)malloc(size);
-	fread(code, sizeof(char), size, f);
-	fclose(f);
-	if (LoadCompiledScript(engine, code, size) < 0) {
-		ShowAngelscriptMessages();
-		return 1;
-	}
-	#endif
-	if (mode == 0) {
-		if (ExecuteScript(engine, scriptfile) < 0) {
-			ShowAngelscriptMessages();
-			ScreenReaderUnload();
-			InputDestroy();
-			engine->ShutDownAndRelease();
-			return 1;
-		}
-		g_shutting_down = true;
-		ScreenReaderUnload();
-		InputDestroy();
-	}
-	#ifndef NVGT_STUB
-	else {
-		#ifdef _WIN32
-		if (g_platform == "auto") g_platform = "windows";
-		#elif defined(__linux__)
-		if (g_platform == "auto") g_platform = "linux";
-		#elif defined(__APPLE__)
-		if (g_platform == "auto") g_platform = "mac"; // Todo: detect difference between IOS and macos (need to look up the correct macros).
-		#else
-		return 1;
-		#endif
-		// See all this nasty looking c? Not good, convert it!
-		char msg[1024];
-		char final_scriptname[MAX_PATH];
-		memset(final_scriptname, 0, MAX_PATH);
-		if (g_compiled_basename != "") {
-			g_compiled_basename += ".nvgt";
-			strcpy(final_scriptname, g_compiled_basename.c_str());
-		} else
-			strcpy(final_scriptname, scriptfile);
-		char* dot = strrchr(final_scriptname, '.');
-		if (g_platform == "windows")
-			strcpy(dot, ".exe");
-		else if (dot)
-			*dot = '\0';
-		char stub_loc[MAX_PATH];
-		memset(stub_loc, 0, MAX_PATH);
-		std::string stub = "nvgt_";
-		stub += g_platform;
-		if (g_stub != "") {
-			stub += "_";
-			stub += g_stub;
-		}
-		stub += ".bin";
-		const char* fn = GetExecutableFilename();
-		const char* dir = strrchr(fn, '\\');
-		if (dir == NULL) dir = strrchr(fn, '/');
-		if (dir == NULL) {
-			snprintf(msg, 512, "Failed to find %s!", stub.c_str());
-			message(msg, "compilation failure");
-			engine->ShutDownAndRelease();
-			return 1;
-		}
-		strncpy(stub_loc, fn, dir - fn);
-		#ifdef _WIN32
-		strcat(stub_loc, "\\");
-		#else
-		strcat(stub_loc, "/");
-		#endif
-		strcat(stub_loc, stub.c_str());
-		if (!FileCopy(stub_loc, final_scriptname, true)) {
-			snprintf(msg, 512, "Failed to prepare compilation output (either missing %s or failed to copy it)", stub.c_str());
-			message(msg, "compilation failure");
-			engine->ShutDownAndRelease();
-			return 1;
-		}
-		int size = FileGetSize(final_scriptname);
-		FILE* f = fopen(final_scriptname, "rb+");
-		if (g_platform == "windows") {
-			fseek(f, 0, SEEK_SET);
-			char tmp[3];
-			strcpy(tmp, "MZ");
-			fwrite(&tmp, 1, 2, f);
-			fseek(f, 56, SEEK_SET);
-			fwrite(&size, 1, 4, f);
-			if (g_make_console) {
-				int subsystem_offset;
-				fseek(f, 60, SEEK_SET); // position of new PE header address.
-				fread(&subsystem_offset, 1, 4, f);
-				subsystem_offset += 92; // offset in new PE header containing subsystem word. 2 for GUI, 3 for console.
-				fseek(f, subsystem_offset, SEEK_SET);
-				unsigned short new_subsystem = 3;
-				fwrite(&new_subsystem, 1, 2, f);
-			}
-			fseek(f, size, SEEK_SET);
-		} else if (g_platform == "linux" || g_platform == "mac")
-			fseek(f, 0, SEEK_END);
-		serialize_nvgt_plugins(f);
-		const unsigned char* code = NULL;
-		int bcsize = SaveCompiledScript(engine, &code);
-		if (bcsize < 1) {
-			message("Failed to retrieve script compilation output", "compilation failure");
-			engine->ShutDownAndRelease();
-			return 1;
-		}
-		int wsize = bcsize ^ NVGT_BYTECODE_NUMBER_XOR;
-		fwrite(&wsize, 1, 4, f);
-		fwrite(code, 1, bcsize, f);
-		if (g_platform == "linux" || g_platform == "mac")
-			fwrite(&size, 1, 4, f);
-		fclose(f);
-		snprintf(msg, 1024, "%s build succeeded in %lldms, saved to %s", (g_debug ? "Debug" : "Release"), (long long int)(ticks() - timer), final_scriptname);
-		message(msg, "Success!");
-	}
-	#endif
-	engine->ShutDownAndRelease();
-	return 0;
-}
+// Poco::Util::Application and SDL_main conflict, macro magic in SDL_main.h is replacing all occurances of "main" with "SDL_main", including the one in nvgt's derived Poco application causing the overwritten method to not call. Hack around that. You are about to scroll past 5 utterly simple lines of code that took hours of frustration and mind pain to determine the nesessety of.
+#if !defined(_WIN32) || defined(NVGT_WIN_APP) || defined(NVGT_STUB)
+	#undef SDL_MAIN_HANDLED
+	#undef SDL_main_h_
+	#include <sdl2/SDL_main.h>
+#endif
 
-void message(const std::string& text, const std::string& header) {
-	#ifdef _WIN32
-	MessageBoxA(0, text.c_str(), header.c_str(), 0);
-	#else
-	std::string tmp = header;
-	tmp += ": ";
-	tmp += text;
-	printf("%s", tmp.c_str());
-	#endif
+int main(int argc, char** argv) {
+	AutoPtr<Application> app = new nvgt_application();
+	try {
+		app->init(argc, argv);
+	} catch(Poco::Exception& e) {
+		#ifndef NVGT_WIN_APP
+		app->logger().fatal(e.displayText());
+		#else
+			message(e.displayText(), "initialization error");
+		#endif
+		return Application::EXIT_CONFIG;
+	}
+	return app->run();
 }
 
 #ifndef _WIN32

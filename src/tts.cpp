@@ -17,7 +17,7 @@
 	#define VC_EXTRALEAN
 	#include <windows.h>
 #endif
-#include "window.h"
+#include "UI.h"
 #include "tts.h"
 #include "riffheader.h"
 #include <obfuscate.h>
@@ -200,7 +200,7 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 		}
 		int samples;
 		data = (char*)speech_gen(&samples, text.c_str(), NULL);
-		bufsize = samples * 2;
+		bufsize = samples * 4;
 	}
 	#ifdef _WIN32
 	else {

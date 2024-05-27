@@ -355,7 +355,7 @@ bool pack::delete_file(const string& pack_filename) {
 	// This sucks...
 	//new_eof-=oldblock-oldsize;
 	#ifdef _WIN32
-	HANDLE hFile = CreateFile(current_filename.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE hFile = CreateFileA(current_filename.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (!hFile)
 		return true; // At this point the operation has completed, but we couldn't set the new eof. Hopefully a new file being added to the pack gets a chance to overwrite the new existing deleted data...
 	SetFilePointer(hFile, new_eof, NULL, FILE_BEGIN);

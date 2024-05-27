@@ -117,7 +117,7 @@ class async_result : public RefCountedObject, public Runnable {
 							engine->ReturnContext(ctx);
 							return false;
 						}
-						value_args[obj] = param_type;
+						value_args[*(void**)obj] = param_type;
 						*(void**)ctx->GetAddressOfArg(i) = obj;
 					}
 					success = ExecuteString(engine, format("return %s;", std::string(param_default)).c_str(), *(void**)ctx->GetAddressOfArg(i), param_typeid, nullptr, defCtx);

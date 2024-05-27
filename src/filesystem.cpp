@@ -32,6 +32,7 @@
 #include <datetime.h>
 #include <Poco/Exception.h>
 #include <Poco/File.h>
+#include <Poco/UnicodeConverter.h>
 
 using namespace std;
 
@@ -455,7 +456,10 @@ CDateTime FileGetModified(const string& path) {
 }
 bool FNMatch(const std::string& file, const std::string& pattern) {
 	#ifdef _WIN32
-	return PathMatchSpec(file.c_str(), pattern.c_str());
+	std::wstring file_u, pattern_u;
+	Poco::UnicodeConverter::convert(file, file_u);
+	Poco::UnicodeConverter::convert(pattern, pattern_u);
+	return PathMatchSpec(file_u.c_str(), pattern_u.c_str());
 	#else
 	return fnmatch(pattern.c_str(), file.c_str(), 0) == 0;
 	#endif

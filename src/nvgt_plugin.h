@@ -165,10 +165,11 @@ inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* e
 	shared->user = user;
 }
 // Forward declarations only needed when compiling for nvgt and not for a plugin, thus the following functions are in nvgt_plugin.cpp.
+namespace Poco { class BinaryReader; class BinaryWriter; }
 bool load_nvgt_plugin(const std::string& name, void* user = NULL);
 bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e);
-bool load_serialized_nvgt_plugins(FILE* f);
-void serialize_nvgt_plugins(FILE* f);
+bool load_serialized_nvgt_plugins(Poco::BinaryReader& br);
+void serialize_nvgt_plugins(Poco::BinaryWriter& bw);
 void unload_nvgt_plugins();
 // Boilerplate to make registering a static plugin in the nvgt_config.h file consist of a single pretty looking line.
 #ifndef static_plugin

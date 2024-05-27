@@ -13,17 +13,20 @@
 */
 
 #define NOMINMAX
-#include "window.h"
+#include "UI.h"
 #include "network.h"
 #include <exception>
+#include <iostream>
 #include <string>
 #include <angelscript.h>
 #include <Poco/Exception.h>
 #include <Poco/File.h>
+#include <Poco/FileStream.h>
 #include <Poco/Glob.h>
 #include <Poco/Mutex.h>
 #include <Poco/Path.h>
 #include <Poco/zlib.h>
+#include <Poco/Util/Application.h>
 #include <SDL2/SDL.h>
 #include "bullet3.h"
 #include "compression.h"
@@ -57,6 +60,7 @@
 
 #ifndef NVGT_STUB
 	#include "scriptbuilder.h"
+	#include "debugger.h"
 #endif
 #include "scriptstdstring.h"
 #include "print_func.h"
@@ -83,9 +87,31 @@ using namespace std;
 using namespace Poco;
 
 CContextMgr* g_ctxMgr = nullptr;
+#ifndef NVGT_STUB
+CDebugger *g_dbg = nullptr;
+#endif
 int g_bcCompressionLevel = 9;
 string g_last_exception_callstack;
 string g_compiled_basename;
+vector<asIScriptContext*> g_ctxPool;
+Mutex g_ctxPoolMutex;
+vector<string> g_IncludeDirs;
+vector<string> g_IncludeScripts;
+std::string g_CommandLine;
+CScriptArray* g_commandLineArgs = 0;
+int g_argc = 0;
+char** g_argv = 0;
+bool g_debug = true; // Whether script has been compiled with extra debug information in the bytecode, true by default because source runs contain such information.
+bool g_ASDebugBreak = false; // If the angelscript debugger is in use, user can ctrl+c to perform a manual break.
+asIScriptEngine* g_ScriptEngine = NULL;
+std::string g_command_line;
+int g_LastError;
+int g_retcode = 0;
+bool g_initialising_globals = true;
+bool g_shutting_down = false;
+std::string g_stub = "";
+std::string g_platform = "auto";
+bool g_make_console = false;
 
 class NVGTBytecodeStream : public asIBinaryStream {
 	unsigned char* content;
@@ -159,7 +185,7 @@ public:
 	}
 	#ifndef NVGT_STUB
 	// ZLib compress and encrypt the bytecode for saving to a compiled binary. Encryption is handled by function angelscript_bytecode_encrypt in nvgt_config.h. If that function needs to change the size of the data, it should realloc() the data.
-	int get(const unsigned char** code) {
+	int get(unsigned char** code) {
 		if (zstr.avail_out < buffer_size) {
 			alloc_size += buffer_size;
 			zstr.avail_out += buffer_size;
@@ -175,9 +201,6 @@ public:
 	#endif
 };
 
-vector<asIScriptContext*> g_ctxPool;
-Mutex g_ctxPoolMutex;
-vector<string> g_IncludeDirs;
 string g_scriptMessagesWarn;
 string g_scriptMessagesErr;
 string g_scriptMessagesLine0;
@@ -186,15 +209,19 @@ int g_scriptMessagesErrNum;
 void ShowAngelscriptMessages() {
 	if (g_scriptMessagesErr == "" && g_scriptMessagesWarn == "" && g_scriptMessagesLine0 == "") return;
 	#ifdef _WIN32
-	if (g_scriptMessagesErrNum)
-		info_box("Compilation error", "", (g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0));
-	else
-		info_box("Compilation warnings", "", g_scriptMessagesWarn);
-	#else
+	if (Util::Application::instance().config().hasOption("application.gui")) {
+		if (g_scriptMessagesErrNum)
+			info_box("Compilation error", "", (g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0));
+		else
+			info_box("Compilation warnings", "", g_scriptMessagesWarn);
+	} else {
+	#endif
 	if (g_scriptMessagesErrNum)
 		message((g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0), "Compilation error");
 	else
 		message(g_scriptMessagesWarn, "Compilation warnings");
+	#ifdef _WIN32
+	} // endif gui
 	#endif
 }
 
@@ -218,6 +245,19 @@ void MessageCallback(const asSMessageInfo* msg, void* param) {
 	} else
 		g_scriptMessagesWarn += g_scriptMessagesInfo + buffer;
 }
+void nvgt_line_callback(asIScriptContext* ctx, void* obj) {
+	#ifndef NVGT_STUB
+		if (g_dbg) {
+			if (g_ASDebugBreak) {
+				g_ASDebugBreak = false;
+				cout << "user debug break" << endl;
+				g_dbg->TakeCommands(ctx);
+			}
+			g_dbg->LineCallback(ctx);
+		}
+	#endif
+	profiler_callback(ctx, obj);
+}
 #ifndef NVGT_STUB
 int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilder* builder, void* param) {
 	File include_file;
@@ -234,7 +274,7 @@ int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilde
 			include_file = include;
 			if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str());
 		}
-	} catch (Poco::Exception& e) {} // Might be wildcards.
+	} catch (Exception& e) {} // Might be wildcards.
 	try {
 		set<string> includes;
 		Glob::glob(Path(sectionname).parent().append(filename), includes, Glob::GLOB_DOT_SPECIAL | Glob::GLOB_FOLLOW_SYMLINKS | Glob::GLOB_CASELESS);
@@ -247,7 +287,7 @@ int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilde
 			if (include_file.exists() && include_file.isFile()) builder->AddSectionFromFile(i.c_str());
 		}
 		if (includes.size() > 0) return 1; // So that the below failure message won't execute.
-	} catch (Poco::Exception& e) {
+	} catch (Exception& e) {
 		message(e.displayText().c_str(), "exception while finding includes");
 	}
 	builder->GetEngine()->WriteMessage(filename, 0, 0, asMSGTYPE_ERROR, "unable to locate this include");
@@ -257,7 +297,7 @@ int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilde
 void TranslateException(asIScriptContext* ctx, void* /*userParam*/) {
 	try {
 		throw;
-	} catch (Poco::Exception& e) {
+	} catch (Exception& e) {
 		ctx->SetException(e.displayText().c_str());
 	} catch (std::exception& e) {
 		ctx->SetException(e.what());
@@ -336,8 +376,7 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	RegisterScriptTimestuff(engine);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_SPEECH);
 	RegisterTTSVoice(engine);
-	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UI);
-	RegisterWindow(engine);
+	RegisterUI(engine);
 	g_ctxMgr = new CContextMgr();
 	g_ctxMgr->SetGetTimeCallback(GetTimeCallback);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
@@ -348,9 +387,11 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	return 0;
 }
 #ifndef NVGT_STUB
-int CompileScript(asIScriptEngine* engine, const char* scriptFile) {
+int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
 	Path global_include(Path(Path::self()).parent().append("include"));
 	g_IncludeDirs.push_back(global_include.toString());
+	if (!g_debug)
+		engine->SetEngineProperty(asEP_BUILD_WITHOUT_LINE_CUES, true);
 	CScriptBuilder builder;
 	builder.SetIncludeCallback(IncludeCallback, 0);
 	builder.SetPragmaCallback(PragmaCallback, 0);
@@ -358,15 +399,19 @@ int CompileScript(asIScriptEngine* engine, const char* scriptFile) {
 		return -1;
 	asIScriptModule* mod = builder.GetModule();
 	if (mod) mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
-	if (builder.AddSectionFromFile(scriptFile) < 0)
+	if (builder.AddSectionFromFile(scriptFile.c_str()) < 0)
 		return -1;
+		for (unsigned int i = 0; i < g_IncludeScripts.size(); i++) {
+		if (builder.AddSectionFromFile(g_IncludeScripts[i].c_str()) < 0)
+			return -1;
+		}
 	if (builder.BuildModule() < 0) {
-		engine->WriteMessage(scriptFile, 0, 0, asMSGTYPE_ERROR, "Script failed to build");
+		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "Script failed to build");
 		return -1;
 	}
 	return 0;
 }
-int SaveCompiledScript(asIScriptEngine* engine, const unsigned char** output) {
+int SaveCompiledScript(asIScriptEngine* engine, unsigned char** output) {
 	asIScriptModule* mod = engine->GetModule("nvgt_game", asGM_ONLY_IF_EXISTS);
 	if (mod == 0)
 		return -1;
@@ -375,7 +420,71 @@ int SaveCompiledScript(asIScriptEngine* engine, const unsigned char** output) {
 		return -1;
 	return codestream.get(output);
 }
-#endif
+int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
+	#ifdef _WIN32
+	if (g_platform == "auto") g_platform = "windows";
+	#elif defined(__linux__)
+	if (g_platform == "auto") g_platform = "linux";
+	#elif defined(__APPLE__)
+	if (g_platform == "auto") g_platform = "mac"; // Todo: detect difference between IOS and macos (need to look up the correct macros).
+	#else
+	return -1;
+	#endif
+	Poco::File stub = format("%snvgt_%s%s.bin", Util::Application::instance().config().getString("application.dir"), g_platform, (g_stub !=""? string("_") + g_stub : ""));
+	Path outpath(!g_compiled_basename.empty()? g_compiled_basename : Path(scriptFile).setExtension(""));
+	if (g_platform  == "windows") outpath.setExtension("exe");
+	try {
+		stub.copyTo(outpath.toString());
+	} catch(Exception& e) {
+		g_ScriptEngine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to copy %s to %s, %s", stub.path(), outpath.toString(), e.displayText()).c_str());
+		return -1;
+	}
+	FileStream fs;
+	try {
+		fs.open(outpath.toString(), std::ios::in | std::ios::out | std::ios::ate);
+		BinaryReader br(fs);
+		BinaryWriter bw(fs);
+		UInt64 stub_size = fs.size();
+		if (g_platform == "windows") {
+			// NVGT distributes windows stubs with the first 2 bytes of the PE header modified so that they are not recognised as executables, this avoids an extra AV scan when the stub is copied which may add a few hundred ms to compile times. Fix them now in the copied file.
+			fs.seekp(0);
+			bw.writeRaw("MZ");
+			// There are some reserved bytes in the PE structure, after 2 years of testing we have not run into any issues with using them that we know of. Store the offset to the beginning of our data at such a location.
+			fs.seekp(56);
+			bw << int(stub_size);
+			if (g_make_console) { // The user wants to compile their app without /subsystem:windows
+				int subsystem_offset;
+				fs.seekg(60); // position of new PE header address.
+				br >> subsystem_offset;
+				subsystem_offset += 92; // offset in new PE header containing subsystem word. 2 for GUI, 3 for console.
+				fs.seekp(subsystem_offset);
+				bw << unsigned short(3);
+			}
+		}
+		// Other code that does platform specific things can go here, for now the platforms we support do nearly the same from now on.
+		fs.seekp(0, std::ios::end);
+		serialize_nvgt_plugins(bw);
+		unsigned char* code = NULL;
+		UInt32 code_size = SaveCompiledScript(engine, &code);
+		if (code_size < 1) {
+			engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to retrieve bytecode while trying to compile %s", outpath.toString()).c_str());
+			return -1;
+		}
+		bw.write7BitEncoded(code_size ^ NVGT_BYTECODE_NUMBER_XOR);
+		bw.writeRaw((const char*)code, code_size);
+		if (g_platform != "windows") bw << int(stub_size); // All platforms but windows currently read our data offset from the end of the executable, but this is likely subject to change as we learn about any negative consequences of doing so on various platforms.
+		fs.close(); // Compilation success!
+		free(code);
+		bool quiet = Util::Application::instance().config().hasOption("application.quiet") || Util::Application::instance().config().hasOption("application.QUIET"); // Maybe we should switch to a verbocity level?
+		if (quiet) return 0;
+		message(format("%s build succeeded in %?ums, saved to %s", string(g_debug? "Debug" : "Release"), Util::Application::instance().uptime().totalMilliseconds(), outpath.toString()), "Success!");
+	} catch(Exception& e) {
+		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s", outpath.toString(), e.displayText()).c_str());
+		return -1;
+	}
+	return 0;
+}
+#else
 int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size) {
 	//engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
 	//engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, 10000);
@@ -390,7 +499,29 @@ int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size
 	//engine->SetEngineProperty(asEP_PROPERTY_ACCESSOR_MODE, 2);
 	return 0;
 }
-int ExecuteScript(asIScriptEngine* engine, const char* scriptFile) {
+int LoadCompiledExecutable(asIScriptEngine* engine) {
+	FileInputStream fs(Util::Application::instance().commandPath());
+	BinaryReader br(fs);
+	UInt32 data_location, code_size;
+	#ifdef _WIN32
+		fs.seekg(56);
+	#else
+		fs.seekg(-4, std::ios::end);
+	#endif
+	br >> data_location;
+	fs.seekg(data_location);
+	if (!load_serialized_nvgt_plugins(br)) return -1;
+	br.read7BitEncoded(code_size);
+	code_size ^= NVGT_BYTECODE_NUMBER_XOR;
+	unsigned char* code = (unsigned char*)malloc(code_size);
+	br.readRaw((char*)code, code_size);
+	fs.close();
+	int r = LoadCompiledScript(engine, code, code_size);
+	free(code);
+	return r;
+}
+#endif
+int ExecuteScript(asIScriptEngine* engine, const string& scriptFile) {
 	asIScriptModule* mod = engine->GetModule("nvgt_game", asGM_ONLY_IF_EXISTS);
 	if (!mod) return -1;
 	mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
@@ -399,7 +530,7 @@ int ExecuteScript(asIScriptEngine* engine, const char* scriptFile) {
 		func = mod->GetFunctionByDecl("void main()");
 	if (!func) {
 		g_scriptMessagesInfo = "";
-		engine->WriteMessage(scriptFile, 0, 0, asMSGTYPE_ERROR, "No entry point found (either 'int main()' or 'void main()'.)");
+		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "No entry point found (either 'int main()' or 'void main()'.)");
 		return -1;
 	}
 	asIScriptFunction* prefunc = mod->GetFunctionByDecl("bool preglobals()");
@@ -410,11 +541,17 @@ int ExecuteScript(asIScriptEngine* engine, const char* scriptFile) {
 		if (!ctx->GetReturnByte()) return 0;
 	}
 	if (mod->ResetGlobalVars(0) < 0) {
-		engine->WriteMessage(scriptFile, 0, 0, asMSGTYPE_ERROR, "Failed while initializing global variables");
+		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "Failed while initializing global variables");
 		return -1;
 	}
 	g_initialising_globals = false;
 	ctx = g_ctxMgr->AddContext(engine, func, true);
+	#ifndef NVGT_STUB
+		if (g_dbg) {
+			cout << "Debugging, waiting for commands. Type 'h' for help." << endl;
+			g_dbg->TakeCommands(ctx);
+		}
+	#endif
 	while (g_ctxMgr->ExecuteScripts());
 	int r = ctx->GetState();
 	if (r != asEXECUTION_FINISHED) {
@@ -494,6 +631,88 @@ int PragmaCallback(const string& pragmaText, CScriptBuilder& builder, void* /*us
 	else return -1;
 	return 0;
 }
+// angelscript debugger stuff taken from asrun sample.
+std::string StringToString(void *obj, int /* expandMembers */, CDebugger * /* dbg */) {
+	std::string *val = reinterpret_cast<std::string*>(obj);
+	std::stringstream s;
+	s << "(len=" << val->length() << ") \"";
+	if( val->length() < 240 )
+		s << *val << "\"";
+	else
+		s << val->substr(0, 240) << "...";
+	return s.str();
+}
+std::string ArrayToString(void *obj, int expandMembers, CDebugger *dbg) {
+	CScriptArray *arr = reinterpret_cast<CScriptArray*>(obj);
+	std::stringstream s;
+	s << "(len=" << arr->GetSize() << ")";
+	if( expandMembers > 0 )
+	{
+		s << " [";
+		for( asUINT n = 0; n < arr->GetSize(); n++ )
+		{
+			s << dbg->ToString(arr->At(n), arr->GetElementTypeId(), expandMembers - 1, arr->GetArrayObjectType()->GetEngine());
+			if( n < arr->GetSize()-1 )
+				s << ", ";
+		}
+		s << "]";
+	}
+	return s.str();
+}
+std::string DictionaryToString(void *obj, int expandMembers, CDebugger *dbg) {
+	CScriptDictionary *dic = reinterpret_cast<CScriptDictionary*>(obj);
+	std::stringstream s;
+	s << "(len=" << dic->GetSize() << ")";
+	if( expandMembers > 0 )
+	{
+		s << " [";
+		asUINT n = 0;
+		for( CScriptDictionary::CIterator it = dic->begin(); it != dic->end(); it++, n++ )
+		{
+			s << "[" << it.GetKey() << "] = ";
+			const void *val = it.GetAddressOfValue();
+			int typeId = it.GetTypeId();
+			asIScriptContext *ctx = asGetActiveContext();
+			s << dbg->ToString(const_cast<void*>(val), typeId, expandMembers - 1, ctx ? ctx->GetEngine() : 0);
+			if( n < dic->GetSize() - 1 )
+				s << ", ";
+		}
+		s << "]";
+	}
+	return s.str();
+}
+std::string DateTimeToString(void *obj, int expandMembers, CDebugger *dbg) {
+	CDateTime *dt = reinterpret_cast<CDateTime*>(obj);
+	std::stringstream s;
+	s << "{" << dt->getYear() << "-" << dt->getMonth() << "-" << dt->getDay() << " ";
+	s << dt->getHour() << ":" << dt->getMinute() << ":" << dt->getSecond() << "}";
+	return s.str(); 
+}
+std::string Vector3ToString(void *obj, int expandMembers, CDebugger *dbg) {
+	Vector3 *v = reinterpret_cast<Vector3*>(obj);
+	std::stringstream s;
+	s << "{" << v->x << ", " << v->y << ", " << v->z << "}";
+	return s.str(); 
+}
+#ifdef _WIN32
+BOOL WINAPI debugger_ctrlc(DWORD event) {
+	if (event != CTRL_C_EVENT || !g_dbg || g_dbg->IsTakingCommands()) return FALSE;
+	g_ASDebugBreak = true;
+	return TRUE;
+}
+#endif
+void InitializeDebugger(asIScriptEngine *engine) {
+	#ifdef _WIN32
+		SetConsoleCtrlHandler(debugger_ctrlc, TRUE);;
+	#endif
+	g_dbg = new CDebugger();
+	g_dbg->SetEngine(engine);
+	g_dbg->RegisterToStringCallback(engine->GetTypeInfoByName("string"), StringToString);
+	g_dbg->RegisterToStringCallback(engine->GetTypeInfoByName("array"), ArrayToString);
+	g_dbg->RegisterToStringCallback(engine->GetTypeInfoByName("dictionary"), DictionaryToString);
+	g_dbg->RegisterToStringCallback(engine->GetTypeInfoByName("datetime"), DateTimeToString);
+	g_dbg->RegisterToStringCallback(engine->GetTypeInfoByName("vector"), Vector3ToString);
+}
 #endif
 
 asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* /*param*/) {
@@ -510,7 +729,7 @@ asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* /*param*
 	if (!pool_size) {
 		ctx = engine->CreateContext();
 		ctx->SetExceptionCallback(asFUNCTION(ExceptionHandlerCallback), NULL, asCALL_CDECL);
-		ctx->SetLineCallback(asFUNCTION(profiler_callback), NULL, asCALL_CDECL);
+		ctx->SetLineCallback(asFUNCTION(nvgt_line_callback), NULL, asCALL_CDECL);
 	}
 	return ctx;
 }

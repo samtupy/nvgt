@@ -1,4 +1,4 @@
-/* misc_functions.h - header for miscellaneous wrapped functions that have no better place
+/* version.h - externs for automatically generated version information constants that exist in version.cpp at compile time
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -12,25 +12,10 @@
 
 #pragma once
 #include <string>
-#ifdef _WIN32
-	#include <windows.h>
-#endif
-#include <angelscript.h>
-#include "nvgt.h"
 
-asINT64 GetFileSize(const std::string& path);
-BOOL ChDir(const std::string& d);
-double range_convert(double old_value, double old_min, double old_max, double new_min, double new_max);
-class refstring {
-public:
-	int RefCount;
-	std::string str;
-	refstring() : RefCount(1) {}
-	void AddRef() {
-		asAtomicInc(RefCount);
-	}
-	void Release() {
-		if (asAtomicDec(RefCount) < 1) delete this;
-	}
-};
-void RegisterMiscFunctions(asIScriptEngine* engine);
+extern const std::string NVGT_VERSION; // major.minor.patch-type
+extern const std::string NVGT_VERSION_COMMIT_HASH; // derived from `git rev-parse HEAD`
+extern const std::string NVGT_VERSION_BUILD_TIME; // from python strftime specifiers "%A, %B %d, %Y at %I:%M:%S %p %Z"
+extern unsigned int NVGT_VERSION_BUILD_TIMESTAMP; // Unix epoch in seconds
+extern int NVGT_VERSION_MAJOR, NVGT_VERSION_MINOR, NVGT_VERSION_PATCH;
+extern const std::string NVGT_VERSION_TYPE;

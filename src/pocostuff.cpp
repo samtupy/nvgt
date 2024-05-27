@@ -773,7 +773,7 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("path", _O("bool parse(const string&in)"), asMETHODPR(Path, tryParse, (const std::string&), bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("path", _O("bool parse(const string&in, path_style)"), asMETHODPR(Path, tryParse, (const std::string&, Path::Style), bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("path", _O("string opImplConv() const"), asMETHODPR(Path, toString, () const, std::string), asCALL_THISCALL);
-	engine->RegisterObjectMethod("path", _O("string to_string(path_style = PATH_STYLE_NATIVE) const"), asMETHODPR(Path, toString, (Path::Style) const, std::string), asCALL_THISCALL);
+	engine->RegisterObjectMethod("path", _O("string to_string(path_style = spec::PATH_STYLE_NATIVE) const"), asMETHODPR(Path, toString, (Path::Style) const, std::string), asCALL_THISCALL);
 	engine->RegisterObjectMethod("path", _O("path& make_directory()"), asMETHOD(Path, makeDirectory), asCALL_THISCALL);
 	engine->RegisterObjectMethod("path", _O("path& make_file()"), asMETHOD(Path, makeFile), asCALL_THISCALL);
 	engine->RegisterObjectMethod("path", _O("path& make_parent()"), asMETHOD(Path, makeParent), asCALL_THISCALL);

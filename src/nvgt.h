@@ -17,7 +17,6 @@
 class asIScriptEngine;
 extern bool g_debug;
 extern asIScriptEngine* g_ScriptEngine;
-extern std::string g_command_line;
 extern int g_LastError;
 extern int g_retcode;
 extern bool g_initialising_globals;
@@ -25,10 +24,6 @@ extern bool g_shutting_down;
 extern std::string g_stub;
 extern std::string g_platform;
 extern bool g_make_console;
-
-const char* GetExecutableFilename();
-void message(const std::string& text, const std::string& header);
-
 
 #ifndef _WIN32
 	#ifndef BOOL

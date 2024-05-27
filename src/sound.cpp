@@ -28,7 +28,7 @@
 #include <obfuscate.h>
 #include <Poco/UnicodeConverter.h>
 #include <phonon.h>
-#include "window.h" // wait
+#include "UI.h" // wait
 #include "misc_functions.h" // range_convert
 #include "nvgt.h" // g_ScriptEngine
 #ifndef NVGT_USER_CONFIG // sound_data_char_decrypt

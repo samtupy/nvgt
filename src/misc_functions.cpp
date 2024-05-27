@@ -17,7 +17,6 @@
 #include <regex>
 #include <math.h>
 #ifdef _WIN32
-	#include "InputBox.h"
 	#define WIN32_LEAN_AND_MEAN
 	#include <windows.h>
 	#include <direct.h>
@@ -25,9 +24,6 @@
 	#include <unistd.h>
 	#include <sys/types.h>
 	#include <sys/wait.h>
-#endif
-#ifdef __APPLE__
-	#include "apple.h"
 #endif
 #include <Poco/Exception.h>
 #include <Poco/UnicodeConverter.h>
@@ -38,95 +34,20 @@
 #include <SDL2/SDL.h>
 #include <tinyexpr.h>
 #include <dbgtools.h>
+#include "angelscript.h"
 #include "nvgt.h"
+#include "UI.h" // wait
 #include "bl_number_to_words.h"
 #include "obfuscate.h"
 #include "input.h"
 #include "misc_functions.h"
-#include "window.h"
 
 
-int message_box(const std::string& title, const std::string& text, const std::vector<std::string>& buttons, unsigned int mb_flags) {
-	// Start with the buttons.
-	std::vector<SDL_MessageBoxButtonData> sdlbuttons;
-	for (int i = 0; i < buttons.size(); i++) {
-		std::string btn = buttons[i];
-		int skip = 0;
-		unsigned int button_flag = 0;
-		if (btn.substr(0, 1) == "`") {
-			button_flag |= SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
-			skip += 1;
-		}
-		if (btn.substr(skip, 1) == "~") {
-			button_flag |= SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT;
-			skip += 1;
-		}
-		SDL_MessageBoxButtonData& sdlbtn = sdlbuttons.emplace_back();
-		sdlbtn.flags = button_flag;
-		sdlbtn.buttonid = i + 1;
-		sdlbtn.text = buttons[i].c_str() + skip;
-	}
-	SDL_MessageBoxData box = {mb_flags, g_WindowHandle, title.c_str(), text.c_str(), int(sdlbuttons.size()), sdlbuttons.data(), NULL};
-	int ret;
-	if (SDL_ShowMessageBox(&box, &ret) != 0) return 0; // failure.
-	return ret;
-}
-int message_box_script(const std::string& title, const std::string& text, CScriptArray* buttons, unsigned int flags) {
-	std::vector<std::string> v_buttons(buttons->GetSize());
-	for (unsigned int i = 0; i < buttons->GetSize(); i++) v_buttons[i] = (*(std::string*)(buttons->At(i)));
-	return message_box(title, text, v_buttons, flags);
-}
-int alert(const std::string& title, const std::string& text, bool can_cancel, unsigned int flags) {
-	std::vector<std::string> buttons = {can_cancel ? "`OK" : "`~OK"};
-	if (can_cancel) buttons.push_back("~Cancel");
-	return message_box(title, text, buttons, flags);
-}
-int question(const std::string& title, const std::string& text, bool can_cancel, unsigned int flags) {
-	std::vector<std::string> buttons = {"`Yes", "No"};
-	if (can_cancel) buttons.push_back("~Cancel");
-	return message_box(title, text, buttons, flags);
-}
 BOOL ChDir(const std::string& d) {
 	#ifdef _WIN32
 	return _chdir(d.c_str()) == 0;
 	#else
 	return chdir(d.c_str()) == 0;
-	#endif
-}
-std::string ClipboardGetText() {
-	InputInit();
-	char* r = SDL_GetClipboardText();
-	std::string cb_text(r);
-	SDL_free(r);
-	return cb_text;
-}
-BOOL ClipboardSetText(const std::string& text) {
-	InputInit();
-	return SDL_SetClipboardText(text.c_str()) == 0;
-}
-BOOL ClipboardSetRawText(const std::string& text) {
-	#ifdef _WIN32
-	if (!OpenClipboard(nullptr))
-		return FALSE;
-	EmptyClipboard();
-	if (text == "") {
-		CloseClipboard();
-		return TRUE;
-	}
-	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, text.size() + 1);
-	if (!hMem) {
-		CloseClipboard();
-		return FALSE;
-	}
-	char* cbText = (char*)GlobalLock(hMem);
-	memcpy(cbText, text.c_str(), text.size());
-	cbText[text.size()] = 0;
-	GlobalUnlock(hMem);
-	SetClipboardData(CF_TEXT, hMem);
-	CloseClipboard();
-	return TRUE;
-	#else
-	return FALSE;
 	#endif
 }
 asBYTE character_to_ascii(const std::string& character) {
@@ -157,7 +78,7 @@ asQWORD timestamp() {
 	return time(0);
 }
 std::string get_command_line() {
-	return g_command_line;
+	return g_CommandLine;
 }
 double Round(double n, int p) {
 	int P = powf(10, fabs(p));
@@ -185,7 +106,10 @@ bool run(const std::string& filename, const std::string& cmdline, bool wait_for_
 		strncpy(c_cmdline, tmp.c_str(), tmp.size());
 		c_cmdline[tmp.size()] = 0;
 	}
-	BOOL r = CreateProcess(filename.c_str(), c_cmdline, NULL, NULL, FALSE, INHERIT_CALLER_PRIORITY, NULL, NULL, &si, &info);
+	std::wstring filename_u, cmdline_u;
+	Poco::UnicodeConverter::convert(filename, filename_u);
+	Poco::UnicodeConverter::convert(c_cmdline, cmdline_u);
+	BOOL r = CreateProcess(filename_u.c_str(), &cmdline_u[0], NULL, NULL, FALSE, INHERIT_CALLER_PRIORITY, NULL, NULL, &si, &info);
 	if (r == FALSE)
 		return false;
 	if (wait_for_completion) {
@@ -211,18 +135,10 @@ bool run(const std::string& filename, const std::string& cmdline, bool wait_for_
 	}
 	#endif
 }
-bool urlopen(const std::string& url) {
-	return !SDL_OpenURL(url.c_str());
-}
 double tinyexpr(const std::string& expr) {
 	return te_interp(expr.c_str(), NULL);
 }
 
-void next_keyboard_layout() {
-	#ifdef _WIN32
-	ActivateKeyboardLayout((HKL)HKL_NEXT, 0);
-	#endif
-}
 std::string number_to_words(asINT64 number, bool include_and) {
 	if (number < 0) return "negative " + number_to_words(number * -1, include_and);
 	std::string output(128, '\0');
@@ -233,46 +149,6 @@ std::string number_to_words(asINT64 number, bool include_and) {
 	}
 	output.resize(size);
 	return output;
-}
-std::string input_box(const std::string& title, const std::string& text, const std::string& default_value) {
-	#ifdef _WIN32
-	std::wstring titleU, textU, defaultU;
-	Poco::UnicodeConverter::convert(title, titleU);
-	Poco::UnicodeConverter::convert(text, textU);
-	Poco::UnicodeConverter::convert(default_value, defaultU);
-	std::wstring r = InputBox(titleU, textU, defaultU);
-	if (r == L"\xff") {
-		g_LastError = -12;
-		return "";
-	}
-	std::string resultA;
-	Poco::UnicodeConverter::convert(r, resultA);
-	return resultA;
-	#elif defined(__APPLE__)
-	std::string r = apple_input_box(title, text, default_value, false, false);
-	if (g_WindowHandle) SDL_RaiseWindow(g_WindowHandle);
-	if (r == "\xff") {
-		g_LastError = -12;
-		return "";
-	}
-	return r;
-	#else
-	return "";
-	#endif
-}
-bool info_box(const std::string& title, const std::string& text, const std::string& value) {
-	#ifdef _WIN32
-	std::wstring titleU, textU, valueU;
-	Poco::UnicodeConverter::convert(title, titleU);
-	Poco::UnicodeConverter::convert(text, textU);
-	Poco::UnicodeConverter::convert(value, valueU);
-	return InfoBox(titleU, textU, valueU);
-	#elif defined(__APPLE__)
-	apple_input_box(title, text, value, false, false);
-	return true;
-	#else
-	return false;
-	#endif
 }
 int get_last_error() {
 	int e = g_LastError;
@@ -412,24 +288,8 @@ CScriptArray* get_preferred_locales() {
 }
 
 void RegisterMiscFunctions(asIScriptEngine* engine) {
-	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UI);
-	engine->RegisterEnum(_O("message_box_flags"));
-	engine->RegisterEnumValue(_O("message_box_flags"), _O("MESSAGE_BOX_ERROR"), SDL_MESSAGEBOX_ERROR);
-	engine->RegisterEnumValue(_O("message_box_flags"), _O("MESSAGE_BOX_WARNING"), SDL_MESSAGEBOX_WARNING);
-	engine->RegisterEnumValue(_O("message_box_flags"), _O("MESSAGE_BOX_INFORMATION"), SDL_MESSAGEBOX_INFORMATION);
-	engine->RegisterEnumValue(_O("message_box_flags"), _O("MESSAGE_BOX_BUTTONS_LEFT_TO_RIGHT"), SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT);
-	engine->RegisterEnumValue(_O("message_box_flags"), _O("MESSAGE_BOX_BUTTONS_RIGHT_TO_LEFT"), SDL_MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT);
-	engine->RegisterGlobalFunction(_O("int message_box(const string& in, const string& in, string[]@, uint = 0)"), asFUNCTION(message_box_script), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("int alert(const string &in, const string &in, bool = false, uint = 0)"), asFUNCTION(alert), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("int question(const string& in, const string& in, bool = false, uint = 0)"), asFUNCTION(question), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction(_O("bool chdir(const string& in)"), asFUNCTION(ChDir), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string clipboard_get_text()"), asFUNCTION(ClipboardGetText), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool clipboard_set_text(const string& in)"), asFUNCTION(ClipboardSetText), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool clipboard_set_raw_text(const string& in)"), asFUNCTION(ClipboardSetRawText), asCALL_CDECL);
-	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UI);
-	engine->RegisterGlobalFunction(_O("string input_box(const string& in, const string& in, const string& in = '', uint64 = 0)"), asFUNCTION(input_box), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool info_box(const string& in, const string& in, const string& in, uint64 = 0)"), asFUNCTION(info_box), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
 	engine->RegisterGlobalFunction(_O("uint8 character_to_ascii(const string&in)"), asFUNCTION(character_to_ascii), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string ascii_to_character(uint8)"), asFUNCTION(ascii_to_character), asCALL_CDECL);
@@ -440,9 +300,7 @@ void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("string[]@ get_preferred_locales()"), asFUNCTION(get_preferred_locales), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_COMMAND_LINE() property"), asFUNCTION(get_command_line), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool run(const string& in, const string& in, bool, bool)"), asFUNCTION(run), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool urlopen(const string &in)"), asFUNCTION(urlopen), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool is_debugger_present()"), asFUNCTION(debugger_present), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("void next_keyboard_layout()"), asFUNCTION(next_keyboard_layout), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int get_last_error()"), asFUNCTION(get_last_error), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->RegisterGlobalFunction(_O("double round(double, int)"), asFUNCTION(Round), asCALL_CDECL);

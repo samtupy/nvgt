@@ -49,7 +49,7 @@ void getMacHash(unsigned short& mac1, unsigned short& mac2) {
 
 unsigned short getVolumeHash() {
 	DWORD serialNum = 0;
-	GetVolumeInformation("c:\\", NULL, 0, &serialNum, NULL, NULL, NULL, 0);
+	GetVolumeInformation(L"c:\\", NULL, 0, &serialNum, NULL, NULL, NULL, 0);
 	unsigned short hash = (unsigned short)((serialNum + (serialNum >> 16)) & 0xFFFF);
 	return hash;
 }
@@ -68,7 +68,7 @@ unsigned short getCpuHash() {
 const char* getMachineName() {
 	static char computerName[1024];
 	DWORD size = 1024;
-	GetComputerName(computerName, &size);
+	GetComputerNameA(computerName, &size);
 	return &(computerName[0]);
 }
 #else

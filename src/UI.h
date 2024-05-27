@@ -1,4 +1,4 @@
-/* window.h - header for sdl window management functions
+/* UI.h - header for sdl window management functions and other user interface related routines
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -28,6 +28,12 @@
 
 extern SDL_Window* g_WindowHandle;
 
+int alert(const std::string& title, const std::string& text, bool can_cancel = false, unsigned int flags = 0);
+int question(const std::string& title, const std::string& text, bool can_cancel = false, unsigned int flags = 0);
+void message(const std::string& text, const std::string& header);
+bool info_box(const std::string& title, const std::string& text, const std::string& value);
+BOOL ClipboardSetText(const std::string& text);
+
 asINT64 ShowWindow(std::string& window_title);
 void wait(int ms);
-void RegisterWindow(asIScriptEngine* engine);
+void RegisterUI(asIScriptEngine* engine);

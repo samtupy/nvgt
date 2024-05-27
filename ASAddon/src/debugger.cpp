@@ -1,4 +1,5 @@
 #include "debugger.h"
+#include "scripthelper.h" // ExecuteString
 #include <iostream>  // cout
 #include <sstream>   // stringstream
 #include <stdlib.h>  // atoi
@@ -9,11 +10,19 @@ using namespace std;
 
 BEGIN_AS_NAMESPACE
 
+// Simply print the text of any error messages to stderr.
+void DebuggerMessageCallback(const asSMessageInfo* msg, void* param)
+{
+	if (msg->type != asMSGTYPE_ERROR) return;
+	cerr << "error: " << msg->message << endl;
+}
+
 CDebugger::CDebugger()
 {
 	m_action = CONTINUE;
 	m_lastFunction = 0;
 	m_engine = 0;
+	m_takingCommands = false;
 }
 
 CDebugger::~CDebugger()
@@ -301,16 +310,25 @@ bool CDebugger::CheckBreakPoint(asIScriptContext *ctx)
 
 void CDebugger::TakeCommands(asIScriptContext *ctx)
 {
+	m_takingCommands = true;
+	bool output_header = true;
 	for(;;)
 	{
 		char buf[512];
 
-		Output("[dbg]> ");
+		if (output_header) Output("[dbg]> ");
+		output_header = true;
 		cin.getline(buf, 512);
-
+if (!cin.good())
+{
+	cin.clear();
+	output_header = false;
+	continue; // Allow the user to handle ctrl+c or loss of stdin on their own.
+}
 		if( InterpretCommand(string(buf), ctx) )
 			break;
 	}
+	m_takingCommands = false;
 }
 
 bool CDebugger::InterpretCommand(const string &cmd, asIScriptContext *ctx)
@@ -468,6 +486,76 @@ bool CDebugger::InterpretCommand(const string &cmd, asIScriptContext *ctx)
 				Output("Incorrect format for print, expected:\n"
 					   " p <expression>\n");
 			}
+		}
+		// take more commands
+		return false;
+
+	case 'e':
+		{
+		// Evaluate a statement.
+		string rettype, statement;
+		size_t p = cmd.find_first_not_of(" \t", 1);
+		size_t p2;
+		if( p != string::npos && p > 1 )
+		{
+			p2 = cmd.find_first_of(" \t", p + 1);
+			if( p2 != string::npos && p2 > p )
+			{
+				rettype = cmd.substr(p, p2 - p);
+			}
+			else
+			{
+				Output("Incorrect format for eval, expected:\n"
+						 " e <returntype> <statement>\n");
+				return false;
+			}
+			p2 = cmd.find_first_not_of(" \t", p2);
+		}
+		if( p2 != string::npos && p2 > p )
+		{
+			statement = cmd.substr(p2);
+			if (statement.find_first_of(";") == string::npos) statement = string("return ") + statement + ";";
+			void* ref;
+			int typeId = GetEngine()->GetTypeIdByDecl(rettype.c_str());
+			if ( typeId < 0 )
+			{
+				Output(string("invalid return type " + rettype) + "\n");
+				return false;
+			}
+			int bytes = GetEngine()->GetSizeOfPrimitiveType(typeId);
+			if (!bytes) bytes = sizeof(void*);
+			if (!(typeId & asTYPEID_MASK_OBJECT) || typeId & asTYPEID_OBJHANDLE) ref = malloc(bytes);
+			if (typeId & asTYPEID_MASK_OBJECT)
+			{
+				if (!(typeId & asTYPEID_OBJHANDLE)) ref = GetEngine()->CreateScriptObject(GetEngine()->GetTypeInfoById(typeId));
+				else *(void**)ref = nullptr;
+			}
+			asIScriptModule* mod = ctx && ctx->GetFunction()? ctx->GetFunction()->GetModule() : nullptr;
+			asIScriptContext* execCtx = GetEngine()->RequestContext();
+			GetEngine()->SetMessageCallback(asFUNCTION(DebuggerMessageCallback), nullptr, asCALL_CDECL);
+			int r = ExecuteString(GetEngine(), statement.c_str(), ref, typeId, mod, execCtx);
+			GetEngine()->ClearMessageCallback();
+			if (r == asEXECUTION_FINISHED)
+			{
+				Output(ToString(ref, typeId, 0, GetEngine()) + "\n");
+				if (typeId & asTYPEID_MASK_OBJECT) GetEngine()->ReleaseScriptObject(ref, GetEngine()->GetTypeInfoById(typeId));
+			}
+			else if (r == asEXECUTION_EXCEPTION)
+			{
+				Output(string("exception: ") + execCtx->GetExceptionString());
+			}
+			else if (r != asERROR)
+			{
+				Output("suspend or abort while evaluating statement\n");
+			}
+			if (!(typeId & asTYPEID_MASK_OBJECT) || typeId & asTYPEID_OBJHANDLE) free(ref);
+			if (execCtx) GetEngine()->ReturnContext(execCtx);
+		}
+		else
+		{
+			Output("Incorrect format for eval, expected:\n"
+					 " e <returntype> <statement>\n");
+		}
 		}
 		// take more commands
 		return false;
@@ -832,6 +920,7 @@ void CDebugger::PrintHelp()
 	       " l - List various things\n"
 	       " r - Remove break point\n"
 	       " p - Print value\n"
+	       " e - Evaluate expression\n"
 	       " w - Where am I?\n"
 	       " a - Abort execution\n"
 	       " h - Print this help text\n");
@@ -858,6 +947,11 @@ void CDebugger::SetEngine(asIScriptEngine *engine)
 asIScriptEngine *CDebugger::GetEngine()
 {
 	return m_engine;
+}
+
+bool CDebugger::IsTakingCommands()
+{
+	return m_takingCommands;
 }
 
 END_AS_NAMESPACE

@@ -53,6 +53,7 @@ public:
 	// by callbacks that need it. This will hold a reference to the engine.
 	virtual void SetEngine(asIScriptEngine *engine);
 	virtual asIScriptEngine *GetEngine();
+	virtual bool IsTakingCommands();
 	
 protected:
 	enum DebugAction
@@ -65,6 +66,7 @@ protected:
 	DebugAction        m_action;
 	asUINT             m_lastCommandAtStackLevel;
 	asIScriptFunction *m_lastFunction;
+	bool m_takingCommands;
 
 	struct BreakPoint
 	{

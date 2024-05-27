@@ -13,11 +13,13 @@
 
 #include <string>
 #include <unordered_map>
+#include <Poco/BinaryReader.h>
+#include <Poco/BinaryWriter.h>
 #include <Poco/Format.h>
 #include <SDL2/SDL.h>
-#include "misc_functions.h"
 #include "nvgt.h"
 #include "nvgt_plugin.h"
+#include "UI.h"
 
 std::unordered_map<std::string, void*> loaded_plugins; // Contains handles to sdl objects.
 std::unordered_map<std::string, nvgt_plugin_entry*>* static_plugins = NULL; // Contains pointers to static plugin entry points. This doesn't contain entry points for plugins loaded from a dll, rather those that have been linked statically into the executable produced by a custom build of nvgt. This is a pointer because the map is initialized the first time register_static_plugin is called so that we are not trusting in global initialization order.
@@ -60,15 +62,13 @@ bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e) {
 	return true;
 }
 
-bool load_serialized_nvgt_plugins(FILE* f) {
+bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
 	unsigned short count;
-	fread(&count, 1, 2, f);
+	br >> count;
 	if (!count) return true;
 	for (int i = 0; i < count; i++) {
-		unsigned char len;
-		fread(&len, 1, 1, f);
-		std::string name(len, '\0');
-		fread(&name[0], 1, len, f);
+		std::string name;
+		br >> name;
 		if (!load_nvgt_plugin(name)) {
 			alert("Error", Poco::format("Unable to load %s, exiting.", name));
 			return false;
@@ -77,14 +77,11 @@ bool load_serialized_nvgt_plugins(FILE* f) {
 	return true;
 }
 
-void serialize_nvgt_plugins(FILE* f) {
+void serialize_nvgt_plugins(Poco::BinaryWriter& bw) {
 	unsigned short count = loaded_plugins.size();
-	fwrite(&count, 1, 2, f);
+	bw << count;
 	for (const auto& i : loaded_plugins) {
-		const std::string& name = i.first;
-		unsigned char len = name.size();
-		fwrite(&len, 1, 1, f);
-		fwrite(name.c_str(), 1, len, f);
+		bw << i.first;
 	}
 }
 

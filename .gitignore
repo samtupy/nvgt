@@ -13,7 +13,9 @@
 __pycache__
 
 # other intermediet build
+build/lastbuild
 build/windev_path
+src/version.cpp
 .sconsign.dblite
 *.orig
 release/lib/3rd_party_licenses.html

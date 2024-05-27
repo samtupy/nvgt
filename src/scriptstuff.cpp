@@ -20,6 +20,7 @@
 	#include <windows.h>
 #endif
 #include <obfuscate.h>
+#include <Poco/Util/Application.h>
 #include <Poco/format.h>
 #include <thread.h>
 #include <scriptany.h>
@@ -31,6 +32,7 @@
 #include "scriptstuff.h"
 #include "timestuff.h"
 
+// The seemingly pointless few lines of code that follow are just a bit of structure that can be used to aid in some types of debugging if needed. Extra code can be added temporarily in the line callback that sets any needed info in the g_DebugInfo string which can easily be read by a c debugger.
 std::string g_DebugInfo;
 void debug_callback(asIScriptContext* ctx, void* obj) {
 	asIScriptFunction* func = ctx->GetFunction();
@@ -223,7 +225,7 @@ int get_script_current_line() {
 	return ctx->GetLineNumber();
 }
 std::string get_script_executable() {
-	return std::string(GetExecutableFilename());
+	return Poco::Util::Application::instance().config().getString("application.path");
 }
 std::string get_function_signature(void* function, int type_id) {
 	asIScriptContext* ctx = asGetActiveContext();

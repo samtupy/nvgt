@@ -10,10 +10,11 @@ env = Environment()
 Decider('content-timestamp')
 env.Alias("install", "c:/nvgt")
 SConscript("build/upx_sconscript.py", exports = ["env"])
+SConscript("build/version_sconscript.py", exports = ["env"])
 env.SetOption("num_jobs", multiprocessing.cpu_count())
 if env["PLATFORM"] == "win32":
 	SConscript("build/windev_sconscript.py", exports = ["env"])
-	env.Append(CCFLAGS = ["/EHsc", "/J", "/std:c++17", "/GF", "/Zc:inline", "/O2"])
+	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT", "/Z7", "/std:c++17", "/GF", "/Zc:inline", "/O2"])
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
 	env.Append(LIBS = ["tolk", "enet", "angelscript64", "SDL2"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
@@ -27,9 +28,8 @@ elif env["PLATFORM"] == "posix":
 	env.Append(CPPPATH = ["/usr/local/include", "#lindev/include"], LIBPATH = ["/usr/local/lib", "#lindev/lib"], LINKFLAGS = ["-fuse-ld=gold", "-s"])
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
 	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL2.a"])
-env.Append(CPPDEFINES = ["POCO_STATIC", "NDEBUG"])
+env.Append(CPPDEFINES = ["POCO_STATIC", "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
-VariantDir("build/obj_src", "src", duplicate = 0)
 
 # plugins
 plugin_env = env.Clone()
@@ -43,10 +43,14 @@ env.Append(LIBS = static_plugins)
 
 # nvgt itself
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
+if "version.cpp" in sources: sources.remove("version.cpp")
+env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
+version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.
+VariantDir("build/obj_src", "src", duplicate = 0)
 env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoNetSSLWinMT", "PocoUtilMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoXML", "PocoZip", "PocoFoundation", "crypto", "ssl"], "phonon", "bass", "bass_fx", "bassmix", "SDL2main"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
-	env.Append(LINKFLAGS = ["/SUBSYSTEM:WINDOWS", "/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll", "/delayload:Tolk.dll"])
+	env.Append(LINKFLAGS = ["/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll", "/delayload:Tolk.dll"])
 elif env["PLATFORM"] == "darwin":
 	sources.append("macos.mm")
 	env["FRAMEWORKPREFIX"] = "-weak_framework"
@@ -64,8 +68,14 @@ if ARGUMENTS.get("no_user", "0") == "0":
 			break # only execute one script from here
 SConscript("ASAddon/_SConscript", variant_dir = "build/obj_ASAddon", duplicate = 0, exports = "env")
 SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, exports = "env")
-nvgt = env.Program("release/nvgt", [os.path.join("build/obj_src", s) for s in sources], PDB = "#build/debug/nvgt.pdb")
-if env["PLATFORM"] == "win32": env.Install("c:/nvgt", nvgt)
+nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [version_object], PDB = "#build/debug/nvgt.pdb")
+if env["PLATFORM"] == "win32":
+	# Only on windows we must go through the frustrating hastle of compiling a version of nvgt with no console E. the windows subsystem. It is at least set up so that we only need to recompile one object
+	if "nvgt.cpp" in sources: sources.remove("nvgt.cpp")
+	nvgtw = env.Program("release/nvgtw", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [env.Object("build/obj_src/nvgtw", "build/obj_src/nvgt.cpp", CPPDEFINES = ["$CPPDEFINES", "NVGT_WIN_APP"]), version_object], LINKFLAGS = ["$LINKFLAGS", "/subsystem:windows"], PDB = "#build/debug/nvgtw.pdb")
+	sources.append("nvgt.cpp")
+	env.Install("c:/nvgt", nvgt)
+	env.Install("c:/nvgt", nvgtw)
 
 # stubs
 def fix_windows_stub(target, source, env):
@@ -85,8 +95,9 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	VariantDir("build/obj_stub", "src", duplicate = 0)
 	stub_env = env.Clone(PROGSUFFIX = ".bin")
 	stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
+	if env["PLATFORM"] == "win32": stub_env.Append(LINKFLAGS = ["/subsystem:windows"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
-	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources])
+	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + [version_object]
 	stub = stub_env.Program(f"release/nvgt_{stub_platform}", stub_objects)
 	if env["PLATFORM"] == "win32": env.Install("c:/nvgt", stub)
 	if "upx" in env:
