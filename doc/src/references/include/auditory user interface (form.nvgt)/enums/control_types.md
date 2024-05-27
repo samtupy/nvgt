@@ -1,7 +1,7 @@
 # control_types
 This is a complete list of all control types available in the audio form, as well as a breif description of what they do.
 
-* ct_button: a normal, rpessable button.
+* ct_button: a normal, pressable button.
 * ct_input: any form of text box.
 * ct_checkbox: a checkable/uncheckable control.
 * ct_progress: a progress bar that can both beep and speak.

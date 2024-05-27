@@ -2,7 +2,7 @@
 	Returns the path of the executable running your script.
 	string SCRIPT_EXECUTABLE;
 	## Remarks:
-		If you're running form source, this will return the path to your NVGT binary.
+		If you're running from source, this will return the path to your NVGT binary.
 */
 
 // Example:

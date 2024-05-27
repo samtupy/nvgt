@@ -1,5 +1,5 @@
 # audioform_errorcodes
-This enum contains any error values that can be returned by the `audio_form::get_last_error();;` function.
+This enum contains any error values that can be returned by the `audio_form::get_last_error();` function.
 
 * form_error_none: No error.
 * form_error_invalid_index: you provided a control index that doesn't exist.
