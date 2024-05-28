@@ -15,7 +15,7 @@ hhk_base = "<li><object type=\"text/sitemap\"><param name=\"Name\" value=\"{name
 md_nav_link = "[{text}]({url})"
 
 def make_topicname(path):
-	"""Takes any path and converts it into a titlecased topic name according to the rules in doc/src/advanced/docgen+.md."""
+	"""Takes any path and converts it into a topic name according to the rules in doc/src/advanced/docgen+.md."""
 	if not os.path.exists(path):
 		print(f"titlecase_topicname can't find {path}, skipping.\n")
 		return ""
@@ -24,7 +24,6 @@ def make_topicname(path):
 	else:
 		name = os.path.split(path)[1].lstrip("!-_") # The topic name is determined by removing any prepended punctuation characters then titlecasing the result in some cases.
 		if os.path.isfile(path): name = os.path.splitext(name)[0]
-		if not path.endswith(".nvgt") and name.islower(): name = name.title()
 		if name.endswith("@"): name = name[:-1]
 		return name
 
@@ -290,7 +289,7 @@ def main():
 	hhc_output.close()
 	hhk_output.close()
 	hhp_output=open(os.path.join("chm", "nvgt.hhp"), "w")
-	hhp_output.write("[OPTIONS]\nContents file=nvgt.hhc\nIndex file=nvgt.hhk\nDefault topic=introduction.htm\nTitle=NVGT Documentation\n\n[FILES]\n")
+	hhp_output.write("[OPTIONS]\nContents file=nvgt.hhc\nIndex file=nvgt.hhk\nDefault topic=Introduction.htm\nTitle=NVGT Documentation\n\n[FILES]\n")
 	for f in os.listdir("chm"):
 		if f.endswith(".htm"): hhp_output.write(f + "\n")
 	hhp_output.close()

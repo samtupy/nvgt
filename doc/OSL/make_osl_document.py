@@ -42,7 +42,7 @@ def main():
 	f.write(html_base.format(title = "third party code attributions", body = mistune.html(header + summary + body)))
 	f.close()
 	try:
-		shutil.copyfile(f"{output_filename}.md", os.path.join("..", "src", "appendix", "third party code attributions@.md"))
+		shutil.copyfile(f"{output_filename}.md", os.path.join("..", "src", "appendix", "Third Party Code Attributions@.md"))
 		if os.path.isdir(os.path.join("..", "..", "release")):
 			if not os.path.isdir(os.path.join("..", "..", "release", "lib")): os.mkdir(os.path.join("..", "..", "release", "lib"))
 			shutil.copyfile(f"{output_filename}.html", os.path.join("..", "..", "release", "lib", f"{output_filename}.html"))
