@@ -25,11 +25,11 @@
 #include <thread.h>
 #include <string>
 #include <vector>
+#include <Poco/Thread.h>
 #include <Poco/UnicodeConverter.h>
 #include <Poco/Util/Application.h>
 #include "input.h"
 #include "misc_functions.h"
-#include "nvgt.h"
 #include "scriptstuff.h"
 #include "timestuff.h"
 #include "UI.h"
@@ -266,14 +266,14 @@ void handle_sdl_event(SDL_Event* evt) {
 }
 void wait(int ms) {
 	if (!g_WindowHandle || g_WindowThreadId != thread_current_thread_id()) {
-		Sleep(ms);
+		Poco::Thread::sleep(ms);
 		return;
 	}
 	while (ms >= 0) {
 		int MS = (ms > 25 ? 25 : ms);
 		if (g_GCMode == 2)
 			garbage_collect_action();
-		Sleep(MS);
+		Poco::Thread::sleep(MS);
 		SDL_PumpEvents();
 		ms -= MS;
 		if (ms < 1) break;

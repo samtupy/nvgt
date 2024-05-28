@@ -26,6 +26,7 @@
 #include <bass_fx.h>
 #include <bassmix.h>
 #include <obfuscate.h>
+#include <Poco/Thread.h>
 #include <Poco/UnicodeConverter.h>
 #include <phonon.h>
 #include "UI.h" // wait

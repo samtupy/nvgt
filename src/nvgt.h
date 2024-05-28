@@ -32,5 +32,4 @@ extern bool g_make_console;
 		#define TRUE 1
 	#endif
 	typedef unsigned int DWORD;
-	int Sleep(long msec);
 #endif

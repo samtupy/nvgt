@@ -22,7 +22,7 @@
 #include <obfuscate.h>
 #include <Poco/Util/Application.h>
 #include <Poco/format.h>
-#include <thread.h>
+#include <Poco/Thread.h>
 #include <scriptany.h>
 #include <scriptarray.h>
 #include <scriptdictionary.h>
@@ -39,7 +39,7 @@ void debug_callback(asIScriptContext* ctx, void* obj) {
 }
 
 int g_GCMode = 2;
-thread_ptr_t g_GCThread = NULL;
+Poco::Thread* g_GCThread = nullptr;
 asQWORD g_GCAutoFullTime = ticks();
 DWORD g_GCAutoFrequency = 300000;
 void garbage_collect(bool full = true) {
@@ -57,14 +57,14 @@ void garbage_collect_action() {
 		g_GCAutoFullTime = ticks();
 	}
 }
-int garbage_collect_thread(void* user) {
-	Sleep(10);
+void garbage_collect_thread(void* user) {
+	Poco::Thread::sleep(10);
 	while (g_GCMode == 3) {
-		Sleep(5);
+		Poco::Thread::sleep(5);
 		garbage_collect_action();
 	}
-	g_GCThread = NULL;
-	return 0;
+	delete g_GCThread;
+	g_GCThread = nullptr;
 }
 int get_garbage_collect_mode() {
 	return g_GCMode;
@@ -72,9 +72,10 @@ int get_garbage_collect_mode() {
 bool set_garbage_collect_mode(int m) {
 	if (m < 1 || m > 3) return false;
 	if (m == 3 && !g_GCThread) {
-		g_GCThread = thread_create(garbage_collect_thread, NULL, 0);
+		g_GCThread = new Poco::Thread;
 		if (!g_GCThread)
 			return false;
+		g_GCThread->start(garbage_collect_thread);
 	}
 	g_GCMode = m;
 	return true;

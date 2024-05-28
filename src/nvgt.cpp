@@ -159,20 +159,22 @@ class nvgt_application : public Poco::Util::Application {
 					return Application::EXIT_CONFIG;
 				}
 			#endif
-			if (mode == NVGT_RUN && ExecuteScript(g_ScriptEngine, scriptfile.c_str()) < 0 || mode == NVGT_COMPILE && CompileExecutable(g_ScriptEngine, scriptfile)) {
+			int retcode = Application::EXIT_OK;
+			if (mode == NVGT_RUN && (retcode = ExecuteScript(g_ScriptEngine, scriptfile.c_str())) < 0 || mode == NVGT_COMPILE && CompileExecutable(g_ScriptEngine, scriptfile)) {
 				ShowAngelscriptMessages();
 				return Application::EXIT_SOFTWARE;
 			}
-			return Application::EXIT_OK;
+			return retcode;
 		}
 		#else
 		virtual int main(const std::vector<std::string>& args) override {
 			setupCommandLineProperty(args);
-			if (LoadCompiledExecutable(g_ScriptEngine) < 0 || ExecuteScript(g_ScriptEngine, commandName().c_str()) < 0) {
+			int retcode = Application::EXIT_OK;
+			if (LoadCompiledExecutable(g_ScriptEngine) < 0 || (retcode = ExecuteScript(g_ScriptEngine, commandName().c_str())) < 0) {
 				ShowAngelscriptMessages();
 				return Application::EXIT_DATAERR;
 			}
-			return Application::EXIT_OK;
+			return retcode;
 		}
 		#endif
 		void uninitialize() {
@@ -187,11 +189,9 @@ class nvgt_application : public Poco::Util::Application {
 
 // Poco::Util::Application and SDL_main conflict, macro magic in SDL_main.h is replacing all occurances of "main" with "SDL_main", including the one in nvgt's derived Poco application causing the overwritten method to not call. Hack around that. You are about to scroll past 5 utterly simple lines of code that took hours of frustration and mind pain to determine the nesessety of.
 #if !defined(_WIN32) || defined(NVGT_WIN_APP) || defined(NVGT_STUB)
-	#undef SDL_MAIN_HANDLED
-	#undef SDL_main_h_
-	#include <sdl2/SDL_main.h>
-#endif
-
+#undef SDL_MAIN_HANDLED
+#undef SDL_main_h_
+#include <sdl2/SDL_main.h>
 int main(int argc, char** argv) {
 	AutoPtr<Application> app = new nvgt_application();
 	try {
@@ -206,20 +206,7 @@ int main(int argc, char** argv) {
 	}
 	return app->run();
 }
-
-#ifndef _WIN32
-int Sleep(long msec) {
-	struct timespec ts;
-	int res;
-	if (msec < 0) {
-		errno = EINVAL;
-		return -1;
-	}
-	ts.tv_sec = msec / 1000;
-	ts.tv_nsec = (msec % 1000) * 1000000;
-	do {
-		res = nanosleep(&ts, &ts);
-	} while (res && errno == EINTR);
-	return res;
-}
+#else
+POCO_APP_MAIN(nvgt_application); // We don't use SDL_main for windows console nvgt, POCO_APP_MAIN handles UTF16 command line arguments for us via wmain.
 #endif
+
