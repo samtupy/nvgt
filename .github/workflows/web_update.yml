@@ -9,7 +9,7 @@ on:
 
 jobs:
   web_update:
-    runs-on: ubuntu-22.04
+    runs-on: windows-2022
     steps:
     - uses: actions/checkout@v4
     - name: build
@@ -21,7 +21,7 @@ jobs:
         cd ..
         python3 docgen.py
         cd ..
-        wget -q -O - https://github.com/cobalt-org/cobalt.rs/releases/download/v0.19.2/cobalt-v0.19.2-x86_64-unknown-linux-gnu.tar.gz|tar -xzf - ./cobalt
+        curl -s -O https://nvgt.gg/ci/static/cobalt.exe
         cd web
         ../cobalt build
         cd public_html
