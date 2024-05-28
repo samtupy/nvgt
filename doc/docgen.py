@@ -267,8 +267,10 @@ def main():
 	if not os.path.exists("chm"): os.mkdir("chm")
 	if not os.path.exists("html"): os.mkdir("html")
 	if not os.path.exists("md"): os.mkdir("md")
+	website_exists = False
 	if os.path.exists(os.path.join("..", "web")):
 		if not os.path.exists(os.path.join("..", "web", "src", "docs")): os.makedirs(os.path.join("..", "web", "src", "docs"))
+		website_exists = True
 	txt_output = open("nvgt.txt", "w", encoding = "UTF8")
 	hhc_output = open("chm/nvgt.hhc", "w")
 	hhc_output.write("<html>\n<head>\n</head>\n<body>\n<ul>\n")
@@ -298,7 +300,11 @@ def main():
 		if os.path.isfile(os.path.join("chm", "nvgt.chm")):
 			if os.path.isfile("nvgt.chm"): os.remove("nvgt.chm")
 			os.rename(os.path.join("chm", "nvgt.chm"), "nvgt.chm")
-			if os.path.isdir(os.path.join("..", "web", "src", "docs")): shutil.copy("nvgt.chm", os.path.join("..", "web", "src", "docs"))
+			if website_exists: shutil.copy("nvgt.chm", os.path.join("..", "web", "src", "docs"))
+		if website_exists:
+			shutil.make_archive(os.path.join("..", "web", "src", "docs", "nvgt-html"), "zip", "html")
+			shutil.make_archive(os.path.join("..", "web", "src", "docs", "nvgt-markdown"), "zip", "md")
+			shutil.copy("nvgt.txt", os.path.join("..", "web", "src", "docs"))
 
 if __name__ == "__main__":
 	main()

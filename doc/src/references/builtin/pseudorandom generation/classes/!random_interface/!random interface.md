@@ -4,7 +4,7 @@ Defines the class structure that is available in NVGT's object based pseudorando
 2. random_interface(uint seed);
 ## Arguments (2):
 * uint seed: The number used as the seed/starting point for the RNG, passing the same seed will yield the same sequence of random numbers.
-# # Remarks:
+## Remarks:
 NVGT contains several different pseudorandom number generators which can all be instanciated as many times as the programmer needs.
 
 These generators all share pretty much exactly the same methods by signature and are interacted with in the same way, and so it will be documented only once here. Small topics explaining the differences for each actual generator are documented below this interface.
