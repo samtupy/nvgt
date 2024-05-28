@@ -533,7 +533,10 @@ bool CDebugger::InterpretCommand(const string &cmd, asIScriptContext *ctx)
 			asIScriptModule* mod = ctx && ctx->GetFunction()? ctx->GetFunction()->GetModule() : nullptr;
 			asIScriptContext* execCtx = GetEngine()->RequestContext();
 			GetEngine()->SetMessageCallback(asFUNCTION(DebuggerMessageCallback), nullptr, asCALL_CDECL);
+			DebugAction lastDebugAction = m_action;
+			m_action = CONTINUE;
 			int r = ExecuteString(GetEngine(), statement.c_str(), ref, typeId, mod, execCtx);
+			m_action = lastDebugAction;
 			GetEngine()->ClearMessageCallback();
 			if (r == asEXECUTION_FINISHED)
 			{
