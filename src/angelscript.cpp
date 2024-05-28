@@ -28,6 +28,7 @@
 #include <Poco/zlib.h>
 #include <Poco/Util/Application.h>
 #include <SDL2/SDL.h>
+#include "angelscript.h"
 #include "bullet3.h"
 #include "compression.h"
 #include "crypto.h"
@@ -57,6 +58,7 @@
 #include "threading.h"
 #include "timestuff.h"
 #include "tts.h"
+#include "version.h"
 
 #ifndef NVGT_STUB
 	#include "scriptbuilder.h"
@@ -379,6 +381,7 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	RegisterUI(engine);
 	g_ctxMgr = new CContextMgr();
 	g_ctxMgr->SetGetTimeCallback(GetTimeCallback);
+	RegisterUnsorted(engine);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	g_ctxMgr->RegisterThreadSupport(engine);
 	g_ctxMgr->RegisterCoRoutineSupport(engine);
@@ -713,6 +716,17 @@ void InitializeDebugger(asIScriptEngine *engine) {
 	g_dbg->RegisterToStringCallback(engine->GetTypeInfoByName("datetime"), DateTimeToString);
 	g_dbg->RegisterToStringCallback(engine->GetTypeInfoByName("vector"), Vector3ToString);
 }
+void asDebugBreak() {
+	if (!g_dbg) return;
+	cout << "script debug break" << endl;
+	g_dbg->TakeCommands(asGetActiveContext());
+}
+void asDebuggerAddFileBreakpoint(const std::string& file, int line) { if (g_dbg) g_dbg->AddFileBreakPoint(file, line); }
+void asDebuggerAddFuncBreakpoint(const std::string& func) { if (g_dbg)  g_dbg->AddFuncBreakPoint(func); }
+#else
+void asDebugBreak() {} // Debugger not present for compiled executables.
+void asDebuggerAddFileBreakpoint(const std::string& file, int line) {}
+void asDebuggerAddFuncBreakpoint(const std::string& func) {}
 #endif
 
 asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* /*param*/) {
@@ -740,4 +754,20 @@ void ReturnContextCallback(asIScriptEngine* engine, asIScriptContext* ctx, void*
 }
 void ExceptionHandlerCallback(asIScriptContext* ctx, void* obj) {
 	g_last_exception_callstack = get_call_stack();
+}
+
+// Try not to register things here unless absolutely no other place can be found for them.
+void RegisterUnsorted(asIScriptEngine* engine) {
+	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
+	engine->RegisterGlobalProperty("const string NVGT_VERSION", (void*)&NVGT_VERSION);
+	engine->RegisterGlobalProperty("const string NVGT_VERSION_COMMIT_HASH", (void*)&NVGT_VERSION_COMMIT_HASH);
+	engine->RegisterGlobalProperty("const string NVGT_VERSION_BUILD_TIME", (void*)&NVGT_VERSION_BUILD_TIME);
+	engine->RegisterGlobalProperty("const uint NVGT_VERSION_BUILD_TIMESTAMP", (void*)&NVGT_VERSION_BUILD_TIMESTAMP);
+	engine->RegisterGlobalProperty("const int NVGT_VERSION_MAJOR", (void*)&NVGT_VERSION_MAJOR);
+	engine->RegisterGlobalProperty("const int NVGT_VERSION_MINOR", (void*)&NVGT_VERSION_MINOR);
+	engine->RegisterGlobalProperty("const int NVGT_VERSION_PATCH", (void*)&NVGT_VERSION_PATCH);
+	engine->RegisterGlobalProperty("const string NVGT_VERSION_TYPE", (void*)&NVGT_VERSION_TYPE);
+	engine->RegisterGlobalFunction("void debug_break()", asFUNCTION(asDebugBreak), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void debug_add_file_breakpoint(const string&in, int)", asFUNCTION(asDebuggerAddFileBreakpoint), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void debug_add_func_breakpoint(const string&in)", asFUNCTION(asDebuggerAddFuncBreakpoint), asCALL_CDECL);
 }

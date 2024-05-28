@@ -40,3 +40,4 @@ asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* param);
 void ReturnContextCallback(asIScriptEngine* engine, asIScriptContext* ctx, void* param);
 void ExceptionHandlerCallback(asIScriptContext* ctx, void* obj);
 asUINT GetTimeCallback();
+void RegisterUnsorted(asIScriptEngine* engine);

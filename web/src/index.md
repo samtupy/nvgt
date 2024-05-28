@@ -36,6 +36,7 @@ The NVGT engine advertises the following qualities and features:
 * text reencoding; Handle text created in a player's native encoding using the engine's ability to convert text from one encoding to another with the option of enabling over 35 locale specific encodings.
 * datastreams; Move, analyze/encrypt, and in other ways manipulate data with a low memory footprint and with few lines of code using connectable streaming classes (enspired by and wrapping c++/poco iostreams).
 * multithreading primatives; Make your game run faster using multiple threads, including related mutual exclusion/locking primatives like mutexes and events.
+* script debugger; Find issues in your code like never before with standard debugging techniques like breakpoints, single instruction stepping, realtime expression evaluation and more.
 * ever expanding plugin system; Be free of the Angelscript sandbox and code whatever extensions to your game you want in c++ or another language.
 * subscripting; Add downloadable levels to your games or make them more dynamic with NVGT's ability to execute Angelscript code from within Angelscript code like the javascript or python eval function.
 * cross platform; Release your games for macOS and Linux!

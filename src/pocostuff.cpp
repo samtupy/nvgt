@@ -619,9 +619,9 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("string string_base32_decode(const string& in)"), asFUNCTION(base32_decode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string string_recode(const string&in, const string&in, const string&in, int&out = void)"), asFUNCTION(string_recode), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
-	engine->RegisterGlobalFunction(_O("void debug_message(const string&in)"), asFUNCTIONPR(Debugger::message, (const std::string&), void), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("void debug_break()"), asFUNCTIONPR(Debugger::enter, (), void), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("void debug_break(const string&in)"), asFUNCTIONPR(Debugger::enter, (const std::string&), void), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void c_debug_message(const string&in)"), asFUNCTIONPR(Debugger::message, (const std::string&), void), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void c_debug_break()"), asFUNCTIONPR(Debugger::enter, (), void), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void c_debug_break(const string&in)"), asFUNCTIONPR(Debugger::enter, (const std::string&), void), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_HOME() property"), asFUNCTION(Path::home), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_APPDATA() property"), asFUNCTION(Path::configHome), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_COMMON_APPDATA() property"), asFUNCTION(Path::config), asCALL_CDECL);
