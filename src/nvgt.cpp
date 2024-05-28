@@ -62,7 +62,7 @@ class nvgt_application : public Poco::Util::Application {
 			#endif
 		}
 	protected:
-		void initialize(Application& self) {
+		void initialize(Application& self) override {
 			loadConfiguration();
 			Application::initialize(self);
 			#ifdef _WIN32
@@ -87,7 +87,7 @@ class nvgt_application : public Poco::Util::Application {
 			if (!g_ScriptEngine || ConfigureEngine(g_ScriptEngine) < 0) throw ApplicationException("unable to initialize script engine");
 		}
 		#ifndef NVGT_STUB
-		void defineOptions(OptionSet& options) {
+		void defineOptions(OptionSet& options) override {
 			Application::defineOptions(options);
 			options.addOption(Option("compile", "c", "compile script in release mode").group("compiletype"));
 			options.addOption(Option("compile-debug", "C", "compile script in debug mode").group("compiletype"));
@@ -99,7 +99,7 @@ class nvgt_application : public Poco::Util::Application {
 			options.addOption(Option("version", "V", "print version information and exit"));
 			options.addOption(Option("help", "h", "display available command line options"));
 		}
-		void handleOption(const std::string& name, const std::string& value) {
+		void handleOption(const std::string& name, const std::string& value) override {
 			Application::handleOption(name, value);
 			if (name == "help") {
 				mode = NVGT_HELP;
@@ -177,7 +177,7 @@ class nvgt_application : public Poco::Util::Application {
 			return retcode;
 		}
 		#endif
-		void uninitialize() {
+		void uninitialize() override {
 			g_shutting_down = true;
 			Application::uninitialize();
 			ScreenReaderUnload();
@@ -191,7 +191,7 @@ class nvgt_application : public Poco::Util::Application {
 #if !defined(_WIN32) || defined(NVGT_WIN_APP) || defined(NVGT_STUB)
 #undef SDL_MAIN_HANDLED
 #undef SDL_main_h_
-#include <sdl2/SDL_main.h>
+#include <SDL2/SDL_main.h>
 int main(int argc, char** argv) {
 	AutoPtr<Application> app = new nvgt_application();
 	try {

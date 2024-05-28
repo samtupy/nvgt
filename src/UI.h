@@ -32,7 +32,7 @@ int alert(const std::string& title, const std::string& text, bool can_cancel = f
 int question(const std::string& title, const std::string& text, bool can_cancel = false, unsigned int flags = 0);
 void message(const std::string& text, const std::string& header);
 bool info_box(const std::string& title, const std::string& text, const std::string& value);
-BOOL ClipboardSetText(const std::string& text);
+bool ClipboardSetText(const std::string& text);
 
 asINT64 ShowWindow(std::string& window_title);
 void wait(int ms);

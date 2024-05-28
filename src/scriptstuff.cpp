@@ -21,7 +21,7 @@
 #endif
 #include <obfuscate.h>
 #include <Poco/Util/Application.h>
-#include <Poco/format.h>
+#include <Poco/Format.h>
 #include <Poco/Thread.h>
 #include <scriptany.h>
 #include <scriptarray.h>

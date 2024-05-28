@@ -461,7 +461,7 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 				br >> subsystem_offset;
 				subsystem_offset += 92; // offset in new PE header containing subsystem word. 2 for GUI, 3 for console.
 				fs.seekp(subsystem_offset);
-				bw << unsigned short(3);
+				bw << UInt16(3);
 			}
 		}
 		// Other code that does platform specific things can go here, for now the platforms we support do nearly the same from now on.

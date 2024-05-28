@@ -12,6 +12,7 @@
 
 #include <errno.h>
 #include <obfuscate.h>
+#include <Poco/Thread.h>
 #ifndef _WIN32
 	#include <sys/stat.h>
 	#include <unistd.h>
@@ -157,7 +158,7 @@ bool pack::open(const string& filename, pack_open_mode mode, bool memload) {
 }
 
 bool pack::close() {
-	while (delay_close) Sleep(5);
+	while (delay_close) Poco::Thread::sleep(5);
 	delay_close = false;
 	bool was_opened = fptr || mptr;
 	bool ret = false;

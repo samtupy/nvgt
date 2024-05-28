@@ -18,6 +18,8 @@
 	#define VC_EXTRALEAN
 	#include <windows.h>
 	#include "InputBox.h"
+#elif defined(__APPLE__)
+	#include "apple.h"
 #endif
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
@@ -93,23 +95,23 @@ std::string ClipboardGetText() {
 	SDL_free(r);
 	return cb_text;
 }
-BOOL ClipboardSetText(const std::string& text) {
+bool ClipboardSetText(const std::string& text) {
 	InputInit();
 	return SDL_SetClipboardText(text.c_str()) == 0;
 }
-BOOL ClipboardSetRawText(const std::string& text) {
+bool ClipboardSetRawText(const std::string& text) {
 	#ifdef _WIN32
 	if (!OpenClipboard(nullptr))
-		return FALSE;
+		return false;
 	EmptyClipboard();
 	if (text == "") {
 		CloseClipboard();
-		return TRUE;
+		return true;
 	}
 	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, text.size() + 1);
 	if (!hMem) {
 		CloseClipboard();
-		return FALSE;
+		return false;
 	}
 	char* cbText = (char*)GlobalLock(hMem);
 	memcpy(cbText, text.c_str(), text.size());
@@ -117,7 +119,7 @@ BOOL ClipboardSetRawText(const std::string& text) {
 	GlobalUnlock(hMem);
 	SetClipboardData(CF_TEXT, hMem);
 	CloseClipboard();
-	return TRUE;
+	return true;
 	#else
 	return FALSE;
 	#endif
