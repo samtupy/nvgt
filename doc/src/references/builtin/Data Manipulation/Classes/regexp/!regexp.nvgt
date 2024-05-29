@@ -1,0 +1,21 @@
+/**
+	The regexp object allows for the easy usage of regular expressions in NVGT.
+	regexp(string pattern, int options = RE_UTF8);
+	## Arguments:
+		* string pattern: the regular expression's pattern (see remarks).
+		* int options = RE_UTF8: a combination of any of the values from the `regexp_options` enum.
+	## Remarks:
+		Regular expressions are a language used for matching, substituting, and otherwise manipulating text. To learn about the regular expression syntax that nVGT uses (called PCRE), see this link: https://en.wikipedia.org/wiki/Perl_Compatible_Regular_Expressions
+*/
+
+// Example:
+void main() {
+	regexp re("^[a-z]{2,4}$"); // Will match any lowercase alphabetical string between 2 and 4 characters in length.
+	string compare = input_box("Text", "Enter the text to check against the regular expression.");
+	if (compare.empty()) {
+		alert("Regular expression tester", "You didn't type a string to test.");
+		exit(1);
+	}
+	bool matches = re.match(compare);
+	alert("The regular expression", matches ? "matches" : "does not match");
+}

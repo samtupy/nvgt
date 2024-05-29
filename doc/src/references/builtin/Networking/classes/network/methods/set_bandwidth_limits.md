@@ -1,5 +1,5 @@
 # set_bandwidth_limits
-Set the incoming and outgoing bandwidth limits of the server per second.
+Set the incoming and outgoing bandwidth limits of the server (in bytes-per-second).
 
 `void network::set_bandwidth_limits(uint incoming, uint outgoing);`
 
