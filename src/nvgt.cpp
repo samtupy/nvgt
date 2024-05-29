@@ -25,6 +25,7 @@
 #include <Poco/Util/HelpFormatter.h>
 #include <Poco/Util/OptionSet.h>
 #include <Poco/Environment.h>
+#include <Poco/File.h>
 #include <Poco/Path.h>
 #include <Poco/UnicodeConverter.h>
 #include <SDL2/SDL.h>
@@ -63,7 +64,9 @@ class nvgt_application : public Poco::Util::Application {
 		}
 	protected:
 		void initialize(Application& self) override {
-			loadConfiguration();
+			#ifndef NVGT_STUB
+				loadConfiguration();
+			#endif
 			Application::initialize(self);
 			#ifdef _WIN32
 				setlocale(LC_ALL, ".UTF8");
@@ -146,6 +149,21 @@ class nvgt_application : public Poco::Util::Application {
 				return Application::EXIT_USAGE;
 			}
 			string scriptfile = args[0];
+			try {
+				// Parse the provided script path to insure it is valid and check if it is a file.
+				if (!File(Path(scriptfile)).isFile()) throw Exception("Expected a file", scriptfile);
+				// The scripter is able to create configuration files that can change some behaviours of the engine, such files are named after the script that is to be run.
+				Path conf_file(scriptfile);
+				conf_file.setExtension("properties");
+				if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
+				conf_file.setExtension("ini");
+				if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
+				conf_file.setExtension("json");
+				if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
+			} catch(Poco::Exception& e) {
+				message(e.displayText(), "error");
+				return Application::EXIT_CONFIG;
+			}
 			setupCommandLineProperty(args, 1);
 			if (CompileScript(g_ScriptEngine, scriptfile.c_str()) < 0) {
 				ShowAngelscriptMessages();

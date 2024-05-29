@@ -433,7 +433,7 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 	#else
 	return -1;
 	#endif
-	Poco::File stub = format("%snvgt_%s%s.bin", Util::Application::instance().config().getString("application.dir"), g_platform, (g_stub !=""? string("_") + g_stub : ""));
+	Poco::File stub = format("%snvgt_%s%s.bin", Path(Util::Application::instance().config().getString("application.dir")).pushDirectory("stub").toString(), g_platform, (g_stub !=""? string("_") + g_stub : ""));
 	Path outpath(!g_compiled_basename.empty()? g_compiled_basename : Path(scriptFile).setExtension(""));
 	if (g_platform  == "windows") outpath.setExtension("exe");
 	try {

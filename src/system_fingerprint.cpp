@@ -1,5 +1,6 @@
 /* system_fingerprint.cpp - code for generating unique system IDs
  * original repo: https://github.com/Tarik02/machineid
+ * Note that before version 1.0 it is very likely that this function will be rewritten from scratch using various functions from Poco and SDL, as well as having callbacks into nvgt_config.h  for extra security.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
