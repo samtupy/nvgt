@@ -1,44 +1,5 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-{% if page.published_date -%}
-<title>{{ page.title }} &ndash; {{ collections.posts.title }}</title>
-{%- else -%}
-<title>{{ page.title }} &ndash; {{ site.title }}</title>
-{%- endif %}
-<style>
-details summary
-{
-cursor: pointer;
-}
-details summary > *
-{
-display: inline;
-}
-</style>
-</head>
-<body>
-<a href="#content-anchor">Skip to content</a>
-<div id="navigation"><nav>
-{%- assign permalink = "/" | append: page.permalink -%}
-<ul class="links" style="list-style-type:none;">
-{% for item in site.data.nav -%}
-{%- assign item_with_index = item[1] | append: "/index.html" %}
-{%- if permalink == item[1] or permalink == item_with_index -%}
-<li><a href="{{ item[1] }}" aria-current="page">{{ item[0] }}</a></li>
-{% else -%}
-<li><a href="{{ item[1] }}">{{ item[0] }}</a></li>
-{% endif %}
-{%- endfor -%}
-</ul>
-</div></nav>
-<main><div id="content">
-<div id="content-anchor"></div>
+{% include "header.liquid" %}
+
 {{ page.content }}
-</div></main>
-<footer><div id="footer">
-      &copy; 2022&ndash;{{ site.time | date: "%Y" }} <a href="https://samtupy.com">Sam Tupy Productions</a>
-</div></footer>
-</body>
-</html>
+
+{% include "footer.liquid" %}
