@@ -1,6 +1,7 @@
 # Generally, the easiest way to build nvgt is using the provided package of build artifacts used when constructing the public nvgt releases, consisting of many static libraries, headers, and even some redistributable dlls. We will try to find that here and add include/libpaths, or else you can add paths to your own libraries manually if desired. This is included from any sconstruct scripts that need these paths set.
 # There are many more libraries and headers for the windows version of this package than for other platforms where getting the packages takes considerably less time and effort, but never the less there are still bass builds and steam audio for linux and macos.
 # This also contains code to copy these libraries to the release/lib directory in the repo to make packaging easier, this way the release directory contains a fully working copy of nvgt upon build.
+
 import os
 
 Import("env")
