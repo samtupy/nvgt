@@ -353,8 +353,8 @@ internet_request* Script_internet_request_Factory_u_u_p(const std::string& url, 
 
 void RegisterInternetPlugin(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_NET);
-	engine->RegisterGlobalFunction("string curl_encode(const string& in)", asFUNCTION(url_encode), asCALL_CDECL);
-	engine->RegisterGlobalFunction("string curl_decode(const string& in)", asFUNCTION(url_decode), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string curl_url_encode(const string& in)", asFUNCTION(url_encode), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string curl_url_decode(const string& in)", asFUNCTION(url_decode), asCALL_CDECL);
 	engine->RegisterObjectType("internet_request", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("internet_request", asBEHAVE_FACTORY, "internet_request @i()", asFUNCTION(Script_internet_request_Factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("internet_request", asBEHAVE_FACTORY, "internet_request @i(const string &in, bool = true)", asFUNCTION(Script_internet_request_Factory_u), asCALL_CDECL);
