@@ -13,7 +13,6 @@ def generate_version(env, target, source):
 	version_major, version_minor, version_patch, version_type = version.replace("-", ".").split(".")
 	with open("src/version.cpp", "w") as f:
 		f.write("// Auto-generated code containing version information and other constants retrieved from the system at build time.\n\n")
-		f.write("#include <string>\n");
 		f.write('#include "version.h"\n');
 		f.write(f'const std::string NVGT_VERSION = "{version}";\n')
 		f.write(f'const std::string NVGT_VERSION_COMMIT_HASH = "{git_hash}";\n')

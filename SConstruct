@@ -12,8 +12,8 @@ env.Alias("install", "c:/nvgt")
 SConscript("build/upx_sconscript.py", exports = ["env"])
 SConscript("build/version_sconscript.py", exports = ["env"])
 env.SetOption("num_jobs", multiprocessing.cpu_count())
+SConscript("build/osdev_sconscript.py", exports = ["env"])
 if env["PLATFORM"] == "win32":
-	SConscript("build/windev_sconscript.py", exports = ["env"])
 	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT", "/Z7", "/std:c++17", "/GF", "/Zc:inline", "/O2"])
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
 	env.Append(LIBS = ["tolk", "enet", "angelscript64", "SDL2"])
@@ -21,11 +21,11 @@ if env["PLATFORM"] == "win32":
 else:
 	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++17", "-fpermissive", "-O2", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result"], LIBS = ["m"])
 if env["PLATFORM"] == "darwin":
-	# homebrew paths, as well as paths for a folder called macosdev containing headers and pre-built libraries like bass and steam audio.
-	env.Append(CPPPATH = ["/opt/homebrew/include", "#macosdev/include"], CCFLAGS = ["-mmacosx-version-min=14.0"], LIBPATH = ["/opt/homebrew/lib", "#macosdev/lib"], LIBS = ["angelscript", "enet", "SDL2"])
+	# homebrew paths and other libraries/flags for MacOS
+	env.Append(CPPPATH = ["/opt/homebrew/include"], CCFLAGS = ["-mmacosx-version-min=14.0"], LIBPATH = ["/opt/homebrew/lib"], LIBS = ["angelscript", "enet", "SDL2"])
 elif env["PLATFORM"] == "posix":
-	# Same custom directory here accept called lindev for now, we enable the gold linker to silence seemingly pointless warnings about symbols in the bass libraries, we also strip the resulting binaries, and we add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
-	env.Append(CPPPATH = ["/usr/local/include", "#lindev/include"], LIBPATH = ["/usr/local/lib", "#lindev/lib"], LINKFLAGS = ["-fuse-ld=gold", "-s"])
+	# enable the gold linker to silence seemingly pointless warnings about symbols in the bass libraries, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
+	env.Append(CPPPATH = ["/usr/local/include"], LIBPATH = ["/usr/local/lib"], LINKFLAGS = ["-fuse-ld=gold", "-s"])
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
 	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL2.a"])
 env.Append(CPPDEFINES = ["POCO_STATIC", "NDEBUG", "UNICODE"])
@@ -56,9 +56,9 @@ elif env["PLATFORM"] == "darwin":
 	env["FRAMEWORKPREFIX"] = "-weak_framework"
 	env.Append(FRAMEWORKS = ["CoreAudio",  "CoreFoundation", "CoreHaptics", "CoreVideo", "AudioToolbox", "AppKit", "IOKit", "Carbon", "Cocoa", "ForceFeedback", "GameController", "QuartzCore"])
 	env.Append(LIBS = ["objc"])
-	env.Append(LINKFLAGS = ["-Wl,-rpath,'.'", "-mmacosx-version-min=14.0"])
+	env.Append(LINKFLAGS = ["-Wl,-rpath,'.',-rpath,'./lib'", "-mmacosx-version-min=14.0"])
 elif env["PLATFORM"] == "posix":
-	env.Append(LINKFLAGS = ["-Wl,-rpath,'lib'"])
+	env.Append(LINKFLAGS = ["-Wl,-rpath,'.',-rpath,'lib'"])
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
 		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
@@ -98,11 +98,11 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	if env["PLATFORM"] == "win32": stub_env.Append(LINKFLAGS = ["/subsystem:windows"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
 	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + [version_object]
-	stub = stub_env.Program(f"release/nvgt_{stub_platform}", stub_objects)
-	if env["PLATFORM"] == "win32": env.Install("c:/nvgt", stub)
+	stub = stub_env.Program(f"release/stub/nvgt_{stub_platform}", stub_objects)
+	if env["PLATFORM"] == "win32": env.Install("c:/nvgt/stub", stub)
 	if "upx" in env:
-		stub_u = stub_env.UPX(f"release/nvgt_{stub_platform}_upx.bin", stub)
-		if env["PLATFORM"] == "win32": env.Install("c:/nvgt", stub_u)
+		stub_u = stub_env.UPX(f"release/stub/nvgt_{stub_platform}_upx.bin", stub)
+		if env["PLATFORM"] == "win32": env.Install("c:/nvgt/stub", stub_u)
 	# on windows, we should have a version of the Angelscript library without the compiler, allowing for slightly smaller executables.
 	if env["PLATFORM"] == "win32":
 		stub_env.AddPostAction(stub, fix_windows_stub)
@@ -111,10 +111,12 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 		if "angelscript64" in stublibs:
 			stublibs.remove("angelscript64")
 			stublibs.append("angelscript64nc")
-			stub_nc = stub_env.Program(f"release/nvgt_{stub_platform}_nc", stub_objects, LIBS = stublibs)
+			stub_nc = stub_env.Program(f"release/stub/nvgt_{stub_platform}_nc", stub_objects, LIBS = stublibs)
 			stub_env.AddPostAction(stub_nc, fix_windows_stub)
-			env.Install("c:/nvgt", stub_nc)
+			env.Install("c:/nvgt/stub", stub_nc)
 			if "upx" in env:
-				stub_nc_u = stub_env.UPX(f"release/nvgt_{stub_platform}_nc_upx.bin", stub_nc)
+				stub_nc_u = stub_env.UPX(f"release/stub/nvgt_{stub_platform}_nc_upx.bin", stub_nc)
 				stub_env.AddPostAction(stub_nc_u, fix_windows_stub)
-				env.Install("c:/nvgt", stub_nc_u)
+				env.Install("c:/nvgt/stub", stub_nc_u)
+
+env["NVGT_OSDEV_COPY_LIBS"](env)
