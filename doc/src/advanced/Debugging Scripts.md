@@ -2,7 +2,7 @@
 One very useful feature of NVGT is the ability to debug the scripts that you write. This means being able to pause script execution at any time (either triggered manually or automatically), view what's going on and even make changes or inject code, and then resume the execution. You can even execute one statement in your code at a time to get an idea of exactly what it is doing.
 
 ## The -d or --debug option
-To debug a script in nvgt, it is required that you use the command line version of nvgt (nvgt.exe). On other platforms, only a command line version is available.
+To debug a script in nvgt, it is required that you use the command line version of nvgt (nvgt.exe). On platforms other than Windows, only a command line version is available.
 
 There is a command line argument you must pass to nvgt.exe along with the script you want to run in order to debug it, which is either -d, or --debug depending on what you prefer.
 
