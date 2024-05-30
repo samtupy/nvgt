@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>nvgt</string>
+	<key>CFBundleExecutable</key>
+	<string>MacOS/nvgt</string>
+	<key>CFBundleIconFile</key>
+	<string>unicon.icns</string>
+	<key>CFBundleIdentifier</key>
+	<string>gg.nvgt</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>nvgt</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.85.0</string>
+	<key>LSEnvironment</key>
+	<dict>
+		<key>MACOS_BUNDLED_APP</key>
+		<string>1</string>
+	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Microphone access for recording voice messages.</string>
+</dict>
+</plist>

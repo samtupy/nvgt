@@ -16,6 +16,8 @@ def make_app_bundle(bundle_name, release_path):
 	shutil.copytree(release_path, bundle_basename + "/MacOS")
 	os.mkdir(bundle_basename + "/Resources")
 	os.rename(bundle_basename + "/MacOS/stub", bundle_basename + "/Resources/stub")
+	shutil.copy("macos_info.plist", bundle_basename + "/info.plist")
+	shutil.copy("macos_icon.icns", bundle_basename + "/Resources/unicon.icns")
 
 def make_dmg(src_dir, filename):
 	subprocess.check_call(["hdiutil", "create", "-srcfolder", src_dir, filename])
