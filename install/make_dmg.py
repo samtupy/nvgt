@@ -12,20 +12,25 @@ def make_executable(path):
 	os.chmod(path, mode)
 
 def make_app_bundle(bundle_name, release_path):
+	if os.path.isdir(bundle_name): shutil.rmtree(bundle_name) # start fresh
 	bundle_basename = f"{bundle_name}/Contents"
 	shutil.copytree(release_path, bundle_basename + "/MacOS")
 	os.mkdir(bundle_basename + "/Resources")
+	os.rename(bundle_basename + "/MacOS/lib", bundle_basename + "/Frameworks")
+	os.rename(bundle_basename + "/MacOS/include", bundle_basename + "/Resources/include")
 	os.rename(bundle_basename + "/MacOS/stub", bundle_basename + "/Resources/stub")
 	shutil.copy("macos_info.plist", bundle_basename + "/info.plist")
 	shutil.copy("macos_icon.icns", bundle_basename + "/Resources/unicon.icns")
 
 def make_dmg(src_dir, filename):
+	if os.path.isfile(filename): os.remove(filename)
 	subprocess.check_call(["hdiutil", "create", "-srcfolder", src_dir, filename])
 
 def get_version_info():
-	return Path("../version").read_text().replace("-", "_")
+	return Path("../version").read_text().strip().replace("-", "_")
 
 relpath = "../release"
 if len(sys.argv) > 1:
 	relpath = " ".join(sys.argv[1:])
 make_app_bundle("nvgt.app", relpath)
+make_dmg("nvgt.app", f"nvgt_{get_version_info()}.dmg")
