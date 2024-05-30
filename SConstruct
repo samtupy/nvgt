@@ -56,7 +56,7 @@ elif env["PLATFORM"] == "darwin":
 	env["FRAMEWORKPREFIX"] = "-weak_framework"
 	env.Append(FRAMEWORKS = ["CoreAudio",  "CoreFoundation", "CoreHaptics", "CoreVideo", "AudioToolbox", "AppKit", "IOKit", "Carbon", "Cocoa", "ForceFeedback", "GameController", "QuartzCore"])
 	env.Append(LIBS = ["objc"])
-	env.Append(LINKFLAGS = ["-Wl,-rpath,'.',-rpath,'./lib'", "-mmacosx-version-min=14.0"])
+	env.Append(LINKFLAGS = ["-Wl,-rpath,'@loader_path',-rpath,'@loader_path/lib'", "-mmacosx-version-min=14.0"])
 elif env["PLATFORM"] == "posix":
 	env.Append(LINKFLAGS = ["-Wl,-rpath,'.',-rpath,'lib'"])
 if ARGUMENTS.get("no_user", "0") == "0":

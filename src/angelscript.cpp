@@ -19,6 +19,7 @@
 #include <iostream>
 #include <string>
 #include <angelscript.h>
+#include <Poco/Environment.h>
 #include <Poco/Exception.h>
 #include <Poco/File.h>
 #include <Poco/FileStream.h>
@@ -433,7 +434,12 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 	#else
 	return -1;
 	#endif
-	Poco::File stub = format("%snvgt_%s%s.bin", Path(Util::Application::instance().config().getString("application.dir")).pushDirectory("stub").toString(), g_platform, (g_stub !=""? string("_") + g_stub : ""));
+	Path stubspath = Util::Application::instance().config().getString("application.dir");
+	#ifdef __APPLE__ // Stub may be in Resources directory of an app bundle.
+		if (Poco::Environment::has("MACOS_BUNDLED_APP")) stubspath.makeParent().pushDirectory("Resources");
+	#endif
+	stubspath.pushDirectory("stub");
+	Poco::File stub = format("%snvgt_%s%s.bin", stubspath.toString(), g_platform, (g_stub !=""? string("_") + g_stub : ""));
 	Path outpath(!g_compiled_basename.empty()? g_compiled_basename : Path(scriptFile).setExtension(""));
 	if (g_platform  == "windows") outpath.setExtension("exe");
 	try {

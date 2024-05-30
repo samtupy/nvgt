@@ -74,6 +74,11 @@ class nvgt_application : public Poco::Util::Application {
 				wstring dir_u;
 				UnicodeConverter::convert(Path(config().getString("application.dir")).append("lib").toString(), dir_u);
 				SetDllDirectoryW(dir_u.c_str());
+			#elif defined(__APPLE__)
+				if (Environment::has("MACOS_BUNDLED_APP")) { // Use GUI instead of stdout and chdir to Resources directory.
+					config().setString("application.gui", "");
+					chdir(Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString().c_str());
+				}
 			#endif
 			srand(ticks()); // Random bits of NVGT if not it's components might use the c rand function.
 			#if defined(NVGT_WIN_APP) || defined(NVGT_STUB)
@@ -124,13 +129,12 @@ class nvgt_application : public Poco::Util::Application {
 			hf.setUsage("[options] script [-- arg1 arg2 ...]");
 			hf.setHeader("NonVisual Gaming Toolkit (NVGT) - available command line arguments");
 			hf.setFooter("A script file is required.");
-			#ifndef NVGT_WIN_APP
-				hf.format(cout);
-			#else
+			if (!config().hasOption("application.gui")) hf.format(cout);
+			else {
 				stringstream ss;
 				hf.format(ss);
 				message(ss.str(), "help");
-			#endif
+			}
 		}
 		virtual int main(const std::vector<std::string>& args) override {
 			if (mode == NVGT_HELP) {
@@ -138,11 +142,8 @@ class nvgt_application : public Poco::Util::Application {
 				return Application::EXIT_OK;
 			} else if (mode == NVGT_VERSIONINFO) {
 				string ver = format("NVGT (NonVisual Gaming Toolkit) version %s, built on %s for %s %s", NVGT_VERSION, NVGT_VERSION_BUILD_TIME, Environment::osName(), Environment::osArchitecture());
-				#ifdef NVGT_WIN_APP
-					message(ver, "version information");
-				#else
-					cout << ver << endl;
-				#endif
+				if (config().hasOption("application.gui")) message(ver, "version information");
+				else cout << ver << endl;
 				return Application::EXIT_OK;
 			} else if (args.size() < 1) {
 				std::cout << commandName() << ": error, no input files." << std::endl << "type " << commandName() << " --help for usage instructions" << std::endl;
@@ -169,14 +170,15 @@ class nvgt_application : public Poco::Util::Application {
 				ShowAngelscriptMessages();
 				return Application::EXIT_DATAERR;
 			}
-			#if !defined(NVGT_STUB) && !defined(NVGT_WIN_APP)
-				if (config().hasOption("application.as_debug")) InitializeDebugger(g_ScriptEngine);
-			#elif defined(NVGT_WIN_APP)
-				if (config().hasOption("application.as_debug")) {
+			if (config().hasOption("application.as_debug")) {
+				if (config().hasOption("application.gui")) {
 					message("please use the command line version of nvgt if you wish to invoque the debugger", "error");
 					return Application::EXIT_CONFIG;
 				}
-			#endif
+				#if !defined(NVGT_STUB) && !defined(NVGT_WIN_APP)
+					else InitializeDebugger(g_ScriptEngine);
+				#endif
+			}
 			int retcode = Application::EXIT_OK;
 			if (mode == NVGT_RUN && (retcode = ExecuteScript(g_ScriptEngine, scriptfile.c_str())) < 0 || mode == NVGT_COMPILE && CompileExecutable(g_ScriptEngine, scriptfile)) {
 				ShowAngelscriptMessages();

@@ -77,12 +77,10 @@ int question(const std::string& title, const std::string& text, bool can_cancel,
 	return message_box(title, text, buttons, flags);
 }
 void message(const std::string& text, const std::string& header) { // Usually used internally by NVGT's c++ code
-	#if defined(_WIN32)
 	if (Poco::Util::Application::instance().config().hasOption("application.gui")){
-		MessageBoxA(0, text.c_str(), header.c_str(), 0);
+		alert(header, text);
 		return;
 	}
-	#endif
 	std::string tmp = header;
 	tmp += ": ";
 	tmp += text;
