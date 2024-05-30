@@ -1,21 +1,20 @@
 #!/bin/zsh
 
+function setup_homebrew {
+	brew install autoconf automake libtool openssl sdl2 bullet
+}
+
 function setup_angelscript {
 	echo Installing Angelscript...
 	git clone https://github.com/codecat/angelscript-mirror
 	cd "angelscript-mirror/sdk/angelscript/projects/cmake"
-	mkdir build
+	mkdir -p build
 	cd build
 	cmake ..
 	cmake --build .
 	sudo cmake --install .
 	cd ../../../../../..
 	echo Angelscript installed.
-}
-
-function setup_bullet {
-	echo Installing bullet3...
-	brew install bullet
 }
 
 function setup_enet {
@@ -31,27 +30,25 @@ function setup_enet {
 }
 
 function setup_libgit2 {
-	echo Installing libgit2...
-	git clone https://github.com/libgit2/libgit2
-	cd libgit2
-	mkdir build
+	curl -s -O -L https://github.com/libgit2/libgit2/archive/refs/tags/v1.8.1.tar.gz
+	tar -xzf v1.8.1.tar.gz
+	cd libgit2-1.8.1
+	mkdir -p build
 	cd build
-	cmake ..
+	cmake .. -DBUILD_TESTS=OFF -DUSE_ICONV=OFF -DBUILD_CLI=OFF -DCMAKE_BUILD_TYPE=Release
 	cmake --build .
-	sudo cmake --install .
 	cd ../..
-	echo libgit2 installed.
+	rm v1.8.1.tar.gz
 }
 
 function setup_poco {
-	echo Installing poco...
-	git clone https://github.com/pocoproject/poco
-	cd poco
+	curl -s -O https://pocoproject.org/releases/poco-1.13.3/poco-1.13.3-all.tar.gz
+	tar -xzf poco-1.13.3-all.tar.gz
+	cd poco-1.13.3-all
 	./configure --static --no-tests --no-samples
 	make -s -j16
-	sudo make install
 	cd ..
-	echo poco installed.
+	rm poco-1.13.3-all.tar.gz
 }
 
 function setup_nvgt {
@@ -72,8 +69,8 @@ function setup_nvgt {
 	fi
 	
 	echo Downloading macosdev...
-	wget https://nvgt.gg/macosdev.tar.gz
-	mkdir macosdev
+	curl -s -O https://nvgt.gg/macosdev.tar.gz
+	mkdir -p macosdev
 	cd macosdev
 	tar -xvf ../macosdev.tar.gz
 	cd ..
@@ -84,13 +81,11 @@ function setup_nvgt {
 
 function main {
 	set -e
-	mkdir deps
+	mkdir -p deps
 	cd deps
-	
+	setup_homebrew
 	setup_angelscript
-	setup_bullet
 	setup_enet
-	setup_libgit2
 	setup_poco
 	setup_nvgt
 	echo Success!
