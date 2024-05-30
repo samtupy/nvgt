@@ -6,7 +6,7 @@ function setup_homebrew {
 
 function setup_angelscript {
 	echo Installing Angelscript...
-	git clone https://github.com/codecat/angelscript-mirror
+	git clone https://github.com/codecat/angelscript-mirror||true
 	cd "angelscript-mirror/sdk/angelscript/projects/cmake"
 	mkdir -p build
 	cd build
@@ -19,7 +19,7 @@ function setup_angelscript {
 
 function setup_enet {
 	echo Installing enet...
-	git clone https://github.com/lsalzman/enet
+	git clone https://github.com/lsalzman/enet||true
 	cd enet
 	autoreconf -vfi
 	./configure
@@ -37,6 +37,7 @@ function setup_libgit2 {
 	cd build
 	cmake .. -DBUILD_TESTS=OFF -DUSE_ICONV=OFF -DBUILD_CLI=OFF -DCMAKE_BUILD_TYPE=Release
 	cmake --build .
+	sudo cmake --install .
 	cd ../..
 	rm v1.8.1.tar.gz
 }
@@ -45,9 +46,12 @@ function setup_poco {
 	curl -s -O https://pocoproject.org/releases/poco-1.13.3/poco-1.13.3-all.tar.gz
 	tar -xzf poco-1.13.3-all.tar.gz
 	cd poco-1.13.3-all
-	./configure --static --no-tests --no-samples
-	make -s -j16
-	cd ..
+	mkdir -p cmake_build
+	cd cmake_build
+	cmake .. -DENABLE_TESTS=OFF -DENABLE_SAMPLES=OFF -DCMAKE_BUILD_TYPE=Release -DENABLE_PAGECOMPILER=OFF -DENABLE_PAGECOMPILER_FILE2PAGE=OFF -DENABLE_ACTIVERECORD=OFF -DENABLE_ACTIVERECORD_COMPILER=OFF -DENABLE_XML=OFF -DENABLE_MONGODB=OFF -DBUILD_SHARED_LIBS=OFF
+	cmake --build .
+	sudo cmake --install .
+	cd ../..
 	rm poco-1.13.3-all.tar.gz
 }
 
@@ -59,8 +63,7 @@ function setup_nvgt {
 		echo Not running on CI.
 		cd ..	
 		
-		# TODO - make `git clone` when public, CI most likely won't have gh.
-		gh repo clone https://github.com/samtupy/nvgt
+		git clone https://github.com/samtupy/nvgt||true
 		cd nvgt
 	
 	else

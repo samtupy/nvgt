@@ -36,7 +36,6 @@
 #include <Poco/StreamCopier.h>
 #include <Poco/TeeStream.h>
 #include <Poco/TextEncoding.h>
-#include <Poco/Zip/PartialStream.h>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -499,18 +498,6 @@ template <class T, class S> void RegisterCountingStream(asIScriptEngine* engine,
 	engine->RegisterObjectMethod(type.c_str(), "void add_lines(int64)", asFUNCTION(counting_stream_add_lines), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void add_pos(int64)", asFUNCTION(counting_stream_add_pos), asCALL_CDECL_OBJFIRST);
 }
-// PartialInputStream, known to nvgt as partial_reader.
-bool partial_reader_open(datastream* ds, datastream* ds_connect, unsigned long long start, unsigned long long end, bool initialize, const std::string& prefix, const std::string& postfix, f_streamargs) {
-	if (!ds_connect) return false;
-	std::istream* istr = ds_connect->get_istr();
-	if (!istr) return false;
-	return ds->open(new Zip::PartialInputStream(*istr, start, end, initialize, prefix, postfix), nullptr, p_streamargs, ds_connect);
-}
-datastream* partial_reader_factory(datastream* ds_connect, unsigned long long start, unsigned long long end, bool initialize, const std::string& prefix, const std::string& postfix, f_streamargs) {
-	datastream* ds = new datastream();
-	partial_reader_open(ds, ds_connect, start, end, initialize, prefix, postfix, p_streamargs);
-	return ds;
-}
 
 // Wrappers around cin, cout and cerr from the stl. The first function just performs any common setup used for all 3 streams.
 datastream* dscmd(datastream* ds) {
@@ -565,9 +552,6 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("file", "bool open(const string&in, const string&in, const string&in = \"\", int byteorder = 1)", asFUNCTION(file_stream_open), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("file", "uint64 get_size() const property", asFUNCTION(file_stream_size), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
-	RegisterDatastreamType<Zip::PartialInputStream, datastream_factory_closed>(engine, "partial_reader");
-	engine->RegisterObjectBehaviour("partial_reader", asBEHAVE_FACTORY, "partial_reader@ d(datastream@, uint64, uint64, bool = true, const string&in = \"\", const string&in = \"\", const string&in encoding = \"\", int byteorder = 1)", asFUNCTION(partial_reader_factory), asCALL_CDECL);
-	engine->RegisterObjectMethod("partial_reader", "bool open(datastream@, uint64, uint64, bool = true, const string&in = \"\", const string&in = \"\", const string&in encoding = \"\", int byteorder = 1)", asFUNCTION(partial_reader_open), asCALL_CDECL_OBJFIRST);
 	RegisterInputDatastreamType<HexBinaryDecoder>(engine, "hex_decoder");
 	RegisterOutputDatastreamType<HexBinaryEncoder>(engine, "hex_encoder");
 	RegisterInputDatastreamType<Base32Decoder>(engine, "base32_decoder");
