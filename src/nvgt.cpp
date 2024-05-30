@@ -41,6 +41,7 @@
 #else
 	#include "../user/nvgt_config.h"
 #endif
+#include "serialize.h" // current location of g_StringTypeid (subject to change)
 #include "sound.h"
 #include "srspeech.h"
 #include "timestuff.h"
@@ -84,15 +85,19 @@ class nvgt_application : public Poco::Util::Application {
 			#if defined(NVGT_WIN_APP) || defined(NVGT_STUB)
 				config().setString("application.gui", "");
 			#endif
-		}
-		void setupCommandLineProperty(const vector<string>& argv, int offset = 0) {
-			// Prepare the COMMAND_LINE property used by scripts by combining all arguments into one string, for bgt backwards compatibility.
-			for (unsigned int i = offset; i < argv.size(); i++) {
-				g_CommandLine += argv[i];
-				if (i < argv.size() -1) g_CommandLine += " ";
-			}
 			g_ScriptEngine = asCreateScriptEngine();
 			if (!g_ScriptEngine || ConfigureEngine(g_ScriptEngine) < 0) throw ApplicationException("unable to initialize script engine");
+		}
+		void setupCommandLineProperty(const vector<string>& argv, int offset = 0) {
+			// Prepare the COMMAND_LINE property used by scripts by combining all arguments into one string, for bgt backwards compatibility. NVGT also has a new ARGS array which we will also set up here.
+			if (!g_StringTypeid)
+				g_StringTypeid = g_ScriptEngine->GetStringFactoryReturnTypeId();
+			g_command_line_args = CScriptArray::Create(g_ScriptEngine->GetTypeInfoByDecl("string[]"));
+			for (unsigned int i = offset; i < argv.size(); i++) {
+				g_CommandLine += argv[i];
+				g_command_line_args->InsertLast((void*)&argv[i]);
+				if (i < argv.size() -1) g_CommandLine += " ";
+			}
 		}
 		#ifndef NVGT_STUB
 		void defineOptions(OptionSet& options) override {
@@ -166,6 +171,7 @@ class nvgt_application : public Poco::Util::Application {
 				return Application::EXIT_CONFIG;
 			}
 			setupCommandLineProperty(args, 1);
+			g_command_line_args->InsertAt(0, (void*)&scriptfile);
 			if (CompileScript(g_ScriptEngine, scriptfile.c_str()) < 0) {
 				ShowAngelscriptMessages();
 				return Application::EXIT_DATAERR;
@@ -189,6 +195,7 @@ class nvgt_application : public Poco::Util::Application {
 		#else
 		virtual int main(const std::vector<std::string>& args) override {
 			setupCommandLineProperty(args);
+			g_command_line_args->InsertAt(0, (void*)&config().getString("application.path"));
 			int retcode = Application::EXIT_OK;
 			if (LoadCompiledExecutable(g_ScriptEngine) < 0 || (retcode = ExecuteScript(g_ScriptEngine, commandName().c_str())) < 0) {
 				ShowAngelscriptMessages();

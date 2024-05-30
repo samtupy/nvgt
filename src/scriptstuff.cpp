@@ -21,6 +21,7 @@
 #endif
 #include <obfuscate.h>
 #include <Poco/Util/Application.h>
+#include <Poco/Exception.h>
 #include <Poco/Format.h>
 #include <Poco/Thread.h>
 #include <scriptany.h>
@@ -254,6 +255,9 @@ void dump_angelscript_engine_configuration(datastream* output) {
 		if (!output || !output->get_ostr()) return;
 		WriteConfigToStream(g_ScriptEngine, *output->get_ostr());
 	#endif
+}
+void script_assert(bool expr, const std::string& failtext = "") {
+	if (!expr) throw Poco::AssertionViolationException(failtext);
 }
 
 class script_function;
@@ -764,6 +768,7 @@ void RegisterScriptstuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("string get_SCRIPT_CURRENT_FUNCTION() property", asFUNCTION(get_script_current_function), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_SCRIPT_CURRENT_FILE() property", asFUNCTION(get_script_current_file), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_SCRIPT_CURRENT_LINE() property", asFUNCTION(get_script_current_line), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void assert(bool, const string&in = \"\")", asFUNCTION(script_assert), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	engine->RegisterGlobalFunction("string get_SCRIPT_EXECUTABLE() property", asFUNCTION(get_script_executable), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool get_SCRIPT_COMPILED() property", asFUNCTION(script_compiled), asCALL_CDECL);

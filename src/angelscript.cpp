@@ -101,9 +101,7 @@ Mutex g_ctxPoolMutex;
 vector<string> g_IncludeDirs;
 vector<string> g_IncludeScripts;
 std::string g_CommandLine;
-CScriptArray* g_commandLineArgs = 0;
-int g_argc = 0;
-char** g_argv = 0;
+CScriptArray* g_command_line_args = 0;
 bool g_debug = true; // Whether script has been compiled with extra debug information in the bytecode, true by default because source runs contain such information.
 bool g_ASDebugBreak = false; // If the angelscript debugger is in use, user can ctrl+c to perform a manual break.
 asIScriptEngine* g_ScriptEngine = NULL;
@@ -776,4 +774,5 @@ void RegisterUnsorted(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("void debug_break()", asFUNCTION(asDebugBreak), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void debug_add_file_breakpoint(const string&in, int)", asFUNCTION(asDebuggerAddFileBreakpoint), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void debug_add_func_breakpoint(const string&in)", asFUNCTION(asDebuggerAddFuncBreakpoint), asCALL_CDECL);
+	engine->RegisterGlobalProperty("const string[]@ ARGS", &g_command_line_args);
 }

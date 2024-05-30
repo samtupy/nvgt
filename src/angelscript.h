@@ -14,9 +14,11 @@
 
 #include <string>
 #include <angelscript.h>
+#include <scriptarray.h>
 #include "contextmgr.h"
 
 extern std::string g_compiled_basename;
+extern CScriptArray* g_command_line_args;
 extern std::string g_CommandLine;
 extern std::vector<asIScriptContext*> g_ctxPool;
 extern std::vector<std::string> g_IncludeDirs;
