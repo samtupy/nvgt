@@ -1,14 +1,14 @@
 !execute "py nsis_genversion.py"
 !include "nvgt_version.nsh"
 !include "MUI2.nsh"
+!include "Integration.nsh"
 !define /date COPYRIGHT_YEAR "%Y"
 Name "nvgt"
-Caption "NVGT - NonVisual Gaming Toolkit ${ver_string}"
+Caption "NVGT - NonVisual Gaming Toolkit ${ver_string} setup"
 OutFile "nvgt_${ver_filename_string}.exe"
 RequestExecutionLevel admin
 Unicode True
 InstallDir C:\nvgt
-InstallDirRegKey HKCU "Software\Sam Tupy Productions\NVGT" ""
 
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Welcome to the NonVisual Gaming Toolkit ${ver_string} Setup Program"
@@ -41,12 +41,28 @@ InstallDirRegKey HKCU "Software\Sam Tupy Productions\NVGT" ""
   VIAddVersionKey /LANG=${LANG_ENGLISH} "FileVersion" "${ver}"
   VIAddVersionKey /LANG=${LANG_ENGLISH} "ProductVersion" "${ver}"
 
+Function .onInit
+  SetRegView 64
+  ReadRegStr $0 HKLM "Software\Sam Tupy Productions\NVGT" ""
+  ${If} $0 != ""
+    StrCpy $INSTDIR $0
+  ${EndIf}
+FunctionEnd
+Function un.onInit
+  SetRegView 64
+FunctionEnd
+
 Section "-NVGT"
   SetOutPath $INSTDIR
   File /a /r ..\release\lib
   File /a ..\release\*
   File ..\doc\nvgt.chm
-  WriteRegStr HKCU "Software\Sam Tupy Productions\NVGT" "" $INSTDIR
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NVGT"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NVGT" "DisplayName" "NonVisual Gaming Toolkit (NVGT)"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NVGT" "DisplayVersion" ${ver_string}
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NVGT" "Publisher" "Sam Tupy Productions and contributors"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NVGT" "UninstallString" $INSTDIR\uninst.exe
+  WriteRegStr HKLM "Software\Sam Tupy Productions\NVGT" "" $INSTDIR
   WriteUninstaller "$INSTDIR\uninst.exe"
 SectionEnd
 
@@ -80,6 +96,7 @@ Section "File explorer context menu registration"
   DeleteRegKey HKCR ".nvgt"
   DeleteRegKey HKCR "NVGTScript"
   WriteRegStr HKCR ".nvgt" "" "NVGTScript"
+  WriteRegStr HKCR ".nvgt" "PerceivedType" "text"
   WriteRegStr HKCR "NVGTScript" "" "NVGT Script"
   WriteRegStr HKCR "NVGTScript\DefaultIcon" "" ""
   WriteRegStr HKCR "NVGTScript\shell\compile" "MUIVerb" "Compile Script"
@@ -97,11 +114,14 @@ Section "File explorer context menu registration"
   WriteRegStr HKCR "NVGTScript\shell\run\command" "" '$INSTDIR\nvgtw.exe "%1"'
   WriteRegStr HKCR "NVGTScript\shell\debug" "" "Debug Script"
   WriteRegStr HKCR "NVGTScript\shell\debug\command" "" '$INSTDIR\nvgt.exe -d "%1"'
+  ${NotifyShell_AssocChanged}
 SectionEnd
 
 Section "uninstall"
   RMDir /r $INSTDIR
-  DeleteRegKey HKCU "Software\Sam Tupy Productions\NVGT"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NVGT"
+  DeleteRegKey HKLM "Software\Sam Tupy Productions\NVGT"
+  DeleteRegKey /ifempty HKLM "Software\Sam Tupy Productions"
   DeleteRegKey HKCR ".nvgt"
   DeleteRegKey HKCR "NVGTScript"
 SectionEnd
