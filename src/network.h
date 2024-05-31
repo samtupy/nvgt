@@ -44,7 +44,7 @@ public:
 	bool setup_server(unsigned short port, unsigned char max_channels, unsigned short max_peers);
 	bool setup_local_server(unsigned short port, unsigned char max_channels, unsigned short max_peers);
 	asQWORD connect(const std::string& hostname, unsigned short port);
-	network_event* request();
+	network_event* request(uint32_t timeout = 0);
 	std::string get_peer_address(asQWORD peer_id);
 	unsigned int get_peer_average_round_trip_time(asQWORD peer_id);
 	bool send(asQWORD peer_id, const std::string& message, unsigned char channel, bool reliable = true);

@@ -97,12 +97,12 @@ asQWORD network::connect(const std::string& hostname, unsigned short port) {
 	return next_peer - 1;
 }
 
-network_event* network::request() {
+network_event* network::request(uint32_t timeout) {
 	network_event* e = new network_event();
 	if (!host)
 		return e;
 	ENetEvent event;
-	int r = enet_host_service(host, &event, 0);
+	int r = enet_host_service(host, &event, timeout);
 	if (r < 1) return e;
 	e->type = event.type;
 	e->channel = event.channelID;
@@ -267,7 +267,7 @@ void RegisterScriptNetwork(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("network"), _O("bool setup_server(uint16, uint8, uint16)"), asMETHOD(network, setup_server), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool setup_local_server(uint16, uint8, uint16)"), asMETHOD(network, setup_local_server), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint64 connect(const string& in, uint16)"), asMETHOD(network, connect), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("network_event@ request()"), asMETHOD(network, request), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("network_event@ request(uint = 0)"), asMETHOD(network, request), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("string get_peer_address(uint64) const"), asMETHOD(network, get_peer_address), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint get_peer_average_round_trip_time(uint64) const"), asMETHOD(network, get_peer_average_round_trip_time), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool send(uint64, const string& in, uint8, bool = true)"), asMETHOD(network, send), asCALL_THISCALL);

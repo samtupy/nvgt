@@ -11,8 +11,8 @@ void main() {
 	}
 	show_window("server up");
 	while (!key_down(KEY_ESCAPE)) {
-		wait(5);
-		network_event@ e = n.request();
+		wait(0);
+		network_event@ e = n.request(5);
 		if (e.type == event_connect)
 			v.speak("connection from peer " + e.peer_id + " " + n.get_peer_address(e.peer_id), true);
 		else if (e.type == event_disconnect)

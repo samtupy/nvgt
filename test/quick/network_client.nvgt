@@ -15,8 +15,8 @@ void main() {
 	show_window("client test");
 	bool connected = false;
 	while (!key_down(KEY_ESCAPE)) {
-		wait(5);
-		network_event@ e = n.request();
+		wait(0);
+		network_event@ e = n.request(5);
 		if (e.type == event_receive)
 			screen_reader_speak(e.message, true);
 		else if (e.type == event_connect)
