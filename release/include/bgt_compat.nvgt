@@ -11,38 +11,6 @@
 */
 
 #include "instance.nvgt"
-shared class timer {
-	int64 t = ticks();
-	bool paused = false;
-	int64 get_elapsed() property {
-		if (paused) return t;
-		else return ticks() - t;
-	}
-	bool get_running() property {
-		return !paused;
-	}
-	void restart() {
-		t = ticks();
-		paused = false;
-	}
-	void pause() {
-		paused = true;
-		t = ticks() - t;
-	}
-	void resume() {
-		paused = false;
-		t = ticks() + t;
-	}
-	void force(uint64 ms) {
-		if (paused)
-			t = ms;
-		else
-			t = ticks() - ms;
-	}
-	void set_elapsed(int64 ms) property {
-		force(ms);
-	}
-}
 uint string_len(const string& in str) {
 	return str.length();
 }

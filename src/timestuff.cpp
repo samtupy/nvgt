@@ -11,12 +11,6 @@
 */
 
 #include "timestuff.h"
-#ifdef _WIN32
-	#define NOMINMAX
-	#define WIN32_LEAN_AND_MEAN
-	#define VC_EXTRALEAN
-	#include <windows.h>
-#endif
 #include <cstring>
 #include <ctime>
 #include <string>
@@ -24,22 +18,24 @@
 #include <obfuscate.h>
 #include <fstream>
 #include <iostream>
+#include <Poco/Clock.h>
+#include <Poco/DateTime.h>
+#include <Poco/DateTimeFormat.h>
+#include <Poco/DateTimeFormatter.h>
+#include <Poco/LocalDateTime.h>
+#include <Poco/Mutex.h>
+#include <Poco/Timestamp.h>
 #include <Poco/Timezone.h>
 #include "nvgt.h"
 #include "scriptstuff.h"
 
-std::chrono::high_resolution_clock::time_point g_clock = std::chrono::high_resolution_clock::now();
-#ifdef _WIN32
-	ULARGE_INTEGER g_ftclock;
-#endif
-void timestuff_startup() {
-	#ifdef _WIN32
-	FILETIME ft_now;
-	GetSystemTimeAsFileTime(&ft_now);
-	g_ftclock.LowPart = ft_now.dwLowDateTime;
-	g_ftclock.HighPart = ft_now.dwHighDateTime;
-	#endif
-}
+using namespace Poco;
+
+Poco::Clock g_clock;
+Poco::Timestamp g_secure_clock;
+Poco::Timestamp g_time_cache;
+Poco::LocalDateTime g_time_values;
+Poco::FastMutex g_time_mutex;
 
 static asIScriptContext* callback_ctx = NULL;
 timer_queue_item::timer_queue_item(timer_queue* parent, const std::string& id, asIScriptFunction* callback, const std::string& callback_data, int timeout, bool repeating) : parent(parent), id(id), callback(callback), callback_data(callback_data), timeout(timeout), repeating(repeating), is_scheduled(true) {
@@ -190,85 +186,67 @@ bool timer_queue::loop(int max_timers, int max_catchup) {
 	if (!open_tick) last_looped += t;
 	return !open_tick;
 }
-timer_queue* new_timer_queue() {
-	return new timer_queue();
-}
-
-static tm tm_cache;
-time_t time_cache;
-const char* daynames[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", NULL};
-const char* monthnames[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December", NULL};
 
 void update_tm() {
-	time_t t = time(0);
-	if (t == time_cache)
-		return;
-	time_cache = t;
-	tm* new_tm = localtime(&t);
-	if (!new_tm)
-		return;
-	memcpy(&tm_cache, new_tm, sizeof(tm));
+	Timestamp ts;
+	if (ts.epochTime() == g_time_cache.epochTime()) return;
+	FastMutex::ScopedLock l(g_time_mutex);
+	g_time_cache = ts;
+	g_time_values = ts;
 }
 
 int get_date_year() {
 	update_tm();
-	return tm_cache.tm_year + 1900;
+	return g_time_values.year();
 }
 int get_date_month() {
 	update_tm();
-	return tm_cache.tm_mon + 1;
+	return g_time_values.month();
 }
 std::string get_date_month_name() {
 	update_tm();
-	return monthnames[tm_cache.tm_mon];
+	return DateTimeFormat::MONTH_NAMES[g_time_values.month() -1];
 }
 int get_date_day() {
 	update_tm();
-	return tm_cache.tm_mday;
+	return g_time_values.day();
 }
 int get_date_weekday() {
 	update_tm();
-	return tm_cache.tm_wday + 1;
+	return g_time_values.dayOfWeek() + 1;
 }
 std::string get_date_weekday_name() {
 	update_tm();
-	return daynames[tm_cache.tm_wday];
+	return DateTimeFormat::WEEKDAY_NAMES[g_time_values.dayOfWeek()];
 }
 int get_time_hour() {
 	update_tm();
-	return tm_cache.tm_hour;
+	return g_time_values.hour();
 }
 int get_time_minute() {
 	update_tm();
-	return tm_cache.tm_min;
+	return g_time_values.minute();
 }
 int get_time_second() {
 	update_tm();
-	return tm_cache.tm_sec;
+	return g_time_values.second();
 }
 
 bool speedhack_protection = true;
-asINT64 secure_ticks() {
-	#ifdef _WIN32
-	FILETIME ft_now;
-	GetSystemTimeAsFileTime(&ft_now);
-	ULARGE_INTEGER ft_calc;
-	ft_calc.LowPart = ft_now.dwLowDateTime;
-	ft_calc.HighPart = ft_now.dwHighDateTime;
-	ft_calc.QuadPart -= g_ftclock.QuadPart;
-	ft_calc.QuadPart /= 10000;
-	return ft_calc.QuadPart;
-	#else
-	return ticks(true);
-	#endif
+uint64_t secure_ticks() {
+	return g_secure_clock.elapsed() / Timespan::MILLISECONDS;
 }
-asINT64 ticks(bool unsecure) {
-	if (!speedhack_protection || unsecure) {
-		auto t = std::chrono::high_resolution_clock::now();
-		return std::chrono::duration_cast<std::chrono::milliseconds>(t - g_clock).count();
-	} else
-		return secure_ticks();
+uint64_t ticks(bool unsecure) {
+	return (unsecure? g_clock.elapsed() : g_secure_clock.elapsed()) / Timespan::MILLISECONDS;
 }
+uint64_t microticks(bool unsecure) {
+	return unsecure? g_clock.elapsed() : g_secure_clock.elapsed();
+}
+
+// Replace the following function with something from an external library or something as soon as we find it.
+#ifdef _WIN32
+#include <windows.h>
+#endif
 asINT64 system_running_milliseconds() {
 	#ifdef _WIN32
 	return GetTickCount64();
@@ -283,18 +261,42 @@ asINT64 system_running_milliseconds() {
 	#endif
 }
 
-int get_timezone_offset() {
-	#ifdef _WIN32
-	TIME_ZONE_INFORMATION tzi;
-	GetTimeZoneInformation(&tzi);
-	return tzi.Bias;
-	#else
-	std::time_t current_time;
-	std::time(&current_time);
-	struct std::tm* timeinfo = std::localtime(&current_time);
-	return timeinfo->tm_gmtoff;
-	#endif
+// timer class
+uint64_t timer_default_accuracy = Timespan::MILLISECONDS;
+timer::timer() : value(microticks()), accuracy(timer_default_accuracy), paused(false), secure(speedhack_protection) {}
+timer::timer(bool secure) : value(microticks(secure)), accuracy(timer_default_accuracy), paused(false), secure(secure) {}
+timer::timer(int64_t initial_value, bool secure) : value(microticks(secure) + initial_value * timer_default_accuracy), accuracy(timer_default_accuracy), paused(false), secure(secure) {}
+timer::timer(int64_t initial_value, uint64_t initial_accuracy, bool secure) : value(microticks(secure) + initial_value * initial_accuracy), accuracy(initial_accuracy), paused(false), secure(secure) {}
+int64_t timer::get_elapsed() const { return (paused? value : microticks(secure) - value) / accuracy; }
+bool timer::has_elapsed(int64_t value) const { return get_elapsed() >= value; }
+void timer::force(int64_t new_value) { paused? value = new_value * accuracy : value = microticks(secure) - new_value * accuracy; }
+void timer::adjust(int64_t new_value) { paused? value += new_value * accuracy : value -= new_value * accuracy; }
+void timer::restart() { value = paused? 0 : microticks(secure); }
+bool timer::get_secure() const { return secure; }
+bool timer::get_paused() const { return paused; }
+bool timer::get_running() const { return !paused; }
+bool timer::pause() { return paused? false : set_paused(true); }
+bool timer::resume() { return !paused? false : set_paused(false); }
+void timer::toggle_pause() { 	value = microticks(secure) - value; paused = !paused; }
+bool timer::set_paused(bool new_paused) {
+	if (paused == new_paused) return false;
+	value = microticks(secure) - value;
+	paused = new_paused;
+	return true;
 }
+bool timer::set_secure(bool new_secure) {
+	if (secure == new_secure) return false;
+	bool is_paused = paused;
+	if (!is_paused) pause();
+	secure = new_secure;
+	if (!is_paused) resume();
+	return true;
+}
+
+// Angelscript factories.
+template <class T, typename... A> void timestuff_construct(void* mem, A... args) { return new(mem)<T>(args...); }
+template <class T> void timestuff_destruct(T* obj) { obj->~T(); }
+template <class T, typename... A> void* timestuff_factory(A... args) { return new T(args...); }
 
 void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
@@ -309,6 +311,7 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("int get_TIME_SECOND() property", asFUNCTION(get_time_second), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64 ticks(bool = false)"), asFUNCTION(ticks), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64 secure_ticks()"), asFUNCTION(secure_ticks), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 microticks(bool = false)"), asFUNCTION(microticks), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction(_O("uint64 get_TIME_SYSTEM_RUNNING_MILLISECONDS() property"), asFUNCTION(system_running_milliseconds), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_TIMEZONE_BASE_OFFSET() property", asFUNCTION(Poco::Timezone::utcOffset), asCALL_CDECL);
@@ -321,7 +324,7 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty(_O("bool speedhack_protection"), &speedhack_protection);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_TMRQ);
 	engine->RegisterObjectType(_O("timer_queue"), 0, asOBJ_REF);
-	engine->RegisterObjectBehaviour(_O("timer_queue"), asBEHAVE_FACTORY, _O("timer_queue @q()"), asFUNCTION(new_timer_queue), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(_O("timer_queue"), asBEHAVE_FACTORY, _O("timer_queue @q()"), asFUNCTION(timestuff_factory<timer_queue>), asCALL_CDECL);
 	engine->RegisterObjectBehaviour(_O("timer_queue"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(timer_queue, add_ref), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("timer_queue"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(timer_queue, release), asCALL_THISCALL);
 	engine->RegisterFuncdef(_O("uint timer_callback(string, string)"));
@@ -339,4 +342,33 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("void reset()"), asMETHOD(timer_queue, reset), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint size() const"), asMETHOD(timer_queue, size), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool loop(int = 0, int = 100)"), asMETHOD(timer_queue, loop), asCALL_THISCALL);
+	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
+	engine->RegisterObjectType(_O("timer"), 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_FACTORY, _O("timer@ t()"), asFUNCTION(timestuff_factory<timer>), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_FACTORY, _O("timer@ t(bool)"), asFUNCTION((timestuff_factory<timer, bool>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_FACTORY, _O("timer@ t(int64, bool = speedhack_protection)"), asFUNCTION((timestuff_factory<timer, int64_t, bool>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_FACTORY, _O("timer@ t(int64, uint64, bool = speedhack_protection)"), asFUNCTION((timestuff_factory<timer, int64_t, uint64_t, bool>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(timer, duplicate), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(timer, release), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("int64 get_elapsed() const property"), asMETHOD(timer, get_elapsed), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("void set_elapsed(int64) property"), asMETHOD(timer, force), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("bool has_elapsed(int64) const"), asMETHOD(timer, has_elapsed), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("void force(int64)"), asMETHOD(timer, force), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("void adjust(int64)"), asMETHOD(timer, adjust), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("void restart()"), asMETHOD(timer, restart), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("bool get_secure() const property"), asMETHOD(timer, get_secure), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("void set_secure(bool) property"), asMETHOD(timer, set_secure), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("bool get_paused() const property"), asMETHOD(timer, get_paused), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("bool get_running() const property"), asMETHOD(timer, get_running), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("void toggle_pause()"), asMETHOD(timer, toggle_pause), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("bool pause()"), asMETHOD(timer, pause), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("bool resume()"), asMETHOD(timer, resume), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("bool set_paused(bool)"), asMETHOD(timer, set_paused), asCALL_THISCALL);
+	engine->RegisterObjectProperty(_O("timer"), _O("uint64 accuracy"), asOFFSET(timer, accuracy));
+	engine->RegisterGlobalProperty(_O("const int64 MILLISECONDS"), (void*)&Timespan::MILLISECONDS);
+	engine->RegisterGlobalProperty(_O("const int64 SECONDS"), (void*)&Timespan::SECONDS);
+	engine->RegisterGlobalProperty(_O("const int64 MINUTES"), (void*)&Timespan::MINUTES);
+	engine->RegisterGlobalProperty(_O("const int64 HOURS"), (void*)&Timespan::HOURS);
+	engine->RegisterGlobalProperty(_O("const int64 DAYS"), (void*)&Timespan::DAYS);
+	engine->RegisterGlobalProperty(_O("uint64 timer_default_accuracy"), &timer_default_accuracy);
 }

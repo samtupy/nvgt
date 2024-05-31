@@ -34,17 +34,16 @@
 #define NVGT_LOAD_STATIC_PLUGINS
 #include "angelscript.h" // nvgt's angelscript implementation
 #include "input.h"
-#include "misc_functions.h"
 #include "nvgt.h"
 #ifndef NVGT_USER_CONFIG
 	#include "nvgt_config.h"
 #else
 	#include "../user/nvgt_config.h"
 #endif
+#include "random.h" // random_seed()
 #include "serialize.h" // current location of g_StringTypeid (subject to change)
 #include "sound.h"
 #include "srspeech.h"
-#include "timestuff.h"
 #include "UI.h" // message
 #include "version.h"
 
@@ -71,7 +70,6 @@ class nvgt_application : public Poco::Util::Application {
 			Application::initialize(self);
 			#ifdef _WIN32
 				setlocale(LC_ALL, ".UTF8");
-				timestuff_startup();
 				wstring dir_u;
 				UnicodeConverter::convert(Path(config().getString("application.dir")).append("lib").toString(), dir_u);
 				SetDllDirectoryW(dir_u.c_str());
@@ -81,7 +79,7 @@ class nvgt_application : public Poco::Util::Application {
 					chdir(Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString().c_str());
 				}
 			#endif
-			srand(ticks()); // Random bits of NVGT if not it's components might use the c rand function.
+			srand(random_seed()); // Random bits of NVGT if not it's components might use the c rand function.
 			#if defined(NVGT_WIN_APP) || defined(NVGT_STUB)
 				config().setString("application.gui", "");
 			#endif
