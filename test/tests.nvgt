@@ -43,6 +43,7 @@ void main() {
 			exit(64);
 		}
 	}
+	if (!directory_exists("tmp")) directory_create("tmp");
 	// These tests are either intended to run from source or along side the source.
 	string[]@ files = find_files("case/*.nvgt");
 	for (uint i = 0; i < files.length(); i++) {
