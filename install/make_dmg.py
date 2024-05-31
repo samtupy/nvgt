@@ -1,3 +1,4 @@
+import ftplib
 import glob
 import os
 from pathlib import Path
@@ -30,7 +31,20 @@ def get_version_info():
 	return Path("../version").read_text().strip().replace("-", "_")
 
 relpath = "../release"
+ftp_creds = []
 if len(sys.argv) > 1:
-	relpath = " ".join(sys.argv[1:])
+	relpath = sys.argv[1]
+	if len(sys.argv) > 2:
+		ftp_creds=sys.argv[2].split(":")
+	ver = get_version_info()
 make_app_bundle("nvgt.app", relpath)
-make_dmg("nvgt.app", f"nvgt_{get_version_info()}.dmg")
+make_dmg("nvgt.app", f"nvgt_{ver}.dmg")
+if ftp_creds:
+	try:
+		ftp = ftplib.FTP("nvgt.gg", ftp_creds[0], ftp_creds[1])
+		f = open(f"nvgt_{ver}.dmg", "rb")
+		ftp.storbinary(f"STOR nvgt_{ver}.dmg", f)
+		f.close()
+		ftp.quit()
+	except Exception as e:
+		print(f"Warning, cannot upload to ftp {e}")

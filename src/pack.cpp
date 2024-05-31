@@ -592,7 +592,7 @@ void write_embedded_packs(Poco::BinaryWriter& bw) {
 	for (const auto& p : embedding_packs) {
 		bw << p.first;
 		Poco::FileInputStream fs(p.second);
-		bw << unsigned int(fs.size());
+		bw << uint32_t(fs.size());
 		Poco::StreamCopier::copyStream(fs, bw.stream());
 		fs.close();
 	}

@@ -56,9 +56,9 @@ elif env["PLATFORM"] == "darwin":
 	env["FRAMEWORKPREFIX"] = "-weak_framework"
 	env.Append(FRAMEWORKS = ["CoreAudio",  "CoreFoundation", "CoreHaptics", "CoreVideo", "AudioToolbox", "AppKit", "IOKit", "Carbon", "Cocoa", "ForceFeedback", "GameController", "QuartzCore"])
 	env.Append(LIBS = ["objc"])
-	env.Append(LINKFLAGS = ["-Wl,-rpath,'@loader_path',-rpath,'@loader_path/lib',-rpath,'@loader_path/../Frameworks'", "-mmacosx-version-min=14.0"])
+	env.Append(LINKFLAGS = ["-Wl,-rpath,'@loader_path',-rpath,'@loader_path/lib',-rpath,'@loader_path/../Frameworks',-dead_strip_dylibs", "-mmacosx-version-min=14.0"])
 elif env["PLATFORM"] == "posix":
-	env.Append(LINKFLAGS = ["-Wl,-rpath,'.',-rpath,'lib'"])
+	env.Append(LINKFLAGS = ["-Wl,-rpath,'$$ORIGIN/.',-rpath,'$$ORIGIN/lib'"])
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
 		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
