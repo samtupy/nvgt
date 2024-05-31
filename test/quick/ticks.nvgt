@@ -1,0 +1,12 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	uint64 start = ticks();
+	show_window("press space to check timer (holding shift for unsecure)");
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (key_pressed(KEY_SPACE)) screen_reader_speak(ticks(keyboard_modifiers & KEYMOD_SHIFT > 0) - start, true);
+	}
+}

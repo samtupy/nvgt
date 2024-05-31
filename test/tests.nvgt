@@ -1,5 +1,8 @@
 /* tests.nvgt - main test runner application
  * In our case, it's actually better to write our tests directly in Angelscript, as any specific parts of the c++ code will be tested by loading and executing this Angelscript code which can test engine features in the same way as end-users will be employing them.
+ * To add a test, create a .nvgt script in the case folder with a function that returns void, takes no arguments and is named after the basename of the test script, for example void foo() for foo.nvgt. A test should throw an exception if it fails, if the function returns successfully the test is considered to have passed.
+ * If a test case relies on any static files, those should go in the data folder.
+ * If a test case produces any temporary data to work with, it should go in the tmp folder so as to be ignored by git.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -15,21 +18,25 @@
 #include "case/*.nvgt"
 
 dictionary disabled_tests;
-bool verbose = false;
+bool verbose = false, nonfatal = false;
 script_module@ nvgt_game = script_get_module("nvgt_game");
+int tests_total, tests_skipped, tests_failed, tests_passed;
 
 void help() {
 	println("NVGT tests program available options:");
 	println("-v (verbose), print status information.");
+	println("-n (nonfatal), Warn on failed test and continue rather than exiting.");
 	println("-d (disable), do not run a given test (-dbase64).");
-	println("-h (help), This message.");
+	println("-h (help), Print this message and exit.");
 	exit();
 }
 void main() {
+	timer timetracker;
 	// Very oversimplified command line parsing.
 	for (uint i = 1; i < ARGS.length(); i++) {
 		if (ARGS[i] == "-h") help();
 		else if(ARGS[i] == "-v") verbose = true;
+		else if(ARGS[i] == "-n") nonfatal = true;
 		else if(ARGS[i].starts_with("-d")) disabled_tests.set(ARGS[i].substr(2), true);
 		else {
 			println("unknown command line option " + ARGS[i]);
@@ -41,35 +48,49 @@ void main() {
 	for (uint i = 0; i < files.length(); i++) {
 		test(spec::path(files[i]).basename);
 	}
-	println("All tests have passed successfully!");
+	if (tests_failed == 0)
+		println("%0 of %1 tests passed successfully in %2ms!".format(tests_passed, tests_total, timetracker.elapsed));
+	else
+		println("%0 of %1 tests have passed successfully, with %2 failures. Total time %3ms.".format(tests_passed, tests_total, tests_failed, timetracker.elapsed));
+	if (tests_skipped > 0) println("%0 tests skipped.".format(tests_skipped));
 }
 void test(const string&in testcase) {
+	tests_total++;
 	if (disabled_tests.exists(testcase)) {
-		if (verbose) println("Skipping " + testcase + " (commandline)");
+		if (verbose) println("Skipping %0 (commandline)".format(testcase));
+		tests_skipped++;
 		return;
 	}
 	// It is possible to skip a test by creating a global variable in the test case called bool test_<case>_skip = true;
-	any@ v_skip = nvgt_game.get_global(nvgt_game.get_global_index_by_decl("bool test_" + testcase + "_skip"));
+	any@ v_skip = nvgt_game.get_global(nvgt_game.get_global_index_by_decl("bool test_%0_skip".format(testcase)));
 	bool b_skip = false;
 	if (@v_skip != null and v_skip.retrieve(b_skip) and b_skip) {
-		if (verbose) println("Skipping " + testcase + " (script)");
+		if (verbose) println("Skipping %0 (script)".format(testcase));
+		tests_skipped++;
 		return;
 	}
-	script_function@ func = nvgt_game.get_function_by_name(testcase);
+	script_function@ func = nvgt_game.get_function_by_decl("void test_%0()".format(testcase));
 	if (@func == null) {
-		println("Error, test case " + testcase + " is badly formatted, can't find void " + testcase + "()");
-		exit(64);
+		println("Error, test case %0 is badly formatted, can't find void %0()".format(testcase));
+		tests_failed++;
+		if (nonfatal) return;
+		else exit(64);
 	}
 	string[] errors;
-	if (verbose) print("Testing " + testcase + "... ");
+	if (verbose) print("Testing %0... ".format(testcase));
 	func({}, errors);
 	if (errors.length() < 1) {
 		if (verbose) println("OK");
+		tests_passed++;
 		return;
 	}
+	tests_failed++;
 	if (verbose) println("FAILED!");
-	else println("TEST " + testcase + " FAILED!");
-	for (uint i = 1; i < errors.length(); i++) println(errors[i]);
-	println(errors[0]); // Move the exception itself to the bottom of the output to avoid waiding through the call stack when unwanted.
-	exit(1);
+	else println("TEST %0 FAILED!".format(testcase));
+	if (!nonfatal) { // Only print full callstacks if we exit on test fail rather than warn where we just print the exception and last frame instead.
+		for (uint i = 1; i < errors.length(); i++) println(errors[i]); // We start at offset 1 in order to move the exception itself to the bottom of the output to avoid waiding through the call stack when unwanted.
+	}
+	println(errors[0]);
+	if (nonfatal) return;
+	else exit(1);
 }
