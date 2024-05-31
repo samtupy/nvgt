@@ -409,7 +409,7 @@ Let's write some code to demonstrate:
 void main(){
     speak("Welcome to the camping store! You need to have 30 dollars to buy a folding chairr.");
 }
-``
+```
 
 This looks fine, but we're using this value in only one area of our code (mostly because there is only one place in which to use it, but that's beside the point).
 
@@ -424,6 +424,7 @@ The answer to that question is that it would be a coding nightmare! We would hav
 This is where consts will save the day!
 
 Using them , we could rewrite our code like this:
+```
 const int price_foldable_chair = 30;
 void main(){
     speak("Welcome to the camping store! You need to have " + price_folding_chair + " dollars to buy a folding chair.");
