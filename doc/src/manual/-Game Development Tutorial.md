@@ -75,7 +75,9 @@ Running this file, you should get a similar effect to just running the script, b
 Now that we've learned the basics of nvgt scripts, let's move on and create a simple program!
 ## Learning Project: Calculator
 
-Let's make a calculator program with nvgt. We should be able to type mathematical expressions into it, and then get results out. We'll then build on our program by adding more features, and hopefully learn lots along the way! You'll encounter many new programming concepts at once, so don't feel discouraged if you are lost. All will be explained!
+Let's make a calculator program with nvgt. We should be able to type mathematical expressions into it, and then get results out. We'll then build on our program by adding more features, and hopefully learn lots along the way!
+
+You'll encounter many new programming concepts at once, so don't feel discouraged if you are lost. All will be explained!
 
 In this chapter, we'll learn about many of the fundamental concepts of nvgt, and of programming as well! I will try to make this interesting, but learning the basics can admittedly be boring. It is not shameful if you need a coffee or two reading through this.
 
@@ -145,7 +147,7 @@ Why the #? In nvgt, # signifies what's called a preprocessor directive: usually 
 NVGT has what's called an include path. It searches multiple folders for your include scripts, and if it can't find them, it will give you an error. It works a bit like this:
 1. Search the directory of the script from which another script was included
 2. Search the include folder in nvgt, in which all the built-in includes are stored.
-//add more later here maybe
+[add more later here maybe]
 
 Here is a full code example, which you can copy into an nvgt script and run.
 ```
@@ -173,7 +175,7 @@ x = -3;
 uint y = 3;
 y=-3; // Oh no!
 ```
-As you can see, there are two types of them. One is called an int, as we'd expect, but the other is called a uint. What does the u mean? You might have already guessed!
+As you can see, we used both kinds of integers. One is called an int, as we'd expect, but the other is called a uint. What does the u mean? You might have already guessed!
 
 We'll talk about that in a second. And if you don't want to learn about binary now, it's enough to know that unsigned ints sacrifice the ability to store negative values for double+1 the positive number range.
 
@@ -394,6 +396,41 @@ This shows how to declare a bool: it's fairly similar to other variables. Unlike
 
 That's all we'll learn about variables for now. We'll come back to them later on, but for our calculator project, this is all that we'll need to know.
 
+#### Const Keyword
+For this project, the last thing we will explore regarding variables is consts.
+
+Const variables (or constants) are variables which can never change after they are first assigned. This must be done when they are initialized.
+
+They are particularly useful in avoiding "magic numbers": using numbers directly in our code is bad!
+
+Let's write some code to demonstrate:
+```
+#include "speech.nvgt"
+void main(){
+    speak("Welcome to the camping store! You need to have 30 dollars to buy a folding chairr.");
+}
+``
+
+This looks fine, but we're using this value in only one area of our code (mostly because there is only one place in which to use it, but that's beside the point).
+
+Suppose, now, that we use the value 30 in many areas: not just telling the user how much it is to buy a chair, but also for the logic of buying and selling them itself.
+
+This is also valid in that it works, but it is frowned upon.
+
+Consider this: inflation is making everything more expensive these days, so what if we need to raise this price to 35 dollars next year?
+
+The answer to that question is that it would be a coding nightmare! We would have to go through our code, painstakingly changing every reference of the value 30 to 35. But we could get it wrong: we might accidentally make one of the values 53, or change the number of centimeters in a foot from 30 to 35 in our frantic search - wouldn't it be much better if we only had to change the value once?
+
+This is where consts will save the day!
+
+Using them , we could rewrite our code like this:
+const int price_foldable_chair = 30;
+void main(){
+    speak("Welcome to the camping store! You need to have " + price_folding_chair + " dollars to buy a folding chair.");
+}
+```
+Much better! Now we can use this value wherever we want to, and all we have to do to change it is update the one declaration at the top of the file!
+
 ### conditionals and the if statement
 The if statement is perhaps one of the most overwhelmingly useful pieces of code. Its ubiquity is almost unparalleled and a variation of it can be found in just about every programming language in use today.
 
@@ -414,15 +451,25 @@ This small dice game is very simple. Roll a dice, and see how low a number you c
 
 There are three options: you get a 1 (the luckiest roll), 2 or 3 (the 2nd luckiest), or 4-6 (which means you lose).
 
-We can express these three options using the "if", "else if", and "else" statements. They work like this:
+We can express these three options using the "if", "else if", and optional "else" constructions. They work like this:
+
 if(conditional)
+
 statement/block
+
 else if(conditional)
+
 statement/block
+
 else if(conditional)
+
 statement/block
+
 else
+
 statement/block
+
+These are slightly different than normal statements, because they do not always have the ; where you would expect, at the end: if multiple lines are to be run (a block, surrounded by braces) then you use the ; on the last line of the block, before the }.
 
 But what is a conditional?
 A condition is any value that returns either true or false. This can be something which is already a bool variable, or the result of a comparison operator.
@@ -454,7 +501,10 @@ void main(){
     bool alive=true;
     if(alive)
         speak("You are alive!");
-    if(monster_level>your_level){
+    if(monster_level<=your_level){
+        speak("You manage to kill the monster!");
+    }
+    else{
         speak("The monster is higher level than you, so it kills you!");
         alive=false;
     }
@@ -464,7 +514,7 @@ void main(){
         speak("Your level is equal to a tenth of your experience points.");
 }   
 ```
-This example demonstrates an important distinction: if statements which use a block instead of a single statement need to have the block surrounded by braces.
+This example demonstrates an important distinction we touched upon earlier: if statements which use a block instead of a single statement need to have the block surrounded by braces.
 
 Where a block might be used, a single statement can usually be used as well; the exception is functions, which must always use a block, whether or not it is a single line.
 
@@ -477,9 +527,57 @@ The return value is so named because it gives some critical piece of information
 
 Let's use baking a cake as an example: in the process of baking a cake (simplifying greatly) you put the batter in the oven. The oven cooks the cake, and then you open it up and take a cooked cake out.
 
-You can't do something else related to baking a cake while the oven is baking, because you don't have the cake: the oven does. In the same vein, only one function can be running at oncea, and we say that function is currently executing.
+You can't do something else related to baking a cake while the oven is baking, because you don't have the cake: the oven does. In the same vein, only one function can be running at once, and we say that function is currently executing.
 
 When a function ends, execution returns to the function from which it was called, just like taking the cake back out of the oven. It returns, along with execution, whatever is specified using a return statement (discussed shortly).
+Here is a snippet for the purpose of example:
+```
+int add(const int&in a, const int&in b){
+    return a + b;
+}
+```
+Frankly, this code is a needless abstraction over an already-simple thing (the addition operator) and you should almost never do it like this in production. Nonetheless, it's a good example of what a function can do. It takes data in, and then outputs some other data.
+The way we declare functions is a little bit strange, and this example is packed with new ideas, so let's break it down piece by piece:
+
+int add(
+
+The beginning of the function's declaration, letting the compiler know that it is a function with the return datatype (int), the name (add) and the left parenthesis
+
+const
+
+a guarantee to the compiler that this variable will not be re-assigned
+
+int
+
+the type of the first variable
+
+&in
+
+Denotes a reference, specifically an input-only (or read-only) reference. Since the compiler knows we won't change the data (we used const), this reference can improve performance, because the value doesn't need to be copied for our function.
+
+
+a, 
+
+the name (identifier) of the first parameter/argument variable, and a comma and space to separate it from the next variable, just as we use when calling functions
+
+const int&in b)
+
+The declaration of the second parameter/argument variable, a read-only integer reference, and a right parenthesis to tell the compiler there are no more parameter variables
+
+{
+
+The beginning of our function (remember, there must always be braces enclosing functions, even if the execution step is only one line in length.)
+
+Then, the next line:
+
+    return a + b;
+
+This is the only line in our function, and returns an expression evaluating to an int variable. It adds the a and b variables' values together.
+
+}
+
+The end of our function, which lets the compiler know that we're back in the outer scope (probably global)
+
 * arrays/lists
 * classes (methods and properties)
 * datastreams and files
