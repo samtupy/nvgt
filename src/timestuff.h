@@ -76,7 +76,7 @@ class timer : public Poco::RefCountedObject {
 	uint64_t value;
 	bool paused;
 	bool secure;
-	public:
+public:
 	uint64_t accuracy;
 	timer();
 	timer(bool secure);

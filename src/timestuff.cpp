@@ -205,7 +205,7 @@ int get_date_month() {
 }
 std::string get_date_month_name() {
 	update_tm();
-	return DateTimeFormat::MONTH_NAMES[g_time_values.month() -1];
+	return DateTimeFormat::MONTH_NAMES[g_time_values.month() - 1];
 }
 int get_date_day() {
 	update_tm();
@@ -237,15 +237,15 @@ uint64_t secure_ticks() {
 	return g_secure_clock.elapsed() / Timespan::MILLISECONDS;
 }
 uint64_t ticks(bool unsecure) {
-	return (unsecure? g_clock.elapsed() : g_secure_clock.elapsed()) / Timespan::MILLISECONDS;
+	return (unsecure ? g_clock.elapsed() : g_secure_clock.elapsed()) / Timespan::MILLISECONDS;
 }
 uint64_t microticks(bool unsecure) {
-	return unsecure? g_clock.elapsed() : g_secure_clock.elapsed();
+	return unsecure ? g_clock.elapsed() : g_secure_clock.elapsed();
 }
 
 // Replace the following function with something from an external library or something as soon as we find it.
 #ifdef _WIN32
-#include <windows.h>
+	#include <windows.h>
 #endif
 asINT64 system_running_milliseconds() {
 	#ifdef _WIN32
@@ -267,17 +267,17 @@ timer::timer() : value(microticks()), accuracy(timer_default_accuracy), paused(f
 timer::timer(bool secure) : value(microticks(secure)), accuracy(timer_default_accuracy), paused(false), secure(secure) {}
 timer::timer(int64_t initial_value, bool secure) : value(microticks(secure) + initial_value * timer_default_accuracy), accuracy(timer_default_accuracy), paused(false), secure(secure) {}
 timer::timer(int64_t initial_value, uint64_t initial_accuracy, bool secure) : value(microticks(secure) + initial_value * initial_accuracy), accuracy(initial_accuracy), paused(false), secure(secure) {}
-int64_t timer::get_elapsed() const { return (paused? value : microticks(secure) - value) / accuracy; }
+int64_t timer::get_elapsed() const { return (paused ? value : microticks(secure) - value) / accuracy; }
 bool timer::has_elapsed(int64_t value) const { return get_elapsed() >= value; }
-void timer::force(int64_t new_value) { paused? value = new_value * accuracy : value = microticks(secure) - new_value * accuracy; }
-void timer::adjust(int64_t new_value) { paused? value += new_value * accuracy : value -= new_value * accuracy; }
-void timer::restart() { value = paused? 0 : microticks(secure); }
+void timer::force(int64_t new_value) { paused ? value = new_value * accuracy : value = microticks(secure) - new_value * accuracy; }
+void timer::adjust(int64_t new_value) { paused ? value += new_value * accuracy : value -= new_value * accuracy; }
+void timer::restart() { value = paused ? 0 : microticks(secure); }
 bool timer::get_secure() const { return secure; }
 bool timer::get_paused() const { return paused; }
 bool timer::get_running() const { return !paused; }
-bool timer::pause() { return paused? false : set_paused(true); }
-bool timer::resume() { return !paused? false : set_paused(false); }
-void timer::toggle_pause() { 	value = microticks(secure) - value; paused = !paused; }
+bool timer::pause() { return paused ? false : set_paused(true); }
+bool timer::resume() { return !paused ? false : set_paused(false); }
+void timer::toggle_pause() { value = microticks(secure) - value; paused = !paused; }
 bool timer::set_paused(bool new_paused) {
 	if (paused == new_paused) return false;
 	value = microticks(secure) - value;
@@ -294,7 +294,7 @@ bool timer::set_secure(bool new_secure) {
 }
 
 // Angelscript factories.
-template <class T, typename... A> void timestuff_construct(void* mem, A... args) { return new(mem) T(args...); }
+template <class T, typename... A> void timestuff_construct(void* mem, A... args) { return new (mem) T(args...); }
 template <class T> void timestuff_destruct(T* obj) { obj->~T(); }
 template <class T, typename... A> void* timestuff_factory(A... args) { return new T(args...); }
 

@@ -77,7 +77,7 @@ int question(const std::string& title, const std::string& text, bool can_cancel,
 	return message_box(title, text, buttons, flags);
 }
 void message(const std::string& text, const std::string& header) { // Usually used internally by NVGT's c++ code
-	if (Poco::Util::Application::instance().config().hasOption("application.gui")){
+	if (Poco::Util::Application::instance().config().hasOption("application.gui")) {
 		alert(header, text);
 		return;
 	}

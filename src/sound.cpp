@@ -227,7 +227,7 @@ void phonon_dsp(void* buffer, unsigned int length, float x, float y, float z, so
 	}
 	if ((x != 0 || y != 0 || z != 0) && s.hrtf_effect) {
 		IPLBinauralEffectParams effect_args{};
-		effect_args.direction = iplCalculateRelativeDirection(phonon_context, IPLVector3{s.x, s.y, s.z}, s.env? IPLVector3{s.env->listener_x, s.env->listener_y, s.env->listener_z} : IPLVector3{s.listener_x, s.listener_y, s.listener_z}, s.env? IPLVector3{sin(s.env->listener_rotation), cos(s.env->listener_rotation), 0} : IPLVector3{sin(s.rotation), cos(s.rotation), 0}, IPLVector3{0, 0, 1});
+		effect_args.direction = iplCalculateRelativeDirection(phonon_context, IPLVector3{s.x, s.y, s.z}, s.env ? IPLVector3{s.env->listener_x, s.env->listener_y, s.env->listener_z} : IPLVector3{s.listener_x, s.listener_y, s.listener_z}, s.env ? IPLVector3{sin(s.env->listener_rotation), cos(s.env->listener_rotation), 0} : IPLVector3{sin(s.rotation), cos(s.rotation), 0}, IPLVector3{0, 0, 1});
 		effect_args.interpolation = IPL_HRTFINTERPOLATION_BILINEAR;
 		effect_args.spatialBlend = blend;
 		effect_args.hrtf = phonon_hrtf;
@@ -426,9 +426,9 @@ void CALLBACK bass_closeproc_script(void* user) {
 	if (ctx->SetArgObject(0, &s->callback_data) < 0)
 		goto finish;
 	ctx->Execute();
-	finish:
-		g_ScriptEngine->ReturnContext(ctx);
-		asThreadCleanup();
+finish:
+	g_ScriptEngine->ReturnContext(ctx);
+	asThreadCleanup();
 }
 QWORD CALLBACK bass_lenproc_script(void* user) {
 	if (!user)
@@ -446,10 +446,10 @@ QWORD CALLBACK bass_lenproc_script(void* user) {
 	if (ctx->Execute() != asEXECUTION_FINISHED)
 		goto finish;
 	ret = ctx->GetReturnDWord();
-	finish:
-		g_ScriptEngine->ReturnContext(ctx);
-		asThreadCleanup();
-		return ret;
+finish:
+	g_ScriptEngine->ReturnContext(ctx);
+	asThreadCleanup();
+	return ret;
 }
 DWORD CALLBACK bass_readproc_script(void* buffer, DWORD length, void* user) {
 	if (!user)
@@ -469,9 +469,9 @@ DWORD CALLBACK bass_readproc_script(void* buffer, DWORD length, void* user) {
 	if (data.size() > length) data.resize(length);
 	if (data.size() > 0)
 		memcpy(buffer, &data[0], data.size());
-	finish:
-		g_ScriptEngine->ReturnContext(ctx);
-		asThreadCleanup();
+finish:
+	g_ScriptEngine->ReturnContext(ctx);
+	asThreadCleanup();
 	return ret;
 }
 BOOL CALLBACK bass_seekproc_script(QWORD offset, void* user) {
@@ -488,9 +488,9 @@ BOOL CALLBACK bass_seekproc_script(QWORD offset, void* user) {
 	if (ctx->SetArgDWord(0, offset) < 0 || ctx->SetArgObject(1, &s->callback_data) < 0) goto finish;
 	if (ctx->Execute() != asEXECUTION_FINISHED) goto finish;
 	ret = ctx->GetReturnByte();
-	finish:
-		g_ScriptEngine->ReturnContext(ctx);
-		asThreadCleanup();
+finish:
+	g_ScriptEngine->ReturnContext(ctx);
+	asThreadCleanup();
 	return ret;
 }
 
@@ -607,9 +607,8 @@ void sound_preloads_clean() {
 
 int sound_environment_thread(void* args) {
 	sound_environment* e = (sound_environment*)args;
-	while (e->ref_count > 0) {
+	while (e->ref_count > 0)
 		e->background_update();
-	}
 	e->_detach_all();
 	return 0;
 }
@@ -662,9 +661,8 @@ void sound_environment::add_ref() {
 	asAtomicInc(ref_count);
 }
 void sound_environment::release() {
-	if (asAtomicDec(ref_count) < 1) {
+	if (asAtomicDec(ref_count) < 1)
 		delete this;
-	}
 }
 bool sound_environment::add_material(const std::string& name, float absorption_low, float absorption_mid, float absorption_high, float scattering, float transmission_low, float transmission_mid, float transmission_high, bool replace_if_existing) {
 	if (!replace_if_existing && materials.find(name) != materials.end()) return false;
@@ -772,7 +770,7 @@ mixer* sound_environment::new_mixer() {
 	mixer* s = new mixer();
 	s->use_hrtf = true;
 	attach(s);
-	if (!s->pos_effect) s->pos_effect = BASS_ChannelSetDSP(s->channel, positioning_dsp, s, 0	);
+	if (!s->pos_effect) s->pos_effect = BASS_ChannelSetDSP(s->channel, positioning_dsp, s, 0);
 	return s;
 }
 sound* sound_environment::new_sound() {
@@ -1176,13 +1174,13 @@ BOOL sound_base::set_position(float listener_x, float listener_y, float listener
 	this->volume_step = volume_step;
 	if (x == listener_x && y == listener_y && z == listener_z && !env) {
 		if (pos_effect) {
-			BASS_ChannelRemoveDSP(output_mixer? output_mixer->channel : channel, pos_effect);
+			BASS_ChannelRemoveDSP(output_mixer ? output_mixer->channel : channel, pos_effect);
 			if (hrtf_effect)
 				iplBinauralEffectReset(hrtf_effect);
 			pos_effect = 0;
 		}
 	} else if (!pos_effect)
-		pos_effect = BASS_ChannelSetDSP(output_mixer? output_mixer->channel : channel, positioning_dsp, this, 0);
+		pos_effect = BASS_ChannelSetDSP(output_mixer ? output_mixer->channel : channel, positioning_dsp, this, 0);
 	if (source) {
 		IPLSimulationInputs inputs{};
 		inputs.flags = IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS);

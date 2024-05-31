@@ -91,7 +91,7 @@ using namespace Poco;
 
 CContextMgr* g_ctxMgr = nullptr;
 #ifndef NVGT_STUB
-CDebugger *g_dbg = nullptr;
+	CDebugger* g_dbg = nullptr;
 #endif
 int g_bcCompressionLevel = 9;
 string g_last_exception_callstack;
@@ -217,13 +217,13 @@ void ShowAngelscriptMessages() {
 			info_box("Compilation warnings", "", g_scriptMessagesWarn);
 	} else {
 	#endif
-	if (g_scriptMessagesErrNum)
-		message((g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0), "Compilation error");
-	else
-		message(g_scriptMessagesWarn, "Compilation warnings");
-	#ifdef _WIN32
+		if (g_scriptMessagesErrNum)
+			message((g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0), "Compilation error");
+		else
+			message(g_scriptMessagesWarn, "Compilation warnings");
+		#ifdef _WIN32
 	} // endif gui
-	#endif
+		#endif
 }
 
 void MessageCallback(const asSMessageInfo* msg, void* param) {
@@ -248,14 +248,14 @@ void MessageCallback(const asSMessageInfo* msg, void* param) {
 }
 void nvgt_line_callback(asIScriptContext* ctx, void* obj) {
 	#ifndef NVGT_STUB
-		if (g_dbg) {
-			if (g_ASDebugBreak) {
-				g_ASDebugBreak = false;
-				cout << "user debug break" << endl;
-				g_dbg->TakeCommands(ctx);
-			}
-			g_dbg->LineCallback(ctx);
+	if (g_dbg) {
+		if (g_ASDebugBreak) {
+			g_ASDebugBreak = false;
+			cout << "user debug break" << endl;
+			g_dbg->TakeCommands(ctx);
 		}
+		g_dbg->LineCallback(ctx);
+	}
 	#endif
 	profiler_callback(ctx, obj);
 }
@@ -407,10 +407,10 @@ int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
 	if (mod) mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
 	if (builder.AddSectionFromFile(scriptFile.c_str()) < 0)
 		return -1;
-		for (unsigned int i = 0; i < g_IncludeScripts.size(); i++) {
+	for (unsigned int i = 0; i < g_IncludeScripts.size(); i++) {
 		if (builder.AddSectionFromFile(g_IncludeScripts[i].c_str()) < 0)
 			return -1;
-		}
+	}
 	if (builder.BuildModule() < 0) {
 		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "Script failed to build");
 		return -1;
@@ -438,15 +438,15 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 	#endif
 	Path stubspath = Util::Application::instance().config().getString("application.dir");
 	#ifdef __APPLE__ // Stub may be in Resources directory of an app bundle.
-		if (Poco::Environment::has("MACOS_BUNDLED_APP")) stubspath.makeParent().pushDirectory("Resources");
+	if (Poco::Environment::has("MACOS_BUNDLED_APP")) stubspath.makeParent().pushDirectory("Resources");
 	#endif
 	stubspath.pushDirectory("stub");
-	Poco::File stub = format("%snvgt_%s%s.bin", stubspath.toString(), g_platform, (g_stub !=""? string("_") + g_stub : ""));
-	Path outpath(!g_compiled_basename.empty()? g_compiled_basename : Path(scriptFile).setExtension(""));
-	if (g_platform  == "windows") outpath.setExtension("exe");
+	Poco::File stub = format("%snvgt_%s%s.bin", stubspath.toString(), g_platform, (g_stub != "" ? string("_") + g_stub : ""));
+	Path outpath(!g_compiled_basename.empty() ? g_compiled_basename : Path(scriptFile).setExtension(""));
+	if (g_platform == "windows") outpath.setExtension("exe");
 	try {
 		stub.copyTo(outpath.toString());
-	} catch(Exception& e) {
+	} catch (Exception& e) {
 		g_ScriptEngine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to copy %s to %s, %s", stub.path(), outpath.toString(), e.displayText()).c_str());
 		return -1;
 	}
@@ -486,8 +486,8 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 		free(code);
 		bool quiet = Util::Application::instance().config().hasOption("application.quiet") || Util::Application::instance().config().hasOption("application.QUIET"); // Maybe we should switch to a verbocity level?
 		if (quiet) return 0;
-		message(format("%s build succeeded in %?ums, saved to %s", string(g_debug? "Debug" : "Release"), Util::Application::instance().uptime().totalMilliseconds(), outpath.toString()), "Success!");
-	} catch(Exception& e) {
+		message(format("%s build succeeded in %?ums, saved to %s", string(g_debug ? "Debug" : "Release"), Util::Application::instance().uptime().totalMilliseconds(), outpath.toString()), "Success!");
+	} catch (Exception& e) {
 		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s", outpath.toString(), e.displayText()).c_str());
 		return -1;
 	}
@@ -513,32 +513,30 @@ int LoadCompiledExecutable(asIScriptEngine* engine) {
 	BinaryReader br(fs);
 	UInt32 data_location, code_size;
 	#ifdef _WIN32
-		fs.seekg(60);
-		// READ the PE header location
-		DWORD header_location;
-		br >> header_location;
-		fs.seekg(header_location);
-		UInt32 sig;
-		br >> sig;
-		if (sig != IMAGE_NT_SIGNATURE) {
-			return -1;
-		}
-		IMAGE_FILE_HEADER ih;
-		br.readRaw(reinterpret_cast<char *>(&ih), sizeof(IMAGE_FILE_HEADER));
-		// Skip the optional header
-		fs.seekg(ih.SizeOfOptionalHeader, ios::cur);
-		DWORD offset=0;
-		for (int i=0;i < ih.NumberOfSections;i++) {
-			IMAGE_SECTION_HEADER sh;
-			br.readRaw(reinterpret_cast<char *>(&sh), sizeof(IMAGE_SECTION_HEADER));
-			if (sh.PointerToRawData + sh.SizeOfRawData > offset) {
-				offset = sh.PointerToRawData + sh.SizeOfRawData;
-			}
-		}
-		data_location = offset;
+	fs.seekg(60);
+	// READ the PE header location
+	DWORD header_location;
+	br >> header_location;
+	fs.seekg(header_location);
+	UInt32 sig;
+	br >> sig;
+	if (sig != IMAGE_NT_SIGNATURE)
+		return -1;
+	IMAGE_FILE_HEADER ih;
+	br.readRaw(reinterpret_cast<char*>(&ih), sizeof(IMAGE_FILE_HEADER));
+	// Skip the optional header
+	fs.seekg(ih.SizeOfOptionalHeader, ios::cur);
+	DWORD offset = 0;
+	for (int i = 0; i < ih.NumberOfSections; i++) {
+		IMAGE_SECTION_HEADER sh;
+		br.readRaw(reinterpret_cast<char*>(&sh), sizeof(IMAGE_SECTION_HEADER));
+		if (sh.PointerToRawData + sh.SizeOfRawData > offset)
+			offset = sh.PointerToRawData + sh.SizeOfRawData;
+	}
+	data_location = offset;
 	#else
-		fs.seekg(-4, std::ios::end);
-		br >> data_location;
+	fs.seekg(-4, std::ios::end);
+	br >> data_location;
 	#endif
 	fs.seekg(data_location);
 	if (!load_serialized_nvgt_plugins(br)) return -1;
@@ -579,10 +577,10 @@ int ExecuteScript(asIScriptEngine* engine, const string& scriptFile) {
 	g_initialising_globals = false;
 	ctx = g_ctxMgr->AddContext(engine, func, true);
 	#ifndef NVGT_STUB
-		if (g_dbg) {
-			cout << "Debugging, waiting for commands. Type 'h' for help." << endl;
-			g_dbg->TakeCommands(ctx);
-		}
+	if (g_dbg) {
+		cout << "Debugging, waiting for commands. Type 'h' for help." << endl;
+		g_dbg->TakeCommands(ctx);
+	}
 	#endif
 	while (g_ctxMgr->ExecuteScripts());
 	int r = ctx->GetState();
@@ -664,67 +662,63 @@ int PragmaCallback(const string& pragmaText, CScriptBuilder& builder, void* /*us
 	return 0;
 }
 // angelscript debugger stuff taken from asrun sample.
-std::string StringToString(void *obj, int /* expandMembers */, CDebugger * /* dbg */) {
-	std::string *val = reinterpret_cast<std::string*>(obj);
+std::string StringToString(void* obj, int /* expandMembers */, CDebugger* /* dbg */) {
+	std::string* val = reinterpret_cast<std::string*>(obj);
 	std::stringstream s;
 	s << "(len=" << val->length() << ") \"";
-	if( val->length() < 240 )
+	if (val->length() < 240)
 		s << *val << "\"";
 	else
 		s << val->substr(0, 240) << "...";
 	return s.str();
 }
-std::string ArrayToString(void *obj, int expandMembers, CDebugger *dbg) {
-	CScriptArray *arr = reinterpret_cast<CScriptArray*>(obj);
+std::string ArrayToString(void* obj, int expandMembers, CDebugger* dbg) {
+	CScriptArray* arr = reinterpret_cast<CScriptArray*>(obj);
 	std::stringstream s;
 	s << "(len=" << arr->GetSize() << ")";
-	if( expandMembers > 0 )
-	{
+	if (expandMembers > 0) {
 		s << " [";
-		for( asUINT n = 0; n < arr->GetSize(); n++ )
-		{
+		for (asUINT n = 0; n < arr->GetSize(); n++) {
 			s << dbg->ToString(arr->At(n), arr->GetElementTypeId(), expandMembers - 1, arr->GetArrayObjectType()->GetEngine());
-			if( n < arr->GetSize()-1 )
+			if (n < arr->GetSize() - 1)
 				s << ", ";
 		}
 		s << "]";
 	}
 	return s.str();
 }
-std::string DictionaryToString(void *obj, int expandMembers, CDebugger *dbg) {
-	CScriptDictionary *dic = reinterpret_cast<CScriptDictionary*>(obj);
+std::string DictionaryToString(void* obj, int expandMembers, CDebugger* dbg) {
+	CScriptDictionary* dic = reinterpret_cast<CScriptDictionary*>(obj);
 	std::stringstream s;
 	s << "(len=" << dic->GetSize() << ")";
-	if( expandMembers > 0 )
-	{
+	if (expandMembers > 0) {
 		s << " [";
 		asUINT n = 0;
-		for( CScriptDictionary::CIterator it = dic->begin(); it != dic->end(); it++, n++ )
-		{
+		for (CScriptDictionary::CIterator it = dic->begin(); it != dic->end(); it++, n++) {
 			s << "[" << it.GetKey() << "] = ";
-			const void *val = it.GetAddressOfValue();
+			const void* val = it.GetAddressOfValue();
 			int typeId = it.GetTypeId();
-			asIScriptContext *ctx = asGetActiveContext();
+			asIScriptContext* ctx = asGetActiveContext();
 			s << dbg->ToString(const_cast<void*>(val), typeId, expandMembers - 1, ctx ? ctx->GetEngine() : 0);
-			if( n < dic->GetSize() - 1 )
+			if (n < dic->GetSize() - 1)
 				s << ", ";
 		}
 		s << "]";
 	}
 	return s.str();
 }
-std::string DateTimeToString(void *obj, int expandMembers, CDebugger *dbg) {
-	CDateTime *dt = reinterpret_cast<CDateTime*>(obj);
+std::string DateTimeToString(void* obj, int expandMembers, CDebugger* dbg) {
+	CDateTime* dt = reinterpret_cast<CDateTime*>(obj);
 	std::stringstream s;
 	s << "{" << dt->getYear() << "-" << dt->getMonth() << "-" << dt->getDay() << " ";
 	s << dt->getHour() << ":" << dt->getMinute() << ":" << dt->getSecond() << "}";
-	return s.str(); 
+	return s.str();
 }
-std::string Vector3ToString(void *obj, int expandMembers, CDebugger *dbg) {
-	Vector3 *v = reinterpret_cast<Vector3*>(obj);
+std::string Vector3ToString(void* obj, int expandMembers, CDebugger* dbg) {
+	Vector3* v = reinterpret_cast<Vector3*>(obj);
 	std::stringstream s;
 	s << "{" << v->x << ", " << v->y << ", " << v->z << "}";
-	return s.str(); 
+	return s.str();
 }
 #ifdef _WIN32
 BOOL WINAPI debugger_ctrlc(DWORD event) {
@@ -733,9 +727,9 @@ BOOL WINAPI debugger_ctrlc(DWORD event) {
 	return TRUE;
 }
 #endif
-void InitializeDebugger(asIScriptEngine *engine) {
+void InitializeDebugger(asIScriptEngine* engine) {
 	#ifdef _WIN32
-		SetConsoleCtrlHandler(debugger_ctrlc, TRUE);;
+	SetConsoleCtrlHandler(debugger_ctrlc, TRUE);;
 	#endif
 	g_dbg = new CDebugger();
 	g_dbg->SetEngine(engine);
@@ -751,7 +745,7 @@ void asDebugBreak() {
 	g_dbg->TakeCommands(asGetActiveContext());
 }
 void asDebuggerAddFileBreakpoint(const std::string& file, int line) { if (g_dbg) g_dbg->AddFileBreakPoint(file, line); }
-void asDebuggerAddFuncBreakpoint(const std::string& func) { if (g_dbg)  g_dbg->AddFuncBreakPoint(func); }
+void asDebuggerAddFuncBreakpoint(const std::string& func) { if (g_dbg) g_dbg->AddFuncBreakPoint(func); }
 #else
 void asDebugBreak() {} // Debugger not present for compiled executables.
 void asDebuggerAddFileBreakpoint(const std::string& file, int line) {}

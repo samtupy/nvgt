@@ -40,170 +40,170 @@ class async_result : public RefCountedObject, public Runnable {
 	asIScriptContext* ctx; // The angelscript context used to call the function asynchronously, stored as a property because we need to pass it between functions in this class without arguments.
 	std::unordered_map<void*, asITypeInfo*> value_args; // Value typed arguments must be copied before being passed to the destination function on another thread, this is because such arguments reside on the stack and so they would otherwise get destroyed when the async_result::call method unwinds but well before the destination function returns. Store pointers to such copied arguments here so they can be released later.
 	std::string exception; // Set to an exception string if an exception is thrown from within the async function call.
-	public:
+public:
 	Event progress; // Public so that some functions in this object can be called directly from Angelscript such as wait and tryWait.
-		async_result(asITypeInfo* t) : value(nullptr), subtype(t), subtypeid(subtype->GetSubTypeId()), progress(Event::EVENT_MANUALRESET), task(nullptr), ctx(nullptr) {}
-		~async_result() {
-			if (task) angelscript_refcounted_release<Thread>(task);
-			release_value_args();
-			if (value) {
-				if (subtypeid & asTYPEID_MASK_OBJECT) subtype->GetEngine()->ReleaseScriptObject(*(void**)value, subtype->GetSubType());
-				free(value);
-			}
+	async_result(asITypeInfo* t) : value(nullptr), subtype(t), subtypeid(subtype->GetSubTypeId()), progress(Event::EVENT_MANUALRESET), task(nullptr), ctx(nullptr) {}
+	~async_result() {
+		if (task) angelscript_refcounted_release<Thread>(task);
+		release_value_args();
+		if (value) {
+			if (subtypeid & asTYPEID_MASK_OBJECT) subtype->GetEngine()->ReleaseScriptObject(*(void**)value, subtype->GetSubType());
+			free(value);
 		}
-		void* get_value() {
-			if (!ctx) throw NullValueException("Object not initialized");
-			progress.wait();
-			if (exception != "") throw Exception(exception);
-			if ((subtypeid & asTYPEID_MASK_OBJECT) && !(subtypeid & asTYPEID_OBJHANDLE))
-				return *(void**)value;
-			else return value;
+	}
+	void* get_value() {
+		if (!ctx) throw NullValueException("Object not initialized");
+		progress.wait();
+		if (exception != "") throw Exception(exception);
+		if ((subtypeid & asTYPEID_MASK_OBJECT) && !(subtypeid & asTYPEID_OBJHANDLE))
+			return *(void**)value;
+		else return value;
+	}
+	std::string get_exception() { return progress.tryWait(0) ? exception : ""; }
+	bool call(asIScriptGeneric* gen, ThreadPool* pool = nullptr) {
+		asIScriptContext* aCtx = asGetActiveContext();
+		asIScriptEngine* engine = aCtx->GetEngine();
+		asIScriptFunction* func;
+		int func_typeid = gen->GetArgTypeId(1);
+		asITypeInfo* func_type = engine->GetTypeInfoById(func_typeid);
+		if (!func_type || !(func_type->GetFlags() & asOBJ_FUNCDEF)) {
+			aCtx->SetException("First argument to async must be a callable function");
+			return false;
 		}
-		std::string get_exception() { return progress.tryWait(0)? exception : ""; }
-		bool call(asIScriptGeneric* gen, ThreadPool* pool = nullptr) {
-			asIScriptContext* aCtx = asGetActiveContext();
-			asIScriptEngine* engine = aCtx->GetEngine();
-			asIScriptFunction* func;
-			int func_typeid = gen->GetArgTypeId(1);
-			asITypeInfo* func_type = engine->GetTypeInfoById(func_typeid);
-			if (!func_type || !(func_type->GetFlags() & asOBJ_FUNCDEF)) {
-				aCtx->SetException("First argument to async must be a callable function");
-				return false;
-			}
-			if (func_typeid & asTYPEID_OBJHANDLE) func = *(asIScriptFunction**)gen->GetArgAddress(1);
-			else func = (asIScriptFunction*)gen->GetArgAddress(1);
-			if (func->GetReturnTypeId() != subtypeid) {
-				aCtx->SetException(format("return type of %s is incompatible with async result type %s", std::string(func->GetDeclaration()), std::string(engine->GetTypeDeclaration(subtypeid))).c_str());
-				return false;
-			}
-			ctx = engine->RequestContext();
-			if (!ctx || ctx->Prepare(func) < 0) {
-				aCtx->SetException("Async can't prepare calling context");
+		if (func_typeid & asTYPEID_OBJHANDLE) func = *(asIScriptFunction**)gen->GetArgAddress(1);
+		else func = (asIScriptFunction*)gen->GetArgAddress(1);
+		if (func->GetReturnTypeId() != subtypeid) {
+			aCtx->SetException(format("return type of %s is incompatible with async result type %s", std::string(func->GetDeclaration()), std::string(engine->GetTypeDeclaration(subtypeid))).c_str());
+			return false;
+		}
+		ctx = engine->RequestContext();
+		if (!ctx || ctx->Prepare(func) < 0) {
+			aCtx->SetException("Async can't prepare calling context");
+			engine->ReturnContext(ctx);
+			return false;
+		}
+		asIScriptContext* defCtx = nullptr; // We may need an extra context if we are required to evaluate expressions for default arguments.
+		for (unsigned int i = 0; i < func->GetParamCount(); i++) {
+			// In this context, param will be the argument as being received by the calling function and arg will be the argument as being passed to this async::call function.
+			int param_typeid, arg_typeid;
+			asITypeInfo* param_type, * arg_type;
+			asDWORD param_flags, arg_flags;
+			const char* param_default;
+			int success = func->GetParam(i, &param_typeid, &param_flags, nullptr, &param_default);
+			if (success < 0) {
+				aCtx->SetException(format("Angelscript error %d while setting art %u of async call to %s", success, i, std::string(func->GetDeclaration())).c_str());
 				engine->ReturnContext(ctx);
 				return false;
 			}
-			asIScriptContext* defCtx = nullptr; // We may need an extra context if we are required to evaluate expressions for default arguments.
-			for (unsigned int i = 0; i < func->GetParamCount(); i++) {
-				// In this context, param will be the argument as being received by the calling function and arg will be the argument as being passed to this async::call function.
-				int param_typeid, arg_typeid;
-				asITypeInfo*param_type, * arg_type;
-				asDWORD param_flags, arg_flags;
-				const char* param_default;
-				int success = func->GetParam(i, &param_typeid, &param_flags, nullptr, &param_default);
-				if (success < 0) {
-					aCtx->SetException(format("Angelscript error %d while setting art %u of async call to %s", success, i, std::string(func->GetDeclaration())).c_str());
+			if (gen->GetArgCount() - 2 <= i || param_default) {
+				if (!param_default) {
+					aCtx->SetException("Not enough arguments");
 					engine->ReturnContext(ctx);
 					return false;
 				}
-				if (gen->GetArgCount() -2 <= i || param_default) {
-					if (!param_default) {
-						aCtx->SetException("Not enough arguments");
-						engine->ReturnContext(ctx);
-						return false;
-					}
-					// We must initialize the default arguments ourselves.
-					if (!defCtx) defCtx = engine->RequestContext();
-					if (!defCtx) {
-						aCtx->SetException("Cannot attain context to evaluate default async call argument expressions");
-						engine->ReturnContext(ctx);
-						return false;
-					}
-					param_type = engine->GetTypeInfoById(param_typeid);
-					if (param_typeid & asTYPEID_MASK_OBJECT && !(param_typeid & asTYPEID_OBJHANDLE)) {
-						// Create a copy of the object.
-						void* obj = engine->CreateScriptObject(param_type);
-						if (!obj) {
-							aCtx->SetException(format("Cannot create empty object for default assign of argument %u of async function call", i + 1).c_str());
-							engine->ReturnContext(ctx);
-							return false;
-						}
-						value_args[*(void**)obj] = param_type;
-						*(void**)ctx->GetAddressOfArg(i) = obj;
-					}
-					success = ExecuteString(engine, format("return %s;", std::string(param_default)).c_str(), *(void**)ctx->GetAddressOfArg(i), param_typeid, nullptr, defCtx);
-					if (success < 0) {
-						aCtx->SetException(format("Angelscript error %d while setting default argument %u in async call to %s", success, i + 1, std::string(func->GetDeclaration())).c_str());
-						engine->ReturnContext(ctx);
-						return false;
-					}
-					continue;
+				// We must initialize the default arguments ourselves.
+				if (!defCtx) defCtx = engine->RequestContext();
+				if (!defCtx) {
+					aCtx->SetException("Cannot attain context to evaluate default async call argument expressions");
+					engine->ReturnContext(ctx);
+					return false;
 				}
-				arg_typeid = gen->GetArgTypeId(i +2);
-				arg_type = engine->GetTypeInfoById(arg_typeid);
-				success = asINVALID_ARG;
-				if (arg_typeid & asTYPEID_MASK_OBJECT && arg_typeid & asTYPEID_OBJHANDLE) success = ctx->SetArgObject(i, gen->GetArgObject(i + 2));
-				else if(arg_typeid & asTYPEID_MASK_OBJECT) {
-					void* obj = engine->CreateScriptObjectCopy(gen->GetArgAddress(i + 2), arg_type);
+				param_type = engine->GetTypeInfoById(param_typeid);
+				if (param_typeid & asTYPEID_MASK_OBJECT && !(param_typeid & asTYPEID_OBJHANDLE)) {
+					// Create a copy of the object.
+					void* obj = engine->CreateScriptObject(param_type);
 					if (!obj) {
-						aCtx->SetException(format("Cannot copy object for argument %u of async function call", i + 1).c_str());
+						aCtx->SetException(format("Cannot create empty object for default assign of argument %u of async function call", i + 1).c_str());
 						engine->ReturnContext(ctx);
 						return false;
 					}
-					success = ctx->SetArgObject(i, obj);
-					if (success >= 0) 				value_args[obj] = arg_type;
-					else engine->ReleaseScriptObject(obj, arg_type);
-				} else if (arg_typeid & asTYPEID_VOID) success = ctx->SetArgAddress(i, nullptr);
-				else if (arg_typeid == asTYPEID_BOOL || arg_typeid == asTYPEID_INT8 || arg_typeid == asTYPEID_UINT8) success = ctx->SetArgByte(i, gen->GetArgByte(i + 2));
-				else if (arg_typeid == asTYPEID_INT16 || arg_typeid == asTYPEID_UINT16) success = ctx->SetArgWord(i, gen->GetArgWord(i + 2));
-				else if (arg_typeid == asTYPEID_INT32 || arg_typeid == asTYPEID_UINT32) success = ctx->SetArgDWord(i, gen->GetArgDWord(i + 2));
-				else if (arg_typeid == asTYPEID_INT64 || arg_typeid == asTYPEID_UINT64) success = ctx->SetArgQWord(i, gen->GetArgQWord(i + 2));
-				else if (arg_typeid == asTYPEID_FLOAT) success = ctx->SetArgFloat(i, gen->GetArgFloat(i + 2));
-				else if (arg_typeid == asTYPEID_DOUBLE) success = ctx->SetArgDouble(i, gen->GetArgDouble(i + 2));
+					value_args[*(void**)obj] = param_type;
+					*(void**)ctx->GetAddressOfArg(i) = obj;
+				}
+				success = ExecuteString(engine, format("return %s;", std::string(param_default)).c_str(), *(void**)ctx->GetAddressOfArg(i), param_typeid, nullptr, defCtx);
 				if (success < 0) {
-					aCtx->SetException(format("Angelscript error %d while setting argument %u in async call to %s", success, i + 1, std::string(func->GetDeclaration())).c_str());
+					aCtx->SetException(format("Angelscript error %d while setting default argument %u in async call to %s", success, i + 1, std::string(func->GetDeclaration())).c_str());
 					engine->ReturnContext(ctx);
 					return false;
 				}
+				continue;
 			}
-			if (defCtx) engine->ReturnContext(defCtx);
-			// Finally our context is actually prepared for execution, which will take place in the thread we're about to spin up.
-			duplicate(); // Insure that this object won't get destroyed while the function is executing encase the user chose not to keep a handle to the async_result.
-			try {
-				if (pool) pool->start(*this);
-				else {
-					task = angelscript_refcounted_factory<Thread>();
-					task->start(*this);
+			arg_typeid = gen->GetArgTypeId(i + 2);
+			arg_type = engine->GetTypeInfoById(arg_typeid);
+			success = asINVALID_ARG;
+			if (arg_typeid & asTYPEID_MASK_OBJECT && arg_typeid & asTYPEID_OBJHANDLE) success = ctx->SetArgObject(i, gen->GetArgObject(i + 2));
+			else if (arg_typeid & asTYPEID_MASK_OBJECT) {
+				void* obj = engine->CreateScriptObjectCopy(gen->GetArgAddress(i + 2), arg_type);
+				if (!obj) {
+					aCtx->SetException(format("Cannot copy object for argument %u of async function call", i + 1).c_str());
+					engine->ReturnContext(ctx);
+					return false;
 				}
-			} catch(...) {
+				success = ctx->SetArgObject(i, obj);
+				if (success >= 0) value_args[obj] = arg_type;
+				else engine->ReleaseScriptObject(obj, arg_type);
+			} else if (arg_typeid & asTYPEID_VOID) success = ctx->SetArgAddress(i, nullptr);
+			else if (arg_typeid == asTYPEID_BOOL || arg_typeid == asTYPEID_INT8 || arg_typeid == asTYPEID_UINT8) success = ctx->SetArgByte(i, gen->GetArgByte(i + 2));
+			else if (arg_typeid == asTYPEID_INT16 || arg_typeid == asTYPEID_UINT16) success = ctx->SetArgWord(i, gen->GetArgWord(i + 2));
+			else if (arg_typeid == asTYPEID_INT32 || arg_typeid == asTYPEID_UINT32) success = ctx->SetArgDWord(i, gen->GetArgDWord(i + 2));
+			else if (arg_typeid == asTYPEID_INT64 || arg_typeid == asTYPEID_UINT64) success = ctx->SetArgQWord(i, gen->GetArgQWord(i + 2));
+			else if (arg_typeid == asTYPEID_FLOAT) success = ctx->SetArgFloat(i, gen->GetArgFloat(i + 2));
+			else if (arg_typeid == asTYPEID_DOUBLE) success = ctx->SetArgDouble(i, gen->GetArgDouble(i + 2));
+			if (success < 0) {
+				aCtx->SetException(format("Angelscript error %d while setting argument %u in async call to %s", success, i + 1, std::string(func->GetDeclaration())).c_str());
 				engine->ReturnContext(ctx);
-				release();
-				throw;
+				return false;
 			}
-			return true;
 		}
-		void run() {
-			int result = ctx->Execute();
-			if (result == asEXECUTION_ABORTED) exception = "function call aborted";
-			else if (result == asEXECUTION_SUSPENDED) exception = "function call suspended";
-			else if (result == asEXECUTION_EXCEPTION) exception = ctx->GetExceptionString();
-			else if (result == asEXECUTION_FINISHED && subtypeid != asTYPEID_VOID) {
-				// Looking at and being heavily enspired from the scriptgrid addon as I write this.
-				if (subtypeid & asTYPEID_MASK_OBJECT) value = malloc(sizeof(asPWORD));
-				else value = malloc(ctx->GetEngine()->GetSizeOfPrimitiveType(subtypeid));
-				if ((subtypeid & ~asTYPEID_MASK_SEQNBR) && !(subtypeid & asTYPEID_OBJHANDLE)) *(void**)value = ctx->GetEngine()->CreateScriptObjectCopy(ctx->GetReturnObject(), subtype->GetSubType());
-				else if (subtypeid & asTYPEID_OBJHANDLE) {
-					void* tmp = value;
-					*(void**)value = ctx->GetReturnObject();
-					ctx->GetEngine()->AddRefScriptObject(*(void**)value, subtype->GetSubType());
-					if (tmp) ctx->GetEngine()->ReleaseScriptObject(*(void**)tmp, subtype->GetSubType());
-				} else if (subtypeid == asTYPEID_BOOL || subtypeid == asTYPEID_INT8 || subtypeid == asTYPEID_UINT8) *(char*)value = ctx->GetReturnByte();
-				else if (subtypeid == asTYPEID_INT16 || subtypeid == asTYPEID_UINT16) *(short*)value = ctx->GetReturnWord();
-				else if (subtypeid == asTYPEID_INT32 || subtypeid == asTYPEID_UINT32 || subtypeid > asTYPEID_DOUBLE) *(int*)value = ctx->GetReturnDWord();
-				else if (subtypeid == asTYPEID_FLOAT) *(float*)value = ctx->GetReturnFloat();
-				else if( subtypeid == asTYPEID_INT64 || subtypeid == asTYPEID_UINT64) *(double*)value = ctx->GetReturnQWord();
-				else if (subtypeid == asTYPEID_DOUBLE) *(double*)value = ctx->GetReturnDouble();
+		if (defCtx) engine->ReturnContext(defCtx);
+		// Finally our context is actually prepared for execution, which will take place in the thread we're about to spin up.
+		duplicate(); // Insure that this object won't get destroyed while the function is executing encase the user chose not to keep a handle to the async_result.
+		try {
+			if (pool) pool->start(*this);
+			else {
+				task = angelscript_refcounted_factory<Thread>();
+				task->start(*this);
 			}
-			ctx->GetEngine()->ReturnContext(ctx);
-			release_value_args();
+		} catch (...) {
+			engine->ReturnContext(ctx);
 			release();
-			progress.set();
+			throw;
 		}
-		void release_value_args() {
-			for (const auto& obj : value_args) g_ScriptEngine->ReleaseScriptObject(obj.first, obj.second);
-			value_args.clear();
+		return true;
+	}
+	void run() {
+		int result = ctx->Execute();
+		if (result == asEXECUTION_ABORTED) exception = "function call aborted";
+		else if (result == asEXECUTION_SUSPENDED) exception = "function call suspended";
+		else if (result == asEXECUTION_EXCEPTION) exception = ctx->GetExceptionString();
+		else if (result == asEXECUTION_FINISHED && subtypeid != asTYPEID_VOID) {
+			// Looking at and being heavily enspired from the scriptgrid addon as I write this.
+			if (subtypeid & asTYPEID_MASK_OBJECT) value = malloc(sizeof(asPWORD));
+			else value = malloc(ctx->GetEngine()->GetSizeOfPrimitiveType(subtypeid));
+			if ((subtypeid & ~asTYPEID_MASK_SEQNBR) && !(subtypeid & asTYPEID_OBJHANDLE)) *(void**)value = ctx->GetEngine()->CreateScriptObjectCopy(ctx->GetReturnObject(), subtype->GetSubType());
+			else if (subtypeid & asTYPEID_OBJHANDLE) {
+				void* tmp = value;
+				*(void**)value = ctx->GetReturnObject();
+				ctx->GetEngine()->AddRefScriptObject(*(void**)value, subtype->GetSubType());
+				if (tmp) ctx->GetEngine()->ReleaseScriptObject(*(void**)tmp, subtype->GetSubType());
+			} else if (subtypeid == asTYPEID_BOOL || subtypeid == asTYPEID_INT8 || subtypeid == asTYPEID_UINT8) *(char*)value = ctx->GetReturnByte();
+			else if (subtypeid == asTYPEID_INT16 || subtypeid == asTYPEID_UINT16) *(short*)value = ctx->GetReturnWord();
+			else if (subtypeid == asTYPEID_INT32 || subtypeid == asTYPEID_UINT32 || subtypeid > asTYPEID_DOUBLE) *(int*)value = ctx->GetReturnDWord();
+			else if (subtypeid == asTYPEID_FLOAT) *(float*)value = ctx->GetReturnFloat();
+			else if (subtypeid == asTYPEID_INT64 || subtypeid == asTYPEID_UINT64) *(double*)value = ctx->GetReturnQWord();
+			else if (subtypeid == asTYPEID_DOUBLE) *(double*)value = ctx->GetReturnDouble();
 		}
-		bool complete() { return ctx && progress.tryWait(0); }
-		bool failed() { return progress.tryWait(0) && exception != ""; }
+		ctx->GetEngine()->ReturnContext(ctx);
+		release_value_args();
+		release();
+		progress.set();
+	}
+	void release_value_args() {
+		for (const auto& obj : value_args) g_ScriptEngine->ReleaseScriptObject(obj.first, obj.second);
+		value_args.clear();
+	}
+	bool complete() { return ctx && progress.tryWait(0); }
+	bool failed() { return progress.tryWait(0) && exception != ""; }
 };
 async_result* async_unprepared_factory(asITypeInfo* type) { return new async_result(type); }
 void async_factory(asIScriptGeneric* gen) {
@@ -229,12 +229,12 @@ public:
 		if (ctx->Prepare(func) < 0) goto finish;
 		if (ctx->SetArgObject(0, args) < 0) goto finish;
 		execution_result = ctx->Execute(); // Todo: Work out what we want to do with exceptions or errors that take place in threads.
-		finish:
-			if (ctx && !g_shutting_down) g_ScriptEngine->ReturnContext(ctx); // We only do this when the engine is not shutting down because the angelscript could get partially destroyed on the main thread before this point in the shutdown case.
-			if (thread) angelscript_refcounted_release<Thread>(thread);
-			asThreadCleanup();
-			delete this; // Poco wants us to keep these Runnable objects alive as long as the thread is running, meaning we must delete ourself from within the thread to avoid some other sort of cleanup machinery.
-			return;
+	finish:
+		if (ctx && !g_shutting_down) g_ScriptEngine->ReturnContext(ctx); // We only do this when the engine is not shutting down because the angelscript could get partially destroyed on the main thread before this point in the shutdown case.
+		if (thread) angelscript_refcounted_release<Thread>(thread);
+		asThreadCleanup();
+		delete this; // Poco wants us to keep these Runnable objects alive as long as the thread is running, meaning we must delete ourself from within the thread to avoid some other sort of cleanup machinery.
+		return;
 	}
 };
 

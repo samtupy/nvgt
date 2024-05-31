@@ -95,7 +95,7 @@ template<class T> datastream* ftp_client_begin_list(T* s, const std::string& pat
 // Some functions for name_value_collection and derivatives that we can't directly wrap.
 template <class T> T* name_value_collection_list_factory(asBYTE* buffer) {
 	// This is the first time I've written a repeating list factory wrapper for use with Angelscript, so it is heavily based on the example in asAddon/src/scriptdictionary.cpp but omitting the reference type checks.
-	T* nvc = new(angelscript_refcounted_create<T>()) T();
+	T* nvc = new (angelscript_refcounted_create<T>()) T();
 	asUINT length = *(asUINT*)buffer;
 	buffer += 4;
 	while (length--) {

@@ -32,14 +32,14 @@ bool load_nvgt_plugin(const std::string& name, void* user) {
 	else {
 		std::string dllname = name;
 		#ifdef _WIN32
-			dllname += ".dll";
+		dllname += ".dll";
 		#elif defined(__APPLE__)
-			dllname += ".dylib";
+		dllname += ".dylib";
 		#else
-			dllname += ".so";
+		dllname += ".so";
 		#endif
 		obj = SDL_LoadObject(dllname.c_str());
-		if(!obj) obj = SDL_LoadObject(Poco::format("lib%s", dllname).c_str());
+		if (!obj) obj = SDL_LoadObject(Poco::format("lib%s", dllname).c_str());
 		if (!obj) return false;
 		entry = (nvgt_plugin_entry*)SDL_LoadFunction(obj, "nvgt_plugin");
 	}
@@ -80,9 +80,8 @@ bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
 void serialize_nvgt_plugins(Poco::BinaryWriter& bw) {
 	unsigned short count = loaded_plugins.size();
 	bw << count;
-	for (const auto& i : loaded_plugins) {
+	for (const auto& i : loaded_plugins)
 		bw << i.first;
-	}
 }
 
 void unload_nvgt_plugins() {
