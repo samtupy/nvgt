@@ -1,0 +1,20 @@
+void test_timer_microseconds() {
+	timer t(0, 1);
+	wait(1);
+	assert(t.has_elapsed(900));
+	assert(t.elapsed < 5 * MILLISECONDS);
+	t.pause();
+	int64 old = t.elapsed;
+	wait(1);
+	assert(t.elapsed == old);
+	t.resume();
+	assert(t.has_elapsed(old));
+	t.restart();
+	assert(t.elapsed < 10);
+	t.force(2 * SECONDS);
+	assert(t.has_elapsed(2 * SECONDS));
+	assert(!t.has_elapsed(2 * SECONDS + 1 * MILLISECONDS));
+	t.adjust(-1 * SECONDS);
+	assert(t.has_elapsed(1 * SECONDS));
+	assert(!t.has_elapsed(1 * SECONDS + 1 * MILLISECONDS));
+}

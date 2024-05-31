@@ -50,8 +50,10 @@ void pack::AddRef() {
 	asAtomicInc(RefCount);
 }
 void pack::Release() {
-	if (asAtomicDec(RefCount) < 1)
+	if (asAtomicDec(RefCount) < 1) {
+		close();
 		delete this;
+	}
 }
 
 // Sets the 8 byte header used when loading and saving packs.
@@ -217,23 +219,11 @@ bool pack::add_file(const string& disk_filename, const string& pack_filename, bo
 		fclose(dptr);
 		return false;
 	}
-	#ifdef _UNICODE
-	char* filenameA = (char*)malloc(i.namelen + 1);
-	WideCharToMultiunsigned char(CP_ACP, 0, pack_filename.c_str(), i.namelen, filenameA, i.namelen + 1, NULL, NULL);
-	if (fwrite(filenameA, sizeof(char), i.namelen, fptr) < i.namelen) {
-		free(filenameA);
-		fseek(fptr, cur_pos, SEEK_SET);
-		fclose(dptr);
-		return false;
-	}
-	free(filenameA);
-	#else
 	if (fwrite(pack_filename.c_str(), sizeof(char), i.namelen, fptr) < i.namelen) {
 		fseek(fptr, cur_pos, SEEK_SET);
 		fclose(dptr);
 		return false;
 	}
-	#endif
 	unsigned char read_buffer[4096];
 	while (true) {
 		unsigned int dataread = fread(read_buffer, 1, 4096, dptr);
@@ -261,7 +251,7 @@ bool pack::add_file(const string& disk_filename, const string& pack_filename, bo
 }
 
 bool pack::add_memory(const string& pack_filename, unsigned char* data, unsigned int size, bool allow_replace) {
-	if (open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE || !fptr)
+	if ((open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE) || !fptr)
 		return false;
 	if (file_exists(pack_filename)) {
 		if (allow_replace)
@@ -280,33 +270,28 @@ bool pack::add_memory(const string& pack_filename, unsigned char* data, unsigned
 		fseek(fptr, cur_pos, SEEK_SET);
 		return false;
 	}
-	#ifdef _UNICODE
-	char* filenameA = (char*)malloc(i.namelen + 1);
-	WideCharToMultiunsigned char(CP_ACP, 0, pack_filename.c_str(), i.namelen, filenameA, i.namelen + 1, NULL, NULL);
-	if (fwrite(filenameA, sizeof(char), i.namelen, fptr) < i.namelen) {
-		free(filenameA);
-		fseek(fptr, cur_pos, SEEK_SET);
-		return false;
-	}
-	free(filenameA);
-	#else
 	if (fwrite(pack_filename.c_str(), sizeof(char), i.namelen, fptr) < i.namelen) {
 		fseek(fptr, cur_pos, SEEK_SET);
 		return false;
 	}
-	#endif
-	for (unsigned int j = 0; j < size; j++)
-		data[j] = pack_char_encrypt(data[j], j, i.namelen);
-	if (fwrite(data, 1, size, fptr) != size) {
-		fseek(fptr, cur_pos, SEEK_SET);
-		return false;
+	char tmp[1024];
+	int bufsize = 1024; // Keep at multiple of 16 for encryption.
+	for (uint64_t p = 0; p < size; p += bufsize) {
+		if (p + bufsize >= size) bufsize = size - p;
+		for (unsigned int j = 0; j < bufsize; j++)
+			tmp[j] = pack_char_encrypt(data[(p * bufsize) + j], (p * bufsize) + j, i.namelen);
+		if (fwrite(tmp, 1, bufsize, fptr) != bufsize) {
+			fseek(fptr, cur_pos, SEEK_SET);
+			return false;
+		}
 	}
+	fseek(fptr, 0, SEEK_END);
 	pack_items[pack_filename] = i;
 	pack_filenames.push_back(pack_filename);
 	return true;
 }
 // Adds memory, but getting data from a C++ string.
-bool pack::add_memory(const string& pack_filename, const std::string& data, bool allow_replace) {
+bool pack::add_memory(const string& pack_filename, const string& data, bool allow_replace) {
 	return add_memory(pack_filename, (unsigned char*)data.c_str(), data.size(), allow_replace);
 }
 

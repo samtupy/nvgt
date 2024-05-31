@@ -12,5 +12,6 @@
 
 #pragma once
 class asIScriptEngine;
+unsigned int random_seed();
 
 void RegisterScriptRandom(asIScriptEngine* engine);

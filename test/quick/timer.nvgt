@@ -1,0 +1,19 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// license: zlib (see license.md in the root of the nvgt distrobution)
+
+void main() {
+	timer t_millis, t_dec;
+	timer t_secs(0, SECONDS);
+	timer t_micros(0, 1);
+	show_window("test");
+	t_dec.accuracy = SECONDS / 10;
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (key_pressed(KEY_M)) screen_reader_speak(keyboard_modifiers & KEYMOD_SHIFT > 0? t_micros.elapsed : t_millis.elapsed, true);
+		if (key_pressed(KEY_S)) screen_reader_speak(t_secs.elapsed, true);
+		if (key_pressed(KEY_D)) screen_reader_speak(t_dec.elapsed, true);
+		if (key_pressed(KEY_SPACE)) { t_secs.toggle_pause(); screen_reader_speak(t_secs.running? "seconds running" : "seconds paused", true); }
+		if (key_pressed(KEY_R)) { t_secs.restart(); t_dec.restart(); t_millis.restart(); t_micros.restart(); screen_reader_speak("restarted", true); }
+	}
+}

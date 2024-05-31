@@ -1,4 +1,4 @@
-void base64() {
+void test_base64() {
 	assert(string_base64_encode("hello") == "aGVsbG8=");
 	assert(string_base64_encode("hello", STRING_BASE64_PADLESS) == "aGVsbG8");
 }

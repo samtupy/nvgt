@@ -14,13 +14,14 @@
 
 #include <angelscript.h>
 #include <algorithm>
+#include <Poco/RefCountedObject.h>
 #include <timer-wheel.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <string>
 
-void timestuff_startup();
-asINT64 ticks(bool unsecure = false);
+uint64_t ticks(bool unsecure = false);
+uint64_t microticks(bool unsecure = false);
 
 class timer_queue;
 class timer_queue_item : public TimerEventInterface {
@@ -69,6 +70,31 @@ public:
 		return timer_objects.size();
 	}
 	bool loop(int max_timers = 0, int max_catchup = 100);
+};
+
+class timer : public Poco::RefCountedObject {
+	uint64_t value;
+	bool paused;
+	bool secure;
+	public:
+	uint64_t accuracy;
+	timer();
+	timer(bool secure);
+	timer(int64_t initial_value, bool secure);
+	timer(int64_t initial_value, uint64_t initial_accuracy, bool secure);
+	int64_t get_elapsed() const;
+	bool has_elapsed(int64_t value) const;
+	void force(int64_t value);
+	void adjust(int64_t value);
+	void restart();
+	bool get_secure() const;
+	bool set_secure(bool value);
+	bool get_paused() const;
+	bool get_running() const;
+	void toggle_pause();
+	bool set_paused(bool paused);
+	bool pause();
+	bool resume();
 };
 
 void RegisterScriptTimestuff(asIScriptEngine* engine);
