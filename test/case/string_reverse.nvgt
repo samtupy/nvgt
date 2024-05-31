@@ -1,0 +1,5 @@
+void test_string_reverse() {
+	assert("test".reverse() == "tset");
+	clipboard_set_text("Massive string with a lot of data".reverse());
+	assert("Massive string with a lot of data".reverse() == "atad fo tol a htiw gnirts evissaM");
+}
