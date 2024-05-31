@@ -35,6 +35,6 @@ def copy_osdev_libraries(env):
 	libs = ["bass", "bass_fx", "bassmix", "git2", "phonon"]
 	if env["PLATFORM"] == "win32": libs += ["GPUUtilities", "nvdaControllerClient64", "SAAPI64", "Tolk", "TrueAudioNext"]
 	for l in libs:
-		env.Install("#release/lib", FindFile(env.subst("${SHLIBPREFIX}" + l + "$SHLIBSUFFIX"), env["LIBPATH"]))
+		env.Install("#release/lib", FindFile(env.subst("${SHLIBPREFIX}" + l + "$SHLIBSUFFIX"), env["LIBPATH"] + ["/usr/local/lib"]))
 
 env["NVGT_OSDEV_COPY_LIBS"] = copy_osdev_libraries

@@ -1,12 +1,12 @@
 #!/bin/zsh
 
 function setup_homebrew {
-	brew install autoconf automake libtool openssl sdl2 bullet
+	brew install autoconf automake libtool openssl sdl2 libgit2 bullet upx
 }
 
 function setup_angelscript {
 	echo Installing Angelscript...
-	git clone https://github.com/codecat/angelscript-mirror||true
+	git clone --depth 1 https://github.com/codecat/angelscript-mirror||true
 	cd "angelscript-mirror/sdk/angelscript/projects/cmake"
 	mkdir -p build
 	cd build
@@ -19,7 +19,7 @@ function setup_angelscript {
 
 function setup_enet {
 	echo Installing enet...
-	git clone https://github.com/lsalzman/enet||true
+	git clone --depth 1 https://github.com/lsalzman/enet||true
 	cd enet
 	autoreconf -vfi
 	./configure
@@ -63,7 +63,7 @@ function setup_nvgt {
 		echo Not running on CI.
 		cd ..	
 		
-		git clone https://github.com/samtupy/nvgt||true
+		git clone --depth 1 https://github.com/samtupy/nvgt||true
 		cd nvgt
 	
 	else
@@ -89,6 +89,7 @@ function main {
 	setup_homebrew
 	setup_angelscript
 	setup_enet
+	#setup_libgit2
 	setup_poco
 	setup_nvgt
 	echo Success!

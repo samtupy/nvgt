@@ -2,7 +2,7 @@
 
 function setup_angelscript {
 	echo Installing Angelscript...
-	git clone https://github.com/codecat/angelscript-mirror
+	git clone --depth 1 https://github.com/codecat/angelscript-mirror||true
 	cd "angelscript-mirror/sdk/angelscript/projects/gnuc"
 	make -j$(nproc)
 	sudo make install
@@ -13,7 +13,7 @@ function setup_angelscript {
 function setup_bullet {
 	echo Installing bullet3...
 	sudo apt install python3-dev -y
-	git clone https://github.com/bulletphysics/bullet3
+	git clone --depth 1 https://github.com/bulletphysics/bullet3||true
 	cd bullet3
 	./build_cmake_pybullet_double.sh
 	cd build_cmake
@@ -23,7 +23,7 @@ function setup_bullet {
 
 function setup_enet {
 	echo Installing enet...
-	git clone https://github.com/lsalzman/enet
+	git clone --depth 1 https://github.com/lsalzman/enet||true
 	cd enet
 	autoreconf -vfi
 	./configure
@@ -35,25 +35,33 @@ function setup_enet {
 
 function setup_libgit2 {
 	echo Installing libgit2...
-	git clone https://github.com/libgit2/libgit2
-	cd libgit2
-	mkdir build
+	curl -s -O -L https://github.com/libgit2/libgit2/archive/refs/tags/v1.8.1.tar.gz
+	tar -xzf v1.8.1.tar.gz
+	cd libgit2-1.8.1
+	mkdir -p build
 	cd build
-	cmake ..
+	cmake .. -DBUILD_TESTS=OFF -DUSE_ICONV=OFF -DBUILD_CLI=OFF -DCMAKE_BUILD_TYPE=Release
 	cmake --build .
 	sudo cmake --install .
 	cd ../..
+	rm v1.8.1.tar.gz
 	echo libgit2 installed.
 }
 
 function setup_poco {
 	echo Installing poco...
-	git clone https://github.com/pocoproject/poco
-	cd poco
-	./configure --static --no-tests --no-samples --cflags=-fPIC
-	make -s -j$(nproc)
-	sudo make install
-	cd ..
+	curl -s -O https://pocoproject.org/releases/poco-1.13.3/poco-1.13.3-all.tar.gz
+	tar -xzf poco-1.13.3-all.tar.gz
+	cd poco-1.13.3-all
+	mkdir -p cmake_build
+	cd cmake_build
+	export CFLAGS=-fPIC
+	export CXXFLAGS=-fPIC
+	cmake .. -DENABLE_TESTS=OFF -DENABLE_SAMPLES=OFF -DCMAKE_BUILD_TYPE=MinSizeRel -DENABLE_PAGECOMPILER=OFF -DENABLE_PAGECOMPILER_FILE2PAGE=OFF -DENABLE_ACTIVERECORD=OFF -DENABLE_ACTIVERECORD_COMPILER=OFF -DENABLE_XML=OFF -DENABLE_MONGODB=OFF -DBUILD_SHARED_LIBS=OFF
+	cmake --build .
+	sudo cmake --install .
+	cd ../..
+	rm poco-1.13.3-all.tar.gz
 	echo poco installed.
 }
 
@@ -68,7 +76,7 @@ function setup_sdl {
 	rm SDL2-2.30.2.tar.gz
 	cd SDL2-2.30.2
 	
-	mkdir build
+	mkdir -p build
 	cd build
 	cmake ..
 	cmake --build .
@@ -96,20 +104,21 @@ function setup_nvgt {
 	
 	echo Downloading lindev...
 	wget https://nvgt.gg/lindev.tar.gz
-	mkdir lindev
+	mkdir -p lindev
 	cd lindev
 	tar -xvf ../lindev.tar.gz
 	cd ..
 	rm lindev.tar.gz
-	
-	pip3 install --user --break-system-packages scons
+	if ! which scons &> /dev/null; then
+		pip3 install --user scons
+	fi
 	scons -s
 	echo NVGT built.
 }
 
 function main {
 	set -e
-	mkdir deps
+	mkdir -p deps
 	cd deps
 	
 	# Insure required packages are installed for building.
