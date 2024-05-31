@@ -460,9 +460,6 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 			// NVGT distributes windows stubs with the first 2 bytes of the PE header modified so that they are not recognised as executables, this avoids an extra AV scan when the stub is copied which may add a few hundred ms to compile times. Fix them now in the copied file.
 			fs.seekp(0);
 			bw.writeRaw("MZ");
-			// There are some reserved bytes in the PE structure, after 2 years of testing we have not run into any issues with using them that we know of. Store the offset to the beginning of our data at such a location.
-			fs.seekp(56);
-			bw << int(stub_size);
 			if (g_make_console) { // The user wants to compile their app without /subsystem:windows
 				int subsystem_offset;
 				fs.seekg(60); // position of new PE header address.
@@ -516,11 +513,33 @@ int LoadCompiledExecutable(asIScriptEngine* engine) {
 	BinaryReader br(fs);
 	UInt32 data_location, code_size;
 	#ifdef _WIN32
-		fs.seekg(56);
+		fs.seekg(60);
+		// READ the PE header location
+		DWORD header_location;
+		br >> header_location;
+		fs.seekg(header_location);
+		UInt32 sig;
+		br >> sig;
+		if (sig != IMAGE_NT_SIGNATURE) {
+			return -1;
+		}
+		IMAGE_FILE_HEADER ih;
+		br.readRaw(reinterpret_cast<char *>(&ih), sizeof(IMAGE_FILE_HEADER));
+		// Skip the optional header
+		fs.seekg(ih.SizeOfOptionalHeader, ios::cur);
+		DWORD offset=0;
+		for (int i=0;i < ih.NumberOfSections;i++) {
+			IMAGE_SECTION_HEADER sh;
+			br.readRaw(reinterpret_cast<char *>(&sh), sizeof(IMAGE_SECTION_HEADER));
+			if (sh.PointerToRawData + sh.SizeOfRawData > offset) {
+				offset = sh.PointerToRawData + sh.SizeOfRawData;
+			}
+		}
+		data_location = offset;
 	#else
 		fs.seekg(-4, std::ios::end);
+		br >> data_location;
 	#endif
-	br >> data_location;
 	fs.seekg(data_location);
 	if (!load_serialized_nvgt_plugins(br)) return -1;
 	if (!load_embedded_packs(br)) return -1;
