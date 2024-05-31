@@ -1,5 +1,4 @@
 void test_datastreams_binary() {
-	assert(false);
 	datastream datastring;
 	datastream@ f = duplicating_writer(base64_encoder(hex_encoder(file("tmp/datastreams_binary.txt", "w")))) + file("tmp/datastreams_binary2.txt", "w") + datastring;
 	int16 val1 = 1, val2 = 2, val3 = 3, val4 = 4;
