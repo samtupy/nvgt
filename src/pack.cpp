@@ -12,7 +12,11 @@
 
 #include <errno.h>
 #include <obfuscate.h>
+#include <Poco/FileStream.h>
+#include <Poco/Format.h>
+#include <Poco/StreamCopier.h>
 #include <Poco/Thread.h>
+#include <Poco/Util/Application.h>
 #ifndef _WIN32
 	#include <sys/stat.h>
 	#include <unistd.h>
@@ -33,6 +37,8 @@ using namespace std;
 // A global property that allows a scripter to set the pack identifier for all subsequently created packs.
 static std::string g_pack_ident = "NVPK";
 
+bool find_embedded_pack(string& filename, unsigned int& file_offset);
+
 pack::pack() {
 	fptr = NULL;
 	mptr = NULL;
@@ -44,6 +50,7 @@ pack::pack() {
 	next_stream_idx = 0;
 	open_mode = PACK_OPEN_MODE_NONE;
 	delay_close = false;
+	file_offset = 0;
 	RefCount = 1;
 }
 void pack::AddRef() {
@@ -65,19 +72,17 @@ bool pack::set_pack_identifier(const std::string& ident) {
 	return true;
 }
 // Loads or creates the given pack file based on mode.
-bool pack::open(const string& filename, pack_open_mode mode, bool memload) {
+bool pack::open(const string& filename_in, pack_open_mode mode, bool memload) {
 	if (fptr || mptr)
 		return false; // This object is already in use and must be closed first.
 	if (mode <= PACK_OPEN_MODE_NONE || mode >= PACK_OPEN_MODES_TOTAL)
 		return false; // Invalid mode.
+		string filename = filename_in;
+		if (mode == PACK_OPEN_MODE_READ) find_embedded_pack(filename, file_offset);
 	if (mode == PACK_OPEN_MODE_APPEND && !FileExists(filename))
 		mode = PACK_OPEN_MODE_CREATE;
 	if (mode == PACK_OPEN_MODE_CREATE) {
-		#ifndef _UNICODE
 		fptr = fopen(filename.c_str(), "wb");
-		#else
-		fptr = _wfopen(filename.c_str(), L"wb");
-		#endif
 		if (fptr == NULL)
 			return false;
 		pack_header h;
@@ -89,22 +94,22 @@ bool pack::open(const string& filename, pack_open_mode mode, bool memload) {
 		open_mode = mode;
 		return true;
 	} else if (mode == PACK_OPEN_MODE_APPEND || mode == PACK_OPEN_MODE_READ) {
-		#ifndef _UNICODE
 		fptr = fopen(filename.c_str(), mode == PACK_OPEN_MODE_APPEND ? "rb+" : "rb");
-		#else
-		fptr = _wfopen(filename.c_str(), mode == PACK_OPEN_MODE_APPEND ? L"rb+" : L"rb");
-		#endif
 		if (!fptr)
 			return false;
+		unsigned int total_size;
 		#ifdef _WIN32
-		unsigned int total_size = filelength(fileno(fptr));
+		total_size = filelength(fileno(fptr));
 		#else
 		struct stat st;
-		unsigned int total_size = 0;
 		if (fstat(fileno(fptr), &st) == 0)
 			total_size = st.st_size;
 		#endif
-		fseek(fptr, 0, SEEK_SET);
+		fseek(fptr, file_offset, SEEK_SET);
+		if (file_offset > 0) { // Embedded pack, read the size.
+			fread(&total_size, sizeof(unsigned int), 1, fptr);
+			file_offset += sizeof(unsigned int);
+		}
 		pack_header h;
 		if (!fread(&h, sizeof(pack_header), 1, fptr)) {
 			fclose(fptr);
@@ -131,7 +136,7 @@ bool pack::open(const string& filename, pack_open_mode mode, bool memload) {
 				fclose(fptr);
 				return false;
 			}
-			i.offset = ftell(fptr);
+			i.offset = ftell(fptr) - file_offset;
 			pack_items[fn] = i;
 			pack_filenames.push_back(fn);
 			fseek(fptr, i.filesize, SEEK_CUR);
@@ -140,12 +145,9 @@ bool pack::open(const string& filename, pack_open_mode mode, bool memload) {
 		if (mode == PACK_OPEN_MODE_READ && memload) {
 			mptr = (unsigned char*)malloc(total_size);
 			FILE* mtmp;
-			#ifndef _UNICODE
 			mtmp = fopen(filename.c_str(), "rb+");
-			#else
-			mtmp = _wfopen(filename.c_str(), L"rb+");
-			#endif
 			if (mtmp && mptr) {
+				fseek(mtmp, file_offset, SEEK_SET);
 				fread(mptr, 1, total_size, mtmp);
 				fclose(mtmp);
 			} else {
@@ -179,6 +181,7 @@ bool pack::close() {
 	pack_filenames.clear();
 	pack_streams.clear();
 	current_filename = "";
+	file_offset = 0;
 	//next_stream_idx=0;
 	open_mode = PACK_OPEN_MODE_NONE;
 	fptr = NULL;
@@ -190,7 +193,7 @@ bool pack::close() {
 
 // Adds a file from disk to the pack. Returns false if disk filename doesn't exist or can't be read, pack_filename is already an item in the pack and allow_replace is false, or this object is not opened in append/create mode.
 bool pack::add_file(const string& disk_filename, const string& pack_filename, bool allow_replace) {
-	if (!fptr)
+	if (!fptr || file_offset > 0)
 		return false;
 	if (open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE)
 		return false;
@@ -251,7 +254,7 @@ bool pack::add_file(const string& disk_filename, const string& pack_filename, bo
 }
 
 bool pack::add_memory(const string& pack_filename, unsigned char* data, unsigned int size, bool allow_replace) {
-	if ((open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE) || !fptr)
+	if ((open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE) || !fptr || file_offset > 0)
 		return false;
 	if (file_exists(pack_filename)) {
 		if (allow_replace)
@@ -297,7 +300,7 @@ bool pack::add_memory(const string& pack_filename, const string& data, bool allo
 
 // Deletes a file from the pack if it exists, and returns true on success. This operation is usually highly intensive, and if you must do it over and over again, it's best to just recompile your pack. If this function returns false, and you are sure your arguments are correct, you can consider that your pack file is now probably corrupt. This should only happen if the pack contains invalid headers or incomplete file data in the first place.
 bool pack::delete_file(const string& pack_filename) {
-	if (open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE || !fptr)
+	if (open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE || !fptr || file_offset > 0)
 		return false;
 	unsigned int idx = 0;
 	for (idx = 0; idx < pack_filenames.size(); idx++) {
@@ -374,13 +377,8 @@ unsigned int pack::get_file_name(int idx, char* buffer, unsigned int size) {
 	if (!buffer || size <= pack_filenames[idx].size())
 		return pack_filenames[idx].size() + 1;
 	size = pack_filenames[idx].size();
-	#ifdef _UNICODE
-	wcsncpy(buffer, pack_filenames[idx].c_str(), size);
-	buffer[size] = L'\0';
-	#else
 	strncpy(buffer, pack_filenames[idx].c_str(), size);
 	buffer[size] = '\0';
-	#endif
 	return size;
 }
 string pack::get_file_name(int idx) {
@@ -409,7 +407,7 @@ unsigned int pack::get_file_size(const string& pack_filename) {
 
 unsigned int pack::get_file_offset(const string& pack_filename) {
 	if (pack_items.find(pack_filename) != pack_items.end())
-		return pack_items[pack_filename].offset;
+		return file_offset + pack_items[pack_filename].offset;
 	else
 		return 0;
 }
@@ -434,7 +432,7 @@ unsigned int pack::read_file(const string& pack_filename, unsigned int offset, u
 		reader = fptr;
 	if (open_mode != PACK_OPEN_MODE_READ || !reader || pack_items.find(pack_filename) == pack_items.end())
 		return 0;
-	fseek(reader, pack_items[pack_filename].offset + offset, SEEK_SET);
+	fseek(reader, file_offset + pack_items[pack_filename].offset + offset, SEEK_SET);
 	unsigned int dataread = fread(buffer, 1, bytes_to_read, reader);
 	for (unsigned int i = 0; i < dataread; i++)
 		buffer[i] = pack_char_decrypt(buffer[i], offset + i, pack_items[pack_filename].namelen);
@@ -493,11 +491,7 @@ pack_stream* pack::stream_open(const string& pack_filename, unsigned int offset)
 	s->reading = false;
 	s->close = false;
 	if (!mptr) {
-		#ifndef _UNICODE
 		s->reader = fopen(current_filename.c_str(), "rb");
-		#else
-		s->reader = _wfopen(current_filename.c_str(), L"rb");
-		#endif
 		if (!s->reader)
 			return NULL;
 	} else
@@ -552,7 +546,7 @@ bool pack::stream_seek(pack_stream* stream, unsigned int offset, int origin) {
 	else
 		return false;
 	if (!mptr && stream->reader)
-		fseek(stream->reader, stream->offset, SEEK_SET);
+		fseek(stream->reader, file_offset + stream->offset, SEEK_SET);
 	return true;
 }
 bool pack::stream_seek_script(unsigned int idx, unsigned int offset, int origin) {
@@ -570,6 +564,57 @@ bool pack_set_global_identifier(const std::string& identifier) {
 pack* ScriptPack_Factory() {
 	return new pack();
 }
+
+unordered_map<string, string> embedding_packs; // embed_filename:disc_filename
+unordered_map<string, unsigned int> embedded_packs; // embed_filename:embed_offset
+void embed_pack(const std::string& disc_filename, const string& embed_filename) {
+	if (embedding_packs.find(embed_filename) != embedding_packs.end()) return;
+	// Try opening the file to insure it exists and is readable, exception will be thrown if not.
+	Poco::FileInputStream tmp(disc_filename);
+	tmp.close();
+	embedding_packs[embed_filename] = disc_filename;
+}
+bool load_embedded_packs(Poco::BinaryReader& br) {
+	unsigned int total;
+	br.read7BitEncoded(total);
+	for (unsigned int i = 0; i < total; i++) {
+		string name;
+		br >> name;
+		embedded_packs[name] = br.stream().tellg();
+		unsigned int size;
+		br >> size;
+		br.stream().seekg(size, std::ios::cur);
+	}
+	return true;
+}
+void write_embedded_packs(Poco::BinaryWriter& bw) {
+	bw.write7BitEncoded(embedding_packs.size());
+	for (const auto& p : embedding_packs) {
+		bw << p.first;
+		Poco::FileInputStream fs(p.second);
+		bw << unsigned int(fs.size());
+		Poco::StreamCopier::copyStream(fs, bw.stream());
+		fs.close();
+	}
+}
+bool find_embedded_pack(string& filename, unsigned int& file_offset) {
+	// Translate values that exist as part of a pack::open call so that an embedded pack will be loaded if required.
+	if (filename.empty() || filename[0] != '*') return false;
+	#ifndef NVGT_STUB
+		// If running from nvgt's compiler the packs are not actually embedded, translate the user input back to a valid filename.
+		if (filename == "*" && embedding_packs.size() > 0) filename = embedding_packs.begin()->second; // BGT compatibility
+		else filename = filename.substr(1);
+		return true;
+	#else
+		const auto& it = filename == "*"? embedded_packs.begin() : embedded_packs.find(filename.substr(1));
+		if (it == embedded_packs.end()) return false;
+		filename = Poco::Util::Application::instance().config().getString("application.path");
+		file_offset = it->second;
+		return true;
+	#endif
+	return false;
+}
+
 int packmode1 = PACK_OPEN_MODE_NONE, packmode2 = PACK_OPEN_MODE_APPEND, packmode3 = PACK_OPEN_MODE_CREATE, packmode4 = PACK_OPEN_MODE_READ;
 void RegisterScriptPack(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty(_O("const int PACK_OPEN_MODE_NONE"), &packmode1);

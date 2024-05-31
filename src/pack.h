@@ -18,6 +18,8 @@
 #include <unordered_map>
 #include <string>
 #include <vector>
+#include <Poco/BinaryReader.h>
+#include <Poco/BinaryWriter.h>
 #include <scriptarray.h>
 #include "nvgt.h"
 
@@ -53,7 +55,7 @@ class pack {
 	std::string current_filename;
 	pack_open_mode open_mode;
 	std::string pack_ident;
-
+unsigned int file_offset; // Offset into opened file where pack is contained, used for embedding packs into executables.
 	int RefCount;
 public:
 	unsigned int next_stream_idx;
@@ -106,5 +108,9 @@ public:
 		return fptr || mptr;
 	};
 };
+
+void embed_pack(const std::string& disc_filename,const std::string& embed_filename);
+bool load_embedded_packs(Poco::BinaryReader& br);
+void write_embedded_packs(Poco::BinaryWriter& bw);
 
 void RegisterScriptPack(asIScriptEngine* engine);

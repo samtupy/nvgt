@@ -81,6 +81,7 @@ if env["PLATFORM"] == "win32":
 def fix_windows_stub(target, source, env):
 	"""On windows, we replace the first 2 bytes of a stub with 'NV' to stop some sort of antivirus scan upon script compile that makes it take a bit longer."""
 	for t in target:
+		if not str(t).endswith(".bin"): continue
 		with open(str(t), "rb+") as f:
 			f.seek(0)
 			f.write(b"NV")
@@ -98,7 +99,7 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	if env["PLATFORM"] == "win32": stub_env.Append(LINKFLAGS = ["/subsystem:windows"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
 	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + [version_object]
-	stub = stub_env.Program(f"release/stub/nvgt_{stub_platform}", stub_objects)
+	stub = stub_env.Program(f"release/stub/nvgt_{stub_platform}", stub_objects, PDB = "#build/debug/nvgt_windows.pdb")
 	if env["PLATFORM"] == "win32": env.Install("c:/nvgt/stub", stub)
 	if "upx" in env:
 		stub_u = stub_env.UPX(f"release/stub/nvgt_{stub_platform}_upx.bin", stub)

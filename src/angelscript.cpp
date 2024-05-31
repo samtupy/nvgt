@@ -265,6 +265,10 @@ int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilde
 	try {
 		Path include(Path::expand(filename));
 		include.makeAbsolute();
+		if (include.getExtension() != "nvgt") { // Embedded pack
+			embed_pack(include.toString(), filename);
+			return 0;
+		}
 		include_file = include;
 		if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str());
 		include = Path(sectionname).parent().append(filename);
@@ -471,6 +475,7 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 		// Other code that does platform specific things can go here, for now the platforms we support do nearly the same from now on.
 		fs.seekp(0, std::ios::end);
 		serialize_nvgt_plugins(bw);
+		write_embedded_packs(bw);
 		unsigned char* code = NULL;
 		UInt32 code_size = SaveCompiledScript(engine, &code);
 		if (code_size < 1) {
@@ -518,6 +523,7 @@ int LoadCompiledExecutable(asIScriptEngine* engine) {
 	br >> data_location;
 	fs.seekg(data_location);
 	if (!load_serialized_nvgt_plugins(br)) return -1;
+	if (!load_embedded_packs(br)) return -1;
 	br.read7BitEncoded(code_size);
 	code_size ^= NVGT_BYTECODE_NUMBER_XOR;
 	unsigned char* code = (unsigned char*)malloc(code_size);
