@@ -1,0 +1,17 @@
+name: mac_build
+on:
+  workflow_dispatch:
+
+jobs:
+  mac_build:
+    runs-on: macos-14
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: |
+        brew install scons
+        cp build/build_macos.sh .
+        sudo chmod +x build_macos.sh
+        ./build_macos.sh ci
+        cd install
+        python3 make_dmg.py ../release ${{secrets.CIFTP}}
