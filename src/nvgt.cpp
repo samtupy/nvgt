@@ -69,6 +69,7 @@ class nvgt_application : public Poco::Util::Application {
 			#endif
 			Application::initialize(self);
 			#ifdef _WIN32
+				timeBeginPeriod(1);
 				setlocale(LC_ALL, ".UTF8");
 				wstring dir_u;
 				UnicodeConverter::convert(Path(config().getString("application.dir")).append("lib").toString(), dir_u);
@@ -205,6 +206,9 @@ class nvgt_application : public Poco::Util::Application {
 		void uninitialize() override {
 			g_shutting_down = true;
 			Application::uninitialize();
+			#ifdef _WIN32
+				timeEndPeriod(1);
+			#endif
 			ScreenReaderUnload();
 			InputDestroy();
 			if (g_ScriptEngine) g_ScriptEngine->ShutDownAndRelease();
