@@ -1,6 +1,37 @@
 # Changelog
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
+## New as of 05/31/2024:
+* complete rewrite of NVGT entry point to use a Poco application. This includes much cleanup and organization and adds several features:
+    * There is now proper command line parsing, help printing, config file loading for when we want to use it, and more.
+    * This also introduces the change that on windows, there is now nvgt.exe and nvgtw.exe that gets built, one with the windows subsystem and one without.
+    * Script files and nvgt's binary will check for config files with the basename of file + .ini, .properties, or .json.
+* The above changes mean that we now implement the Angelscript debugger since the nvgt compiler is now always available in console mode.
+* NVGT now uses simantic versioning, for example 0.85.0.
+* Fixed script return code.
+* NVGT finally has a cross-platform installer (NSIS on Windows and a .dmg file on macOS).
+* The timer class once present in `bgt_compat.nvgt` is finally in the core of the engine!
+* it is now possible to embed packs into executables! 
+* The way Windows binaries load has been changed, meaning that UPX or any other binary compresser that supports overlays can now be used on your compiled NVGT binaries!
+* The timer resolution should be much more accurate on Windows.
+* Added a new, optional `uint timeout` parameter to the `network.request()` method.
+* Improved documentation.
+
+## New as of 05/25/2024:
+* Wrapped `thread_pool` and `thread_event` from Poco.
+* New function: `script_engine_dump_configuration()`.
+* We now have an ftp_client class.
+* raw memory allocation functions and memory_reader/writer datastreams to use them.
+* May need more testing, but added the `async` class, for easily running a function on a thread and getting its return value.
+* Many more docs.
+
+## New as of 05/08/2024:
+* Added a plugin to send notifications to systemd on Linux.
+* Many more docs.
+* `string.split()` should now reserve memory properly.
+* Wrapped Poco for HTTP/HTTPS requests.
+* Fix ancient bugs in soundsystem including too many functions registered as const and `close()` returning true on no-op.
+
 ## New as of 04/18/2024:
 * The var type now has PostEnc and PostDec operators.
 * UTF8 fixes: sound.load, and compiled applications can now execute if they contain non-english characters in their filenames.
