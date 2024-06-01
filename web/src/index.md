@@ -7,9 +7,12 @@ permalink: /
 # Welcome to the homepage of the Nonvisual Gaming Toolkit!
 Create audiogames with ease.
 
-This website is currently under construction and you should expect any amount of it to be broken, defunct or uggly until it is officially announced that NVGT has open sourced. Until then, you can watch the development of the website and related materials like docs.
+## Development status
+On May 31 2024, NVGT officially became open source! However, in reality this just means that we are to a point where we can generate official installers on major platforms, and that the repository no longer contains any sensative information that we don't want people seeing. Whether it's finishing docs, cleaning up the code, establishing contributor guidelines or other miscellaneous work, we still have much to do before we are ready to severely begin advertising the engine.
 
-We look forward to serving you soon!
+This all means that you can feel free to download, build, and use NVGT as much as you want right now, but please understand that support may be rather limited at this time and/or elements of your experience may not be as ideal as what we eventually intend. In particular you should not assume that the documentation contains a full reference of engine features.
+
+Nevertheless, we hope you enjoy what we have so far as well as watching the continued development of the engine, thanks for stopping by!
 
 ## What is NVGT?
 Enspired by the Blastbay Gaming Toolkit (bgt) known to much of the audiogaming community and originally created because of that engine's discontinuation, the NVGT engine aims to not only preserve old BGT games and make them better but to also provide a new platform for anybody who wishes to get into game development without learning some of the lower level programming concepts or languages usually required for such a thing, continuing where the concept of the BGT engine left off but with a completely new codebase and a cross platform design.

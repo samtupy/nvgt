@@ -21,7 +21,7 @@ display: inline;
 <body>
 <a href="#content-anchor">Skip to content</a>
 <div id="navigation"><nav>
-{%- assign permalink = "/" | append: page.permalink -%}
+{%- assign permalink = "/" | append: page.permalink | remove: "/index.php" -%}
 <ul class="links" style="list-style-type:none;">
 {% for item in site.data.nav -%}
 {%- assign item_with_index = item[1] | append: "/index.html" %}
