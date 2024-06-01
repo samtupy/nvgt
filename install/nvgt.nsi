@@ -1,6 +1,7 @@
 !execute "py nsis_genversion.py"
 !include "nvgt_version.nsh"
 !include "MUI2.nsh"
+!include "nsDialogs.nsh"
 !include "Integration.nsh"
 !define /date COPYRIGHT_YEAR "%Y"
 Name "nvgt"
@@ -10,6 +11,12 @@ RequestExecutionLevel admin
 Unicode True
 InstallDir C:\nvgt
 
+var default_click_behavior ; 0 == run, 1 == edit
+
+var click_dialog
+var click_run
+var click_edit
+
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Welcome to the NonVisual Gaming Toolkit ${ver_string} Setup Program"
 !define MUI_WELCOMEPAGE_TEXT "This program will guide you through the installation of the NonVisual Gaming Toolkit (NVGT), an open source audio game development engine designed to remove some of the low-level programming challenges inherent in audio game design.$\n$\n$_CLICK"
@@ -17,6 +24,7 @@ InstallDir C:\nvgt
 !insertmacro MUI_PAGE_LICENSE "license.txt"
 !define MUI_COMPONENTSPAGE_NODESC
 !insertmacro MUI_PAGE_COMPONENTS
+Page custom show_default_click_behavior leave_default_click_behavior
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_LINK "Visit the NVGT &website"
@@ -47,6 +55,7 @@ Function .onInit
   ${If} $0 != ""
     StrCpy $INSTDIR $0
   ${EndIf}
+  StrCpy $default_click_behavior 0
 FunctionEnd
 Function un.onInit
   SetRegView 64
@@ -92,7 +101,7 @@ Section /o "MacOS cross-compilation stubs"
 SectionEnd
 !endif
 
-Section "File explorer context menu registration"
+Section "File explorer context menu registration" SEC_CONTEXTMENU
   DeleteRegKey HKCR ".nvgt"
   DeleteRegKey HKCR "NVGTScript"
   WriteRegStr HKCR ".nvgt" "" "NVGTScript"
@@ -109,13 +118,61 @@ Section "File explorer context menu registration"
   WriteRegStr HKCR "NVGTScript\shell\edit" "" "Edit Script"
   WriteRegStr HKCR "NVGTScript\shell\edit\command" "" 'notepad "%1"'
   WriteRegStr HKCR "NVGTScript\shell\open" "" ""
-  WriteRegStr HKCR "NVGTScript\shell\open\command" "" '$INSTDIR\nvgtw.exe "%1"'
+  ${If} $default_click_behavior == 0
+    WriteRegStr HKCR "NVGTScript\shell\open\command" "" '$INSTDIR\nvgtw.exe "%1"'
+  ${Else}
+    WriteRegStr HKCR "NVGTScript\shell\open\command" "" 'notepad "%1"'
+  ${EndIf}
   WriteRegStr HKCR "NVGTScript\shell\run" "" "Run Script"
   WriteRegStr HKCR "NVGTScript\shell\run\command" "" '$INSTDIR\nvgtw.exe "%1"'
   WriteRegStr HKCR "NVGTScript\shell\debug" "" "Debug Script"
   WriteRegStr HKCR "NVGTScript\shell\debug\command" "" '$INSTDIR\nvgt.exe -d "%1"'
   ${NotifyShell_AssocChanged}
 SectionEnd
+
+Function show_default_click_behavior
+    !insertmacro MUI_HEADER_TEXT_PAGE "Default Click Behavior" "Choose a default action for opening NVGT scripts"
+
+    SectionGetFlags ${SEC_CONTEXTMENU} $0
+    IntOp $0 $0 & ${SF_SELECTED}
+    ${If} $0 = 0
+        Abort ; Skip page if we aren't adding context menu handlers anyways
+    ${EndIf}
+
+    nsDialogs::Create 1018
+    Pop $click_dialog
+
+    ${If} $click_dialog == error
+        Abort
+    ${EndIf}
+
+    ${NSD_CreateLabel} 0 0 100% 20u "Select the behavior you would prefer when clicking (pressing enter) on an NVGT script from Windows Explorer."
+    ;Pop $0
+
+    ${NSD_CreateFirstRadioButton} 0 30u 100% 10u "Run script"
+    Pop $click_run
+    ${NSD_CreateAdditionalRadioButton} 0 45u 100% 10u "Edit script"
+    Pop $click_edit
+
+    ${If} $default_click_behavior == 0
+        ${NSD_SetState} $click_run ${BST_CHECKED}
+        ${NSD_SetFocus} $click_run
+    ${Else}
+        ${NSD_SetState} $click_edit ${BST_CHECKED}
+        ${NSD_SetFocus} $click_edit
+    ${EndIf}
+
+    nsDialogs::Show
+FunctionEnd
+
+Function leave_default_click_behavior
+    ${NSD_GetState} $click_run $0
+    ${If} $0 == ${BST_CHECKED}
+        StrCpy $default_click_behavior 0
+    ${Else}
+        StrCpy $default_click_behavior 1
+    ${EndIf}
+FunctionEnd
 
 Section "uninstall"
   RMDir /r $INSTDIR
