@@ -438,7 +438,7 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 	#endif
 	Path stubspath = Util::Application::instance().config().getString("application.dir");
 	#ifdef __APPLE__ // Stub may be in Resources directory of an app bundle.
-	if (Poco::Environment::has("MACOS_BUNDLED_APP")) stubspath.makeParent().pushDirectory("Resources");
+	if (!File(Path(stubspath).pushDirectory("stub")).exists() && stubspath[stubspath.depth() -1] == "MacOS" && stubspath[stubspath.depth() -2] == "Contents") stubspath.makeParent().pushDirectory("Resources");
 	#endif
 	stubspath.pushDirectory("stub");
 	Poco::File stub = format("%snvgt_%s%s.bin", stubspath.toString(), g_platform, (g_stub != "" ? string("_") + g_stub : ""));
@@ -446,6 +446,7 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 	if (g_platform == "windows") outpath.setExtension("exe");
 	try {
 		stub.copyTo(outpath.toString());
+		File(outpath).setExecutable();
 	} catch (Exception& e) {
 		g_ScriptEngine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to copy %s to %s, %s", stub.path(), outpath.toString(), e.displayText()).c_str());
 		return -1;
