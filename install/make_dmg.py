@@ -35,7 +35,7 @@ ftp_creds = []
 if len(sys.argv) > 1:
 	relpath = sys.argv[1]
 	if len(sys.argv) > 2:
-		ftp_creds=sys.argv[2].split(":")
+		ftp_creds = sys.argv[2].split(":")
 	ver = get_version_info()
 make_app_bundle("nvgt.app", relpath)
 make_dmg("nvgt.app", f"nvgt_{ver}.dmg")

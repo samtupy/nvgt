@@ -1,0 +1,11 @@
+/**
+	Represents the number of milliseconds since the system booted up.
+	uint64 TIME_SYSTEM_RUNNING_MILLISECONDS;
+	## Remarks:
+		Note that unlike something like `GetTickCount()` from the Windows API, this value is given as an unsigned 64-bit integer, so it would take an almost impossible amount of uptime to make it overflow.
+*/
+
+// Example:
+void main() {
+	alert("Your computer has been up for", TIME_SYSTEM_RUNNING_MILLISECONDS + " MS");
+}
