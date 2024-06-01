@@ -1,6 +1,7 @@
 name: release
 on:
   workflow_dispatch:
+  push:
 
 jobs:
   mac_build:
@@ -26,6 +27,7 @@ jobs:
       run: |
         sudo chmod +x build/build_linux.sh
         ./build/build_linux.sh ci
+        python3 build/ci_set_version.py
         cd release
         tar -czf ../linux_release.tar.gz *
         cd ..
@@ -52,7 +54,7 @@ jobs:
     needs: ["linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
-    - name: build
+    - name: package
       run: |
         curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/mac_release.tar.gz
         curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/linux_release.tar.gz
@@ -80,7 +82,7 @@ jobs:
     needs: ["linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
-    - name: build
+    - name: package
       run: |
         curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/mac_release.tar.gz
         curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/linux_release.tar.gz
@@ -90,7 +92,6 @@ jobs:
         mkdir windows_release
         tar -xzf windows_release.tar.gz -C windows_release
         tar -xzf mac_release.tar.gz -C release
-        python3 build/ci_set_version.py
         cd doc
         pip3 install --user -r requirements.txt --break-system-packages
         cd OSL
@@ -103,11 +104,40 @@ jobs:
         cd install
         python3 make_dmg.py ../release ${{secrets.CIFTP}}
 
-  final_package:
+  linux_package:
     runs-on: ubuntu-latest
-    needs: ["windows_package", "mac_package"]
+    needs: ["linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
-    - name: build
+    - name: package
+      run: |
+        curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/mac_release.tar.gz
+        curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/linux_release.tar.gz
+        curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/windows_release.tar.gz
+        mkdir mac_release
+        tar -xzf mac_release.tar.gz -C mac_release
+        mkdir windows_release
+        tar -xzf windows_release.tar.gz -C windows_release
+        tar -xzf linux_release.tar.gz -C release
+        cd doc
+        pip3 install --user -r requirements.txt --break-system-packages
+        cd OSL
+        python3 make_osl_document.py
+        cd ..
+        python3 docgen.py
+        cd ..
+        cp mac_release/stub/* release/stub
+        cp windows_release/stub/* release/stub
+        cd release
+        tar -czf ../nvgt_$nvgt_version.tar.gz *
+        cd ..
+        curl -u "${{secrets.CIFTP}}" -s -T nvgt_$version.tar.gz ftp://nvgt.gg
+
+  final_package:
+    runs-on: ubuntu-latest
+    needs: ["windows_package", "mac_package", "linux_package"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: publish
       run: |
         curl -H "X-Auth: ${{secrets.CIPHP}}" -s https://nvgt.gg/ci/release_complete.php?ver=$nvgt_version
