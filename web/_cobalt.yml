@@ -1,5 +1,6 @@
 source: src
 destination: public_html
+template_extensions: [md, liquid, lphp]
 
 site:
  title: The Nonvisual Gaming Toolkit

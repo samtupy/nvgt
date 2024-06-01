@@ -194,7 +194,8 @@ protected:
 	#else
 	virtual int main(const std::vector<std::string>& args) override {
 		setupCommandLineProperty(args);
-		g_command_line_args->InsertAt(0, (void*)&config().getString("application.path"));
+		std::string path_tmp;
+		g_command_line_args->InsertAt(0, (void*)&path_tmp);
 		int retcode = Application::EXIT_OK;
 		if (LoadCompiledExecutable(g_ScriptEngine) < 0 || (retcode = ExecuteScript(g_ScriptEngine, commandName().c_str())) < 0) {
 			ShowAngelscriptMessages();

@@ -1,0 +1,22 @@
+---
+layout: default.liquid
+title: Downloads
+permalink: /downloads/index.php
+---
+
+<h1>Downloads</h1>
+<p>This page contains the latest binary releases for NVGT. The page is not currently particularly organized but will be improved soon.</p>
+
+<h2>available files</h2>
+<?php
+$files = glob("nvgt_*");
+if (count($files) < 1) {
+	echo("<p>no files</p>");
+} else {
+	echo "<ul>\n";
+	foreach($files as $file) {
+		echo '<li><a href="' . $file . '">' .$file. '</a></li>';
+	}
+	echo "</ul>\n";
+}
+?>

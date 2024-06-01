@@ -34,7 +34,7 @@ using namespace Poco;
 Poco::Clock g_clock;
 Poco::Timestamp g_secure_clock;
 Poco::Timestamp g_time_cache;
-Poco::LocalDateTime g_time_values;
+Poco::DateTime g_time_values;
 Poco::FastMutex g_time_mutex;
 
 static asIScriptContext* callback_ctx = NULL;
@@ -193,6 +193,7 @@ void update_tm() {
 	FastMutex::ScopedLock l(g_time_mutex);
 	g_time_cache = ts;
 	g_time_values = ts;
+	g_time_values.makeLocal(Poco::Timezone::tzd());
 }
 
 int get_date_year() {

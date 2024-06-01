@@ -588,7 +588,7 @@ bool load_embedded_packs(Poco::BinaryReader& br) {
 	return true;
 }
 void write_embedded_packs(Poco::BinaryWriter& bw) {
-	bw.write7BitEncoded(embedding_packs.size());
+	bw.write7BitEncoded(uint32_t(embedding_packs.size()));
 	for (const auto& p : embedding_packs) {
 		bw << p.first;
 		Poco::FileInputStream fs(p.second);
