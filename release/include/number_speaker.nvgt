@@ -19,190 +19,150 @@ This class makes it easier to have numbers spoken using concatenated sound files
 To have a number spoken, call either the "speak" or the "speak_wait" method in the class. "speak_wait" will block the execution until the number has finished, while "speak" will let you run other things at the same time. If using "speak" you must also continuously call "speak_next" in order for the class to load the next sound file in the chain on time. "speak" and "speak_wait" take the number to be spoken as their only argument, and return an integer which is 0 on success and -1 on failure. "speak_next" also returns an integer which will be 0 if there are no more files to be played, 1 if there are more files yet to be played or if the last file has not yet finished playing, or -1 if an error occurs.
 */
 
-class number_speaker
-{
-string prepend;
-string append;
-pack@ pack_file = null;
-bool include_and;
+class number_speaker {
+	string prepend;
+	string append;
+	pack@ pack_file = null;
+	bool include_and;
 
-// We set everything to default values in the constructor.
-number_speaker()
-{
-word_list.resize(0);
-has_number=false;
-current_index=0;
-prepend="";
-append=".wav";
-include_and=false;
-@number_speech=@internal_sound;
-}
+	// We set everything to default values in the constructor.
+	number_speaker() {
+		word_list.resize(0);
+		has_number = false;
+		current_index = 0;
+		prepend = "";
+		append = ".wav";
+		include_and = false;
+		@number_speech = @internal_sound;
+	}
 
-bool set_sound_object(sound@ handle)
-{
-if(@handle==null)
-{
-@number_speech=@internal_sound;
-}
-else
-{
-@number_speech=@handle;
-}
-return true;
-}
+	bool set_sound_object(sound@ handle) {
+		if (@handle == null)
+			@number_speech = @internal_sound;
+		else
+			@number_speech = @handle;
+		return true;
+	}
 
-int speak(double the_number)
-{
-// Reset our internal data.
-word_list.resize(0);
-has_number=false;
-current_index=0;
-number_speech.close();
+	int speak(double the_number) {
+		// Reset our internal data.
+		word_list.resize(0);
+		has_number = false;
+		current_index = 0;
+		number_speech.close();
 
-// Check for invalid range.
-if(the_number<-999999999 or the_number>999999999)
-{
-return -1;
-}
+		// Check for invalid range.
+		if (the_number < -999999999 or the_number > 999999999)
+			return -1;
 
-// Convert our number to English words, and then split it up by space.
-string english_words=number_to_words(the_number, include_and);
-if(english_words=="")
-{
-return -1;
-}
-word_list=english_words.split(" ", true);
-has_number=true;
+		// Convert our number to English words, and then split it up by space.
+		string english_words = number_to_words(the_number, include_and);
+		if (english_words == "")
+			return -1;
+		word_list = english_words.split(" ", true);
+		has_number = true;
 
-// We call "speak_next" so that the first number is spoken immediately.
-if(speak_next()==-1)
-{
-return -1;
-}
-return 0;
-}
+		// We call "speak_next" so that the first number is spoken immediately.
+		if (speak_next() == -1)
+			return -1;
+		return 0;
+	}
 
-int speak_next()
-{
-// First we do some checks to see if the number is still being spoken.
-if(has_number==false)
-{
-if(number_speech.active==true)
-{
-if(number_speech.playing==false)
-{
-number_speech.close();
-return 0;
-}
-else
-{
-return 1;
-}
-}
-return -1;
-}
-if(number_speech.playing==true)
-{
-return 1;
-}
+	int speak_next() {
+		// First we do some checks to see if the number is still being spoken.
+		if (has_number == false) {
+			if (number_speech.active == true) {
+				if (number_speech.playing == false) {
+					number_speech.close();
+					return 0;
+				} else
+					return 1;
+			}
+			return -1;
+		}
+		if (number_speech.playing == true)
+			return 1;
 
-// Now we go through the remaining words, looking for the best matching filename.
-uint look_until=word_list.length();
-string assembled_filename=prepend;
-while(true)
-{
-for(uint i=current_index;i<look_until;i++)
-{
-if(i==look_until-1)
-{
-assembled_filename+=word_list[i]+append;
-}
-else
-{
-assembled_filename+=word_list[i]+"_";
-}
-}
+		// Now we go through the remaining words, looking for the best matching filename.
+		uint look_until = word_list.length();
+		string assembled_filename = prepend;
+		while (true) {
+			for (uint i = current_index; i < look_until; i++) {
+				if (i == look_until - 1)
+					assembled_filename += word_list[i] + append;
+				else
+					assembled_filename += word_list[i] + "_";
+			}
 
-// Now we have a filename to test, let's see if it loads.
-if(number_speech.load(assembled_filename, this.pack_file)==false)
-{
+			// Now we have a filename to test, let's see if it loads.
+			if (number_speech.load(assembled_filename, this.pack_file) == false) {
 
-// It didn't, so we remove the last entry from our current search.
-look_until-=1;
-if(look_until==current_index)
-{
-// No file matched the smallest possible search, so we get out.
-word_list.resize(0);
-has_number=false;
-current_index=0;
-number_speech.close();
-return -1;
-}
+				// It didn't, so we remove the last entry from our current search.
+				look_until -= 1;
+				if (look_until == current_index) {
+					// No file matched the smallest possible search, so we get out.
+					word_list.resize(0);
+					has_number = false;
+					current_index = 0;
+					number_speech.close();
+					return -1;
+				}
 
-// There are still some possible alternatives left, keep searching.
-assembled_filename=prepend;
-continue;
-}
-else
-{
+				// There are still some possible alternatives left, keep searching.
+				assembled_filename = prepend;
+				continue;
+			} else {
 
-// We found a file, so we tell the next search to begin at the point where we stopped.
-current_index=look_until;
-number_speech.play();
-if(current_index==word_list.length())
-{
+				// We found a file, so we tell the next search to begin at the point where we stopped.
+				current_index = look_until;
+				number_speech.play();
+				if (current_index == word_list.length()) {
 
-// We've reached the end of our word list, so we don't search anymore.
-word_list.resize(0);
-has_number=false;
-current_index=0;
-}
-return 1;
-}
-}
-return -1;
-}
+					// We've reached the end of our word list, so we don't search anymore.
+					word_list.resize(0);
+					has_number = false;
+					current_index = 0;
+				}
+				return 1;
+			}
+		}
+		return -1;
+	}
 
-void stop()
-{
-// Reset our internal data.
-word_list.resize(0);
-has_number=false;
-current_index=0;
-if(number_speech.active==true)
-{
-if(number_speech.playing==true)
-number_speech.stop();
-number_speech.close();
-}
-}
+	void stop() {
+		// Reset our internal data.
+		word_list.resize(0);
+		has_number = false;
+		current_index = 0;
+		if (number_speech.active == true) {
+			if (number_speech.playing == true)
+				number_speech.stop();
+			number_speech.close();
+		}
+	}
 
-int speak_wait(double the_number)
-{
+	int speak_wait(double the_number) {
 
-// This is just a simple wrapper around "speak" and "speak_next".
-if(speak(the_number)==-1)
-return -1;
-int result=0;
-while(true)
-{
-wait(5);
-result=speak_next();
-if(result==-1)
-{
-return -1;
-}
-if(result==0)
-return 0;
-}
-return -1;
-}
+		// This is just a simple wrapper around "speak" and "speak_next".
+		if (speak(the_number) == -1)
+			return -1;
+		int result = 0;
+		while (true) {
+			wait(5);
+			result = speak_next();
+			if (result == -1)
+				return -1;
+			if (result == 0)
+				return 0;
+		}
+		return -1;
+	}
 
-// The following is private content and should not be modified from the outside.
+	// The following is private content and should not be modified from the outside.
 
-bool has_number;
-string[] word_list;
-uint current_index;
-sound@ number_speech;
-sound internal_sound;
+	bool has_number;
+	string[] word_list;
+	uint current_index;
+	sound@ number_speech;
+	sound internal_sound;
 }
