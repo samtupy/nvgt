@@ -71,7 +71,7 @@ if(english_words=="")
 {
 return -1;
 }
-word_list=string_split(english_words, " ", true);
+word_list=english_words.split(" ", true);
 has_number=true;
 
 // We call "speak_next" so that the first number is spoken immediately.
