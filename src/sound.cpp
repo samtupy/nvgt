@@ -190,7 +190,7 @@ void basic_positioning_dsp(void* buffer, unsigned int length, float x, float y, 
 void phonon_dsp(void* buffer, unsigned int length, float x, float y, float z, sound_base& s) {
 	if (!buffer || length < 2 || !hrtf || !s.hrtf_effect)
 		return;
-	float blend = (fabs(x* s.pan_step) + fabs(y* s.pan_step) + fabs(z* s.pan_step)) / 3;
+	float blend = (fabs(x * s.pan_step) + fabs(y * s.pan_step) + fabs(z * s.pan_step)) / 3;
 	if (blend > 1.0)
 		blend = 1.0;
 	if (blend < 0.0)
@@ -237,10 +237,10 @@ void phonon_dsp(void* buffer, unsigned int length, float x, float y, float z, so
 		effect_args.interpolation = IPL_HRTFINTERPOLATION_BILINEAR;
 		effect_args.spatialBlend = blend;
 		effect_args.hrtf = phonon_hrtf;
-		iplBinauralEffectApply(s.hrtf_effect, &effect_args, s.env ? &mono_tmp_buffer :& inbuffer, &outbuffer);
+		iplBinauralEffectApply(s.hrtf_effect, &effect_args, s.env ? &mono_tmp_buffer : &inbuffer, &outbuffer);
 	} else { // Sound is at the same position as the listener, direct copy to output buffer
-		memcpy(out_left, in_left, sizeof(float)* hrtf_framesize * 2);
-		memcpy(out_right, in_right, sizeof(float)* hrtf_framesize * 2);
+		memcpy(out_left, in_left, sizeof(float) * hrtf_framesize * 2);
+		memcpy(out_right, in_right, sizeof(float) * hrtf_framesize * 2);
 	}
 	if (s.env) { // reflections
 		IPLReflectionEffectParams reflect_params = src_out.reflections;
@@ -285,7 +285,7 @@ void CALLBACK positioning_dsp(HDSP handle, DWORD channel, void* buffer, DWORD le
 		iplBinauralEffectCreate(phonon_context, &phonon_audio_settings, &effect_settings, &s->hrtf_effect);
 	}
 	if (hrtf && s->hrtf_effect && s->use_hrtf)
-		phonon_dsp(buffer, length, x, y, z, * s);
+		phonon_dsp(buffer, length, x, y, z, *s);
 	else
 		basic_positioning_dsp(buffer, length, x, y, z, s->pan_step, s->volume_step);
 }
@@ -295,7 +295,7 @@ void CALLBACK positioning_dsp(HDSP handle, DWORD channel, void* buffer, DWORD le
 void CALLBACK bass_closeproc_pack(void* user) {
 	if (!user)
 		return;
-	packed_sound snd = (* (packed_sound*)user);
+	packed_sound snd = (*(packed_sound*)user);
 	if (!snd.p)
 		return;
 	snd.p->stream_close(snd.s);
@@ -304,7 +304,7 @@ void CALLBACK bass_closeproc_pack(void* user) {
 QWORD CALLBACK bass_lenproc_pack(void* user) {
 	if (!user)
 		return 0xffffffff;
-	packed_sound snd = (* (packed_sound*)user);
+	packed_sound snd = (*(packed_sound*)user);
 	if (!snd.p || !snd.p->next_stream_idx)
 		return 0xffffffff;
 	return snd.p->stream_size(snd.s);
@@ -319,7 +319,7 @@ DWORD CALLBACK bass_readproc_pack(void* buffer, DWORD length, void* user) {
 	if (snd->snd)
 		thread_mutex_lock(&snd->snd->close_mutex);
 	if (!snd->snd || (snd->snd->channel || snd->snd->script_loading))
-		ret = snd->p->stream_read(snd->s, (BYTE*)buffer, length);
+		ret = snd->p->stream_read(snd->s, (BYTE *)buffer, length);
 	if (snd->snd)
 		thread_mutex_unlock(&snd->snd->close_mutex);
 	//if(ret==0) ret=-1;
@@ -762,7 +762,7 @@ bool sound_environment::_detach(sound_base* s) {
 	return true;
 }
 void sound_environment::_detach_all() {
-	for (sound_base* s : attached) _detach(s);
+	for (sound_base * s : attached) _detach(s);
 }
 bool sound_environment::detach(sound_base* s) {
 	if (!s || s->env != this) return false;
@@ -788,7 +788,7 @@ void sound_environment::update() {
 	iplSimulatorRunDirect(sim);
 }
 void sound_environment::background_update() {
-	for (sound_base* s : detaching) {
+	for (sound_base * s : detaching) {
 		_detach(s);
 		if (ref_count < 1) return;
 	}
@@ -1064,7 +1064,7 @@ BOOL sound::push_memory(unsigned char* buffer, unsigned int length, BOOL stream_
 	return ret;
 }
 BOOL sound::push_string(const std::string& buffer, BOOL stream_end, int pcm_rate, int pcm_chans) {
-	return push_memory((unsigned char*)& buffer[0], buffer.size(), stream_end, pcm_rate, pcm_chans);
+	return push_memory((unsigned char*)&buffer[0], buffer.size(), stream_end, pcm_rate, pcm_chans);
 }
 
 BOOL sound::postload(const string& filename) {
@@ -1088,7 +1088,7 @@ BOOL sound::postload(const string& filename) {
 	store_channel = register_hstream(channel);
 	if (g_default_mixer != NULL)
 		set_mixer(g_default_mixer);
-	output_mixer->add_sound(* this, TRUE);
+	output_mixer->add_sound(*this, TRUE);
 	script_loading = FALSE;
 	return TRUE;
 }
@@ -1109,7 +1109,7 @@ BOOL sound::close() {
 		if (output_mixer) {
 			if (parent_mixer)
 				parent_mixer->remove_mixer(output_mixer);
-			output_mixer->remove_sound(* this, TRUE);
+			output_mixer->remove_sound(*this, TRUE);
 			BASS_StreamFree(output_mixer->channel); // Can't do in mixer destructor, it's being called when I don't want it to and I don't know why.
 			output_mixer->channel = 0;
 			delete output_mixer;
@@ -1209,7 +1209,7 @@ BOOL sound::play() {
 	if (BASS_ChannelIsActive(channel) != BASS_ACTIVE_PLAYING)
 		BASS_Mixer_ChannelSetPosition(channel, 0, BASS_POS_BYTE);
 	BASS_ChannelFlags(channel, 0, BASS_SAMPLE_LOOP);
-	return !(BASS_Mixer_ChannelFlags(channel, 0, BASS_MIXER_CHAN_PAUSE)& BASS_MIXER_CHAN_PAUSE);
+	return !(BASS_Mixer_ChannelFlags(channel, 0, BASS_MIXER_CHAN_PAUSE)&BASS_MIXER_CHAN_PAUSE);
 }
 
 BOOL sound::play_wait() {
@@ -1236,7 +1236,7 @@ BOOL sound::pause() {
 		return FALSE;
 	if (!is_playing())
 		return FALSE;
-	BOOL ret = (BASS_Mixer_ChannelFlags(channel, BASS_MIXER_CHAN_PAUSE, BASS_MIXER_CHAN_PAUSE)& BASS_MIXER_CHAN_PAUSE) > 0;
+	BOOL ret = (BASS_Mixer_ChannelFlags(channel, BASS_MIXER_CHAN_PAUSE, BASS_MIXER_CHAN_PAUSE)&BASS_MIXER_CHAN_PAUSE) > 0;
 	if (ret && hrtf && hrtf_effect)
 		iplBinauralEffectReset(hrtf_effect);
 	return ret;
@@ -1255,7 +1255,7 @@ BOOL sound::seek(float offset) {
 BOOL sound::stop() {
 	if (!channel)
 		return FALSE;
-	BOOL ret = (BASS_Mixer_ChannelFlags(channel, BASS_MIXER_CHAN_PAUSE, BASS_MIXER_CHAN_PAUSE)& BASS_MIXER_CHAN_PAUSE) > 0;
+	BOOL ret = (BASS_Mixer_ChannelFlags(channel, BASS_MIXER_CHAN_PAUSE, BASS_MIXER_CHAN_PAUSE)&BASS_MIXER_CHAN_PAUSE) > 0;
 	BASS_Mixer_ChannelSetPosition(channel, 0, BASS_POS_BYTE);
 	if (ret && hrtf && hrtf_effect)
 		iplBinauralEffectReset(hrtf_effect);
@@ -1267,11 +1267,11 @@ BOOL sound::is_active() {
 }
 
 BOOL sound::is_paused() {
-	return channel > 0 && parent_mixer && (BASS_Mixer_ChannelFlags(channel, BASS_MIXER_CHAN_PAUSE, 0)& BASS_MIXER_CHAN_PAUSE) > 0;
+	return channel > 0 && parent_mixer && (BASS_Mixer_ChannelFlags(channel, BASS_MIXER_CHAN_PAUSE, 0)&BASS_MIXER_CHAN_PAUSE) > 0;
 }
 
 BOOL sound::is_playing() {
-	return channel > 0 && parent_mixer && output_mixer && BASS_ChannelIsActive(channel) == BASS_ACTIVE_PLAYING && BASS_Mixer_ChannelGetMixer(channel) == output_mixer->channel && BASS_Mixer_ChannelGetMixer(output_mixer->channel) == parent_mixer->channel && !(BASS_Mixer_ChannelFlags(channel, 0, 0)& BASS_MIXER_CHAN_PAUSE);
+	return channel > 0 && parent_mixer && output_mixer && BASS_ChannelIsActive(channel) == BASS_ACTIVE_PLAYING && BASS_Mixer_ChannelGetMixer(channel) == output_mixer->channel && BASS_Mixer_ChannelGetMixer(output_mixer->channel) == parent_mixer->channel && !(BASS_Mixer_ChannelFlags(channel, 0, 0)&BASS_MIXER_CHAN_PAUSE);
 }
 
 BOOL sound::is_sliding() {
@@ -1389,7 +1389,7 @@ BOOL sound::set_pitch(float pitch) {
 		return FALSE;
 	if (pitch < 0.05 || pitch > 5.0) return false;
 	BASS_ChannelLock(channel, TRUE);
-	BOOL r = BASS_ChannelSetAttribute(channel, BASS_ATTRIB_FREQ, channel_info.freq* pitch);
+	BOOL r = BASS_ChannelSetAttribute(channel, BASS_ATTRIB_FREQ, channel_info.freq * pitch);
 	BASS_ChannelLock(channel, FALSE);
 	return r;
 }
@@ -1401,7 +1401,7 @@ BOOL sound::slide_pitch(float pitch, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (pitch < 0.05 || pitch > 5.0) return false;
-	return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_FREQ, channel_info.freq* pitch, time);
+	return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_FREQ, channel_info.freq * pitch, time);
 }
 BOOL sound::slide_pitch_alt(float pitch, unsigned int time) {
 	return slide_pitch(pitch / 100, time);
@@ -1995,7 +1995,7 @@ unsigned int get_input_device_count() {
 	BASS_DEVICEINFO inf;
 	DWORD count = 0;
 	for (DWORD i = 0; BASS_RecordGetDeviceInfo(i, &inf); i++) {
-		if (!(inf.flags& BASS_DEVICE_LOOPBACK) && inf.flags& BASS_DEVICE_ENABLED)
+		if (!(inf.flags & BASS_DEVICE_LOOPBACK) && inf.flags & BASS_DEVICE_ENABLED)
 			count++;
 	}
 	return count;
@@ -2080,7 +2080,7 @@ BOOL set_output_device(unsigned int device) {
 		BASS_Init(device, 44100, 0, NULL, NULL);
 	BOOL ret = BASS_SetDevice(device);
 	if (ret) {
-		for (hstream_entry* e = last_channel; e; e = e->p)
+		for (hstream_entry * e = last_channel; e; e = e->p)
 			BASS_ChannelSetDevice(e->channel, device);
 	}
 	return ret;
