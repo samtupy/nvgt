@@ -3,9 +3,6 @@
 // license: zlib (see license.md in the root of the nvgt distrobution)
 
 #pragma platform mac
-#pragma plugin nvgt_curl
-#include "form.nvgt"
-#include "simple_speak.nvgt"
 void main() {
 	tts_voice v;
 	string[] voices = v.list_voices();
@@ -21,15 +18,11 @@ void main() {
 			s.load("notify.wav");
 			s.play_wait();
 		}
-		if (key_pressed(KEY_D)) {
-			print(string(sound_output_devices));
-			set_sound_output_device(1);
-		}
 		if (key_pressed(KEY_UP)) v.speak("up arrow", true);
 		if (key_pressed(KEY_DOWN)) v.speak("down arrow", true);
 		if (key_pressed(KEY_LEFT)) v.speak("left arrow", true);
 		if (key_pressed(KEY_RIGHT)) v.speak("right arrow", true);
-		if (key_repeating(KEY_RETURN, 30, 300)) v.speak("I am now speaking a somewhat longer string. I wonder how responsive this will be!", true);
+		if (key_repeating(KEY_RETURN)) v.speak("I am now speaking a somewhat longer string. I wonder how responsive this will be!", true);
 		if (key_pressed(KEY_BACK)) {
 			if (keyboard_modifiers & KEYMOD_SHIFT != 0) {
 				if (v.set_voice(-1)) v.speak_interrupt("Switched to default voice maybe?");
