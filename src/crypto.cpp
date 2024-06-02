@@ -14,6 +14,7 @@
 #include "crypto.h"
 #include "aes.hpp"
 #include <string>
+#include <cstring>
 #include <rng_get_bytes.h>
 #include <obfuscate.h>
 #include <Poco/SHA2Engine.h>

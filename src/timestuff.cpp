@@ -295,7 +295,7 @@ bool timer::set_secure(bool new_secure) {
 }
 
 // Angelscript factories.
-template <class T, typename... A> void timestuff_construct(void* mem, A... args) { return new (mem) T(args...); }
+template <class T, typename... A> void timestuff_construct(void* mem, A... args) { new (mem) T(args...); }
 template <class T> void timestuff_destruct(T* obj) { obj->~T(); }
 template <class T, typename... A> void* timestuff_factory(A... args) { return new T(args...); }
 
