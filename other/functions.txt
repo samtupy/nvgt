@@ -1,0 +1,326 @@
+// functions to convert integers and doubles from and to IEEE notation, angelscript addon
+	float fp_from_IEEE(uint);
+	uint fp_to_IEEE(float);
+	double fpFromIEEE(uint64);
+	uint64 fpToIEEE(double);
+	bool close_to(double a, double b, double epsilon)
+
+
+// math functions, mostly angelscript addon
+	double cos(double);
+	double sin(double);
+	double tan(double);
+	double acos(double);
+	double asin(double);
+	double atan(double);
+	double atan2(double,double);
+	double cosh(double);
+	double sinh(double);
+	double tanh(double);
+	double log(double);
+	double log10(double);
+	double pow(double, double);
+	double sqrt(double);
+	double ceil(double);
+	double abs(double);
+	double floor(double);
+	double fraction(double);
+	double round(double n, int p);
+
+// format a number into a string or convert a string into a number
+	string format_int(int64 val, const string &in options = \"\", uint width = 0);
+	string format_uint(uint64 val, const string &in options = \"\", uint width = 0);
+	string format_float(double val, const string &in options = \"\", uint width = 0, uint precision = 0);
+	int64 parse_int(const string &in, uint base = 10, uint &out byteCount = 0);
+	uint64 parse_uint(const string &in, uint base = 10, uint &out byteCount = 0);
+	double parse_float(const string &in, uint &out byteCount = 0);
+
+string join(const array<string> &in elements, const string &in delimiter);
+
+// security
+	string string_aes_encrypt(const string& in, const string &in);
+	string string_aes_decrypt(const string& in, const string &in);
+	string string_hash_md5(const string& in, bool binary = false);
+	string string_hash_sha1(const string& in, bool binary = false);
+	string string_hash_sha224(const string& in, bool binary = false);
+	string string_hash_sha256(const string& in, bool binary = false);
+	string string_hash_sha384(const string& in, bool binary = false);
+	string string_hash_sha512(const string& in, bool binary = false);
+	string random_bytes(uint length);
+	string byteshift_encrypt(string data, uint offset, uint data_length, uint8 even, uint8 odd);
+	string byteshift_decrypt(string data, uint offset, uint data_length, uint8 even, uint8 odd);
+	string generate_system_fingerprint(const string&in identifier="");
+	uint HOTP(const string&in secret, uint64 counter, uint digits=6);
+	uint crc32(const string& in);
+
+// compression/serialization
+	string string_deflate(const string& in, int compression_level = 9);
+	string string_inflate(const string& in);
+	dictionary@ deserialize(const string&in);
+	string packet(?&in, ?&in, ?&in); // up to 16 arguments.
+	var@ parse_json(const string&in);
+
+// encode/decode
+	string string_to_hex(const string& in);
+	string hex_to_string(const string& in);
+	string string_base32_encode(const string& in);
+	string string_base32_decode(const string& in);
+	string string_base32_normalize(const string& in);
+	enum string_base64_options { STRING_BASE64_DEFAULT, STRING_BASE64_URL, STRING_BASE64_PADLESS }
+	string string_base64_encode(const string& in, string_base64_options=STRING_BASE64_DEFAULT);
+	string string_base64_decode(const string& in, string_base64_options=STRING_BASE64_PADLESS);
+	string url_encode(const string& in);
+	string url_decode(const string& in);
+	uint8 character_to_ascii(const string&in);
+	string ascii_to_character(uint8);
+	string float_to_bytes(float f);
+	string double_to_bytes(double d);
+	float bytes_to_float(const string&in s);
+	double bytes_to_double(const string&in s);
+	int utf8size(const string&in character);
+	int utf8prev(const string&in text, int offset=0);
+	int utf8next(const string&in text, int offset=0);
+	string string_recode(const string&in text, const string&in in_encoding, const string&in out_encoding); // We have ascii, latin-1, latin-2, latin-9, UTF8, UTF16, UTF32, windows-1250, windows-1251, and windows-1252. There may be an editional modular set of encodings later.
+
+// OS and process specific
+	enum OPERATING_SYSTEM {
+		OS_FREE_BSD,
+		OS_AIX,
+		OS_HPUX,
+		OS_TRU64,
+		OS_LINUX,
+		OS_DARWIN,
+		OS_NET_BSD,
+		OS_OPEN_BSD,
+		OS_IRIX,
+		OS_SOLARIS,
+		OS_QNX,
+		OS_VXWORKS,
+		OS_CYGWIN,
+		OS_NACL,
+		OS_ANDROID,
+		OS_UNKNOWN_UNIX,
+		OS_WINDOWS_NT,
+		OS_VMS
+	}
+	enum ARCHITECTURE {
+		ARCH_ALPHA,
+		ARCH_IA32,
+		ARCH_IA64,
+		ARCH_MIPS,
+		ARCH_HPPA,
+		ARCH_PPC,
+		ARCH_POWER,
+		ARCH_SPARC,
+		ARCH_AMD64,
+		ARCH_ARM,
+		ARCH_M68K,
+		ARCH_S390,
+		ARCH_SH,
+		ARCH_NIOS2,
+		ARCH_AARCH64,
+		ARCH_ARM64,
+		ARCH_RISCV64,
+		ARCH_RISCV32,
+		ARCH_LOONGARCH64
+	}
+	const string COMMAND_LINE;
+	bool environment_variable_exists(const string&in);
+	string expand_environment_variables(const string& in);
+	string read_environment_variable(const string&in, const string&in default_value = "");
+	void write_environment_variable(const string&in variable, const string&in value);
+	string clipboard_get_text();
+	bool clipboard_set_text(const string& in);
+	bool clipboard_set_raw_text(const string& in); // Assumed to be native system encoding not UTF8.
+	bool chdir(const string& in);
+	string cwdir();
+	bool urlopen(const string&in url);
+	bool run(const string& in filename, const string& in command_line, bool wait_for_completion, bool run_hidden);
+	bool is_debugger_present();
+	void debug_message(const string&in);
+	void debug_break();
+	void debug_break(const string&in);
+	void next_keyboard_layout();
+	string[]@ get_preferred_locales();
+	dictionary@ system_get_memory_info();
+	dictionary@ system_get_cpu_info();
+	dictionary@ system_get_disk_usage_info(const string&in root);
+	dictionary@ system_get_info();
+	double system_get_uptime();
+	array<double>@ system_get_load_average();
+	uint64 process_get_pid();
+	dictionary@ process_get_memory_info(uint64 pid);
+	dictionary@ process_get_cpu_info(uint64 pid);
+	dictionary@ process_get_time_info(uint64 pid);
+	dictionary@ process_get_state(uint64 pid);
+	dictionary@ process_get_user(uint64 pid);
+	dictionary@ process_get_executable(uint64 pid);
+	const string PLATFORM;
+	const string PLATFORM_DISPLAY_NAME;
+	const string PLATFORM_VERSION;
+	const string PLATFORM_ARCHITECTURE;
+	const OPERATING_SYSTEM OS;
+	const ARCHITECTURE PROCESSOR_ARCHITECTURE;
+	const uint PROCESSOR_COUNT;
+	const string system_node_name;
+	const string system_node_id;
+	const bool system_is_unix;
+	const bool system_is_windows;
+
+// time
+	const int DATE_YEAR;
+	const int DATE_MONTH;
+	const string DATE_MONTH_NAME;
+	const int DATE_DAY;
+	const int DATE_WEEKDAY;
+	const string DATE_WEEKDAY_NAME;
+	const int TIME_HOUR;
+	const int TIME_MINUTE;
+	const int TIME_SECOND;
+	const int TIMEZONE_BASE_OFFSET;
+	const int TIMEZONE_DST_OFFSET;
+	const int TIMEZONE_OFFSET;
+	const string TIMEZONE_NAME;
+	const string TIMEZONE_DST_NAME;
+	const string TIMEZONE_STANDARD_NAME;
+	bool speedhack_protection=true;
+	uint64 ticks();
+	uint64 secure_ticks();
+	uint64 get_TIME_STAMP() property;
+
+// UI
+	enum message_box_flags {MESSAGE_BOX_ERROR, MESSAGE_BOX_WARNING, MESSAGE_BOX_INFORMATION, MESSAGE_BOX_BUTTONS_LEFT_TO_RIGHT, MESSAGE_BOX_BUTTONS_RIGHT_TO_LEFT}
+	int message_box(string title, string text, string[]@ buttons, uint flags=0); // grave (`) prepending button text is default enter key, tilda (~) before text means default cancel.
+	int alert(string, string, bool can_cancel = false, uint flags = 0);
+	int question(const string& in, const string& in, bool can_cancel = false, uint flags = 0);
+	string input_box(const string& in, const string& in, const string& in = '', uint64 = 0);
+	bool info_box(const string& in, const string& in, const string& in, uint64 = 0);
+
+void print(? &in, ? &in, ? &in); // up to 16
+void println(? &in, ? &in, ? &in); // up to 16
+
+void exit();
+
+// pseudorandom
+	bool random_set_state(const string&in state);
+	string random_get_state();
+	uint random_seed();
+	uint64 random_seed64();
+	int random(int, int);
+	bool random_bool(int percent = 50);
+	string random_character(const string&in min_ascii, const string&in max_ascii);
+
+double tinyexpr(const string& expression);
+string number_to_words(int64 the_number, bool include_and = true);
+bool natural_number_sort(const string&in a, const string&in b);
+uint string_distance(const string&in A, const string&in B, uint insert_cost=1, uint delete_cost=1, uint replace_cost=1);
+
+// input
+	bool key_pressed(uint);
+	bool key_down(uint);
+	bool key_repeating(uint);
+	bool key_released(uint);
+	bool key_up(uint);
+	uint[]@ keys_pressed();
+	uint[]@ keys_down();
+	uint[]@ keys_released();
+	int total_keys_down();
+	bool mouse_pressed(uint8);
+	bool mouse_down(uint8);
+	bool mouse_released(uint8);
+	bool mouse_up(uint8);
+	void mouse_update();
+	const int MOUSE_X;
+	const int MOUSE_Y;
+	const int MOUSE_Z;
+	string get_characters();
+	bool install_keyhook();
+	void uninstall_keyhook();
+
+// screen reader speech
+	const bool SCREEN_READER_AVAILABLE;
+	string screen_reader_detect();
+	bool screen_reader_has_speech();
+	bool screen_reader_has_braille();
+	bool screen_reader_is_speaking();
+	bool screen_reader_output(const string &in, bool interrupt);
+	bool screen_reader_speak(const string &in, bool interrupt);
+	bool screen_reader_braille(const string &in);
+	bool screen_reader_silence();
+
+// window
+	bool show_window(const string& in);
+	bool destroy_window();
+	bool hide_window();
+	bool is_window_active();
+	void wait(int);
+
+// filesystem
+	bool directory_exists(const string& in);
+	bool directory_create(const string& in);
+	bool directory_delete(const string& in);
+	bool file_exists(const string& in);
+	bool file_delete(const string& in);
+	bool file_copy(const string& in, const string& in);
+	bool file_hard_link(const string& in, const string&in);
+	//int file_hard_link_count(const string& in);
+	bool file_move(const string& in, const string& in);
+	string[]@ find_directories(const string& in);
+	string[]@ find_files(const string& in);
+	int64 file_get_size(const string& in);
+	datetime file_get_date_created(const string& in);
+	datetime file_get_date_modified(const string& in);
+	bool fnmatch(const string&in data, const string&in pattern);
+
+// sound global functions
+	float get_sound_master_volume() property;
+	void set_sound_master_volume(float) property;
+	uint get_sound_input_device() property;
+	void set_sound_input_device(uint) property;
+	uint get_sound_input_device_count() property;
+	array<string>@ get_sound_input_devices() property;
+	uint get_sound_output_device() property;
+	void set_sound_output_device(uint) property;
+	uint get_sound_output_device_count() property;
+	array<string>@ get_sound_output_devices() property;
+	bool get_sound_global_hrtf() property;
+	void set_sound_global_hrtf(bool) property;
+	mixer@ sound_default_mixer;
+
+// Regular expressions (currently wrapps PCRE2 via poco, see regexp in classes.txt for lower level use)
+	bool regexp_match(const string&in text, const string&in pattern);
+	bool regexp_search(const string&in text, const string&in pattern);
+	string regexp_replace(const string&in text, const string&in pattern, const string&in replace_with);
+
+// script and concurrency
+	const bool SCRIPT_COMPILED;
+	const string SCRIPT_EXECUTABLE;
+	const string SCRIPT_CURRENT_FILE;
+	const string SCRIPT_CURRENT_FUNCTION;
+	const int SCRIPT_CURRENT_LINE;
+	script_module@ script_get_module(const string&in module_name, int mode=1);
+	string get_call_stack();
+	int get_call_stack_size();
+	string get_exception_info();
+	int get_exception_line();
+	string get_exception_function();
+	string get_exception_file();
+	void throw(const string& msg);
+	void start_profiling();
+	void stop_profiling();
+	void reset_profiler();
+	string generate_profile();
+	int garbage_collect_mode;
+	int garbage_collect_auto_frequency;
+	void garbage_collect(bool full = true);
+	funcdef void coroutine(dictionary@ arguments);
+	void create_coroutine(coroutine@ function, dictionary@ arguments);
+	void yield(); // For coroutines, use thread_yield for threads. May make this less confusing later.
+	void acquire_exclusive_lock();
+	void release_exclusive_lock();
+	void acquire_shared_lock();
+	void release_shared_lock();
+	const thread@ thread_current;
+	uint thread_current_id();
+	bool thread_sleep(uint milliseconds); // Returns true if successful or false if interrupted by thread.wake_up, only use from threads created from the script.
+	void thread_yield();
