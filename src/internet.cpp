@@ -13,12 +13,15 @@
 #include <string>
 #include <obfuscate.h>
 #include <Poco/Format.h>
+#include <Poco/NullStream.h>
+#include <Poco/StreamCopier.h>
 #include <Poco/URI.h>
 #include <Poco/URIStreamOpener.h>
 #include <Poco/Net/AcceptCertificateHandler.h>
 #include <Poco/Net/Context.h>
 #include <Poco/Net/FTPClientSession.h>
 #include <Poco/Net/HTTPClientSession.h>
+#include <Poco/Net/HTTPCredentials.h>
 #include <Poco/Net/HTTPMessage.h>
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/Net/HTTPRequest.h>
@@ -264,6 +267,64 @@ template <class T> void RegisterFTPClientSession(asIScriptEngine* engine, const 
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_welcome_message() const property", asMETHOD(T, welcomeMessage), asCALL_THISCALL);
 }
 
+// NVGT's highest level HTTP. The following code will likely be rewritten once after we write the http class, which will be the middle-level http support. For now this is being rushed to fix an issue regarding the removal of curl and the url_get/post methods in bgt_compat.nvgt. The original code was sourced from Poco's HTTPSUriStreamOpener.
+string url_request(const string& method, const string& url, const string& data, HTTPResponse* resp) {
+	URI u(url);
+	if (u.getScheme() != "http" && u.getScheme() != "https") return "";
+	string user, password;
+	bool authorize = false;
+	bool delete_response = resp == nullptr; // In this case we create our own response object and must delete it when finished.
+	HTTPClientSession* http = NULL;
+	if (!resp) resp = new HTTPResponse;
+	int tries = 10;
+	while (tries) {
+		tries--;
+		try {
+			string path = u.getPathAndQuery();
+			if (path.empty()) path = "/";
+			HTTPRequest req(method, path, HTTPMessage::HTTP_1_1);
+			req.setContentLength(data.length());
+			if (!http) http = u.getScheme() == "http"? new HTTPClientSession(u.getHost(), u.getPort()) : new HTTPSClientSession(u.getHost(), u.getPort());
+			if (authorize) {
+				HTTPCredentials::extractCredentials(u, user, password);
+				HTTPCredentials cred(user, password);
+				cred.authenticate(req, *resp);
+			}
+			http->sendRequest(req) << data;
+			std::istream& istr = http->receiveResponse(*resp);
+			bool moved = (resp->getStatus() == HTTPResponse::HTTP_MOVED_PERMANENTLY || resp->getStatus() == HTTPResponse::HTTP_FOUND || resp->getStatus() == HTTPResponse::HTTP_SEE_OTHER || resp->getStatus() == HTTPResponse::HTTP_TEMPORARY_REDIRECT);
+			if (moved) {
+				u.resolve(resp->get("Location"));
+				if (!user.empty()) {
+					u.setUserInfo(user + ":" + password);
+					authorize = false;
+				}
+				delete http;
+				continue; // Try again with the new URI
+			} else if (resp->getStatus() == HTTPResponse::HTTP_UNAUTHORIZED && !authorize) {
+				authorize = true;
+				NullOutputStream null;
+				StreamCopier::copyStream(istr, null);
+				continue;
+			} else {
+				string result;
+				StreamCopier::copyToString(istr, result);
+				delete http;
+				if (delete_response) delete resp;
+				return result;
+			}
+		} catch(Exception& e) {
+			if (delete_response) delete resp;
+			return "";
+		}
+	}
+	if (http) delete http;
+	if (delete_response) delete resp;
+	return "";
+}
+string url_get(const string& url, HTTPResponse* resp) { return url_request(HTTPRequest::HTTP_GET, url, "", resp); }
+string url_post(const string& url, const string& data, HTTPResponse* resp) { return url_request(HTTPRequest::HTTP_POST, url, "", resp); }
+
 void RegisterInternet(asIScriptEngine* engine) {
 	SSLManager::instance().initializeClient(NULL, new AcceptCertificateHandler(false), new Context(Context::TLS_CLIENT_USE, ""));
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
@@ -304,4 +365,7 @@ void RegisterInternet(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("http_client", "https_client@ opCast()", asFUNCTION((angelscript_refcounted_refcast<HTTPClientSession, HTTPSClientSession>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("https_client", "http_client@ opImplCast()", asFUNCTION((angelscript_refcounted_refcast<HTTPSClientSession, HTTPClientSession>)), asCALL_CDECL_OBJFIRST);
 	RegisterFTPClientSession<FTPClientSession>(engine, "ftp_client");
+	engine->RegisterGlobalFunction("string url_request(const string&in, const string&in, const string&in = \"\", http_response&out = void)", asFUNCTION(url_request), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string url_get(const string&in, http_response&out = void)", asFUNCTION(url_get), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string url_post(const string&in, const string&in, http_response&out = void)", asFUNCTION(url_post), asCALL_CDECL);
 }

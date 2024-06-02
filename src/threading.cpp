@@ -120,7 +120,8 @@ public:
 					value_args[*(void**)obj] = param_type;
 					*(void**)ctx->GetAddressOfArg(i) = obj;
 				}
-				success = ExecuteString(engine, format("return %s;", std::string(param_default)).c_str(), *(void**)ctx->GetAddressOfArg(i), param_typeid, nullptr, defCtx);
+				if (std::string_view(param_default) == "void") success = ctx->SetArgObject(i, nullptr);
+				else success = ExecuteString(engine, format("return %s;", std::string(param_default)).c_str(), *(void**)ctx->GetAddressOfArg(i), param_typeid, nullptr, defCtx);
 				if (success < 0) {
 					aCtx->SetException(format("Angelscript error %d while setting default argument %u in async call to %s", success, i + 1, std::string(func->GetDeclaration())).c_str());
 					engine->ReturnContext(ctx);

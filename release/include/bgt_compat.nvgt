@@ -351,19 +351,6 @@ bool generate_profile(const string& in filename) {
 	return success;
 }
 
-// legacy url functions
-string url_get(const string& in url) {
-	internet_request i(url);
-	while (!i.complete) wait(5);
-	return i.response_body;
-}
-string url_post(const string& in url, const string& in data) {
-	internet_request i;
-	i.post(url, data);
-	while (!i.complete) wait(5);
-	return i.response_body;
-}
-
 // wrappers for string_compress/decompress that use deflate.
 string string_compress(string str) {
 	return string_deflate(str, 9);
