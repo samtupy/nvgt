@@ -1,0 +1,127 @@
+void bench_parse_int8() {
+float total = 0.0;
+float avg = 0.0;
+random_pcg pcg;
+string[] numbers;
+// Generate test data
+println("Generating test data");
+for (int i = 0; i < 10000; i++) {
+numbers.insert_last(string(pcg.range(-128, 127)));
+}
+println("Executing benchmark");
+for (int i = 0; i < 1000; i++) {
+timer t(0, 1);
+for (int j = 0; j < numbers.length(); j++) {
+parse_int(numbers[j]);
+}
+t.pause();
+total += float(t.elapsed);
+}
+avg = total / numbers.length();
+println("Parsed %0 8-bit ints: total=%1us, avg=%2us".format(numbers.length(), total, avg));
+}
+
+void bench_parse_int16() {
+float total = 0.0;
+float avg = 0.0;
+random_pcg pcg;
+string[] numbers;
+// Generate test data
+println("Generating test data");
+for (int i = 0; i < 10000; i++) {
+numbers.insert_last(string(pcg.range(-32768, 32767)));
+}
+println("Executing benchmark");
+for (int i = 0; i < 1000; i++) {
+timer t(0, 1);
+for (int j = 0; j < numbers.length(); j++) {
+parse_int(numbers[j]);
+}
+t.pause();
+total += float(t.elapsed);
+}
+avg = total / numbers.length();
+println("Parsed %0 16-bit ints: total=%1us, avg=%2us".format(numbers.length(), total, avg));
+}
+
+void bench_parse_int32() {
+float total = 0.0;
+float avg = 0.0;
+random_pcg pcg;
+string[] numbers;
+// Generate test data
+println("Generating test data");
+for (int i = 0; i < 10000; i++) {
+numbers.insert_last(string(pcg.range(-2147483648, 2147483647)));
+}
+println("Executing benchmark");
+for (int i = 0; i < 1000; i++) {
+timer t(0, 1);
+for (int j = 0; j < numbers.length(); j++) {
+parse_int(numbers[j]);
+}
+t.pause();
+total += float(t.elapsed);
+}
+avg = total / numbers.length();
+println("Parsed %0 32-bit ints: total=%1us, avg=%2us".format(numbers.length(), total, avg));
+}
+
+void bench_parse_int64() {
+float total = 0.0;
+float avg = 0.0;
+random_pcg pcg;
+string[] numbers;
+// Generate test data
+println("Generating test data");
+for (int i = 0; i < 10000; i++) {
+numbers.insert_last(string(pcg.range(-9223372036854775808, 9223372036854775807)));
+}
+println("Executing benchmark");
+for (int i = 0; i < 1000; i++) {
+timer t(0, 1);
+for (int j = 0; j < numbers.length(); j++) {
+parse_int(numbers[j]);
+}
+t.pause();
+total += float(t.elapsed);
+}
+avg = total / numbers.length();
+println("Parsed %0 64-bit ints: total=%1us, avg=%2us".format(numbers.length(), total, avg));
+}
+
+void bench_parse_float() {
+float total = 0.0;
+float avg = 0.0;
+random_pcg pcg;
+string[] numbers;
+// Generate test data
+println("Generating test data");
+for (int i = 0; i < 10000; i++) {
+numbers.insert_last(string(float(pcg.next())));
+}
+println("Executing benchmark");
+for (int i = 0; i < 1000; i++) {
+timer t(0, 1);
+for (int j = 0; j < numbers.length(); j++) {
+parse_float(numbers[j]);
+}
+t.pause();
+total += float(t.elapsed);
+}
+avg = total / numbers.length();
+println("Parsed %0 floats: total=%1us, avg=%2us".format(numbers.length(), total, avg));
+}
+
+void main() {
+println("Bench 1: parse 8-bit integers");
+bench_parse_int8();
+println("Bench 2: parse 16-bit integers");
+bench_parse_int16();
+println("Bench 3: parse 32-bit integers");
+bench_parse_int32();
+println("Bench 4: parse 64-bit integers");
+bench_parse_int64();
+println("Bench 5: parse floats");
+bench_parse_float();
+}
