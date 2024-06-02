@@ -161,8 +161,8 @@ public:
     }
 
 private:
-    TimerEvent<CBType>(const TimerEvent<CBType>& other) = delete;
-    TimerEvent<CBType>& operator=(const TimerEvent<CBType>& other) = delete;
+    TimerEvent(const TimerEvent& other) = delete;
+    TimerEvent& operator=(const TimerEvent& other) = delete;
     CBType callback_;
 };
 

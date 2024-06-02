@@ -4,34 +4,34 @@
 # Copyright (c) 2022-2024 Sam Tupy
 # license: zlib
 
-style=attach
+style = attach
 
 # indentation
-indent=tab
-indent-switches
-indent-namespaces
-indent-labels
-indent-preproc-cond
-indent-preproc-block
-indent-preproc-define
-indent-col1-comments
-min-conditional-indent=1
+indent = tab
+         indent - switches
+         indent - namespaces
+         indent - labels
+         indent - preproc - cond
+         indent - preproc - block
+         indent - preproc - define
+         indent - col1 - comments
+         min - conditional - indent = 1
 
 # padding
-pad-oper
-pad-header
-unpad-paren
-unpad-brackets
-align-pointer=type
+                                      pad - oper
+                                      pad - header
+                                      unpad - paren
+                                      unpad - brackets
+                                      align - pointer = type
 
 # formatting
-squeeze-lines=4
-squeeze-ws
-keep-one-line-blocks
-keep-one-line-statements
-remove-braces
-attach-return-type
-close-templates
-convert-tabs
+                                          squeeze - lines = 4
+                                              squeeze - ws
+                                              keep - one - line - blocks
+                                              keep - one - line - statements
+                                              remove - braces
+                                              attach - return -type
+                                                  close - templates
+                                                  convert - tabs
 
-preserve-date
+                                                  preserve - date
