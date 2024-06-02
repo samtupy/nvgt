@@ -17,6 +17,7 @@
 #include <vector>
 #ifdef _WIN32
 	#define WIN32_LEAN_AND_MEAN
+	#define NOMINMAX
 	#include <windows.h>
 #endif
 #include <math.h>
@@ -45,7 +46,7 @@
 #include <scriptarray.h>
 #include "timestuff.h" //ticks() sound preloading
 #include <system_error>
-#include <charconv>
+#include <fast_float.h>
 #include <Poco/StringTokenizer.h>
 #include <array>
 
@@ -54,6 +55,7 @@
 #endif
 
 using namespace std;
+using namespace fast_float;
 
 static BOOL sound_initialized = FALSE;
 static mixer* output;
