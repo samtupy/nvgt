@@ -1,0 +1,51 @@
+effect sintax
+sound/mixer.set_fx("$id[optional]:effect:arg1:arg2:arg3:...", index = 0);
+Effects are set with a simple string sintax. In it's most basic form, this is just effect_name:argument1:argument2:... You can see the list of effects below (at this time the list is not complete!)
+However, often times you will want to update an existing effect without removing and recreating it. To do this, you give an effect an ID, $roomverb for example. Then your string becomes $roomverb:freeverb:arg1:arg2:arg3...
+If you call set_fx with a string that contains an effect ID and type that already exists, that effect will be updated with the given arguments, rather than a new effect being added to the chain.
+The index parameter is how you control where in the chain the effects are placed. If you leave this at 0, the effect should just add itself to the end of the chain, E. processed last. If you've inserted 2 effects before this one though and you set the index to 2, the effect should be processed first.
+* I want to try to find a better way of controling the effect priorities. For a simple reverb based system, for example, you can leave the index parameter alone.
+To delete all effects, just call set_fx("");
+And to delete a given one, set_fx("", index);
+
+
+Effect list:
+I will try to document each effect as much as I can. However, the bass_fx documentation is unfortunately somewhat lacking, and so as a result this may be as well. However, I'll try to describe as much as possible.
+It's also worth noting that the minimum and maximum denotations here may not always be true, for example I found that you indeed can go beyond 1.0 for the wet mix setting of some effects to make them louder, even though the documentation only seems to state that 1.0 is effected.
+Note: Please be careful when using these effects! Do to the shear nature of how it works, some of these effects require a feedback signal to sound good. This means that the effect is applied, and then at whatever volume is specified in the feedback parameter, the effected audio is then piped back into the input, to be processed anew by the effect. This is how a chorus effect, for example, which would by default only have one extra sound duplication/voice, sounds like it has more when you set the feedback parameter greater than 0. This is because after the first voice is done being processed, it will then feed the processed audio back through the effect, thus creatting one louder, and one quieter copy of the sound. This then continues until older copies of the sounds are no longer autible do to natural atenuation over time. That being said though, it is possible to do the opposite of atenuating sounds with this parameter! Similar to what happens if you put a microphone up to a speaker that is broadcasting the audio from the microphone, and same as the name of this parameter, you will actually get feedback! Of course it won't be the terrible high pitches squelch you are used to, and this only happens if you use the effect wrong, it is possible for the sound to keep multiplying and multiplying until the mixers become overwhelmed and the sound starts to die! Generally to avoid this, it's best to make sure that the value of wetmix+feedback does not get higher than 1.0. wetmix=0.6+feedback=0.3, should work, for example, because ultimate_sound_signal*0.9<ultimate_sound_signal, A.K.A, the volume of the wet mix and feedback cannot cause the sound to multiply because any number aka our signals volume multiplied by less than 1.0 will be less than that volume. If wetmix+feedback>1.0 though, of course multiplying any number by a number greater than 1 will increase that number, aka it will slowly start causing the sound volume to multiply throughout the duration of the effect as the feedback increases and samples multiply. There are no sanity checks here for the simple reason that you can borderline these numbers to make things sound cool, just be careful, use math, common sense and trial and error! So long as you don't publish a broken effect to the public game, there is no consequences aside from possibly renching off your headset in surprise if you mess up effect parameters, so feel free to experiment!
+***
+distortion:drive:dry:wet:feedback:volume:
+Applies distortion to a sound.
+drive: From 0.0 to 1.0, I believe how intense the distortion is
+dry: From -5 to +5, the amount of dry mix to add to the sound. This is weird. For full dry mix, set to -5. For no dry mix, set to 0.
+wet: From 0.0 to 1.0, how much of the distortion effect should be heard, like most other effect's wet mix.
+feedback: Amount of signal to feed back into input
+volume: Volume control for distortion, not entirely sure how this works.
+$nicotine:distortion:0.8:-5:0.1:0:0.2
+
+chorus:dry:wet:feedback:minsweep:maxsweep:rate
+ A chorus effect. Move a secondary copy of the sound up and down the frequency spectrum over and over. When the dry and wet copies of the sounds start playing less than minsweep ms apart, reverse the direction of the frequency sweep until the dry and wet sounds are maxsweep ms apart. The rate of the sweep of the second sound is controled by the rate parameter which is a value in milliseconds per second. Increase the number of voices by carefully using the feedback parameter to feed the output back into the input for reprocessing, thus reduplication.
+ dry: from 0.0 to 1.0, volume of dry uneffected signal.
+ wet: from 0.0 to 1.0, volume of wet effected signal.
+ feedback: Volume of processed output signal to feed back into the input signal for further reprocessing.
+ minsweep: Minimum delay in milliseconds. If the dry and wet sound would get closer than this, reverse the sweep.
+ maxsweep: Maximum delay in milliseconds. If the dry and wet sounds get farther apart than this due to pitch changes, reverse the sweep.
+ rate: In milliseconds per second, rate that the sweap should take place.
+$warble:chorus:1.0:0.4:0.5:10:90:200
+
+freeverb:dry:wet:roomsize:damp:width:
+ Reverb using the freeverb algorithm.
+ dry: from 0.0 to 1.0, volume of dry uneffected signal.
+ wet: from 0.0 to 1.0, volume of wet effected signal.
+ roomsize: from 0.0 to 1.0, size of the room, or in otherwords, similar to decay time.
+ damp: from 0.0 to 1.0, controls the dampness of the reverb. Lower values tend to be more robotic and pragmatic, maybe good for stone walls, while higher values I think attempt simulation of wood or carpet like area in a very general sense.
+ width: from 0.0 to 1.0, controls the stereo width of the reverb. This could be combined with room size to make a smaller room, but be careful because you can also cause your reverb to start sounding mono if you go too low.
+ $room:freeverb:1.0:0.8:0.25:1.0:1.0:0.8
+
+volume:vol
+Set the volume linearly, 0=muted 1=full.
+volume:0.5
+
+lvolume:vol
+Set the volume logarithmicly, 0=muted 1=full.
+lvolume:0.5
