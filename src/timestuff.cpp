@@ -237,11 +237,11 @@ bool speedhack_protection = true;
 uint64_t secure_ticks() {
 	return g_secure_clock.elapsed() / Timespan::MILLISECONDS;
 }
-uint64_t ticks(bool unsecure) {
-	return (unsecure ? g_clock.elapsed() : g_secure_clock.elapsed()) / Timespan::MILLISECONDS;
+uint64_t ticks(bool secure) {
+	return (!secure ? g_clock.elapsed() : g_secure_clock.elapsed()) / Timespan::MILLISECONDS;
 }
-uint64_t microticks(bool unsecure) {
-	return unsecure ? g_clock.elapsed() : g_secure_clock.elapsed();
+uint64_t microticks(bool secure) {
+	return !secure ? g_clock.elapsed() : g_secure_clock.elapsed();
 }
 
 // Replace the following function with something from an external library or something as soon as we find it.
