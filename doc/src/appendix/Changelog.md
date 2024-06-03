@@ -1,17 +1,18 @@
 # Changelog
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
-## New as of 06/02/2024:
-*     The form and speech includes no longer require  bgt_compat!
+## New in 0.85.1-beta (06/03/2024):
+* The restart method on timers will now unpause them.
+* Dramatically increase the speed of floating point string parsing.
+* The form and speech includes no longer require  bgt_compat!
 * adds sound_default_pack property.
     * For example, you can now create a pack object, execute the expression @sound_default_pack = my_pack; and from that point all sounds in the engine will use the default pack you have set unless you explicitly override it.
 * Modified number conversion in sound mixer classes to use more efficient string -> number handling
 * Fixed typo in doc for BSL license
-* Start on pack object docs
-* include form.nvgt in speech by default.
-*     Astyled number_speaker.nvgt
-* Add includes/number_speaker.nvgt; makes it very easy to self-voice numbers!
-* Many more internal tests that basically mean lots of stuff should be much faster!
+* Start on the documentation for the pack object
+* include form.nvgt in the speech.nvgt include by default.
+* Add includes/number_speaker.nvgt (a port of bgt's class); makes it very easy to self-voice numbers!
+* There are now a few more test cases as well as the beginnings of a benchmarking framework which will begin leading to several speed improvements such as the floating point processor mentioned above!
 
 ## New as of 05/31/2024:
 * complete rewrite of NVGT entry point to use a Poco application. This includes much cleanup and organization and adds several features:

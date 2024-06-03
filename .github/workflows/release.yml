@@ -26,7 +26,6 @@ jobs:
       run: |
         sudo chmod +x build/build_linux.sh
         ./build/build_linux.sh ci
-        python3 build/ci_set_version.py
         cd release
         tar -czf ../linux_release.tar.gz *
         cd ..
@@ -108,6 +107,9 @@ jobs:
     needs: ["linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
+    - name: set_version
+      run: |
+        python3 build/ci_set_version.py
     - name: package
       run: |
         curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/mac_release.tar.gz
@@ -137,6 +139,9 @@ jobs:
     needs: ["windows_package", "mac_package", "linux_package"]
     steps:
     - uses: actions/checkout@v4
+    - name: set_version
+      run: |
+        python3 build/ci_set_version.py
     - name: publish
       run: |
         curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/release_complete.php?ver=$nvgt_version"
