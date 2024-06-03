@@ -2,9 +2,8 @@ name: website update
 
 on:
   push:
-    paths:
-      - 'doc/**'
-      - 'web/**'
+    paths: ["doc/**", "web/**"]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:

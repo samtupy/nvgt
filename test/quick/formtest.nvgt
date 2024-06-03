@@ -15,9 +15,3 @@ void main() {
 			speak(f.get_text(b), true);
 	}
 }
-bool speak(string text, bool interrupt = true, bool translate = true) {
-	return screen_reader_output(text, interrupt);
-}
-bool stop_speech() {
-	return screen_reader_silence();
-}

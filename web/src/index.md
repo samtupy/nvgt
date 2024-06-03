@@ -39,6 +39,8 @@ The NVGT engine advertises the following qualities and features:
 * text reencoding; Handle text created in a player's native encoding using the engine's ability to convert text from one encoding to another with the option of enabling over 35 locale specific encodings.
 * datastreams; Move, analyze/encrypt, and in other ways manipulate data with a low memory footprint and with few lines of code using connectable streaming classes (inspired by and wrapping c++/poco iostreams).
 * multithreading primitives; Make your game run faster using multiple threads, including related mutual exclusion/locking primitives like mutexes and events.
+* builtin cheat engine speed hack protection; Stop cheaters by causing cheat engine's speedhack feature to be completely nonfunctional in your games, while also being able to disable such protection should you want to allow your users to speedhack for fun.
+* Timers with adjustable accuracy; Create a timer with an elapsed method that returns values in anything from days to microseconds, and use different accuracies per timer object.
 * script debugger; Find issues in your code like never before with standard debugging techniques like breakpoints, single instruction stepping, realtime expression evaluation and more.
 * ever expanding plugin system; Be free of the Angelscript sandbox and code whatever extensions to your game you want in c++ or another language.
 * subscripting; Add downloadable levels to your games or make them more dynamic with NVGT's ability to execute Angelscript code from within Angelscript code like the javascript or python eval function.
