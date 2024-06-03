@@ -272,7 +272,7 @@ int64_t timer::get_elapsed() const { return (paused ? value : microticks(secure)
 bool timer::has_elapsed(int64_t value) const { return get_elapsed() >= value; }
 void timer::force(int64_t new_value) { paused ? value = new_value * accuracy : value = microticks(secure) - new_value * accuracy; }
 void timer::adjust(int64_t new_value) { paused ? value += new_value * accuracy : value -= new_value * accuracy; }
-void timer::restart() { value = paused ? 0 : microticks(secure); }
+void timer::restart() { value = microticks(secure); paused = false; }
 bool timer::get_secure() const { return secure; }
 bool timer::get_paused() const { return paused; }
 bool timer::get_running() const { return !paused; }
