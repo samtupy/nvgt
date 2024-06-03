@@ -1,9 +1,13 @@
 ---
 title: 48-hours-post-launch-updates
+published_date: 2024-06-03 01:38:21.7829158 +0000
 layout: post.liquid
-is_draft: true
+is_draft: false
 ---
 # {{ page.title }}
+Written by Rory and modified by Sam Tupy
+
+## Introduction
 Hello everybody!
 
 It's now the second day NVGT has been public, and we have several updates to share since the release.
@@ -26,7 +30,7 @@ For example:
 #pragma platform linux
 ```
 
-Note: Mac OS and liux compilation still needs to be tested and improved.
+Note: Mac OS and linux compilation still needs to be tested and improved.
 
 ## built-in url_get and url_post functions
 Early users may have experienced issues with bgt_compat.nvgt in the url_get and url_post functions; the new version of NVGT removes these functions and uses new built-in versions.
@@ -43,6 +47,9 @@ void main(){
 }
 ```
 
+## Performance enhancements
+Ethin P discovered that Angelscript's string addon had such horribly slow floatingpoint parsing routines that I couldn't possibly come up with a kind word to say about them. On some CPUs, it was taking 5ms to parse a string into a float! That is unspeakibly not OK and has only been a thing for so long because before opensource, we didn't have time/availability to get to all of these details like benchmarking the floatingpoint processor. Ethin recoded that function for us to use a much faster floatingpoint parser, and now floating point numbers can parse sometimes in under 150 microseconds, thanks Ethin!
+
 ## The number_speaker.nvgt Include
 Thanks to ogomez92, the number_speaker.bgt include shipped with BGT has now been ported over to NVGT!
 
@@ -58,7 +65,20 @@ A growing collection miscellaneous items including some code samples (in the oth
 * a new fx.txt file contains documentation for the fx system in NVGT
 * there are also other examples to help explain a few miscellaneous actions, like signing executables
 
+## Known issues
+The following is a list of solutions for a few commonly encountered issues that people are experiencing right now. We plan to improve on all things mentioned here, but for now, these troubleshooting steps should help get you up and running if you face any of the most common problems.
+### Running on MacOS
+Sometimes users are having issues getting the official mac build of NVGT to run. This is mostly because apple is quarantining the app upon download. To fix this, try the following:
+* If your mac claims that the app bundle is damaged, try running the following in the terminal: `xattr -c /applications/NVGT.app`
+* If you get an error in a problem report about libgit2.2.17.dylib or something being missing, run `brew install libgit2`
+* Currently we are having issues detecting the builtin includes directory. It will only be a few lines of code to fix, but we haven't gotten to it yet. To run your nvgt code, the recommendation currently is the following (to be improved) command: `/applications/nvgt.app/MacOS/nvgt \`pwd\`/scriptname.nvgt  -I/applications/nvgt.app/Contents/Resources/include`
+### Windows executable won't run
+Remember, NVGT apps may require dependencies. As soon as you initialize the sound system or speak through a screen reader, NVGT tries to call into an external library that you must distribute with your application. Thus, you need to copy c:\nvgt\lib to the directory containing your compiled executable for it to run properly.
+### Visual studio link error when building
+If you are building NVGT and you get a linker error talking about an undefined symbol thread_sleep_for or similar, the solution is to update visual studio 2022 to the latest version, or if you don't want to do that, you'll need to avoid the use of my windev package and build the dependencies yourself. It's probably just easier to update visual studio.
+
 ## What's Next?
 While installers and official downloads are indeed available, it should be noted that this engine is still in its beta stage; complete stability in every aspect is neither expected nor guaranteed, although contributors and early users have had great success converting a huge variety of games from bgt already!
 
 More updates will be given as they are available, and thank you for trying NVGT!
+

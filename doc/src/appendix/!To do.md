@@ -16,6 +16,19 @@ Another object from BGT we have not yet reimplemented, we are considering [tonic
 ### AVSpeech and speech dispatcher
 Currently other than voice over support, the only speech output NVGT can produce on Linux and MacOS is based on a verry bad sounding RSynth derivative that is included as a fallback synthesizer intended to be used in an emergency situation where the user needs to know that their primary synth failed to load. We intend to wrap AVSpeechSynthesizer on MacOS and speechd on Linux to solve this problem.
 
+## VSCode extension
+A plan that has existed for a few months now is to create a VSCode extension for Angelscript that works with NVGT scripts. To facilitate this we have wrapped a function called script_dump_engine_configuration, an example of which you can see in test/quick/dump_engine_config.nvgt. This function dumps a complete reference of everything registred in the engine, enough to compile scripts. This will, once time permits to learn the needed components, allow us to create an extennsion for VSCode that allows everything from symbol lookup to intellisense.
+
+### JAWS keyhook
+Anyone who has been playing Survive the Wild for any period of time and who uses JAWS is no doubt aware that the keyhook in Survive the Wild is currently less than ideal. There is ongoing work to fix it, but this is not yet complete.
+
+### SDL dialog boxes
+At the moment, we are using SDL's message box system to show simple dialogs rather than implementing it on our own. However, this implementation is not ideal for 3 reasons.
+1. shortcuts with an ampersand don't work, we can't create a button called `&yes` that works with alt+y.
+2. Copying text does not work with ctrl+c.
+3. No internationalization, yes and no buttons are English on non-English windows.
+Either we will see if SDL will improve message boxes soon, or switch to something else.
+
 ### Switch to miniaudio
 Currently we use the Bass audio library for sound output, which functionally speaking does work great. However Bass is not open source, and a comercial license must be purchased from [Un4seen](https://www.un4seen.com/bass.html) in order to sell comercial projects. For NVGT, this is not ideal and Bass was only used because it worked quite well at the time that NVGT was only being used to bolster Survive the Wild development with no opensource intentions. Instead, we plan to switch to [miniaudio](https://github.com/mackron/miniaudio) which is open source and in the public domain, and thus which will solve such comercial licensing issues.
 
