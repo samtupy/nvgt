@@ -18,6 +18,7 @@
 #include <math.h>
 #ifdef _WIN32
 	#define WIN32_LEAN_AND_MEAN
+	#define NOMINMAX
 	#include <windows.h>
 	#include <direct.h>
 #else
@@ -41,7 +42,8 @@
 #include "obfuscate.h"
 #include "input.h"
 #include "misc_functions.h"
-
+#include "fast_float.h"
+#include <system_error>
 
 BOOL ChDir(const std::string& d) {
 	#ifdef _WIN32
@@ -287,6 +289,24 @@ CScriptArray* get_preferred_locales() {
 	return array;
 }
 
+float parse_float(const std::string& val) {
+float res = 0.0;
+const auto [valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
+if (valEc != std::errc()) {
+return 0.0;
+}
+return res;
+}
+
+double parse_double(const std::string& val) {
+double res = 0.0;
+const auto [valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
+if (valEc != std::errc()) {
+return 0.0;
+}
+return res;
+}
+
 void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction(_O("bool chdir(const string& in)"), asFUNCTION(ChDir), asCALL_CDECL);
@@ -326,4 +346,6 @@ void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("uint64 memory_allocate_units(uint64, uint64)"), asFUNCTION(calloc), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64 memory_reallocate(uint64, uint64)"), asFUNCTION(realloc), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void memory_free(uint64)"), asFUNCTION(free), asCALL_CDECL);
+	engine->RegisterGlobalFunction("float parse_float(const string &in)", asFUNCTION(parse_float), asCALL_CDECL);
+	engine->RegisterGlobalFunction("double parse_double(const string &in)", asFUNCTION(parse_double), asCALL_CDECL);
 }
