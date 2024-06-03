@@ -5,7 +5,7 @@ layout: post.liquid
 is_draft: false
 ---
 # {{ page.title }}
-Written by Rory and modified by Sam Tupy
+Written by Rory and modified by Sam Tupy, updated about 6 hours after publication to include troubleshooting step regarding the new version which was just released.
 
 ## Introduction
 Hello everybody!
@@ -76,6 +76,8 @@ Sometimes users are having issues getting the official mac build of NVGT to run.
 Remember, NVGT apps may require dependencies. As soon as you initialize the sound system or speak through a screen reader, NVGT tries to call into an external library that you must distribute with your application. Thus, you need to copy c:\nvgt\lib to the directory containing your compiled executable for it to run properly.
 ### Visual studio link error when building
 If you are building NVGT and you get a linker error talking about an undefined symbol thread_sleep_for or similar, the solution is to update visual studio 2022 to the latest version, or if you don't want to do that, you'll need to avoid the use of my windev package and build the dependencies yourself. It's probably just easier to update visual studio.
+### I updated to nvgt 0.85.1-beta and now I'm getting loads of compilation errors!
+Carefully read the changelog topic for 0.85.1-beta, and observe at some includes no longer require the use of bgt_compat.nvgt. Thus, if you have for example included form.nvgt but not bgt_compat.nvgt and if you use symbols like KEY_LCONTROL which are defined in bgt_compat, your code will now stop running because form.nvgt no longer implicitly includes bgt_compat for you as form no longer requires this include to run. Thus, if you receive loads of compilation errors after the update, be sure to `#include "bgt_compat.nvgt"` in your app to see if that helps.
 
 ## What's Next?
 While installers and official downloads are indeed available, it should be noted that this engine is still in its beta stage; complete stability in every aspect is neither expected nor guaranteed, although contributors and early users have had great success converting a huge variety of games from bgt already!
