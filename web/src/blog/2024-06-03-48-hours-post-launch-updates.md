@@ -71,7 +71,10 @@ The following is a list of solutions for a few commonly encountered issues that 
 Sometimes users are having issues getting the official mac build of NVGT to run. This is mostly because apple is quarantining the app upon download. To fix this, try the following:
 * If your mac claims that the app bundle is damaged, try running the following in the terminal: `xattr -c /applications/NVGT.app`
 * If you get an error in a problem report about libgit2.2.17.dylib or something being missing, run `brew install libgit2`
-* Currently we are having issues detecting the builtin includes directory. It will only be a few lines of code to fix, but we haven't gotten to it yet. To run your nvgt code, the recommendation currently is the following (to be improved) command: `/applications/nvgt.app/MacOS/nvgt \`pwd\`/scriptname.nvgt  -I/applications/nvgt.app/Contents/Resources/include`
+* Currently we are having issues detecting the builtin includes directory. It will only be a few lines of code to fix, but we haven't gotten to it yet. To run your nvgt code, the recommendation currently is the following (to be improved) command:
+```
+/applications/nvgt.app/MacOS/nvgt `pwd`/scriptname.nvgt  -I/applications/nvgt.app/Contents/Resources/include
+```
 ### Windows executable won't run
 Remember, NVGT apps may require dependencies. As soon as you initialize the sound system or speak through a screen reader, NVGT tries to call into an external library that you must distribute with your application. Thus, you need to copy c:\nvgt\lib to the directory containing your compiled executable for it to run properly.
 ### Visual studio link error when building

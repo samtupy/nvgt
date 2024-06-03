@@ -16,7 +16,7 @@ Another object from BGT we have not yet reimplemented, we are considering [tonic
 ### AVSpeech and speech dispatcher
 Currently other than voice over support, the only speech output NVGT can produce on Linux and MacOS is based on a verry bad sounding RSynth derivative that is included as a fallback synthesizer intended to be used in an emergency situation where the user needs to know that their primary synth failed to load. We intend to wrap AVSpeechSynthesizer on MacOS and speechd on Linux to solve this problem.
 
-## VSCode extension
+### VSCode extension
 A plan that has existed for a few months now is to create a VSCode extension for Angelscript that works with NVGT scripts. To facilitate this we have wrapped a function called script_dump_engine_configuration, an example of which you can see in test/quick/dump_engine_config.nvgt. This function dumps a complete reference of everything registred in the engine, enough to compile scripts. This will, once time permits to learn the needed components, allow us to create an extennsion for VSCode that allows everything from symbol lookup to intellisense.
 
 ### JAWS keyhook
@@ -34,6 +34,9 @@ Currently we use the Bass audio library for sound output, which functionally spe
 
 ### Consider access permissions for subscripting
 NVGT allows a scripter to execute Angelscript code from within their Angelscript code, such as the python eval function. The user is given control of what builtin NVGT functions and classes these subscripts have access to, but it's still a bit rough. Basically Angelscript provides us with this 32 bit DWORD where we can map certain registered functions to bitflags and restrict access to them if a calling module's access bitmask doesn't include a flag the functions were registered with. However this means that we have 32 systems or switches to choose from, so either we need to assign builtin systems to them in a better way, or investigate this feature Angelscript has which is known as config groups and see if we can use them for permission control. C++ plugins in particular complicate this issue.
+
+### Provide user facing pack file encryption
+Currently pack file encryption uses internal methods requiring a user to rebuild NVGT to change the encryption routines, but there is full intention of also adding a `pack.set_encryption` so that users of NVGT can also manage how their packs are encrypted.
 
 ### get_last_error()
 One area of NVGT that still needs heavy improvement is error handling. Some things use exceptions, some libraries have a get_error function, some things may use the backwards compatibility function get_last_error() etc. We need to find a way to unify this as much as possible into one system.
