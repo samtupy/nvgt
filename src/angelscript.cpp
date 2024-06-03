@@ -76,6 +76,7 @@
 #include "scripthandle.h"
 #include "scripthelper.h"
 #include "scriptmath.h"
+#include "scriptmathcomplex.h"
 #include "contextmgr.h"
 #include "datetime.h"
 #include "weakref.h"
@@ -337,6 +338,7 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	RegisterScriptGrid(engine);
 	RegisterScriptHandle(engine);
 	RegisterScriptMath(engine);
+	RegisterScriptMathComplex(engine);
 	RegisterScriptWeakRef(engine);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_TERMINAL);
 	Print::asRegister(engine);
