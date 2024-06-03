@@ -768,35 +768,6 @@ static asQWORD parseUInt(const string &val, asUINT base, asUINT *byteCount)
 	return res;
 }
 
-// AngelScript signature:
-// double parseFloat(const string &in val, uint &out byteCount = 0)
-double parseFloat(const string &val, asUINT *byteCount)
-{
-	char *end;
-
-	// WinCE doesn't have setlocale. Some quick testing on my current platform
-	// still manages to parse the numbers such as "3.14" even if the decimal for the
-	// locale is ",".
-#if !defined(_WIN32_WCE) && !defined(ANDROID) && !defined(__psp2__)
-	// Set the locale to C so that we are guaranteed to parse the float value correctly
-	char *tmp = setlocale(LC_NUMERIC, 0);
-	string orig = tmp ? tmp : "C";
-	setlocale(LC_NUMERIC, "C");
-#endif
-
-	double res = strtod(val.c_str(), &end);
-
-#if !defined(_WIN32_WCE) && !defined(ANDROID) && !defined(__psp2__)
-	// Restore the locale
-	setlocale(LC_NUMERIC, orig.c_str());
-#endif
-
-	if( byteCount )
-		*byteCount = asUINT(size_t(end - val.c_str()));
-
-	return res;
-}
-
 // This function returns a string containing the substring of the input string
 // determined by the starting index and count of characters.
 //
@@ -922,7 +893,6 @@ void RegisterStdString_Native(asIScriptEngine *engine)
 	r = engine->RegisterGlobalFunction("string format_float(double val, const string &in options = \"\", uint width = 0, uint precision = 0)", asFUNCTION(formatFloat), asCALL_CDECL); assert(r >= 0);
 	r = engine->RegisterGlobalFunction("int64 parse_int(const string &in, uint base = 10, uint &out byteCount = 0)", asFUNCTION(parseInt), asCALL_CDECL); assert(r >= 0);
 	r = engine->RegisterGlobalFunction("uint64 parseUInt(const string &in, uint base = 10, uint &out byteCount = 0)", asFUNCTION(parseUInt), asCALL_CDECL); assert(r >= 0);
-	r = engine->RegisterGlobalFunction("double parse_float(const string &in, uint &out byteCount = 0)", asFUNCTION(parseFloat), asCALL_CDECL); assert(r >= 0);
 
 #if AS_USE_STLNAMES == 1
 	// Same as length
@@ -1122,13 +1092,6 @@ static void parseUInt_Generic(asIScriptGeneric *gen)
 	asUINT base = gen->GetArgDWord(1);
 	asUINT *byteCount = reinterpret_cast<asUINT*>(gen->GetArgAddress(2));
 	gen->SetReturnQWord(parseUInt(*str, base, byteCount));
-}
-
-static void parseFloat_Generic(asIScriptGeneric *gen)
-{
-	string *str = reinterpret_cast<string*>(gen->GetArgAddress(0));
-	asUINT *byteCount = reinterpret_cast<asUINT*>(gen->GetArgAddress(1));
-	gen->SetReturnDouble(parseFloat(*str,byteCount));
 }
 
 static void StringCharAtGeneric(asIScriptGeneric * gen)
@@ -1439,7 +1402,6 @@ void RegisterStdString_Generic(asIScriptEngine *engine)
 	r = engine->RegisterGlobalFunction("string format_float(double val, const string &in options = \"\", uint width = 0, uint precision = 0)", asFUNCTION(formatFloat_Generic), asCALL_GENERIC); assert(r >= 0);
 	r = engine->RegisterGlobalFunction("int64 parse_int(const string &in, uint base = 10, uint &out byteCount = 0)", asFUNCTION(parseInt_Generic), asCALL_GENERIC); assert(r >= 0);
 	r = engine->RegisterGlobalFunction("uint64 parseUInt(const string &in, uint base = 10, uint &out byteCount = 0)", asFUNCTION(parseUInt_Generic), asCALL_GENERIC); assert(r >= 0);
-	r = engine->RegisterGlobalFunction("double parse_float(const string &in, uint &out byteCount = 0)", asFUNCTION(parseFloat_Generic), asCALL_GENERIC); assert(r >= 0);
 }
 
 void RegisterStdString(asIScriptEngine * engine)
