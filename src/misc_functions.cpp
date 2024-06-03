@@ -148,7 +148,7 @@ std::string number_to_words(asINT64 number, bool include_and) {
 		output.resize(size);
 		size = bl_number_to_words(number, &output[0], size, include_and);
 	}
-	output.resize(size);
+	output.resize(size -1); // It appears bl_number_to_words includes a trailing null byte in it's size calculation.
 	return output;
 }
 int get_last_error() {
