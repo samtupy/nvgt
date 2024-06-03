@@ -1,10 +1,10 @@
 ---
-title: 48-hours-post-launch-updates
+title: 48-hours post launch updates
 published_date: 2024-06-03 01:38:21.7829158 +0000
 layout: post.liquid
 is_draft: false
 ---
-# {{ page.title }}
+
 Written by Rory and modified by Sam Tupy, updated about 6 hours after publication to include troubleshooting step regarding the new version which was just released.
 
 ## Introduction

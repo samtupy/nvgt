@@ -42,17 +42,17 @@ encryption_key=b[3];
 }
 else if (cont==true)
 {
-filename=input_box("pack creater", "enter the name of the pack you wish to create");
+filename=input_box("pack creator", "enter the name of the pack you wish to create");
 if (filename=="")
 {
 exit();
 }
-foldername=input_box("pack creater", "enter the path that the files you wish to pack are contained.");
+foldername=input_box("pack creator", "enter the path that the files you wish to pack are contained.");
 if (foldername=="")
 {
 exit();
 }
-int answer=question("pack creater", "would you like these files to be encrypted");
+int answer=question("pack creator", "would you like these files to be encrypted");
 if (answer==1)
 {
 encrypt=true;
@@ -91,7 +91,7 @@ exit();
 }
 find_stuff(foldername);
 if (silent==false)
-alert("pack creater", "there are "+fol.length()+" files in the pack. Hit OK to start packing!");
+alert("pack creator", "there are "+fol.length()+" files in the pack. Hit OK to start packing!");
 for (uint i=0; i<fol.length(); i++)
 {
 if (silent==false)
