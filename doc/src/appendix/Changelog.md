@@ -1,6 +1,18 @@
 # Changelog
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
+## New as of 06/02/2024:
+*     The form and speech includes no longer require  bgt_compat!
+* adds sound_default_pack property.
+    * For example, you can now create a pack object, execute the expression @sound_default_pack = my_pack; and from that point all sounds in the engine will use the default pack you have set unless you explicitly override it.
+* Modified number conversion in sound mixer classes to use more efficient string -> number handling
+* Fixed typo in doc for BSL license
+* Start on pack object docs
+* include form.nvgt in speech by default.
+*     Astyled number_speaker.nvgt
+* Add includes/number_speaker.nvgt; makes it very easy to self-voice numbers!
+* Many more internal tests that basically mean lots of stuff should be much faster!
+
 ## New as of 05/31/2024:
 * complete rewrite of NVGT entry point to use a Poco application. This includes much cleanup and organization and adds several features:
     * There is now proper command line parsing, help printing, config file loading for when we want to use it, and more.
