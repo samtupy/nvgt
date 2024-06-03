@@ -27,6 +27,7 @@ user/**
 lindev
 macosdev
 windev
+deps
 
 # website builds
 web/public_html

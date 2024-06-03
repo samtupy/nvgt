@@ -68,6 +68,7 @@ static IPLHRTFSettings phonon_hrtfSettings{};
 static IPLHRTF phonon_hrtf = NULL;
 static IPLHRTF phonon_hrtf_reflections = NULL;
 static thread_mutex_t preload_mutex;
+static pack* g_sound_default_pack = nullptr;
 
 hstream_entry* last_channel = NULL;
 hstream_entry* register_hstream(unsigned int channel) {
@@ -2122,6 +2123,7 @@ sound_environment* ScriptSound_Environment_Factory() {
 	return new sound_environment();
 }
 void RegisterScriptSound(asIScriptEngine* engine) {
+	engine->RegisterGlobalProperty("pack@ sound_default_pack", &g_sound_default_pack);
 	engine->RegisterFuncdef(_O("void sound_close_callback(string)"));
 	engine->RegisterFuncdef(_O("uint sound_length_callback(string)"));
 	engine->RegisterFuncdef(_O("int sound_read_callback(string &out, uint, string)"));
@@ -2135,11 +2137,11 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_ADDREF, "void f()", asMETHOD(sound, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_RELEASE, "void f()", asMETHOD(sound, Release), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool close()", asMETHOD(sound, close), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool load(const string &in, pack@ = null, bool = true)", asMETHOD(sound, load), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load(const string &in, pack@ = sound_default_pack, bool = true)", asMETHOD(sound, load), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool load(sound_close_callback@, sound_length_callback@, sound_read_callback@, sound_seek_callback@, const string &in, const string&in = \"\")", asMETHOD(sound, load_script), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool load(string&, uint, const string&in = \"\", bool = false)", asMETHOD(sound, load_memstream), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool load_url(const string &in)", asMETHOD(sound, load_url), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool stream(const string &in, pack@ = null)", asMETHOD(sound, stream), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool stream(const string &in, pack@ = sound_default_pack)", asMETHOD(sound, stream), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool push_memory(const string &in, bool = false, int = 0, int = 0)", asMETHOD(sound, push_string), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool set_position(float, float, float, float, float, float, float, float, float)", asMETHOD(sound, set_position), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool set_mixer(mixer@ = null)", asMETHOD(sound, set_mixer), asCALL_THISCALL);
