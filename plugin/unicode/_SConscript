@@ -1,0 +1,7 @@
+Import("env")
+
+if ARGUMENTS.get("no_shared_plugins", "0") == "0":
+	env.SharedLibrary("#release/lib/unicode", ["unicode.cpp", "data.cpp"], LIBS = [])
+static = env.Object("unicode_static", ["unicode.cpp", "data.cpp"], CPPDEFINES = [("NVGT_PLUGIN_STATIC", "unicode_plugin")])
+static = env.StaticLibrary("#build/lib/unicode", [static])
+Return("static")
