@@ -75,6 +75,18 @@ This is a complete list of possible keycodes in NVGT, as well as a short descrip
 * KEY_F10: the F10 key.
 * KEY_F11: the F11 key.
 * KEY_F12: the F12 key.
+* KEY_F13: the F13 key.
+* KEY_F14: the F14 key.
+* KEY_F15: the F15 key.
+* KEY_F16: the F16 key.
+* KEY_F17: the F17 key.
+* KEY_F18: the F18 key.
+* KEY_F19: the F19 key.
+* KEY_F20: the F20 key.
+* KEY_F21: the F21 key.
+* KEY_F22: the F22 key.
+* KEY_F23: the F23 key.
+* KEY_F24: the F24 key.
 
 ## Arrow keys
 * KEY_RIGHT: the Right Arrow key.
