@@ -285,6 +285,7 @@ string url_request(const string& method, const string& url, const string& data, 
 			if (path.empty()) path = "/";
 			HTTPRequest req(method, path, HTTPMessage::HTTP_1_1);
 			req.setContentLength(data.length());
+			req.setContentType("application/x-www-form-urlencoded");
 			if (!http) http = u.getScheme() == "http"? new HTTPClientSession(u.getHost(), u.getPort()) : new HTTPSClientSession(u.getHost(), u.getPort());
 			if (authorize) {
 				HTTPCredentials::extractCredentials(u, user, password);
