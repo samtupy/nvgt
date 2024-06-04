@@ -60,7 +60,7 @@ If you are not familiar with it, this script allows you to easily play recorded 
 ## The Other Directory
 A growing collection miscellaneous items including some code samples (in the other directory):
 * in the other directory, there is a new simple_nvgt_console.nvgt script, which serves as a subscripting example and a simple environment for testing and experimentation
-* in the other directory as well, a new pack_creater.nvgt script from Masonasons makes it easier than ever to get packs ready to use in your games.
+* in the other directory as well, a new pack_creator.nvgt script from Masonasons makes it easier than ever to get packs ready to use in your games.
 * There are also more references for some classes and functions. Although these are sometimes out of date, they are included because they can help you to understand some components of NVGT which are not yet documented
 * a new fx.txt file contains documentation for the fx system in NVGT
 * there are also other examples to help explain a few miscellaneous actions, like signing executables

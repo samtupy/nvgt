@@ -34,6 +34,7 @@
 #include "internet.h"
 #include "nvgt.h"
 #include "pocostuff.h" // angelscript_refcounted
+#include "version.h"
 
 using namespace std;
 using namespace Poco;
@@ -284,13 +285,16 @@ string url_request(const string& method, const string& url, const string& data, 
 			if (path.empty()) path = "/";
 			HTTPRequest req(method, path, HTTPMessage::HTTP_1_1);
 			req.setContentLength(data.length());
+			req.setContentType("application/x-www-form-urlencoded");
 			if (!http) http = u.getScheme() == "http"? new HTTPClientSession(u.getHost(), u.getPort()) : new HTTPSClientSession(u.getHost(), u.getPort());
 			if (authorize) {
 				HTTPCredentials::extractCredentials(u, user, password);
 				HTTPCredentials cred(user, password);
 				cred.authenticate(req, *resp);
 			}
-			http->sendRequest(req) << data;
+			req.set("User-Agent"s, "nvgt "s + NVGT_VERSION);
+			std::ostream& ostr = http->sendRequest(req);
+			ostr << data;
 			std::istream& istr = http->receiveResponse(*resp);
 			bool moved = (resp->getStatus() == HTTPResponse::HTTP_MOVED_PERMANENTLY || resp->getStatus() == HTTPResponse::HTTP_FOUND || resp->getStatus() == HTTPResponse::HTTP_SEE_OTHER || resp->getStatus() == HTTPResponse::HTTP_TEMPORARY_REDIRECT);
 			if (moved) {
@@ -300,6 +304,7 @@ string url_request(const string& method, const string& url, const string& data, 
 					authorize = false;
 				}
 				delete http;
+				http = nullptr;
 				continue; // Try again with the new URI
 			} else if (resp->getStatus() == HTTPResponse::HTTP_UNAUTHORIZED && !authorize) {
 				authorize = true;
@@ -323,7 +328,7 @@ string url_request(const string& method, const string& url, const string& data, 
 	return "";
 }
 string url_get(const string& url, HTTPResponse* resp) { return url_request(HTTPRequest::HTTP_GET, url, "", resp); }
-string url_post(const string& url, const string& data, HTTPResponse* resp) { return url_request(HTTPRequest::HTTP_POST, url, "", resp); }
+string url_post(const string& url, const string& data, HTTPResponse* resp) { return url_request(HTTPRequest::HTTP_POST, url, data, resp); }
 
 void RegisterInternet(asIScriptEngine* engine) {
 	SSLManager::instance().initializeClient(NULL, new AcceptCertificateHandler(false), new Context(Context::TLS_CLIENT_USE, ""));
