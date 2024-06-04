@@ -19,7 +19,6 @@
 #include <sstream>
 #include <Poco/InflatingStream.h>
 #include <Poco/DeflatingStream.h>
-#include <Poco/StreamCopier.h>
 #include "compression.h"
 #include <istream>
 #include <ostream>
@@ -27,19 +26,24 @@
 std::string string_deflate(const std::string& str, int compressionlevel = -1) {
 	std::stringstream istream(str);
 	std::string output;
+	std::string tmp;
 	Poco::DeflatingInputStream stream(istream, Poco::DeflatingStreamBuf::STREAM_ZLIB, compressionlevel);
 	stream.exceptions(std::istream::failbit | std::istream::badbit); 
-	stream >> output;
+	while ((stream >> tmp))
+		output += tmp;
+
 	return output;
 }
 
 std::string string_inflate(const std::string& str) {
 	std::stringstream istream(str);
 	std::string output;
+	std::string tmp;
 	Poco::InflatingInputStream stream(istream, Poco::InflatingStreamBuf::STREAM_ZLIB);
 	stream.exceptions(std::istream::failbit | std::istream::badbit); 
-	stream >> output;
-	stream.close();
+	while ((stream >> tmp))
+		output += tmp;
+
 	return output;
 }
 
