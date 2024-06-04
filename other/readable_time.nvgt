@@ -1,0 +1,62 @@
+/*
+Readable time
+A script to convert milliseconds into a human-readable format
+**A note before using this script**
+Due to incorrect calculations, this script only goes as far as weeks. The reason is because we can't assume that a month is always 30 days, and a year is always 365 days, taking the length of different months and leap years into consideration.
+That being said, if you plan to use this script, it is useful for things such as game completion time, a stopwatch, that sort. You may use it for server uptime, just keeping in mind that it will only go up to weeks.
+*/
+string ms_to_readable_time(int64 ms) {
+	//If the milliseconds are less than 0, return No time at all.
+	if(ms <= 0){
+		return "No time at all";
+	}
+	//If the milliseconds are less than 1000 (1 second) return Less than a second.
+	if(ms < 1000){
+		return "Less than a second";
+	}
+
+	int64 seconds, minutes, hours, days, weeks;
+	
+	// We know that 1000ms is equivalent to 1sec, so we divide ms by 1000.
+	seconds = ms / 1000;
+	ms %= 1000;
+	
+	// We know that 60sec is equivalent to 1min, so we divide minutes by 60sec.
+	minutes = seconds / 60;
+	seconds %= 60;
+	
+	// We know that 60min is equivalent to 1hr, so we divide hours by 60min.
+	hours = minutes / 60;
+	minutes %= 60;
+	
+	// We know that 24hr is equivalent to 1 day, so we divide days by 24hr.
+	days = hours / 24;
+	hours %= 24;
+	
+	// We know that 7 days is equivalent to 1 week, so we divide weeks by 7 days.
+	weeks = days / 7;
+	days %= 7;
+	
+	// Now for the readable string format.
+	// Taking the above concept that ms/1000 is 1 second, times 60 is one minute,
+	// times 60 is one hour, times 24 is 24 hours or 1 day, and times 7 is 1 week.
+	string human_readable = "";
+	
+	if (weeks > 0) {
+		human_readable += weeks + " " + (weeks == 1 ? "week" : "weeks") + " ";
+	}
+	if (days > 0) {
+		human_readable += days + " " + (days == 1 ? "day" : "days") + " ";
+	}
+	if (hours > 0) {
+		human_readable += hours + " " + (hours == 1 ? "hour" : "hours") + " ";
+	}
+	if (minutes > 0) {
+		human_readable += minutes + " " + (minutes == 1 ? "minute" : "minutes") + " ";
+	}
+	if (seconds > 0) {
+		human_readable += seconds + " " + (seconds == 1 ? "second" : "seconds");
+	}
+	
+	return human_readable;
+}
