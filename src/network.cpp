@@ -92,7 +92,7 @@ asQWORD network::connect(const std::string& hostname, unsigned short port) {
 	ENetPeer* svr = enet_host_connect(host, &addr, channel_count, 0);
 	if (!svr) return 0;
 	peers[next_peer] = svr;
-	svr->data = &next_peer;
+	svr->data = reinterpret_cast<void*>(next_peer);
 	next_peer += 1;
 	return next_peer - 1;
 }
@@ -109,7 +109,7 @@ network_event* network::request(uint32_t timeout) {
 	if (event.type == ENET_EVENT_TYPE_CONNECT) {
 		enet_peer_timeout(event.peer, 128, 10000, 35000);
 		if (!is_client) {
-			event.peer->data = &next_peer;
+			event.peer->data = reinterpret_cast<void*>(next_peer);
 			peers[next_peer] = event.peer;
 			e->peer_id = next_peer;
 			next_peer++;
