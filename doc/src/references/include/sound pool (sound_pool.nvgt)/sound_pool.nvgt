@@ -5,8 +5,47 @@ Allows for the playback and managing of multiple sounds easily.
 sound_pool(int default_item_size=100)
 ### Parameters:
 int default_item_size: Indicate howmany sounds the sound pool is allowed to contain. If no arguments are provided, this meens that you would have 100 sounds that can be added to the sound pool.
-*/
 
 // example:
 sound_pool p; //with no arguments provided.
 sound_pool p(100); //If you manually want to tell nvgt howmany items the sound pool may have.
+## methods
+### int play_extended(int dimension, string filename, pack@ packfile, float listener_x, float listener_y, float listener_z, float sound_x, float sound_y, float sound_z, double rotation, int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range, bool looping, double offset, float start_pan, float start_volume, float start_pitch, bool persistent = false, mixer@ mix = null, string[]@ fx = null, bool start_playing = true, double theta = 0) 
+#### Parameters:
+* int dimension: Play A sound in 1d, 2d or 3d.
+* string filename: The name of the file to play.
+* pack@ packfile: Play from A pack.
+* float listener_x: The x of the listener.
+* float listener_y: The y position of the listener.
+* float listener_z: The z position for the listener.
+* float sound_x: The x position of the sound.
+* float sound_y: The y position of the sound.
+* float sound_z: The z position of the sound.
+* double rotation: Rotate the sound
+* int left_range: The left most position for the sound's range.
+* int right_range: The right most position for the sound's range.
+* int backward_range: The backward most position for the sound's range.
+* int forward_range: The forward most position for the sound's range.
+* int lower_range: The lower most position for the sound's range. This is used for when you position A sound in 3d space and the sound has to come from the bottom or below A player.
+* int upper_range: The upper most position for the sound's range. Also positions A sound above A player.
+* bool looping: If set to true, loops the sound. If set to false, plays the sound once.
+* bool persistent = false: Tells the pool to free up the sound once it is done playing or not.
+* mixer@ mix = null: Set the mixer for the pool.
+* string[]@ fx = null: Add effects to the pool.
+* bool start_playing = true: Indicates if the sound should play as soon as this method is called or not.
+* double theta = 0: Not too sure what this 1 does.
+
+### Remarx
+Plays A sound in 1d, 2d or 3d positioning.
+Returns the slot of the sound.
+
+### int play_stationary(string filename, pack@ packfile, bool looping, bool persistent = false) 
+#### Parameters:
+* string filename: The name of the file.
+* pack@ packfile: Play A sound from A pack.
+* bool looping: See above.
+* bool persistent = false: See above.
+
+### Remarx:
+Allows for quickly playing A sound that should not be panned in the stereo field. Returns the slot of the sound.
+*/
