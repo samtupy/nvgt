@@ -124,7 +124,7 @@ CScriptArray* FindFiles(const string& path) {
 			continue;
 
 		// Skip sub directories
-		currentPath.append('/');
+		currentPath += '/';
 		currentPath.append(filename);
 		struct stat st;
 		if (stat(currentPath.c_str(), &st) == -1)
@@ -206,7 +206,7 @@ CScriptArray* FindDirectories(const string& path) {
 			continue;
 
 		// Skip files
-		currentPath.append('/');
+		currentPath += '/';
 		currentPath.append(filename);
 		struct stat st;
 		if (stat(currentPath.c_str(), &st) == -1)
