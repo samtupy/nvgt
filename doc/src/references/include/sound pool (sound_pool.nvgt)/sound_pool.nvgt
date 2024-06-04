@@ -48,4 +48,9 @@ Returns the slot of the sound.
 
 ### Remarx:
 Allows for quickly playing A sound that should not be panned in the stereo field. Returns the slot of the sound.
+
+## int play_stationary(string filename, bool looping, bool persistent = false)
+Does exactly the same as above function, you just don't have to include the pack file.
+
+
 */
