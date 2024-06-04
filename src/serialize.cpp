@@ -82,7 +82,7 @@ bool serialize_value(const void* value, int type_id, cmp_ctx_t* ctx) {
 			dict = (CScriptDictionary*)value;
 		if (!cmp_write_map(ctx, dict->GetSize())) return false;
 		for (CScriptDictionary::CIterator it = dict->begin(); it != dict->end(); it++) {
-			std::string key = it.GetKey();
+			const std::string& key = it.GetKey();
 			cmp_write_str(ctx, key.c_str(), key.size());
 			if (!serialize_value(it.GetAddressOfValue(), it.GetTypeId(), ctx))
 				cmp_write_nil(ctx);
@@ -168,7 +168,7 @@ std::string serialize(CScriptDictionary& dict) {
 	ss.write((char*)&size, 4);
 	asUINT keys_written = size;
 	for (CScriptDictionary::CIterator it = dict.begin(); it != dict.end(); it++) {
-		std::string key = it.GetKey();
+		const std::string& key = it.GetKey();
 		unsigned short len = key.size();
 		ss.write((char*)&len, 2);
 		ss.write(key.c_str(), len);

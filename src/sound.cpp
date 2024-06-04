@@ -513,7 +513,7 @@ typedef struct {
 	std::string filename;
 	pack* p;
 } sound_preload_transport;
-void sound_preload_perform(HSTREAM channel, std::string filename) {
+void sound_preload_perform(HSTREAM channel, const std::string& filename) {
 	if (!channel) return;
 	sound_preload* pre = (sound_preload*)malloc(sizeof(sound_preload));
 	memset(pre, 0, sizeof(sound_preload));

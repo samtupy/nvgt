@@ -336,7 +336,7 @@ poco_shared<Dynamic::Var>* json_parse_datastream(datastream* input) {
 // We make a custom json_object class for a couple reasons, mostly so that we can build in poco's json querying as well as other more easily wrapped functions. We'll do very similar for arrays below, I'm not even remotely good enough at this c++ templating thing to avoid this duplicated code and I don't want to meld it all into one class.
 class poco_json_object : public poco_shared<JSON::Object> {
 public:
-	poco_json_object(JSON::Object::Ptr o) : poco_shared<JSON::Object>(o) {}
+	poco_json_object(JSON::Object::Ptr o) : poco_shared<JSON::Object>(std::move(o)) {}
 	poco_shared<Dynamic::Var>* get(const std::string& key) {
 		return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(key)))); // Oof, more duplication that I like probably?
 	}
@@ -373,7 +373,7 @@ public:
 };
 class poco_json_array : public poco_shared<JSON::Array> {
 public:
-	poco_json_array(JSON::Array::Ptr a) : poco_shared<JSON::Array>(a) {}
+	poco_json_array(JSON::Array::Ptr a) : poco_shared<JSON::Array>(std::move(a)) {}
 	poco_shared<Dynamic::Var>* get(unsigned int index) {
 		return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(index))));
 	}
