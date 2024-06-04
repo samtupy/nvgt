@@ -1,0 +1,18 @@
+#pragma plugin unicode
+void test_unicode_lowercase() {
+    assert("HELLO".lowercase() == "hello");
+    assert("ÀÉÌÒÙ".lowercase() == "àéìòù");
+    assert("ÇĞİŞÜ".lowercase() == "çği̇şü");
+    assert("ΕΛΛΗΝΙΚΆ".lowercase() == "ελληνικά");
+    assert("КИРИЛЛИЦА".lowercase() == "кириллица");
+    assert("中文字符".lowercase() == "中文字符");
+    assert("日本語".lowercase() == "日本語");
+    assert("한글".lowercase() == "한글");
+    assert("עִברִית".lowercase() == "עִברִית");
+    assert("हिन्दी".lowercase() == "हिन्दी");
+    assert("العَرَبِيَّة".lowercase() == "العَرَبِيَّة");
+    assert("ภาษาไทย".lowercase() == "ภาษาไทย");
+    assert("ქართული".lowercase() == "ქართული");
+    assert("მარგალური".lowercase() == "მარგალური");
+    assert("සිංහල".lowercase() == "සිංහල");
+}
