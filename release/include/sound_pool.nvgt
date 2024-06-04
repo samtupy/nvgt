@@ -90,7 +90,7 @@ class sound_pool_item {
 				return;
 			}
 			if (total_distance <= max_distance and handle.active == false) {
-				handle.load(filename, @packfile);
+				handle.load(filename, @packfile != null? @packfile : @sound_default_pack);
 				if (handle.active == true) {
 					if (start_offset > 0)
 						handle.seek(start_offset);
@@ -331,7 +331,7 @@ class sound_pool {
 					return slot;
 				}
 			}
-			items[slot].handle.load(items[slot].filename, @items[slot].packfile);
+			items[slot].handle.load(items[slot].filename, @items[slot].packfile != null? @items[slot].packfile : @sound_default_pack);
 			if (items[slot].handle.active == false) {
 				items[slot].reset();
 				return -1;
