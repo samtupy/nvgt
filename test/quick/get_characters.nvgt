@@ -16,6 +16,3 @@ void main() {
 		f.monitor();
 	}
 }
-void speak(string text, bool interrupt = true, bool um = true) {
-	screen_reader_speak(text, interrupt);
-}
