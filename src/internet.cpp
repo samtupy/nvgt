@@ -34,6 +34,7 @@
 #include "internet.h"
 #include "nvgt.h"
 #include "pocostuff.h" // angelscript_refcounted
+#include "version.h"
 
 using namespace std;
 using namespace Poco;
@@ -290,7 +291,9 @@ string url_request(const string& method, const string& url, const string& data, 
 				HTTPCredentials cred(user, password);
 				cred.authenticate(req, *resp);
 			}
-			http->sendRequest(req) << data;
+			req.set("User-Agent"s, "nvgt "s + NVGT_VERSION);
+			std::ostream& ostr = http->sendRequest(req);
+			ostr << data;
 			std::istream& istr = http->receiveResponse(*resp);
 			bool moved = (resp->getStatus() == HTTPResponse::HTTP_MOVED_PERMANENTLY || resp->getStatus() == HTTPResponse::HTTP_FOUND || resp->getStatus() == HTTPResponse::HTTP_SEE_OTHER || resp->getStatus() == HTTPResponse::HTTP_TEMPORARY_REDIRECT);
 			if (moved) {
@@ -300,6 +303,7 @@ string url_request(const string& method, const string& url, const string& data, 
 					authorize = false;
 				}
 				delete http;
+				http = nullptr;
 				continue; // Try again with the new URI
 			} else if (resp->getStatus() == HTTPResponse::HTTP_UNAUTHORIZED && !authorize) {
 				authorize = true;
