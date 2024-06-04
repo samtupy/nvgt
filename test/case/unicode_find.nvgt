@@ -1,5 +1,5 @@
 void test_unicode_find() {
 const string text = "The quick brown fox jumped over the lazy dog";
 uint64[] results = text.find("quick", false);
-assert(results[0] == 4 && results[1] == 8);
+assert(results[0] == 4 && results[1] == 9);
 }

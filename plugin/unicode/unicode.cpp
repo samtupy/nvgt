@@ -1,6 +1,5 @@
 #include "uni_algo/all.h"
 #include "../../src/nvgt_plugin.h"
-#include "../../src/nvgt.h"
 #include <string>
 #include <string_view>
 #include <cstdint>
@@ -59,7 +58,7 @@ res = una::caseless::find_utf8(string1, string2);
 }
 auto start = res.pos();
 auto end = res.end_pos();
-auto* array = CScriptArray::Create(asGetActiveContext()->GetEngine()->GetTypeInfoByDecl("array<uint64>"));
+auto array = CScriptArray::Create(asGetActiveContext()->GetEngine()->GetTypeInfoByDecl("array<uint64>"));
 array->InsertLast(&start);
 array->InsertLast(&end);
 return array;
@@ -183,6 +182,7 @@ return una::codepoint::has_script(actual_chars[0], una::locale::script(script));
 
 plugin_main(nvgt_plugin_shared* shared) {
 	prepare_plugin(shared);
+	CScriptArray::SetMemoryFunctions(asAllocMem, asFreeMem);
 shared->script_engine->RegisterEnum("general_category");
 shared->script_engine->RegisterEnumValue("general_category", "CN", static_cast<int>(una::codepoint::general_category::Cn));
 shared->script_engine->RegisterEnumValue("general_category", "LU", static_cast<int>(una::codepoint::general_category::Lu));
