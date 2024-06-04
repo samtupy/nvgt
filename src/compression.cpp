@@ -24,27 +24,19 @@
 #include <ostream>
 
 std::string string_deflate(const std::string& str, int compressionlevel = -1) {
-	std::stringstream istream(str);
-	std::string output;
-	std::string tmp;
-	Poco::DeflatingInputStream stream(istream, Poco::DeflatingStreamBuf::STREAM_ZLIB, compressionlevel);
-	stream.exceptions(std::istream::failbit | std::istream::badbit); 
-	while ((stream >> tmp))
-		output += tmp;
-
-	return output;
+	std::stringstream ostr;
+	Poco::DeflatingOutputStream stream(ostr, Poco::DeflatingStreamBuf::STREAM_ZLIB, compressionlevel);
+	stream << str;
+	stream.close();
+	return ostr.str();
 }
 
 std::string string_inflate(const std::string& str) {
-	std::stringstream istream(str);
-	std::string output;
-	std::string tmp;
-	Poco::InflatingInputStream stream(istream, Poco::InflatingStreamBuf::STREAM_ZLIB);
-	stream.exceptions(std::istream::failbit | std::istream::badbit); 
-	while ((stream >> tmp))
-		output += tmp;
-
-	return output;
+	std::stringstream ostr;
+	Poco::InflatingOutputStream stream(ostr, Poco::DeflatingStreamBuf::STREAM_ZLIB);
+	stream << str;
+	stream.close();
+	return ostr.str();
 }
 
 void RegisterScriptCompression(asIScriptEngine* engine) {
