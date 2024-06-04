@@ -1,0 +1,12 @@
+/**
+# Sound pool class
+Allows for the playback and managing of multiple sounds easily.
+## class:
+sound_pool(int default_item_size=100)
+### Parameters:
+int default_item_size: Indicate howmany sounds the sound pool is allowed to contain. If no arguments are provided, this meens that you would have 100 sounds that can be added to the sound pool.
+*/
+
+// example:
+sound_pool p; //with no arguments provided.
+sound_pool p(100); //If you manually want to tell nvgt howmany items the sound pool may have.
