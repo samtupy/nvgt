@@ -14,7 +14,7 @@ SConscript("build/version_sconscript.py", exports = ["env"])
 env.SetOption("num_jobs", multiprocessing.cpu_count())
 SConscript("build/osdev_sconscript.py", exports = ["env"])
 if env["PLATFORM"] == "win32":
-	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/O2", "/bigobj", "/permissive-", "/W4"])
+	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/O2", "/bigobj", "/permissive-"])
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
 	env.Append(LIBS = ["tolk", "enet", "angelscript64", "SDL2"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
