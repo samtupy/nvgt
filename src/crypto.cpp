@@ -19,7 +19,7 @@
 #include <obfuscate.h>
 #include <Poco/SHA2Engine.h>
 
-void string_pad(std::string& str, int blocksize = 16) {
+void string_pad(std::string& str, [[maybe_unused]] int blocksize = 16) {
 	if (str.size() == 0) return;
 	int remainder = 16 - (str.size() % 16);
 	if (remainder == 0) remainder = 16;
