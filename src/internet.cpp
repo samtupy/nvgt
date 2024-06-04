@@ -300,7 +300,7 @@ string url_request(const string& method, const string& url, const string& data, 
 			if (moved) {
 				u.resolve(resp->get("Location"));
 				if (!user.empty()) {
-					u.setUserInfo(std::format("{}:{}", user, password));
+					u.setUserInfo(format("%s:%s", user, password));
 					authorize = false;
 				}
 				delete http;
