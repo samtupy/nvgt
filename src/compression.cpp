@@ -29,7 +29,7 @@ std::string string_deflate(const std::string& str, int compressionlevel = -1) {
 	std::string output;
 	Poco::DeflatingInputStream stream(istream, Poco::DeflatingStreamBuf::STREAM_ZLIB, compressionlevel);
 	stream.exceptions(std::istream::failbit | std::istream::badbit); 
-	Poco::StreamCopier::copyToString64(istream, output);
+	stream >> output;
 	return output;
 }
 
@@ -38,7 +38,8 @@ std::string string_inflate(const std::string& str) {
 	std::string output;
 	Poco::InflatingInputStream stream(istream, Poco::InflatingStreamBuf::STREAM_ZLIB);
 	stream.exceptions(std::istream::failbit | std::istream::badbit); 
-	Poco::StreamCopier::copyToString64(istream, output);
+	stream >> output;
+	stream.close();
 	return output;
 }
 
