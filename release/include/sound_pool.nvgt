@@ -90,7 +90,7 @@ class sound_pool_item {
 				return;
 			}
 			if (total_distance <= max_distance and handle.active == false) {
-				handle.load(filename, @packfile);
+				handle.load(filename, @packfile != null? @packfile : @sound_default_pack);
 				if (handle.active == true) {
 					if (start_offset > 0)
 						handle.seek(start_offset);
@@ -170,8 +170,8 @@ class sound_pool_item {
 		}
 		*/
 		if (rotation > 0) {
-			float tmp_true_x = (cosine(rotation) * (true_x - listener_x)) - (sine(rotation) * (true_y - listener_y)) + listener_x;
-			true_y = (sine(rotation) * (true_x - listener_x)) + (cosine(rotation) * (true_y - listener_y)) + listener_y;
+			float tmp_true_x = (cos(rotation) * (true_x - listener_x)) - (sin(rotation) * (true_y - listener_y)) + listener_x;
+			true_y = (sin(rotation) * (true_x - listener_x)) + (cos(rotation) * (true_y - listener_y)) + listener_y;
 			true_x = tmp_true_x;
 		}
 		float pitch = start_pitch;
@@ -250,9 +250,9 @@ class sound_pool {
 	mixer@ mixer = null;
 	pack@ pack_file = null;
 
-	// Default constructor, where we give the user 100 sounds.
-	sound_pool() {
-		items.resize(100);
+	// Default constructor, where we give the user 100 sounds by default (although the amount can be specified).
+	sound_pool(int default_item_size = 100) {
+		items.resize(default_item_size);
 		max_distance = 0;
 		pan_step = 1.0;
 		volume_step = 1.0;
@@ -265,20 +265,6 @@ class sound_pool {
 		clean_frequency = 3;
 	}
 
-	// In this constructor the user can specify how many sounds they want.
-	sound_pool(int number_of_items) {
-		items.resize(number_of_items);
-		max_distance = 0;
-		pan_step = 1.0;
-		volume_step = 1.0;
-		behind_pitch_decrease = 0.25;
-		last_listener_x = 0;
-		last_listener_y = 0;
-		last_listener_z = 0;
-		last_listener_rotation = 0.0;
-		highest_slot = 0;
-		clean_frequency = 3;
-	}
 
 	int play_extended(int dimension, string filename, pack@ packfile, float listener_x, float listener_y, float listener_z, float sound_x, float sound_y, float sound_z, double rotation, int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range, bool looping, double offset, float start_pan, float start_volume, float start_pitch, bool persistent = false, mixer@ mix = null, string[]@ fx = null, bool start_playing = true, double theta = 0) {
 		int slot = reserve_slot();
@@ -329,24 +315,23 @@ class sound_pool {
 					items[slot].reset();
 					return -2;
 				} else {
-					if (dimension > 0) {
-						if (dimension > 0)
-							last_listener_x = listener_x;
-						if (dimension > 1)
-							last_listener_y = listener_y;
-						if (dimension > 2)
-							last_listener_z = listener_z;
-						if (dimension > 1) {
-							last_listener_rotation = rotation;
-							items[slot].update(listener_x, listener_y, (dimension == 2 ? 0 : listener_z), rotation, max_distance);
-						}
+					if (dimension > 0){
+						last_listener_x = listener_x;
+					}
+					if (dimension > 1){
+						last_listener_y = listener_y;
+						last_listener_rotation = rotation;
+						items[slot].update(listener_x, listener_y, (dimension == 2 ? 0 : listener_z), rotation, max_distance);
+					}
+					if (dimension > 2){
+						last_listener_z = listener_z;
 					}
 					if (slot > highest_slot)
 						highest_slot = slot;
 					return slot;
 				}
 			}
-			items[slot].handle.load(items[slot].filename, @items[slot].packfile);
+			items[slot].handle.load(items[slot].filename, @items[slot].packfile != null? @items[slot].packfile : @sound_default_pack);
 			if (items[slot].handle.active == false) {
 				items[slot].reset();
 				return -1;
@@ -359,14 +344,16 @@ class sound_pool {
 				items[slot].handle.set_volume(start_volume);
 			items[slot].handle.set_pitch(start_pitch);
 		}
-		if (dimension > 0)
+		if (dimension > 0){
 			last_listener_x = listener_x;
-		if (dimension > 1)
+}
+		if (dimension > 1){
 			last_listener_y = listener_y;
-		if (dimension > 2)
-			last_listener_z = listener_z;
-		if (dimension > 1)
 			last_listener_rotation = rotation;
+}
+		if (dimension > 2){
+			last_listener_z = listener_z;
+}
 		if (filename != "") {
 			items[slot].update(listener_x, listener_y, listener_z, rotation, max_distance);
 			if (!start_playing)
@@ -580,7 +567,7 @@ class sound_pool {
 
 	int get_sound_by_owner(string owner, int priority = 0) {
 		for (int i = 0; i <= highest_slot; i++) {
-			if (string_left(items[i].owner, owner.length()) == owner and items[i].priority == priority)
+			if (items[i].owner.substr(0, owner.length()) == owner and items[i].priority == priority)
 				return i;
 		}
 		return -1;
@@ -604,7 +591,7 @@ class sound_pool {
 
 	bool update_sounds_3d(string owner, int x, int y, int z, double rotation = -1) {
 		for (uint slot = 0; slot <= highest_slot; slot++) {
-			if (items[slot].stationary or string_left(items[slot].owner, owner.length()) != owner)
+			if (items[slot].stationary or items[slot].owner.substr(0, owner.length()) != owner)
 				continue;
 			items[slot].x = x;
 			items[slot].y = y;
@@ -627,7 +614,7 @@ class sound_pool {
 
 	bool set_sounds_rotation(string owner, double rotation, vector pivit) {
 		for (uint slot = 0; slot <= highest_slot; slot++) {
-			if (items[slot].stationary or string_left(items[slot].owner, owner.length()) != owner)
+			if (items[slot].stationary or items[slot].owner.substr(0, owner.length()) != owner)
 				continue;
 			items[slot].theta = rotation;
 			items[slot].pivit = pivit;
@@ -638,7 +625,7 @@ class sound_pool {
 
 	bool set_sounds_amp(string owner, int priority, float amp) {
 		for (uint slot = 0; slot <= highest_slot; slot++) {
-			if (string_left(items[slot].owner, owner.length()) != owner or items[slot].priority != priority)
+			if (items[slot].owner.substr(0, owner.length()) != owner or items[slot].priority != priority)
 				continue;
 			items[slot].handle.set_fx("$amp:volume:" + amp);
 		}
@@ -647,7 +634,7 @@ class sound_pool {
 
 	bool destroy_sounds(string owner) {
 		for (uint slot = 0; slot <= highest_slot; slot++) {
-			if (string_left(items[slot].owner, owner.length()) == owner)
+			if (items[slot].owner.substr(0, owner.length()) == owner)
 				destroy_sound(slot);
 		}
 		return true;

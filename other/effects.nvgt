@@ -1,0 +1,321 @@
+/*
+Note: this script is not yet complete. There is still lots of work to be done, including rapping other effects.
+*/
+#include"token_gen.nvgt"
+class effect_manager {
+mixer@[]mixers(0);
+effect@[]effects(0);
+effect_manager() {
+}
+bool attach_to_mixer(mixer@m = null, bool find_default_mixer = true) {
+if(@m == null and !find_default_mixer) return false;
+else@m = sound_default_mixer;
+if(@m == null) return false; //no mixer.
+this.mixers.insert_last(m);
+return true;
+}
+int add_effect(effect@e) {
+if(@e == null) return -1;
+this.effects.insert_last(e);
+this.update();
+return this.effects.length()-1;
+}
+int create_freeverb_effect(const float dry, const float wet, const float room_size, const float damp, const float width, const string&in id = "") {
+freeverb f(dry, wet, room_size, damp, width, id);
+return this.add_effect(f);
+}
+void update() {
+if(this.mixers.length()<=0 or this.effects.length()<=0) return;
+for(uint i =0; i<this.mixers.length(); i+=1) this.update_mixer(i);
+}
+void update_mixer(uint index) {
+if(index<0 or index>this.mixers.length()-1) return;
+this.mixers[index].set_fx("");
+for(uint i =0; i<this.effects.length(); i+=1) {
+string r = this.effects[i].stringify();
+if(!r.is_empty()) this.mixers[index].set_fx(r);
+}
+}
+}
+class effect {
+string type;
+string id;
+mixer@mix;
+effect(string&in type, string&in id = "") {
+this.type = type;
+if(!id.is_empty()) this.id = id;
+else this.id = generate_token(5);
+}
+effect() {
+}
+bool in_range(float value, float min, float max) {
+bool inrange = true;
+if(value>max or value<min) inrange = false;
+return inrange;
+}
+bool is_safe(sound@handle) {
+if(@handle == null) return false;
+if(!handle.active) return false;
+return true;
+}
+bool attach_to_mixer(mixer@m = null) {
+if(@m == null) @m = sound_default_mixer;
+string r = this.stringify();
+if(@m == null or r.is_empty()) return false;
+m.set_fx(r);
+@this.mix = m;
+return true;
+}
+bool attach(sound@handle) {
+return this.configure_effect(handle);
+}
+string stringify() {
+return "";
+}
+bool configure_effect(sound@handle) {
+if(!this.is_safe(handle)) return false;
+string r = this.stringify();
+if(r.is_empty()) return false;
+handle.set_fx(r);
+return true;
+}
+}
+class freeverb: effect {
+float dry = 0.5, wet = 0.5, room_size = 0.4, damp = 0.8, width = 1.0;
+freeverb(const float dry, const float wet, const float room_size, const float damp, const float width, const string&in id = "") {
+super("freeverb", id);
+this.dry = dry;
+this.wet = wet;
+this.room_size = room_size;
+this.damp = damp;
+this.width = width;
+this.init();
+}
+freeverb(const string&in id) {
+super("freeverb", id);
+this.init();
+}
+private void init() {
+this.set_dry(dry);
+this.set_wet(wet);
+this.set_room_size(room_size);
+this.set_damp(damp);
+this.set_width(width);
+}
+bool set_dry(float value) {
+if(this.in_range(value, 0.1, 1.0)) {
+this.dry = value;
+return true;
+}
+return false;
+}
+bool set_wet(float value) {
+if(this.in_range(value, 0.1, 1.0)) {
+this.wet = value;
+return true;
+}
+return false;
+}
+bool set_room_size(float value) {
+if(this.in_range(value, 0.1, 1.0)) {
+this.room_size = value;
+return true;
+}
+return false;
+}
+bool set_damp(float value) {
+if(this.in_range(value, 0.1, 1.0)) {
+this.damp = value;
+return true;
+}
+return false;
+}
+bool set_width(float value) {
+if(this.in_range(value, 0.1, 1.0)) {
+this.width = value;
+return true;
+}
+return false;
+}
+string stringify() {
+string[] vals = {"$"+this.id, this.type, format_float(this.dry, precision  : 1), format_float(this.wet, precision  : 1), format_float(this.room_size, precision  : 1), format_float(this.damp, precision  : 1), format_float(this.width, precision  : 1)};
+return join(vals, ":");
+}
+}
+class volume : effect {
+float vol = 1.0;
+volume(const float vol, const string&in id = "") {
+super("volume", id);
+this.vol = vol;
+this.init();
+}
+volume(const string&in id) {
+super("volume", id);
+this.init();
+}
+private void init() {
+this.set_vol(vol);
+}
+bool set_vol(float value) {
+if(this.in_range(value, 0.0, 1.0)) {
+this.vol = value;
+return true;
+}
+return false;
+}
+string stringify() {
+string[] vals = {"$" + this.id, this.type, format_float(this.vol, precision : 1)};
+return join(vals, ":");
+}
+}
+class lvolume : effect {
+float vol = 1.0;
+lvolume(const float vol, const string&in id = "") {
+super("lvolume", id);
+this.vol = vol;
+this.init();
+}
+lvolume(const string&in id) {
+super("lvolume", id);
+this.init();
+}
+private void init() {
+this.set_vol(vol);
+}
+bool set_vol(float value) {
+if(this.in_range(value, 0.0, 1.0)) {
+this.vol = value;
+return true;
+}
+return false;
+}
+string stringify() {
+string[] vals = {"$" + this.id, this.type, format_float(this.vol, precision : 1)};
+return join(vals, ":");
+}
+}
+class chorus : effect {
+float dry = 0.5;
+float wet = 0.5;
+float feedback = 0.0;
+float minsweep = 10.0;
+float maxsweep = 90.0;
+float rate = 200.0;
+chorus(const float dry, const float wet, const float feedback, const float minsweep, const float maxsweep, const float rate, const string&in id = "") {
+super("chorus", id);
+this.dry = dry;
+this.wet = wet;
+this.feedback = feedback;
+this.minsweep = minsweep;
+this.maxsweep = maxsweep;
+this.rate = rate;
+this.init();
+}
+chorus(const string&in id) {
+super("chorus", id);
+this.init();
+}
+private void init() {
+this.set_dry(dry);
+this.set_wet(wet);
+this.set_feedback(feedback);
+this.set_minsweep(minsweep);
+this.set_maxsweep(maxsweep);
+this.set_rate(rate);
+}
+bool set_dry(float value) {
+if(this.in_range(value, 0.0, 1.0)) {
+this.dry = value;
+return true;
+}
+return false;
+}
+bool set_wet(float value) {
+if(this.in_range(value, 0.0, 1.0)) {
+this.wet = value;
+return true;
+}
+return false;
+}
+bool set_feedback(float value) {
+this.feedback = value;
+return true;
+}
+bool set_minsweep(float value) {
+this.minsweep = value;
+return true;
+}
+bool set_maxsweep(float value) {
+this.maxsweep = value;
+return true;
+}
+bool set_rate(float value) {
+this.rate = value;
+return true;
+}
+
+string stringify() {
+string[] vals = {"$" + this.id, this.type, format_float(this.dry, precision : 1), format_float(this.wet, precision : 1), format_float(this.feedback, precision : 1), format_float(this.minsweep, precision : 1), format_float(this.maxsweep, precision : 1), format_float(this.rate, precision : 1)};
+return join(vals, ":");
+}
+}
+class distortion : effect {
+float drive = 0.5;
+float dry = 0.0;
+float wet = 0.5;
+float feedback = 0.0;
+float volume = 0.5;
+distortion(const float drive, const float dry, const float wet, const float feedback, const float volume, const string&in id = "") {
+super("distortion", id);
+this.drive = drive;
+this.dry = dry;
+this.wet = wet;
+this.feedback = feedback;
+this.volume = volume;
+this.init();
+}
+distortion(const string&in id) {
+super("distortion", id);
+this.init();
+}
+private void init() {
+this.set_drive(drive);
+this.set_dry(dry);
+this.set_wet(wet);
+this.set_feedback(feedback);
+this.set_volume(volume);
+}
+bool set_drive(float value) {
+if(this.in_range(value, 0.0, 1.0)) {
+this.drive = value;
+return true;
+}
+return false;
+}
+bool set_dry(float value) {
+if(this.in_range(value, -5.0, 5.0)) {
+this.dry = value;
+return true;
+}
+return false;
+}
+bool set_wet(float value) {
+if(this.in_range(value, 0.0, 1.0)) {
+this.wet = value;
+return true;
+}
+return false;
+}
+bool set_feedback(float value) {
+this.feedback = value;
+return true;
+}
+bool set_volume(float value) {
+this.volume = value;
+return true;
+}
+string stringify() {
+string[] vals = {"$" + this.id, this.type, format_float(this.drive, precision : 1), format_float(this.dry, precision : 1), format_float(this.wet, precision : 1), format_float(this.feedback, precision : 1), format_float(this.volume, precision : 1)};
+return join(vals, ":");
+}
+}

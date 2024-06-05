@@ -153,7 +153,7 @@ Here is a full code example, which you can copy into an nvgt script and run.
 ```
 #include "speech.nvgt"
 void main(){
-    speak("Hello from the NVGTT speech include!');
+    speak("Hello from the NVGTT speech include!");
 }
 ```
 

@@ -40,7 +40,7 @@ int message_box(const std::string& title, const std::string& text, const std::ve
 	// Start with the buttons.
 	std::vector<SDL_MessageBoxButtonData> sdlbuttons;
 	for (int i = 0; i < buttons.size(); i++) {
-		std::string btn = buttons[i];
+		const std::string& btn = buttons[i];
 		int skip = 0;
 		unsigned int button_flag = 0;
 		if (btn.substr(0, 1) == "`") {
@@ -76,15 +76,15 @@ int question(const std::string& title, const std::string& text, bool can_cancel,
 	if (can_cancel) buttons.push_back("~Cancel");
 	return message_box(title, text, buttons, flags);
 }
-void message(const std::string& text, const std::string& header) { // Usually used internally by NVGT's c++ code
-	if (Poco::Util::Application::instance().config().hasOption("application.gui")){
-		alert(header, text);
-		return;
-	}
+void message(const std::string& text, const std::string& header) { // Usually used internally by NVGT's c++ code to print an error first to stdout if that's available, then to a message box if that's enabled.
 	std::string tmp = header;
 	tmp += ": ";
 	tmp += text;
 	printf("%s", tmp.c_str());
+	if (Poco::Util::Application::instance().config().hasOption("application.gui")) {
+		alert(header, text);
+		return;
+	}
 }
 std::string ClipboardGetText() {
 	InputInit();

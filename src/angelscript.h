@@ -31,11 +31,11 @@ int ExecuteScript(asIScriptEngine* engine, const std::string& scriptFile);
 #ifndef NVGT_STUB
 	int               CompileScript(asIScriptEngine* engine, const std::string& scriptFile);
 	int SaveCompiledScript(asIScriptEngine* engine, unsigned char** output);
-int CompileExecutable(asIScriptEngine* engine, const std::string& scriptFile);
-void              InitializeDebugger(asIScriptEngine *engine);
+	int CompileExecutable(asIScriptEngine* engine, const std::string& scriptFile);
+	void              InitializeDebugger(asIScriptEngine* engine);
 #else
-int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size);
-int LoadCompiledExecutable(asIScriptEngine* engine);
+	int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size);
+	int LoadCompiledExecutable(asIScriptEngine* engine);
 #endif
 void MessageCallback(const asSMessageInfo* msg, void* param);
 asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* param);

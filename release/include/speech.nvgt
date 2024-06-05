@@ -10,6 +10,8 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include "form.nvgt"
+
 tts_voice tts;
 string speechbuff;
 bool use_sr = true;
@@ -23,8 +25,8 @@ bool speak(string text, bool interrupt = true, bool translate_text = true, bool 
 		while (tmp.length() > 0) {
 			uint pos = 4096;
 			while (pos > 2048 and pos < tmp.length() and tmp[pos] != " ") pos--;
-			raw_speak(string_left(tmp, pos), interrupt and tmp.length() == text.length());
-			tmp = string_trim_left(tmp, pos);
+			raw_speak(tmp.substr(0, pos), interrupt and tmp.length() == text.length());
+			tmp = tmp.substr(pos);
 		}
 	} else
 		raw_speak(text, interrupt);

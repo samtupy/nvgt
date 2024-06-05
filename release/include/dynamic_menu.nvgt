@@ -11,7 +11,7 @@
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
 */
-
+#include "bgt_compat.nvgt"
 class dynamic_menu_item {
 	string option;
 	bool is_filename;
@@ -41,6 +41,15 @@ class dynamic_menu {
 	int add_item_tts(string text, string name = "") {
 		return add_item_extended(text, false, name);
 	}
+
+	int[] add_multiple_items(string[][] items){
+		int[] res;
+		for (uint i = 0; i < items.length(); i++){
+			string text = items[i][0], name = items[i].length() > 1 ? items[i][1] : "";
+			res.insert_last(add_item_extended(text, false, name));
+		}
+	return res;
+}
 
 	bool set_speech_mode(int speech_output) {
 		if ((speech_output < 0) || (speech_output > 4))

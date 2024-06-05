@@ -19,8 +19,8 @@ void main() {
 		alert("error", "deserialization failed");
 		return;
 	}
-	alert("deserialized", D.getSize());
-	string[] k = D.getKeys();
+	alert("deserialized", D.get_size());
+	string[] k = D.get_keys();
 	for (uint i = 0; i < k.length(); i++) alert("key", k[i]);
 	string S;
 	if (D.get("str", S))

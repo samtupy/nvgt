@@ -55,7 +55,7 @@ class pack {
 	std::string current_filename;
 	pack_open_mode open_mode;
 	std::string pack_ident;
-unsigned int file_offset; // Offset into opened file where pack is contained, used for embedding packs into executables.
+	unsigned int file_offset; // Offset into opened file where pack is contained, used for embedding packs into executables.
 	int RefCount;
 public:
 	unsigned int next_stream_idx;
@@ -109,7 +109,7 @@ public:
 	};
 };
 
-void embed_pack(const std::string& disc_filename,const std::string& embed_filename);
+void embed_pack(const std::string& disc_filename, const std::string& embed_filename);
 bool load_embedded_packs(Poco::BinaryReader& br);
 void write_embedded_packs(Poco::BinaryWriter& bw);
 

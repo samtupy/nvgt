@@ -1,5 +1,6 @@
 source: src
 destination: public_html
+template_extensions: [md, liquid, lphp]
 
 site:
  title: The Nonvisual Gaming Toolkit
@@ -11,6 +12,8 @@ site:
    - [Home, "/"]
    - ["Documentation", "/docs"]
    - [Blog, "/blog"]
+   - [Downloads, "/downloads"]
+   - [Community on discord, "https://discord.gg/pJjRBXDxzw"]
    - [Source code on Github, "https://github.com/samtupy/nvgt"]
 
 posts:

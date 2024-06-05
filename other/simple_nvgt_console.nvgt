@@ -1,0 +1,65 @@
+//NVGT console
+//Do you want to know what a particular function does without having to write scripts to test it? Do you want to debug or test fast? Here is a simple editor with a couple of extra features for you to do any small tasks you might need to do with nvgt
+// fixes a temporary issue
+#pragma plugin nvgt_curl
+
+#include "nvgt_subsystems.nvgt" //for subscripting
+#include "form.nvgt"
+#include "speech.nvgt"
+
+class simple_nvgt_console{
+	audio_form f;
+	int loglist;
+	void main(){
+		script_module@ console_environment = script_get_module("console_environment", 1);
+		console_environment.set_access_mask(NVGT_SUBSYSTEM_EVERYTHING);
+		show_window("Simple NVGT Console");
+		f.create_window();
+		//why not just f.create_window? Because otherwise it speaks the title twice, and we don't want that; this happens 
+		//because this is the first and only window we're even making
+		int txt=f.create_input_box("&Code", multiline: true);
+		int btn=f.create_button("&Run", primary: true);
+		loglist=f.create_list("&log (add to log with log(string text, bool silent=false)");
+		while(true){
+			wait(5); //always wait or your programs die
+			f.monitor();
+			if(f.is_pressed(btn)){
+				console_environment.add_section("imports", "import void log(const string&in text, const bool&in silent=false) from \"nvgt_game\";");
+				console_environment.add_section("<console>", "void console(){"+f.get_text(txt)+"}");
+				string[] errors;
+				if(console_environment.build(errors)<0){
+					info_box("Compilation error","information", join(errors, "\r\n\r\n"));
+					continue;
+				}
+				errors.resize(0);
+				console_environment.bind_all_imported_functions();
+				script_function @console_function=console_environment.get_function_by_name("console");
+				console_function({}, errors);
+				if(errors.length()>0)
+				info_box("Run-time Error","information", join(errors, "\r\n\r\n"));
+			}
+			if(key_pressed(KEY_F4) && (key_down(KEY_LALT)||key_down(KEY_RALT)) || key_pressed(KEY_ESCAPE))
+				exit();
+		}
+	}
+	
+	void log(const string&in text, const bool&in silent=false){
+		if(!silent)
+		screen_reader_speak(text, false);
+		f.add_list_item(loglist, text);
+	}
+}
+
+//for the sake of sharing this to another module, we need to make it global.
+simple_nvgt_console c;
+
+//compiler entry point calls main in the class
+void main(){
+	
+	c.main();
+}
+
+//As far as I know, we can't bind class methods to other modules, so we'll have to do this instead
+void log(const string&in text, const bool&in interrupt=false){
+	c.log(text, interrupt);
+}

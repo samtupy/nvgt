@@ -6,7 +6,8 @@ void main() {
 	show_window("test");
 	while (!key_down(KEY_ESCAPE)) {
 		wait(5);
-		if (key_pressed(KEY_SHIFT))
-			ScreenReaderSpeak("shift", true);
+		if (key_pressed(KEY_LSHIFT) or key_pressed(KEY_RSHIFT)){
+			screen_reader_speak("shift", true);
+		}
 	}
 }

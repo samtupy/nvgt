@@ -22,7 +22,6 @@ pad-oper
 pad-header
 unpad-paren
 unpad-brackets
-align-pointer=type
 
 # formatting
 squeeze-lines=4

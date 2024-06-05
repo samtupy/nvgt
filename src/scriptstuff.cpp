@@ -231,7 +231,7 @@ std::string get_script_executable() {
 }
 std::string get_function_signature(void* function, int type_id) {
 	asIScriptContext* ctx = asGetActiveContext();
-	asIScriptEngine* engine = ctx? ctx->GetEngine() : g_ScriptEngine;
+	asIScriptEngine* engine = ctx ? ctx->GetEngine() : g_ScriptEngine;
 	asITypeInfo* t = engine->GetTypeInfoById(type_id);
 	asIScriptFunction* sig = t->GetFuncdefSignature();
 	if (!sig) {
@@ -252,8 +252,8 @@ bool script_compiled() {
 }
 void dump_angelscript_engine_configuration(datastream* output) {
 	#ifndef NVGT_STUB
-		if (!output || !output->get_ostr()) return;
-		WriteConfigToStream(g_ScriptEngine, *output->get_ostr());
+	if (!output || !output->get_ostr()) return;
+	WriteConfigToStream(g_ScriptEngine, *output->get_ostr());
 	#endif
 }
 void script_assert(bool expr, const std::string& failtext = "") {

@@ -53,167 +53,168 @@ using namespace Poco;
 using namespace Poco::Util;
 
 class nvgt_application : public Poco::Util::Application {
-		enum run_mode {NVGT_RUN, NVGT_COMPILE, NVGT_HELP, NVGT_VERSIONINFO};
-		run_mode mode;
-	public:
-		nvgt_application() : mode(NVGT_RUN) {
-			setUnixOptions(true);
-			#ifdef NVGT_STUB
-				stopOptionsProcessing(); // The command line is completely controled by the scripter in the case of a compiled executable.
-			#endif
-		}
-	protected:
-		void initialize(Application& self) override {
-			#ifndef NVGT_STUB
-				loadConfiguration();
-			#endif
-			Application::initialize(self);
-			#ifdef _WIN32
-				timeBeginPeriod(1);
-				setlocale(LC_ALL, ".UTF8");
-				wstring dir_u;
-				UnicodeConverter::convert(Path(config().getString("application.dir")).append("lib").toString(), dir_u);
-				SetDllDirectoryW(dir_u.c_str());
-			#elif defined(__APPLE__)
-				if (Environment::has("MACOS_BUNDLED_APP")) { // Use GUI instead of stdout and chdir to Resources directory.
-					config().setString("application.gui", "");
-					chdir(Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString().c_str());
-				}
-			#endif
-			srand(random_seed()); // Random bits of NVGT if not it's components might use the c rand function.
-			#if defined(NVGT_WIN_APP) || defined(NVGT_STUB)
-				config().setString("application.gui", "");
-			#endif
-			g_ScriptEngine = asCreateScriptEngine();
-			if (!g_ScriptEngine || ConfigureEngine(g_ScriptEngine) < 0) throw ApplicationException("unable to initialize script engine");
-		}
-		void setupCommandLineProperty(const vector<string>& argv, int offset = 0) {
-			// Prepare the COMMAND_LINE property used by scripts by combining all arguments into one string, for bgt backwards compatibility. NVGT also has a new ARGS array which we will also set up here.
-			if (!g_StringTypeid)
-				g_StringTypeid = g_ScriptEngine->GetStringFactoryReturnTypeId();
-			g_command_line_args = CScriptArray::Create(g_ScriptEngine->GetTypeInfoByDecl("string[]"));
-			for (unsigned int i = offset; i < argv.size(); i++) {
-				g_CommandLine += argv[i];
-				g_command_line_args->InsertLast((void*)&argv[i]);
-				if (i < argv.size() -1) g_CommandLine += " ";
-			}
-		}
+	enum run_mode {NVGT_RUN, NVGT_COMPILE, NVGT_HELP, NVGT_VERSIONINFO};
+	run_mode mode;
+public:
+	nvgt_application() : mode(NVGT_RUN) {
+		setUnixOptions(true);
+		#ifdef NVGT_STUB
+		stopOptionsProcessing(); // The command line is completely controled by the scripter in the case of a compiled executable.
+		#endif
+	}
+protected:
+	void initialize(Application& self) override {
 		#ifndef NVGT_STUB
-		void defineOptions(OptionSet& options) override {
-			Application::defineOptions(options);
-			options.addOption(Option("compile", "c", "compile script in release mode").group("compiletype"));
-			options.addOption(Option("compile-debug", "C", "compile script in debug mode").group("compiletype"));
-			options.addOption(Option("quiet", "q", "do not output anything upon successful compilation").binding("application.quiet").group("quiet"));
-			options.addOption(Option("QUIET", "Q", "do not output anything (work in progress), error status must be determined by process exit code (intended for automation)").binding("application.QUIET").group("quiet"));
-			options.addOption(Option("debug", "d", "run with the Angelscript debugger").binding("application.as_debug"));
-			options.addOption(Option("include", "i", "include an aditional script similar to the #include directive", false, "script", true).repeatable(true));
-			options.addOption(Option("include-directory", "I", "add an aditional directory to the search path for included scripts", false, "directory", true).repeatable(true));
-			options.addOption(Option("version", "V", "print version information and exit"));
-			options.addOption(Option("help", "h", "display available command line options"));
-		}
-		void handleOption(const std::string& name, const std::string& value) override {
-			Application::handleOption(name, value);
-			if (name == "help") {
-				mode = NVGT_HELP;
-				stopOptionsProcessing();
-			} else if (name == "version") {
-				mode = NVGT_VERSIONINFO;
-				stopOptionsProcessing();
-			} else if (name == "compile" || name == "compile-debug") {
-				mode = NVGT_COMPILE;
-				g_debug = name == "compile-debug";
-			} else if (name == "include-directory") g_IncludeDirs.push_back(value);
-			else if (name == "include") g_IncludeScripts.push_back(value);
-		}
-		void displayHelp() {
-			HelpFormatter hf(options());
-			hf.setUnixStyle(true);
-			hf.setIndent(4); // Visually appealing vs. accessibility and usability. The latter wins.
-			hf.setCommand(commandName());
-			hf.setUsage("[options] script [-- arg1 arg2 ...]");
-			hf.setHeader("NonVisual Gaming Toolkit (NVGT) - available command line arguments");
-			hf.setFooter("A script file is required.");
-			if (!config().hasOption("application.gui")) hf.format(cout);
-			else {
-				stringstream ss;
-				hf.format(ss);
-				message(ss.str(), "help");
-			}
-		}
-		virtual int main(const std::vector<std::string>& args) override {
-			if (mode == NVGT_HELP) {
-				displayHelp();
-				return Application::EXIT_OK;
-			} else if (mode == NVGT_VERSIONINFO) {
-				string ver = format("NVGT (NonVisual Gaming Toolkit) version %s, built on %s for %s %s", NVGT_VERSION, NVGT_VERSION_BUILD_TIME, Environment::osName(), Environment::osArchitecture());
-				if (config().hasOption("application.gui")) message(ver, "version information");
-				else cout << ver << endl;
-				return Application::EXIT_OK;
-			} else if (args.size() < 1) {
-				std::cout << commandName() << ": error, no input files." << std::endl << "type " << commandName() << " --help for usage instructions" << std::endl;
-				return Application::EXIT_USAGE;
-			}
-			string scriptfile = args[0];
-			try {
-				// Parse the provided script path to insure it is valid and check if it is a file.
-				if (!File(Path(scriptfile)).isFile()) throw Exception("Expected a file", scriptfile);
-				// The scripter is able to create configuration files that can change some behaviours of the engine, such files are named after the script that is to be run.
-				Path conf_file(scriptfile);
-				conf_file.setExtension("properties");
-				if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
-				conf_file.setExtension("ini");
-				if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
-				conf_file.setExtension("json");
-				if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
-			} catch(Poco::Exception& e) {
-				message(e.displayText(), "error");
-				return Application::EXIT_CONFIG;
-			}
-			setupCommandLineProperty(args, 1);
-			g_command_line_args->InsertAt(0, (void*)&scriptfile);
-			if (CompileScript(g_ScriptEngine, scriptfile.c_str()) < 0) {
-				ShowAngelscriptMessages();
-				return Application::EXIT_DATAERR;
-			}
-			if (config().hasOption("application.as_debug")) {
-				if (config().hasOption("application.gui")) {
-					message("please use the command line version of nvgt if you wish to invoque the debugger", "error");
-					return Application::EXIT_CONFIG;
-				}
-				#if !defined(NVGT_STUB) && !defined(NVGT_WIN_APP)
-					else InitializeDebugger(g_ScriptEngine);
-				#endif
-			}
-			int retcode = Application::EXIT_OK;
-			if (mode == NVGT_RUN && (retcode = ExecuteScript(g_ScriptEngine, scriptfile.c_str())) < 0 || mode == NVGT_COMPILE && CompileExecutable(g_ScriptEngine, scriptfile)) {
-				ShowAngelscriptMessages();
-				return Application::EXIT_SOFTWARE;
-			}
-			return retcode;
-		}
-		#else
-		virtual int main(const std::vector<std::string>& args) override {
-			setupCommandLineProperty(args);
-			g_command_line_args->InsertAt(0, (void*)&config().getString("application.path"));
-			int retcode = Application::EXIT_OK;
-			if (LoadCompiledExecutable(g_ScriptEngine) < 0 || (retcode = ExecuteScript(g_ScriptEngine, commandName().c_str())) < 0) {
-				ShowAngelscriptMessages();
-				return Application::EXIT_DATAERR;
-			}
-			return retcode;
+		loadConfiguration();
+		#endif
+		Application::initialize(self);
+		#ifdef _WIN32
+		timeBeginPeriod(1);
+		setlocale(LC_ALL, ".UTF8");
+		wstring dir_u;
+		UnicodeConverter::convert(Path(config().getString("application.dir")).append("lib").toString(), dir_u);
+		SetDllDirectoryW(dir_u.c_str());
+		#elif defined(__APPLE__)
+		if (Environment::has("MACOS_BUNDLED_APP")) { // Use GUI instead of stdout and chdir to Resources directory.
+			config().setString("application.gui", "");
+			chdir(Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString().c_str());
 		}
 		#endif
-		void uninitialize() override {
-			g_shutting_down = true;
-			Application::uninitialize();
-			#ifdef _WIN32
-				timeEndPeriod(1);
-			#endif
-			ScreenReaderUnload();
-			InputDestroy();
-			if (g_ScriptEngine) g_ScriptEngine->ShutDownAndRelease();
-			g_ScriptEngine = nullptr;
+		srand(random_seed()); // Random bits of NVGT if not it's components might use the c rand function.
+		#if defined(NVGT_WIN_APP) || defined(NVGT_STUB)
+		config().setString("application.gui", "");
+		#endif
+		g_ScriptEngine = asCreateScriptEngine();
+		if (!g_ScriptEngine || ConfigureEngine(g_ScriptEngine) < 0) throw ApplicationException("unable to initialize script engine");
+	}
+	void setupCommandLineProperty(const vector<string>& argv, int offset = 0) {
+		// Prepare the COMMAND_LINE property used by scripts by combining all arguments into one string, for bgt backwards compatibility. NVGT also has a new ARGS array which we will also set up here.
+		if (!g_StringTypeid)
+			g_StringTypeid = g_ScriptEngine->GetStringFactoryReturnTypeId();
+		g_command_line_args = CScriptArray::Create(g_ScriptEngine->GetTypeInfoByDecl("string[]"));
+		for (unsigned int i = offset; i < argv.size(); i++) {
+			g_CommandLine += argv[i];
+			g_command_line_args->InsertLast((void*)&argv[i]);
+			if (i < argv.size() - 1) g_CommandLine += " ";
 		}
+	}
+	#ifndef NVGT_STUB
+	void defineOptions(OptionSet& options) override {
+		Application::defineOptions(options);
+		options.addOption(Option("compile", "c", "compile script in release mode").group("compiletype"));
+		options.addOption(Option("compile-debug", "C", "compile script in debug mode").group("compiletype"));
+		options.addOption(Option("quiet", "q", "do not output anything upon successful compilation").binding("application.quiet").group("quiet"));
+		options.addOption(Option("QUIET", "Q", "do not output anything (work in progress), error status must be determined by process exit code (intended for automation)").binding("application.QUIET").group("quiet"));
+		options.addOption(Option("debug", "d", "run with the Angelscript debugger").binding("application.as_debug"));
+		options.addOption(Option("include", "i", "include an aditional script similar to the #include directive", false, "script", true).repeatable(true));
+		options.addOption(Option("include-directory", "I", "add an aditional directory to the search path for included scripts", false, "directory", true).repeatable(true));
+		options.addOption(Option("version", "V", "print version information and exit"));
+		options.addOption(Option("help", "h", "display available command line options"));
+	}
+	void handleOption(const std::string& name, const std::string& value) override {
+		Application::handleOption(name, value);
+		if (name == "help") {
+			mode = NVGT_HELP;
+			stopOptionsProcessing();
+		} else if (name == "version") {
+			mode = NVGT_VERSIONINFO;
+			stopOptionsProcessing();
+		} else if (name == "compile" || name == "compile-debug") {
+			mode = NVGT_COMPILE;
+			g_debug = name == "compile-debug";
+		} else if (name == "include-directory") g_IncludeDirs.push_back(value);
+		else if (name == "include") g_IncludeScripts.push_back(value);
+	}
+	void displayHelp() {
+		HelpFormatter hf(options());
+		hf.setUnixStyle(true);
+		hf.setIndent(4); // Visually appealing vs. accessibility and usability. The latter wins.
+		hf.setCommand(commandName());
+		hf.setUsage("[options] script [-- arg1 arg2 ...]");
+		hf.setHeader("NonVisual Gaming Toolkit (NVGT) - available command line arguments");
+		hf.setFooter("A script file is required.");
+		if (!config().hasOption("application.gui")) hf.format(cout);
+		else {
+			stringstream ss;
+			hf.format(ss);
+			message(ss.str(), "help");
+		}
+	}
+	virtual int main(const std::vector<std::string>& args) override {
+		if (mode == NVGT_HELP) {
+			displayHelp();
+			return Application::EXIT_OK;
+		} else if (mode == NVGT_VERSIONINFO) {
+			string ver = format("NVGT (NonVisual Gaming Toolkit) version %s, built on %s for %s %s", NVGT_VERSION, NVGT_VERSION_BUILD_TIME, Environment::osName(), Environment::osArchitecture());
+			if (config().hasOption("application.gui")) message(ver, "version information");
+			else cout << ver << endl;
+			return Application::EXIT_OK;
+		} else if (args.size() < 1) {
+			std::cout << commandName() << ": error, no input files." << std::endl << "type " << commandName() << " --help for usage instructions" << std::endl;
+			return Application::EXIT_USAGE;
+		}
+		string scriptfile = args[0];
+		try {
+			// Parse the provided script path to insure it is valid and check if it is a file.
+			if (!File(Path(scriptfile)).isFile()) throw Exception("Expected a file", scriptfile);
+			// The scripter is able to create configuration files that can change some behaviours of the engine, such files are named after the script that is to be run.
+			Path conf_file(scriptfile);
+			conf_file.setExtension("properties");
+			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
+			conf_file.setExtension("ini");
+			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
+			conf_file.setExtension("json");
+			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
+		} catch (Poco::Exception& e) {
+			message(e.displayText(), "error");
+			return Application::EXIT_CONFIG;
+		}
+		setupCommandLineProperty(args, 1);
+		g_command_line_args->InsertAt(0, (void*)&scriptfile);
+		if (CompileScript(g_ScriptEngine, scriptfile.c_str()) < 0) {
+			ShowAngelscriptMessages();
+			return Application::EXIT_DATAERR;
+		}
+		if (config().hasOption("application.as_debug")) {
+			if (config().hasOption("application.gui")) {
+				message("please use the command line version of nvgt if you wish to invoque the debugger", "error");
+				return Application::EXIT_CONFIG;
+			}
+			#if !defined(NVGT_STUB) && !defined(NVGT_WIN_APP)
+			else InitializeDebugger(g_ScriptEngine);
+			#endif
+		}
+		int retcode = Application::EXIT_OK;
+		if (mode == NVGT_RUN && (retcode = ExecuteScript(g_ScriptEngine, scriptfile.c_str())) < 0 || mode == NVGT_COMPILE && CompileExecutable(g_ScriptEngine, scriptfile)) {
+			ShowAngelscriptMessages();
+			return Application::EXIT_SOFTWARE;
+		}
+		return retcode;
+	}
+	#else
+	virtual int main(const std::vector<std::string>& args) override {
+		setupCommandLineProperty(args);
+		std::string path_tmp;
+		g_command_line_args->InsertAt(0, (void*)&path_tmp);
+		int retcode = Application::EXIT_OK;
+		if (LoadCompiledExecutable(g_ScriptEngine) < 0 || (retcode = ExecuteScript(g_ScriptEngine, commandName().c_str())) < 0) {
+			ShowAngelscriptMessages();
+			return Application::EXIT_DATAERR;
+		}
+		return retcode;
+	}
+	#endif
+	void uninitialize() override {
+		g_shutting_down = true;
+		Application::uninitialize();
+		#ifdef _WIN32
+		timeEndPeriod(1);
+		#endif
+		ScreenReaderUnload();
+		InputDestroy();
+		if (g_ScriptEngine) g_ScriptEngine->ShutDownAndRelease();
+		g_ScriptEngine = nullptr;
+	}
 };
 
 // Poco::Util::Application and SDL_main conflict, macro magic in SDL_main.h is replacing all occurances of "main" with "SDL_main", including the one in nvgt's derived Poco application causing the overwritten method to not call. Hack around that. You are about to scroll past 5 utterly simple lines of code that took hours of frustration and mind pain to determine the nesessety of.
@@ -225,11 +226,11 @@ int main(int argc, char** argv) {
 	AutoPtr<Application> app = new nvgt_application();
 	try {
 		app->init(argc, argv);
-	} catch(Poco::Exception& e) {
+	} catch (Poco::Exception& e) {
 		#ifndef NVGT_WIN_APP
 		app->logger().fatal(e.displayText());
 		#else
-			message(e.displayText(), "initialization error");
+		message(e.displayText(), "initialization error");
 		#endif
 		return Application::EXIT_CONFIG;
 	}

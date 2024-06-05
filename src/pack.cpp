@@ -77,8 +77,8 @@ bool pack::open(const string& filename_in, pack_open_mode mode, bool memload) {
 		return false; // This object is already in use and must be closed first.
 	if (mode <= PACK_OPEN_MODE_NONE || mode >= PACK_OPEN_MODES_TOTAL)
 		return false; // Invalid mode.
-		string filename = filename_in;
-		if (mode == PACK_OPEN_MODE_READ) find_embedded_pack(filename, file_offset);
+	string filename = filename_in;
+	if (mode == PACK_OPEN_MODE_READ) find_embedded_pack(filename, file_offset);
 	if (mode == PACK_OPEN_MODE_APPEND && !FileExists(filename))
 		mode = PACK_OPEN_MODE_CREATE;
 	if (mode == PACK_OPEN_MODE_CREATE) {
@@ -588,7 +588,7 @@ bool load_embedded_packs(Poco::BinaryReader& br) {
 	return true;
 }
 void write_embedded_packs(Poco::BinaryWriter& bw) {
-	bw.write7BitEncoded(embedding_packs.size());
+	bw.write7BitEncoded(uint32_t(embedding_packs.size()));
 	for (const auto& p : embedding_packs) {
 		bw << p.first;
 		Poco::FileInputStream fs(p.second);
@@ -601,16 +601,16 @@ bool find_embedded_pack(string& filename, unsigned int& file_offset) {
 	// Translate values that exist as part of a pack::open call so that an embedded pack will be loaded if required.
 	if (filename.empty() || filename[0] != '*') return false;
 	#ifndef NVGT_STUB
-		// If running from nvgt's compiler the packs are not actually embedded, translate the user input back to a valid filename.
-		if (filename == "*" && embedding_packs.size() > 0) filename = embedding_packs.begin()->second; // BGT compatibility
-		else filename = filename.substr(1);
-		return true;
+	// If running from nvgt's compiler the packs are not actually embedded, translate the user input back to a valid filename.
+	if (filename == "*" && embedding_packs.size() > 0) filename = embedding_packs.begin()->second; // BGT compatibility
+	else filename = filename.substr(1);
+	return true;
 	#else
-		const auto& it = filename == "*"? embedded_packs.begin() : embedded_packs.find(filename.substr(1));
-		if (it == embedded_packs.end()) return false;
-		filename = Poco::Util::Application::instance().config().getString("application.path");
-		file_offset = it->second;
-		return true;
+	const auto& it = filename == "*" ? embedded_packs.begin() : embedded_packs.find(filename.substr(1));
+	if (it == embedded_packs.end()) return false;
+	filename = Poco::Util::Application::instance().config().getString("application.path");
+	file_offset = it->second;
+	return true;
 	#endif
 	return false;
 }

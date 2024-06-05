@@ -39,6 +39,9 @@ inline int angelscript_bytecode_decrypt(unsigned char* code, int size, int alloc
 	AES_ctx crypt;
 	AES_init_ctx_iv(&crypt, key, iv);
 	AES_CBC_decrypt_buffer(&crypt, code, size);
+	memset(tmp, 0, sizeof(tmp));
+	memset(iv, 0, sizeof(iv));
+	memset(&crypt, 0, sizeof(AES_ctx));
 	return size - code[size - 1];
 }
 inline int angelscript_bytecode_encrypt(unsigned char* code, int size, int alloc_size) {
@@ -58,6 +61,9 @@ inline int angelscript_bytecode_encrypt(unsigned char* code, int size, int alloc
 	AES_ctx crypt;
 	AES_init_ctx_iv(&crypt, key, iv);
 	AES_CBC_encrypt_buffer(&crypt, code, size);
+	memset(tmp, 0, sizeof(tmp));
+	memset(iv, 0, sizeof(iv));
+	memset(&crypt, 0, sizeof(AES_ctx));
 	return size;
 }
 

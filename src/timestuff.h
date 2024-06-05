@@ -20,8 +20,8 @@
 #include <unordered_set>
 #include <string>
 
-uint64_t ticks(bool unsecure = false);
-uint64_t microticks(bool unsecure = false);
+uint64_t ticks(bool secure = true);
+uint64_t microticks(bool secure = true);
 
 class timer_queue;
 class timer_queue_item : public TimerEventInterface {
@@ -76,7 +76,7 @@ class timer : public Poco::RefCountedObject {
 	uint64_t value;
 	bool paused;
 	bool secure;
-	public:
+public:
 	uint64_t accuracy;
 	timer();
 	timer(bool secure);

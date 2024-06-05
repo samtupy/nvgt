@@ -1,0 +1,168 @@
+/* number_speaker.nvgt - number_speaker.bgt from bgt, but now modified to support pack_files by Oriol Gomez
+ *
+ * NVGT - NonVisual Gaming Toolkit
+ * Copyright (c) 2022-2024 Sam Tupy
+ * https://nvgt.gg
+ * original number_speaker.bgt Copyright (C) 2010-2014 Blastbay Studios
+ * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+ * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+ * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+*/
+
+/*
+Number Speaker Class.
+
+This class makes it easier to have numbers spoken using concatenated sound files. It will look for them in the same folder, unless you set the prepend property to be something like "sounds/" for example. You may also set the append property in the class to something other than ".wav" which is the default. There is also a boolean property called include_and which decides whether the word "and" should be included in the appropriate places. The class will look for a sound file that matches the words in the number as closely as possible, separating the words with an underline. So if the number is 56, the class will first look to see if there is a file called "fifty_six.wav". If this is not found, it'll look to see if there is a file called "fifty.wav" and another called "six.wav" and use those instead. In short this means that you are able to record as many numbers as you wish to make the spoken output sound as flawless as possible, or you may record only the necessary ones which is to say "zero.wav" to "nineteen.wav", "twenty.wav" to "ninety.wav" and then optionally "hundred.wav", "thousand.wav" and "million.wav". You may also make a file called "minus.wav" if you wish the class to distinguish between positive and negative numbers, and a file called "and.wav" if you choose to include this word when speaking your number.
+
+To have a number spoken, call either the "speak" or the "speak_wait" method in the class. "speak_wait" will block the execution until the number has finished, while "speak" will let you run other things at the same time. If using "speak" you must also continuously call "speak_next" in order for the class to load the next sound file in the chain on time. "speak" and "speak_wait" take the number to be spoken as their only argument, and return an integer which is 0 on success and -1 on failure. "speak_next" also returns an integer which will be 0 if there are no more files to be played, 1 if there are more files yet to be played or if the last file has not yet finished playing, or -1 if an error occurs.
+*/
+
+class number_speaker {
+	string prepend;
+	string append;
+	pack@ pack_file = null;
+	bool include_and;
+
+	// We set everything to default values in the constructor.
+	number_speaker() {
+		word_list.resize(0);
+		has_number = false;
+		current_index = 0;
+		prepend = "";
+		append = ".wav";
+		include_and = false;
+		@number_speech = @internal_sound;
+	}
+
+	bool set_sound_object(sound@ handle) {
+		if (@handle == null)
+			@number_speech = @internal_sound;
+		else
+			@number_speech = @handle;
+		return true;
+	}
+
+	int speak(double the_number) {
+		// Reset our internal data.
+		word_list.resize(0);
+		has_number = false;
+		current_index = 0;
+		number_speech.close();
+
+		// Check for invalid range.
+		if (the_number < -999999999 or the_number > 999999999)
+			return -1;
+
+		// Convert our number to English words, and then split it up by space.
+		string english_words = number_to_words(the_number, include_and);
+		if (english_words == "")
+			return -1;
+		word_list = english_words.split(" ", true);
+		has_number = true;
+
+		// We call "speak_next" so that the first number is spoken immediately.
+		if (speak_next() == -1)
+			return -1;
+		return 0;
+	}
+
+	int speak_next() {
+		// First we do some checks to see if the number is still being spoken.
+		if (has_number == false) {
+			if (number_speech.active == true) {
+				if (number_speech.playing == false) {
+					number_speech.close();
+					return 0;
+				} else
+					return 1;
+			}
+			return -1;
+		}
+		if (number_speech.playing == true)
+			return 1;
+
+		// Now we go through the remaining words, looking for the best matching filename.
+		uint look_until = word_list.length();
+		string assembled_filename = prepend;
+		while (true) {
+			for (uint i = current_index; i < look_until; i++) {
+				if (i == look_until - 1)
+					assembled_filename += word_list[i] + append;
+				else
+					assembled_filename += word_list[i] + "_";
+			}
+
+			// Now we have a filename to test, let's see if it loads.
+			if (number_speech.load(assembled_filename, this.pack_file) == false) {
+
+				// It didn't, so we remove the last entry from our current search.
+				look_until -= 1;
+				if (look_until == current_index) {
+					// No file matched the smallest possible search, so we get out.
+					word_list.resize(0);
+					has_number = false;
+					current_index = 0;
+					number_speech.close();
+					return -1;
+				}
+
+				// There are still some possible alternatives left, keep searching.
+				assembled_filename = prepend;
+				continue;
+			} else {
+
+				// We found a file, so we tell the next search to begin at the point where we stopped.
+				current_index = look_until;
+				number_speech.play();
+				if (current_index == word_list.length()) {
+
+					// We've reached the end of our word list, so we don't search anymore.
+					word_list.resize(0);
+					has_number = false;
+					current_index = 0;
+				}
+				return 1;
+			}
+		}
+		return -1;
+	}
+
+	void stop() {
+		// Reset our internal data.
+		word_list.resize(0);
+		has_number = false;
+		current_index = 0;
+		if (number_speech.active == true) {
+			if (number_speech.playing == true)
+				number_speech.stop();
+			number_speech.close();
+		}
+	}
+
+	int speak_wait(double the_number) {
+
+		// This is just a simple wrapper around "speak" and "speak_next".
+		if (speak(the_number) == -1)
+			return -1;
+		int result = 0;
+		while (true) {
+			wait(5);
+			result = speak_next();
+			if (result == -1)
+				return -1;
+			if (result == 0)
+				return 0;
+		}
+		return -1;
+	}
+
+	// The following is private content and should not be modified from the outside.
+
+	bool has_number;
+	string[] word_list;
+	uint current_index;
+	sound@ number_speech;
+	sound internal_sound;
+}

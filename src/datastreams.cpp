@@ -194,7 +194,7 @@ unsigned int datastream::write(const std::string& data) {
 	std::streamsize pos = _ostr->tellp();
 	try {
 		w->writeRaw(data);
-	if (r && w) _istr->seekg(_ostr->tellp()); // Make sure that read and write pointers are in sync.
+		if (r && w) _istr->seekg(_ostr->tellp()); // Make sure that read and write pointers are in sync.
 	} catch (std::exception) {
 		return long(_ostr->tellp()) - pos;
 	}

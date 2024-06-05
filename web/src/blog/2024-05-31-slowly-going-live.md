@@ -4,7 +4,7 @@ published_date: 2024-05-31 21:04:38.4605021 +0000
 layout: post.liquid
 is_draft: false
 ---
-# {{ page.title }}
+
 Hello everybody!
 
 We are pleased to announce that after over 2 years of development, the NVGT source code repository is about to go public for everyone to have a gander at!

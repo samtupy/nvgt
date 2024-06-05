@@ -72,7 +72,7 @@ void test(const string&in testcase) {
 	}
 	script_function@ func = nvgt_game.get_function_by_decl("void test_%0()".format(testcase));
 	if (@func == null) {
-		println("Error, test case %0 is badly formatted, can't find void %0()".format(testcase));
+		println("Error, test case %0 is badly formatted, can't find void test_%0()".format(testcase));
 		tests_failed++;
 		if (nonfatal) return;
 		else exit(64);

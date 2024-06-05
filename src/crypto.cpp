@@ -1,4 +1,5 @@
 /* crypto.cpp - AES encryption and decryption functions code
+ * Warning, the author of this code is not an expert on encryption. While the functions here will protect your data, they have by no means been battletested by a cryptography expert and/or they may not follow standards perfectly. Please feel free to report any vulterabilities.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -13,6 +14,7 @@
 #include "crypto.h"
 #include "aes.hpp"
 #include <string>
+#include <cstring>
 #include <rng_get_bytes.h>
 #include <obfuscate.h>
 #include <Poco/SHA2Engine.h>
@@ -38,6 +40,8 @@ std::string string_aes_encrypt(const std::string& original_text, std::string key
 	Poco::SHA2Engine hash;
 	hash.update(key);
 	const unsigned char* key_hash = hash.digest().data();
+	key.clear();
+	key.shrink_to_fit();
 	unsigned char iv[16];
 	for (int i = 0; i < 16; i++)
 		iv[i] = key_hash[i * 2] ^ (4 * i + 1);
@@ -45,9 +49,12 @@ std::string string_aes_encrypt(const std::string& original_text, std::string key
 	AES_init_ctx_iv(&crypt, key_hash, iv);
 	string_pad(text);
 	AES_CBC_encrypt_buffer(&crypt, (uint8_t*)&text.front(), text.size());
+	memset(iv, 0, sizeof(iv));
+	memset(&crypt, 0, sizeof(AES_ctx));
 	return text;
 }
 std::string string_aes_encrypt_r(const std::string& text, std::string& key) {
+	// Sorry I know this seems pointless, ran into some sort of issue with constant strings and Angelscript function registration 2 years ago when this was implemented. I probably know enough now to get rid of this redundant function but don't want to risk breaking something at the time of writing this comment, so later.
 	std::string t = text;
 	string_aes_encrypt(t, key);
 	return t;
@@ -61,9 +68,13 @@ std::string string_aes_decrypt(const std::string& original_text, std::string key
 	unsigned char iv[16];
 	for (int i = 0; i < 16; i++)
 		iv[i] = key_hash[i * 2] ^ (4 * i + 1);
+	key.clear();
+	key.shrink_to_fit();
 	AES_ctx crypt;
 	AES_init_ctx_iv(&crypt, key_hash, iv);
 	AES_CBC_decrypt_buffer(&crypt, (uint8_t*)&text.front(), text.size());
+	memset(iv, 0, sizeof(iv));
+	memset(&crypt, 0, sizeof(AES_ctx));
 	string_unpad(text);
 	return text;
 }

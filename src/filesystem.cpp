@@ -86,8 +86,8 @@ CScriptArray* FindFiles(const string& path) {
 
 	FindClose(hFind);
 	#else
-	int wildcard = path.rfind("/");
-	if (wildcard == std::string::npos) wildcard = path.rfind("\\");
+	int wildcard = path.rfind('/');
+	if (wildcard == std::string::npos) wildcard = path.rfind('\\');
 	string currentPath = path;
 	string Wildcard = "*";
 	if (wildcard != std::string::npos) {
@@ -105,9 +105,10 @@ CScriptArray* FindFiles(const string& path) {
 			continue;
 
 		// Skip sub directories
-		const string fullname = currentPath + "/" + filename;
+		currentPath += '/';
+		currentPath.append(filename);
 		struct stat st;
-		if (stat(fullname.c_str(), &st) == -1)
+		if (stat(currentPath.c_str(), &st) == -1)
 			continue;
 		if ((st.st_mode & S_IFDIR) != 0)
 			continue;
@@ -167,8 +168,8 @@ CScriptArray* FindDirectories(const string& path) {
 
 	FindClose(hFind);
 	#else
-	int wildcard = path.rfind("/");
-	if (wildcard == std::string::npos) wildcard = path.rfind("\\");
+	int wildcard = path.rfind('/');
+	if (wildcard == std::string::npos) wildcard = path.rfind('\\');
 	string currentPath = path;
 	string Wildcard = "*";
 	if (wildcard != std::string::npos) {
@@ -186,9 +187,10 @@ CScriptArray* FindDirectories(const string& path) {
 			continue;
 
 		// Skip files
-		const string fullname = currentPath + "/" + filename;
+		currentPath += '/';
+		currentPath.append(filename);
 		struct stat st;
-		if (stat(fullname.c_str(), &st) == -1)
+		if (stat(currentPath.c_str(), &st) == -1)
 			continue;
 		if ((st.st_mode & S_IFDIR) == 0)
 			continue;

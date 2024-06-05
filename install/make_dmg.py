@@ -31,12 +31,12 @@ def get_version_info():
 	return Path("../version").read_text().strip().replace("-", "_")
 
 relpath = "../release"
+ver = get_version_info()
 ftp_creds = []
 if len(sys.argv) > 1:
 	relpath = sys.argv[1]
 	if len(sys.argv) > 2:
-		ftp_creds=sys.argv[2].split(":")
-	ver = get_version_info()
+		ftp_creds = sys.argv[2].split(":")
 make_app_bundle("nvgt.app", relpath)
 make_dmg("nvgt.app", f"nvgt_{ver}.dmg")
 if ftp_creds:

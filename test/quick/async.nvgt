@@ -2,19 +2,11 @@
 // Copyright (C) 2022-2024 Sam Tupy
 // license: zlib (see license.md in the root of the nvgt distrobution)
 
-string url_retrieve(string host, const string&in uri) {
-	http_request req(HTTP_GET, uri);
-	http_response resp;
-	https_client http(host);
-	http.send_request(req);
-	datastream@ ds = http.receive_response(resp);
-	return ds.read();
-}
 // One unfortunate thing is that we must define funcdefs to call methods in classes, not sure how to fix that yet.
 funcdef void r_void_uint(uint);
 void main() {
 	// url_get
-	async<string> r(url_retrieve, "samtupy.com", "/ip.php");
+	async<string> r(url_get, "https://samtupy.com/ip.php");
 	r.wait();
 	alert("test", r.value);
 	// exception
