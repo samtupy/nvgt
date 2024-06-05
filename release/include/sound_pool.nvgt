@@ -11,6 +11,7 @@ class sound_pool_item {
 	string filename;
 	pack@ packfile = null;
 	string owner;
+	int hrtf_mode;
 	int priority;
 	float x;
 	float y;
@@ -155,7 +156,7 @@ class sound_pool_item {
 		while (rotation < 0) rotation += 2 * pi;
 		//if(theta!=0)
 		//speak("old_listener="+listener_x+", "+listener_y+". new_listener="+r_listener.x+", "+r_listener.y+". pivit="+pivit.x+", "+pivit.y);
-		handle.set_position(r_listener.x, r_listener.y, listener_z, true_x, true_y, true_z, rotation, pan_step, volume_step);
+		handle.set_position(r_listener.x, hrtf_mode==0?r_listener.y:listener_z, hrtf_mode==0?listener_z:r_listener.y, true_x, hrtf_mode==0?true_y:true_z, hrtf_mode==0?true_z:true_y, rotation, pan_step, volume_step);
 		/*if(occlude)
 		{
 		int[] factors=occlusion_factors(r_listener.x, r_listener.y, listener_z, true_x, true_y, true_z);
@@ -241,6 +242,7 @@ class sound_pool_item {
 This is the actual sound_pool class. For more information on how to use the class, please see the BGT documentation.
 */
 class sound_pool {
+	int hrtf_mode=0;
 	int max_distance;
 	float pan_step;
 	float volume_step;
@@ -270,6 +272,7 @@ class sound_pool {
 		int slot = reserve_slot();
 		if (slot == -1)
 			return -1;
+		items[slot].hrtf_mode=hrtf_mode;
 		items[slot].filename = filename;
 		items[slot].x = sound_x;
 		items[slot].y = sound_y;
