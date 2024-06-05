@@ -1,6 +1,5 @@
 name: nightly_build
-on:
-  push:
+on: [push, pull_request]
 
 jobs:
   mac_build:
