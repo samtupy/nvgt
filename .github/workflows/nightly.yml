@@ -102,7 +102,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: windows_package_build
-        path: install/nvgt_${{ env.version }}_${{ env.build_time }}.exe
+        path: nvgt_${{ env.version }}_${{ env.build_time }}.exe
 
   mac_package:
     runs-on: macos-latest
@@ -149,7 +149,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: mac_package
-        path: install/nvgt_${{ env.version }}_${{ env.build_time }}.dmg
+        path: nvgt_${{ env.version }}_${{ env.build_time }}.dmg
 
   linux_package:
     runs-on: ubuntu-latest
@@ -196,4 +196,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: linux_package
-        path: release/nvgt_${{ env.version }}_${{ env.build_time }}.tar.gz
+        path: nvgt_${{ env.version }}_${{ env.build_time }}.tar.gz
