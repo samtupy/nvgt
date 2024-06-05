@@ -74,6 +74,7 @@ jobs:
       with:
         name: windows_release
     - name: package
+      id: package_step
       shell: bash
       run: |
         mkdir linux_release
@@ -94,12 +95,14 @@ jobs:
         makensis nvgt.nsi
         version=$(cat ../version)
         build_time=$(TZ=UTC date +'%Y-%m-%d-%H:%M:%S')
+        echo "version=$version" >> $GITHUB_ENV
+        echo "build_time=$build_time" >> $GITHUB_ENV
         mv nvgt_*.exe nvgt_${version}_$build_time.exe
     - name: Upload packaged build
       uses: actions/upload-artifact@v4
       with:
         name: windows_package_build
-        path: install/nvgt_${version}_$build_time.exe
+        path: install/nvgt_${{ env.version }}_${{ env.build_time }}.exe
 
   mac_package:
     runs-on: macos-latest
@@ -119,6 +122,7 @@ jobs:
       with:
         name: mac_release
     - name: package
+      id: package_step
       run: |
         mkdir linux_release
         tar -xzf linux_release.tar.gz -C linux_release
@@ -138,12 +142,14 @@ jobs:
         python3 make_dmg.py ../release
         version=$(cat ../version)
         build_time=$(TZ=UTC date +'%Y-%m-%d-%H:%M:%S')
+        echo "version=$version" >> $GITHUB_ENV
+        echo "build_time=$build_time" >> $GITHUB_ENV
         mv nvgt_*.dmg nvgt_${version}_$build_time.dmg
     - name: Upload package
       uses: actions/upload-artifact@v4
       with:
         name: mac_package
-        path: install/nvgt_${version}_$build_time.dmg
+        path: install/nvgt_${{ env.version }}_${{ env.build_time }}.dmg
 
   linux_package:
     runs-on: ubuntu-latest
@@ -163,6 +169,7 @@ jobs:
       with:
         name: mac_release
     - name: package
+      id: package_step
       run: |
         mkdir mac_release
         tar -xzf mac_release.tar.gz -C mac_release
@@ -181,10 +188,12 @@ jobs:
         cd release
         version=$(cat ../version)
         build_time=$(TZ=UTC date +'%Y-%m-%d-%H:%M:%S')
+        echo "version=$version" >> $GITHUB_ENV
+        echo "build_time=$build_time" >> $GITHUB_ENV
         tar -czf "nvgt.tar.gz" *
         mv nvgt.tar.gz nvgt_${version}_$build_time.tar.gz
     - name: Upload packaged build
       uses: actions/upload-artifact@v4
       with:
         name: linux_package
-        path: release/nvgt_${version}_$build_time.tar.gz
+        path: release/nvgt_${{ env.version }}_${{ env.build_time }}.tar.gz
