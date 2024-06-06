@@ -104,85 +104,86 @@ bool is_nfkd(const std::string& source) {
 return una::norm::is_nfkd_utf8(source);
 }
 
-una::codepoint::general_category get_general_category(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
-return una::codepoint::get_general_category(actual_chars[0]);
+una::codepoint::general_category get_general_category(const std::string& chars) {
+const auto uchars = una::utf8to32u(chars);
+return una::codepoint::get_general_category(uchars[0]);
 }
 
 bool is_alphabetic(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::is_alphabetic(actual_chars[0]);
 }
 
 bool is_numeric(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::is_numeric(actual_chars[0]);
 }
 
 bool is_alphanumeric(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::is_alphanumeric(actual_chars[0]);
 }
 
 bool is_whitespace(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::is_whitespace(actual_chars[0]);
 }
 
 bool is_reserved(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::is_reserved(actual_chars[0]);
 }
 
 bool is_valid_char(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::is_valid(actual_chars[0]);
 }
 
 bool is_valid_scalar(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::is_valid_scalar(actual_chars[0]);
 }
 
 bool is_supplementary(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::is_supplementary(actual_chars[0]);
 }
 
 bool is_noncharacter(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::is_noncharacter(actual_chars[0]);
 }
 
 bool is_surrogate(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::is_surrogate(actual_chars[0]);
 }
 
 bool is_private_use(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::is_private_use(actual_chars[0]);
 }
 
 bool is_control(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::is_control(actual_chars[0]);
 }
 
 std::string get_script(const std::string& chr) {
-std::u32string actual_chars(chr.begin(), chr.end());
-char32_t script = una::codepoint::get_script(actual_chars[0]);
-return una::utf32to8(std::u32string(&script, 1));
+const auto actual_chars = una::utf8to32u(chr);
+const char32_t script = una::codepoint::get_script(actual_chars[0]);
+return una::utf32to8(std::u32string(&script));
 }
 
 bool has_script(const std::string& chr, const std::string& script) {
-std::u32string actual_chars(chr.begin(), chr.end());
+const auto actual_chars = una::utf8to32u(chr);
 return una::codepoint::has_script(actual_chars[0], una::locale::script(script));
 }
 
 plugin_main(nvgt_plugin_shared* shared) {
 	prepare_plugin(shared);
 	CScriptArray::SetMemoryFunctions(asAllocMem, asFreeMem);
+	shared->script_engine->SetDefaultNamespace("unicode");
 shared->script_engine->RegisterEnum("general_category");
 shared->script_engine->RegisterEnumValue("general_category", "CN", static_cast<int>(una::codepoint::general_category::Cn));
 shared->script_engine->RegisterEnumValue("general_category", "LU", static_cast<int>(una::codepoint::general_category::Lu));
@@ -214,6 +215,7 @@ shared->script_engine->RegisterEnumValue("general_category", "CC", static_cast<i
 shared->script_engine->RegisterEnumValue("general_category", "CF", static_cast<int>(una::codepoint::general_category::Cf));
 shared->script_engine->RegisterEnumValue("general_category", "CS", static_cast<int>(una::codepoint::general_category::Cs));
 shared->script_engine->RegisterEnumValue("general_category", "CO", static_cast<int>(una::codepoint::general_category::Co));
+	shared->script_engine->SetDefaultNamespace("");
 shared->script_engine->RegisterObjectMethod("string", "string lowercase() const", asFUNCTION(lowercase), asCALL_CDECL_OBJFIRST);
 shared->script_engine->RegisterObjectMethod("string", "string uppercase() const", asFUNCTION(uppercase), asCALL_CDECL_OBJFIRST);
 shared->script_engine->RegisterObjectMethod("string", "string casefold() const", asFUNCTION(casefold), asCALL_CDECL_OBJFIRST);
