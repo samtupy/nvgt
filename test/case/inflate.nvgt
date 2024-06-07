@@ -1,0 +1,6 @@
+void test_inflate() {
+	string inflated = file("data/inflated.txt", "rb").read();
+	assert(inflated == inflating_reader(file("data/deflated.zz", "rb"), COMPRESSION_METHOD_ZLIB).read());
+	assert(inflated == inflating_reader(file("data/deflated.gz", "rb"), COMPRESSION_METHOD_GZIP).read());
+	assert(inflated == string_inflate(file("data/deflated.zz", "rb").read()));
+}
