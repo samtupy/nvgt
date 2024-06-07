@@ -181,5 +181,5 @@ void RegisterScriptLibrary(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("library"), _O("bool unload()"), asMETHOD(library, load), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("bool get_active() const property"), asMETHOD(library, is_active), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("dictionary@ call(const string&in, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null)"), asFUNCTION(library_call_generic), asCALL_GENERIC);
-	engine->RegisterGlobalFunction("string string_create_from_pointer(uint64, uin64)", asFUNCTION(string_create_from_pointer), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string string_create_from_pointer(uint64, uint64)", asFUNCTION(string_create_from_pointer), asCALL_CDECL);
 }

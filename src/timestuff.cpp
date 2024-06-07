@@ -399,7 +399,7 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("timestamp", "timestamp& opSubAssign(int64)", asMETHODPR(Timestamp, operator-=, (Int64), Timestamp&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timestamp", "timestamp& opSubAssign(const timespan&in)", asMETHODPR(Timestamp, operator-=, (const Timespan&), Timestamp&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timestamp", "int64 get_UTC_time() const property", asMETHOD(Timestamp, utcTime), asCALL_THISCALL);
-	engine->RegisterObjectMethod("timestamp", "int64 get_elapsed() const property", asMETHOD(Timestamp, update), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "int64 get_elapsed() const property", asMETHOD(Timestamp, elapsed), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timestamp", "bool has_elapsed(int64) const", asMETHOD(Timestamp, isElapsed), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timestamp", "int64 opImplConv() const", asMETHOD(Timestamp, raw), asCALL_THISCALL);
 	engine->RegisterGlobalFunction("timestamp timestamp_from_UTC_time(int64)", asFUNCTION(Timestamp::fromUtcTime), asCALL_CDECL);
@@ -410,4 +410,28 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("timespan", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(timestuff_destruct<Timespan>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("timespan", "timespan& opAssign(const timespan&in)", asMETHODPR(Timespan, operator=, (const Timespan&), Timespan&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "timespan& opAssign(int64)", asMETHODPR(Timespan, operator=, (Int64), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "bool opEquals(const timespan&in) const", asMETHODPR(Timespan, operator==, (const Timespan&) const, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "bool opEquals(int64) const", asMETHODPR(Timespan, operator==, (Int64) const, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int opCmp(const timespan&in) const", asFUNCTION((timestuff_opCmp<Timespan, const Timespan&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("timespan", "int opCmp(int64) const", asFUNCTION((timestuff_opCmp<Timespan, Int64>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("timespan", "timespan opAdd(int64) const", asMETHODPR(Timespan, operator+, (Int64) const, Timespan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan opAdd(const timespan&in) const", asMETHODPR(Timespan, operator+, (const Timespan&) const, Timespan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan opSub(int64) const", asMETHODPR(Timespan, operator-, (Int64) const, Timespan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan opSub(const timespan&in) const", asMETHODPR(Timespan, operator-, (const Timespan&) const, Timespan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opAddAssign(int64)", asMETHODPR(Timespan, operator+=, (Int64), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opAddAssign(const timespan&in)", asMETHODPR(Timespan, operator+=, (const Timespan&), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opSubAssign(int64)", asMETHODPR(Timespan, operator-=, (Int64), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opSubAssign(const timespan&in)", asMETHODPR(Timespan, operator-=, (const Timespan&), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_days() const property", asMETHOD(Timespan, days), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_hours() const property", asMETHOD(Timespan, hours), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_total_hours() const property", asMETHOD(Timespan, totalHours), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_minutes() const property", asMETHOD(Timespan, minutes), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_total_minutes() const property", asMETHOD(Timespan, totalMinutes), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_seconds() const property", asMETHOD(Timespan, seconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_total_seconds() const property", asMETHOD(Timespan, totalSeconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_milliseconds() const property", asMETHOD(Timespan, milliseconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_total_milliseconds() const property", asMETHOD(Timespan, totalMilliseconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_microseconds() const property", asMETHOD(Timespan, microseconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_useconds() const property", asMETHOD(Timespan, useconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_total_microseconds() const property", asMETHOD(Timespan, totalMicroseconds), asCALL_THISCALL);
 }
