@@ -296,8 +296,14 @@ bool timer::set_secure(bool new_secure) {
 
 // Angelscript factories.
 template <class T, typename... A> void timestuff_construct(void* mem, A... args) { new (mem) T(args...); }
+template <class T> void timestuff_copy_construct(void* mem, const T& obj) { new(mem) T(obj); }
 template <class T> void timestuff_destruct(T* obj) { obj->~T(); }
 template <class T, typename... A> void* timestuff_factory(A... args) { return new T(args...); }
+template <class T, typename O> int timestuff_opCmp(T* self, O other) {
+	if (*self < other) return -1;
+	else if (*self > other) return 1;
+	else return 0;
+}
 
 void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
@@ -372,5 +378,36 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty(_O("const int64 HOURS"), (void*)&Timespan::HOURS);
 	engine->RegisterGlobalProperty(_O("const int64 DAYS"), (void*)&Timespan::DAYS);
 	engine->RegisterGlobalProperty(_O("uint64 timer_default_accuracy"), &timer_default_accuracy);
+	engine->RegisterObjectType("timespan", sizeof(Timespan), asOBJ_VALUE | asGetTypeTraits<Timespan>());
 	engine->RegisterObjectType("timestamp", sizeof(Timestamp), asOBJ_VALUE | asGetTypeTraits<Timestamp>());
+	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(timestuff_construct<Timestamp>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_CONSTRUCT, "void f(int64)", asFUNCTION((timestuff_construct<Timestamp, Int64>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_CONSTRUCT, "void f(const timestamp&in)", asFUNCTION(timestuff_copy_construct<Timestamp>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(timestuff_destruct<Timestamp>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("timestamp", "timestamp& opAssign(const timestamp&in)", asMETHODPR(Timestamp, operator=, (const Timestamp&), Timestamp&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp& opAssign(int64)", asMETHODPR(Timestamp, operator=, (Int64), Timestamp&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "void update()", asMETHOD(Timestamp, update), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "bool opEquals(const timestamp&in) const", asMETHOD(Timestamp, operator==), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "int opCmp(const timestamp&in) const", asFUNCTION((timestuff_opCmp<Timestamp, const Timestamp&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("timestamp", "timestamp opAdd(int64) const", asMETHODPR(Timestamp, operator+, (Int64) const, Timestamp), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp opAdd(const timespan&in) const", asMETHODPR(Timestamp, operator+, (const Timespan&) const, Timestamp), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp opSub(int64) const", asMETHODPR(Timestamp, operator-, (Int64) const, Timestamp), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp opSub(const timespan&in) const", asMETHODPR(Timestamp, operator-, (const Timespan&) const, Timestamp), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "int64 opSub(const timestamp&in) const", asMETHODPR(Timestamp, operator-, (const Timestamp&) const, Int64), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp& opAddAssign(int64)", asMETHODPR(Timestamp, operator+=, (Int64), Timestamp&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp& opAddAssign(const timespan&in)", asMETHODPR(Timestamp, operator+=, (const Timespan&), Timestamp&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp& opSubAssign(int64)", asMETHODPR(Timestamp, operator-=, (Int64), Timestamp&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp& opSubAssign(const timespan&in)", asMETHODPR(Timestamp, operator-=, (const Timespan&), Timestamp&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "int64 get_UTC_time() const property", asMETHOD(Timestamp, utcTime), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "int64 get_elapsed() const property", asMETHOD(Timestamp, update), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "bool has_elapsed(int64) const", asMETHOD(Timestamp, isElapsed), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "int64 opImplConv() const", asMETHOD(Timestamp, raw), asCALL_THISCALL);
+	engine->RegisterGlobalFunction("timestamp timestamp_from_UTC_time(int64)", asFUNCTION(Timestamp::fromUtcTime), asCALL_CDECL);
+
+	engine->RegisterObjectBehaviour("timespan", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(timestuff_construct<Timespan>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timespan", asBEHAVE_CONSTRUCT, "void f(int64)", asFUNCTION((timestuff_construct<Timespan, Int64>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timespan", asBEHAVE_CONSTRUCT, "void f(const timespan&in)", asFUNCTION(timestuff_copy_construct<Timespan>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timespan", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(timestuff_destruct<Timespan>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("timespan", "timespan& opAssign(const timespan&in)", asMETHODPR(Timespan, operator=, (const Timespan&), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opAssign(int64)", asMETHODPR(Timespan, operator=, (Int64), Timespan&), asCALL_THISCALL);
 }

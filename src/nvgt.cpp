@@ -16,6 +16,7 @@
 #ifdef _WIN32
 	#include <windows.h>
 	#include <locale.h>
+	#include <crtdbg.h>
 #else
 	#include <time.h>
 	#include <unistd.h>
@@ -223,6 +224,9 @@ protected:
 #undef SDL_main_h_
 #include <SDL2/SDL_main.h>
 int main(int argc, char** argv) {
+	_CrtSetDbgFlag(_CRTDBG_LEAK_CHECK_DF|_CRTDBG_ALLOC_MEM_DF);
+	_CrtSetReportMode(_CRT_ASSERT,_CRTDBG_MODE_FILE);
+	_CrtSetReportFile(_CRT_ASSERT,_CRTDBG_FILE_STDERR);
 	AutoPtr<Application> app = new nvgt_application();
 	try {
 		app->init(argc, argv);
