@@ -138,10 +138,10 @@ public:
 };
 
 class sound : public sound_base {
-	std::string loaded_filename;
 	float pitch;
 	float length;
 public:
+	std::string loaded_filename;
 	BASS_CHANNELINFO channel_info;
 	sound_preload* preload_ref;
 	asIScriptFunction* len_callback;
