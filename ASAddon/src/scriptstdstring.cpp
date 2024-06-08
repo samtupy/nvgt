@@ -544,6 +544,14 @@ static void StringResize(asUINT l, string &str)
 }
 
 // AngelScript signature:
+// void string::reserve(uint l)
+static void StringReserve(asUINT l, string &str)
+{
+	// We don't register the method directly because the argument types change between 32bit and 64bit platforms
+	str.reserve(l);
+}
+
+// AngelScript signature:
 // string formatInt(int64 val, const string &in options, uint width)
 static string formatInt(asINT64 value, const string &options, asUINT width)
 {
@@ -836,6 +844,7 @@ void RegisterStdString_Native(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("string", "uint length() const", asFUNCTION(StringLength), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 #endif
 	r = engine->RegisterObjectMethod("string", "void resize(uint)", asFUNCTION(StringResize), asCALL_CDECL_OBJLAST); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("string", "void reserve(uint)", asFUNCTION(StringReserve), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 #if AS_USE_STLNAMES != 1 && AS_USE_ACCESSORS == 1
 	// Don't register these if STL names is used, as they conflict with the method size()
 	r = engine->RegisterObjectMethod("string", "uint get_length() const property", asFUNCTION(StringLength), asCALL_CDECL_OBJLAST); assert( r >= 0 );
