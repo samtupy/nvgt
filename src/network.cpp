@@ -155,6 +155,7 @@ bool network::send(asQWORD peer_id, const std::string& message, unsigned char ch
 		r = enet_peer_send(peer, channel, packet) == 0;
 	else
 		enet_host_broadcast(host, channel, packet);
+		if (!r) enet_packet_destroy(packet);
 	return r;
 }
 bool network::send_peer(asQWORD peer, const std::string& message, unsigned char channel, bool reliable) {
