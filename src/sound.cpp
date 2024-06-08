@@ -1555,17 +1555,19 @@ BOOL mixer::remove_sound(sound& s, BOOL internal) {
 }
 
 int mixer::set_fx(std::string& fx, int idx) {
-	if (fx.size() < 1) {
+	if (fx.empty()) {
 		if (idx >= 0 && idx < effects.size()) {
-			for (DWORD i = idx + 1; i < effects.size(); i++)
+			for (auto i = idx + 1; i < effects.size(); i++)
 				BASS_FXSetPriority(effects[i].hfx, i);
 			BASS_ChannelRemoveFX(channel, effects[idx].hfx);
 			effects.erase(effects.begin() + idx);
+			effects.shrink_to_fit();
 			return TRUE;
 		} else if (idx == -1) {
 			for (DWORD i = 0; i < effects.size(); i++)
 				BASS_ChannelRemoveFX(channel, effects[i].hfx);
 			effects.clear();
+			effects.shrink_to_fit();
 			return TRUE;
 		} else
 			return -1;
@@ -1573,19 +1575,18 @@ int mixer::set_fx(std::string& fx, int idx) {
 	vector<string> args;
 	Poco::StringTokenizer tokenizer(fx, ":", Poco::StringTokenizer::TOK_IGNORE_EMPTY | Poco::StringTokenizer::TOK_TRIM);
 	move(tokenizer.begin(), tokenizer.end(), back_inserter(args));
-	if (args.size() < 1)
+	if (args.empty())
 		return -1;
 	else if (args.size() == 1 && args[0].size() > 0 && args[0][0] == '$') {
-		DWORD idx = 0;
-		while (idx < effects.size()) {
-			if (args[0].compare(effects[idx].id) == 0) {
-				for (DWORD i = idx + 1; i < effects.size(); i++)
+		for (std::vector<string>::size_type idx = 0; idx < effects.size(); idx++) {
+			if (std::string_view(effects[idx].id).compare(args[0]) == 0) {
+				for (auto i = idx + 1; i < effects.size(); i++)
 					BASS_FXSetPriority(effects[i].hfx, i);
 				BASS_ChannelRemoveFX(channel, effects[idx].hfx);
 				effects.erase(effects.begin() + idx);
+				effects.shrink_to_fit();
 				idx -= 1;
 			}
-			idx++;
 		}
 		return 1;
 	}
@@ -1597,7 +1598,7 @@ int mixer::set_fx(std::string& fx, int idx) {
 	mixer_effect e;
 	e.type = 0;
 	e.id[0] = 0;
-	if (effect_id != "")
+	if (!effect_id.empty())
 		effect_id = e.id;
 	array<BYTE, 512> effect_settings;
 	// effects
@@ -1834,7 +1835,7 @@ int mixer::set_fx(std::string& fx, int idx) {
 		effects.insert(effects.begin() + idx, e);
 		return idx;
 	}
-	effects.push_back(e);
+	effects.emplace_back(e);
 	return effects.size() - 1;
 }
 
