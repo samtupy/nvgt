@@ -474,7 +474,7 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("datetime", "void make_UTC(int)", asMETHOD(DateTime, makeUTC), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "void make_local(int)", asMETHOD(DateTime, makeLocal), asCALL_THISCALL);
 	engine->RegisterGlobalFunction("bool datetime_is_leap_year(int year)", asFUNCTION(DateTime::isLeapYear), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool datetime_days_of_month(int year, int month)", asFUNCTION(DateTime::daysOfMonth), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int datetime_days_of_month(int year, int month)", asFUNCTION(DateTime::daysOfMonth), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool datetime_is_valid(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION(DateTime::isValid), asCALL_CDECL);
 
 	engine->RegisterObjectBehaviour("calander", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(timestuff_construct<LocalDateTime>), asCALL_CDECL_OBJFIRST);
@@ -520,4 +520,23 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("timespan", "string format(const string&in fmt = \"%dd %H:%M:%S.%i\")", asFUNCTIONPR(DateTimeFormatter::format, (const Timespan&, const std::string&), std::string), asCALL_CDECL_OBJFIRST);
 	engine->RegisterGlobalFunction("datetime parse_datetime(const string&in fmt, const string&in str, int& tzd)", asFUNCTIONPR(DateTimeParser::parse, (const std::string&, const std::string&, int&), DateTime), asCALL_CDECL);
 	engine->RegisterGlobalFunction("datetime parse_datetime(const string&in str, int& tzd)", asFUNCTIONPR(DateTimeParser::parse, (const std::string&, int&), DateTime), asCALL_CDECL);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_ISO8601", (void*)&DateTimeFormat::ISO8601_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_ISO8601_FRAC", (void*)&DateTimeFormat::ISO8601_FRAC_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_ISO8601", (void*)&DateTimeFormat::ISO8601_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_RFC822", (void*)&DateTimeFormat::RFC822_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_RFC822", (void*)&DateTimeFormat::RFC822_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_RFC1123", (void*)&DateTimeFormat::RFC1123_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_RFC1123", (void*)&DateTimeFormat::RFC1123_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_RFC850", (void*)&DateTimeFormat::RFC850_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_RFC850", (void*)&DateTimeFormat::RFC850_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_RFC1036", (void*)&DateTimeFormat::RFC1036_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_RFC1036", (void*)&DateTimeFormat::RFC1036_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_HTTP", (void*)&DateTimeFormat::HTTP_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_HTTP", (void*)&DateTimeFormat::HTTP_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_ASCTIME", (void*)&DateTimeFormat::ASCTIME_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_ASCTIME", (void*)&DateTimeFormat::ASCTIME_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_SORTABLE", (void*)&DateTimeFormat::SORTABLE_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_SORTABLE", (void*)&DateTimeFormat::SORTABLE_REGEX);
+	engine->RegisterGlobalFunction("bool datetime_is_valid_format_string(const strring&in)", asFUNCTION(DateTimeFormat::hasFormat), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool datetime_is_valid_format(const strring&in)", asFUNCTION(DateTimeFormat::isValid), asCALL_CDECL);
 }
