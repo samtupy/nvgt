@@ -1,6 +1,30 @@
 # Changelog
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
+## New in 0.85.2-beta (2024/06/08):
+* running nvgtw.exe or the mac app should now show a message box at least rather than silently exiting.
+* pack::open is now set to read mode by default and will try closing any opened pack rather than returning false in that case.
+* Added sound.loaded_filename property to determine the currently loaded filename of a sound object.
+* Added string.reserve() function.
+* Added  get_window_os_handle() function.
+* Fix issues in sound::set_fx in regards to effect deletion.
+* NVGT's datetime facilities now wrap Poco's implementations. Documentation is not complete, but the 4 new classes are datetime, timestamp, timespan, and calander (which wraps LocalDateTime) in Poco and is called calander for bgt backwards compatibility. Global functions include parse_datetime, datetime_is_leap_year and more, and all classes include a format method to convert the objects into strings given a format specifier.
+* Converted most filesystem functions to wrap Poco's implementations.
+* Fix potential issue with network where packets don't destroy on send failure.
+* Added string_create_from_pointer to library functions.
+* Though the sound pool will soon be superseded by better methods of handling sounds, it has received various improvements nevertheless:
+    * Add y_is_elevation property. When this is set to false, the positioning works as normal, E.G. x is left/right, y is back/forward, and Z is up/down. When it's set to true, y is now up/down and Z is back/forward. This is useful for 2D platforming games for example, or games where y is up/down and Z is back/forward rather than the reverse. At some point this will be built into the engine so that it can be used on sound objects directly.
+    * Fix a bug when using the new sound_default_pack global property.
+    * Cleaned up the constructors and play_extended functions a bit.
+    * bgt_compat.nvgt is no longer required to used this include.
+* Adds a new function to dynamic_menu (add_multiple_items) that accepts an array of arrays. Each subarray must have at least 1 element. The first element is the text, the second element is the name. (#31)
+* Fix a couple of issues in the url_post implementation.
+* Register the Angelscript math complex addon.
+* fix missing include of bgt_compat in dynamic_menu.nvgt
+* fix number_to_words implementation appending null character to the end of it's output string
+* Adds a set_sound_storage function to bgt_compat.nvgt which takes advantage of the new sound_default_pack property.
+* Still a long long ways to go, but minor docs updates and a couple of new test cases.
+
 ## New in 0.85.1-beta (06/03/2024):
 * The restart method on timers will now unpause them.
 * Dramatically increase the speed of floating point string parsing.
