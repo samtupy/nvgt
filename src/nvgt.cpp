@@ -150,7 +150,7 @@ protected:
 			else cout << ver << endl;
 			return Application::EXIT_OK;
 		} else if (args.size() < 1) {
-			std::cout << commandName() << ": error, no input files." << std::endl << "type " << commandName() << " --help for usage instructions" << std::endl;
+			message("error, no input files.\nType " + commandName() + " --help for usage instructions\n", commandName());
 			return Application::EXIT_USAGE;
 		}
 		string scriptfile = args[0];
