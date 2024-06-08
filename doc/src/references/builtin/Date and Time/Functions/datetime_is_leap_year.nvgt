@@ -1,0 +1,15 @@
+/**
+	Determine whether a given year is a leap year.
+	bool datetime_is_leap_year(int year);
+	## Arguments:
+		* int year: The year to check the leap year status of.
+	## Returns:
+		* bool: true if the given year is a leap year, false otherwise.
+*/
+
+// Example:
+void main() {
+	for(int year = 2019; year < 2026; year ++) {
+		alert("example", year+" is " + (datetime_is_leap_year(year)? "a leap year!" : "not a leap year."));
+	}
+}

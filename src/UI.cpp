@@ -40,7 +40,7 @@ int message_box(const std::string& title, const std::string& text, const std::ve
 	// Start with the buttons.
 	std::vector<SDL_MessageBoxButtonData> sdlbuttons;
 	for (int i = 0; i < buttons.size(); i++) {
-		std::string btn = buttons[i];
+		const std::string& btn = buttons[i];
 		int skip = 0;
 		unsigned int button_flag = 0;
 		if (btn.substr(0, 1) == "`") {

@@ -22,6 +22,7 @@
 #include <Poco/DateTime.h>
 #include <Poco/DateTimeFormat.h>
 #include <Poco/DateTimeFormatter.h>
+#include <Poco/DateTimeParser.h>
 #include <Poco/LocalDateTime.h>
 #include <Poco/Mutex.h>
 #include <Poco/Timestamp.h>
@@ -296,8 +297,14 @@ bool timer::set_secure(bool new_secure) {
 
 // Angelscript factories.
 template <class T, typename... A> void timestuff_construct(void* mem, A... args) { new (mem) T(args...); }
+template <class T> void timestuff_copy_construct(void* mem, const T& obj) { new(mem) T(obj); }
 template <class T> void timestuff_destruct(T* obj) { obj->~T(); }
 template <class T, typename... A> void* timestuff_factory(A... args) { return new T(args...); }
+template <class T, typename O> int timestuff_opCmp(T* self, O other) {
+	if (*self < other) return -1;
+	else if (*self > other) return 1;
+	else return 0;
+}
 
 void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
@@ -372,4 +379,164 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty(_O("const int64 HOURS"), (void*)&Timespan::HOURS);
 	engine->RegisterGlobalProperty(_O("const int64 DAYS"), (void*)&Timespan::DAYS);
 	engine->RegisterGlobalProperty(_O("uint64 timer_default_accuracy"), &timer_default_accuracy);
+	engine->RegisterObjectType("calander", sizeof(LocalDateTime), asOBJ_VALUE | asGetTypeTraits<LocalDateTime>());
+	engine->RegisterObjectType("datetime", sizeof(DateTime), asOBJ_VALUE | asGetTypeTraits<DateTime>());
+	engine->RegisterObjectType("timespan", sizeof(Timespan), asOBJ_VALUE | asGetTypeTraits<Timespan>());
+	engine->RegisterObjectType("timestamp", sizeof(Timestamp), asOBJ_VALUE | asGetTypeTraits<Timestamp>());
+	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(timestuff_construct<Timestamp>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_CONSTRUCT, "void f(int64)", asFUNCTION((timestuff_construct<Timestamp, Int64>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_CONSTRUCT, "void f(const timestamp&in)", asFUNCTION(timestuff_copy_construct<Timestamp>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(timestuff_destruct<Timestamp>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("timestamp", "timestamp& opAssign(const timestamp&in)", asMETHODPR(Timestamp, operator=, (const Timestamp&), Timestamp&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp& opAssign(int64)", asMETHODPR(Timestamp, operator=, (Int64), Timestamp&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "void update()", asMETHOD(Timestamp, update), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "bool opEquals(const timestamp&in) const", asMETHOD(Timestamp, operator==), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "int opCmp(const timestamp&in) const", asFUNCTION((timestuff_opCmp<Timestamp, const Timestamp&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("timestamp", "timestamp opAdd(int64) const", asMETHODPR(Timestamp, operator+, (Int64) const, Timestamp), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp opAdd(const timespan&in) const", asMETHODPR(Timestamp, operator+, (const Timespan&) const, Timestamp), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp opSub(int64) const", asMETHODPR(Timestamp, operator-, (Int64) const, Timestamp), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp opSub(const timespan&in) const", asMETHODPR(Timestamp, operator-, (const Timespan&) const, Timestamp), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "int64 opSub(const timestamp&in) const", asMETHODPR(Timestamp, operator-, (const Timestamp&) const, Int64), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp& opAddAssign(int64)", asMETHODPR(Timestamp, operator+=, (Int64), Timestamp&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp& opAddAssign(const timespan&in)", asMETHODPR(Timestamp, operator+=, (const Timespan&), Timestamp&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp& opSubAssign(int64)", asMETHODPR(Timestamp, operator-=, (Int64), Timestamp&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "timestamp& opSubAssign(const timespan&in)", asMETHODPR(Timestamp, operator-=, (const Timespan&), Timestamp&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "int64 get_UTC_time() const property", asMETHOD(Timestamp, utcTime), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "int64 get_elapsed() const property", asMETHOD(Timestamp, elapsed), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "bool has_elapsed(int64) const", asMETHOD(Timestamp, isElapsed), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timestamp", "int64 opImplConv() const", asMETHOD(Timestamp, raw), asCALL_THISCALL);
+	engine->RegisterGlobalFunction("timestamp timestamp_from_UTC_time(int64)", asFUNCTION(Timestamp::fromUtcTime), asCALL_CDECL);
+
+	engine->RegisterObjectBehaviour("timespan", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(timestuff_construct<Timespan>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timespan", asBEHAVE_CONSTRUCT, "void f(int64)", asFUNCTION((timestuff_construct<Timespan, Int64>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timespan", asBEHAVE_CONSTRUCT, "void f(const timespan&in)", asFUNCTION(timestuff_copy_construct<Timespan>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timespan", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(timestuff_destruct<Timespan>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("timespan", "timespan& opAssign(const timespan&in)", asMETHODPR(Timespan, operator=, (const Timespan&), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opAssign(int64)", asMETHODPR(Timespan, operator=, (Int64), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "bool opEquals(const timespan&in) const", asMETHODPR(Timespan, operator==, (const Timespan&) const, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "bool opEquals(int64) const", asMETHODPR(Timespan, operator==, (Int64) const, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int opCmp(const timespan&in) const", asFUNCTION((timestuff_opCmp<Timespan, const Timespan&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("timespan", "int opCmp(int64) const", asFUNCTION((timestuff_opCmp<Timespan, Int64>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("timespan", "timespan opAdd(int64) const", asMETHODPR(Timespan, operator+, (Int64) const, Timespan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan opAdd(const timespan&in) const", asMETHODPR(Timespan, operator+, (const Timespan&) const, Timespan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan opSub(int64) const", asMETHODPR(Timespan, operator-, (Int64) const, Timespan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan opSub(const timespan&in) const", asMETHODPR(Timespan, operator-, (const Timespan&) const, Timespan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opAddAssign(int64)", asMETHODPR(Timespan, operator+=, (Int64), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opAddAssign(const timespan&in)", asMETHODPR(Timespan, operator+=, (const Timespan&), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opSubAssign(int64)", asMETHODPR(Timespan, operator-=, (Int64), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opSubAssign(const timespan&in)", asMETHODPR(Timespan, operator-=, (const Timespan&), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_days() const property", asMETHOD(Timespan, days), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_hours() const property", asMETHOD(Timespan, hours), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_total_hours() const property", asMETHOD(Timespan, totalHours), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_minutes() const property", asMETHOD(Timespan, minutes), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_total_minutes() const property", asMETHOD(Timespan, totalMinutes), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_seconds() const property", asMETHOD(Timespan, seconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_total_seconds() const property", asMETHOD(Timespan, totalSeconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_milliseconds() const property", asMETHOD(Timespan, milliseconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_total_milliseconds() const property", asMETHOD(Timespan, totalMilliseconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_microseconds() const property", asMETHOD(Timespan, microseconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_useconds() const property", asMETHOD(Timespan, useconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int get_total_microseconds() const property", asMETHOD(Timespan, totalMicroseconds), asCALL_THISCALL);
+
+	engine->RegisterObjectBehaviour("datetime", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(timestuff_construct<DateTime>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("datetime", asBEHAVE_CONSTRUCT, "void f(double)", asFUNCTION((timestuff_construct<DateTime, double>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("datetime", asBEHAVE_CONSTRUCT, "void f(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION((timestuff_construct<DateTime, int, int, int, int, int, int, int, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("datetime", asBEHAVE_CONSTRUCT, "void f(const datetime&in)", asFUNCTION(timestuff_copy_construct<DateTime>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("datetime", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(timestuff_destruct<DateTime>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("datetime", "datetime& opAssign(const datetime&in)", asMETHODPR(DateTime, operator=, (const DateTime&), DateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "datetime& opAssign(const timestamp&in)", asMETHODPR(DateTime, operator=, (const Timestamp&), DateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "datetime& opAssign(double)", asMETHODPR(DateTime, operator=, (double), DateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "datetime& set(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asMETHOD(DateTime, assign), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int get_year() const property", asMETHOD(DateTime, year), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int get_yearday() const property", asMETHOD(DateTime, dayOfYear), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int get_month() const property", asMETHOD(DateTime, month), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int week(int first_day_of_week = 1) const", asMETHOD(DateTime, week), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int get_weekday() const property", asMETHOD(DateTime, dayOfWeek), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int get_day() const property", asMETHOD(DateTime, day), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int get_hour() const property", asMETHOD(DateTime, hour), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int get_hour12() const property", asMETHOD(DateTime, hourAMPM), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "bool get_AM() const property", asMETHOD(DateTime, isAM), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "bool get_PM() const property", asMETHOD(DateTime, isPM), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int get_minute() const property", asMETHOD(DateTime, minute), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int get_second() const property", asMETHOD(DateTime, second), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int get_millisecond() const property", asMETHOD(DateTime, millisecond), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int get_microsecond() const property", asMETHOD(DateTime, microsecond), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "double get_julian_day() const property", asMETHOD(DateTime, julianDay), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "timestamp get_timestamp() const property", asMETHOD(DateTime, timestamp), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int64 get_UTC_time() const property", asMETHOD(DateTime, utcTime), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "bool opEquals(const datetime&in) const", asMETHOD(DateTime, operator==), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "int opCmp(const datetime&in) const", asFUNCTION((timestuff_opCmp<DateTime, const DateTime&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("datetime", "datetime opAdd(const timespan&in) const", asMETHODPR(DateTime, operator+, (const Timespan&) const, DateTime), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "datetime opSub(const timespan&in) const", asMETHODPR(DateTime, operator-, (const Timespan&) const, DateTime), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "timespan opSub(const datetime&in) const", asMETHODPR(DateTime, operator-, (const DateTime&) const, Timespan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "datetime& opAddAssign(const timespan&in)", asMETHODPR(DateTime, operator+=, (const Timespan&), DateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "datetime& opSubAssign(const timespan&in)", asMETHODPR(DateTime, operator-=, (const Timespan&), DateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "void make_UTC(int)", asMETHOD(DateTime, makeUTC), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "void make_local(int)", asMETHOD(DateTime, makeLocal), asCALL_THISCALL);
+	engine->RegisterGlobalFunction("bool datetime_is_leap_year(int year)", asFUNCTION(DateTime::isLeapYear), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int datetime_days_of_month(int year, int month)", asFUNCTION(DateTime::daysOfMonth), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool datetime_is_valid(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION(DateTime::isValid), asCALL_CDECL);
+
+	engine->RegisterObjectBehaviour("calander", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(timestuff_construct<LocalDateTime>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("calander", asBEHAVE_CONSTRUCT, "void f(double)", asFUNCTION((timestuff_construct<LocalDateTime, double>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("calander", asBEHAVE_CONSTRUCT, "void f(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION((timestuff_construct<LocalDateTime, int, int, int, int, int, int, int, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("calander", asBEHAVE_CONSTRUCT, "void f(const datetime&in)", asFUNCTION((timestuff_construct<LocalDateTime, const DateTime&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("calander", asBEHAVE_CONSTRUCT, "void f(const calander&in)", asFUNCTION(timestuff_copy_construct<LocalDateTime>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("calander", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(timestuff_destruct<LocalDateTime>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("calander", "calander& opAssign(const calander&in)", asMETHODPR(LocalDateTime, operator=, (const LocalDateTime&), LocalDateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "calander& opAssign(const timestamp&in)", asMETHODPR(LocalDateTime, operator=, (const Timestamp&), LocalDateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "calander& opAssign(double)", asMETHODPR(LocalDateTime, operator=, (double), LocalDateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "calander& set(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asMETHODPR(LocalDateTime, assign, (int, int, int, int, int, int, int, int), LocalDateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int get_year() const property", asMETHOD(LocalDateTime, year), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int get_yearday() const property", asMETHOD(LocalDateTime, dayOfYear), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int get_month() const property", asMETHOD(LocalDateTime, month), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int week(int first_day_of_week = 1) const", asMETHOD(LocalDateTime, week), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int get_weekday() const property", asMETHOD(LocalDateTime, dayOfWeek), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int get_day() const property", asMETHOD(LocalDateTime, day), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int get_hour() const property", asMETHOD(LocalDateTime, hour), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int get_hour12() const property", asMETHOD(LocalDateTime, hourAMPM), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "bool get_AM() const property", asMETHOD(LocalDateTime, isAM), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "bool get_PM() const property", asMETHOD(LocalDateTime, isPM), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int get_minute() const property", asMETHOD(LocalDateTime, minute), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int get_second() const property", asMETHOD(LocalDateTime, second), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int get_millisecond() const property", asMETHOD(LocalDateTime, millisecond), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int get_microsecond() const property", asMETHOD(LocalDateTime, microsecond), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "double get_julian_day() const property", asMETHOD(LocalDateTime, julianDay), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int get_tzd() const property", asMETHOD(LocalDateTime, tzd), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "datetime get_UTC() const property", asMETHOD(LocalDateTime, utc), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "timestamp get_timestamp() const property", asMETHOD(LocalDateTime, timestamp), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int64 get_UTC_time() const property", asMETHOD(LocalDateTime, utcTime), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "bool opEquals(const calander&in) const", asMETHOD(LocalDateTime, operator==), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "int opCmp(const calander&in) const", asFUNCTION((timestuff_opCmp<LocalDateTime, const LocalDateTime&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("calander", "calander opAdd(const timespan&in) const", asMETHODPR(LocalDateTime, operator+, (const Timespan&) const, LocalDateTime), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "calander opSub(const timespan&in) const", asMETHODPR(LocalDateTime, operator-, (const Timespan&) const, LocalDateTime), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "timespan opSub(const calander&in) const", asMETHODPR(LocalDateTime, operator-, (const LocalDateTime&) const, Timespan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "calander& opAddAssign(const timespan&in)", asMETHODPR(LocalDateTime, operator+=, (const Timespan&), LocalDateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calander", "calander& opSubAssign(const timespan&in)", asMETHODPR(LocalDateTime, operator-=, (const Timespan&), LocalDateTime&), asCALL_THISCALL);
+
+	engine->RegisterObjectMethod("timestamp", "string format(const string&in fmt, int tzd = 0xffff)", asFUNCTIONPR(DateTimeFormatter::format, (const Timestamp&, const std::string&, int), std::string), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("datetime", "string format(const string&in fmt, int tzd = 0xffff)", asFUNCTIONPR(DateTimeFormatter::format, (const DateTime&, const std::string&, int), std::string), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("calander", "string format(const string&in fmt)", asFUNCTIONPR(DateTimeFormatter::format, (const LocalDateTime&, const std::string&), std::string), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("timespan", "string format(const string&in fmt = \"%dd %H:%M:%S.%i\")", asFUNCTIONPR(DateTimeFormatter::format, (const Timespan&, const std::string&), std::string), asCALL_CDECL_OBJFIRST);
+	engine->RegisterGlobalFunction("datetime parse_datetime(const string&in fmt, const string&in str, int& tzd)", asFUNCTIONPR(DateTimeParser::parse, (const std::string&, const std::string&, int&), DateTime), asCALL_CDECL);
+	engine->RegisterGlobalFunction("datetime parse_datetime(const string&in str, int& tzd)", asFUNCTIONPR(DateTimeParser::parse, (const std::string&, int&), DateTime), asCALL_CDECL);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_ISO8601", (void*)&DateTimeFormat::ISO8601_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_ISO8601_FRAC", (void*)&DateTimeFormat::ISO8601_FRAC_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_ISO8601", (void*)&DateTimeFormat::ISO8601_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_RFC822", (void*)&DateTimeFormat::RFC822_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_RFC822", (void*)&DateTimeFormat::RFC822_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_RFC1123", (void*)&DateTimeFormat::RFC1123_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_RFC1123", (void*)&DateTimeFormat::RFC1123_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_RFC850", (void*)&DateTimeFormat::RFC850_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_RFC850", (void*)&DateTimeFormat::RFC850_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_RFC1036", (void*)&DateTimeFormat::RFC1036_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_RFC1036", (void*)&DateTimeFormat::RFC1036_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_HTTP", (void*)&DateTimeFormat::HTTP_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_HTTP", (void*)&DateTimeFormat::HTTP_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_ASCTIME", (void*)&DateTimeFormat::ASCTIME_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_ASCTIME", (void*)&DateTimeFormat::ASCTIME_REGEX);
+	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_SORTABLE", (void*)&DateTimeFormat::SORTABLE_FORMAT);
+	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_SORTABLE", (void*)&DateTimeFormat::SORTABLE_REGEX);
+	engine->RegisterGlobalFunction("bool datetime_is_valid_format_string(const strring&in)", asFUNCTION(DateTimeFormat::hasFormat), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool datetime_is_valid_format(const strring&in)", asFUNCTION(DateTimeFormat::isValid), asCALL_CDECL);
 }

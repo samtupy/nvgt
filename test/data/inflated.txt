@@ -1,0 +1,26 @@
+https://www.ryadel.com/en/visual-studio-2019-vs2017-vs2015-vs2013-vs2012-older-download-iso-offline-installer/
+
+Visual Studio 2019
+• 
+For 32-bit target
+  call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat"
+• 
+For 64-bit target
+  call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
+Visual Studio 2017
+• 
+For 32-bit target
+  call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars32.bat"
+• 
+For 64-bit target
+  call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
+Visual Studio 2015
+• 
+For 32-bit target
+  call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86
+• 
+For 64-bit target
+  call "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x64
+  call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86_amd64
+  
+  

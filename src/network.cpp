@@ -92,7 +92,7 @@ asQWORD network::connect(const std::string& hostname, unsigned short port) {
 	ENetPeer* svr = enet_host_connect(host, &addr, channel_count, 0);
 	if (!svr) return 0;
 	peers[next_peer] = svr;
-	svr->data = (void*)next_peer;
+	svr->data = reinterpret_cast<void*>(next_peer);
 	next_peer += 1;
 	return next_peer - 1;
 }
@@ -109,7 +109,7 @@ network_event* network::request(uint32_t timeout) {
 	if (event.type == ENET_EVENT_TYPE_CONNECT) {
 		enet_peer_timeout(event.peer, 128, 10000, 35000);
 		if (!is_client) {
-			event.peer->data = (void*)next_peer;
+			event.peer->data = reinterpret_cast<void*>(next_peer);
 			peers[next_peer] = event.peer;
 			e->peer_id = next_peer;
 			next_peer++;
@@ -155,11 +155,12 @@ bool network::send(asQWORD peer_id, const std::string& message, unsigned char ch
 		r = enet_peer_send(peer, channel, packet) == 0;
 	else
 		enet_host_broadcast(host, channel, packet);
+		if (!r) enet_packet_destroy(packet);
 	return r;
 }
 bool network::send_peer(asQWORD peer, const std::string& message, unsigned char channel, bool reliable) {
 	if (!host || channel > channel_count) return false;
-	ENetPeer* peer_obj = (ENetPeer*)peer;
+	ENetPeer* peer_obj = reinterpret_cast<ENetPeer*>(peer);
 	if (!peer_obj) return false;
 	ENetPacket* packet = enet_packet_create(message.c_str(), message.size(), (reliable ? ENET_PACKET_FLAG_RELIABLE : 0));
 	if (!packet) return false;

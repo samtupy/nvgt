@@ -1,15 +1,19 @@
 /**
 	Set the date and time of the datetime object.
-	bool datetime::set(uint year, uint month, uint day, uint hour, uint minute, uint second);
+	datetime& datetime::set(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0);
 	## Arguments:
-		* uint year: the year to set.
-		* uint month: the month to set.
-		* uint day: the day to set.
-		* uint hour: the hour to set.
-		* uint minute: the minute to set.
-		* uint second: the second to set.
+		* int year: the year to set.
+		* int month: the month to set.
+		* int day: the day to set.
+		* int hour = 0: the hour to set (from 0 to 23).
+		* int minute = 0: the minute to set (from 0 to 59).
+		* int second = 0: the second to set (0 to 59).
+		* int millisecond = 0: the millisecond to set (0 to 999).
+		* int microsecond = 0: the microsecond to set (0 to 999).
 	## Returns:
-		bool: true if the values were successfully set, false otherwise.
+		datetime&: A reference to the datetime object allowing for chaining calls together.
+	## Remarks:
+		This method will throw an exception if the date or time is invalid. You can use the datetime_is_valid global function which takes similar arguments to this one and returns a boolean if you want to verify any values before passing them to this method.
 */
 
 // Example:

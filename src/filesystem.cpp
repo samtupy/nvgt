@@ -12,29 +12,16 @@
 */
 
 #include <string>
-#if defined(_WIN32)
-	#include <direct.h> // _getcwd
-	#include <Windows.h> // FindFirstFile, GetFileAttributes
-	#include <shlwapi.h>
-
-	#undef DeleteFile
-	#undef CopyFile
-
-#else
-	#include <unistd.h> // getcwd
-	#include <dirent.h> // opendir, readdir, closedir
-	#include <fnmatch.h> // fnmatch
-	#include <sys/stat.h> // stat
-#endif
-#include <assert.h> // assert
 #include <angelscript.h>
 #include <scriptarray.h>
-#include <datetime.h>
 #include <Poco/Exception.h>
 #include <Poco/File.h>
+#include <Poco/Glob.h>
+#include <Poco/Timestamp.h>
 #include <Poco/UnicodeConverter.h>
 
 using namespace std;
+using namespace Poco;
 
 #include <string.h>
 
@@ -44,28 +31,22 @@ bool FileHardLink(const std::string& source, const std::string& target) {
 	} catch (Poco::Exception) {
 		return false;
 	}
-	/*try
-	{
-	filesystem::create_hard_link(source, target);
-	return true;
-	}
-	catch(filesystem::filesystem_error)
-	{
-	return false;
-	}*/
 	return false;
 }
-int FileHardLinkCount(const std::string& path) {
-	/*try
-	{
-	return filesystem::hard_link_count(path);
-	}
-	catch(filesystem::filesystem_error)
-	{
-	return 0;
-	}*/
-	return 0;
+
+bool FNMatch(const std::string& file, const std::string& pattern) {
+	try {
+		return Glob(pattern).match(file);
+	} catch(Exception& e) { return false; }
 }
+
+// Includes below only used for this function, the Angelscript filesystem functions are faster than Poco's directory iterators where we have to repeatedly call GetFileAttributes to determine whether each item is a file or directory.
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sys/stat.h>
+#include <dirent.h>
+#endif
 
 CScriptArray* FindFiles(const string& path) {
 	// Obtain a pointer to the engine
@@ -105,8 +86,8 @@ CScriptArray* FindFiles(const string& path) {
 
 	FindClose(hFind);
 	#else
-	int wildcard = path.rfind("/");
-	if (wildcard == std::string::npos) wildcard = path.rfind("\\");
+	int wildcard = path.rfind('/');
+	if (wildcard == std::string::npos) wildcard = path.rfind('\\');
 	string currentPath = path;
 	string Wildcard = "*";
 	if (wildcard != std::string::npos) {
@@ -124,15 +105,16 @@ CScriptArray* FindFiles(const string& path) {
 			continue;
 
 		// Skip sub directories
-		const string fullname = currentPath + "/" + filename;
+		currentPath += '/';
+		currentPath.append(filename);
 		struct stat st;
-		if (stat(fullname.c_str(), &st) == -1)
+		if (stat(currentPath.c_str(), &st) == -1)
 			continue;
 		if ((st.st_mode & S_IFDIR) != 0)
 			continue;
 
 		// wildcard matching
-		if (fnmatch(Wildcard.c_str(), filename.c_str(), 0) != 0)
+		if (FNMatch(filename, Wildcard) != 0)
 			continue;
 
 		// Add the file to the array
@@ -186,8 +168,8 @@ CScriptArray* FindDirectories(const string& path) {
 
 	FindClose(hFind);
 	#else
-	int wildcard = path.rfind("/");
-	if (wildcard == std::string::npos) wildcard = path.rfind("\\");
+	int wildcard = path.rfind('/');
+	if (wildcard == std::string::npos) wildcard = path.rfind('\\');
 	string currentPath = path;
 	string Wildcard = "*";
 	if (wildcard != std::string::npos) {
@@ -205,15 +187,16 @@ CScriptArray* FindDirectories(const string& path) {
 			continue;
 
 		// Skip files
-		const string fullname = currentPath + "/" + filename;
+		currentPath += '/';
+		currentPath.append(filename);
 		struct stat st;
-		if (stat(fullname.c_str(), &st) == -1)
+		if (stat(currentPath.c_str(), &st) == -1)
 			continue;
 		if ((st.st_mode & S_IFDIR) == 0)
 			continue;
 
 		// wildcard matching
-		if (fnmatch(Wildcard.c_str(), filename.c_str(), 0) != 0)
+		if (FNMatch(filename, Wildcard) != 0)
 			continue;
 
 		// Add the dir to the array
@@ -227,25 +210,10 @@ CScriptArray* FindDirectories(const string& path) {
 }
 
 bool DirectoryExists(const string& path) {
-	#if defined(_WIN32)
-	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
-
-	// Check if the path exists and is a directory
-	DWORD attrib = GetFileAttributesW(bufUTF16);
-	if (attrib == INVALID_FILE_ATTRIBUTES || !(attrib & FILE_ATTRIBUTE_DIRECTORY))
-		return false;
-	#else
-	// Check if the path exists and is a directory
-	struct stat st;
-	if (stat(path.c_str(), &st) == -1)
-		return false;
-	if ((st.st_mode & S_IFDIR) == 0)
-		return false;
-	#endif
-
-	return true;
+	try {
+		File f(path);
+		return f.exists() && f.isDirectory();
+	} catch(Exception& e) { return false; }
 }
 
 bool FileExists(const string& path) {
@@ -303,173 +271,42 @@ bool DirectoryCreate(const string& path) {
 	return true;
 }
 
-bool DirectoryDelete(const string& path) {
-	#if defined(_WIN32)
-	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
-
-	// Remove the directory
-	BOOL success = RemoveDirectoryW(bufUTF16);
-	return success;
-	#else
-	// Remove the directory
-	int failure = rmdir(path.c_str());
-	return !failure ? true : false;
-	#endif
+bool DirectoryDelete(const string& path, bool recursive) {
+	try {
+		File(path).remove(recursive);
+		return true;
+	} catch(Exception& e) { return false; }
 }
 
 bool FileDelete(const string& path) {
-	#if defined(_WIN32)
-	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
-
-	// Remove the file
-	BOOL success = DeleteFileW(bufUTF16);
-	return success;
-	#else
-	// Remove the file
-	int failure = unlink(path.c_str());
-	return !failure ? true : false;
-	#endif
+	return DirectoryDelete(path, false);
 }
 
 bool FileCopy(const string& source, const string& target, bool overwrite) {
-	#if defined(_WIN32)
-	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16_1[1024];
-	MultiByteToWideChar(CP_UTF8, 0, source.c_str(), -1, bufUTF16_1, 1024);
-
-	wchar_t bufUTF16_2[1024];
-	MultiByteToWideChar(CP_UTF8, 0, target.c_str(), -1, bufUTF16_2, 1024);
-
-	// Copy the file
-	BOOL success = CopyFileW(bufUTF16_1, bufUTF16_2, (overwrite ? FALSE : TRUE));
-	return success;
-	#else
-	// Copy the file manually as there is no posix function for this
-	bool failure = !FileExists(source);
-	if (failure) return false;
-	FILE* src = 0, * tgt = 0;
-	src = fopen(source.c_str(), "r");
-	if (src == 0) failure = true;
-	failure = !overwrite && FileExists(target);
-	if (!failure) tgt = fopen(target.c_str(), "w");
-	if (tgt == 0) failure = true;
-	char buf[1024];
-	size_t n;
-	while (!failure && (n = fread(buf, sizeof(char), sizeof(buf), src)) > 0) {
-		if (fwrite(buf, sizeof(char), n, tgt) != n)
-			failure = true;
-	}
-	if (src) fclose(src);
-	if (tgt) fclose(tgt);
-	return !failure ? true : false;
-	#endif
+	try {
+		File(source).copyTo(target, !overwrite? File::OPT_FAIL_ON_OVERWRITE : 0);
+		return true;
+	} catch(Exception& e) { return false; }
 }
 
-bool FileMove(const string& source, const string& target) {
-	#if defined(_WIN32)
-	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16_1[1024];
-	MultiByteToWideChar(CP_UTF8, 0, source.c_str(), -1, bufUTF16_1, 1024);
-
-	wchar_t bufUTF16_2[1024];
-	MultiByteToWideChar(CP_UTF8, 0, target.c_str(), -1, bufUTF16_2, 1024);
-
-	// Move the file or directory
-	BOOL success = MoveFileW(bufUTF16_1, bufUTF16_2);
-	return success;
-	#else
-	// Move the file or directory
-	int failure = rename(source.c_str(), target.c_str());
-	return !failure ? true : false;
-	#endif
+bool FileMove(const string& source, const string& target, bool overwrite) {
+	try {
+		File(source).renameTo(target, File::OPT_FAIL_ON_OVERWRITE);
+		return true;
+	} catch(Exception& e) { return false; }
 }
 
-CDateTime FileGetCreated(const string& path) {
-	#if defined(_WIN32)
-	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
-
-	// Get the create date/time of the file
-	FILETIME createTm;
-	HANDLE file = CreateFileW(bufUTF16, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-	BOOL success = GetFileTime(file, &createTm, 0, 0);
-	CloseHandle(file);
-	if (!success) {
-		asIScriptContext* ctx = asGetActiveContext();
-		if (ctx)
-			ctx->SetException("Failed to get file creation date/time");
-		return CDateTime();
-	}
-	SYSTEMTIME tm;
-	FileTimeToSystemTime(&createTm, &tm);
-	return CDateTime(tm.wYear, tm.wMonth, tm.wDay, tm.wHour, tm.wMinute, tm.wSecond);
-	#else
-	// Get the create date/time of the file
-	struct stat st;
-	if (stat(path.c_str(), &st) == -1) {
-		asIScriptContext* ctx = asGetActiveContext();
-		if (ctx)
-			ctx->SetException("Failed to get file creation date/time");
-		return CDateTime();
-	}
-	tm* t = localtime(&st.st_ctime);
-	return CDateTime(t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
-	#endif
+Timestamp FileGetCreated(const string& path) {
+	return File(path).created();
 }
 
-CDateTime FileGetModified(const string& path) {
-	#if defined(_WIN32)
-	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
-	FILETIME modifyTm;
-	// Get the last modify date/time of the file
-	HANDLE file = CreateFileW(bufUTF16, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-	BOOL success = GetFileTime(file, 0, 0, &modifyTm);
-	CloseHandle(file);
-	if (!success) {
-		asIScriptContext* ctx = asGetActiveContext();
-		if (ctx)
-			ctx->SetException("Failed to get file modify date/time");
-		return CDateTime();
-	}
-	SYSTEMTIME tm;
-	FileTimeToSystemTime(&modifyTm, &tm);
-	return CDateTime(tm.wYear, tm.wMonth, tm.wDay, tm.wHour, tm.wMinute, tm.wSecond);
-	#else
-	// Get the last modify date/time of the file
-	struct stat st;
-	if (stat(path.c_str(), &st) == -1) {
-		asIScriptContext* ctx = asGetActiveContext();
-		if (ctx)
-			ctx->SetException("Failed to get file modify date/time");
-		return CDateTime();
-	}
-	tm* t = localtime(&st.st_mtime);
-	return CDateTime(t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
-	#endif
+Timestamp FileGetModified(const string& path) {
+	return File(path).getLastModified();
 }
-bool FNMatch(const std::string& file, const std::string& pattern) {
-	#ifdef _WIN32
-	std::wstring file_u, pattern_u;
-	Poco::UnicodeConverter::convert(file, file_u);
-	Poco::UnicodeConverter::convert(pattern, pattern_u);
-	return PathMatchSpec(file_u.c_str(), pattern_u.c_str());
-	#else
-	return fnmatch(pattern.c_str(), file.c_str(), 0) == 0;
-	#endif
-}
+
 
 
 void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
-	assert(engine->GetTypeInfoByName("string"));
-	assert(engine->GetTypeInfoByDecl("array<string>"));
-	assert(engine->GetTypeInfoByName("datetime"));
 	engine->RegisterGlobalFunction("bool directory_exists(const string& in)", asFUNCTION(DirectoryExists), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool directory_create(const string& in)", asFUNCTION(DirectoryCreate), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool directory_delete(const string& in)", asFUNCTION(DirectoryDelete), asCALL_CDECL);
@@ -477,12 +314,11 @@ void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool file_delete(const string& in)", asFUNCTION(FileDelete), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_copy(const string& in, const string& in, bool)", asFUNCTION(FileCopy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_hard_link(const string& in, const string&in)", asFUNCTION(FileHardLink), asCALL_CDECL);
-	engine->RegisterGlobalFunction("int file_hard_link_count(const string& in)", asFUNCTION(FileHardLinkCount), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_move(const string& in, const string& in)", asFUNCTION(FileMove), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string[]@ find_directories(const string& in)", asFUNCTION(FindDirectories), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string[]@ find_files(const string& in)", asFUNCTION(FindFiles), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int64 file_get_size(const string& in)", asFUNCTION(FileGetSize), asCALL_CDECL);
-	engine->RegisterGlobalFunction("datetime file_get_date_created(const string& in)", asFUNCTION(FileGetCreated), asCALL_CDECL);
-	engine->RegisterGlobalFunction("datetime file_get_date_modified(const string& in)", asFUNCTION(FileGetModified), asCALL_CDECL);
+	engine->RegisterGlobalFunction("timestamp file_get_date_created(const string& in)", asFUNCTION(FileGetCreated), asCALL_CDECL);
+	engine->RegisterGlobalFunction("timestamp file_get_date_modified(const string& in)", asFUNCTION(FileGetModified), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool fnmatch(const string& in, const string& in)", asFUNCTION(FNMatch), asCALL_CDECL);
 }

@@ -1,0 +1,23 @@
+/**
+	Check whether the components of a date/time are valid.
+	bool datetime_is_valid(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0);
+	## Arguments:
+		* int year: the year to check.
+		* int month: the month to check (from 1 to 12).
+		* int day: the day to check (from 1 to 31).
+		* int hour = 0: the hour to check (from 0 to 23).
+		* int minute = 0: the minute to check (from 0 to 59).
+		* int second = 0: the second to check (0 to 59).
+		* int millisecond = 0: the millisecond to check (0 to 999).
+		* int microsecond = 0: the microsecond to check (0 to 999).
+	## Returns:
+		bool: true if the given arguments make up a valid date and time, false otherwise.
+*/
+
+// Example:
+void main() {
+	alert("example 1", datetime_is_valid(2023, 2, 29)); // Will display false (not a leepyear!)
+	alert("example 2", datetime_is_valid(2020, 2, 29)); // Will display true, is a leapyear.
+	alert("example 3", datetime_is_valid(2020, 6, 31)); // Will display false (June has 30 days).
+	alert("example 4", datetime_is_valid(2020, 7, 31, 13, 71, 59)); // Will display false (invalid time values).
+}

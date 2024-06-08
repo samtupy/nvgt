@@ -513,7 +513,7 @@ typedef struct {
 	std::string filename;
 	pack* p;
 } sound_preload_transport;
-void sound_preload_perform(HSTREAM channel, std::string filename) {
+void sound_preload_perform(HSTREAM channel, const std::string& filename) {
 	if (!channel) return;
 	sound_preload* pre = (sound_preload*)malloc(sizeof(sound_preload));
 	memset(pre, 0, sizeof(sound_preload));
@@ -1439,7 +1439,7 @@ BOOL sound::slide_volume_alt(float volume, unsigned int time) {
 BOOL mixer::get_effect_index(const char* id) {
 	if (!id || strlen(id) < 2) return -1;
 	for (DWORD i = 0; i < effects.size(); i++) {
-		if (strcmp(effects[i].id, id) == 0) return i;
+		if (effects[i].id == std::string_view(id)) return i;
 	}
 	return -1;
 }
@@ -1555,17 +1555,19 @@ BOOL mixer::remove_sound(sound& s, BOOL internal) {
 }
 
 int mixer::set_fx(std::string& fx, int idx) {
-	if (fx.size() < 1) {
+	if (fx.empty()) {
 		if (idx >= 0 && idx < effects.size()) {
-			for (DWORD i = idx + 1; i < effects.size(); i++)
+			for (auto i = idx + 1; i < effects.size(); i++)
 				BASS_FXSetPriority(effects[i].hfx, i);
 			BASS_ChannelRemoveFX(channel, effects[idx].hfx);
 			effects.erase(effects.begin() + idx);
+			effects.shrink_to_fit();
 			return TRUE;
 		} else if (idx == -1) {
 			for (DWORD i = 0; i < effects.size(); i++)
 				BASS_ChannelRemoveFX(channel, effects[i].hfx);
 			effects.clear();
+			effects.shrink_to_fit();
 			return TRUE;
 		} else
 			return -1;
@@ -1573,19 +1575,18 @@ int mixer::set_fx(std::string& fx, int idx) {
 	vector<string> args;
 	Poco::StringTokenizer tokenizer(fx, ":", Poco::StringTokenizer::TOK_IGNORE_EMPTY | Poco::StringTokenizer::TOK_TRIM);
 	move(tokenizer.begin(), tokenizer.end(), back_inserter(args));
-	if (args.size() < 1)
+	if (args.size() < 1) {
 		return -1;
-	else if (args.size() == 1 && args[0].size() > 0 && args[0][0] == '$') {
-		DWORD idx = 0;
-		while (idx < effects.size()) {
-			if (args[0].compare(effects[idx].id) == 0) {
-				for (DWORD i = idx + 1; i < effects.size(); i++)
+	} else if (args.size() == 1 && args[0].size() > 0 && args[0][0] == '$') {
+		for (DWORD idx = 0; idx < effects.size(); idx++) {
+			if (effects[idx].id.starts_with(args[0])) {
+				for (DWORD i = idx + 1; i < effects.size(); i++) {
 					BASS_FXSetPriority(effects[i].hfx, i);
+					}
 				BASS_ChannelRemoveFX(channel, effects[idx].hfx);
 				effects.erase(effects.begin() + idx);
 				idx -= 1;
 			}
-			idx++;
 		}
 		return 1;
 	}
@@ -1596,9 +1597,9 @@ int mixer::set_fx(std::string& fx, int idx) {
 	}
 	mixer_effect e;
 	e.type = 0;
-	e.id[0] = 0;
-	if (effect_id != "")
-		effect_id = e.id;
+	if (!effect_id.empty())
+		e.id = effect_id;
+	else e.id = "";
 	array<BYTE, 512> effect_settings;
 	// effects
 	if (args[0] == "i3DL2reverb" && args.size() > 12) {
@@ -1812,7 +1813,7 @@ int mixer::set_fx(std::string& fx, int idx) {
 		memcpy(effect_settings.data(), &settings, sizeof(BASS_BFX_FREEVERB));
 	} else
 		return -1;
-	int id_idx = get_effect_index(e.id);
+	int id_idx = get_effect_index(e.id.c_str());
 	if (id_idx == -1 && idx >= 0 && idx < effects.size()) {
 		for (unsigned int i = idx; i < effects.size(); i++) {
 			if (effects[i].hfx)
@@ -1834,7 +1835,7 @@ int mixer::set_fx(std::string& fx, int idx) {
 		effects.insert(effects.begin() + idx, e);
 		return idx;
 	}
-	effects.push_back(e);
+	effects.emplace_back(e);
 	return effects.size() - 1;
 }
 

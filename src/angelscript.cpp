@@ -19,6 +19,7 @@
 #include <iostream>
 #include <string>
 #include <angelscript.h>
+#include <Poco/DateTime.h>
 #include <Poco/Environment.h>
 #include <Poco/Exception.h>
 #include <Poco/File.h>
@@ -78,7 +79,6 @@
 #include "scriptmath.h"
 #include "scriptmathcomplex.h"
 #include "contextmgr.h"
-#include "datetime.h"
 #include "weakref.h"
 #ifndef NVGT_STUB
 	int PragmaCallback(const std::string& pragmaText, CScriptBuilder& builder, void* /*userParam*/);
@@ -331,9 +331,6 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	RegisterStdStringUtils(engine);
 	RegisterScriptDictionary(engine);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
-	RegisterScriptDateTime(engine);
-	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_FS);
-	RegisterScriptFileSystemFunctions(engine);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	RegisterScriptGrid(engine);
 	RegisterScriptHandle(engine);
@@ -381,6 +378,8 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("void exit(int=0)", asFUNCTION(Exit), asCALL_CDECL);
 	RegisterThreading(engine);
 	RegisterScriptTimestuff(engine);
+	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_FS);
+	RegisterScriptFileSystemFunctions(engine);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_SPEECH);
 	RegisterTTSVoice(engine);
 	RegisterUI(engine);
@@ -710,12 +709,12 @@ std::string DictionaryToString(void* obj, int expandMembers, CDebugger* dbg) {
 	}
 	return s.str();
 }
-std::string DateTimeToString(void* obj, int expandMembers, CDebugger* dbg) {
-	CDateTime* dt = reinterpret_cast<CDateTime*>(obj);
+std::string DateTimeToString(void *obj, int expandMembers, CDebugger *dbg) {
+	Poco::DateTime*dt = reinterpret_cast<Poco::DateTime*>(obj);
 	std::stringstream s;
-	s << "{" << dt->getYear() << "-" << dt->getMonth() << "-" << dt->getDay() << " ";
-	s << dt->getHour() << ":" << dt->getMinute() << ":" << dt->getSecond() << "}";
-	return s.str();
+	s << "{" << dt->year() << "-" << dt->month() << "-" << dt->day() << " ";
+	s << dt->hour() << ":" << dt->minute() << ":" << dt->second() << "}";
+	return s.str(); 
 }
 std::string Vector3ToString(void* obj, int expandMembers, CDebugger* dbg) {
 	Vector3* v = reinterpret_cast<Vector3*>(obj);

@@ -1,0 +1,11 @@
+/**
+	Represents the current millisecond of the datetime object.
+	const uint millisecond;
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set(d.year, d.month, d.day, 12, 47, 19, 217);
+	alert("The current millisecond value of the datetime object is", d.millisecond);
+}

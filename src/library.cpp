@@ -165,6 +165,12 @@ void library_call_generic(asIScriptGeneric* gen) {
 	l->call(gen);
 }
 
+std::string string_create_from_pointer(const char* str, size_t length) {
+	if (!str) return "";
+	if (length == 0) length = strlen(str);
+	return std::string(str, length);
+}
+
 void RegisterScriptLibrary(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DLLCALL);
 	engine->RegisterObjectType(_O("library"), 0, asOBJ_REF);
@@ -175,4 +181,5 @@ void RegisterScriptLibrary(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("library"), _O("bool unload()"), asMETHOD(library, load), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("bool get_active() const property"), asMETHOD(library, is_active), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("dictionary@ call(const string&in, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null)"), asFUNCTION(library_call_generic), asCALL_GENERIC);
+	engine->RegisterGlobalFunction("string string_create_from_pointer(uint64, uint64)", asFUNCTION(string_create_from_pointer), asCALL_CDECL);
 }
