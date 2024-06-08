@@ -1584,10 +1584,18 @@ std::cout << "Sound: " << fx << ", idx: " << idx << '\n';
 	} else if (args.size() == 1 && args[0].size() > 0 && args[0][0] == '$') {
 	std::cout << "Clearing effect " << args[0] << "\n";
 		for (DWORD idx = 0; idx < effects.size(); idx++) {
-			if (strncmp(effects[idx].id, args[0].c_str(), args[0].size()) == 0) {
-				for (DWORD i = idx + 1; i < effects.size(); i++)
-					BASS_FXSetPriority(effects[i].hfx, i);
-				BASS_ChannelRemoveFX(channel, effects[idx].hfx);
+		std::cout << "Examining effect " << idx << "\n";
+		std::cout << "strncmp returned: " << strncmp(effects[idx].id, args[0].c_str(), args[0].size()) << '\n';
+		std::cout << "operator== returned: " << std::to_string(std::string_view(effects[idx].id) == std::string_view(args[0])) << '\n';
+			if (strncmp(effects[idx].id, args[0].c_str(), args[0].size()) == 0 || std::string(effects[idx].id) == std::string(args[0])) {
+				for (DWORD i = idx + 1; i < effects.size(); i++) {
+				std::cout << "Modify effect priority: " << i << '\n';
+					auto res = BASS_FXSetPriority(effects[i].hfx, i);
+					std::cout << "BASS_FXSetPriority(effects[i].hfx, i) returned: " << res << '\n';
+					}
+					std::cout << "Remove effect " << idx << " from channel " << channel << '\n';
+				auto res = BASS_ChannelRemoveFX(channel, effects[idx].hfx);
+				std::cout << "BASS_ChannelRemoveFX(channel, effects[idx].hfx) returned: " << res << '\n';
 				effects.erase(effects.begin() + idx);
 				idx -= 1;
 			}

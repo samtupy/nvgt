@@ -28,7 +28,7 @@ while(true)
 wait(5);
 if(key_pressed(KEY_C)){
 screen_reader_speak("FX cleared", false);
-mix.set_fx("");
+mix.set_fx("$room");
 }
 if(key_pressed(KEY_ESCAPE))
 exit();
