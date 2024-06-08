@@ -1440,7 +1440,7 @@ BOOL sound::slide_volume_alt(float volume, unsigned int time) {
 BOOL mixer::get_effect_index(const char* id) {
 	if (!id || strlen(id) < 2) return -1;
 	for (DWORD i = 0; i < effects.size(); i++) {
-		if (strcmp(effects[i].id, id) == 0) return i;
+		if (effects[i].id == std::string_view(id)) return i;
 	}
 	return -1;
 }
@@ -1585,9 +1585,9 @@ std::cout << "Sound: " << fx << ", idx: " << idx << '\n';
 	std::cout << "Clearing effect " << args[0] << "\n";
 		for (DWORD idx = 0; idx < effects.size(); idx++) {
 		std::cout << "Examining effect " << idx << "\n";
-		std::cout << "strncmp returned: " << strncmp(effects[idx].id, args[0].c_str(), args[0].size()) << '\n';
+		std::cout << "strncmp returned: " << strncmp(effects[idx].id.c_str(), args[0].c_str(), args[0].size()) << '\n';
 		std::cout << "operator== returned: " << std::to_string(std::string_view(effects[idx].id) == std::string_view(args[0])) << '\n';
-			if (strncmp(effects[idx].id, args[0].c_str(), args[0].size()) == 0 || std::string(effects[idx].id) == std::string(args[0])) {
+			if (std::string_view(effects[idx].id) == std::string_view(args[0])) {
 				for (DWORD i = idx + 1; i < effects.size(); i++) {
 				std::cout << "Modify effect priority: " << i << '\n';
 					auto res = BASS_FXSetPriority(effects[i].hfx, i);
@@ -1610,9 +1610,8 @@ std::cout << "Sound: " << fx << ", idx: " << idx << '\n';
 	}
 	mixer_effect e;
 	e.type = 0;
-	e.id[0] = 0;
 	if (!effect_id.empty())
-		effect_id = e.id;
+		e.id = effect_id;
 	array<BYTE, 512> effect_settings;
 	// effects
 	if (args[0] == "i3DL2reverb" && args.size() > 12) {
@@ -1826,7 +1825,7 @@ std::cout << "Sound: " << fx << ", idx: " << idx << '\n';
 		memcpy(effect_settings.data(), &settings, sizeof(BASS_BFX_FREEVERB));
 	} else
 		return -1;
-	int id_idx = get_effect_index(e.id);
+	int id_idx = get_effect_index(e.id.c_str());
 	if (id_idx == -1 && idx >= 0 && idx < effects.size()) {
 		for (unsigned int i = idx; i < effects.size(); i++) {
 			if (effects[i].hfx)
