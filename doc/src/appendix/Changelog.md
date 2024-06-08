@@ -1,8 +1,9 @@
 # Changelog
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
-## New in 0.85.2-beta (2024/06/08):
+## New in 0.86.0-beta (06/08/2024):
 * running nvgtw.exe or the mac app should now show a message box at least rather than silently exiting.
+* Improves the functionality of the JAWS keyhook. We likely still have more to go before it's perfect, but it is at least far better than it was before.
 * pack::open is now set to read mode by default and will try closing any opened pack rather than returning false in that case.
 * Added sound.loaded_filename property to determine the currently loaded filename of a sound object.
 * Added string.reserve() function.

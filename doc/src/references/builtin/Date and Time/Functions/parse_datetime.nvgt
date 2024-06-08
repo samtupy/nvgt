@@ -1,0 +1,32 @@
+/**
+	Parse a string into a datetime object given a format specifier.
+	1. datetime parse_datetime(string fmt, string datetime_to_parse, int& timezone_difference);
+	2. datetime parse_datetime(string datetime_to_parse, int& timezone_difference);
+	## Arguments:
+		* string fmt (1): The format specifier string.
+		* string datetime_to_parse: The string containing a date/time to parse according to the given format specifier, or automatically if one is not provided.
+		* int& timezone_difference: A reference to an integer which will store any timezone offset parsed from the provided string.
+	## Returns:
+		datetime: A datetime object containing the parsed information.
+	## Remarks:
+		This function may throw an exception if an invalid date/time is provided. You can use the global `bool datetime_is_valid_format(string str)` function to attempt validating user input before passing it as an argument here.
+		If you use the version of this function without a format specifier, it will try to automatically determine the format of the date/time using several available standard formats.
+		This function will clean the input string such as trimming whitespace before parsing is attempted.
+		Internally, this wraps the DateTimeParser functionality in the Poco c++ libraries. Their documentation says the following, copied verbatim, about this parsing engine, though note in nvgt DateTime:::makeUTC is called datetime.make_UTC, for example.
+		This class provides a method for parsing dates and times from strings. All parsing methods do their best to parse a meaningful result, even from malformed input strings.
+		The returned DateTime will always contain a time in the same timezone as the time in the string. Call DateTime::makeUTC() with the timeZoneDifferential returned by parse() to convert the DateTime to UTC.
+		Note: When parsing a time in 12-hour (AM/PM) format, the hour (%h) must be parsed before the AM/PM designator (%a, %A), otherwise the AM/PM designator will be ignored.
+		See the DateTimeFormatter class for a list of supported format specifiers.
+		In addition to the format specifiers supported by DateTimeFormatter, an additional specifier is supported: %r will parse a year given by either two or four digits. Years 69-00 are interpreted in the 20th century (1969-2000), years 01-68 in the 21th century (2001-2068).
+		Note that in the current implementation all characters other than format specifiers in the format string are ignored/not matched against the date/time string. This may lead to non-error results even with nonsense input strings. This may change in a future version to a more strict behavior.
+		If more strict format validation of date/time strings is required, a regular expression could be used for initial validation, before passing the string to DateTimeParser.
+*/
+
+// Example:
+void main() {
+	int tzd;
+	datetime dt = parse_datetime("2024-03-19 13:19:51", tzd);
+	alert("example", "the parsed time is " + dt.format("%W, %B %d %Y at %H:%M:%S"));
+	dt = parse_datetime("%Y/%m/%d %H:%M:%S", "2024/03/19 13:19:51", tzd);
+	alert("example", "the parsed time is " + dt.format("%W, %B %d %Y at %H:%M:%S"));
+}
