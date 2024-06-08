@@ -49,6 +49,7 @@
 #include <fast_float.h>
 #include <Poco/StringTokenizer.h>
 #include <array>
+#include <iostream>
 
 #ifndef _WIN32
 	#define strnicmp strncasecmp
@@ -1555,7 +1556,9 @@ BOOL mixer::remove_sound(sound& s, BOOL internal) {
 }
 
 int mixer::set_fx(std::string& fx, int idx) {
+std::cout << "Sound: " << fx << ", idx: " << idx << '\n';
 	if (fx.empty()) {
+	std::cout << "Clearing effect\n";
 		if (idx >= 0 && idx < effects.size()) {
 			for (auto i = idx + 1; i < effects.size(); i++)
 				BASS_FXSetPriority(effects[i].hfx, i);
@@ -1575,21 +1578,23 @@ int mixer::set_fx(std::string& fx, int idx) {
 	vector<string> args;
 	Poco::StringTokenizer tokenizer(fx, ":", Poco::StringTokenizer::TOK_IGNORE_EMPTY | Poco::StringTokenizer::TOK_TRIM);
 	move(tokenizer.begin(), tokenizer.end(), back_inserter(args));
-	if (args.empty())
+	if (args.size() < 1) {
+	std::cout << "No args; aborting\n";
 		return -1;
-	else if (args.size() == 1 && args[0].size() > 0 && args[0][0] == '$') {
-		for (std::vector<string>::size_type idx = 0; idx < effects.size(); idx++) {
-			if (std::string_view(effects[idx].id).compare(args[0]) == 0) {
-				for (auto i = idx + 1; i < effects.size(); i++)
+	} else if (args.size() == 1 && args[0].size() > 0 && args[0][0] == '$') {
+	std::cout << "Clearing effect " << args[0] << "\n";
+		for (DWORD idx = 0; idx < effects.size(); idx++) {
+			if (strncmp(effects[idx].id, args[0].c_str(), args[0].size()) == 0) {
+				for (DWORD i = idx + 1; i < effects.size(); i++)
 					BASS_FXSetPriority(effects[i].hfx, i);
 				BASS_ChannelRemoveFX(channel, effects[idx].hfx);
 				effects.erase(effects.begin() + idx);
-				effects.shrink_to_fit();
 				idx -= 1;
 			}
 		}
 		return 1;
 	}
+	std::cout << "Applying effect\n";
 	string effect_id;
 	if (args[0].size() > 0 && args[0][0] == '$') {
 		effect_id = args[0];
