@@ -3,7 +3,9 @@
 // license: zlib (see license.md in the root of the nvgt distrobution)
 
 network n;
+string long_packet="aaaaaaa";
 void main() {
+	for (int i = 0; i<15; i++) long_packet += long_packet;
 	if (!n.setup_client(1, 10)) {
 		alert("error", "couldn't init client!");
 		exit();
@@ -21,7 +23,8 @@ void main() {
 			screen_reader_speak(e.message, true);
 		else if (e.type == event_connect)
 			screen_reader_speak("connection ok", true);
-		if (key_pressed(KEY_SPACE)) n.send_reliable(1, "spk", 0);
+		if (key_repeating(KEY_SPACE)) n.send_reliable(1, "spk", 0);
+		if (key_down(KEY_W)) n.send_reliable(0, long_packet, 0);
 	}
 	n.destroy();
 	wait(100);
