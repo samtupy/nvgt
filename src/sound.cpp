@@ -1579,7 +1579,7 @@ int mixer::set_fx(std::string& fx, int idx) {
 		return -1;
 	} else if (args.size() == 1 && args[0].size() > 0 && args[0][0] == '$') {
 		for (DWORD idx = 0; idx < effects.size(); idx++) {
-			if (std::string_view(effects[idx].id) == std::string_view(args[0])) {
+			if (effects[idx].id.starts_with(args[0])) {
 				for (DWORD i = idx + 1; i < effects.size(); i++) {
 					BASS_FXSetPriority(effects[i].hfx, i);
 					}
@@ -1599,6 +1599,7 @@ int mixer::set_fx(std::string& fx, int idx) {
 	e.type = 0;
 	if (!effect_id.empty())
 		e.id = effect_id;
+	else e.id = "";
 	array<BYTE, 512> effect_settings;
 	// effects
 	if (args[0] == "i3DL2reverb" && args.size() > 12) {
