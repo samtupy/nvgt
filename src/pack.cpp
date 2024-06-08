@@ -73,8 +73,9 @@ bool pack::set_pack_identifier(const std::string& ident) {
 }
 // Loads or creates the given pack file based on mode.
 bool pack::open(const string& filename_in, pack_open_mode mode, bool memload) {
-	if (fptr || mptr)
-		return false; // This object is already in use and must be closed first.
+	if (fptr || mptr) {
+			if (!close()) return false; // A pack file is already opened and was unable to close, maybe some sounds are actively playing from it.
+		}
 	if (mode <= PACK_OPEN_MODE_NONE || mode >= PACK_OPEN_MODES_TOTAL)
 		return false; // Invalid mode.
 	string filename = filename_in;
@@ -628,7 +629,7 @@ void RegisterScriptPack(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("pack"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(pack, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("pack"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(pack, Release), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("pack"), _O("bool set_pack_identifier(const string&in)"), asMETHOD(pack, set_pack_identifier), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool open(const string &in, uint, bool = false)"), asMETHOD(pack, open), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool open(const string &in, uint = PACK_OPEN_MODE_READ, bool = false)"), asMETHOD(pack, open), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("pack"), _O("bool close()"), asMETHOD(pack, close), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("pack"), _O("bool add_file(const string &in, const string& in, bool = false)"), asMETHOD(pack, add_file), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("pack"), _O("bool add_memory(const string &in, const string& in, bool = false)"), asMETHODPR(pack, add_memory, (const string&, const string&, bool), bool), asCALL_THISCALL);
