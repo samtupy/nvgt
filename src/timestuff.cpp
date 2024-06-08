@@ -537,6 +537,6 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_ASCTIME", (void*)&DateTimeFormat::ASCTIME_REGEX);
 	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_SORTABLE", (void*)&DateTimeFormat::SORTABLE_FORMAT);
 	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_SORTABLE", (void*)&DateTimeFormat::SORTABLE_REGEX);
-	engine->RegisterGlobalFunction("bool datetime_is_valid_format_string(const strring&in)", asFUNCTION(DateTimeFormat::hasFormat), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool datetime_is_valid_format(const strring&in)", asFUNCTION(DateTimeFormat::isValid), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool datetime_is_valid_format_string(const string&in)", asFUNCTION(DateTimeFormat::hasFormat), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool datetime_is_valid_format(const string&in)", asFUNCTION(DateTimeFormat::isValid), asCALL_CDECL);
 }
