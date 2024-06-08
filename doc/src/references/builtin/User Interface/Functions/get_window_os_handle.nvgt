@@ -1,0 +1,19 @@
+/**
+	Returns the native handle used by the operating system to manage NVGT's window.
+	uint64 get_window_os_handle();
+	## Returns:
+		uint64: An HWND / NSWindow\* / similar handle that the operating system uses to manage the window.
+	## Remarks:
+		This function is only useful for someone trying to do something advanced, usually involving passing the identifier for the game window to a system API function or something similar. If you don't understand what this function does, you should probably avoid it for the present.
+*/
+
+// Example:
+void main() {
+	// Lets set the window title using the windows API, typically you'd use show_window a second time for this.
+	show_window("hello");
+	uint64 handle = get_window_os_handle();
+	library lib;
+	lib.load("user32");
+	lib.call("int SetWindowTextA(uint64, ptr)", handle, "example window");
+	wait(500); // Let the user observe the change before exiting.
+}
