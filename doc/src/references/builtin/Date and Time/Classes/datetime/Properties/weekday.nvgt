@@ -1,0 +1,11 @@
+/**
+	Represents the current day of the week (from 0 to 6) calculated by the datetime object.
+	const uint weekday;
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set(2024, 5, 8);
+	alert("The datetime's current day of the week is", d.weekday);
+}

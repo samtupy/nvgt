@@ -1,0 +1,11 @@
+/**
+	A boolean which is true if the datetime object is set to an hour before noon (ante meridiem).
+	const bool AM;
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set(2024, 5, 8, 14, 18);
+	alert("The datetime's AM value is", d.AM);
+}

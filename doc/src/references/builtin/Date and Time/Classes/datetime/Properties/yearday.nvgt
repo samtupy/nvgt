@@ -1,0 +1,11 @@
+/**
+	Represents the current day of the year calculated by the datetime object.
+	const uint yearday;
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set(2024, 5, 8);
+	alert("The datetime's current day of the year is", d.yearday);
+}

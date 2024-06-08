@@ -1,0 +1,11 @@
+/**
+	A boolean which is true if the datetime object is set to an hour after noon (post meridiem).
+	const bool PM;
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set(2024, 5, 8, 14, 18);
+	alert("The datetime's PM value is", d.PM);
+}

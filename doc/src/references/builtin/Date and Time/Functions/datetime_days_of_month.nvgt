@@ -1,0 +1,18 @@
+/**
+	Returns the number of days in a given month, a year is also required so that leap year can be handled correctly.
+	int datetime_days_of_month(int year, int month);
+	## Arguments:
+		* int year: The year involved in this calculation due to leap year.
+		* month: The month to fetch the number of days of (from 1 to 12).
+	## Returns:
+		int: The number of days in the month provided with leap year accounted for, or 0 if invalid/out of range arguments are provided.
+*/
+
+// Example:
+void main() {
+	for(int i = 1; i <= 12; i++) {
+		alert("month " + i + " no leap year", datetime_days_of_month(2023, i));
+		if (i == 2) alert("month " + i + " leap year", datetime_days_of_month(2024, i));
+	}
+	alert("invalid", datetime_days_of_month(2015, 17)); // Will show 0 (there are not 17 months in the year)!
+}

@@ -1,11 +1,11 @@
 /**
-	Represents the current hour of the datetime object.
-	uint datetime::hour;
+	Represents the current hour (from 0 to 23) of the datetime object.
+	const uint hour;
 */
 
 // Example:
 void main() {
 	datetime d;
-	d.set_time(12, 47, 19);
+	d.set(d.year, d.month, d.day, 13, 47, 19);
 	alert("The current hour of the datetime object is", d.hour);
 }

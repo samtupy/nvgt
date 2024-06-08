@@ -1,0 +1,12 @@
+/**
+	Determines the UTC based time point stored in the datetime object.
+	const int64 UTC_time;
+	## Remarks:
+		UTC based time begins on October 15, 1582 at 12 AM and uses an accuracy of 100 nanoseconds.
+*/
+
+// Example:
+void main() {
+	datetime dt;
+	alert("example", "The current UTC time value is " + dt.UTC_time);
+}

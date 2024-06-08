@@ -1,0 +1,17 @@
+/**
+	Returns the currently set week number within the year of the datetime object.
+	int week(int first_day_of_week = 1);
+	## Arguments:
+		* int first_day_of_week = 1: Determines whether 0 (sunday) or 1 (monday) begins the week.
+	## Returns:
+		int: The week number within the year (0 to 53).
+	## Remarks:
+		The first_day_of_week argument controls whether the week counter increases by 1 upon reaching Sunday or Monday. Passing other values to this function has undefined results.
+		Week 1 of the year begins in whatever week contains January 4th.
+*/
+
+// Example:
+void main() {
+	datetime dt(2016, 9, 17);
+	alert("example", "week " + dt.week()); // Will display 37.
+}
