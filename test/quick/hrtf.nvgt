@@ -1,0 +1,57 @@
+#pragma stub boxed
+#include "bgt_compat.nvgt"
+#include "sound_pool.nvgt"
+sound_pool p;
+sound dummy; //temporary solution to a fixed bug
+timer rotationtimer;
+
+void main()
+{
+dummy.load("dummy");
+sound_global_hrtf=true;
+
+show_window("NVGT 3d sound demo");
+p.hrtf=true;
+//p.behind_pitch_decrease=5;
+int mus=p.play_3d(input_box("HRTF Demo", "Enter the name of a sound to be played"), 0, 0, 0, 0, 0, 5, rotation: 0, looping: true);
+
+mixer mix;
+mix.set_fx("$room:freeverb:1.0:0.8:0.50:1.0:1.0:0.8");
+p.items[mus].handle.set_mixer(@mix);
+int x=0;
+int y=0;
+int z=0;
+double angle=0;
+
+while(true)
+{
+wait(5);
+if(key_pressed(KEY_C)){
+screen_reader_speak("FX cleared", false);
+mix.set_fx("$room");
+}
+if(key_pressed(KEY_ESCAPE))
+exit();
+if(key_down(KEY_E) and rotationtimer.elapsed>100){
+angle+=calculate_theta(5);
+rotationtimer.restart();
+}
+if(key_down(KEY_Q) and rotationtimer.elapsed>100){
+angle-=calculate_theta(5);
+rotationtimer.restart();
+}
+if(key_pressed(KEY_LEFT))
+x--;
+if(key_pressed(KEY_RIGHT))
+x++;
+if(key_pressed(KEY_DOWN))
+y--;
+if(key_pressed(KEY_UP))
+y++;
+if(key_pressed(KEY_PAGEDOWN))
+z--;
+if(key_pressed(KEY_PAGEUP))
+z++;
+p.update_listener_3d(x, y, z, angle);
+}
+}

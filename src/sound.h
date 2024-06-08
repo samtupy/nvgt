@@ -56,7 +56,7 @@ typedef struct hstream_entry {
 typedef struct {
 	HFX hfx;
 	unsigned int type;
-	char id[32];
+	std::string id;
 } mixer_effect;
 
 typedef struct {
