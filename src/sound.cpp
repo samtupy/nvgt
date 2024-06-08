@@ -49,7 +49,6 @@
 #include <fast_float.h>
 #include <Poco/StringTokenizer.h>
 #include <array>
-#include <iostream>
 
 #ifndef _WIN32
 	#define strnicmp strncasecmp
@@ -1556,9 +1555,7 @@ BOOL mixer::remove_sound(sound& s, BOOL internal) {
 }
 
 int mixer::set_fx(std::string& fx, int idx) {
-std::cout << "Sound: " << fx << ", idx: " << idx << '\n';
 	if (fx.empty()) {
-	std::cout << "Clearing effect\n";
 		if (idx >= 0 && idx < effects.size()) {
 			for (auto i = idx + 1; i < effects.size(); i++)
 				BASS_FXSetPriority(effects[i].hfx, i);
@@ -1579,30 +1576,20 @@ std::cout << "Sound: " << fx << ", idx: " << idx << '\n';
 	Poco::StringTokenizer tokenizer(fx, ":", Poco::StringTokenizer::TOK_IGNORE_EMPTY | Poco::StringTokenizer::TOK_TRIM);
 	move(tokenizer.begin(), tokenizer.end(), back_inserter(args));
 	if (args.size() < 1) {
-	std::cout << "No args; aborting\n";
 		return -1;
 	} else if (args.size() == 1 && args[0].size() > 0 && args[0][0] == '$') {
-	std::cout << "Clearing effect " << args[0] << "\n";
 		for (DWORD idx = 0; idx < effects.size(); idx++) {
-		std::cout << "Examining effect " << idx << "\n";
-		std::cout << "strncmp returned: " << strncmp(effects[idx].id.c_str(), args[0].c_str(), args[0].size()) << '\n';
-		std::cout << "operator== returned: " << std::to_string(std::string_view(effects[idx].id) == std::string_view(args[0])) << '\n';
 			if (std::string_view(effects[idx].id) == std::string_view(args[0])) {
 				for (DWORD i = idx + 1; i < effects.size(); i++) {
-				std::cout << "Modify effect priority: " << i << '\n';
-					auto res = BASS_FXSetPriority(effects[i].hfx, i);
-					std::cout << "BASS_FXSetPriority(effects[i].hfx, i) returned: " << res << '\n';
+					BASS_FXSetPriority(effects[i].hfx, i);
 					}
-					std::cout << "Remove effect " << idx << " from channel " << channel << '\n';
-				auto res = BASS_ChannelRemoveFX(channel, effects[idx].hfx);
-				std::cout << "BASS_ChannelRemoveFX(channel, effects[idx].hfx) returned: " << res << '\n';
+				BASS_ChannelRemoveFX(channel, effects[idx].hfx);
 				effects.erase(effects.begin() + idx);
 				idx -= 1;
 			}
 		}
 		return 1;
 	}
-	std::cout << "Applying effect\n";
 	string effect_id;
 	if (args[0].size() > 0 && args[0][0] == '$') {
 		effect_id = args[0];
