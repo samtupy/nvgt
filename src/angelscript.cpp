@@ -416,6 +416,15 @@ int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
 		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "Script failed to build");
 		return -1;
 	}
+	// Do not let the script compile if it contains no entry point.
+	asIScriptFunction* func = mod->GetFunctionByDecl("int main()");
+	if (!func)
+		func = mod->GetFunctionByDecl("void main()");
+	if (!func) {
+		g_scriptMessagesInfo = "";
+		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "No entry point found (either 'int main()' or 'void main()'.)");
+		return -1;
+	}
 	return 0;
 }
 int SaveCompiledScript(asIScriptEngine* engine, unsigned char** output) {
