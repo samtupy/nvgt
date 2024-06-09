@@ -7,12 +7,19 @@ import os, multiprocessing
 
 # setup
 env = Environment()
+# Prevent scons from wiping out the environment for certain tools, e.g. scan-build
+env["CC"] = os.getenv("CC") or env["CC"]
+env["CXX"] = os.getenv("CXX") or env["CXX"]
+env["ENV"].update(x for x in os.environ.items() if x[0].startswith("CCC_"))
 Decider('content-timestamp')
 env.Alias("install", "c:/nvgt")
 SConscript("build/upx_sconscript.py", exports = ["env"])
 SConscript("build/version_sconscript.py", exports = ["env"])
 env.SetOption("num_jobs", multiprocessing.cpu_count())
 SConscript("build/osdev_sconscript.py", exports = ["env"])
+env.Tool('compilation_db')
+cdb = env.CompilationDatabase()
+Alias('cdb', cdb)
 if env["PLATFORM"] == "win32":
 	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/O2", "/bigobj", "/permissive-"])
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
