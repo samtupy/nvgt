@@ -248,7 +248,7 @@ void main(){
 #### bonus: binary 1100101 (or 101)
 To understand signed and unsigned integers (and to understand integers) we must first understand binary. Otherwise known as base 2, it is a system based on 0s and 1s. It's most well known for appearing on terminals in poorly written movies about hackers, but it is integral to understand it as a programmer, so let's talk about it.
 
-The unsigned integer version of binary is actually easier to explain, so we'll start with that one. In terms of byte order, we will assume big-endian, but you don't need to worry about that because this is probably what you will be dealing with. Little-endian is just big-endian in reverse, which as you will soon discover is fairly easy to visualize.
+The unsigned integer version of binary is actually easier to explain, so we'll start with that one.
 
 Consider a row of bits. In base 2, we can already surmise that the maximum possible value is 2^bits-1. NVGT's ints are 32-bit, although it does also support int64 and uint64 types if you want them.
 
