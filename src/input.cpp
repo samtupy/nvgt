@@ -272,55 +272,49 @@ bool joystick::vibrate_triggers(unsigned short left, unsigned short right, int d
 	return SDL_GameControllerRumbleTriggers(stick, left, right, duration);
 }
 
-bool keyhook_active = true;
 #ifdef _WIN32
-// Thanks Quentin Cosendey (Universal Speech) for this jaws keyboard hook code.
+// Thanks Quentin Cosendey (Universal Speech) for this jaws keyboard hook code as well as to male-srdiecko and silak for various improvements and fixes that have taken place since initial implementation.
 static HHOOK hHook = nullptr;
+bool keyhook_active = true;
 bool altPressed = false;
 bool capsPressed = false;
 bool insertPressed = false;
+
 LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
-    if (nCode != HC_ACTION) {
-        return CallNextHookEx(hHook, nCode, wParam, lParam);
-    }
+	if (nCode != HC_ACTION)
+		return CallNextHookEx(hHook, nCode, wParam, lParam);
 
-    PKBDLLHOOKSTRUCT p = reinterpret_cast<PKBDLLHOOKSTRUCT>(lParam);
-    UINT vkCode = p->vkCode;
-    bool altDown = p->flags & LLKHF_ALTDOWN;
-    bool keyDown = p->flags & LLKHF_UP == 0;
+	PKBDLLHOOKSTRUCT p = reinterpret_cast<PKBDLLHOOKSTRUCT>(lParam);
+	UINT vkCode = p->vkCode;
+	bool altDown = p->flags & LLKHF_ALTDOWN;
+	bool keyDown = (p->flags & LLKHF_UP) == 0;
 
-    if ((vkCode != VK_CAPITAL && vkCode != VK_INSERT) && (capsPressed || insertPressed)) {
-        return CallNextHookEx(hHook, nCode, wParam, lParam);
-    }
+	altPressed = altDown;
 
-    switch (vkCode) {
-        case VK_TAB:
-        case VK_SPACE:
-            if ((vkCode == VK_INSERT && keyDown) || (vkCode == VK_CAPITAL && keyDown) || altDown) {
-                return CallNextHookEx(hHook, nCode, wParam, lParam);
-            }
-            break;
-        case VK_INSERT:
-            insertPressed = keyDown;
-            break;
-        case VK_CAPITAL:
-            capsPressed = keyDown;
-            break;
-        case VK_NUMLOCK:
-        case VK_LCONTROL:
-        case VK_RCONTROL:
-        case VK_LSHIFT:
-        case VK_RSHIFT:
-        case VK_LMENU:
-        case VK_RMENU:
-            break;
-        default:
-            return 0; // Do nothing for other keys
-    }
+	if (vkCode != VK_CAPITAL && vkCode != VK_INSERT && (capsPressed || insertPressed))
+		return CallNextHookEx(hHook, nCode, wParam, lParam);
 
-    return CallNextHookEx(hHook, nCode, wParam, lParam);
+	switch (vkCode) {
+		case VK_INSERT:
+			insertPressed = keyDown;
+			return CallNextHookEx(hHook, nCode, wParam, lParam);
+		case VK_CAPITAL:
+			capsPressed = keyDown;
+			return CallNextHookEx(hHook, nCode, wParam, lParam);
+		case VK_NUMLOCK:
+		case VK_LCONTROL:
+		case VK_RCONTROL:
+		case VK_LSHIFT:
+		case VK_RSHIFT:
+			return CallNextHookEx(hHook, nCode, wParam, lParam);
+		default:
+			return 0; // Do nothing for other keys
+	}
+
+	return CallNextHookEx(hHook, nCode, wParam, lParam);
 }
 #endif
+
 void uninstall_keyhook();
 bool install_keyhook(bool allow_reinstall) {
 	#ifdef _WIN32
