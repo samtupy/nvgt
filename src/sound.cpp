@@ -49,6 +49,7 @@
 #include <fast_float.h>
 #include <Poco/StringTokenizer.h>
 #include <array>
+#include <algorithm>
 
 #ifndef _WIN32
 	#define strnicmp strncasecmp
@@ -1436,7 +1437,7 @@ BOOL sound::slide_volume_alt(float volume, unsigned int time) {
 	return slide_volume((volume + 100) / 100, time);
 }
 
-BOOL mixer::get_effect_index(const char* id) {
+int mixer::get_effect_index(const char* id) {
 	if (!id || strlen(id) < 2) return -1;
 	for (DWORD i = 0; i < effects.size(); i++) {
 		if (effects[i].id == std::string_view(id)) return i;
@@ -1600,6 +1601,7 @@ int mixer::set_fx(std::string& fx, int idx) {
 	if (!effect_id.empty())
 		e.id = effect_id;
 	else e.id = "";
+	e.original_fx_str = fx;
 	array<BYTE, 512> effect_settings;
 	// effects
 	if (args[0] == "i3DL2reverb" && args.size() > 12) {
@@ -1630,7 +1632,7 @@ int mixer::set_fx(std::string& fx, int idx) {
 		if (fInGainEc != errc() || fReverbMixEc != errc() || fReverbTimeEc != errc() || fHighFreqRTRatioEc != errc())
 			return -1;
 		memcpy(effect_settings.data(), &settings, sizeof(BASS_DX8_REVERB));
-	} else if (args[0] == "rotate" && args.size() > 1) {
+	} else if (args[0] == "rotate" && args.size() > 2) {
 		e.type = BASS_FX_BFX_ROTATE;
 		BASS_BFX_ROTATE settings;
 		const auto[fRatePtr, fRateEc] = from_chars(args[1].c_str(), args[1].c_str() + args[1].size(), settings.fRate);
@@ -1821,9 +1823,14 @@ int mixer::set_fx(std::string& fx, int idx) {
 		}
 	}
 	if (id_idx < 0) {
-		e.hfx = BASS_ChannelSetFX(channel, e.type, (idx >= 0 && idx < effects.size() ? idx + 1 : effects.size() + 1));
+		    e.hfx = BASS_ChannelSetFX(channel, e.type, (idx >= 0 && idx < effects.size() ? idx + 1 : effects.size() + 1));
 		if (!e.hfx)
 			return -1;
+    if (idx == 0 && effects.size() == 0) {
+        // First effect being added
+        effects.insert(effects.begin(), e);
+        return 0;
+    }
 	} else {
 		if (effects[id_idx].type != e.type)
 			return -1;
@@ -1835,8 +1842,27 @@ int mixer::set_fx(std::string& fx, int idx) {
 		effects.insert(effects.begin() + idx, e);
 		return idx;
 	}
-	effects.emplace_back(e);
-	return effects.size() - 1;
+if (idx == 0 && effects.size() == 0) {
+    // First effect being added and was not previously in the list
+    effects.emplace_back(e);
+    return 0;
+}
+return -1;
+}
+
+void mixer::clear_all_effects() {
+std::for_each(effects.begin(), effects.end(), [&](const auto& effect) {
+BASS_ChannelRemoveFX(channel, effect.hfx);
+});
+effects.clear();
+}
+
+CScriptArray* mixer::get_all_raw_effects() {
+CScriptArray* arr = CScriptArray::Create(g_ScriptEngine->GetTypeInfoByDecl("array<string>"));
+std::for_each(effects.begin(), effects.end(), [&](auto& effect) {
+arr->InsertLast(static_cast<void*>(&effect.original_fx_str));
+});
+return arr;
 }
 
 BOOL mixer::set_mixer(mixer* m) {
@@ -2175,6 +2201,8 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("sound", "void set_volume(float) property", asMETHOD(sound, set_volume_alt), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool slide_volume(float, uint)", asMETHOD(sound, slide_volume_alt), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool set_fx(const string &in, int = 0)", asMETHOD(mixer, set_fx), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "void clear_all_effects()", asMETHOD(mixer, clear_all_effects), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "string[]@ get_all_raw_effects()", asMETHOD(mixer, get_all_raw_effects), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool set_position(float, float, float, float, float, float, float, float, float)", asMETHOD(mixer, set_position), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool set_mixer(mixer@ = null)", asMETHOD(mixer, set_mixer), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool get_sliding() const property", asMETHOD(mixer, is_sliding), asCALL_THISCALL);
