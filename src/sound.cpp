@@ -2175,7 +2175,7 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("sound", "bool set_mixer(mixer@ = null)", asMETHOD(sound, set_mixer), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "void set_hrtf(bool = true)", asMETHOD(sound, set_hrtf), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "void set_length(float = 0.0)", asMETHOD(sound, set_length), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool set_fx(const string &in, int = 0)", asMETHOD(sound, set_fx), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool set_fx(const string &in, int = -1)", asMETHOD(sound, set_fx), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool play()", asMETHOD(sound, play), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool play_wait()", asMETHOD(sound, play_wait), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool play_looped()", asMETHOD(sound, play_looped), asCALL_THISCALL);
