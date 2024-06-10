@@ -17,8 +17,8 @@ string speechbuff;
 bool use_sr = true;
 string voicename = "SR";
 audio_form@ tts_config_form = null;
-bool default_interrupt=false;
-bool speak(string text, bool interrupt = default_interrupt, bool translate_text = true, bool braille = true) {
+bool tts_default_interrupt = true;
+bool speak(string text, bool interrupt = tts_default_interrupt, bool translate_text = true, bool braille = true) {
 	speechbuff = text;
 	if (text.length() > 10000) {
 		string tmp = text;
