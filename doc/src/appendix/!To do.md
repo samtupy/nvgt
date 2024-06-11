@@ -51,3 +51,8 @@ Due to lack of experience towards the beginning of this project's development, o
 ### Naming of globals
 Along the same line, partly due to initial closed source intentions and also partly do to the use of sample Angelscript code, some of NVGT's global symbols are not named ideally. The best example right now is g_CommandLine vs. g_command_line_args. We need to decide on a scheme and stick to it unless forced by a dependency, and then do a quick symbol renaming session in vscode.
 
+### Rewrite system_fingerprint.cpp
+Currently we are using parts of an apache2 licensed library for system fingerprint generation. Not only is it a bit rough but it also uses several architecture specific assembly instructions at times when we probably don't need any. We should rewrite this to use our own system instead comprised of calls into Poco, SDL and other libraries that can return various bits of system information, or at the very least find a solid tiny dependency that can handle it for us.
+
+### SDL3 upgrade
+At some point we do indeed intend to upgrade to SDL3 instead of sticking with SDL2. The priority of this task is somewhat unknown and at least partially revolves around making sure SDL3 is easy to aquire/build/install on all the platforms we're interested in using it on. So long as we manually build one of the prereleases, we're probably OK though it would be nice to wait until it shows up on brew, apt and other package managers.

@@ -9,7 +9,7 @@ This document lists all major changes that have taken place in NVGT since we sta
 * Added string.reserve() function.
 * Added  get_window_os_handle() function.
 * Fix issues in sound::set_fx in regards to effect deletion.
-* NVGT's datetime facilities now wrap Poco's implementations. Documentation is not complete, but the 4 new classes are datetime, timestamp, timespan, and calander (which wraps LocalDateTime) in Poco and is called calander for bgt backwards compatibility. Global functions include parse_datetime, datetime_is_leap_year and more, and all classes include a format method to convert the objects into strings given a format specifier.
+* NVGT's datetime facilities now wrap Poco's implementations. Documentation is not complete, but the 4 new classes are datetime, timestamp, timespan, and calendar (which wraps LocalDateTime) in Poco and is called calendar for bgt backwards compatibility. Global functions include parse_datetime, datetime_is_leap_year and more, and all classes include a format method to convert the objects into strings given a format specifier.
 * Converted most filesystem functions to wrap Poco's implementations.
 * Fix potential issue with network where packets don't destroy on send failure.
 * Added string_create_from_pointer to library functions.
