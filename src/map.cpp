@@ -142,8 +142,8 @@ void map_area::unframe() {
 		auto it = std::find(f->areas.begin(), f->areas.end(), this);
 		while (it != f->areas.end()) {
 			f->areas.erase(it);
+			if (ref_count > 1)
 			release();
-			if (ref_count < 1) return;
 			else
 				it = std::find(f->areas.begin(), f->areas.end(), this);
 		}
@@ -269,6 +269,9 @@ void coordinate_map::release() {
 }
 Vector3 coordinate_map::get_frame_coordinates(int x, int y, int z, int size) {
 	Vector3 r;
+	r.x = 0;
+	r.y = 0;
+	r.z = 0;
 	if (size < 0 || size >= total_frame_sizes) return r;
 	r.x -= x & (frame_sizes[size] - 1);
 	r.y -= y & (frame_sizes[size] - 1);

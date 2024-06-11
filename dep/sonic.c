@@ -332,15 +332,19 @@ void sonicSetVolume(sonicStream stream, float volume) {
 static void freeStreamBuffers(sonicStream stream) {
   if (stream->inputBuffer != NULL) {
     sonicFree(stream->inputBuffer);
+    stream->inputBuffer = NULL;
   }
   if (stream->outputBuffer != NULL) {
     sonicFree(stream->outputBuffer);
+    stream->outputBuffer = NULL;
   }
   if (stream->pitchBuffer != NULL) {
     sonicFree(stream->pitchBuffer);
+    stream->pitchBuffer = NULL;
   }
   if (stream->downSampleBuffer != NULL) {
     sonicFree(stream->downSampleBuffer);
+    stream->downSampleBuffer = NULL;
   }
 }
 
@@ -775,9 +779,13 @@ static int findPitchPeriodInRange(short* samples, int minPeriod, int maxPeriod,
       worstPeriod = period;
     }
   }
+  if (bestPeriod != 0 && worstPeriod != 0) {
   *retMinDiff = minDiff / bestPeriod;
   *retMaxDiff = maxDiff / worstPeriod;
   return bestPeriod;
+  } else {
+  return 0;
+  }
 }
 
 /* At abrupt ends of voiced words, we can have pitch periods that are better

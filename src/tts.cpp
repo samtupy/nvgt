@@ -216,6 +216,7 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 		}
 	}
 	#endif
+	if (!data) return "";
 	char* ptr = minitrim(data, &bufsize, bitrate, channels);
 	wav_header h = make_wav_header(44 + bufsize, samprate, bitrate, channels);
 	std::string output((char*)&h, sizeof(wav_header));

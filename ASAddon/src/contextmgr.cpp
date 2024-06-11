@@ -379,18 +379,18 @@ void CContextMgr::RegisterThreadSupport(asIScriptEngine *engine)
 
 void CContextMgr::RegisterCoRoutineSupport(asIScriptEngine *engine)
 {
-	int r; 
+	int r = 0; 
 
 	// The dictionary add-on must have been registered already
 	assert( engine->GetTypeInfoByDecl("dictionary") );
 
 #ifndef AS_MAX_PORTABILITY
 	r = engine->RegisterGlobalFunction("void yield()", asFUNCTION(ScriptYield), asCALL_CDECL); assert( r >= 0 );
-	r = engine->RegisterFuncdef("void coroutine(dictionary@)");
+	r = engine->RegisterFuncdef("void coroutine(dictionary@)"); assert( r >= 0 );
 	r = engine->RegisterGlobalFunction("void create_coroutine(coroutine @+, dictionary @+)", asFUNCTION(ScriptCreateCoRoutine), asCALL_CDECL); assert( r >= 0 );
 #else
 	r = engine->RegisterGlobalFunction("void yield()", asFUNCTION(ScriptYield_generic), asCALL_GENERIC); assert( r >= 0 );
-	r = engine->RegisterFuncdef("void coroutine(dictionary@)");
+	r = engine->RegisterFuncdef("void coroutine(dictionary@)"); assert( r >= 0 );
 	r = engine->RegisterGlobalFunction("void create_coroutine(coroutine @+, dictionary @+)", asFUNCTION(ScriptCreateCoRoutine_generic), asCALL_GENERIC); assert( r >= 0 );
 #endif
 }

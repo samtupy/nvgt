@@ -987,7 +987,7 @@ std::string ScriptGetExceptionFunctionDecl()
 {
 	asIScriptContext *ctx = asGetActiveContext();
 	if (!ctx)
-		return 0;
+		return "";
 	asIScriptFunction* func=ctx->GetExceptionFunction();
 	if(!func) return "";
 	return std::string(func->GetDeclaration());
@@ -997,7 +997,7 @@ std::string ScriptGetExceptionModule()
 {
 	asIScriptContext *ctx = asGetActiveContext();
 	if (!ctx)
-		return 0;
+		return "";
 	asIScriptFunction* func=ctx->GetExceptionFunction();
 	if(!func) return "";
 	return std::string(func->GetScriptSectionName());

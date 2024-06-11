@@ -229,7 +229,7 @@ public:
 		if (!ctx) goto finish;
 		if (ctx->Prepare(func) < 0) goto finish;
 		if (ctx->SetArgObject(0, args) < 0) goto finish;
-		execution_result = ctx->Execute(); // Todo: Work out what we want to do with exceptions or errors that take place in threads.
+		ctx->Execute(); // Todo: Work out what we want to do with exceptions or errors that take place in threads.
 	finish:
 		if (ctx && !g_shutting_down) g_ScriptEngine->ReturnContext(ctx); // We only do this when the engine is not shutting down because the angelscript could get partially destroyed on the main thread before this point in the shutdown case.
 		if (thread) angelscript_refcounted_release<Thread>(thread);

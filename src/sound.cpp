@@ -1162,7 +1162,7 @@ BOOL sound::set_mixer(mixer* m) {
 	if (output_mixer) {
 		if (parent_mixer)
 			parent_mixer->remove_mixer(output_mixer, TRUE);
-		if (m->add_mixer(output_mixer))
+		if (m && m->add_mixer(output_mixer))
 			parent_mixer = m;
 		return parent_mixer == m;
 	}
@@ -1189,7 +1189,7 @@ BOOL sound_base::set_position(float listener_x, float listener_y, float listener
 		}
 	} else if (!pos_effect)
 		pos_effect = BASS_ChannelSetDSP(output_mixer ? output_mixer->channel : channel, positioning_dsp, this, 0);
-	if (source) {
+	if (source && env->sim) {
 		IPLSimulationInputs inputs{};
 		inputs.flags = IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS);
 		inputs.directFlags = IPLDirectSimulationFlags(IPL_DIRECTSIMULATIONFLAGS_DISTANCEATTENUATION | IPL_DIRECTSIMULATIONFLAGS_AIRABSORPTION | IPL_DIRECTSIMULATIONFLAGS_OCCLUSION | IPL_DIRECTSIMULATIONFLAGS_TRANSMISSION);
@@ -1872,7 +1872,9 @@ BOOL mixer::set_mixer(mixer* m) {
 		return FALSE;
 	if (parent_mixer)
 		parent_mixer->remove_mixer(this, TRUE);
-	return m->add_mixer(this);
+	if (m)
+		return m->add_mixer(this);
+	return false;
 }
 
 BOOL mixer::is_sliding() {

@@ -97,7 +97,7 @@ std::ios* datastream::stream() {
 bool datastream::seek(unsigned long long offset) {
 	if (!r && !w) return false;
 	if (_istr) {
-		if (r->eof() && offset < _istr->tellg()) _istr->clear();
+		if (r && r->eof() && offset < _istr->tellg()) _istr->clear();
 		_istr->seekg(offset, std::ios::beg);
 	}
 	if (_ostr) _ostr->seekp(offset, std::ios::beg);
@@ -106,7 +106,7 @@ bool datastream::seek(unsigned long long offset) {
 bool datastream::seek_end(unsigned long long offset) {
 	if (!r && !w) return false;
 	if (_istr) {
-		if (r->eof() && offset > 0) _istr->clear();
+		if (r && r->eof() && offset > 0) _istr->clear();
 		_istr->seekg(offset, std::ios::end);
 	}
 	if (_ostr) _ostr->seekp(offset, std::ios::end);
@@ -115,7 +115,7 @@ bool datastream::seek_end(unsigned long long offset) {
 bool datastream::seek_relative(long long offset) {
 	if (!r && !w) return false;
 	if (_istr) {
-		if (r->eof() && offset < 0) _istr->clear();
+		if (r && r->eof() && offset < 0) _istr->clear();
 		_istr->seekg(offset, std::ios::cur);
 	}
 	if (_ostr) _ostr->seekp(offset, std::ios::cur);
