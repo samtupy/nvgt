@@ -12,6 +12,51 @@
 
 #include <angelscript.h>
 #include <Poco/Format.h>
+#include <Poco/RefCountedObject.h>
+#include <Poco/Dynamic/Var.h>
+#include <Poco/JSON/Array.h>
+#include <Poco/JSON/Object.h>
+
+// I wonder if this is gonna be one of those things I'll look back at in a year and lament the fact that I couldn't have found a better way before spending the same amount of time then that I'm about to spend now finding a better way to wrap Poco's shared pointers in a simplistic enough way for real use. These SharedPtr's literally have reference counting that we can't use because the pointers' reference counter is private, and I'm not sure I can use Angelscript's composition features directly either because raw access to the underlying pointer is also private! Maybe I can specify my own reference counter when constructing these pointers (not sure I could count on that for all pointers being received), I could mess with Angelscript scoped reference types (not sure how the user could choose between assigning a new reference or value to a variable), and I could try using angelscripts opHndlAssign thing but based on the docs I would need to do more research to answer questions about that as well! So we're left with this, a duplicate reference counter and a duplicate copy of any raw pointer assigned just so that the user gets to type @my_var=handle vs. my_var=variable to deepcopy.
+template <class T> class poco_shared : public Poco::RefCountedObject {
+public:
+	Poco::SharedPtr<T> shared;
+	T* ptr;
+	poco_shared(Poco::SharedPtr<T> shared) : shared(shared), ptr(shared.get()) {}
+};
+
+class datastream;
+class poco_json_array;
+class poco_json_object : public poco_shared<Poco::JSON::Object> {
+public:
+	poco_json_object(Poco::JSON::Object::Ptr o);
+	poco_shared<Poco::Dynamic::Var>* get(const std::string& key) const;
+	poco_shared<Poco::Dynamic::Var>* query(const std::string& path) const;
+	poco_json_array* get_array(const std::string& key) const;
+	poco_json_object* get_object(const std::string& key) const;
+	void set(const std::string& key, poco_shared<Poco::Dynamic::Var>* v);
+	bool is_array(const std::string& key) const;
+	bool is_null(const std::string& key) const;
+	bool is_object(const std::string& key) const;
+	std::string stringify(unsigned int indent = 0, int step = -1) const;
+	void stringify(datastream* ds, unsigned int indent = 0, int step = -1) const;
+	CScriptArray* get_keys() const;
+};
+class poco_json_array : public poco_shared<Poco::JSON::Array> {
+public:
+	poco_json_array(Poco::JSON::Array::Ptr a);
+	poco_shared<Poco::Dynamic::Var>* get(unsigned int index) const;
+	poco_shared<Poco::Dynamic::Var>* query(const std::string& path) const;
+	poco_json_array* get_array(unsigned int index) const;
+	poco_json_object* get_object(unsigned int index) const;
+	void set(unsigned int index, poco_shared<Poco::Dynamic::Var>* v);
+	void add(poco_shared<Poco::Dynamic::Var>* v);
+	bool is_array(unsigned int index) const;
+	bool is_null(unsigned int index) const;
+	bool is_object(unsigned int index) const;
+	std::string stringify(unsigned int indent = 0, int step = -1) const;
+	void stringify(datastream* ds, unsigned int indent = 0, int step = -1) const;
+};
 
 // Not sure if this should be in another header, if I use this for more than Poco I may consider it. I'm so tired of trying to decide whether to register angelscript types as value or reference. I'm always turned away from reference types because well, the classes I want to wrap have no reference counter. Look maybe this could have been done with c++ multiple inheritance or something, but my brain is tired of learning new concepts for the moment and so hopefully this is portable enough to make better later. Following are methods for attaching a reference counter to any class for registration with angelscript as a reference type.
 struct angelscript_refcounted {

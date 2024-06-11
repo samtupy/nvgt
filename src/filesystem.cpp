@@ -209,6 +209,17 @@ CScriptArray* FindDirectories(const string& path) {
 	return array;
 }
 
+CScriptArray* script_glob(const string& pattern, int options) {
+	// Expected to have been called from a script.
+	CScriptArray* array = CScriptArray::Create(asGetActiveContext()->GetEngine()->GetTypeInfoByDecl("array<string>"));
+	set<string> files;
+	try {
+		Glob::glob(pattern, files, options);
+		array->Reserve(files.size());
+		for (const std::string& path : files) array->InsertLast((void*)&path);
+	} catch(Exception&) {}
+	return array;
+}
 bool DirectoryExists(const string& path) {
 	try {
 		File f(path);
@@ -307,6 +318,11 @@ Timestamp FileGetModified(const string& path) {
 
 
 void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
+	engine->RegisterEnum("glob_options");
+	engine->RegisterEnumValue("glob_options", "GLOB_DEFAULT", Glob::GLOB_DEFAULT);
+	engine->RegisterEnumValue("glob_options", "GLOB_IGNORE_HIDDEN", Glob::GLOB_DOT_SPECIAL);
+	engine->RegisterEnumValue("glob_options", "GLOB_FOLLOW_SYMLINKS", Glob::GLOB_FOLLOW_SYMLINKS);
+	engine->RegisterEnumValue("glob_options", "GLOB_CASELESS", Glob::GLOB_CASELESS);
 	engine->RegisterGlobalFunction("bool directory_exists(const string& in)", asFUNCTION(DirectoryExists), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool directory_create(const string& in)", asFUNCTION(DirectoryCreate), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool directory_delete(const string& in)", asFUNCTION(DirectoryDelete), asCALL_CDECL);
@@ -317,6 +333,7 @@ void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool file_move(const string& in, const string& in)", asFUNCTION(FileMove), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string[]@ find_directories(const string& in)", asFUNCTION(FindDirectories), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string[]@ find_files(const string& in)", asFUNCTION(FindFiles), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string[]@ glob(const string& in, glob_options = GLOB_DEFAULT)", asFUNCTION(script_glob), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int64 file_get_size(const string& in)", asFUNCTION(FileGetSize), asCALL_CDECL);
 	engine->RegisterGlobalFunction("timestamp file_get_date_created(const string& in)", asFUNCTION(FileGetCreated), asCALL_CDECL);
 	engine->RegisterGlobalFunction("timestamp file_get_date_modified(const string& in)", asFUNCTION(FileGetModified), asCALL_CDECL);
