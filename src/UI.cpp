@@ -19,7 +19,17 @@
 	#include <windows.h>
 	#include "InputBox.h"
 #elif defined(__APPLE__)
+#include <IOKit/IOKitLib.h>
+#include <IOKit/IOCFBundle.h>
+#include <CoreFoundation/CoreFoundation.h>
 	#include "apple.h"
+#else
+// Following commented includes are for determining user idle time using x11 screensaver extension. Disabled for now until viability of linking with this library is established or until we fix the idle_ticks() function to use dlopen/dlsym and friends.
+//#include <X11/Xlib.h>
+//#include <X11/extensions/scrnsaver.h>
+#endif
+#ifndef _WIN32
+#include <sys/time.h>
 #endif
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
@@ -306,6 +316,49 @@ void wait(int ms) {
 		post_events.clear();
 	}
 }
+
+
+// The following function contributed to NVGT by silak
+uint64_t idle_ticks() {
+	#ifdef _WIN32
+		LASTINPUTINFO lii = { sizeof(LASTINPUTINFO) };
+		GetLastInputInfo(&lii);
+		DWORD currentTick = GetTickCount();
+		return (currentTick - lii.dwTime);
+	#elif __APPLE__
+		io_iterator_t iter;
+		io_registry_entry_t entry;
+		CFMutableDictionaryRef matching = IOServiceMatching("IOHIDSystem");
+		if (!matching) return -1;
+		kern_return_t kr = IOServiceGetMatchingServices(                                                                kIOMainPortDefault, matching, &iter);
+		if (kr != KERN_SUCCESS) return -1;
+		entry = IOIteratorNext(iter);
+		IOObjectRelease(iter);
+		if (entry) {
+			CFNumberRef obj = (CFNumberRef)IORegistryEntryCreateCFProperty(entry, CFSTR("HIDIdleTime"), kCFAllocatorDefault, 0);
+			if (obj) {
+				int64_t idleTimeNanoSeconds = 0;
+				CFNumberGetValue(obj, kCFNumberSInt64Type, &idleTimeNanoSeconds);
+				CFRelease(obj);
+				return idleTimeNanoSeconds / 1000000; // Convert nanoseconds to milliseconds
+			}
+			IOObjectRelease(entry);
+		}
+		return -1;
+	#else
+		/* Probably switch this to use dlopen instead of direct linkage at least until we can verify that it safely does not compromise portability.
+		Display* dpy = XOpenDisplay(NULL);
+		if (!dpy) return -1;
+		XScreenSaverInfo info;
+		XScreenSaverQueryInfo(dpy, DefaultRootWindow(dpy), &info);
+		uint64_t idleTime = info.idle;
+		XCloseDisplay(dpy);
+		return idleTime;
+		*/
+		return 0; // currently unsupported
+	#endif
+}
+
 void RegisterUI(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UI);
 	engine->RegisterEnum(_O("message_box_flags"));
@@ -335,4 +388,5 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("string get_window_text()", asFUNCTION(get_window_text), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 get_window_os_handle()", asFUNCTION(get_window_os_handle), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void wait(int)", asFUNCTIONPR(wait, (int), void), asCALL_CDECL);
+	engine->RegisterGlobalFunction("uint64 idle_ticks()", asFUNCTION(idle_ticks), asCALL_CDECL);
 }

@@ -91,8 +91,11 @@ CScriptArray* FindFiles(const string& path) {
 	string currentPath = path;
 	string Wildcard = "*";
 	if (wildcard != std::string::npos) {
-		currentPath = path.substr(0, wildcard);
+		currentPath = path.substr(0, wildcard + 1);
 		Wildcard = path.substr(wildcard + 1);
+	} else {
+		currentPath = "./";
+		Wildcard = path;
 	}
 	dirent* ent = 0;
 	DIR* dir = opendir(currentPath.c_str());
@@ -105,17 +108,15 @@ CScriptArray* FindFiles(const string& path) {
 			continue;
 
 		// Skip sub directories
-		currentPath += '/';
-		currentPath.append(filename);
+		string fullname = currentPath + filename;
 		struct stat st;
-		if (stat(currentPath.c_str(), &st) == -1)
+		if (stat(fullname.c_str(), &st) == -1)
 			continue;
 		if ((st.st_mode & S_IFDIR) != 0)
 			continue;
 
 		// wildcard matching
-		if (FNMatch(filename, Wildcard) != 0)
-			continue;
+		if (!FNMatch(filename, Wildcard)) continue;
 
 		// Add the file to the array
 		array->Resize(array->GetSize() + 1);
@@ -173,8 +174,11 @@ CScriptArray* FindDirectories(const string& path) {
 	string currentPath = path;
 	string Wildcard = "*";
 	if (wildcard != std::string::npos) {
-		currentPath = path.substr(0, wildcard);
+		currentPath = path.substr(0, wildcard + 1);
 		Wildcard = path.substr(wildcard + 1);
+	} else {
+		currentPath = "./";
+		Wildcard = path;
 	}
 	dirent* ent = 0;
 	DIR* dir = opendir(currentPath.c_str());
@@ -187,17 +191,15 @@ CScriptArray* FindDirectories(const string& path) {
 			continue;
 
 		// Skip files
-		currentPath += '/';
-		currentPath.append(filename);
+		string fullname = currentPath + filename;
 		struct stat st;
-		if (stat(currentPath.c_str(), &st) == -1)
+		if (stat(fullname.c_str(), &st) == -1)
 			continue;
 		if ((st.st_mode & S_IFDIR) == 0)
 			continue;
 
 		// wildcard matching
-		if (FNMatch(filename, Wildcard) != 0)
-			continue;
+		if (!FNMatch(filename, Wildcard)) continue;
 
 		// Add the dir to the array
 		array->Resize(array->GetSize() + 1);
