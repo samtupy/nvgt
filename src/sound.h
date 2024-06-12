@@ -56,8 +56,7 @@ typedef struct hstream_entry {
 typedef struct {
 	HFX hfx;
 	unsigned int type;
-	std::string id;
-	std::string original_fx_str; // debugging only
+	char id[32];
 } mixer_effect;
 
 typedef struct {
@@ -232,7 +231,6 @@ public:
 	bool set_impulse_response(const std::string& response, float dry, float wet);
 	int set_fx(std::string& fx, int idx = -1);
 	void clear_all_effects();
-	CScriptArray* get_all_raw_effects();
 	BOOL set_mixer(mixer* m);
 	BOOL is_sliding();
 	BOOL is_pan_sliding();
