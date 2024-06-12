@@ -416,6 +416,7 @@ int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
 		return -1;
 	}
 	// Do not let the script compile if it contains no entry point.
+	if (!mod) return -1;
 	asIScriptFunction* func = mod->GetFunctionByDecl("int main()");
 	if (!func)
 		func = mod->GetFunctionByDecl("void main()");

@@ -158,7 +158,6 @@ bool deserialize_value(void* value, int type_id, cmp_ctx_t* ctx, cmp_object_t* o
 
 std::string serialize(CScriptDictionary& dict) {
 	asIScriptContext* ctx = asGetActiveContext();
-	asIScriptEngine* engine = ctx->GetEngine();
 	asUINT size = dict.GetSize();
 	if (size < 1) return "";
 	if (!g_StringTypeid)

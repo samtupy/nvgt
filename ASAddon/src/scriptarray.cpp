@@ -322,7 +322,7 @@ static void RegisterScriptArray_Native(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("array<T>", "bool is_empty() const", asMETHOD(CScriptArray, IsEmpty), asCALL_THISCALL); assert( r >= 0 );
 
 	// Sort with callback for comparison
-	r = engine->RegisterFuncdef("bool array<T>::less(const T&in if_handle_then_const a, const T&in if_handle_then_const b)");
+	r = engine->RegisterFuncdef("bool array<T>::less(const T&in if_handle_then_const a, const T&in if_handle_then_const b)"); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void sort(const less &in, uint startAt = 0, uint count = uint(-1))", asMETHODPR(CScriptArray, Sort, (asIScriptFunction*, asUINT, asUINT), void), asCALL_THISCALL); assert(r >= 0);
 
 #if AS_USE_STLNAMES != 1 && AS_USE_ACCESSORS == 1
@@ -430,6 +430,8 @@ CScriptArray::CScriptArray(asITypeInfo *ti, void *buf)
 		// Only allocate the buffer, but not the objects
 		subTypeId |= asTYPEID_OBJHANDLE;
 		CreateBuffer(&buffer, length);
+		if (!buffer)
+			throw std::bad_alloc();
 		subTypeId &= ~asTYPEID_OBJHANDLE;
 
 		// Copy the handles into the internal buffer
@@ -2245,7 +2247,7 @@ static void RegisterScriptArray_Generic(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("array<T>", "int find_by_ref(uint startAt, const T&in if_handle_then_const value) const", asFUNCTION(ScriptArrayFindByRef2_Generic), asCALL_GENERIC); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "bool opEquals(const array<T>&in) const", asFUNCTION(ScriptArrayEquals_Generic), asCALL_GENERIC); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "bool is_empty() const", asFUNCTION(ScriptArrayIsEmpty_Generic), asCALL_GENERIC); assert( r >= 0 );
-	r = engine->RegisterFuncdef("bool array<T>::less(const T&in if_handle_then_const a, const T&in if_handle_then_const b)");
+	r = engine->RegisterFuncdef("bool array<T>::less(const T&in if_handle_then_const a, const T&in if_handle_then_const b)"); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void sort(const less &in, uint startAt = 0, uint count = uint(-1))", asFUNCTION(ScriptArraySortCallback_Generic), asCALL_GENERIC); assert(r >= 0);
 #if AS_USE_STLNAMES != 1 && AS_USE_ACCESSORS == 1
 	r = engine->RegisterObjectMethod("array<T>", "uint get_length() const property", asFUNCTION(ScriptArrayLength_Generic), asCALL_GENERIC); assert( r >= 0 );

@@ -105,6 +105,7 @@ void library::call(asIScriptGeneric* gen) {
 	asIScriptContext* ctx = engine->CreateContext();
 	if (!ctx || ctx->Prepare(func) < 0) {
 		gen->SetReturnObject(NULL);
+		if (ctx)
 		ctx->Release();
 		return;
 	}

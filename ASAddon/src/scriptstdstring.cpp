@@ -815,7 +815,7 @@ void RegisterStdString_Native(asIScriptEngine *engine)
 	r = engine->RegisterObjectType("string", sizeof(string), asOBJ_VALUE | asOBJ_APP_CLASS_CDAK); assert( r >= 0 );
 #endif
 
-	r = engine->RegisterStringFactory("string", GetStdStringFactorySingleton());
+	r = engine->RegisterStringFactory("string", GetStdStringFactorySingleton()); assert( r >= 0 );
 
 	// Register the object operator overloads
 	r = engine->RegisterObjectBehaviour("string", asBEHAVE_CONSTRUCT,  "void f()",                    asFUNCTION(ConstructString), asCALL_CDECL_OBJLAST); assert( r >= 0 );
@@ -1341,7 +1341,7 @@ void RegisterStdString_Generic(asIScriptEngine *engine)
 	// Register the string type
 	r = engine->RegisterObjectType("string", sizeof(string), asOBJ_VALUE | asOBJ_APP_CLASS_CDAK); assert( r >= 0 );
 
-	r = engine->RegisterStringFactory("string", GetStdStringFactorySingleton());
+	r = engine->RegisterStringFactory("string", GetStdStringFactorySingleton()); assert( r >= 0 );
 
 	// Register the object operator overloads
 	r = engine->RegisterObjectBehaviour("string", asBEHAVE_CONSTRUCT,  "void f()",                    asFUNCTION(ConstructStringGeneric), asCALL_GENERIC); assert( r >= 0 );

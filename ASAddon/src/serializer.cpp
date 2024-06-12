@@ -394,7 +394,7 @@ void CSerializedValue::Restore(void *ref, int typeId)
 		asIScriptObject *obj = (asIScriptObject *)ref;
 
 		// Retrieve children
-		for( asUINT i = 0; i < type->GetPropertyCount() ; i++ )
+		for( asUINT i = 0; type && i < type->GetPropertyCount() ; i++ )
 		{	
 			const char *nameProperty;
 			int ptypeId;
@@ -420,7 +420,10 @@ void CSerializedValue::Restore(void *ref, int typeId)
 		else
 		{
 			std::string str = "Cannot restore type '";
+			if (type)
 			str += type->GetName();
+			else
+			str += "unknown";
 			str += "'";
 			m_serializer->m_engine->WriteMessage("", 0, 0, asMSGTYPE_ERROR, str.c_str());
 		}

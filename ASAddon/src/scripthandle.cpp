@@ -165,7 +165,7 @@ bool CScriptHandle::operator!=(const CScriptHandle &o) const
 	return !(*this == o);
 }
 
-bool CScriptHandle::Equals(void *ref, int typeId) const
+bool CScriptHandle::Equals(void *ref, const int typeId) const
 {
 	// Null handles are received as reference to a null handle
 	if( typeId == 0 )
@@ -176,7 +176,6 @@ bool CScriptHandle::Equals(void *ref, int typeId) const
 	{
 		// Compare the actual reference
 		ref = *(void**)ref;
-		typeId &= ~asTYPEID_OBJHANDLE;
 	}
 
 	// TODO: If typeId is not the same, we should attempt to do a dynamic cast, 

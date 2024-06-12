@@ -970,14 +970,14 @@ static void CScriptDictValue_opCast(void *ref, int typeId, CScriptDictValue *obj
 
 static asINT64 CScriptDictValue_opConvInt(CScriptDictValue *obj)
 {
-	asINT64 value;
+	asINT64 value = 0;
 	CScriptDictValue_opCast(&value, asTYPEID_INT64, obj);
 	return value;
 }
 
 static double CScriptDictValue_opConvDouble(CScriptDictValue *obj)
 {
-	double value;
+	double value = 0.0;
 	CScriptDictValue_opCast(&value, asTYPEID_DOUBLE, obj);
 	return value;
 }
