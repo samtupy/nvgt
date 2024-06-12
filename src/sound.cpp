@@ -1703,14 +1703,6 @@ int mixer::set_fx(std::string& fx, int idx) {
 	return effects.size()-1;
 }
 
-
-void mixer::clear_all_effects() {
-std::for_each(effects.begin(), effects.end(), [&](const auto& effect) {
-BASS_ChannelRemoveFX(channel, effect.hfx);
-});
-effects.clear();
-}
-
 BOOL mixer::set_mixer(mixer* m) {
 	if (!m)
 		m = output;
