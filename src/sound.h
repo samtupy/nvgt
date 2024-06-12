@@ -218,7 +218,7 @@ class mixer : public sound_base {
 	std::unordered_set<sound*> sounds;
 	std::vector<mixer_effect> effects;
 	mixer* parent_mixer;
-	int get_effect_index(const char* id);
+	int get_effect_index(const std::string& id);
 public:
 	mixer(mixer* parent = NULL, BOOL for_single_sound = FALSE, BOOL for_decode = FALSE, BOOL floatingpoint = TRUE);
 	~mixer();
