@@ -71,7 +71,6 @@
 #include "scriptany.h"
 #include "scriptarray.h"
 #include "scriptdictionary.h"
-#include "scriptfile.h"
 #include "filesystem.h"
 #include "scriptgrid.h"
 #include "scripthandle.h"
