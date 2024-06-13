@@ -321,6 +321,7 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->SetMessageCallback(asFUNCTION(MessageCallback), 0, asCALL_CDECL);
 	engine->SetTranslateAppExceptionCallback(asFUNCTION(TranslateException), 0, asCALL_CDECL);
 	engine->SetEngineProperty(asEP_ALLOW_UNSAFE_REFERENCES, true);
+	engine->SetEngineProperty(asEP_ALLOW_MULTILINE_STRINGS, true);
 	engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
 	engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, 10000);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
