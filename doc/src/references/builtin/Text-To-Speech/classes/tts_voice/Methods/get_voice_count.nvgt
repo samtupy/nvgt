@@ -1,0 +1,14 @@
+/**
+	Get a count of all available text to speech voices, including the builtin.
+	int tts_voice::get_voice_count();
+	## Returns:
+		* int: the number of tts voices.
+	## Remarks:
+		The default voice built into Nvgt is counted here so it's always one more than the available system voices.
+*/
+
+// Example:
+void main() {
+	tts_voice v;
+	alert("result:", "You have "+v.get_voice_count()+" voices");
+}
