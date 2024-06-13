@@ -24,6 +24,7 @@
 #include <Poco/Util/Application.h>
 #include <Poco/Util/HelpFormatter.h>
 #include <Poco/Util/OptionSet.h>
+#include <Poco/Util/RegExpValidator.h>
 #include <Poco/Environment.h>
 #include <Poco/File.h>
 #include <Poco/Path.h>
@@ -103,6 +104,7 @@ protected:
 		Application::defineOptions(options);
 		options.addOption(Option("compile", "c", "compile script in release mode").group("compiletype"));
 		options.addOption(Option("compile-debug", "C", "compile script in debug mode").group("compiletype"));
+		options.addOption(Option("platform", "p", "select target platform to compile for (auto|windows|linux|mac)", false, "platform", true).validator(new RegExpValidator("^(auto|windows|linux|mac)$")));
 		options.addOption(Option("quiet", "q", "do not output anything upon successful compilation").binding("application.quiet").group("quiet"));
 		options.addOption(Option("QUIET", "Q", "do not output anything (work in progress), error status must be determined by process exit code (intended for automation)").binding("application.QUIET").group("quiet"));
 		options.addOption(Option("debug", "d", "run with the Angelscript debugger").binding("application.as_debug"));
@@ -124,6 +126,7 @@ protected:
 			g_debug = name == "compile-debug";
 		} else if (name == "include-directory") g_IncludeDirs.push_back(value);
 		else if (name == "include") g_IncludeScripts.push_back(value);
+		else if (name == "platform") g_platform = value;
 	}
 	void displayHelp() {
 		HelpFormatter hf(options());
