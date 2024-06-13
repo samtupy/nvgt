@@ -1,0 +1,22 @@
+/**
+	Set the text to speech voice's playback rate (how fast it speaks).
+	void tts_voice::set_rate(int rate);
+	## Arguments:
+		* int rate: the desired speech rate.
+	## Remarks:
+		-10 is slowest, 10 is fastest, with 0 being default speed, or 50 percent if you like. If this hasn't been manually assigned, it will use the OS setting which may not be 0. If moving in old bgt code, you may want to update it to use this method instead of the rate property.
+*/
+
+// Example:
+void main() {
+	tts_voice v;
+	v.set_rate(0);
+	v.speak("This is at fifty percent rate");
+	v.set_rate(5);
+	v.speak_wait("this is at seventy-five percent rate");
+	//demonstrate setting it like it's a percentage, but note that it'll jump a bit because percentages have 100 values but there are only technically 21 choices, so implement this idea with an increment of 5 for best results.
+	uint desired_rate=85;
+	v.set_rate(desired_rate/5-10);
+	int resulting_rate=v.get_rate();
+	alert("after setting as 85 percent, the resulting rate now is:", resulting_rate);
+}

@@ -1,0 +1,17 @@
+/**
+	Set the text to speech voice's volume (how loud it is).
+	void tts_voice::set_volume(int volume);
+	## Arguments:
+		* int volume: the desired volume level.
+	## Remarks:
+		0 is silent, 100 is louded. If this hasn't been assigned, it will use the OS setting which may not be 100%. Beware if running old code, this is different from bgt having 0 be the max. It's better to use this instead of directly setting volume property.
+*/
+
+// Example:
+void main() {
+	tts_voice v;
+	v.set_volume(50);
+	v.speak("This is at 50 volume");
+	v.set_volume(100);
+	v.speak_wait("this is at 100 volume");
+}
