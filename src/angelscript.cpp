@@ -219,7 +219,7 @@ private:
 };
 class nvgt_bytecode_stream_ios : public virtual std::ios {
 public:
-	nvgt_bytecode_stream_ios(NVGTBytecodeStream* stream) : _buf(stream) { poco_ios_init(&_buf) }
+	nvgt_bytecode_stream_ios(NVGTBytecodeStream* stream) : _buf(stream) { poco_ios_init(&_buf); }
 	nvgt_bytecode_stream_iostream_buf* rdbuf() { return &_buf; }
 protected:
 	nvgt_bytecode_stream_iostream_buf _buf;
@@ -494,7 +494,7 @@ int SaveCompiledScript(asIScriptEngine* engine, unsigned char** output) {
 	nvgt_bytecode_ostream ostr(&codestream);
 	BinaryWriter bw(ostr);
 	serialize_nvgt_plugins(bw);
-	for(int i = 0; i < asEP_LAST_PROPERTY; i++) bw.write7BitEncoded(engine->GetEngineProperty(asEEngineProp(i)));
+	for(int i = 0; i < asEP_LAST_PROPERTY; i++) bw.write7BitEncoded(UInt64(engine->GetEngineProperty(asEEngineProp(i))));
 	if (mod->SaveByteCode(&codestream, !g_debug) < 0)
 		return -1;
 	return codestream.get(output);
@@ -581,9 +581,9 @@ int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size
 	if (!load_serialized_nvgt_plugins(br))
 		return -1;
 	for (int i = 0; i < asEP_LAST_PROPERTY; i++) {
-		asPWORD val;
+		UInt64 val;
 		br.read7BitEncoded(val);
-		engine->SetEngineProperty(asEEngineProp(i), val);
+		engine->SetEngineProperty(asEEngineProp(i), asPWORD(val));
 	}
 	codestream.reset_cursor(); // Angelscript can produce bytecode load failures as a result of user misconfigurations or bugs, and such failures only include an offset of bytes read maintained by Angelscript internally. The solution in such cases is to breakpoint NVGTBytecodeStream::Read if cursor is greater than the offset given, then one can get more debug info. For that to work, we make sure that the codestream's variable that tracks number of bytes written does not include the count of those written by engine properties, plugins etc. We could theoretically store such data at the end of the stream instead of the beginning and avoid this, but then we are trusting Angelscript to read exactly the number of bytes it's written, and since I don't know how much of a gamble that is, I opted for this instead.
 	if (mod->LoadByteCode(&codestream, &g_debug) < 0)

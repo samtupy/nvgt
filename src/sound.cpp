@@ -1057,11 +1057,11 @@ BOOL sound::push_memory(unsigned char* buffer, unsigned int length, BOOL stream_
 	if (!pcm_rate)
 		push_prebuff.insert(push_prebuff.end(), buffer, buffer + length);
 	else {
-		ret = BASS_StreamPutData(channel, buffer, length) > 0;
-		if (stream_end)
-			BASS_StreamPutData(channel, NULL, BASS_STREAMPROC_END);
-	return ret;
+			ret = BASS_StreamPutData(channel, buffer, length) > 0;
+			if (stream_end)
+				BASS_StreamPutData(channel, NULL, BASS_STREAMPROC_END);
 	}
+	return ret;
 }
 BOOL sound::push_string(const std::string& buffer, BOOL stream_end, int pcm_rate, int pcm_chans) {
 	return push_memory((unsigned char*)&buffer[0], buffer.size(), stream_end, pcm_rate, pcm_chans);
