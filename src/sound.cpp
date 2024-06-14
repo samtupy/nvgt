@@ -1,4 +1,6 @@
 /* sound.cpp - sound system implementation code
+ * Please note that the beginnings of this file were written way back in 2021 before the NVGT project even really started, and there has been a lot of learning that has taken place since then. This could have been written better putting it kindly, but it does provide the expected functionality.
+ * Most likely this entire file will be written from complete scratch when it comes time to transition from bass to miniaudio in the coming months.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -350,11 +352,11 @@ DWORD CALLBACK bass_readproc_push(void* buffer, DWORD length, void* user) {
 		return 0;
 	sound* s = (sound*)user;
 	thread_mutex_lock(&s->close_mutex);
-	if (!s->channel && !s->script_loading) {
-		thread_mutex_unlock(&s->close_mutex);
-		return -1;
-	}
 	if (s->memstream) {
+		if (!s->channel && !s->script_loading) {
+			thread_mutex_unlock(&s->close_mutex);
+			return -1;
+		}
 		DWORD l = length;
 		DWORD S = s->memstream->size();
 		if (s->memstream_pos + l >= s->memstream_size)
@@ -1019,6 +1021,8 @@ BOOL sound::load_url(const string& url) {
 }
 
 BOOL sound::push_memory(unsigned char* buffer, unsigned int length, BOOL stream_end, int pcm_rate, int pcm_chans) {
+	if (!sound_initialized)
+		init_sound();
 	if (!sound_initialized || !stream_end && length < 1)
 		return FALSE;
 	if (loaded_filename != "") {
@@ -1037,7 +1041,7 @@ BOOL sound::push_memory(unsigned char* buffer, unsigned int length, BOOL stream_
 			prox.read = bass_readproc_push;
 			prox.seek = bass_seekproc_push;
 			push_prebuff.insert(push_prebuff.end(), buffer, buffer + length);
-			channel = BASS_StreamCreateFileUser(STREAMFILE_BUFFERPUSH, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT, &prox, this);
+			channel = BASS_StreamCreateFileUser(STREAMFILE_BUFFER, BASS_STREAM_DECODE | BASS_SAMPLE_FLOAT, &prox, this);
 			BASS_ChannelSetAttribute(channel, BASS_ATTRIB_NET_RESUME, 20);
 		} else {
 			push_prebuff.insert(push_prebuff.end(), buffer, buffer + length);
