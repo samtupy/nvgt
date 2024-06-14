@@ -174,6 +174,7 @@ protected:
 		}
 		setupCommandLineProperty(args, 1);
 		g_command_line_args->InsertAt(0, (void*)&scriptfile);
+		ConfigureEngineOptions(g_ScriptEngine);
 		if (CompileScript(g_ScriptEngine, scriptfile.c_str()) < 0) {
 			ShowAngelscriptMessages();
 			return Application::EXIT_DATAERR;

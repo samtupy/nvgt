@@ -16,7 +16,6 @@
 #include "UI.h"
 #include "network.h"
 #include <exception>
-#include <iostream>
 #include <string>
 #include <angelscript.h>
 #include <Poco/DateTime.h>
@@ -27,6 +26,7 @@
 #include <Poco/Glob.h>
 #include <Poco/Mutex.h>
 #include <Poco/Path.h>
+#include <Poco/UnbufferedStreamBuf.h>
 #include <Poco/zlib.h>
 #include <Poco/Util/Application.h>
 #include <SDL2/SDL.h>
@@ -175,6 +175,9 @@ public:
 		cursor += size;
 		return size;
 	}
+	void reset_cursor() {
+		cursor = 0; // This storage area holds more than bytecode, and after extra non-bytecode data is read, we may need to reset the variable keeping track of the number of bytes read encase we need to use that information later for debugging angelscript bytecode load failures which only provide an offset of bytes read in the stream as debug info. We don't store our non-bytecode data at the end of the stream to avoid any imagined edgecase where Angelscript could read a few less bytes than it's written during compilation thus making such data inaccessible.
+	}
 	// Receives raw bytes read from a compiled executable for decryption and decompression.
 	void set(unsigned char* code, int size) {
 		written_size = angelscript_bytecode_decrypt(code, size, alloc_size);
@@ -201,6 +204,35 @@ public:
 	}
 	#endif
 };
+// Since we will likely want to store more in this encrypted data section than just bytecode, create a c++ iostream around the above class. If this had been written when I had more experience, the above class would be written around an existing iostream instead and indeed this is likely to happen at some point.
+class nvgt_bytecode_stream_iostream_buf : public UnbufferedStreamBuf {
+public:
+	nvgt_bytecode_stream_iostream_buf(NVGTBytecodeStream* stream) : stream(stream) {}
+private:
+	int readFromDevice() {
+		char c;
+		if (stream->Read(&c, 1) != 1) return char_traits::eof();
+		return c;
+	}
+	int writeToDevice(char c) { return stream->Write(&c, 1); }
+	NVGTBytecodeStream* stream;
+};
+class nvgt_bytecode_stream_ios : public virtual std::ios {
+public:
+	nvgt_bytecode_stream_ios(NVGTBytecodeStream* stream) : _buf(stream) { poco_ios_init(&_buf) }
+	nvgt_bytecode_stream_iostream_buf* rdbuf() { return &_buf; }
+protected:
+	nvgt_bytecode_stream_iostream_buf _buf;
+};
+class nvgt_bytecode_istream : public nvgt_bytecode_stream_ios, public std::istream {
+public:
+	nvgt_bytecode_istream(NVGTBytecodeStream* stream) : nvgt_bytecode_stream_ios(stream), std::istream(&_buf) {}
+};
+class nvgt_bytecode_ostream : public nvgt_bytecode_stream_ios, public std::ostream {
+public:
+	nvgt_bytecode_ostream(NVGTBytecodeStream* stream) : nvgt_bytecode_stream_ios(stream), std::ostream(&_buf) {}
+};
+
 
 string g_scriptMessagesWarn;
 string g_scriptMessagesErr;
@@ -212,18 +244,19 @@ void ShowAngelscriptMessages() {
 	#ifdef _WIN32
 	if (Util::Application::instance().config().hasOption("application.gui")) {
 		if (g_scriptMessagesErrNum)
-			info_box("Compilation error", "", (g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0));
+			info_box("Compilation error", "", (g_ScriptEngine->GetEngineProperty(asEP_COMPILER_WARNINGS) == 2? g_scriptMessagesWarn : "") + (g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0));
 		else
 			info_box("Compilation warnings", "", g_scriptMessagesWarn);
 	} else {
 	#endif
 		if (g_scriptMessagesErrNum)
-			message((g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0), "Compilation error");
+			message((g_ScriptEngine->GetEngineProperty(asEP_COMPILER_WARNINGS) == 2? g_scriptMessagesWarn : "") + (g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0), "Compilation error");
 		else
 			message(g_scriptMessagesWarn, "Compilation warnings");
 		#ifdef _WIN32
 	} // endif gui
 		#endif
+		g_scriptMessagesErr = g_scriptMessagesWarn = g_scriptMessagesLine0 = ""; // Clear out the message buffers such that only new messages will be displayed upon a second call to this function.
 }
 
 void MessageCallback(const asSMessageInfo* msg, void* param) {
@@ -321,9 +354,7 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->SetMessageCallback(asFUNCTION(MessageCallback), 0, asCALL_CDECL);
 	engine->SetTranslateAppExceptionCallback(asFUNCTION(TranslateException), 0, asCALL_CDECL);
 	engine->SetEngineProperty(asEP_ALLOW_UNSAFE_REFERENCES, true);
-	if (Util::Application::instance().config().hasOption("application.multiline_strings")) engine->SetEngineProperty(asEP_ALLOW_MULTILINE_STRINGS, true);
 	engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
-	engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, 10000);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	RegisterStdString(engine);
 	RegisterScriptAny(engine);
@@ -394,6 +425,33 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	return 0;
 }
 #ifndef NVGT_STUB
+// The following function translates various configuration options into Angelscript engine properties.
+void ConfigureEngineOptions(asIScriptEngine* engine) {
+	Util::LayeredConfiguration& config = Util::Application::instance().config();
+	if (config.hasOption("scripting.allow_multiline_strings")) engine->SetEngineProperty(asEP_ALLOW_MULTILINE_STRINGS, true);
+	if (config.hasOption("scripting.allow_UNICODE_IDENTIFIERS")) engine->SetEngineProperty(asEP_ALLOW_UNICODE_IDENTIFIERS, true);
+	if (config.hasOption("scripting.allow_implicit_handle_types")) engine->SetEngineProperty(asEP_ALLOW_IMPLICIT_HANDLE_TYPES, true);
+	if (config.hasOption("scripting.disallow_empty_list_elements")) engine->SetEngineProperty(asEP_DISALLOW_EMPTY_LIST_ELEMENTS, true);
+	if (config.hasOption("scripting.disallow_global_vars")) engine->SetEngineProperty(asEP_DISALLOW_GLOBAL_VARS, true);
+	if (config.hasOption("scripting.disallow_value_assign_for_ref_type")) engine->SetEngineProperty(asEP_DISALLOW_VALUE_ASSIGN_FOR_REF_TYPE, true);
+	if (config.hasOption("scripting.disable_integer_division")) engine->SetEngineProperty(asEP_DISABLE_INTEGER_DIVISION, true);
+	if (config.hasOption("scripting.use_character_literals")) engine->SetEngineProperty(asEP_USE_CHARACTER_LITERALS, true);
+	if (config.hasOption("scripting.ignore_duplicate_shared_interface")) engine->SetEngineProperty(asEP_IGNORE_DUPLICATE_SHARED_INTF, true);
+	if (config.hasOption("scripting.private_prop_as_protected")) engine->SetEngineProperty(asEP_PRIVATE_PROP_AS_PROTECTED, true);
+	if (config.hasOption("scripting.always_impl_default_construct")) engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_CONSTRUCT, true);
+	if (config.hasOption("scripting.expand_default_array_to_template")) engine->SetEngineProperty(asEP_EXPAND_DEF_ARRAY_TO_TMPL, true);
+	if (config.hasOption("scripting.require_enum_scope")) engine->SetEngineProperty(asEP_REQUIRE_ENUM_SCOPE, true);
+	if (config.hasOption("scripting.do_not_optimize_bytecode")) engine->SetEngineProperty(asEP_OPTIMIZE_BYTECODE, false);
+	engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, config.getInt("scripting.max_nested_calls", 10000));
+	engine->SetEngineProperty(asEP_MAX_STACK_SIZE, config.getInt("scripting.max_stack_size", 0));
+	engine->SetEngineProperty(asEP_MAX_CALL_STACK_SIZE, config.getInt("scripting.max_call_stack_size", 0));
+	engine->SetEngineProperty(asEP_INIT_STACK_SIZE, config.getInt("scripting.init_stack_size", 4096));
+	engine->SetEngineProperty(asEP_INIT_CALL_STACK_SIZE, config.getInt("scripting.init_call_stack_size", 10));
+	engine->SetEngineProperty(asEP_PROPERTY_ACCESSOR_MODE, config.getInt("scripting.property_accessor_mode", 3));
+	engine->SetEngineProperty(asEP_COMPILER_WARNINGS, config.getInt("scripting.compiler_warnings", 0)); // We must disable these by default for the sake of the megabytes of bgt code that exists.
+	engine->SetEngineProperty(asEP_HEREDOC_TRIM_MODE, config.getInt("scripting.heredoc_trim_mode", 1));
+	engine->SetEngineProperty(asEP_ALTER_SYNTAX_NAMED_ARGS, config.getInt("scripting.alter_syntax_named_args", 2));
+}
 int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
 	Path global_include(Path(Path::self()).parent().append("include"));
 	g_IncludeDirs.push_back(global_include.toString());
@@ -433,6 +491,10 @@ int SaveCompiledScript(asIScriptEngine* engine, unsigned char** output) {
 	if (mod == 0)
 		return -1;
 	NVGTBytecodeStream codestream;
+	nvgt_bytecode_ostream ostr(&codestream);
+	BinaryWriter bw(ostr);
+	serialize_nvgt_plugins(bw);
+	for(int i = 0; i < asEP_LAST_PROPERTY; i++) bw.write7BitEncoded(engine->GetEngineProperty(asEEngineProp(i)));
 	if (mod->SaveByteCode(&codestream, !g_debug) < 0)
 		return -1;
 	return codestream.get(output);
@@ -483,7 +545,6 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 		}
 		// Other code that does platform specific things can go here, for now the platforms we support do nearly the same from now on.
 		fs.seekp(0, std::ios::end);
-		serialize_nvgt_plugins(bw);
 		write_embedded_packs(bw);
 		unsigned char* code = NULL;
 		UInt32 code_size = SaveCompiledScript(engine, &code);
@@ -515,6 +576,16 @@ int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size
 	mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
 	NVGTBytecodeStream codestream;
 	codestream.set(code, size);
+	nvgt_bytecode_istream istr(&codestream);
+	BinaryReader br(istr);
+	if (!load_serialized_nvgt_plugins(br))
+		return -1;
+	for (int i = 0; i < asEP_LAST_PROPERTY; i++) {
+		asPWORD val;
+		br.read7BitEncoded(val);
+		engine->SetEngineProperty(asEEngineProp(i), val);
+	}
+	codestream.reset_cursor(); // Angelscript can produce bytecode load failures as a result of user misconfigurations or bugs, and such failures only include an offset of bytes read maintained by Angelscript internally. The solution in such cases is to breakpoint NVGTBytecodeStream::Read if cursor is greater than the offset given, then one can get more debug info. For that to work, we make sure that the codestream's variable that tracks number of bytes written does not include the count of those written by engine properties, plugins etc. We could theoretically store such data at the end of the stream instead of the beginning and avoid this, but then we are trusting Angelscript to read exactly the number of bytes it's written, and since I don't know how much of a gamble that is, I opted for this instead.
 	if (mod->LoadByteCode(&codestream, &g_debug) < 0)
 		return -1;
 	//engine->SetEngineProperty(asEP_PROPERTY_ACCESSOR_MODE, 2);
@@ -551,7 +622,6 @@ int LoadCompiledExecutable(asIScriptEngine* engine) {
 	br >> data_location;
 	#endif
 	fs.seekg(data_location);
-	if (!load_serialized_nvgt_plugins(br)) return -1;
 	if (!load_embedded_packs(br)) return -1;
 	br.read7BitEncoded(code_size);
 	code_size ^= NVGT_BYTECODE_NUMBER_XOR;
@@ -576,16 +646,25 @@ int ExecuteScript(asIScriptEngine* engine, const string& scriptFile) {
 		return -1;
 	}
 	asIScriptFunction* prefunc = mod->GetFunctionByDecl("bool preglobals()");
-	asIScriptContext* ctx;
+	asIScriptContext* ctx = engine->RequestContext();
+	if (!ctx) return -1;
 	if (prefunc) {
-		ctx = g_ctxMgr->AddContext(engine, prefunc);
-		if (!ctx || ctx->Execute() < 0) return -1;
-		if (!ctx->GetReturnByte()) return 0;
+		if (ctx->Prepare(prefunc) < 0 || ctx->Execute() < 0) {
+			engine->ReturnContext(ctx);
+			return -1;
+		}
+		if (!ctx->GetReturnByte()) {
+						engine->ReturnContext(ctx);
+			return 0;
+		}
+		engine->ReturnContext(ctx);
 	}
 	if (mod->ResetGlobalVars(0) < 0) {
-		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "Failed while initializing global variables");
+		// In this case any extra information is printed as an info message, we usually filter those out.
+		g_scriptMessagesErr += g_scriptMessagesInfo;
 		return -1;
 	}
+	ShowAngelscriptMessages(); // Display any warnings or extra info if the user has asked for it.
 	g_initialising_globals = false;
 	ctx = g_ctxMgr->AddContext(engine, func, true);
 	#ifndef NVGT_STUB

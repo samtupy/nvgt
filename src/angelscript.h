@@ -27,6 +27,7 @@ extern CContextMgr* g_ctxMgr;
 
 void ShowAngelscriptMessages();
 int ConfigureEngine(asIScriptEngine* engine);
+void ConfigureEngineOptions(asIScriptEngine* engine);
 int ExecuteScript(asIScriptEngine* engine, const std::string& scriptFile);
 #ifndef NVGT_STUB
 	int               CompileScript(asIScriptEngine* engine, const std::string& scriptFile);
