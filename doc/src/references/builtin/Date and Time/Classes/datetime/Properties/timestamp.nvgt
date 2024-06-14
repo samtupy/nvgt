@@ -1,0 +1,11 @@
+/**
+	Represents the datetime object as a timestamp object.
+	const timestamp timestamp;
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set(d.year, d.month, d.day, 12, 47, 19);
+	alert("The current timestamp represented by the datetime object is", d.timestamp / SECONDS);
+}
