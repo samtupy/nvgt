@@ -260,15 +260,14 @@ void ShowAngelscriptMessages() {
 }
 
 void MessageCallback(const asSMessageInfo* msg, void* param) {
-	const char* type = "ERROR";
+	string type = "ERROR";
 	if (msg->type == asMSGTYPE_WARNING)
 		type = "WARNING";
 	else if (msg->type == asMSGTYPE_INFORMATION)
 		type = "INFO";
 	else
 		g_scriptMessagesErrNum += 1;
-	char buffer[8192];
-	snprintf(buffer, 8192, "file: %s\r\nline: %d (%d)\r\n%s: %s\r\n\r\n", msg->section, msg->row > 0 ? msg->row : 0, msg->col > 0 ? msg->col : 0, type, msg->message);
+	std::string buffer = format(Util::Application::instance().config().getString("application.compilation_message_template", "file: %s\r\nline: %u (%u)\r\n%s: %s\r\n") + "\r\n"s, string(msg->section), unsigned int(msg->row > 0 ? msg->row : 0), unsigned int(msg->col > 0 ? msg->col : 0), type, string(msg->message));
 	if (msg->type == asMSGTYPE_INFORMATION)
 		g_scriptMessagesInfo = buffer;
 	else if (msg->type == asMSGTYPE_ERROR) {
@@ -725,6 +724,10 @@ int PragmaCallback(const string& pragmaText, CScriptBuilder& builder, void* /*us
 		asETokenClass tokenClass = engine->ParseToken(pragmaText.c_str() + pos, 0, &length);
 		if (tokenClass == asTC_IDENTIFIER || tokenClass == asTC_KEYWORD || tokenClass == asTC_VALUE) {
 			string token = pragmaText.substr(pos, length);
+			if (tokenClass == asTC_VALUE) { // May be a string, trim quotes
+				if (token.starts_with("\"")) token.erase(0, 1);
+				if (token.ends_with("\"")) token.pop_back();
+			}
 			cleanText += " " + token;
 		}
 		if (tokenClass == asTC_UNKNOWN)

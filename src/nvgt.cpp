@@ -24,6 +24,8 @@
 #include <Poco/Util/Application.h>
 #include <Poco/Util/HelpFormatter.h>
 #include <Poco/Util/OptionSet.h>
+#include <Poco/Util/IntValidator.h>
+#include <Poco/Util/IniFileConfiguration.h>
 #include <Poco/Util/RegExpValidator.h>
 #include <Poco/Environment.h>
 #include <Poco/File.h>
@@ -66,7 +68,14 @@ public:
 protected:
 	void initialize(Application& self) override {
 		#ifndef NVGT_STUB
-		loadConfiguration();
+		loadConfiguration(); // This will load config files with the basename of the currently running executable.
+		// We also want to look for config.json/.ini/.properties so that the user can create global configuration properties despite whether nvgt.exe or nvgtw.exe is being run.
+		Path confpath = Path(config().getString("application.dir")).setFileName("config.ini");
+		if (File(confpath).exists()) loadConfiguration(confpath.toString(), 1);
+		confpath.setExtension("properties");
+		if (File(confpath).exists()) loadConfiguration(confpath.toString(), 1);
+		confpath.setExtension("json");
+		if (File(confpath).exists()) loadConfiguration(confpath.toString(), 1);
 		#endif
 		Application::initialize(self);
 		#ifdef _WIN32
@@ -108,6 +117,7 @@ protected:
 		options.addOption(Option("quiet", "q", "do not output anything upon successful compilation").binding("application.quiet").group("quiet"));
 		options.addOption(Option("QUIET", "Q", "do not output anything (work in progress), error status must be determined by process exit code (intended for automation)").binding("application.QUIET").group("quiet"));
 		options.addOption(Option("debug", "d", "run with the Angelscript debugger").binding("application.as_debug"));
+		options.addOption(Option("warnings", "w", "select how script warnings should be handled (0 ignore (default), 1 print, 2 treat as error)", false, "level", true).binding("scripting.compiler_warnings").validator(new IntValidator(0, 2)));
 		options.addOption(Option("include", "i", "include an aditional script similar to the #include directive", false, "script", true).repeatable(true));
 		options.addOption(Option("include-directory", "I", "add an aditional directory to the search path for included scripts", false, "directory", true).repeatable(true));
 		options.addOption(Option("version", "V", "print version information and exit"));
@@ -163,11 +173,15 @@ protected:
 			// The scripter is able to create configuration files that can change some behaviours of the engine, such files are named after the script that is to be run.
 			Path conf_file(scriptfile);
 			conf_file.setExtension("properties");
-			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
+			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -2);
 			conf_file.setExtension("ini");
-			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
+			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -2);
 			conf_file.setExtension("json");
-			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
+			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -2);
+			// The user can also place a .nvgtrc file in the current directory of their script or any parent of it, expected to be in ini format.
+			conf_file.setFileName(".nvgtrc");
+			while (conf_file.depth() > 0 && !File(conf_file).exists()) conf_file.popDirectory();
+			if (File(conf_file).exists()) config().addWriteable(new IniFileConfiguration(conf_file.toString()), -1);
 		} catch (Poco::Exception& e) {
 			message(e.displayText(), "error");
 			return Application::EXIT_CONFIG;
