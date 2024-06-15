@@ -428,7 +428,7 @@ int ConfigureEngine(asIScriptEngine* engine) {
 void ConfigureEngineOptions(asIScriptEngine* engine) {
 	Util::LayeredConfiguration& config = Util::Application::instance().config();
 	if (config.hasOption("scripting.allow_multiline_strings")) engine->SetEngineProperty(asEP_ALLOW_MULTILINE_STRINGS, true);
-	if (config.hasOption("scripting.allow_UNICODE_IDENTIFIERS")) engine->SetEngineProperty(asEP_ALLOW_UNICODE_IDENTIFIERS, true);
+	if (config.hasOption("scripting.allow_unicode_identifiers")) engine->SetEngineProperty(asEP_ALLOW_UNICODE_IDENTIFIERS, true);
 	if (config.hasOption("scripting.allow_implicit_handle_types")) engine->SetEngineProperty(asEP_ALLOW_IMPLICIT_HANDLE_TYPES, true);
 	if (config.hasOption("scripting.disallow_empty_list_elements")) engine->SetEngineProperty(asEP_DISALLOW_EMPTY_LIST_ELEMENTS, true);
 	if (config.hasOption("scripting.disallow_global_vars")) engine->SetEngineProperty(asEP_DISALLOW_GLOBAL_VARS, true);
@@ -735,20 +735,22 @@ int PragmaCallback(const string& pragmaText, CScriptBuilder& builder, void* /*us
 		pos += length;
 	}
 	cleanText.erase(cleanText.begin());
-	if (cleanText.substr(0, 8) == "include ") {
+	if (cleanText.starts_with("include ")) {
 		cleanText.erase(0, 8);
 		g_IncludeDirs.insert(g_IncludeDirs.begin(), cleanText);
-	} else if (cleanText.substr(0, 5) == "stub ")
+	} else if (cleanText.starts_with("stub "))
 		g_stub = cleanText.substr(5);
-	else if (cleanText.substr(0, 7) == "plugin ") {
+	else if (cleanText.starts_with("embed "))
+		embed_pack(cleanText.substr(6), Path(cleanText.substr(6)).getFileName());
+	else if (cleanText.starts_with("plugin ")) {
 		if (!load_nvgt_plugin(cleanText.substr(7)))
 			engine->WriteMessage(cleanText.substr(7).c_str(), -1, -1, asMSGTYPE_ERROR, "failed to load plugin");
-	} else if (cleanText.substr(0, 18) == "compiled_basename ") {
+	} else if (cleanText.starts_with("compiled_basename ")) {
 		g_compiled_basename = cleanText.substr(18);
 		if (g_compiled_basename == "*") g_compiled_basename = "";
-	} else if (cleanText.substr(0, 9) == "platform ")
+	} else if (cleanText.starts_with("platform "))
 		g_platform = cleanText.substr(9);
-	else if (cleanText.substr(0, 21) == "bytecode_compression ") {
+	else if (cleanText.starts_with("bytecode_compression ")) {
 		g_bcCompressionLevel = strtol(cleanText.substr(21).c_str(), NULL, 10);
 		if (g_bcCompressionLevel < 0 || g_bcCompressionLevel > 9) return -1;
 	} else if (cleanText == "console") g_make_console = true;
