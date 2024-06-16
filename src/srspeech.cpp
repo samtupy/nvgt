@@ -54,7 +54,7 @@ bool ScreenReaderLoad() {
 #elif defined(__linux__) || defined(__unix__) || \
       defined(__FreeBSD__) || defined(__NetBSD__) || \
       defined(__OpenBSD__) || defined(__DragonFly__)
-    const char* addr = spd_get_default_address(nullptr);
+    const auto *addr = spd_get_default_address(nullptr);
     if (!addr) {
         g_SRSpeechAvailable.reset();
         return false;
@@ -115,7 +115,7 @@ bool ScreenReaderHasSpeech() {
 #elif defined(__linux__) || defined(__unix__) || \
       defined(__FreeBSD__) || defined(__NetBSD__) || \
       defined(__OpenBSD__) || defined(__DragonFly__)
-    return conn != nullptr && spd_fd(conn) > 0;
+    return conn != nullptr;
 #else
     return false;
 #endif
