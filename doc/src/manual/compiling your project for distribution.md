@@ -1,5 +1,5 @@
 # Compiling your game for distribution.
-Once your game is ready to be distributed to others, you may want to turn it into a compiled binary executable. This procedure assembles all the individual nvgt files of your source code into a single file that can run natively on its targeted opperating system without having Nvgt available to interpret it.
+Once your game is ready to be distributed to others, you may want to turn it into a compiled binary executable. This procedure assembles all the individual nvgt files of your source code into a single file that can run natively on its targeted operating system without having Nvgt available to interpret it.
 
 # Here are some thoughts about reasons to do this:
 * Doing this can let you make your work more a closed-source affair which limits the ease at which someone can reverse engineer your work and hack in changes if that is something you don't want to happen, which is probably the case if your game isn't a free one for sure.
@@ -15,8 +15,8 @@ Once your game is ready to be distributed to others, you may want to turn it int
 # What is an executable file?
 This will be sometimes called a binary. It's a file that is a complete program directly compatible with the opperating system for which it is intended. It can be launched directly. 
 
-# What about all the different opperating systems?
-Since Nvgt is intended to be able to run on Windows, Linux and Mac OS, there will be different executables for each targeted opperating system. At the moment, you have to compile it on the opperating system you want to target, so if you want all 3 you need access to all 3. The resulting compiled binary will have a certain file extension depending on which opperating system, as follows:
+# What about all the different operating systems?
+Since Nvgt is intended to be able to run on Windows, Linux and Mac OS, there will be different executables for each targeted operating system. At the moment, you have to compile it on the operating system you want to target, so if you want all 3 you need access to all 3. The resulting compiled binary will have a certain file extension depending on which opperating system, as follows:
 * Windows: *.exe
 * Linux: *.
 * Mac OS: *.
@@ -37,10 +37,10 @@ You will receive a popup letting you know how long the compilation took. You sho
 # Libraries needed for distribution:
 There are a few libraries (dependancies) that Nvgt code relies on. When running from source, Nvgt is just interpreting your .nvgt scripts and using the libraries found in its own installation folder. Generally, if all is normal that will be:
 * On Windows, c:\Nvgt
-* On Linux, 
-* On Mac OS, 
+* On Linux, where you extracted NVGT's tarball to.
+* On Mac OS, `/Applications/nvgt.app/Contents`
 
-Within that folder you should have a subfolder that is called "lib". Lib contains the redistributable dependancies Nvgt uses for certain functionality. When you run from source, the Nvgt interpretor uses this very folder. However, when you compile, you must provide the files in the same directory as the compiled program so that it can find them. You may copy the entire lib folder to the location of the compiled game, or you can optionally just copy the files directly there if you don't want a lib folder for some reason. You can omit some of the dll files not needed by your code. A list is provided below of the basic purpose and importance of each so you can hopefully know what to omit if you don't want all of them. These files must be included where ever the program ends up, so installers need to copy those over as well, and they should be included in any zip files for portable programs, etc.
+Within that folder you should have a subfolder that is called "lib" (or "Frameworks" on macOS). Lib contains the redistributable dependancies Nvgt uses for certain functionality. When you run from source, the Nvgt interpretor uses this very folder. However, when you compile, you must provide the files in the same directory as the compiled program so that it can find them. You may copy the entire lib folder to the location of the compiled game, or you can optionally just copy the files directly there if you don't want a lib folder for some reason. You can omit some of the dll files not needed by your code. A list is provided below of the basic purpose and importance of each so you can hopefully know what to omit if you don't want all of them. These files must be included where ever the program ends up, so installers need to copy those over as well, and they should be included in any zip files for portable programs, etc.
 
 **Note: you can have a subdirectory within the program's directory called lib with the files inside, or you can also just place the dlls right in the program's directory where the binary is.**
 
