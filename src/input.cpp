@@ -90,10 +90,14 @@ void remove_keyhook();
 bool install_keyhook(bool allow_reinstall = true);
 void lost_window_focus() {
 	SDL_ResetKeyboard();
+	#ifdef _WIN32
 	if (g_keyhook_active) remove_keyhook();
+	#endif
 }
 void regained_window_focus() {
+	#ifdef _WIN32
 	if (g_keyhook_active) install_keyhook();
+	#endif
 }
 bool KeyPressed(unsigned int key) {
 	if (key > 511) return false;

@@ -1,6 +1,37 @@
 # Changelog
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
+## New in 0.87.0-beta (06/16/2024):
+* The jaws keyhook works even better than it did before and is nearing full functionality, though you may still need to alt+tab a few times in and out of the game window if JAWS restarts.
+* Various improvements to the network object:
+    * added packet_compression boolean which allows the user to toggle enet's builtin packet compressor allowing nvgt network objects to be backwards compatible with BGT if this is enabled!
+    * Added packets_received and packets_sent properties.
+    * network.destroy takes an optional boolean argument (flush = true) which can make sure any remaining packets are dispatched before the host is destroyed.
+    * bytes_received and bytes_sent properties no longer wrap around after 4gb due to enet tracking that information using 32 bit integers.
+* Add support for speech dispatcher on Linux and other BSD systems!
+* You can now use the directive `#pragma embed packname.dat` as an alternative to `#including` your pack files.
+* Fix broken quoted strings when handling pragma directives, resolving issues with the `#pragma include` option.
+* Mostly finishes making it possible to configure various Angelscript engine properties as well as other NVGT options using configuration files, jjust needs pollishing.
+* bgt_compat's string_to_number function now trims whitespace to comply with bgt's standard, our new faster parse_float doesn't do that anymore in the name of performance.
+* Fix issues with sound::push_memory():
+    * actual audio files can be pushed to the function without modifying any other arguments other than the data string.
+    * Calling sound.load() with a blank filename is no longer required before push_memory functions.
+* Some pollishing to the Angelscript integration:
+    * If a global variable fails to initialize, the exception that caused it is now properly shown in the compilation error dialog.
+    * There should hoefully be no more cases where a compilation error dialog can show up after a script executes successfully and throws an exception. Instead if the user enables the warnings display, they should properly see warnings before the script executes.
+    * Set up the infrastructure to be able to store a bit of extra encrypted information along side the bytecode payload in compiled programs, for now using that to more securely store the list of enabled plugins as well as the serialized Angelscript properties.
+    * Scripts no longer compile if they do not contain a valid entry point.
+* Revert the code changes to mixer::set_fx back to NVGT's first public release as the refactor did not go well and continued introducing unwanted side effects.
+* Fixed bugs in find_directories and find_files on Unix platforms, the functions should now behave like on windows.
+* Adds idle_time() function (works on windows and MacOS at present) which returns the number of milliseconds since the user has been idle.
+* Update Angelscript's script builder addon which makes it possible to use unicode characters in script include paths.
+* Add multiplication operators to strings, for example `string result = "hello" * 10;`
+* There is a new way to list files and directories, a function called glob. Not only can it return all files and directories in one call, but you can even provide wildcards that enter sub directories. The function is documented in the reference.
+* New additional version of json_array and json_object.stringify() which takes a datastream argument to write to.
+* json_array and json_object now have get_array and get_object methods that directly return casted json_array@ or json_object@ handles.
+* Added default_interrupt property in the high level Speech.nvgt include to set default interrupting for all the speech.
+* Documentation: configuration tutorial, much of tts_voice object and other minor improvements.
+
 ## New in 0.86.0-beta (06/08/2024):
 * running nvgtw.exe or the mac app should now show a message box at least rather than silently exiting.
 * Improves the functionality of the JAWS keyhook. We likely still have more to go before it's perfect, but it is at least far better than it was before.

@@ -19,7 +19,6 @@
 
 union SDL_Event;
 extern std::string g_UserInput;
-extern bool keyhook_active;
 
 class joystick : Poco::RefCountedObject {
 	SDL_GameController* stick;
