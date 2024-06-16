@@ -14,6 +14,7 @@
 #include <obfuscate.h>
 
 bool g_enet_initialized = false;
+network_event g_enet_none_event; // The none event is static and never changes, why reallocate it every time network::request() doesn't come up with an event?
 ENetPeer* network::get_peer(asQWORD peer_id) {
 	std::unordered_map<asQWORD, ENetPeer*>::iterator i = peers.find(peer_id);
 	if (i == peers.end())
@@ -101,13 +102,18 @@ asQWORD network::connect(const std::string& hostname, unsigned short port) {
 }
 
 network_event* network::request(uint32_t timeout) {
-	network_event* e = new network_event();
-	if (!host)
-		return e;
+	if (!host) {
+		g_enet_none_event.addRef();
+			return &g_enet_none_event;
+		}
 	ENetEvent event;
 	int r = enet_host_service(host, &event, timeout);
-	if (r < 1) return e;
+	if (r < 1) {
+		g_enet_none_event.addRef();
+			return &g_enet_none_event;
+		}
 	update_totals(); // total_sent, total_received...
+	network_event* e = new network_event();
 	e->type = event.type;
 	e->channel = event.channelID;
 	if (event.type == ENET_EVENT_TYPE_CONNECT) {
