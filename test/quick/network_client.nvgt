@@ -5,12 +5,20 @@
 network n;
 string long_packet="aaaaaaa";
 void main() {
+	// Make sure application doesn't die out if trying to access functions on a not set up network object.
+	n.send(1, "test", 1, false);
+	n.send(0, "test", 0);
+	n.request();
 	for (int i = 0; i<15; i++) long_packet += long_packet;
 	if (!n.setup_client(1, 10)) {
 		alert("error", "couldn't init client!");
 		exit();
 	}
-	n.packet_compression = true;
+	// Same test of send failures before connect
+	// Make sure application doesn't die out if trying to access functions on a not set up network object.
+	n.send(1, "test", 1, false);
+	n.send(0, "test", 0);
+	n.request();
 	if (n.connect("localhost", 23456) == 0) {
 		alert("error", "can't connect!");
 		exit();
@@ -24,7 +32,12 @@ void main() {
 			screen_reader_speak(e.message, true);
 		else if (e.type == event_connect)
 			screen_reader_speak("connection ok", true);
-		if (key_repeating(KEY_SPACE)) n.send_reliable(1, "spk", 0);
+		if (key_repeating(KEY_SPACE)) {
+			n.send_unreliable(1, "spk", 0);
+			n.send_reliable(1, "spk", 0);
+			n.send_reliable(0, "spk", 0);
+			n.send_unreliable(0, "spk", 0);
+		}
 		if (key_down(KEY_W)) n.send_reliable(0, long_packet, 0);
 	}
 	n.destroy();

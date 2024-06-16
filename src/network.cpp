@@ -154,10 +154,9 @@ bool network::send(asQWORD peer_id, const std::string& message, unsigned char ch
 	if (peer_id && !peer) return false;
 	ENetPacket* packet = enet_packet_create(message.c_str(), message.size(), (reliable ? ENET_PACKET_FLAG_RELIABLE : 0));
 	if (!packet) return false;
-	size_t old_refcount = packet->referenceCount; // If this is not incremented by enet for any reason we must destroy the packet here to avoid a memory leak (http://enet.bespin.org/group__peer.html).
-	if (peer_id) enet_peer_send(peer, channel, packet);
+	bool r = true;
+	if (peer_id) r = enet_peer_send(peer, channel, packet) == 0;
 	else enet_host_broadcast(host, channel, packet);
-	bool r = packet->referenceCount > old_refcount;
 	if (!r) enet_packet_destroy(packet);
 	return r;
 }

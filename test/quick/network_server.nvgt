@@ -9,7 +9,7 @@ void main() {
 		alert("error", "can't bind server");
 		return;
 	}
-	n.packet_compression = true;
+	//n.packet_compression = true;
 	show_window("server up");
 	while (!key_down(KEY_ESCAPE)) {
 		wait(0);

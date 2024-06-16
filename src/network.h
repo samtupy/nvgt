@@ -37,6 +37,7 @@ class network {
 	// Enet's total_sent/received counters are 32 bit integers that can overflow, work around that
 	asQWORD total_sent_data, total_sent_packets, total_received_data, total_received_packets;
 	void update_totals() {
+		if (!host) return;
 		total_sent_data += host->totalSentData; host->totalSentData = 0;
 		total_sent_packets += host->totalSentPackets; host->totalSentPackets = 0;
 		total_received_data += host->totalReceivedData; host->totalReceivedData = 0;
