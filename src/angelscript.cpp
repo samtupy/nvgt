@@ -267,7 +267,7 @@ void MessageCallback(const asSMessageInfo* msg, void* param) {
 		type = "INFO";
 	else
 		g_scriptMessagesErrNum += 1;
-	std::string buffer = format(Util::Application::instance().config().getString("application.compilation_message_template", "file: %s\r\nline: %u (%u)\r\n%s: %s\r\n") + "\r\n"s, msg->section, uint32_t(msg->row > 0 ? msg->row : 0), uint32_t(msg->col > 0 ? msg->col : 0), type, msg->message);
+	std::string buffer = format(Util::Application::instance().config().getString("application.compilation_message_template", "file: %s\r\nline: %u (%u)\r\n%s: %s\r\n") + "\r\n"s, string(msg->section), uint32_t(msg->row > 0 ? msg->row : 0), uint32_t(msg->col > 0 ? msg->col : 0), string(type), string(msg->message));
 	if (msg->type == asMSGTYPE_INFORMATION)
 		g_scriptMessagesInfo = buffer;
 	else if (msg->type == asMSGTYPE_ERROR) {
