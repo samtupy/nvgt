@@ -15,13 +15,9 @@
 	#include <Tolk.h>
 #elif defined(__APPLE__)
 	#include "apple.h"
-#elif defined(__linux__) || defined(__unix__) || \
-	  defined(__FreeBSD__) || defined(__NetBSD__) || \
-	  defined(__OpenBSD__) || defined(__DragonFly__)
+#elif defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
 	#include <Poco/SharedLibrary.h>
-	#include <speech-dispatcher/libspeechd.h>
-#else
-	#error Unknown platform detected
+	#define using_speechd
 #endif
 #include <string>
 #include <Poco/AtomicFlag.h>
@@ -30,28 +26,27 @@
 Poco::AtomicFlag g_SRSpeechLoaded;
 Poco::AtomicFlag g_SRSpeechAvailable;
 
-#if defined(__linux__) || defined(__unix__) || \
-	defined(__FreeBSD__) || defined(__NetBSD__) || \
-	defined(__OpenBSD__) || defined(__DragonFly__)
+#ifdef using_speechd
+	// Define the functions we want to use from speech-dispatcher with some temporary macro replacements that allow the libspeechd header to still be usable while turning the function definitions into pointers. Not perfectly ideal, but still the cleanest I can find at this time.
+	#define spd_get_default_address (*spd_get_default_address)
+	#define spd_open2 (*spd_open2)
+	#define spd_close (*spd_close)
+	#define spd_say (*spd_say)
+	#define spd_stop (*spd_stop)
+	#define spd_cancel (*spd_cancel)
+	#include <speech-dispatcher/libspeechd.h>
+	#undef spd_get_default_address
+	#undef spd_open2
+	#undef spd_close
+	#undef spd_say
+	#undef spd_stop
+	#undef spd_cancel
 	SPDConnection*  g_SpeechdConn = nullptr;
 	Poco::SharedLibrary g_SpeechdLib;
-	// Setup the needed function pointers for speech dispatcher
-	SPDConnectionAddress* (*f_spd_get_default_address)(char **error) = nullptr;
-	#define spd_get_default_address f_spd_get_default_address
-	SPDConnection* (*f_spd_open2)(const char *client_name, const char *connection_name, const char *user_name, SPDConnectionMode mode, const SPDConnectionAddress * address, int autospawn, char **error_result) = nullptr;
-	#define spd_open2 f_spd_open2
-	void (*f_spd_close)(SPDConnection * connection) = nullptr;
-	#define spd_close f_spd_close
-	int (*f_spd_say)(SPDConnection * connection, SPDPriority priority, const char *text) = nullptr;
-	#define spd_say f_spd_say
-	int (*f_spd_stop)(SPDConnection * connection);
-	#define spd_stop f_spd_stop
-	int (*f_spd_cancel)(SPDConnection * connection);
-	#define spd_cancel f_spd_cancel
 #endif
 
 bool ScreenReaderLoad() {
-#if defined(_WIN32)
+	#if defined(_WIN32)
 	g_SRSpeechAvailable.set();
 	if (!g_SRSpeechAvailable) return false;
 	if (g_SRSpeechLoaded) return true;
@@ -63,12 +58,10 @@ bool ScreenReaderLoad() {
 	}
 	g_SRSpeechLoaded.set();
 	return true;
-#elif defined(__APPLE__)
+	#elif defined(__APPLE__)
 	g_SRSpeechLoaded.set();
 	return true; // Voice over or libraries to access it don't need loading.
-#elif defined(__linux__) || defined(__unix__) || \
-	  defined(__FreeBSD__) || defined(__NetBSD__) || \
-	  defined(__OpenBSD__) || defined(__DragonFly__)
+	#elif defined(using_speechd)
 	if (g_SRSpeechLoaded) return true;
 	try {
 		g_SpeechdLib.load("libspeechd.so");
@@ -94,29 +87,27 @@ bool ScreenReaderLoad() {
 	}
 	g_SRSpeechAvailable.set();
 	return true;
-#else
+	#else
 	return false;
-#endif
+	#endif
 }
 
 void ScreenReaderUnload() {
-#if defined(_WIN32)
+	#if defined(_WIN32)
 	if (!g_SRSpeechLoaded) return;
 	Tolk_Unload();
 	g_SRSpeechLoaded.reset();
-#elif defined(__APPLE__)
+	#elif defined(__APPLE__)
 	voice_over_speech_shutdown(); // Really just stops a hacky thread intended to get speech event queuing working.
-#elif defined(__linux__) || defined(__unix__) || \
-	  defined(__FreeBSD__) || defined(__NetBSD__) || \
-	  defined(__OpenBSD__) || defined(__DragonFly__)
+	#elif defined(using_speechd)
 	spd_close(g_SpeechdConn);
 	g_SpeechdConn = nullptr;
 	g_SpeechdLib.unload();
-#endif
+	#endif
 }
 
 std::string ScreenReaderDetect() {
-#if defined(_WIN32)
+	#if defined(_WIN32)
 	if (!ScreenReaderLoad()) return "";
 	const wchar_t* srname = Tolk_DetectScreenReader();
 	if (srname == NULL) return "";
@@ -124,117 +115,107 @@ std::string ScreenReaderDetect() {
 	memset(srnameA, 0, sizeof(srnameA));
 	WideCharToMultiByte(CP_UTF8, 0, srname, wcslen(srname), srnameA, sizeof(srnameA), NULL, NULL);
 	return std::string(srnameA);
-#elif defined(__APPLE__)
+	#elif defined(__APPLE__)
 	return voice_over_is_running() ? "VoiceOver" : "";
-#elif defined(__linux__) || defined(__unix__) || \
-	  defined(__FreeBSD__) || defined(__NetBSD__) || \
-	  defined(__OpenBSD__) || defined(__DragonFly__)
+	#elif defined(using_speechd)
 	return g_SpeechdConn != nullptr ? "Speech dispatcher" : "";
-#else
+	#else
 	return "";
-#endif
+	#endif
 }
 
 bool ScreenReaderHasSpeech() {
-#if defined(_WIN32)
+	#if defined(_WIN32)
 	if (!ScreenReaderLoad()) return false;
 	return Tolk_HasSpeech();
-#elif defined(__APPLE__)
+	#elif defined(__APPLE__)
 	return voice_over_is_running();
-#elif defined(__linux__) || defined(__unix__) || \
-	  defined(__FreeBSD__) || defined(__NetBSD__) || \
-	  defined(__OpenBSD__) || defined(__DragonFly__)
+	#elif defined(using_speechd)
 	return g_SpeechdConn != nullptr;
-#else
+	#else
 	return false;
-#endif
+	#endif
 }
 
 bool ScreenReaderHasBraille() {
-#if defined(_WIN32)
+	#if defined(_WIN32)
 	if (!ScreenReaderLoad()) return false;
 	return Tolk_HasBraille();
-#elif defined(__APPLE__)
+	#elif defined(__APPLE__)
 	return voice_over_is_running();
-#else
+	#else
 	return false;
-#endif
+	#endif
 }
 
 bool ScreenReaderIsSpeaking() {
-#if defined(_WIN32)
+	#if defined(_WIN32)
 	if (!ScreenReaderLoad()) return false;
 	return Tolk_IsSpeaking();
-#else
+	#else
 	return false;
-#endif
+	#endif
 }
 
 bool ScreenReaderOutput(std::string& text, bool interrupt) {
 	if (!ScreenReaderLoad()) return false;
-#if defined(_WIN32)
+	#if defined(_WIN32)
 	std::wstring textW(text.begin(), text.end());
 	return Tolk_Output(textW.c_str(), interrupt);
-#elif defined(__APPLE__)
+	#elif defined(__APPLE__)
 	return voice_over_speak(text, interrupt);
-#elif defined(__linux__) || defined(__unix__) || \
-	  defined(__FreeBSD__) || defined(__NetBSD__) || \
-	  defined(__OpenBSD__) || defined(__DragonFly__)
+	#elif defined(using_speechd)
 	if (interrupt) {
 		spd_stop(g_SpeechdConn);
 		spd_cancel(g_SpeechdConn);
 	}
-	return spd_say(g_SpeechdConn, interrupt? SPD_IMPORTANT : SPD_TEXT, text.c_str());
-#else
+	return spd_say(g_SpeechdConn, interrupt ? SPD_IMPORTANT : SPD_TEXT, text.c_str());
+	#else
 	return false;
-#endif
+	#endif
 }
 
 bool ScreenReaderSpeak(std::string& text, bool interrupt) {
 	if (!ScreenReaderLoad()) return false;
-#if defined(_WIN32)
+	#if defined(_WIN32)
 	std::wstring textW(text.begin(), text.end());
 	return Tolk_Speak(textW.c_str(), interrupt);
-#elif defined(__APPLE__)
+	#elif defined(__APPLE__)
 	return voice_over_speak(text, interrupt);
-#elif defined(__linux__) || defined(__unix__) || \
-	  defined(__FreeBSD__) || defined(__NetBSD__) || \
-	  defined(__OpenBSD__) || defined(__DragonFly__)
+	#elif defined(using_speechd)
 	if (interrupt) {
 		spd_stop(g_SpeechdConn);
 		spd_cancel(g_SpeechdConn);
 	}
-	return spd_say(g_SpeechdConn, interrupt? SPD_IMPORTANT : SPD_TEXT, text.c_str());
-#else
+	return spd_say(g_SpeechdConn, interrupt ? SPD_IMPORTANT : SPD_TEXT, text.c_str());
+	#else
 	return false;
-#endif
+	#endif
 }
 
 bool ScreenReaderBraille(std::string& text) {
 	if (!ScreenReaderLoad()) return false;
-#if defined(_WIN32)
+	#if defined(_WIN32)
 	std::wstring textW(text.begin(), text.end());
 	return Tolk_Braille(textW.c_str());
-#else
+	#else
 	return false;
-#endif
+	#endif
 }
 
 bool ScreenReaderSilence() {
 	if (!ScreenReaderLoad()) return false;
-#if defined(_WIN32)
+	#if defined(_WIN32)
 	return Tolk_Silence();
-#elif defined(__APPLE__)
+	#elif defined(__APPLE__)
 	return voice_over_speak("", true);
-#elif defined(__linux__) || defined(__unix__) || \
-	  defined(__FreeBSD__) || defined(__NetBSD__) || \
-	  defined(__OpenBSD__) || defined(__DragonFly__)
+	#elif defined(using_speechd)
 	spd_cancel(g_SpeechdConn);
 	spd_stop(g_SpeechdConn);
 	return true;
-#else
+	#else
 	return false;
-#endif
+	#endif
 }
 
 void RegisterScreenReaderSpeech(asIScriptEngine* engine) {
