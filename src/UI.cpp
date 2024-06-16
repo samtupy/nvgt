@@ -273,7 +273,9 @@ void handle_sdl_event(SDL_Event* evt) {
 	if (evt->type == SDL_KEYDOWN || evt->type == SDL_KEYUP || evt->type == SDL_TEXTINPUT || evt->type == SDL_MOUSEMOTION || evt->type == SDL_MOUSEBUTTONDOWN || evt->type == SDL_MOUSEBUTTONUP || evt->type == SDL_MOUSEWHEEL)
 		InputEvent(evt);
 	else if (evt->type == SDL_WINDOWEVENT && evt->window.event == SDL_WINDOWEVENT_FOCUS_LOST)
-		SDL_ResetKeyboard();
+		lost_window_focus();
+	else if (evt->type == SDL_WINDOWEVENT && evt->window.event == SDL_WINDOWEVENT_FOCUS_GAINED)
+		regained_window_focus();
 }
 void wait(int ms) {
 	if (!g_WindowHandle || g_WindowThreadId != thread_current_thread_id()) {
