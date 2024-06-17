@@ -90,7 +90,7 @@ void message(const std::string& text, const std::string& header) { // Usually us
 	std::string tmp = header;
 	tmp += ": ";
 	tmp += text;
-	printf("%s", tmp.c_str());
+	printf("%s\n", tmp.c_str());
 	if (Poco::Util::Application::instance().config().hasOption("application.gui")) {
 		alert(header, text);
 		return;

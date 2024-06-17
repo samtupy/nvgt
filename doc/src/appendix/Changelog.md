@@ -1,6 +1,12 @@
 # Changelog
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
+## New in 0.87.1-beta (06/16/2024):
+* This patches an issue with the speech dispatcher support on linux where calling screen_reader_unload() would cause a segmentation fault if it had not loaded to begin with due to no libspeechd being available.
+* Fixed a severe lack of debugging information issue where if a plugin could not load on linux, no error information was printed and instead the app silently exited.
+* Fix an issue where some error messages that printed to stdout were not following up with a new line.
+* Another enhancement to the network object which avoids an extra memory allocation every time a network_event of type event_none was created.
+
 ## New in 0.87.0-beta (06/16/2024):
 * The jaws keyhook works even better than it did before and is nearing full functionality, though you may still need to alt+tab a few times in and out of the game window if JAWS restarts.
 * Various improvements to the network object:

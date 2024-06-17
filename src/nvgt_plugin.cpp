@@ -70,7 +70,7 @@ bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
 		std::string name;
 		br >> name;
 		if (!load_nvgt_plugin(name)) {
-			alert("Error", Poco::format("Unable to load %s, exiting.", name));
+			message(Poco::format("Unable to load %s, exiting.", name), "error");
 			return false;
 		}
 	}

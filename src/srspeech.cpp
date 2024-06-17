@@ -93,8 +93,8 @@ bool ScreenReaderLoad() {
 }
 
 void ScreenReaderUnload() {
+if (!g_SRSpeechLoaded) return;
 	#if defined(_WIN32)
-	if (!g_SRSpeechLoaded) return;
 	Tolk_Unload();
 	g_SRSpeechLoaded.reset();
 	#elif defined(__APPLE__)
