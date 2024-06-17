@@ -7,7 +7,8 @@ This document lists all major changes that have taken place in NVGT since we sta
 * NVGT will no longer fail if a plugin pragma with the same plugin name gets encountered multiple times.
 * Fix minor error in bgt_compat's set_sound_storage function where the filename stored was not caching for display properly.
 * Improve the downloads page to include release dates and headings for old versions as well as file sizes, yes we do still intend to integrate with github releases.
-* A fun little aside, visit https://nvtt.zip/windows, /mac or /linux to instantly download the latest NVGT for that platform!
+* Fix the broken SCREEN_READER_AVAILABLE property on windows.
+* New documentation on compiling a game for distrobution.
 
 ## New in 0.87.1-beta (06/16/2024):
 * This patches an issue with the speech dispatcher support on linux where calling screen_reader_unload() would cause a segmentation fault if it had not loaded to begin with due to no libspeechd being available.

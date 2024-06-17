@@ -16,11 +16,11 @@
 #elif defined(__APPLE__)
 	#include "apple.h"
 #elif defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
-	#include <Poco/SharedLibrary.h>
 	#define using_speechd
 #endif
 #include <string>
 #include <Poco/AtomicFlag.h>
+	#include <Poco/SharedLibrary.h>
 #include <Poco/UnicodeConverter.h>
 #include "srspeech.h"
 
@@ -48,15 +48,15 @@ Poco::AtomicFlag g_SRSpeechAvailable;
 
 bool ScreenReaderLoad() {
 	#if defined(_WIN32)
-	g_SRSpeechAvailable.set();
-	if (!g_SRSpeechAvailable) return false;
 	if (g_SRSpeechLoaded) return true;
-	__try {
-		Tolk_Load();
-	} __except (1) {
+	try {
+		Poco::SharedLibrary("Tolk.dll");
+	} catch(Poco::Exception&) {
 		g_SRSpeechAvailable.reset();
 		return false;
 	}
+	Tolk_Load();
+	g_SRSpeechAvailable.set();
 	g_SRSpeechLoaded.set();
 	return true;
 	#elif defined(__APPLE__)
@@ -96,7 +96,9 @@ bool ScreenReaderLoad() {
 void ScreenReaderUnload() {
 if (!g_SRSpeechLoaded) return;
 	#if defined(_WIN32)
+	__try {
 	Tolk_Unload();
+	} __except(1) {}
 	g_SRSpeechLoaded.reset();
 	#elif defined(__APPLE__)
 	voice_over_speech_shutdown(); // Really just stops a hacky thread intended to get speech event queuing working.
