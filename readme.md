@@ -9,6 +9,8 @@ It aims to remove some of the headaches that anyone interested in audio game dev
 Find out more at nvgt.gg.
 
 ## building
+You will need a c++ build toolchain if you want to build NVGT from source. On windows we recommend the visual studio build command line tools or the very latest version of visual studio 2022. On macos you will need at least the command line development tools if not xcode, and a functioning GNU/g++ compiler collection is expected to be available on linux.
+
 NVGT uses SCons, a python build system. If you have python, you can get it by running `pip install scons`.
 
 Other than scons, the following libraries are needed to build NVGT:
@@ -27,7 +29,15 @@ For Linux and MacOS, scripts with build commands are in build/build_linux.sh and
 For now only on windows, the option exists to make the process of dealing with dependencies much simpler than hunting them down manually and setting up include/library paths. For those who want them, I've decided to provide my own build artifacts. This is a bin/include/lib directory structure that contains organised header files, link libraries (static when possible), and dlls for distribution like bass and phonon which makes building nvgt as simple as pointing to this directory structure and running the build command. This download contains more than the libraries specifically required to build NVGT as A, it includes the libraries required to build plugins and B, it may include libraries that I use in other projects. If it gets giant, I'll provide a download just containing nvgt libraries. For now, you can 
 [download windev.zip here](https://nvgt.gg/windev.zip) and place an extracted version of it in the root of the nvgt repository, that is a folder called windev containing bin, include, lib, misc should exist in the root of the nvgt repo.
 
-Though unlike the windeps.zip file these only contain binaries for the bass and steam audio versions we are using at present, you can also [download macosdev.tar.gz](https://nvgt.gg/macosdev.tar.gz) for MacOS or [download lindev.tar.gz](https://nvgt.gg/lindev.tar.gz) for Linux to ease at least some of the dependancy hunt.
+Though unlike the windev.zip file these only contain binaries for the bass and steam audio versions we are using at present, you can also [download macosdev.tar.gz](https://nvgt.gg/macosdev.tar.gz) for MacOS or [download lindev.tar.gz](https://nvgt.gg/lindev.tar.gz) for Linux to ease at least some of the dependancy hunt.
 
-Once dependencies are in place, you can now open a command prompt or terminal window up to the root of the nvgt repository and run `scons -s` to build nvgt. If you don't want to build plugins, you can run, for example, `scons -s no_curl_plugin=1 no_git_plugin=1` to disable the curl and git plugins. You can disable the creation of shared plugin dlls with the option no_shared_plugins=1. You can omit the -s from the build command if you want to get spammed with the outputting of every internal build command used, which is hundreds of them.
+Once dependencies are in place, you can now open a command prompt or terminal window up to the root of the nvgt repository and run `scons -s` to build nvgt.
+
+If you don't want to build plugins, you can run, for example, `scons -s no_curl_plugin=1 no_git_plugin=1` to disable the curl and git plugins.
+
+You can disable the creation of shared plugin dlls with the option no_shared_plugins=1.
+
+If you do not want to build the stubs, such as for active development where generating them would be time consuming, you can pass no_stubs=1 to the scons command.
+
+You can omit the -s from the build command if you want to get spammed with the outputting of every internal build command used, which is hundreds of them.
 
