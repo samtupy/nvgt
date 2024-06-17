@@ -241,7 +241,7 @@ class audio_form {
 		@c_form[control_counter].ui_speech = ui_speech;
 		return control_counter;
 	}
-	int create_list(string caption, int maximum_items = 0, bool multiselect = false, bool repeat_boundary_items = false) {
+	int create_list(string caption, int maximum_items = 0, bool multiselect = false, bool repeat_boundary_items = false, bool is_tab_panel=false) {
 		form_error = 0;
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
@@ -260,6 +260,7 @@ class audio_form {
 		c_form[control_counter].max_length = maximum_items;
 		c_form[control_counter].list_multiselect = multiselect;
 		c_form[control_counter].list_repeat_boundary_items = repeat_boundary_items;
+		c_form[control_counter].list_is_tab_panel = is_tab_panel;
 		c_form[control_counter].speech_output = speech_output;
 		@c_form[control_counter].ui_speech = ui_speech;
 		return control_counter;
@@ -2088,6 +2089,7 @@ class control {
 	list_item[] list;
 	bool list_multiselect;
 	bool list_repeat_boundary_items;
+	bool list_is_tab_panel;
 	bool list_nav_translate;
 	int type;
 	int progress;
@@ -2240,7 +2242,10 @@ class control {
 		if (type == ct_slider)
 			speak(slider_value_string(), false);
 		if ((type == ct_list) && (list_position > -1)) {
-			speak(list[list_position].item, false);
+			if(list_is_tab_panel){
+				speak(list[list_position].item+" tab", false);
+				}
+			else speak(list[list_position].item, false);
 			if (list[list_position].checked)
 				speak("Checked", false);
 		}
@@ -2446,7 +2451,7 @@ class control {
 						speak("Checked", false);
 				}
 			}
-			if (key_repeating(KEY_SPACE)) {
+			if (key_repeating(KEY_SPACE) and !list_is_tab_panel){
 				if ((list_position == -1) || (!list_multiselect))
 					return;
 				if (list[list_position].checked) {
@@ -2462,29 +2467,100 @@ class control {
 					list[counter].checked = true;
 				speak("All items selected", true);
 			}
-			if (key_repeating(KEY_UP)) {
-				if (list_position <= 0) {
-					if (list_repeat_boundary_items && list_position == 0) {
-						dictionary args = {{"key", KEY_UP}, {"boundary", true}};
-						if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) return;
-						if (!args.exists("silent")) {
-							speak(list[list_position].item, true);
-							if (list[list_position].checked)
-								speak("Checked", false);
+			if(list_is_tab_panel){
+				if (key_repeating(KEY_LEFT)) {
+					if (list_position <= 0) {
+						if (list_repeat_boundary_items && list_position == 0) {
+							dictionary args = {{"key", KEY_LEFT}, {"boundary", true}};
+							if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) return;
+							if (!args.exists("silent")) {
+								speak(list[list_position].item+" tab", true);
+							}
 						}
+						return;
 					}
-					return;
+					list_position--;
+					dictionary args = {{"key", KEY_LEFT}};
+					if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) {
+						list_position++;
+						return;
+					}
+					if (!args.exists("silent")) {
+						speak(list[list_position].item+" tab", true);
+					}
 				}
-				list_position--;
-				dictionary args = {{"key", KEY_UP}};
-				if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) {
+				if (key_repeating(KEY_RIGHT)) {
+					if (list_position >= list_length) {
+						if (list_repeat_boundary_items && list_position == list.length() - 1) {
+							dictionary args = {{"key", KEY_RIGHT}, {"boundary", true}};
+							if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) return;
+							if (!args.exists("silent")) {
+								speak(list[list_position].item+" tab", true);
+							}
+						}
+						return;
+					}
 					list_position++;
-					return;
+					dictionary args = {{"key", KEY_RIGHT}};
+					if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) {
+						list_position--;
+						return;
+					}
+					if (!args.exists("silent")) {
+						speak(list[list_position].item+" tab", true);
+					}
 				}
-				if (!args.exists("silent")) {
-					speak(list[list_position].item, true);
-					if (list[list_position].checked)
-						speak("Checked", false);
+			}
+			else{
+				if (key_repeating(KEY_UP)) {
+					if (list_position <= 0) {
+						if (list_repeat_boundary_items && list_position == 0) {
+							dictionary args = {{"key", KEY_UP}, {"boundary", true}};
+							if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) return;
+							if (!args.exists("silent")) {
+								speak(list[list_position].item, true);
+								if (list[list_position].checked)
+									speak("Checked", false);
+							}
+						}
+						return;
+					}
+					list_position--;
+					dictionary args = {{"key", KEY_UP}};
+					if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) {
+						list_position++;
+						return;
+					}
+					if (!args.exists("silent")) {
+						speak(list[list_position].item, true);
+						if (list[list_position].checked)
+							speak("Checked", false);
+					}
+				}
+				if (key_repeating(KEY_DOWN)) {
+					if (list_position >= list_length) {
+						if (list_repeat_boundary_items && list_position == list.length() - 1) {
+							dictionary args = {{"key", KEY_DOWN}, {"boundary", true}};
+							if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) return;
+							if (!args.exists("silent")) {
+								speak(list[list_position].item, true);
+								if (list[list_position].checked)
+									speak("Checked", false);
+							}
+						}
+						return;
+					}
+					list_position++;
+					dictionary args = {{"key", KEY_DOWN}};
+					if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) {
+						list_position--;
+						return;
+					}
+					if (!args.exists("silent")) {
+						speak(list[list_position].item, true);
+						if (list[list_position].checked)
+							speak("Checked", false);
+					}
 				}
 			}
 			if (key_repeating(KEY_HOME) && (list_position > 0 || list_repeat_boundary_items)) {
@@ -2496,7 +2572,10 @@ class control {
 					return;
 				}
 				if (!args.exists("silent")) {
-					speak(list[list_position].item, true);
+					if(list_is_tab_panel){
+						speak(list[list_position].item+" tab", true);
+						}
+					else speak(list[list_position].item, true);
 					if (list[list_position].checked)
 						speak("Checked", false);
 				}
@@ -2510,32 +2589,10 @@ class control {
 					return;
 				}
 				if (!args.exists("silent")) {
-					speak(list[list_position].item, true);
-					if (list[list_position].checked)
-						speak("Checked", false);
-				}
-			}
-			if (key_repeating(KEY_DOWN)) {
-				if (list_position >= list_length) {
-					if (list_repeat_boundary_items && list_position == list.length() - 1) {
-						dictionary args = {{"key", KEY_DOWN}, {"boundary", true}};
-						if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) return;
-						if (!args.exists("silent")) {
-							speak(list[list_position].item, true);
-							if (list[list_position].checked)
-								speak("Checked", false);
+					if(list_is_tab_panel){
+						speak(list[list_position].item+" tab", true);
 						}
-					}
-					return;
-				}
-				list_position++;
-				dictionary args = {{"key", KEY_DOWN}};
-				if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) {
-					list_position--;
-					return;
-				}
-				if (!args.exists("silent")) {
-					speak(list[list_position].item, true);
+					else speak(list[list_position].item, true);
 					if (list[list_position].checked)
 						speak("Checked", false);
 				}
@@ -3025,8 +3082,9 @@ class control {
 		string name;
 		if (type == ct_button)
 			name = "Button";
-		if (type == ct_list)
-			name = "List";
+		if (type == ct_list){
+			if(list_is_tab_panel) name = "Tab panel";
+			else name = "List";}
 		if (type == ct_input) {
 			if (multiline == false)
 				name = "Edit";
