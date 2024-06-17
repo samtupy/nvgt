@@ -348,6 +348,7 @@ bool set_sound_storage(const string&in filename, bool reset = false) {
 	pack@p = open_pack(filename);
 	if(@p == null) return false;
 	@sound_default_pack = p;
+	sound_storage = filename;
 	return true;
 }
 
