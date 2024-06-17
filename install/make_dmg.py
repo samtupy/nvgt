@@ -22,6 +22,7 @@ def make_app_bundle(bundle_name, release_path):
 	os.rename(bundle_basename + "/MacOS/stub", bundle_basename + "/Resources/stub")
 	shutil.copy("macos_info.plist", bundle_basename + "/info.plist")
 	shutil.copy("macos_icon.icns", bundle_basename + "/Resources/unicon.icns")
+	subprocess.check_call(["xattr", "-c", bundle_name])
 
 def make_dmg(src_dir, filename):
 	if os.path.isfile(filename): os.remove(filename)

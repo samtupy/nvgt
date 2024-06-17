@@ -21,6 +21,7 @@
 #endif
 #include <string>
 #include <Poco/AtomicFlag.h>
+#include <Poco/UnicodeConverter.h>
 #include "srspeech.h"
 
 Poco::AtomicFlag g_SRSpeechLoaded;
@@ -160,7 +161,8 @@ bool ScreenReaderIsSpeaking() {
 bool ScreenReaderOutput(std::string& text, bool interrupt) {
 	if (!ScreenReaderLoad()) return false;
 	#if defined(_WIN32)
-	std::wstring textW(text.begin(), text.end());
+	std::wstring textW;
+	Poco::UnicodeConverter::convert(text, textW);
 	return Tolk_Output(textW.c_str(), interrupt);
 	#elif defined(__APPLE__)
 	return voice_over_speak(text, interrupt);
@@ -178,7 +180,8 @@ bool ScreenReaderOutput(std::string& text, bool interrupt) {
 bool ScreenReaderSpeak(std::string& text, bool interrupt) {
 	if (!ScreenReaderLoad()) return false;
 	#if defined(_WIN32)
-	std::wstring textW(text.begin(), text.end());
+	std::wstring textW;
+	Poco::UnicodeConverter::convert(text, textW);
 	return Tolk_Speak(textW.c_str(), interrupt);
 	#elif defined(__APPLE__)
 	return voice_over_speak(text, interrupt);

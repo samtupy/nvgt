@@ -1,6 +1,14 @@
 # Changelog
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
+## New in 0.87.2-beta (06/17/2024):
+* Hopefully removed the need for the user to run `xattr -c` on the mac app bundle!
+* Fix an accidental UTF8 conversion issue introduced into screen reader speech that took place when implementing speech dispatcher.
+* NVGT will no longer fail if a plugin pragma with the same plugin name gets encountered multiple times.
+* Fix minor error in bgt_compat's set_sound_storage function where the filename stored was not caching for display properly.
+* Improve the downloads page to include release dates and headings for old versions as well as file sizes, yes we do still intend to integrate with github releases.
+* A fun little aside, visit https://nvtt.zip/windows, /mac or /linux to instantly download the latest NVGT for that platform!
+
 ## New in 0.87.1-beta (06/16/2024):
 * This patches an issue with the speech dispatcher support on linux where calling screen_reader_unload() would cause a segmentation fault if it had not loaded to begin with due to no libspeechd being available.
 * Fixed a severe lack of debugging information issue where if a plugin could not load on linux, no error information was printed and instead the app silently exited.
@@ -27,6 +35,7 @@ This document lists all major changes that have taken place in NVGT since we sta
     * There should hoefully be no more cases where a compilation error dialog can show up after a script executes successfully and throws an exception. Instead if the user enables the warnings display, they should properly see warnings before the script executes.
     * Set up the infrastructure to be able to store a bit of extra encrypted information along side the bytecode payload in compiled programs, for now using that to more securely store the list of enabled plugins as well as the serialized Angelscript properties.
     * Scripts no longer compile if they do not contain a valid entry point.
+* Updated to the latest Angelscript WIP code which resolves a bytecode load error that had been reported.
 * Revert the code changes to mixer::set_fx back to NVGT's first public release as the refactor did not go well and continued introducing unwanted side effects.
 * Fixed bugs in find_directories and find_files on Unix platforms, the functions should now behave like on windows.
 * Adds idle_time() function (works on windows and MacOS at present) which returns the number of milliseconds since the user has been idle.
