@@ -1,6 +1,6 @@
 /*
 	Obtain the time passed since a user has pressed a key or used the mouse.
-	uint64 idle_ticks()
+	uint64 idle_ticks();
 	## returns
 		Returns the number of milliseconds since a user has not interacted with the machine.
 	## remarks
@@ -8,10 +8,8 @@
 */
 
 // Example
-void main()
-	{
+void main() {
 	int64 t;
-
 	show_window("Idle test");
 	wait(50);
 	screen_reader_speak("Press space to check the idle time and escape to exit.", true);
@@ -19,7 +17,6 @@ void main()
 		wait(5);
 		if (key_pressed(KEY_SPACE))
 			screen_reader_speak("You have been idle for %0 milliseconds".format(t), true);
-
 		t = idle_ticks();
 	}
 }
