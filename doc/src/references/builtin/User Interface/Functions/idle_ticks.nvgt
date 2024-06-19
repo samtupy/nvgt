@@ -1,4 +1,4 @@
-/*
+/**
 	Obtain the time passed since a user has pressed a key or used the mouse.
 	uint64 idle_ticks();
 	## returns
