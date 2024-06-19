@@ -85,7 +85,7 @@ template <typename T, typename F> constexpr inline T to_from_cast(const F &val) 
 }
 
 bool verify_plugin_signature(const std::array<char, 64>& signature, const std::array<char, 32>& public_key, const std::string& name) {
-auto plugin_path = std::filesystem::path(Poco::Util::Application::instance().config().getString("application.appDir"));
+auto plugin_path = std::filesystem::path(Poco::Util::Application::instance().config().getString("application.dir"));
 #if defined(_WIN32) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
 plugin_path /= "lib";
 #elif defined(__APPLE__)
@@ -112,7 +112,7 @@ return crypto_eddsa_check(to_from_cast<const std::uint8_t*>(signature.data()), t
 }
 
 std::array<char, 64> sign_plugin(std::array<char, 64>& sk, const std::string& name) {
-auto plugin_path = std::filesystem::path(Poco::Util::Application::instance().config().getString("application.appDir"));
+auto plugin_path = std::filesystem::path(Poco::Util::Application::instance().config().getString("application.dir"));
 #if defined(_WIN32) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
 plugin_path /= "lib";
 #elif defined(__APPLE__)
@@ -153,7 +153,7 @@ bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
 		br.readRaw(signature.data(), signature.size());
 		std::array<char, 32> public_key;
 		br.readRaw(public_key.data(), public_key.size());
-		if (verify_plugin_signature(signature, public_key, name)) {
+		if (!verify_plugin_signature(signature, public_key, name)) {
             message(Poco::format("Unable to verify %s, exiting.", name), "error");
             return false;
         }
@@ -175,7 +175,7 @@ void serialize_nvgt_plugins(Poco::BinaryWriter& bw) {
 		// We use the platform-provided CSPRNG here instead of pocos because Pocos cannot be trusted.
 		// Reasoning: on Windows Poco's CSPRNG behaves correctly, but on non-windows platforms the behavior varies (i.e., reading /dev/random which is dangerous to use correctly and opens file-based attacks, and on other platforms it uses a digest hash to generate the key, which risks security degredation).
 #ifdef _WIN32
-    if (!BCryptGenRandom(NULL, seed.data(), seed.size(), BCRYPT_USE_SYSTEM_PREFERRED_RNG)) {
+    if (const auto res = BCryptGenRandom(NULL, seed.data(), seed.size(), BCRYPT_USE_SYSTEM_PREFERRED_RNG); res != 0) {
         throw std::runtime_error("Cannot generate seed for plugin signing!");
     }
 #elif defined(__APPLE__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
