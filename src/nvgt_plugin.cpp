@@ -85,61 +85,78 @@ template <typename T, typename F> constexpr inline T to_from_cast(const F &val) 
 }
 
 bool verify_plugin_signature(const std::array<char, 64>& signature, const std::array<char, 32>& public_key, const std::string& name) {
-auto plugin_path = std::filesystem::path(Poco::Util::Application::instance().config().getString("application.dir"));
+    auto plugin_path = std::filesystem::path(Poco::Util::Application::instance().config().getString("application.dir"));
 #if defined(_WIN32) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
-plugin_path /= "lib";
+    plugin_path /= "lib";
 #elif defined(__APPLE__)
-plugin_path = plugin_path.parent_path() / "frameworks";
+    plugin_path = plugin_path.parent_path() / "frameworks";
 #endif
-		std::string dllname = name;
-		#ifdef _WIN32
-		dllname += ".dll";
-		#elif defined(__APPLE__)
-		dllname += ".dylib";
-		#else
-		dllname += ".so";
-		#endif
-		plugin_path /= dllname;
-Poco::FileInputStream fileStream(plugin_path.string());
-if (!fileStream.good()) {
-throw std::runtime_error("Internal error: file stream is broken in verify_plugin_signature!");
-}
-Poco::BinaryReader br(fileStream);
-std::vector<char> bytes;
-bytes.reserve(br.available());
-br.readRaw(bytes.data(), bytes.size());
-return crypto_eddsa_check(to_from_cast<const std::uint8_t*>(signature.data()), to_from_cast<const std::uint8_t*>(public_key.data()), to_from_cast<const std::uint8_t*>(bytes.data()), bytes.size()) == 0;
+
+    std::string dllname = name;
+#ifdef _WIN32
+    dllname += ".dll";
+#elif defined(__APPLE__)
+    dllname += ".dylib";
+#else
+    dllname += ".so";
+#endif
+    plugin_path /= dllname;
+
+    Poco::FileInputStream fileStream(plugin_path.string());
+    if (!fileStream.good()) {
+        throw std::runtime_error("Internal error: file stream is broken in verify_plugin_signature!");
+    }
+
+    std::vector<char> bytes(fileStream.size());
+    fileStream.read(bytes.data(), fileStream.size());
+
+    int result = crypto_eddsa_check(
+        reinterpret_cast<const uint8_t*>(signature.data()), 
+        reinterpret_cast<const uint8_t*>(public_key.data()), 
+        reinterpret_cast<const uint8_t*>(bytes.data()), 
+        bytes.size()
+    );
+
+    return result == 0;
 }
 
 std::array<char, 64> sign_plugin(std::array<char, 64>& sk, const std::string& name) {
-auto plugin_path = std::filesystem::path(Poco::Util::Application::instance().config().getString("application.dir"));
+    auto plugin_path = std::filesystem::path(Poco::Util::Application::instance().config().getString("application.dir"));
 #if defined(_WIN32) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
-plugin_path /= "lib";
+    plugin_path /= "lib";
 #elif defined(__APPLE__)
-plugin_path = plugin_path.parent_path() / "frameworks";
+    plugin_path = plugin_path.parent_path() / "frameworks";
 #endif
-		std::string dllname = name;
-		#ifdef _WIN32
-		dllname += ".dll";
-		#elif defined(__APPLE__)
-		dllname += ".dylib";
-		#else
-		dllname += ".so";
-		#endif
-		plugin_path /= dllname;
-Poco::FileInputStream fileStream(plugin_path.string());
-if (!fileStream.good()) {
-crypto_wipe(sk.data(), sk.size());
-throw std::runtime_error("Internal error: file stream is broken in sign_plugin!");
-}
-Poco::BinaryReader br(fileStream);
-std::vector<char> bytes;
-bytes.reserve(br.available());
-br.readRaw(bytes.data(), bytes.size());
-std::array<char, 64> signature;
-crypto_eddsa_sign(to_from_cast<std::uint8_t*>(signature.data()), to_from_cast<std::uint8_t*>(sk.data()), to_from_cast<std::uint8_t*>(bytes.data()), bytes.size());
-crypto_wipe(sk.data(), sk.size());
-return signature;
+
+    std::string dllname = name;
+#ifdef _WIN32
+    dllname += ".dll";
+#elif defined(__APPLE__)
+    dllname += ".dylib";
+#else
+    dllname += ".so";
+#endif
+    plugin_path /= dllname;
+
+    Poco::FileInputStream fileStream(plugin_path.string());
+    if (!fileStream.good()) {
+        crypto_wipe(reinterpret_cast<uint8_t*>(sk.data()), sk.size());
+        throw std::runtime_error("Internal error: file stream is broken in sign_plugin!");
+    }
+
+    std::vector<char> bytes(fileStream.size());
+    fileStream.read(bytes.data(), fileStream.size());
+
+    std::array<char, 64> signature;
+    crypto_eddsa_sign(
+        reinterpret_cast<uint8_t*>(signature.data()), 
+        reinterpret_cast<uint8_t*>(sk.data()), 
+        reinterpret_cast<const uint8_t*>(bytes.data()), 
+        bytes.size()
+    );
+
+    crypto_wipe(reinterpret_cast<uint8_t*>(sk.data()), sk.size());
+    return signature;
 }
 
 bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
@@ -153,7 +170,7 @@ bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
 		br.readRaw(signature.data(), signature.size());
 		std::array<char, 32> public_key;
 		br.readRaw(public_key.data(), public_key.size());
-		if (!verify_plugin_signature(signature, public_key, name)) {
+		if (verify_plugin_signature(signature, public_key, name) == false) {
             message(Poco::format("Unable to verify %s, exiting.", name), "error");
             return false;
         }
