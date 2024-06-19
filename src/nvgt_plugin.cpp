@@ -20,6 +20,23 @@
 #include "nvgt.h"
 #include "nvgt_plugin.h"
 #include "UI.h"
+#include "monocypher.h"
+#include <cstdint>
+#include <array>
+#ifdef _WIN32
+#include <bcrypt.h>
+#elif defined(__APPLE__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
+#include <stdlib.h>
+#elif defined(__linux__)
+#include <sys/random.h>
+#include <errno.h>
+#else
+#error Unsupported target platform
+#endif
+#include <filesystem>
+#include <Poco/Util/Application.h>
+#include <Poco/FileStream.h>
+#include <vector>
 
 std::unordered_map<std::string, void*> loaded_plugins; // Contains handles to sdl objects.
 std::unordered_map<std::string, nvgt_plugin_entry*>* static_plugins = NULL; // Contains pointers to static plugin entry points. This doesn't contain entry points for plugins loaded from a dll, rather those that have been linked statically into the executable produced by a custom build of nvgt. This is a pointer because the map is initialized the first time register_static_plugin is called so that we are not trusting in global initialization order.
@@ -63,6 +80,68 @@ bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e) {
 	return true;
 }
 
+template <typename T, typename F> constexpr inline T to_from_cast(const F &val) {
+  return reinterpret_cast<T>(static_cast<F>(val));
+}
+
+bool verify_plugin_signature(const std::array<char, 64>& signature, const std::array<char, 32>& public_key, const std::string& name) {
+auto plugin_path = std::filesystem::path(Poco::Util::Application::instance().config().getString("application.appDir"));
+#if defined(_WIN32) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
+plugin_path /= "lib";
+#elif defined(__APPLE__)
+plugin_path = plugin_path.parent_path() / "frameworks";
+#endif
+		std::string dllname = name;
+		#ifdef _WIN32
+		dllname += ".dll";
+		#elif defined(__APPLE__)
+		dllname += ".dylib";
+		#else
+		dllname += ".so";
+		#endif
+		plugin_path /= dllname;
+Poco::FileInputStream fileStream(plugin_path.string());
+if (!fileStream.good()) {
+throw std::runtime_error("Internal error: file stream is broken in verify_plugin_signature!");
+}
+Poco::BinaryReader br(fileStream);
+std::vector<char> bytes;
+bytes.reserve(br.available());
+br.readRaw(bytes.data(), bytes.size());
+return crypto_eddsa_check(to_from_cast<const std::uint8_t*>(signature.data()), to_from_cast<const std::uint8_t*>(public_key.data()), to_from_cast<const std::uint8_t*>(bytes.data()), bytes.size()) == 0;
+}
+
+std::array<char, 64> sign_plugin(std::array<char, 64>& sk, const std::string& name) {
+auto plugin_path = std::filesystem::path(Poco::Util::Application::instance().config().getString("application.appDir"));
+#if defined(_WIN32) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
+plugin_path /= "lib";
+#elif defined(__APPLE__)
+plugin_path = plugin_path.parent_path() / "frameworks";
+#endif
+		std::string dllname = name;
+		#ifdef _WIN32
+		dllname += ".dll";
+		#elif defined(__APPLE__)
+		dllname += ".dylib";
+		#else
+		dllname += ".so";
+		#endif
+		plugin_path /= dllname;
+Poco::FileInputStream fileStream(plugin_path.string());
+if (!fileStream.good()) {
+crypto_wipe(sk.data(), sk.size());
+throw std::runtime_error("Internal error: file stream is broken in sign_plugin!");
+}
+Poco::BinaryReader br(fileStream);
+std::vector<char> bytes;
+bytes.reserve(br.available());
+br.readRaw(bytes.data(), bytes.size());
+std::array<char, 64> signature;
+crypto_eddsa_sign(to_from_cast<std::uint8_t*>(signature.data()), to_from_cast<std::uint8_t*>(sk.data()), to_from_cast<std::uint8_t*>(bytes.data()), bytes.size());
+crypto_wipe(sk.data(), sk.size());
+return signature;
+}
+
 bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
 	unsigned short count;
 	br >> count;
@@ -70,6 +149,14 @@ bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
 	for (int i = 0; i < count; i++) {
 		std::string name;
 		br >> name;
+		std::array<char, 64> signature;
+		br.readRaw(signature.data(), signature.size());
+		std::array<char, 32> public_key;
+		br.readRaw(public_key.data(), public_key.size());
+		if (verify_plugin_signature(signature, public_key, name)) {
+            message(Poco::format("Unable to verify %s, exiting.", name), "error");
+            return false;
+        }
 		if (!load_nvgt_plugin(name)) {
 			message(Poco::format("Unable to load %s, exiting.", name), "error");
 			return false;
@@ -81,8 +168,39 @@ bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
 void serialize_nvgt_plugins(Poco::BinaryWriter& bw) {
 	unsigned short count = loaded_plugins.size();
 	bw << count;
-	for (const auto& i : loaded_plugins)
+	for (const auto& i : loaded_plugins) {
 		bw << i.first;
+		std::array<std::uint8_t, 32> seed;
+		// We must be careful to only use this seed once
+		// We use the platform-provided CSPRNG here instead of pocos because Pocos cannot be trusted.
+		// Reasoning: on Windows Poco's CSPRNG behaves correctly, but on non-windows platforms the behavior varies (i.e., reading /dev/random which is dangerous to use correctly and opens file-based attacks, and on other platforms it uses a digest hash to generate the key, which risks security degredation).
+#ifdef _WIN32
+    if (!BCryptGenRandom(NULL, seed.data(), seed.size(), BCRYPT_USE_SYSTEM_PREFERRED_RNG)) {
+        throw std::runtime_error("Cannot generate seed for plugin signing!");
+    }
+#elif defined(__APPLE__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
+    arc4random_buf(seed.data(), seed.size());
+#elif defined(__linux__)
+    ssize_t bytes_written = getrandom(seed.data(), seed.size(), 0);
+    if (bytes_written == -1 && errno != ENOSYS) {
+        throw std::runtime_error("Error generating random data with getrandom(2)");
+    }
+    while (bytes_written != seed.size()) {
+        if (bytes_written == -1) {
+            throw std::runtime_error("Error generating random data with getrandom(2)");
+        }
+        bytes_written = getrandom(seed.data() + bytes_written, seed.size() - bytes_written, 0);
+    }
+#endif
+std::array<char, 64> sk;
+std::array<char, 32> pk;
+crypto_eddsa_key_pair(to_from_cast<std::uint8_t*>(sk.data()), to_from_cast<std::uint8_t*>(pk.data()), seed.data());
+crypto_wipe(seed.data(), seed.size());
+std::array<char, 64> signature = sign_plugin(sk, i.first);
+crypto_wipe(sk.data(), sk.size());
+bw.writeRaw(signature.data(), signature.size());
+bw.writeRaw(pk.data(), pk.size());
+}
 }
 
 void unload_nvgt_plugins() {
