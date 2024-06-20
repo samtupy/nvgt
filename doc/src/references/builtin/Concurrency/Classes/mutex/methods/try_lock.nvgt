@@ -1,0 +1,48 @@
+/**
+	Attempts to lock the mutex.
+	1. bool try_lock();
+	2. bool try_lock(uint milliseconds);
+	## Arguments (2):
+		* uint milliseconds: The amount of time to wait for a lock to acquire.
+	## Returns:
+		bool: true if a lock was acquired, false otherwise.
+	## Remarks:
+		This is the method to use if you want to try locking a mutex without blocking your programs execution. The 0 argument version of this function will return false immediately if the mutex is already locked on another thread, while the version of the method taking a milliseconds value will  wait for the timeout to expire before returning false on failure.
+		Note that several operating systems do not implement this functionality natively or in an easily accessible manner, such that the version of this function that takes a timeout might enter what amounts to a `while(!try_lock()) wait(0);` loop while attempting to acquire a lock. If the operating system supports such a timeout functionality natively which will be a lot faster such as those using pthreads, that will be used instead.
+*/
+
+// Example:
+// Press space to perform a calculation, and press enter to see the result only so long as the calculation is not in progress.
+thread_event keep_calculating;
+bool exit_program = false; // NVGT will wrap atomic flags later, for now we'll piggyback off the keep_calculating event.
+mutex calculation_mutex;
+int calculation;
+void do_calculations() {
+	while (true) {
+		keep_calculating.wait();
+		if (exit_program) return;
+		// Lets increase the calculation variable for a bit.
+		screen_reader_speak("calculating...", true);
+		timer t;
+		calculation_mutex.lock();
+		while(t.elapsed < 1000) calculation++;
+		calculation_mutex.unlock();
+		screen_reader_speak("complete", true);
+	}
+}
+void main() {
+	async<void>(do_calculations); // Spin up our thread.
+	show_window("try_lock example");
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (key_pressed(KEY_SPACE)) keep_calculating.set();
+		if (key_pressed(KEY_RETURN)) {
+			if (calculation_mutex.try_lock()) {
+				screen_reader_speak(calculation, true);
+				calculation_mutex.unlock();
+			} else screen_reader_speak("calculation in progress", true);
+		}
+	}
+	exit_program = true;
+	keep_calculating.set();
+}

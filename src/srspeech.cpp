@@ -1,4 +1,5 @@
 /* srspeech.cpp - code for screen reader speech
+ * Thanks to Ethin P for the speech dispatcher support!
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy

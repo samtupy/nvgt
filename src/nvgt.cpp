@@ -36,6 +36,9 @@
 #include "scriptarray.h"
 #define NVGT_LOAD_STATIC_PLUGINS
 #include "angelscript.h" // nvgt's angelscript implementation
+#ifdef __APPLE__
+#include "apple.h" // apple_requested_file
+#endif
 #include "input.h"
 #include "nvgt.h"
 #ifndef NVGT_USER_CONFIG
@@ -154,6 +157,12 @@ protected:
 		}
 	}
 	virtual int main(const std::vector<std::string>& args) override {
+		// Determine the script file that is to be executed.
+		string scriptfile = "";
+		#ifdef __APPLE__
+			scriptfile = apple_requested_file(); // Files opened from finder on mac do not use command line arguments.
+		#endif
+		if (scriptfile.empty() && args.size() > 0) scriptfile = args[0];
 		if (mode == NVGT_HELP) {
 			displayHelp();
 			return Application::EXIT_OK;
@@ -162,11 +171,10 @@ protected:
 			if (config().hasOption("application.gui")) message(ver, "version information");
 			else cout << ver << endl;
 			return Application::EXIT_OK;
-		} else if (args.size() < 1) {
+		} else if (scriptfile.empty()) {
 			message("error, no input files.\nType " + commandName() + " --help for usage instructions\n", commandName());
 			return Application::EXIT_USAGE;
 		}
-		string scriptfile = args[0];
 		try {
 			// Parse the provided script path to insure it is valid and check if it is a file.
 			if (!File(Path(scriptfile)).isFile()) throw Exception("Expected a file", scriptfile);

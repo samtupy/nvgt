@@ -11,19 +11,24 @@
 */
 
 #pragma once
-#ifdef _WIN32
-	#include "blastspeak.h"
-#endif
 #include <speech.h>
 #include <string>
 #include <angelscript.h>
 #include <scriptarray.h>
 #include "sound.h"
 
+#ifdef _WIN32
+struct blastspeak;
+#elif defined(__APPLE__)
+class AVTTSVoice;
+#endif
+
 class tts_voice {
 	int RefCount;
 	#ifdef _WIN32
 	blastspeak* inst;
+	#elif defined(__APPLE__)
+	AVTTSVoice* inst;
 	#endif
 	bool destroyed;
 	HSTREAM audioout;
@@ -37,6 +42,7 @@ public:
 	int voice_index;
 	tts_voice(const std::string& builtin_voice_name = "builtin fallback voice");
 	~tts_voice();
+	void setup();
 	void destroy();
 	void AddRef();
 	void Release();

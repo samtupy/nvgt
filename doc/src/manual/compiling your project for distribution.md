@@ -16,12 +16,11 @@ Once your game is ready to be distributed to others, you may want to turn it int
 This will be sometimes called a binary. It's a file that is a complete program directly compatible with the opperating system for which it is intended. It can be launched directly. 
 
 ## What about all the different operating systems?
-Since Nvgt is intended to be able to run on Windows, Linux and Mac OS, there will be different executables for each targeted operating system. The resulting compiled binary will have a certain file extension depending on which opperating system, as follows:
-* Windows: *.exe
-* Linux: *.
-* Mac OS: *.
+Since Nvgt is intended to be able to run on Windows, Linux and Mac OS, there will be different executables for each targeted operating system. On windows, the resulting binary will have a .exe eextension like other programs you may have seen. On other platforms though, there is no standard file extension for executable files.
 
-e.g. if you compile my_game.nvgt on Windows you'll get a my_game.exe.
+e.g. if you compile my_game.nvgt on Windows you'll get a my_game.exe but if you compile on linux, you'll just get a file called my_game. Keep this in mind when trying to compile on a non-windows platform. If you have a file called my_game.nvgt and next to it is a directory called my_game, the compilation process will fail because my_game already exists and is a directory!
+
+When compiling on a non-windows platform, the executable permission bitt on the resulting file is automatically set for you.
 
 NVGT does support what is known as cross compiling projects, which means compiling a project on one platform that targets another one. For example, compiling a mac app on a windows computer. However, this support is still a bit rough and generally requires fiddling with command line options, configuration properties, manual app bundling etc and so the documentation for cross compiling will be written once this support becomes more stable in NVGT. The gist is that the --platform command line argument lets you select from auto, linux, mac or windows what type of executable you'd like to generate assuming you have the cross compilation stubs available.
 
@@ -76,6 +75,12 @@ bool preglobals() {
 ```
 
 ## Crediting open source libraries
-NVGT is an open source project that uses open source dependencies. While aside from bass (which we will replace) we have been very careful to avoid any open source components that forbids or restricts comertial usage, we do not always avoid dependencies that ask for a simple attribution in project documentation such as those under a BSD license. We'd rather focus on a good engine which we can fix quickly that can produce some epic games with awesome features without discarding a library that implements some amazing feature just because it's devs simply ask it's users to simply admit that they didn't write it.
+NVGT is an open source project that uses open source dependencies. While aside from bass (which we will replace) we have been very careful to avoid any open source components that forbids or restricts comertial usage in any way, we do not always avoid dependencies that ask for a simple attribution in project documentation such as those under a BSD license. We'd rather focus on creating a good engine which we can fix quickly that can produce some epic games with awesome features, without needing to discard a library that implements some amazing feature just because it's devs simply ask users to do little more than just admit to the fact that they didn't write the library.
 
-To facilitate the proper attribution of such libraries, a file called 3rd_party_code_attributions.html exists in the lib folder. We highly recommend that you distribute this file with your game in order to comply with all attribution requirements which you can read about in the file. For those who really care about not distributing this file, we plan to provide extra stubs in the future which do not include any components that require a binary attribution. The existing file attributes all open source components in NVGT, not just those that require it. If you want to change this, you can regenerate the file by looking in the doc/OSL folder in NVGT's github repository.
+To facilitate the proper attribution of such libraries, a file called 3rd_party_code_attributions.html exists in the lib folder. We highly recommend that you distribute this file with your game in order to comply with all attribution requirements which you can read about in the aforementioned document.
+
+The idea is that by simply distributing this attributions document within the lib folder of your app, any user who is very interested in this information can easily find and read it, while any nnormal game player will not stumble upon random code attributions in any kind of intrusive manner. The attributions document is currently well under 100kb, so it should not bloat your distrobution.
+
+The existing file attributes all open source components in NVGT, not just those that require it. If you want to change this, you can regenerate the file by looking in the doc/OSL folder in NVGT's github repository to see how.
+
+For those who really care about not distributing this file, we hope to provide extra stubs in the future which do not include any components that require a binary attribution. However, there is no denying that this goal is very costly to reach and maintain, while yielding absolutely no true reward for all the time spent sans not needing to distribute an html file with game releases which players and even most developers will not be bothered by anyway. As such, it might be a while before this goal comes to fruition, and we could decide at any point that it is not a viable or worthwhile project to attempt if we find that doing so in any way detraments the development of NVGT, such as by making a feature we want to add very difficult due to lack of available public domain libraries for that feature.

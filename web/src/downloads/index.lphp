@@ -23,7 +23,7 @@ function size2string($bytes) {
 // This function prints the information for a given version, again still a bit hacky.
 function echo_version($ver) {
 	echo "<h3>" . $ver . "</h3>\n";
-	echo "<p>Released on " . date("l, F jS, Y \a\t h:i:s A", filemtime("nvgt_" . $ver . ".exe")) . " UTC.</p>\n";
+	echo "<p>Released on " . date("l, F jS, Y \a\\t h:i:s A", filemtime("nvgt_" . $ver . ".exe")) . " UTC.</p>\n";
 	$files = glob("nvgt_" . $ver . "*");
 	echo "<ul>\n";
 	foreach($files as $file) {

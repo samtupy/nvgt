@@ -80,6 +80,7 @@ public:
 	void InsertAt(asUINT index, void *value);
 	void InsertAt(asUINT index, const CScriptArray &arr);
 	void InsertLast(void *value);
+	void InsertLast(const CScriptArray &arr);
 	void RemoveAt(asUINT index);
 	void RemoveLast();
 	void RemoveRange(asUINT start, asUINT count);
