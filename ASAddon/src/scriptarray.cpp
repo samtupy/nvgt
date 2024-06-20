@@ -295,7 +295,8 @@ static void RegisterScriptArray_Native(asIScriptEngine *engine)
 	// Other methods
 	r = engine->RegisterObjectMethod("array<T>", "void insert_at(uint index, const T&in value)", asMETHODPR(CScriptArray, InsertAt, (asUINT, void *), void), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void insert_at(uint index, const array<T>& arr)", asMETHODPR(CScriptArray, InsertAt, (asUINT, const CScriptArray &), void), asCALL_THISCALL); assert(r >= 0);
-	r = engine->RegisterObjectMethod("array<T>", "void insert_last(const T&in value)", asMETHOD(CScriptArray, InsertLast), asCALL_THISCALL); assert(r >= 0);
+	r = engine->RegisterObjectMethod("array<T>", "void insert_last(const T&in value)", asMETHODPR(CScriptArray, InsertLast, (void*), void), asCALL_THISCALL); assert(r >= 0);
+	r = engine->RegisterObjectMethod("array<T>", "void insert_last(const array<T>& arr)", asMETHODPR(CScriptArray, InsertLast, (const CScriptArray &), void), asCALL_THISCALL); assert(r >= 0);
 	r = engine->RegisterObjectMethod("array<T>", "void remove_at(uint index)", asMETHOD(CScriptArray, RemoveAt), asCALL_THISCALL); assert(r >= 0);
 	r = engine->RegisterObjectMethod("array<T>", "void remove_last()", asMETHOD(CScriptArray, RemoveLast), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void remove_range(uint start, uint count)", asMETHOD(CScriptArray, RemoveRange), asCALL_THISCALL); assert(r >= 0);
@@ -344,7 +345,7 @@ static void RegisterScriptArray_Native(asIScriptEngine *engine)
 	// Same as isEmpty
 	r = engine->RegisterObjectMethod("array<T>", "bool empty() const", asMETHOD(CScriptArray, IsEmpty), asCALL_THISCALL); assert( r >= 0 );
 	// Same as insertLast
-	r = engine->RegisterObjectMethod("array<T>", "void push_back(const T&in)", asMETHOD(CScriptArray, InsertLast), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("array<T>", "void push_back(const T&in)", asMETHODPR(CScriptArray, InsertLast, (void*), void), asCALL_THISCALL); assert( r >= 0 );
 	// Same as removeLast
 	r = engine->RegisterObjectMethod("array<T>", "void pop_back()", asMETHOD(CScriptArray, RemoveLast), asCALL_THISCALL); assert( r >= 0 );
 	// Same as insertAt
@@ -897,6 +898,11 @@ void CScriptArray::InsertAt(asUINT index, const CScriptArray &arr)
 void CScriptArray::InsertLast(void *value)
 {
 	InsertAt(buffer->numElements, value);
+}
+
+void CScriptArray::InsertLast(const CScriptArray &arr)
+{
+	InsertAt(buffer->numElements, arr);
 }
 
 void CScriptArray::RemoveAt(asUINT index)

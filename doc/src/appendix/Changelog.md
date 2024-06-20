@@ -39,7 +39,7 @@ This document lists all major changes that have taken place in NVGT since we sta
 * Updated to the latest Angelscript WIP code which resolves a bytecode load error that had been reported.
 * Revert the code changes to mixer::set_fx back to NVGT's first public release as the refactor did not go well and continued introducing unwanted side effects.
 * Fixed bugs in find_directories and find_files on Unix platforms, the functions should now behave like on windows.
-* Adds idle_time() function (works on windows and MacOS at present) which returns the number of milliseconds since the user has been idle.
+* Adds idle_ticks() function (works on windows and MacOS at present) which returns the number of milliseconds since the user has been idle.
 * Update Angelscript's script builder addon which makes it possible to use unicode characters in script include paths.
 * Add multiplication operators to strings, for example `string result = "hello" * 10;`
 * There is a new way to list files and directories, a function called glob. Not only can it return all files and directories in one call, but you can even provide wildcards that enter sub directories. The function is documented in the reference.

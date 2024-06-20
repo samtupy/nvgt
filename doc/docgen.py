@@ -249,15 +249,13 @@ def output_html_section(md_path, title):
 	if md_path.endswith(".md"): md_path = md_path[:-3] + ".html"
 	html_body = mistune.html(md)
 	md_path = md_path.lower()
-	f = open(os.path.join("html", md_path), "w", encoding = "utf8")
-	f.write(html_base.format(title = title, body = html_body))
-	f.close()
+	with open(os.path.join("html", md_path), "w", encoding = "utf8") as f:
+		f.write(html_base.format(title = title, body = html_body))
 	# The NVGT website is built using cobalt (a tiny static site generator that uses liquid templates), and an html version of the docs are hosted on that website. We want this version of the docs to use the liquid layout that the static site uses, so we simply create very basic .liquid files in the nvgt repo's web directory, if that exists.
 	liquid_path = md_path[:-5] + ".liquid"
 	if os.path.isdir(os.path.join("..", "web", "src", "docs")):
-		f = open(os.path.join("..", "web", "src", "docs", liquid_path), "w", encoding = "utf8")
-		f.write(liquid_base.format(title = title, body = html_body))
-		f.close()
+		with open(os.path.join("..", "web", "src", "docs", liquid_path), "w", encoding = "utf8") as f:
+			f.write(liquid_base.format(title = title, body = html_body))
 
 
 def main():
