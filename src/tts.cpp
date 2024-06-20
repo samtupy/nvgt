@@ -1,5 +1,5 @@
 /* tts.cpp - code for OS based text to speech system
- * On windows this is SAPI, on macOS it will be NSSpeech/AVSpeechSynthesizer, on linux speech dispatcher etc.
+ * On windows this is SAPI, on macOS it is NSSpeech/AVSpeechSynthesizer, on linux speech dispatcher etc.
  * If no OS based speech system can be found for a given platform, a derivative of RSynth that is built into NVGT will be used instead.
  *
  * NVGT - NonVisual Gaming Toolkit
@@ -13,14 +13,15 @@
 */
 
 #ifdef _WIN32
-	#define WIN32_LEAN_AND_MEAN
-	#define VC_EXTRALEAN
-	#include <windows.h>
+	#include <blastspeak.h>
 #endif
-#include "UI.h"
-#include "tts.h"
-#include "riffheader.h"
 #include <obfuscate.h>
+#ifdef __APPLE__
+#include "apple.h"
+#endif
+#include "riffheader.h"
+#include "tts.h"
+#include "UI.h"
 
 char* minitrim(char* data, unsigned long* bufsize, int bitrate, int channels) {
 	char* ptr = data;
@@ -55,6 +56,13 @@ tts_voice::tts_voice(const std::string& builtin_voice_name) {
 	builtin_volume = 0;
 	builtin_index = builtin_voice_name.size() > 0 ? 0 : -1;
 	this->builtin_voice_name = builtin_voice_name;
+	setup();
+	audioout = 0;
+}
+tts_voice::~tts_voice() {
+	//destroy();
+}
+void tts_voice::setup() {
 	#ifdef _WIN32
 	voice_index = -1;
 	inst = (blastspeak*)malloc(sizeof(blastspeak));
@@ -62,14 +70,14 @@ tts_voice::tts_voice(const std::string& builtin_voice_name) {
 	if (!blastspeak_initialize(inst)) {
 		free(inst);
 		inst = NULL;
+		voice_index = builtin_index;
 	}
+	#elif defined(__APPLE__)
+	inst = new AVTTSVoice();
+	voice_index = inst->getVoiceIndex(inst->getCurrentVoice());
 	#else
 	voice_index = builtin_index;
 	#endif
-	audioout = 0;
-}
-tts_voice::~tts_voice() {
-	//destroy();
 }
 void tts_voice::destroy() {
 	if (audioout) {
@@ -81,6 +89,10 @@ void tts_voice::destroy() {
 	blastspeak_destroy(inst);
 	if (inst) free(inst);
 	inst = NULL;
+	#elif defined(__APPLE__)
+	if (!inst) return;
+	delete inst;
+	inst = nullptr;
 	#endif
 	destroyed = true;
 	voice_index = -1;
@@ -121,6 +133,10 @@ bool tts_voice::speak(const std::string& text, bool interrupt) {
 				BASS_StreamFree(audioout);
 			audioout = 0;
 		}
+	}
+	#elif defined(__APPLE__)
+	else {
+		return inst->speak(text, interrupt);
 	}
 	#endif
 	if (voice_index == builtin_index && !text.empty()) {
@@ -174,6 +190,10 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 			audioout = 0;
 		}
 	}
+	#elif defined(__APPLE__)
+	else {
+		return false; // not implemented yet.
+	}
 	#endif
 	char* ptr = minitrim(data, &bufsize, bitrate, channels);
 	FILE* f = fopen(filename.c_str(), "wb");
@@ -215,6 +235,10 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 			audioout = 0;
 		}
 	}
+	#elif defined(__APPLE__)
+	else {
+		return ""; // Not implemented yet.
+	}
 	#endif
 	if (!data) return "";
 	char* ptr = minitrim(data, &bufsize, bitrate, channels);
@@ -227,7 +251,11 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 bool tts_voice::speak_wait(const std::string& text, bool interrupt) {
 	if (!speak(text, interrupt))
 		return false;
+	#ifdef __APPLE__
+	while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || inst->isSpeaking())
+	#else
 	while (BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING)
+	#endif
 		wait(5);
 	return true;
 }
@@ -242,11 +270,18 @@ int tts_voice::get_rate() {
 	if (!blastspeak_get_voice_rate(inst, &result))
 		return 0;
 	return result;
+	#elif defined(__APPLE__)
+	return inst->getRate() * 7;
 	#endif
 	return 0;
 }
 int tts_voice::get_pitch() {
 	//if(voice_index == builtin_index) return builtin_pitch;
+	#ifdef _WIN32
+	// not implemented yet
+	#elif defined(__APPLE__)
+	return inst->getPitch();
+	#endif
 	return 0;
 }
 int tts_voice::get_volume() {
@@ -257,6 +292,8 @@ int tts_voice::get_volume() {
 	if (!blastspeak_get_voice_volume(inst, &result))
 		return 0;
 	return result;
+	#elif defined(__APPLE__)
+	return inst->getRate();
 	#endif
 	return 0;
 }
@@ -265,10 +302,17 @@ void tts_voice::set_rate(int rate) {
 	#ifdef _WIN32
 	if (!inst && !refresh()) return;
 	blastspeak_set_voice_rate(inst, rate);
+	#elif defined(__APPLE__)
+	inst->setRate(rate / 7.0);
 	#endif
 }
 void tts_voice::set_pitch(int pitch) {
 	// if(voice_index == builtin_index) builtin_pitch = pitch;
+	#ifdef _WIN32
+	// not implemented
+	#elif defined(__APPLE__)
+	inst->setPitch(pitch);
+	#endif
 	return;
 }
 void tts_voice::set_volume(int volume) {
@@ -276,6 +320,8 @@ void tts_voice::set_volume(int volume) {
 	#ifdef _WIN32
 	if (!inst && !refresh()) return;
 	blastspeak_set_voice_volume(inst, volume);
+	#elif defined(__APPLE__)
+	inst->setVolume(volume);
 	#endif
 }
 bool tts_voice::set_voice(int voice) {
@@ -289,12 +335,22 @@ bool tts_voice::set_voice(int voice) {
 		voice_index = voice;
 		return true;
 	}
+	#elif defined(__APPLE__)
+	bool r = inst->setVoiceByIndex(voice - (builtin_index + 1));
+	if (!r) return false;
+	voice_index = voice;
+	return true;
 	#endif
 	return false;
 }
 bool tts_voice::get_speaking() {
+	#ifdef __APPLE__
+	if (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING) return true;
+	return inst->isSpeaking();
+	#else
 	if (!audioout) return false;
 	return BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING;
+	#endif
 }
 CScriptArray* tts_voice::list_voices() {
 	asIScriptContext* ctx = asGetActiveContext();
@@ -314,6 +370,8 @@ CScriptArray* tts_voice::list_voices() {
 		else
 			((std::string*)(array->At(array_idx)))->assign("");
 	}
+	#elif defined(__APPLE__)
+	array->InsertLast(*inst->getAllVoices());
 	#endif
 	return array;
 }
@@ -321,34 +379,31 @@ int tts_voice::get_voice_count() {
 	#ifdef _WIN32
 	if (!inst && !refresh()) return builtin_index + 1;
 	return inst ? inst->voice_count + (builtin_index + 1) : builtin_index + 1;
+	#elif defined(__APPLE__)
+	return inst->getVoicesCount() + (builtin_index + 1);
 	#endif
 	return builtin_index + 1;
 }
 std::string tts_voice::get_voice_name(int index) {
 	if (index == builtin_index) return builtin_voice_name;
+	index -= (builtin_index + 1);
 	#ifdef _WIN32
 	int c = get_voice_count();
 	if (!inst && !refresh()) return "";
-	index -= (builtin_index + 1);
 	if (c < 1 || index < 0 || index >= c) return "";
 	const char* result = blastspeak_get_voice_description(inst, index);
 	if (result)
 		return std::string(result);
+	#elif defined(__APPLE__)
+	return inst->getVoiceName(index);
 	#endif
 	return "";
 }
 bool tts_voice::refresh() {
+	int voice = voice_index;
 	destroy();
-	destroyed = false;
-	#ifdef _WIN32
-	inst = (blastspeak*)malloc(sizeof(blastspeak));
-	if (!blastspeak_initialize(inst)) {
-		free(inst);
-		destroyed = true;
-		inst = NULL;
-		return false;
-	}
-	#endif
+	setup();
+	set_voice(voice);
 	return true;
 }
 
