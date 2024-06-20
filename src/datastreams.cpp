@@ -168,9 +168,20 @@ long long datastream::get_wpos() {
 std::string datastream::read(unsigned int size) {
 	if (!r) return "";
 	std::string output;
+	if (!size) {
+		std::streampos pos = _istr->tellg();
+		if (pos > -1) {
+			_istr->seekg(0, std::ios::end);
+			size = _istr->tellg();
+			_istr->seekg(pos, std::ios::beg);
+		}
+	}
 	try {
-		if (size > 0) r->readRaw(size, output);
-		else StreamCopier::copyToString(*_istr, output);
+		if (size > 0) {
+			output.resize(size);
+			r->readRaw(&output[0], size);
+			output.resize(r->stream().gcount());
+		} else StreamCopier::copyToString(*_istr, output);
 	} catch (std::exception) {
 		return "";
 	}
