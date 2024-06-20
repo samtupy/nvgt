@@ -241,7 +241,7 @@ class audio_form {
 		@c_form[control_counter].ui_speech = ui_speech;
 		return control_counter;
 	}
-	int create_list(string caption, int maximum_items = 0, bool multiselect = false, bool repeat_boundary_items = false, bool is_tab_panel=false) {
+	int create_list(string caption, int maximum_items = 0, bool multiselect = false, bool repeat_boundary_items = false) {
 		form_error = 0;
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
@@ -260,7 +260,30 @@ class audio_form {
 		c_form[control_counter].max_length = maximum_items;
 		c_form[control_counter].list_multiselect = multiselect;
 		c_form[control_counter].list_repeat_boundary_items = repeat_boundary_items;
-		c_form[control_counter].list_is_tab_panel = is_tab_panel;
+		c_form[control_counter].speech_output = speech_output;
+		@c_form[control_counter].ui_speech = ui_speech;
+		return control_counter;
+	}
+	int create_tab_panel(string caption, int maximum_items = 0, bool repeat_boundary_items = false) {
+		form_error = 0;
+		if (active_controls >= 50) {
+			form_error = form_error_window_full;
+			return -1;
+		}
+		control_counter++;
+		active_controls++;
+		c_form.resize(control_counter + 1);
+		c_form[control_counter].type = ct_list;
+		@c_form[control_counter].event_callback = event_callback;
+		c_form[control_counter].hotkey = shortcut(caption);
+		c_form[control_counter].hotkey_letter = shortcut_letter(caption);
+		c_form[control_counter].caption = caption.replace("&", "", true);
+		c_form[control_counter].visible = true;
+		c_form[control_counter].enabled = true;
+		c_form[control_counter].max_length = maximum_items;
+		c_form[control_counter].list_multiselect = false;
+		c_form[control_counter].list_repeat_boundary_items = repeat_boundary_items;
+		c_form[control_counter].list_is_tab_panel = true;
 		c_form[control_counter].speech_output = speech_output;
 		@c_form[control_counter].ui_speech = ui_speech;
 		return control_counter;
@@ -2451,7 +2474,7 @@ class control {
 						speak("Checked", false);
 				}
 			}
-			if (key_repeating(KEY_SPACE) and !list_is_tab_panel){
+			if (key_repeating(KEY_SPACE)){
 				if ((list_position == -1) || (!list_multiselect))
 					return;
 				if (list[list_position].checked) {
