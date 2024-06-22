@@ -17,6 +17,7 @@
 #include "network.h"
 #include <exception>
 #include <string>
+#include <unordered_map>
 #include <angelscript.h>
 #include <Poco/DateTime.h>
 #include <Poco/Environment.h>
@@ -113,6 +114,7 @@ bool g_shutting_down = false;
 std::string g_stub = "";
 std::string g_platform = "auto";
 bool g_make_console = false;
+std::unordered_map<std::string, asITypeInfo*> g_TypeInfoCache;
 
 class NVGTBytecodeStream : public asIBinaryStream {
 	unsigned char* content;
@@ -873,6 +875,15 @@ void ReturnContextCallback(asIScriptEngine* engine, asIScriptContext* ctx, void*
 }
 void ExceptionHandlerCallback(asIScriptContext* ctx, void* obj) {
 	g_last_exception_callstack = get_call_stack();
+}
+
+asITypeInfo* get_array_type(const std::string& decl) {
+	if (!g_TypeInfoCache.contains(decl)) {
+		asITypeInfo* t = g_ScriptEngine->GetTypeInfoByDecl(decl.c_str());
+		if (!t) return nullptr;
+		g_TypeInfoCache[decl] = t;
+	}
+	return g_TypeInfoCache[decl];
 }
 
 // Try not to register things here unless absolutely no other place can be found for them.

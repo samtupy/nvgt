@@ -12,13 +12,14 @@
 */
 
 #include <string>
-#include <angelscript.h>
+#include <angelscript.h> // the actual Angelscript header
 #include <scriptarray.h>
 #include <Poco/Exception.h>
 #include <Poco/File.h>
 #include <Poco/Glob.h>
 #include <Poco/Timestamp.h>
 #include <Poco/UnicodeConverter.h>
+#include "angelscript.h" // nvgt's Angelscript implementation needed for get_array_type
 
 using namespace std;
 using namespace Poco;
@@ -55,7 +56,7 @@ CScriptArray* FindFiles(const string& path) {
 
 	// TODO: This should only be done once
 	// TODO: This assumes that CScriptArray was already registered
-	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
+	asITypeInfo* arrayType = get_array_type("array<string>");
 
 	// Create the array object
 	CScriptArray* array = CScriptArray::Create(arrayType);
@@ -133,9 +134,8 @@ CScriptArray* FindDirectories(const string& path) {
 	asIScriptContext* ctx = asGetActiveContext();
 	asIScriptEngine* engine = ctx->GetEngine();
 
-	// TODO: This should only be done once
 	// TODO: This assumes that CScriptArray was already registered
-	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
+	asITypeInfo* arrayType = get_array_type("array<string>");
 
 	// Create the array object
 	CScriptArray* array = CScriptArray::Create(arrayType);
