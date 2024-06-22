@@ -4,12 +4,6 @@
 
 void main() {
 	datastream ds("this is a test of what is actually a c++ stringstream. I should be able to read and write to it, theoretically. ");
-	partial_reader pr(ds, 10, 14);
-	alert(pr.available, pr.read());
-	alert("test", pr.pos);
-	pr.seek(0);
-	ds.seek(10);
-	alert("pr", pr.read());
 	ds.seek_end();
 	ds.write("So lets try writing another sentense to the stream.");
 	alert("pos", ds.pos);
