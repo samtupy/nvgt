@@ -43,4 +43,5 @@ asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* param);
 void ReturnContextCallback(asIScriptEngine* engine, asIScriptContext* ctx, void* param);
 void ExceptionHandlerCallback(asIScriptContext* ctx, void* obj);
 asUINT GetTimeCallback();
+asITypeInfo* get_array_type(const std::string& decl);
 void RegisterUnsorted(asIScriptEngine* engine);
