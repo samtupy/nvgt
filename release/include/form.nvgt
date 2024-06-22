@@ -2264,14 +2264,7 @@ class control {
 			speak_progress(false);
 		if (type == ct_slider)
 			speak(slider_value_string(), false);
-		if ((type == ct_list) && (list_position > -1)) {
-			if(list_is_tab_panel){
-				speak(list[list_position].item+" tab", false);
-				}
-			else speak(list[list_position].item, false);
-			if (list[list_position].checked)
-				speak("Checked", false);
-		}
+		if ((type == ct_list) && (list_position > -1)) speak_list_item(false);
 		focused = true;
 	}
 	void check(audio_form@ f, int tab_index) {
@@ -2468,11 +2461,7 @@ class control {
 					}
 					if (args.exists("silent")) speak_pos = false;
 				}
-				if (speak_pos) {
-					speak(list[list_position].item, true);
-					if (list[list_position].checked)
-						speak("Checked", false);
-				}
+				if (speak_pos) speak_list_item();
 			}
 			if (key_repeating(KEY_SPACE)){
 				if ((list_position == -1) || (!list_multiselect))
@@ -2496,9 +2485,7 @@ class control {
 						if (list_repeat_boundary_items && list_position == 0) {
 							dictionary args = {{"key", KEY_LEFT}, {"boundary", true}};
 							if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) return;
-							if (!args.exists("silent")) {
-								speak(list[list_position].item+" tab", true);
-							}
+							if (!args.exists("silent")) speak_list_item();
 						}
 						return;
 					}
@@ -2508,18 +2495,14 @@ class control {
 						list_position++;
 						return;
 					}
-					if (!args.exists("silent")) {
-						speak(list[list_position].item+" tab", true);
-					}
+					if (!args.exists("silent")) speak_list_item();
 				}
 				if (key_repeating(KEY_RIGHT)) {
 					if (list_position >= list_length) {
 						if (list_repeat_boundary_items && list_position == list.length() - 1) {
 							dictionary args = {{"key", KEY_RIGHT}, {"boundary", true}};
 							if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) return;
-							if (!args.exists("silent")) {
-								speak(list[list_position].item+" tab", true);
-							}
+							if (!args.exists("silent")) speak_list_item();
 						}
 						return;
 					}
@@ -2529,9 +2512,7 @@ class control {
 						list_position--;
 						return;
 					}
-					if (!args.exists("silent")) {
-						speak(list[list_position].item+" tab", true);
-					}
+					if (!args.exists("silent")) speak_list_item();
 				}
 			}
 			else{
@@ -2540,11 +2521,7 @@ class control {
 						if (list_repeat_boundary_items && list_position == 0) {
 							dictionary args = {{"key", KEY_UP}, {"boundary", true}};
 							if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) return;
-							if (!args.exists("silent")) {
-								speak(list[list_position].item, true);
-								if (list[list_position].checked)
-									speak("Checked", false);
-							}
+							if (!args.exists("silent")) speak_list_item();
 						}
 						return;
 					}
@@ -2554,22 +2531,14 @@ class control {
 						list_position++;
 						return;
 					}
-					if (!args.exists("silent")) {
-						speak(list[list_position].item, true);
-						if (list[list_position].checked)
-							speak("Checked", false);
-					}
+					if (!args.exists("silent")) speak_list_item();
 				}
 				if (key_repeating(KEY_DOWN)) {
 					if (list_position >= list_length) {
 						if (list_repeat_boundary_items && list_position == list.length() - 1) {
 							dictionary args = {{"key", KEY_DOWN}, {"boundary", true}};
 							if (@event_callback != null and event_callback(f, tab_index, event_list_cursor, args) == 1) return;
-							if (!args.exists("silent")) {
-								speak(list[list_position].item, true);
-								if (list[list_position].checked)
-									speak("Checked", false);
-							}
+							if (!args.exists("silent")) speak_list_item();
 						}
 						return;
 					}
@@ -2579,11 +2548,7 @@ class control {
 						list_position--;
 						return;
 					}
-					if (!args.exists("silent")) {
-						speak(list[list_position].item, true);
-						if (list[list_position].checked)
-							speak("Checked", false);
-					}
+					if (!args.exists("silent")) speak_list_item();
 				}
 			}
 			if (key_repeating(KEY_HOME) && (list_position > 0 || list_repeat_boundary_items)) {
@@ -2594,14 +2559,7 @@ class control {
 					list_position = old_list_position;
 					return;
 				}
-				if (!args.exists("silent")) {
-					if(list_is_tab_panel){
-						speak(list[list_position].item+" tab", true);
-						}
-					else speak(list[list_position].item, true);
-					if (list[list_position].checked)
-						speak("Checked", false);
-				}
+				if (!args.exists("silent")) speak_list_item();
 			}
 			if (key_repeating(KEY_END) && (list_position < list.length() - 1 || list_repeat_boundary_items)) {
 				int old_list_position = list_position;
@@ -2611,14 +2569,7 @@ class control {
 					list_position = old_list_position;
 					return;
 				}
-				if (!args.exists("silent")) {
-					if(list_is_tab_panel){
-						speak(list[list_position].item+" tab", true);
-						}
-					else speak(list[list_position].item, true);
-					if (list[list_position].checked)
-						speak("Checked", false);
-				}
+				if (!args.exists("silent")) speak_list_item();
 			}
 		}
 		if (type == ct_checkbox) {
@@ -2705,9 +2656,7 @@ class control {
 				list_position = i;
 				if (!silent) {
 					if (wrapped != "") speak(wrapped);
-					speak(list[list_position].item, wrapped == "");
-					if (list[list_position].checked)
-						speak("Checked", false);
+					speak_list_item();
 				}
 				return true;
 			}
@@ -3527,6 +3476,11 @@ class control {
 		sel_start = start;
 		sel_end = end;
 	}
+void speak_list_item(bool interrupt=true){
+if(list_is_tab_panel) speak(list[list_position].item+" tab", (interrupt?true:false));
+else if(!list_is_tab_panel and list[list_position].checked) speak(list[list_position].item+" Checked", (interrupt?true:false));
+else speak(list[list_position].item, (interrupt?true:false));
+}
 	/*
 	bool speak(string text, bool interrupt)
 	{
