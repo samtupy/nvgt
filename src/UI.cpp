@@ -17,6 +17,7 @@
 	#define WIN32_LEAN_AND_MEAN
 	#define VC_EXTRALEAN
 	#include <windows.h>
+	#include <commdlg.h>
 	#include "InputBox.h"
 #elif defined(__APPLE__)
 #include <IOKit/IOKitLib.h>
@@ -30,6 +31,7 @@
 #endif
 #ifndef _WIN32
 #include <sys/time.h>
+
 #endif
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
@@ -318,7 +320,64 @@ void wait(int ms) {
 		post_events.clear();
 	}
 }
+  std::string open_file_Dialog(const std::string& title="") {
+	#ifdef _WIN32
+    OPENFILENAMEW ofn;
+    ZeroMemory(&ofn, sizeof(ofn));
+     wchar_t buffer[260];
+    ofn.lStructSize = sizeof(ofn);
+    ofn.lpstrFile = buffer;
+    ofn.lpstrFile[0] = '\0';
+    ofn.nMaxFile = sizeof(buffer);
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    ofn.hwndOwner = NULL;
+	if(!title.empty()) {}
+    int len = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
+    std::wstring titleW(len, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, &titleW[0], len);
+    ofn.lpstrTitle = titleW.c_str();
+  }
+  else ofn.lpstrTitle=NULL;
+                        if (GetOpenFileName(&ofn)) {
+                            int len = WideCharToMultiByte(CP_UTF8, 0, buffer, -1, nullptr, 0, nullptr, nullptr);
+							std::string bufferA(len, '\0');
+                            WideCharToMultiByte(CP_UTF8, 0, buffer, -1, &bufferA[0], len, nullptr, nullptr);
+        return bufferA;
+    return "";
+	#else
+	return "";
+	#endif
+}
 
+bool save_file_dialog(const std::string& title="") {
+	#ifdef _WIN32
+    OPENFILENAMEW ofn;
+    ZeroMemory(&ofn, sizeof(ofn));
+     wchar_t buffer[260];
+    ofn.lStructSize = sizeof(ofn);
+    ofn.lpstrFile = buffer;
+    ofn.lpstrFile[0] = '\0';
+    ofn.nMaxFile = sizeof(buffer);
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    ofn.hwndOwner = NULL;
+	if(!title.empty()) {}
+    int len = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
+    std::wstring titleW(len, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, &titleW[0], len);
+    ofn.lpstrTitle = titleW.c_str();
+}
+else ofn.lpstrTitle=NULL;
+	return GetSaveFileNameW(&ofn);
+	#else
+	return false;
+	#endif
+}
 
 // The following function contributed to NVGT by silak
 uint64_t idle_ticks() {
