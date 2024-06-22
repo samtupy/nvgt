@@ -448,6 +448,8 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("int message_box(const string& in, const string& in, string[]@, uint = 0)"), asFUNCTION(message_box_script), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int alert(const string &in, const string &in, bool = false, uint = 0)"), asFUNCTION(alert), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int question(const string& in, const string& in, bool = false, uint = 0)"), asFUNCTION(question), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string open_file_dialog(const string &in = \"\")"), asFUNCTION(open_file_Dialog), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string save_file_dialog(const string &in = \"\", const string &in = \"\")"), asFUNCTION(save_file_dialog), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction(_O("string clipboard_get_text()"), asFUNCTION(ClipboardGetText), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool clipboard_set_text(const string& in)"), asFUNCTION(ClipboardSetText), asCALL_CDECL);
@@ -467,6 +469,4 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("uint64 get_window_os_handle()", asFUNCTION(get_window_os_handle), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void wait(int)", asFUNCTIONPR(wait, (int), void), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 idle_ticks()", asFUNCTION(idle_ticks), asCALL_CDECL);
-	engine->RegisterGlobalFunction("string open_file_dialog(const string &in = "")", asFUNCTION(open_file_Dialog), asCALL_CDECL);
-	engine->RegisterGlobalFunction("string save_file_dialog(const string &in = "", const string &in = "")", asFUNCTION(save_file_dialog), asCALL_CDECL);
 }

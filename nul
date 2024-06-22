@@ -1,0 +1,9 @@
+                       Ultimate Packer for eXecutables
+                          Copyright (C) 1996 - 2023
+UPX 4.1.0       Markus Oberhumer, Laszlo Molnar & John Reiser    Aug 8th 2023
+
+        File size         Ratio      Format      Name
+   --------------------   ------   -----------   -----------
+   7946992 ->   4309008   54.22%   macho/arm64   nvgt_mac_upx.bin
+
+Packed 1 file.

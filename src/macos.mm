@@ -95,24 +95,24 @@ std::string apple_input_box(const std::string& title, const std::string& message
 }
 
 std::string openFileDialog(const std::string& title) {
-NSOpenPanel *panel = [NSOPenPanel openPanel];
+NSOpenPanel *panel = [NSOpenPanel openPanel];
     panel.canChooseFiles = YES;
     panel.allowsMultipleSelection = NO;
     panel.canChooseDirectories = NO;
-    panel.title = titile.empty()?@"Open file":[NSString UTF8String:title.c_str()];
-    if(p[panel runModal] == NSModalResponseOK) {
-        NSURL *url = [[panel URLs] firstObject];
+    panel.title = title.empty()?@"Open file" : [NSString stringWithUTF8String:title.c_str()];
+    if([panel runModal] == NSModalResponseOK) {
+        NSURL *url = panel.URL;
         if(url) return std::string([url.path UTF8String]);
         else return "";
     }
     else return "";
 	}
 
-	std::string saveFileDialog(const std::string& title, const stf::string& filename) {
+	std::string saveFileDialog(const std::string& title, const std::string& filename) {
     NSSavePanel *panel = [NSSavePanel savePanel];
-    panel.title = title.empty()?@"Save file":[NSString stringWithUTF8String:title.c_str()];
+    panel.title = title.empty()?@"Save file" : [NSString stringWithUTF8String:title.c_str()];
     panel.canCreateDirectories = NO;
-    panel.filename = filename.empty()?@"File":[NSString stringWithUTF8String:filename.c_str()];
+    panel.nameFieldStringValue = filename.empty()?@"File" : [NSString stringWithUTF8String:filename.c_str()];
     if([panel runModal] == NSModalResponseOK) {
         NSURL *url = panel.URL;
         if(url) return std::string([url.path UTF8String]);
