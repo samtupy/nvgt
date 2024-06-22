@@ -93,3 +93,30 @@ std::string apple_input_box(const std::string& title, const std::string& message
 	else if (result == NSAlertSecondButtonReturn) return "\xff"; // nvgt value for cancel for the moment.
 	return "\xff"; // Either an error or we can't determine what was pressed. Should we throw an exception or something?
 }
+
+std::string openFileDialog(const std::string& title) {
+NSOpenPanel *panel = [NSOPenPanel openPanel];
+    panel.canChooseFiles = YES;
+    panel.allowsMultipleSelection = NO;
+    panel.canChooseDirectories = NO;
+    panel.title = titile.empty()?@"Open file":[NSString UTF8String:title.c_str()];
+    if(p[panel runModal] == NSModalResponseOK) {
+        NSURL *url = [[panel URLs] firstObject];
+        if(url) return std::string([url.path UTF8String]);
+        else return "";
+    }
+    else return "";
+	}
+
+	std::string saveFileDialog(const std::string& title, const stf::string& filename) {
+    NSSavePanel *panel = [NSSavePanel savePanel];
+    panel.title = title.empty()?@"Save file":[NSString stringWithUTF8String:title.c_str()];
+    panel.canCreateDirectories = NO;
+    panel.filename = filename.empty()?@"File":[NSString stringWithUTF8String:filename.c_str()];
+    if([panel runModal] == NSModalResponseOK) {
+        NSURL *url = panel.URL;
+        if(url) return std::string([url.path UTF8String]);
+        else return "";
+    }
+    else return "";
+	}

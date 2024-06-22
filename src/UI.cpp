@@ -320,7 +320,7 @@ void wait(int ms) {
 		post_events.clear();
 	}
 }
-  std::string open_file_Dialog(const std::string& title="") {
+  std::string open_file_Dialog(const std::string& title) {
 	#ifdef _WIN32
     OPENFILENAMEW ofn;
     ZeroMemory(&ofn, sizeof(ofn));
@@ -347,12 +347,14 @@ void wait(int ms) {
                             WideCharToMultiByte(CP_UTF8, 0, buffer, -1, &bufferA[0], len, nullptr, nullptr);
         return bufferA;
     return "";
+	#elif defined(__APPLE__)
+	return openFileDialog(title);
 	#else
-	return "";
+	return ""; //not implemented yet
 	#endif
 }
 
-bool save_file_dialog(const std::string& title="") {
+std::string save_file_dialog(const std::string& title, const std::string& filename) {
 	#ifdef _WIN32
     OPENFILENAMEW ofn;
     ZeroMemory(&ofn, sizeof(ofn));
@@ -362,7 +364,6 @@ bool save_file_dialog(const std::string& title="") {
     ofn.lpstrFile[0] = '\0';
     ofn.nMaxFile = sizeof(buffer);
     ofn.nFilterIndex = 1;
-    ofn.lpstrFileTitle = NULL;
     ofn.nMaxFileTitle = 0;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
     ofn.hwndOwner = NULL;
@@ -373,9 +374,25 @@ bool save_file_dialog(const std::string& title="") {
     ofn.lpstrTitle = titleW.c_str();
 }
 else ofn.lpstrTitle=NULL;
-	return GetSaveFileNameW(&ofn);
+	if(filename.empty()) {
+	int len = MultiByteToWideChar(CP_UTF8, 0, filename.c_str(), -1, nullptr, 0);
+    std::wstring filenameW(len, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, filename.c_str(), -1, &filenameW[0], len);
+	ofn.lpstrFileTitle = filenameW.c_str();
+	}
+	else ofn.lpstrFileTitle = NULL;
+	if(GetSaveFileNameW(&ofn)) {
+		int len = WideCharToMultiByte(CP_UTF8, 0, buffer, -1, nullptr, 0, nullptr, nullptr);
+							std::string bufferA(len, '\0');
+                            WideCharToMultiByte(CP_UTF8, 0, buffer, -1, &bufferA[0], len, nullptr, nullptr);
+        return bufferA;
+    return "";
+	}
+	else return "";
+	#elif defined(__APPLE__)
+	return saveFileDialog(title, filename);
 	#else
-	return false;
+	return ""; //not implemented
 	#endif
 }
 
@@ -450,4 +467,6 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("uint64 get_window_os_handle()", asFUNCTION(get_window_os_handle), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void wait(int)", asFUNCTIONPR(wait, (int), void), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 idle_ticks()", asFUNCTION(idle_ticks), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string open_file_dialog(const string &in = "")", asFUNCTION(open_file_Dialog), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string save_file_dialog(const string &in = "", const string &in = "")", asFUNCTION(save_file_dialog), asCALL_CDECL);
 }

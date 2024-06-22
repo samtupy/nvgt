@@ -36,6 +36,6 @@ bool ClipboardSetText(const std::string& text);
 
 asINT64 ShowWindow(std::string& window_title);
 void wait(int ms);
- std::string open_fileDialog(const std::string& title="");
- bool save_file_dialog(const std::string& title="");
+ std::string open_fileDialog(const std::string& title);
+ std::string save_file_dialog(const std::string& title, const std::string& filename);
 void RegisterUI(asIScriptEngine* engine);
