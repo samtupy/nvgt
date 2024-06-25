@@ -95,7 +95,6 @@ public:
 				engine->ReturnContext(ctx);
 				return false;
 			}
-			printf("function receives %s\n", engine->GetTypeDeclaration(param_typeid));
 			if (gen->GetArgCount() - 2 <= i || param_default) {
 				if (!param_default) {
 					aCtx->SetException("Not enough arguments");
