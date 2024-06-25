@@ -1,6 +1,6 @@
-# Multithreading and parallelism in NVGT
+# Concurrency Tutorial
 
-## Introduction
+## Introduction to multithreading and parallelism in NVGT
 
 Multithreading, often referred to as concurrency, is the process by which a program can divide tasks into separate, independent flows of execution. These tasks, known as threads, can run concurrently within a single process, allowing for more efficient use of resources and faster execution of complex programs. This approach differs from parallelism, where the tasks are executed simultaneously on multiple processors or computers.
 
@@ -12,9 +12,9 @@ While NVGT does not support parallelism as one might use it in other programming
 
 ## Why is this so important?
 
-Those who move from BGT to NVGT, or from other languages such as Python, are used to synchronous execution (and, in BGT's case, it's bad performance). Synchronous execution means that each statement in your code runs to completion before the next is executed. Though Python has supported asynchronous execution for quite a while, I do not believe many BGT users ever used it, because for audio game development, it wasn't all that useful barring particular uses like networking.
+By far, the eseiest wey to program is by sticking to synchronous execution, which is what happens by default unless any concurrency is specifically introduced by the programmer. Synchronous execution means that each statement in your code runs to completion before the next is executed. However as your game grows, you may find that it begins to execute slowly, which may temmpt you to quickly implement concurrency into your application.
 
-This however poses a significant issue because NVGT supports three types of concurrency. People most often jump strait to threads to solve a problem of performance, when, 99 percent of the time, the performance comes from your code and not NVGT. This is something I consider bad practice, and in this article, I aim to explain:
+This however poses a significant issue because NVGT supports three types of concurrency, and not knowing what method to use or when to use it can often result in slower or more buggy code than if either a different method of concurrency had been used, or if concurrency had not been used at all. People most often jump strait to threads to solve a problem of performance, when, 99 percent of the time, the performance degradation comes from an easily solvable issue in the person's code and not NVGT or a true need for threads or the lowest levels of concurrency. It can be not only bad practice but also detromental to your program's development to use more advanced concurrency methods when a simple loop would have sufficed, but knowing when and how to spin up a thread when synchronous execution just won't cut it can also save the day in such cases. As such, this article attempts to explain:
 
 * What exactly concurrency is;
 * How to use concurrency correctly; and
@@ -39,9 +39,9 @@ Any plugins you load may add even more methods of concurrency or even parallelis
 
 ## Async
 
-`async` is the first type of concurrency, and one of the easiest to use. It's also one of the simplest to understand. Although async (may) use a thread (or even multiple) under the hood, it is entirely possible that it may not, and you, as the programmer, needn't care how it works as long as your able to do what needs to be done. In the majority of cases, this is probably the furthest you will ever need concurrency in your game.
+Async is the first type of concurrency, and one of the easiest to use. It's also one of the simplest to understand. Although async (may) use a thread (or even multiple) under the hood, it is entirely possible that it may not, and you, as the programmer, needn't care how it works as long as your able to do what needs to be done. In the majority of cases, this is probably the furthest you will ever need concurrency in your game.
 
-Unlike the other two forms of concurrency, the engine insolates you (mostly) from the problems and mistakes of concurrency that you may make. This is particularly true for functions like `url_get` and `url_post`, where the engine can complete the request while you do other things. Take, for example, this code:
+Unlike the other two forms of concurrency, the engine insilates you (mostly) from the problems and mistakes of concurrency that you may make. This is particularly true for functions like `url_get` and `url_post` where the engine can complete the request while you do other things, or in any case that involves writing an asyncronous function that does not share any state with the rest of your program. Take, for example, this code:
 
 ```nvgt
 async<string> result(url_get, "https://nvgt.gg");
@@ -57,7 +57,7 @@ You may not realize it, but this constructor can take up to 16 parameters. (Wooh
 * A `wait()` method which pauses, or blocks, your code from continuing until the function completes or fails.
 * a `try_wait` function, returning type `bool`, which takes a timeout and will block until either the timeout( also known as the deadline) expires or the task completes.
 
-As stated previously, this is, for the majority of cases, the only thing you will need to reach for in your toolbox, and it's the highest level of concurrency available. The next two are much lower level, and give you more control, at the cost of raising the steaks by quite a bit.
+As stated previously, this is, for the majority of cases, the only thing you will need to reach for in your toolbox, and it's the highest level of concurrency available. The next two are much lower level, and give you more control, at the cost of raising the steaks by quite a bit. Even then, we strongly recommend reading the sections below about what can go wrong when 2 bits of code running at the same time try accessing the same global variable or bit of memory if you intend to write your own functions that are to be called with this async construct.
 
 ## Coroutines
 
@@ -166,7 +166,7 @@ This section is extremely technical in places. This is because multi-threading c
 
 A thread is much different than a coroutine. A thread runs alongside your code, and could even run on other processors in the system. A thread introduces many other problems that coroutines don't: they share state with the rest of your game, meaning they have access to all the global variables the rest of your code does.
 
-One of the most critical rules of threads is to avoid global or shared state. Global or shared state means any global variables that you have in yoru code, as well as any state that your thread may access that other threads (also) might access.
+One of the most critical rules of threads is to avoid global or shared state. Global or shared state means any global variables that you have in your code, as well as any state that your thread may access that other threads (also) might access.
 
 If two or more threads access shared state without any kind of protection, this is known as a data race. A data race occurs when two threads want to perform different operations on a variable, and it just so happens that they do it the same time, or close enough that it doesn't matter. For example, if thread 1 wants to read a sound handle and another thread wants to initialize it, it may just so happen that both operations overlap, causing the handle that thread 1 gets to be in some weird undefined state. Data races can have all kinds of dangerous consequences that could make your program crash, cause unpredictable behavior, and so on. It's even known to cause a write to a variable to mysteriously vanish!
 
@@ -180,11 +180,12 @@ There are several ways of protecting your code against data races if you do shar
 * Atomic variables
 * Events/condition variables
 * Just don't share any state
-* Message passing (which won't be explained here)
+* Message passing (which will be explained here after it is added to NVGT)
 
 #### Locks and semaphores
 
 A lock is a synchronization primitive used to manage access to a shared resource by multiple threads. When a thread wants to "acquire" the lock, it checks if another thread already holds it. If the lock is already acquired, the requesting thread is blocked until the lock becomes available. When the lock is released, the blocked thread can proceed. This mechanism prevents concurrent access to the resource, ensuring data consistency and integrity.
+
 Semaphores are another important synchronization mechanism. A semaphore is a signaling mechanism that can be used to control access to a common resource by multiple threads in a concurrent system. Semaphores can be used to solve various synchronization problems, such as controlling access to a finite number of resources or coordinating the order of thread execution. Semaphores maintain a counter representing the number of available resources. Threads can increment the counter to signal the release of a resource or decrement it to wait for a resource. When the counter is zero, any thread attempting to decrement it is blocked until the counter is incremented by another thread.
 
 There are several types of locks and synchronization mechanisms. One common type is the mutex, or mutual exclusion lock. A mutex ensures that only one thread can access a resource at a time. When a thread acquires a mutex, other threads attempting to acquire the same mutex are blocked until it is released. This is useful for protecting critical sections of code where shared resources are accessed or modified.
@@ -243,7 +244,7 @@ Condition variables are another synchronization mechanism used to block a thread
 
 The primary use case for condition variables is to manage complex thread interactions that require waiting for certain states or conditions. For example, in a producer-consumer scenario, a consumer thread might wait on a condition variable until there are items available in a buffer. The producer thread, after adding an item to the buffer, signals the condition variable to wake up the consumer thread.
 
-Here’s a simplified example: a producer and consumer thread are started one after the other. The producer thread (which is what produces data for the consumer thread to act upon) acquires the mutex, adds an item to the buffer, signals the condition variable, and releases the mutex. By contrast, the consumer thread acquires the mutex, waits on the condition variable while the buffer is empty, processes the item from the buffer the condition variable has been signaled, and releases the mutex. The "mutex," in this  case, could (and should most likely be) a recursive mutex.
+Hereâ€™s a simplified example: a producer and consumer thread are started one after the other. The producer thread (which is what produces data for the consumer thread to act upon) acquires the mutex, adds an item to the buffer, signals the condition variable, and releases the mutex. By contrast, the consumer thread acquires the mutex, waits on the condition variable while the buffer is empty, processes the item from the buffer the condition variable has been signaled, and releases the mutex. The "mutex," in this  case, could (and should most likely be) a recursive mutex.
 
 Condition variables support two main operations: `wait` and `notify`. The `wait` operation puts the thread into a waiting state and releases the mutex. The `notify_one` operation wakes up one waiting thread, while `notify_all` wakes up all waiting threads. These operations are critical for coordinating complex interactions and ensuring that threads only proceed when the required conditions are met.
 
@@ -253,7 +254,7 @@ Condition variables are more suitable for scenarios requiring complex synchroniz
 
 #### Not sharing any state
 
-If all of the above just confused the hell out of you, that's okay; you have lots of other options. The simplest would be to just ignore this section entirely and to just not use threads at all. If you really, really, really do need threads, though, the best method would be to figure out how you don't need to share state. This might be quite difficult in some cases, but the less state you share, the less likely it is you'll need to worry about any of this stuff. If you do need to share state, all of the above is important to understand to do things properly.
+If all of the above has left you utterly confused and wondering what you've just read, that's okay; you have lots of other options. The simplest would be to just ignore this section entirely and to just not use threads at all. If you really, really, really do need threads, though, the best method would be to figure out how you don't need to share state. This might be quite difficult in some cases, but the less state you share, the less likely it is you'll need to worry about any of this stuff. If you do need to share state, all of the above is important to understand to do things properly.
 
 ### Creating and managing threads
 
