@@ -1,7 +1,7 @@
 # Building NVGT on linux
 
 ## Building with the `build_linux.sh` script
-There is a [script to build NVGT on Linux](https://github.com/samtupy/nvgt/blob/main/build/build_linux.sh) (tested on Debian and Ubuntu). It tends to build pretty portably so you can run it basically anywhere, and it will attempt to successfully download all required dependencies and build them for you. The result will be a fully built NVGT.
+There is a [script to build NVGT on Linux](https://raw.githubusercontent.com/samtupy/nvgt/main/build/build_linux.sh) (tested on Debian and Ubuntu). It tends to build pretty portably so you can run it basically anywhere, and it will attempt to successfully download all required dependencies and build them for you. The result will be a fully built NVGT.
 
 Internally, this script is used within our GitHub Actions to make builds of NVGT. It is also used within our local testing environments.
 
@@ -69,7 +69,7 @@ make -s -j2
 ```
 
 ## Note
-The 2 in `make -j2` is how many CPU cores you would like to use when building. Change this to the number of CPU cores you would like to use. If you do not know how many cores your system has, you can use the `lscpu` command on many distrobutions to check.
+The 2 in `make -j2` is how many CPU cores you would like to use when building. Change this to the number of CPU cores you would like to use. If you do not know how many cores your system has, you can use the `lscpu` command on many distributions to check.
 
 ```bash
 sudo make install

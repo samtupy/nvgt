@@ -10,8 +10,9 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "network.h"
 #include <obfuscate.h>
+#include "angelscript.h" // get_array_type
+#include "network.h"
 
 bool g_enet_initialized = false;
 network_event g_enet_none_event; // The none event is static and never changes, why reallocate it every time network::request() doesn't come up with an event?
@@ -101,7 +102,7 @@ asQWORD network::connect(const std::string& hostname, unsigned short port) {
 	return next_peer - 1;
 }
 
-network_event* network::request(uint32_t timeout) {
+const network_event* network::request(uint32_t timeout) {
 	if (!host) {
 		g_enet_none_event.addRef();
 			return &g_enet_none_event;
@@ -203,9 +204,7 @@ bool network::disconnect_peer_forcefully(asQWORD peer_id) {
 }
 
 CScriptArray* network::list_peers() {
-	asIScriptContext* ctx = asGetActiveContext();
-	asIScriptEngine* engine = ctx->GetEngine();
-	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("uint64[]");
+	asITypeInfo* arrayType = get_array_type("uint64[]");
 	CScriptArray* array = CScriptArray::Create(arrayType);
 	if (!host) return array;
 	array->Reserve(peers.size());
@@ -282,7 +281,7 @@ void RegisterScriptNetwork(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("network"), _O("bool setup_server(uint16, uint8, uint16)"), asMETHOD(network, setup_server), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool setup_local_server(uint16, uint8, uint16)"), asMETHOD(network, setup_local_server), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint64 connect(const string& in, uint16)"), asMETHOD(network, connect), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("network_event@ request(uint = 0)"), asMETHOD(network, request), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("const network_event@ request(uint = 0)"), asMETHOD(network, request), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("string get_peer_address(uint64) const"), asMETHOD(network, get_peer_address), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint get_peer_average_round_trip_time(uint64) const"), asMETHOD(network, get_peer_average_round_trip_time), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool send(uint64, const string& in, uint8, bool = true)"), asMETHOD(network, send), asCALL_THISCALL);

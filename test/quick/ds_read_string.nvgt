@@ -1,6 +1,6 @@
 // NonVisual Gaming Toolkit (NVGT)
 // Copyright (C) 2022-2024 Sam Tupy
-// license: zlib (see license.md in the root of the nvgt distrobution)
+// License: zlib (see license.md in the root of the NVGT distribution)
 
 void main() {
 	datastream ds("This is a test to make sure of what happens when we call the read_string function on a datastream who's binary flag is set to false.\r\nHere is a new line\0with a null character.\n");
