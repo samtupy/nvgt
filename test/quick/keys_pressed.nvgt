@@ -2,7 +2,7 @@
 // Test written by tunmi13productions.
 // NonVisual Gaming Toolkit (NVGT)
 // Copyright (C) 2022-2024 Sam Tupy
-// license: zlib (see license.md in the root of the nvgt distrobution)
+// License: zlib (see license.md in the root of the NVGT distribution)
 
 #include "speech.nvgt"
 
