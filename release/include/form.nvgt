@@ -1133,7 +1133,7 @@ class audio_form {
 		c_form[control_index].list_nav_translate = nav_translate;
 		return true;
 	}
-	int[] get_list_selections(int control_index) {
+	int[]@ get_list_selections(int control_index) {
 		int[] temp;
 		int position;
 		form_error = 0;
@@ -1166,6 +1166,63 @@ class audio_form {
 		}
 		if ((temp.length() == 0) && (position > -1))
 			temp.insert_last(position);
+		return temp;
+	}
+	bool is_list_item_checked(int control_index, int item_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return false;
+		}
+		if (c_form[control_index].type != ct_list) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (item_index > c_form[control_index].list_length) {
+			form_error = form_error_invalid_list_index;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (!c_form[control_index].list_multiselect) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		return c_form[control_index].list[item_index].checked;
+	}
+	int[]@ get_checked_list_items(int control_index) {
+		int[] temp;
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return temp;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return temp;
+		}
+		if (c_form[control_index].type != ct_list) {
+			form_error = form_error_invalid_control;
+			return temp;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return temp;
+		}
+		if (!c_form[control_index].list_multiselect) {
+			form_error = form_error_invalid_control;
+			return temp;
+		}
+		for (int counter = 0; counter <= c_form[control_index].list_length; counter++) {
+			if (c_form[control_index].list[counter].checked)
+				temp.insert_last(counter);
+		}
 		return temp;
 	}
 	int get_list_count(int control_index) {
