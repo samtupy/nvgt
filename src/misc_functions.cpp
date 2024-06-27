@@ -274,7 +274,7 @@ int utf8next(const std::string& text, int offset = 0) {
 }
 
 CScriptArray* get_preferred_locales() {
-	asITypeInfo* arrayType = g_ScriptEngine->GetTypeInfoByDecl("array<string>");
+	asITypeInfo* arrayType = get_array_type("array<string>");
 	CScriptArray* array = CScriptArray::Create(arrayType);
 	SDL_Locale* locales = SDL_GetPreferredLocales();
 	if (!locales) return array;

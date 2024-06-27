@@ -60,7 +60,7 @@ It is entirely up to you what formats you want to use in your projects.
 ```
 Likely the most widely used and most modern, NVGT can load configuration options from standard JSON formatted input.
 
-This format receives the most points for standardization. Included directly within many higher level programming languages as preinstalled packages or modules, this is the easiest format to use if you need some code to generate or modify some configuration options used in your program. For example, a python script that prepares your game for distrobution might write a gamename.json file next to your gamename.nvgt script that modifies some Angelscript engine options or changes debug settings before release, and sets them to other values during development.
+This format receives the most points for standardization. Included directly within many higher level programming languages as preinstalled packages or modules, this is the easiest format to use if you need some code to generate or modify some configuration options used in your program. For example, a python script that prepares your game for distribution might write a gamename.json file next to your gamename.nvgt script that modifies some Angelscript engine options or changes debug settings before release, and sets them to other values during development.
 
 Furthermore if NVGT ever includes an interface to set some of these options in a manner where they save, .json files would be the format written out by the engine.
 
