@@ -255,7 +255,7 @@ def output_html_section(md_path, title):
 	liquid_path = md_path[:-5] + ".liquid"
 	if os.path.isdir(os.path.join("..", "web", "src", "docs")):
 		with open(os.path.join("..", "web", "src", "docs", liquid_path), "w", encoding = "utf8") as f:
-			f.write(liquid_base.format(title = title, body = html_body))
+			f.write(liquid_base.format(title = title, body = html_body.replace("{{", "\\{\\{").replace("}}", "\\}\\}")))
 
 
 def main():

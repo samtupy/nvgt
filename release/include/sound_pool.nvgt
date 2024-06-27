@@ -6,6 +6,7 @@ sound Pool Class
 This class provides a convenient way of managing sounds in an environment, both with 1 and 2 dimensions. It uses the functions found in sound_positioning.bgt to do the actual sound adjustments, so modifying these functions will affect the entire system. The sound_pool_item class holds all the information necessary for one single sound in the game world. Note that you should not make instances of the sound_pool_item class directly but always use the methods and properties provided in the sound_pool class.
 */
 #include "rotation.nvgt"
+bool sound_pool_default_y_elevation=false;
 class sound_pool_item {
 	sound@ handle;
 	string filename;
@@ -242,7 +243,7 @@ class sound_pool_item {
 This is the actual sound_pool class. For more information on how to use the class, please see the BGT documentation.
 */
 class sound_pool {
-	bool y_is_elevation=false;
+	bool y_is_elevation=sound_pool_default_y_elevation;
 	int max_distance;
 	float pan_step;
 	float volume_step;

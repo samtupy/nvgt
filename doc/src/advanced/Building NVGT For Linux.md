@@ -69,7 +69,7 @@ make -s -j2
 ```
 
 ## Note
-The 2 in `make -j2` is how many CPU cores you would like to use when building. Change this to the number of CPU cores you would like to use. If you do not know how many cores your system has, you can use the `lscpu` command on many distrobutions to check.
+The 2 in `make -j2` is how many CPU cores you would like to use when building. Change this to the number of CPU cores you would like to use. If you do not know how many cores your system has, you can use the `lscpu` command on many distributions to check.
 
 ```bash
 sudo make install

@@ -520,7 +520,72 @@ This example demonstrates an important distinction we touched upon earlier: if s
 Where a block might be used, a single statement can usually be used as well; the exception is functions, which must always use a block, whether or not it is a single line.
 
 ### loops
-not written
+While the if statement is used to create conditional checks for whether certain pieces of code will be run, loops are used to repeat sections of code more than once.
+
+Loops have many uses, including infinite loops (which are already a well-known concept), loops that run a known number of times, and loops that we use to run through certain data structures like arrays.
+
+For advanced programmers, NVGT does not support iterators; the traditional c-style for loop must be used to iterate through arrays, although this is substantially more convenient because one can query their length.
+
+NVGT has three main types  of loop, which we will discuss in this section: while loops, while-do loops, and for loops. We will also discuss the break and continue statements.
+
+#### While Loops
+The most simple form of loop is the while loop. It is written almost exactly the same as the if statement, and runs exactly the same, except that it will check the condition and run the code over and over, checking before each run, until the condition is determined to be false.
+
+Here is an example which you can run:
+```
+#include "speech.nvgt"
+void main(){
+    int counter = 1;
+    while(counter <6){
+        speak(counter);
+        wait(1000);
+        counter+=1;
+    }
+}
+```
+This should speak out the numbers 1 through 5, with a second's delay between each.
+
+Just like if statements (as well as other types of loops), a while loop can also be written with only one line of code inside. If so, it does not need to be surrounded by braces.
+
+The while loop is the standard way to write an infinite loop: a piece of code that will run forever, perhaps until broken out of with the break keyword.
+
+To make an infinite loop, we simply use
+```
+true
+```
+as the condition, since it will logically always return true, every time.
+
+Here is a more complicated example (with a way to get out, this time, since we obviously don't want this to run forever - that would get boring really fast!):
+```
+// not complete yet
+```
+#### Do-While Loops
+In while loops, the condition is checked before the code is run. This means that, just like an if statement, there is always the possibility that the code may never run at all.
+
+On the other hand, in do-while loops, the condition is checked after the code has run. As a result, code will always run at least one time.
+
+It's often up to the programmer which type they think is best, and there is no real standard. Whichever is more convenient and maps best to the situation can be used, and neither has a performance advantage over the other.
+
+Let's rewrite our counter example using a do-while loop:
+```
+#include "speech.nvgt"
+void main(){
+    int counter = 1;
+    do{
+        speak(counter);
+        wait(1000);
+        counter+=1;
+    } while(counter < 6);
+}
+```
+As you can see, since the condition is at the end, we need to check it based on the value after the counter as updated, instead of before.
+
+If we had used
+```
+while(counter < 5);
+```
+as we had done with our while loop, the code would have only counted to 4, since the counter gets updated after it speaks its current value.
+
 ### functions
 Functions in nvgt are pieces of code that can be "called" or executed by other parts of the code. They take parameters (or arguments) as input, and output a value, called the "return value".
 

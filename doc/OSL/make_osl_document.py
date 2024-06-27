@@ -17,7 +17,7 @@ license_types = {
 
 output_filename = "3rd_party_licenses"
 html_base = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>{title}</title>\n</head>\n<body>\n{body}\n</body>\n</html>\n"
-header = "# Third party code attributions\nThis application may use any amount of the following copywrited code or components, though it may not use all of them or may use some of them minimally.\n\nThis document may not serve as a complete reference of all copywrited material used in this application, and thus it's distrobution should be checked for other similar documents to collect a complete list of copywrited content used in this software.\n\n"
+header = "# Third party code attributions\nThis application may use any amount of the following copywrited code or components, though it may not use all of them or may use some of them minimally.\n\nThis document may not serve as a complete reference of all copywrited material used in this application, and thus it's distribution should be checked for other similar documents to collect a complete list of copywrited content used in this software.\n\n"
 
 def main():
 	summary = "## Summary of components\nThe following is a convenient listing of third party material that this application may use, the full text for each license can be found below the lists.\n\n"

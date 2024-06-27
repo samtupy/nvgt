@@ -1,10 +1,11 @@
 /**
-	Obtain the time passed since a user has pressed a key or used the mouse.
+	Obtain the time passed in milliseconds since a user has pressed a key or used the mouse.
 	uint64 idle_ticks();
 	## returns
-		Returns the number of milliseconds since a user has not interacted with the machine.
+		uint64: the number of milliseconds since a user has last interacted with the machine.
 	## remarks
 		This function can serve as a useful utility to verify whether a user has been away from the keyboard.
+		It is currently integrated for windows and MacOS. On linux, it will always return 0 until further notice.
 */
 
 // Example

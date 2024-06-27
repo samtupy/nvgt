@@ -1,0 +1,28 @@
+/**
+	Determine any printable characters typed into the games window since this function's lass call.
+	string get_characters();
+	## Returns:
+		string: Any characters typed since this function was last called, or an empty string if none are available.
+	## Remarks:
+		This is the function one would use if they wished to integrate a virtual text field of any sort into their games or applications.
+		Unlike functions such as key_down or keys_pressed, this function focuses specifically on textual content which has been input to the application. A character returned from this function, for example, could be anything from the space bar to an emoticon inserted using the windows emoji picker.
+		A typical use case would involve calling this function once per iteration of your game loop and storing any new characters that are typed into a buffer that composes a chat message or a username or anything else requiring virtual text input.
+*/
+
+// Example:
+void main() {
+	string buffer;
+	show_window("get_characters example");
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		string char = get_characters();
+		if (!char.empty()) {
+			buffer += char;
+			screen_reader_speak(char, true); // You need to process this further for screen readers, such as replacing . with period and other punctuation.
+		}
+		if (key_pressed(KEY_RETURN)) {
+			screen_reader_speak("You typed " + (!buffer.empty()? buffer : "nothing"), true);
+			buffer = "";
+		}
+	}
+}

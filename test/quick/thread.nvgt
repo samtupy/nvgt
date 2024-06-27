@@ -1,6 +1,6 @@
 // NonVisual Gaming Toolkit (NVGT)
 // Copyright (C) 2022-2024 Sam Tupy
-// license: zlib (see license.md in the root of the nvgt distrobution)
+// License: zlib (see license.md in the root of the NVGT distribution)
 
 int c = 0, d = 0, l = 0;
 fast_mutex c_mutex; // comment out the mutex.lock/unlock lines, then start many threads and spam c, and at best the number will get messed up, at worst you could experience crashes or memory violations.

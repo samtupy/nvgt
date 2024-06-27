@@ -1,6 +1,6 @@
 // NonVisual Gaming Toolkit (NVGT)
 // Copyright (C) 2022-2024 Sam Tupy
-// license: zlib (see license.md in the root of the nvgt distrobution)
+// License: zlib (see license.md in the root of the NVGT distribution)
 
 // One unfortunate thing is that we must define funcdefs to call methods in classes, not sure how to fix that yet.
 funcdef void r_void_uint(uint);

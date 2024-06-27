@@ -572,6 +572,13 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("string", "string opAdd(const var&in) const", asFUNCTION(poco_var_add_string), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("string", "string& opAssign(const var&in)", asFUNCTION(poco_var_assign_string), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("string", "string& opAddAssign(const var&in)", asFUNCTION(poco_var_add_assign_string), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("var", "void clear()", asMETHOD(Dynamic::Var, clear), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
+	engine->RegisterObjectMethod("var", "bool get_empty() const property", asMETHOD(Dynamic::Var, isEmpty), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
+	engine->RegisterObjectMethod("var", "bool get_is_integer() const property", asMETHOD(Dynamic::Var, isInteger), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
+	engine->RegisterObjectMethod("var", "bool get_is_signed() const property", asMETHOD(Dynamic::Var, isSigned), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
+	engine->RegisterObjectMethod("var", "bool get_is_numeric() const property", asMETHOD(Dynamic::Var, isNumeric), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
+	engine->RegisterObjectMethod("var", "bool get_is_boolean() const property", asMETHOD(Dynamic::Var, isBoolean), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
+	engine->RegisterObjectMethod("var", "bool get_is_string() const property", asMETHOD(Dynamic::Var, isString), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
 	engine->RegisterObjectBehaviour("var", asBEHAVE_FACTORY, "var @v(json_object@)", asFUNCTION(poco_var_factory_value_shared<JSON::Object>), asCALL_CDECL);
 	engine->RegisterObjectMethod("var", "var& opAssign(const json_object&in) const", asFUNCTION(poco_var_assign_shared<JSON::Object>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("var", "json_object@ opImplCast() const", asFUNCTION(poco_var_extract_shared<JSON::Object>), asCALL_CDECL_OBJFIRST);
