@@ -1,0 +1,81 @@
+void test_unicode_uppercase() {
+    // Basic Latin
+    assert("hello".uppercase() == "HELLO");
+    assert("world".uppercase() == "WORLD");
+    
+    // Latin-1 Supplement
+    assert("àéìòù".uppercase() == "ÀÉÌÒÙ");
+    assert("çğişü".uppercase() == "ÇĞIŞÜ");
+
+    // Greek
+    assert("ελληνικά".uppercase() == "ΕΛΛΗΝΙΚΆ");
+    assert("κόσμος".uppercase() == "ΚΌΣΜΟΣ");
+
+    // Cyrillic
+    assert("кириллица".uppercase() == "КИРИЛЛИЦА");
+    assert("мир".uppercase() == "МИР");
+
+    // CJK Unified Ideographs
+    assert("中文字符".uppercase() == "中文字符"); // Chinese characters typically don't change case
+    assert("日本語".uppercase() == "日本語"); // Japanese characters typically don't change case
+
+    // Hangul
+    assert("한글".uppercase() == "한글"); // Korean characters typically don't change case
+
+    // Hebrew
+    assert("עִברִית".uppercase() == "עִברִית"); // Hebrew characters typically don't change case
+
+    // Devanagari
+    assert("हिन्दी".uppercase() == "हिन्दी"); // Devanagari characters typically don't change case
+
+    // Arabic
+    assert("العَرَبِيَّة".uppercase() == "العَرَبِيَّة"); // Arabic characters typically don't change case
+
+    // Thai
+    assert("ภาษาไทย".uppercase() == "ภาษาไทย"); // Thai characters typically don't change case
+
+    // Georgian
+    assert("ქართული".uppercase() == "ᲥᲐᲠᲗᲣᲚᲘ");
+    assert("მარგალური".uppercase() == "ᲛᲐᲠᲒᲐᲚᲣᲠᲘ");
+
+    // Sinhala
+    assert("සිංහල".uppercase() == "සිංහල"); // Sinhala characters typically don't change case
+
+    // Special Characters
+    assert("12345".uppercase() == "12345"); // Digits don't change case
+    assert("!@#$%".uppercase() == "!@#$%"); // Punctuation doesn't change case
+
+    // Latin Extended
+    assert("ẛṭḥ".uppercase() == "ṠṬḤ");
+    assert("ŉẞ".uppercase() == "ʼNẞ");
+
+    // Armenian
+    assert("հայերեն".uppercase() == "ՀԱՅԵՐԵՆ");
+    
+    // Cherokee
+    assert("ᏣᎳᎩ".uppercase() == "ᏣᎳᎩ"); // Cherokee characters typically don't change case
+
+    // Phonetic Extensions
+    assert("ᴋᴋʀ".uppercase() == "ᴋᴋƦ");
+
+    // Latin Extended Additional
+    assert("đħı".uppercase() == "ĐĦI");
+
+    // Fullwidth Latin Letters
+    assert("ａｂｃ".uppercase() == "ＡＢＣ");
+
+    // Gothic
+    assert("𐍈𐌰𐌹𐍄𐌴𐍂".uppercase() == "𐍈𐌰𐌹𐍄𐌴𐍂"); // Gothic characters typically don't change case
+
+    // Mathematical Alphanumeric Symbols
+    assert("𝒶𝒷𝒸".uppercase() == "𝒶𝒷𝒸");
+
+    // Glagolitic
+    assert("ⰀⰁⰂ".uppercase() == "ⰀⰁⰂ");
+
+    // Tifinagh
+    assert("ⵉⵎⵇ".uppercase() == "ⵉⵎⵇ");
+
+    // Combining Diacritical Marks
+    assert("àéîõū".uppercase() == "ÀÉÎÕŪ"); // Diacritical marks should remain combined
+}
