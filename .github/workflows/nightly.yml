@@ -1,0 +1,199 @@
+name: nightly_build
+on: [push, pull_request]
+
+jobs:
+  mac_build:
+    runs-on: macos-14
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: |
+        brew install scons
+        cp build/build_macos.sh .
+        sudo chmod +x build_macos.sh
+        ./build_macos.sh ci
+        cd release
+        tar -czf ../mac_release.tar.gz *
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: mac_release
+        path: mac_release.tar.gz
+
+  linux_build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: |
+        sudo chmod +x build/build_linux.sh
+        ./build/build_linux.sh ci
+        python3 build/ci_set_version.py
+        cd release
+        tar -czf ../linux_release.tar.gz *
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux_release
+        path: linux_release.tar.gz
+
+  windows_build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: |
+        pip3 install scons
+        choco install -y upx
+        curl -s -O https://nvgt.gg/windev.zip
+        7z x windev.zip -owindev
+        scons -s
+        cd release
+        tar -czf ../windows_release.tar.gz *
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows_release
+        path: windows_release.tar.gz
+
+  windows_package:
+    runs-on: windows-latest
+    needs: ["linux_build", "mac_build", "windows_build"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: linux_release
+    - name: download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: mac_release
+    - name: download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: windows_release
+    - name: package
+      id: package_step
+      shell: bash
+      run: |
+        mkdir linux_release
+        tar -xzf linux_release.tar.gz -C linux_release
+        mkdir mac_release
+        tar -xzf mac_release.tar.gz -C mac_release
+        tar -xzf windows_release.tar.gz -C release
+        cd doc
+        pip3 install -r requirements.txt
+        cd OSL
+        python3 make_osl_document.py
+        cd ..
+        python3 docgen.py
+        cd ..
+        cp linux_release/stub/* release/stub
+        cp mac_release/stub/* release/stub
+        cd install
+        makensis nvgt.nsi
+        version=$(cat ../version)
+        build_time=$(TZ=UTC date +'%Y-%m-%d-%H:%M:%S')
+        echo "version=$version" >> $GITHUB_ENV
+        echo "build_time=$build_time" >> $GITHUB_ENV
+        mv nvgt_*.exe nvgt_${version}_$build_time.exe
+    - name: Upload packaged build
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows_package_build
+        path: nvgt_${{ env.version }}_${{ env.build_time }}.exe
+
+  mac_package:
+    runs-on: macos-latest
+    needs: ["linux_build", "mac_build", "windows_build"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: linux_release
+    - name: download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: windows_release
+    - name: download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: mac_release
+    - name: package
+      id: package_step
+      run: |
+        mkdir linux_release
+        tar -xzf linux_release.tar.gz -C linux_release
+        mkdir windows_release
+        tar -xzf windows_release.tar.gz -C windows_release
+        tar -xzf mac_release.tar.gz -C release
+        cd doc
+        pip3 install --user -r requirements.txt --break-system-packages
+        cd OSL
+        python3 make_osl_document.py
+        cd ..
+        python3 docgen.py
+        cd ..
+        cp linux_release/stub/* release/stub
+        cp windows_release/stub/* release/stub
+        cd install
+        python3 make_dmg.py ../release
+        version=$(cat ../version)
+        build_time=$(TZ=UTC date +'%Y-%m-%d-%H:%M:%S')
+        echo "version=$version" >> $GITHUB_ENV
+        echo "build_time=$build_time" >> $GITHUB_ENV
+        mv nvgt_*.dmg nvgt_${version}_$build_time.dmg
+    - name: Upload package
+      uses: actions/upload-artifact@v4
+      with:
+        name: mac_package
+        path: nvgt_${{ env.version }}_${{ env.build_time }}.dmg
+
+  linux_package:
+    runs-on: ubuntu-latest
+    needs: ["linux_build", "mac_build", "windows_build"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: linux_release
+    - name: download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: windows_release
+    - name: download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: mac_release
+    - name: package
+      id: package_step
+      run: |
+        mkdir mac_release
+        tar -xzf mac_release.tar.gz -C mac_release
+        mkdir windows_release
+        tar -xzf windows_release.tar.gz -C windows_release
+        tar -xzf linux_release.tar.gz -C release
+        cd doc
+        pip3 install --user -r requirements.txt
+        cd OSL
+        python3 make_osl_document.py
+        cd ..
+        python3 docgen.py
+        cd ..
+        cp mac_release/stub/* release/stub
+        cp windows_release/stub/* release/stub
+        cd release
+        version=$(cat ../version)
+        build_time=$(TZ=UTC date +'%Y-%m-%d-%H:%M:%S')
+        echo "version=$version" >> $GITHUB_ENV
+        echo "build_time=$build_time" >> $GITHUB_ENV
+        tar -czf "nvgt.tar.gz" *
+        mv nvgt.tar.gz nvgt_${version}_$build_time.tar.gz
+    - name: Upload packaged build
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux_package
+        path: nvgt_${{ env.version }}_${{ env.build_time }}.tar.gz
