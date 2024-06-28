@@ -175,7 +175,7 @@ public:
 		if (len >= 0) length = len;
 	}
 	BOOL set_mixer(mixer* m);
-	BOOL play();
+	BOOL play(bool reset_loop_state = true);
 	BOOL play_wait();
 	BOOL play_looped();
 	BOOL pause();
