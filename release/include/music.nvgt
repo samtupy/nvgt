@@ -234,30 +234,53 @@ class music_manager {
 	bool set_fx(string fx, int index = -1) {
 		return music_mixer.set_fx(fx, index);
 	}
-	bool play(string track) {
+	bool play(string track, bool blocking = false) {
 		stopping = false;
+		music_track@ trk = music_track(track, this);
 		if (@main_track == null) {
-			@main_track = music_track(track, this);
+			@main_track = trk;
 			return true;
 		}
-		@next_track = music_track(track, this);
+		@next_track = trk;
 		next_play = ticks() + next_track.switch_predelay;
 		if (@main_track != null and main_track.playing)
 			main_track.pause(next_track.switch_fade);
+		while (blocking and @main_track != @trk) {
+			wait(5);
+			loop();
+		}
 		return true;
 	}
-	void stop(int fade_ms = 0) {
+	void stop(int fade_ms = 0, bool blocking = false) {
 		if (!playing) return;
 		stopping = true;
 		if (@main_track != null) main_track.stop(fade_ms);
 		if (@next_track != null) next_track.stop(fade_ms);
+		while (blocking and playing) {
+			wait(5);
+			loop();
+		}
+	}
+	bool pause(int fade_ms = 0, bool blocking = false) {
+		if (@main_track != null and main_track.playing) main_track.pause(fade_ms);
+		else return false;
+		while (blocking and playing) {
+			wait(5);
+			loop();
+		}
+		return true;
+	}
+	bool resume(int fade_ms = 0) {
+		if (@main_track != null and !main_track.playing) main_track.play(fade_ms);
+		else return false;
+		return true;
 	}
 	bool get_playing() const property {
 		if (@main_track != null) return main_track.playing;
 		else if (@next_track != null) return next_track.playing;
 		return false;
 	}
-	void loop(uint64 t) {
+	void loop(uint64 t = ticks()) {
 		if (@main_track != null) main_track.loop(t);
 		if (stopping and !playing) {
 			stopping = false;
