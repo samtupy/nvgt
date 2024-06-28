@@ -27,7 +27,7 @@ void main() {
 	bool connected = false;
 	while (!key_down(KEY_ESCAPE)) {
 		wait(0);
-		network_event@ e = n.request(5);
+		const network_event@ e = n.request(5);
 		if (e.type == event_receive)
 			screen_reader_speak(e.message, true);
 		else if (e.type == event_connect)
