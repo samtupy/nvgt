@@ -6,7 +6,7 @@
 	## Returns:
 		string: the normalized string.
 	## Remarks:
-		The primary thing this function does is to skip sepeerators, convert all letters to uppercase, and make sure the length is a multiple of 8.
+		The primary thing this function does is to skip separators, convert all letters to uppercase, and make sure the length is a multiple of 8.
 		To learn more about base32, click [here](https://en.wikipedia.org/wiki/Base32).
 */
 

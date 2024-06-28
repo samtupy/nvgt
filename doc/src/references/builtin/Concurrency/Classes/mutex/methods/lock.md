@@ -1,5 +1,5 @@
 # lock
-Locks the mutex, waiting indefinitely or for a given duration if nesessary for the operation to succeed.
+Locks the mutex, waiting indefinitely or for a given duration if necessary for the operation to succeed.
 
 1. `void lock();`
 2. `void lock(uint milliseconds);`

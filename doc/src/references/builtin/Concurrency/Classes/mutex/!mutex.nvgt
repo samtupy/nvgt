@@ -3,10 +3,10 @@
 	mutex();
 	## Remarks:
 		It is not safe for 2 threads to try accessing the same portion of memory at the same time, that especially becomes true when at least one of the threads performs any kind of updates to the memory. One of the common and widely used solutions to this problem is basically to create a lock condition where, if one thread starts modifying a bit of shared data, another thread which wants to access or also modify that data must first wait for the initial accessing thread to complete that data modification before continuing.
-		The mutex class is one such method of implementing this mechenism. On the surface it is a simple structure that can be in a locked or unlocked state. If thread A calls the lock method on a mutex object which is already locked from thread B, thread A will block execution until thread B calls the unlock method of the mutex object which can then be successfully locked by thread A.
-		This is the most basic mutex class, though there are other derivitives. Most mutex classes have the ability to try locking a mutex for up to a given timeout in milliseconds before returning false if a lock could not be acquired within the given timeout.
+		The mutex class is one such method of implementing this mechanism. On the surface it is a simple structure that can be in a locked or unlocked state. If thread A calls the lock method on a mutex object which is already locked from thread B, thread A will block execution until thread B calls the unlock method of the mutex object which can then be successfully locked by thread A.
+		This is the most basic mutex class, though there are other derivatives. Most mutex classes have the ability to try locking a mutex for up to a given timeout in milliseconds before returning false if a lock could not be acquired within the given timeout.
 		Mutexes or most other threading primitives are not connected by default to any sort of data. You can use one mutex for 10 variables if you want and if it makes sense in your context.
-		Remember, you are beginning to enter lower level and much more dangerous programming teritory when dealing with multiple threads. If you accidentaly forget to unlock a mutex when you are done with it for example, any thread that next tries locking that mutex will at the least malfunction but is much more likely to just hang your app forever. Be careful!
+		Remember, you are beginning to enter lower level and much more dangerous programming territory when dealing with multiple threads. If you accidentally forget to unlock a mutex when you are done with it for example, any thread that next tries locking that mutex will at the least malfunction but is much more likely to just hang your app forever. Be careful!
 */
 
 // Example:
@@ -44,7 +44,7 @@ void main() {
 			snd.volume += 1;
 		} else if (key_pressed(KEY_DOWN)) {
 			mutex_lock exclusive(ding_mutex);
-			snd.volume -= 1; // We can be sure that these volume changes willl not take place while the sound is being accessed on another thread.
+			snd.volume -= 1; // We can be sure that these volume changes will not take place while the sound is being accessed on another thread.
 		}
 	}
 	exit_program.set(); // Make sure the dinging_thread knows it's time to shut down.

@@ -1,5 +1,5 @@
 /**
-	Get a value out of the JSON arraywith literal syntax, for example `arr[2]`.
+	Get a value out of the JSON array with literal syntax, for example `arr[2]`.
 	var@ json_array::get_opIndex(uint index) property;
 	## Arguments:
 		* uint index: the index of the value to get.

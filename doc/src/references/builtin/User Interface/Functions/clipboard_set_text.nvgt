@@ -16,5 +16,5 @@ void main() {
 	if (text == "")
 		alert("Info", "Your clipboard has been cleared.");
 	else
-		alert("Info", "Text coppied");
+		alert("Info", "Text copied");
 }

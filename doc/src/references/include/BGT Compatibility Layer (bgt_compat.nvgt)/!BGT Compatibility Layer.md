@@ -62,7 +62,7 @@ Note that these functions don't map cleanly to how NVGT's API works. As such, su
 * string_to_upper_case: string.upper.
 * string_split: string.split.
 * string_contains: string.find.
-* get_last_error_text: supersceeded by exxceptions.
+* get_last_error_text: Superseded by exceptions.
 * string_to_number: parse_float.
 * string_compress: string_deflate.
 * string_decompress: string_inflate.

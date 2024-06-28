@@ -4,7 +4,7 @@
 	## Arguments:
 		* int volume: the desired volume level.
 	## Remarks:
-		0 is silent, 100 is louded. If this hasn't been assigned, it will use the OS setting which may not be 100%. Beware if running old code, this is different from bgt having 0 be the max. It's better to use this instead of directly setting volume property.
+		0 is silent, 100 is loudest. If this hasn't been assigned, it will use the OS setting which may not be 100%. Beware if running old code, this is different from bgt having 0 be the max. It's better to use this instead of directly setting volume property.
 */
 
 // Example:

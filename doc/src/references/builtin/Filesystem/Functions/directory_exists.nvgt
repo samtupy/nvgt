@@ -2,7 +2,7 @@
 	Determine if a directory exists or not.
 	bool directory_exists(string directory);
 	## Arguments:
-		* string directory: the directory whose existance will be checked (can be a relative or absolute path).
+		* string directory: the directory whose existence will be checked (can be a relative or absolute path).
 	## Returns:
 		true if the directory exists, false otherwise.
 */

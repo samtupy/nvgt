@@ -12,7 +12,7 @@
 		This function may throw an exception if an invalid date/time is provided. You can use the global `bool datetime_is_valid_format(string str)` function to attempt validating user input before passing it as an argument here.
 		If you use the version of this function without a format specifier, it will try to automatically determine the format of the date/time using several available standard formats.
 		This function will clean the input string such as trimming whitespace before parsing is attempted.
-		Internally, this wraps the DateTimeParser functionality in the Poco c++ libraries. Their documentation says the following, copied verbatim, about this parsing engine, though note in nvgt DateTime:::makeUTC is called datetime.make_UTC, for example.
+		Internally, this wraps the DateTimeParser functionality in the Poco c++ libraries. Their documentation says the following, copied verbatim, about this parsing engine, though note in NVGT DateTime:::makeUTC is called datetime.make_UTC, for example.
 		This class provides a method for parsing dates and times from strings. All parsing methods do their best to parse a meaningful result, even from malformed input strings.
 		The returned DateTime will always contain a time in the same timezone as the time in the string. Call DateTime::makeUTC() with the timeZoneDifferential returned by parse() to convert the DateTime to UTC.
 		Note: When parsing a time in 12-hour (AM/PM) format, the hour (%h) must be parsed before the AM/PM designator (%a, %A), otherwise the AM/PM designator will be ignored.

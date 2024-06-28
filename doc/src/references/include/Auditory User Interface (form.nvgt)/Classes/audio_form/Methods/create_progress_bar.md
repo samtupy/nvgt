@@ -5,7 +5,7 @@ Creates a new progress bar control and adds it to the audio form.
 
 ## Arguments:
 * string caption: the label to associate with the progress bar.
-* int speak_interval = 5: how often to spaek percentage changes.
+* int speak_interval = 5: how often to speak percentage changes.
 * bool speak_global = true: should progress updates be spoken even when this control doesn't have keyboard focus?
 
 ## Returns:

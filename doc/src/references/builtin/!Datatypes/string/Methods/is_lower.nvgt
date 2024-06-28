@@ -12,7 +12,7 @@
 
 // example:
 void main() {
-	alert("example", "HELLO".is_lower()); // Should show tfalse.
+	alert("example", "HELLO".is_lower()); // Should show false.
 	string input = input_box("example", "enter a string");
 	if(input.is_empty())
 		exit();

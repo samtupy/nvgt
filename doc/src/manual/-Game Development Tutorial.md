@@ -153,7 +153,7 @@ Here is a full code example, which you can copy into an nvgt script and run.
 ```
 #include "speech.nvgt"
 void main(){
-    speak("Hello from the NVGTT speech include!");
+    speak("Hello from the NVGT speech include!");
 }
 ```
 
@@ -346,7 +346,7 @@ Let's see how it works:
 string sentence = "The quick brown fox";
 message += " jumps over the lazy dog";
 ```
-To give you some familiarity with string concatenation, let's go over a fulle example. Copy this into an NVGT script, and run it:
+To give you some familiarity with string concatenation, let's go over a full example. Copy this into an NVGT script, and run it:
 ```
 #include "speech.nvgt"
 void main(){
@@ -407,7 +407,7 @@ Let's write some code to demonstrate:
 ```
 #include "speech.nvgt"
 void main(){
-    speak("Welcome to the camping store! You need to have 30 dollars to buy a folding chairr.");
+    speak("Welcome to the camping store! You need to have 30 dollars to buy a folding chair.");
 }
 ```
 

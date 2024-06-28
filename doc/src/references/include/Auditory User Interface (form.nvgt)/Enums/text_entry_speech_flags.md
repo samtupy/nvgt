@@ -4,4 +4,4 @@ This enum provides constants to be used with the character echo functionality in
 * textflag_none: no echo.
 * textflag_characters: echo characters only.
 * textflag_words: echo words only.
-* textflag_characters_words: echo both charcters and words.
+* textflag_characters_words: echo both characters and words.

@@ -4,17 +4,17 @@ One highly useful aspect of NVGT is it's ever growing list of ways that an end u
 From `#pragma` directives to command line argument syntax to configuration files, this document attempts to keep track of all such available configuration options NVGT has to offer.
 
 ## Command line arguments
-NVGT's compiler program has a variety of command line arguments you can pass to it which can alter it's behavior. Some of these options can also be set in configuration files, however an explicit command line option is very likely to override any contridictory options that are in a configuration file.
+NVGT's compiler program has a variety of command line arguments you can pass to it which can alter it's behavior. Some of these options can also be set in configuration files, however an explicit command line option is very likely to override any contradictory options that are in a configuration file.
 
 Generally, these command line options are self-documenting. If you open a command prompt or terminal and just run the nvgt application directly with no arguments, you will be informed that you should either provide an input file or run `nvgt --help` for usage instructions. You can also actually just run nvgt -h
 
 In almost all cases, command line arguments have 2 methods of invocation, both a short form and a long form. The short form of a command usually consists of just a letter or two and is easier to type, while the long form of a command is always more descriptive and thus might be suited to an automation script where you want anyone reading such a script to be able to understand exactly what they are asking NVGT to do. What form you wish to use is completely up to you. In either case you should put a space between arguments, and mixing short and long form arguments is completely fine.
 
-The short form of an argument always begins with a single hifen character (-) followed by one or 2 letters. For example, `-C` would tell NVGT to compile your script with debug information. Some arguments take values, in which case the value shall follow directly after the argument when using short form invocations. For example you could set the platform to compile with using the `-pwindows` argument.
+The short form of an argument always begins with a single hyphen character (-) followed by one or 2 letters. For example, `-C` would tell NVGT to compile your script with debug information. Some arguments take values, in which case the value shall follow directly after the argument when using short form invocations. For example you could set the platform to compile with using the `-pwindows` argument.
 
-On the other hand, the long form of an argument begins with two hifens followed by what usually amounts to a few words separated by hifens. Usually it's just one or 2 words, but could be more in rare cases. For example, `--compile-debug` would tell NVGT to compile the given script with debug information. If an option takes an argument, you use an equals (=) character to define such a value. For example `--platform=windows` would tell NVGT to compile a script for the windows platform.
+On the other hand, the long form of an argument begins with two hyphens followed by what usually amounts to a few words separated by hyphens. Usually it's just one or 2 words, but could be more in rare cases. For example, `--compile-debug` would tell NVGT to compile the given script with debug information. If an option takes an argument, you use an equals (=) character to define such a value. For example `--platform=windows` would tell NVGT to compile a script for the windows platform.
 
-Finally, a special argument, two hifens without any following text, indicates that any further arguments should be passed onto the nvgt script that is about to run.
+Finally, a special argument, two hyphens without any following text, indicates that any further arguments should be passed onto the nvgt script that is about to run.
 
 ### Argument list
 The following is a list of all available command line arguments, though note that it is best to directly run `nvgt --help` yourself encase this list is in any way out of date as nvgt's --help argument will always be more accurate because the text it prints is dynamically generated.
@@ -25,15 +25,15 @@ The following is a list of all available command line arguments, though note tha
 * -Q, --QUIET: do not output anything (work in progress), error status must be determined by process exit code (intended for automation)
 * -d, --debug: run with the Angelscript debugger
 * -wlevel, --warnings=level: select how script warnings should be handled (0 ignore (default), 1 print, 2 treat as error)
-* -iscript, --include=script: include an aditional script similar to the #include directive
-* -Idirectory, --include-directory=directory: add an aditional directory to the search path for included scripts
+* -iscript, --include=script: include an additional script similar to the #include directive
+* -Idirectory, --include-directory=directory: add an additional directory to the search path for included scripts
 * -V, --version: print version information and exit
 * -h, --help: display available command line options
 
 ## Configuration files
 Both because command line arguments can become exhausting to type for every script execution for a while and because NVGT contains far too many configuration options to make command line arguments out of, NVGT also supports configuration files which can be used either on a global or a project level to further direct NVGT.
 
-Configuration files can either be in ini, json or properties formats and are loaded from multiple locations. Values in these configuration files are usually separated into sections in some form, for example settings controling the user interface typically go in the application subsection while directives that provide control over Angelscript's engine properties are in a subsection called scripting. The way these directives in various subsections are defined depends on the configuration format you choose, however you can use any combination of configuration formats at once to suit your needs. Though all supported configuration formats are more or less standard, you can find examples of and notes on each format below.
+Configuration files can either be in ini, json or properties formats and are loaded from multiple locations. Values in these configuration files are usually separated into sections in some form, for example settings controlling the user interface typically go in the application subsection while directives that provide control over Angelscript's engine properties are in a subsection called scripting. The way these directives in various subsections are defined depends on the configuration format you choose, however you can use any combination of configuration formats at once to suit your needs. Though all supported configuration formats are more or less standard, you can find examples of and notes on each format below.
 
 Configuration files at any given location have a priority attached to them to resolve directive conflicts. For example if a global configuration file and a project configuration file both contain the same option, the project file takes priority.
 
@@ -45,7 +45,7 @@ The following configuration files are loaded listed in order of priority from lo
 * script_basename.ini, script_basename.json or script_basename.properties in the same directory as the nvgt script about to be run, where script_basename is the name of the nvgt script without an extension (mygame.nvgt = mygame.properties)
 
 ### Supported configuration formats
-NVGT supports 3 widely standard configuration formats, all of which have their own advantages and disadvantages. It is perfectly acceptable to create mmultiple configuration files with the same name but with different extension, all keys from all files will load and be combined. If the files nvgt.json and nvgt.ini both exist and both set the same key to a different value, however, the result is a bit less defined as to what key is actually used and typically depends on what file was internally loaded first by the engine.
+NVGT supports 3 widely standard configuration formats, all of which have their own advantages and disadvantages. It is perfectly acceptable to create multiple configuration files with the same name but with different extension, all keys from all files will load and be combined. If the files nvgt.json and nvgt.ini both exist and both set the same key to a different value, however, the result is a bit less defined as to what key is actually used and typically depends on what file was internally loaded first by the engine.
 
 It is entirely up to you what formats you want to use in your projects.
 
@@ -122,11 +122,11 @@ For more information on these properties, the [Angelscript custom options docume
 * alter_syntax_named_args = integer default 2: control the syntax for passing named arguments to functions (0 only colon, 1 warn if using equals, 2 colon and equals)
 * always_impl_default_construct: create default constructors for all script classes even if none are defined for one
 * compiler_warnings = integer default 0: control how Angelscript warnings should be treated same as -w argument (0 discard, 1 print and continue, 2 treat as error)
-* do_not_optimize_bytecode: disable bytecode optomizations (for debugging)
+* do_not_optimize_bytecode: disable bytecode optimizations (for debugging)
 * disallow_empty_list_elements: disallow empty items in list initializers such as {1,2,,3,4}
 * disallow_global_vars: disable global variable support completely
 * disallow_value_assign_for_ref_type: disable value assignment operators on reference types
-* disable_integer_division: Defer to floatingpoint devision internally even when only integer variables are involved
+* disable_integer_division: Defer to floatingpoint division internally even when only integer variables are involved
 * expand_default_array_to_template: cause compilation messages which would otherwise contain something like string\[\] to instead contain array\<string\>
 * heredoc_trim_mode = integer default 1: decide when to trim whitespace of heredoc strings (0 never, 1 if multiple lines, 2 always)
 * ignore_duplicate_shared_interface: allow shared interfaced with the same name to be declared multiple times
@@ -158,7 +158,7 @@ The syntax for a pragma directive looks like `#pragma name value` or sometimes j
 * `#pragma console`: produce the compiled executable on windows using the console subsystem for CLI based programs
 
 ## Remarks on complex options
-This section contains any explinations of topics that were too bulky to fit in the documentation of each specific configuration option or article section.
+This section contains any explanations of topics that were too bulky to fit in the documentation of each specific configuration option or article section.
 
 ### application.compilation_message_template
 This useful option allows you to control the format that errors and warnings are printed in. The default template looks like this, for example:

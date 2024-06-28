@@ -4,7 +4,7 @@
 	## Returns:
 		int: the current volume in percentage.
 	## Remarks:
-		0 is silent, 100 is louded. If this hasn't been assigned, it will use the OS setting which may not be 100%. Beware if running old code, this is different from bgt having 0 be the max.
+		0 is silent, 100 is loudest. If this hasn't been assigned, it will use the OS setting which may not be 100%. Beware if running old code, this is different from bgt having 0 be the max.
 */
 
 // Example:

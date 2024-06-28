@@ -45,7 +45,7 @@ We shall forgo any general comments or teaching about the c++ language itself he
 
 The first thing that you probably noticed was this include directive which includes "../../src/nvgt_plugin.h". Why there? While this will be described later, the gist is that NVGT's build setup already has some infrastructure set up to build plugins. NVGT's github repository has a plugin folder, and in there are folders for each plugin. This example is using such a structure. We will talk more in detail about this later, but for now it is enough to know that nvgt_plugin.h does not include anything else in nvgt's source tree, and can be safely copy pasted where ever you feel is best for your particular project (though we do recommend building plugins with NVGT's workspace).
 
-The next oddity here, why doesn't the plugin_main function declaration include a return type? This is because it is a macro defined in nvgt_plugin.h. It is required because the name of the entry point will internally changed based on whether you are compiling your plugin statically or dynamically. If you are building your plugin as a shared library, the function that ends up exporting is called nvgt_plugin. However since one of course cannot link 2 static libraries with the same symbol names in each to a final executable, the entry point for a static plugin ends up being called nvgt_plugin_\<plugname\> where \<plugname\> is replaced with the value of the NVGT_PLUGIN_STATIC preprocessor define (set at plugin build time). In the future even dynamic libraries may possibly contain the plugin name in their entry point function signatures such that more than one plugin could be loaded from one dll file, but for now we instead recommend simply registering functions from multiple plugins in one common entry point if you really want to do that.
+The next oddity here, why doesn't the plugin_main function declaration include a return type? This is because it is a macro defined in nvgt_plugin.h. It is required because the name of the entry point will internally change based on whether you are compiling your plugin statically or dynamically. If you are building your plugin as a shared library, the function that ends up exporting is called nvgt_plugin. However since one of course cannot link 2 static libraries with the same symbol names in each to a final executable, the entry point for a static plugin ends up being called nvgt_plugin_\<plugname\> where \<plugname\> is replaced with the value of the NVGT_PLUGIN_STATIC preprocessor define (set at plugin build time). In the future even dynamic libraries may possibly contain the plugin name in their entry point function signatures such that more than one plugin could be loaded from one dll file, but for now we instead recommend simply registering functions from multiple plugins in one common entry point if you really want to do that.
 
 Finally, remember to call prepare_plugin(shared) as the first thing in your plugin, and note that if your entry point does not return true, this indicates an error condition and your plugin is not loaded.
 
@@ -53,11 +53,11 @@ Finally, remember to call prepare_plugin(shared) as the first thing in your plug
 As mentioned a couple of times above, NVGT's official repository already contains the infrastructure required to build plugins and integrate them with NVGT's existing build system, complete with the ability to exclude some of your more private plugins from being picked up by the repository. While it is not required that one use this setup and in fact one may not want to if they have a better workspace set up for themselves, we certainly recommend it especially if you are making a plugin that you may want to share with the NVGT community.
 
 ### The plugin directory
-In nvgt's main repository, the plugin directory contains all publically available plugins. Either if you have downloaded NVGT's repository outside of version control (such as a public release artifact) or if you intend to contribute your plugin to the community by submitting a pull request, you can feel free to use this directory as well.
+In nvgt's main repository, the plugin directory contains all publicly available plugins. Either if you have downloaded NVGT's repository outside of version control (such as a public release artifact) or if you intend to contribute your plugin to the community by submitting a pull request, you can feel free to use this directory as well.
 
 Here, each directory is typically one plugin. It is not required that this be the case, other directories that are not plugins can also exist here, however any directory within the plugin folder that contains a file called _SConscript will automatically be considered as a plugin by the SConstruct script that builds NVGT.
 
-The source code in these plugins can be aranged any way you like, as it is the _SConscript file you provide that instructs the system how to build your plugin.
+The source code in these plugins can be arranged any way you like, as it is the _SConscript file you provide that instructs the system how to build your plugin.
 
 An example _SConscript file for such a plugin might look like this:
 ```
@@ -68,7 +68,7 @@ Import("env")
 if ARGUMENTS.get("no_shared_plugins", "0") == "0":
 	env.SharedLibrary("#release/lib/test_plugin", ["test.cpp"], libs = ["user32"])
 
-# If we want to make a static version along side our shared one, we need to specifically rebuild the object file containing the plugin's entry point with a different name so that SCons can maintain a proper dependancy graph. Note the NVGT_PLUGIN_STATIC define.
+# If we want to make a static version along side our shared one, we need to specifically rebuild the object file containing the plugin's entry point with a different name so that SCons can maintain a proper dependency graph. Note the NVGT_PLUGIN_STATIC define.
 static = env.Object("test_plugin_static", "test.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "test_plugin")])
 # now actually build the static library, reusing the same variable from above for fewer declarations.
 static = env.StaticLibrary("#build/lib/test_plugin", [static])
@@ -76,7 +76,7 @@ static = env.StaticLibrary("#build/lib/test_plugin", [static])
 # Tell NVGT's SConstruct script that the static version of this plugin needs symbols from the user32 library.
 static = [static, "user32"]
 
-# What is being returned to NVGT's SConstruct in the end is a list of aditional static library objects that should be linked.
+# What is being returned to NVGT's SConstruct in the end is a list of additional static library objects that should be linked.
 Return("static")
 ```
 
@@ -91,10 +91,10 @@ Second, if a _SConscript file is present in this directory, NVGT's main build sc
 
 Last but not least, if a file called nvgt_config.h is present in the user folder, this will also be loaded in place of the nvgt_config.h in the repo's src directory.
 
-You can do whatever you want within this user directory, choosing to either follow or ignore any convensions you wish. Below is an example of a working setup that employs the user directory, but keep in mind that you can set up your user directory any way you wish and don't nesessarily have to follow the example exactly.
+You can do whatever you want within this user directory, choosing to either follow or ignore any conventions you wish. Below is an example of a working setup that employs the user directory, but keep in mind that you can set up your user directory any way you wish and don't necessarily have to follow the example exactly.
 
 #### user directory example
-The following setup is used for Survive the Wild development. That game requires a couple of propriatary plugins to work, such as a private encryption layer.
+The following setup is used for Survive the Wild development. That game requires a couple of proprietary plugins to work, such as a private encryption layer.
 
 In this case, what was set up was a second github repository that exists within the user directory. It's not a good idea to make a github repository out of the root user folder itself because git will not appreciate this, but instead a folder should be created within the user directory that could contain a subrepository. We'll call it nvgt_user.
 
@@ -155,7 +155,7 @@ If you are only building plugins for projects that are intended to run on one pl
 
 There are a couple of things that should be considered when creating plugins intended to run on all platforms, but only one really big one. In short, it is important that a cross platform plugin's registered Angelscript interface looks exactly the same on all platforms, even if your plugin doesn't support some functionality on one platform. For example if your plugin has functions foo and bar but the bar function only works on windows, it is important to register an empty bar function for any non-windows builds of your plugin rather than excluding the bar function from the angelscript registration of such a plugin build entirely. This is especially true if you intend to, for example, cross compile your application with the windows version of NVGT to run on a linux platform.
 
-The reasoning is that Angelscript may sometimes store indexes or offsets to internal functions or engine registrations in compiled bytecode rather than the names of them. This makes sense and allows for much smaller/faster compiled programs, but what it does mean is that NVGT's registered interface must appear exactly the same both when compiling and when running a script. Maybe your plugin with foo and bar functions get registered into the engine as functions 500 and 501, then maybe the user loads a plugin after that with boo and bas functions that get registered as functions 502 and 503. Say the user makes a call to the bas function at index 503. Well, if the foo bar plugin doesn't include a bar function on linux builds of it, now we can compile the script on windows and observe that the function call to bas at index 503 is successful. But if I run that compiled code on linux, since the bar function is not registered (as it only works on windows), the bas function is now at index 502 instead of 503 where the bytecode is instructing the program to call a function. Oh no, program panick, invalid bytecode! The solution is to instead register an empty version of the bar function on non-windows builds of such a plugin that does nothing.
+The reasoning is that Angelscript may sometimes store indexes or offsets to internal functions or engine registrations in compiled bytecode rather than the names of them. This makes sense and allows for much smaller/faster compiled programs, but what it does mean is that NVGT's registered interface must appear exactly the same both when compiling and when running a script. Maybe your plugin with foo and bar functions get registered into the engine as functions 500 and 501, then maybe the user loads a plugin after that with boo and bas functions that get registered as functions 502 and 503. Say the user makes a call to the bas function at index 503. Well, if the foo bar plugin doesn't include a bar function on linux builds of it, now we can compile the script on windows and observe that the function call to bas at index 503 is successful. But if I run that compiled code on linux, since the bar function is not registered (as it only works on windows), the bas function is now at index 502 instead of 503 where the bytecode is instructing the program to call a function. Oh no, program panic, invalid bytecode! The solution is to instead register an empty version of the bar function on non-windows builds of such a plugin that does nothing.
 
 ## Angelscript registration
 Hopefully this document has helped you gather the knowledge required to start making some great plugins! The last pressing question we'll end with is "how does one register things with NVGT's Angelscript engine?" The angelscript engine is a variable in the nvgt_plugin_shared structure passed to your plugins entry point, it's called script_engine.
@@ -166,4 +166,4 @@ The best reference for how to register things with Angelscript is the Angelscrip
 * [registering global properties](https://www.angelcode.com/angelscript/sdk/docs/manual/doc_register_prop.html)
 * [registering an object type](https://www.angelcode.com/angelscript/sdk/docs/manual/doc_register_type.html)
 
-Good luck creating NVGT plugins, and feel free to share some of them to the community if you deam them worthy!
+Good luck creating NVGT plugins, and feel free to share some of them to the community if you deem them worthy!
