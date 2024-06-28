@@ -13,14 +13,14 @@ The joystick class in NVGT is still a no-op interface. There has already been a 
 ### tone_synth
 Another object from BGT we have not yet reimplemented, we are considering [tonic](https://github.com/TonicAudio/Tonic) for this but are very open to other suggestions as not much research as been done yet here.
 
-### AVSpeech and speech dispatcher
-Currently other than voice over support, the only speech output NVGT can produce on Linux and MacOS is based on a very bad sounding RSynth derivative that is included as a fallback synthesizer intended to be used in an emergency situation where the user needs to know that their primary synth failed to load. We intend to wrap AVSpeechSynthesizer on MacOS and speechd on Linux to solve this problem.
+### Speech dispatcher and the `tts_voice` object
+Currently, NVGT's Speech Dispatcher implementation for Linux only works with the screen reader speech functions. At this time, we are still considering if we should implement it into the `tts_voice` object as well.
 
 ### VSCode extension
 A plan that has existed for a few months now is to create a VSCode extension for Angelscript that works with NVGT scripts. To facilitate this we have wrapped a function called script_dump_engine_configuration, an example of which you can see in test/quick/dump_engine_config.nvgt. This function dumps a complete reference of everything registered in the engine, enough to compile scripts. This will, once time permits to learn the needed components, allow us to create an extension for VSCode that allows everything from symbol lookup to intellisense.
 
 ### JAWS keyhook
-Anyone who has been playing Survive the Wild for any period of time and who uses JAWS is no doubt aware that the keyhook in Survive the Wild is currently less than ideal. There is ongoing work to fix it, but this is not yet complete.
+There has been loads of progress made with NVGT's JAWS keyhook, and it should now work in almost all senarios. The only thing to be aware of is that if JAWS crashes, you may have to alt+tab a couple of times. Other than that though, the keyhook is stable and useable!
 
 ### SDL dialog boxes
 At the moment, we are using SDL's message box system to show simple dialogs rather than implementing it on our own. However, this implementation is not ideal for 3 reasons.
@@ -31,6 +31,9 @@ Either we will see if SDL will improve message boxes soon, or switch to somethin
 
 ### Switch to miniaudio
 Currently we use the Bass audio library for sound output, which functionally speaking does work great. However Bass is not open source, and a commercial license must be purchased from [Un4seen](https://www.un4seen.com/bass.html) in order to sell commercial projects. For NVGT, this is not ideal and Bass was only used because it worked quite well at the time that NVGT was only being used to bolster Survive the Wild development with no opensource intentions. Instead, we plan to switch to [miniaudio](https://github.com/mackron/miniaudio) which is open source and in the public domain, and thus which will solve such commercial licensing issues.
+
+### Build for both Intel and ARM Mac's
+Currently, NVGT only natively runs on ARM macOS. We plan to create a universal build in the near future that can run on both Intel and ARM simultaneously.
 
 ### Consider access permissions for subscripting
 NVGT allows a scripter to execute Angelscript code from within their Angelscript code, such as the python eval function. The user is given control of what builtin NVGT functions and classes these subscripts have access to, but it's still a bit rough. Basically Angelscript provides us with this 32 bit DWORD where we can map certain registered functions to bitflags and restrict access to them if a calling module's access bitmask doesn't include a flag the functions were registered with. However this means that we have 32 systems or switches to choose from, so either we need to assign builtin systems to them in a better way, or investigate this feature Angelscript has which is known as config groups and see if we can use them for permission control. C++ plugins in particular complicate this issue.
