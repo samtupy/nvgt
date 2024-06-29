@@ -99,7 +99,7 @@ enum control_event_type {
 	event_slider
 }
 //characters that should be considered word boundaries.
-string audioform_word_separators  = "_ .,!\\\"/[{()}]=\n";
+string audioform_word_seperators = "_ .,!\\\"/[{()}]=\n";
 //prespeech callback, if set the given function will be called right before the form speaks.
 funcdef void prespeech_callback(audio_form@ f);
 //control event callback
@@ -638,6 +638,39 @@ class audio_form {
 	bool focus_silently(int control_id) {
 		return focus(control_id, false, true);
 	}
+bool is_unallowed_char(int control_index, string char, bool search_all=true)
+{
+form_error = 0;
+if (!active)
+{
+form_error = form_error_no_window;
+return false;
+}
+if ((control_index < 0) || (control_index > c_form.length() - 1))
+{
+form_error = form_error_invalid_index;
+return false;
+}
+if (!c_form[control_index].active)
+{
+form_error = form_error_invalid_control;
+return false;
+}
+if(char.length()<1)
+{
+form_error=form_error_invalid_value;
+return false;
+}
+if(search_all)
+{
+for(uint i=0; i<char.length(); i++)
+{
+if(c_form[control_index].unallowed_chars.find(char[i])<0) return false;
+}
+return true;
+}
+return c_form[control_index].unallowed_chars.find(char)>-1;
+}
 	bool is_visible(int control_index) {
 		form_error = 0;
 		if (!active) {
@@ -1039,6 +1072,39 @@ class audio_form {
 		c_form[control_index].visible = visible;
 		return true;
 	}
+bool set_unallowed_chars(int control_index, string chars, bool use_only_unallowed_chars=false, string char_allow_description="")
+{
+form_error = 0;
+if (!active)
+{
+form_error = form_error_no_window;
+return false;
+}
+if ((control_index < 0) || (control_index > c_form.length() - 1))
+{
+form_error = form_error_invalid_control;
+return false;
+}
+if (!c_form[control_index].active)
+{
+form_error = form_error_invalid_control;
+return false;
+}
+if(chars.length()<1)
+{
+c_form[control_index].unallowed_chars.resize(0);
+}
+else
+{
+for(uint i=0; i<chars.length(); i++)
+{
+c_form[control_index].unallowed_chars.insert_last(chars[i]);
+}
+}
+c_form[control_index].use_only_unallowed_chars=use_only_unallowed_chars;
+c_form[control_index].char_allow_description=char_allow_description;
+return true;
+}
 	bool set_overwrite_mode(int control_index, bool overwrite) {
 		form_error = 0;
 		if (!active) {
@@ -1133,7 +1199,7 @@ class audio_form {
 		c_form[control_index].list_nav_translate = nav_translate;
 		return true;
 	}
-	int[]@ get_list_selections(int control_index) {
+	int[] get_list_selections(int control_index) {
 		int[] temp;
 		int position;
 		form_error = 0;
@@ -1166,63 +1232,6 @@ class audio_form {
 		}
 		if ((temp.length() == 0) && (position > -1))
 			temp.insert_last(position);
-		return temp;
-	}
-	bool is_list_item_checked(int control_index, int item_index) {
-		form_error = 0;
-		if (!active) {
-			form_error = form_error_no_window;
-			return false;
-		}
-		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
-			form_error = form_error_invalid_index;
-			return false;
-		}
-		if (c_form[control_index].type != ct_list) {
-			form_error = form_error_invalid_control;
-			return false;
-		}
-		if (item_index > c_form[control_index].list_length) {
-			form_error = form_error_invalid_list_index;
-			return false;
-		}
-		if (!c_form[control_index].active) {
-			form_error = form_error_invalid_control;
-			return false;
-		}
-		if (!c_form[control_index].list_multiselect) {
-			form_error = form_error_invalid_control;
-			return false;
-		}
-		return c_form[control_index].list[item_index].checked;
-	}
-	int[]@ get_checked_list_items(int control_index) {
-		int[] temp;
-		form_error = 0;
-		if (!active) {
-			form_error = form_error_no_window;
-			return temp;
-		}
-		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
-			form_error = form_error_invalid_index;
-			return temp;
-		}
-		if (c_form[control_index].type != ct_list) {
-			form_error = form_error_invalid_control;
-			return temp;
-		}
-		if (!c_form[control_index].active) {
-			form_error = form_error_invalid_control;
-			return temp;
-		}
-		if (!c_form[control_index].list_multiselect) {
-			form_error = form_error_invalid_control;
-			return temp;
-		}
-		for (int counter = 0; counter <= c_form[control_index].list_length; counter++) {
-			if (c_form[control_index].list[counter].checked)
-				temp.insert_last(counter);
-		}
 		return temp;
 	}
 	int get_list_count(int control_index) {
@@ -2213,6 +2222,9 @@ class control {
 	bool multinav_numbers;
 	tts_voice@ ui_speech;
 	audio_form@ subform = null;
+string[] unallowed_chars;
+bool use_only_unallowed_chars;
+string char_allow_description;
 	control() {
 		progress_time.restart();
 		progress_time.pause();
@@ -2260,6 +2272,9 @@ class control {
 		list_position = -1;
 		list_repeat_boundary_items = false;
 		@ui_speech = null;
+this.unallowed_chars.resize(0);
+this.use_only_unallowed_chars=false;
+this.char_allow_description="";
 	}
 	void focus(bool interrupt_previous_speech, bool separate_attributes, bool silent = false) {
 		if (silent == true) {
@@ -2324,6 +2339,22 @@ class control {
 		if ((type == ct_list) && (list_position > -1)) speak_list_item(false);
 		focused = true;
 	}
+bool is_unallowed_char(string char, bool search_all=true)
+{
+if(char.length()<1)
+{
+return false;
+}
+if(search_all)
+{
+for(uint i=0; i<char.length(); i++)
+{
+if(this.unallowed_chars.find(char[i])<0) return false;
+}
+return true;
+}
+return this.unallowed_chars.find(char)>-1;
+}
 	void check(audio_form@ f, int tab_index) {
 		if (type == ct_keyboard_area)
 			return;
@@ -2332,6 +2363,19 @@ class control {
 		if ((type == ct_input) && key_up(KEY_LALT) && (focused)) {
 			if (!read_only) {
 				if (char != "") {
+if(this.unallowed_chars.length()>0)
+{
+if(this.use_only_unallowed_chars && !this.is_unallowed_char(char))
+{
+if(this.char_allow_description!="") speak(this.char_allow_description);
+return;
+}
+else if(!this.use_only_unallowed_chars && this.is_unallowed_char(char))
+{
+if(this.char_allow_description!="") speak(this.char_allow_description);
+return;
+}
+}
 					if (overwrite)
 						edit(char);
 					else
@@ -2835,9 +2879,9 @@ class control {
 		}
 		if (echo_flag == textflag_characters || echo_flag == textflag_characters_words)
 			speak(input_box_speak(find_appropriate_character(character)), true);
-		if (audioform_word_separators .find(character) > -1 && (echo_flag == textflag_words || echo_flag == textflag_characters_words)) {
+		if (audioform_word_seperators.find(character) > -1 && (echo_flag == textflag_words || echo_flag == textflag_characters_words)) {
 			int temp_position = cursor - 1;
-			while (temp_position > 0 && (temp_position >= text.length() || audioform_word_separators .find(text[temp_position - 1]) < 0 && text[temp_position - 1] != "\n"))
+			while (temp_position > 0 && (temp_position >= text.length() || audioform_word_seperators.find(text[temp_position - 1]) < 0 && text[temp_position - 1] != "\n"))
 				temp_position--;
 			string word = read_word_from_position(temp_position);
 			if (password_mask != "") {
@@ -2857,9 +2901,9 @@ class control {
 			text[cursor] = character;
 		if (echo_flag == textflag_characters || echo_flag == textflag_characters_words)
 			speak(input_box_speak(find_appropriate_character(character)), true);
-		if (audioform_word_separators .find(character) > -1 && (echo_flag == textflag_words || echo_flag == textflag_characters_words)) {
+		if (audioform_word_seperators.find(character) > -1 && (echo_flag == textflag_words || echo_flag == textflag_characters_words)) {
 			int temp_position = cursor - 1;
-			while (temp_position > 0 && (temp_position >= text.length() || audioform_word_separators .find(text[temp_position - 1]) < 0))
+			while (temp_position > 0 && (temp_position >= text.length() || audioform_word_seperators.find(text[temp_position - 1]) < 0))
 				temp_position--;
 			speak(read_word_from_position(temp_position), echo_flag != textflag_characters_words);
 		}
@@ -3054,7 +3098,7 @@ class control {
 		if (text == "")
 			return -1;
 		int i = cursor;
-		while (i<text.length() and word and i >= 0 and audioform_word_separators .find(text[i]) > -1)
+		while (i<text.length() and word and i >= 0 and audioform_word_seperators.find(text[i]) > -1)
 			i--;
 		for (i; i > -1; i--) {
 			if (i >= text.length() || i == cursor && !word && text[cursor] == "\n")
@@ -3064,7 +3108,7 @@ class control {
 					return i + 1;
 				else
 					return i;
-			} else if (!word && text[i] == "\n" || (word && audioform_word_separators .find(text[i]) > -1))
+			} else if (!word && text[i] == "\n" || (word && audioform_word_seperators.find(text[i]) > -1))
 				return i + 1;
 		}
 		return 0;
@@ -3323,12 +3367,12 @@ class control {
 			speak("Blank");
 			return;
 		}
-		bool found_boundary = audioform_word_separators .find(text[cursor]) > -1;
+		bool found_boundary = audioform_word_seperators.find(text[cursor]) > -1;
 		int new_word = -1;
 		for (uint i = cursor; i < text.length(); i++) {
-			if (audioform_word_separators .find(text[i]) > -1)
+			if (audioform_word_seperators.find(text[i]) > -1)
 				found_boundary = true;
-			else if (found_boundary && audioform_word_separators .find(text[i]) < 0) {
+			else if (found_boundary && audioform_word_seperators.find(text[i]) < 0) {
 				new_word = i;
 				break;
 			}
@@ -3384,9 +3428,9 @@ class control {
 			return "";
 		int word_end = 0;
 		for (int counter = position; counter < text.length(); counter++) {
-			if (word_end < 1 && (audioform_word_separators .find(text[counter]) > -1 || text[counter] == "\n"))
+			if (word_end < 1 && (audioform_word_seperators.find(text[counter]) > -1 || text[counter] == "\n"))
 				word_end = counter;
-			else if (word_end > 0 && (audioform_word_separators .find(text[counter]) < 0) && (text[counter] != "\n")) {
+			else if (word_end > 0 && (audioform_word_seperators.find(text[counter]) < 0) && (text[counter] != "\n")) {
 				word_end = counter;
 				break;
 			}
