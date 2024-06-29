@@ -17,6 +17,7 @@
 	#define WIN32_LEAN_AND_MEAN
 	#define VC_EXTRALEAN
 	#include <windows.h>
+	#include <commdlg.h>
 	#include "InputBox.h"
 #elif defined(__APPLE__)
 #include <IOKit/IOKitLib.h>
@@ -30,6 +31,7 @@
 #endif
 #ifndef _WIN32
 #include <sys/time.h>
+
 #endif
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
@@ -318,7 +320,81 @@ void wait(int ms) {
 		post_events.clear();
 	}
 }
+  std::string open_file_Dialog(const std::string& title) {
+	#ifdef _WIN32
+    OPENFILENAMEW ofn;
+    ZeroMemory(&ofn, sizeof(ofn));
+     wchar_t buffer[260];
+    ofn.lStructSize = sizeof(ofn);
+    ofn.lpstrFile = buffer;
+    ofn.lpstrFile[0] = '\0';
+    ofn.nMaxFile = sizeof(buffer);
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    ofn.hwndOwner = NULL;
+	if(!title.empty()) {}
+    int len = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
+    std::wstring titleW(len, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, &titleW[0], len);
+    ofn.lpstrTitle = titleW.c_str();
+  }
+  else ofn.lpstrTitle=NULL;
+                        if (GetOpenFileName(&ofn)) {
+                            int len = WideCharToMultiByte(CP_UTF8, 0, buffer, -1, nullptr, 0, nullptr, nullptr);
+							std::string bufferA(len, '\0');
+                            WideCharToMultiByte(CP_UTF8, 0, buffer, -1, &bufferA[0], len, nullptr, nullptr);
+        return bufferA;
+    return "";
+	#elif defined(__APPLE__)
+	return openFileDialog(title);
+	#else
+	return ""; //not implemented yet
+	#endif
+}
 
+std::string save_file_dialog(const std::string& title, const std::string& filename) {
+	#ifdef _WIN32
+    OPENFILENAMEW ofn;
+    ZeroMemory(&ofn, sizeof(ofn));
+     wchar_t buffer[260];
+    ofn.lStructSize = sizeof(ofn);
+    ofn.lpstrFile = buffer;
+    ofn.lpstrFile[0] = '\0';
+    ofn.nMaxFile = sizeof(buffer);
+    ofn.nFilterIndex = 1;
+    ofn.nMaxFileTitle = 0;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    ofn.hwndOwner = NULL;
+	if(!title.empty()) {}
+    int len = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
+    std::wstring titleW(len, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, &titleW[0], len);
+    ofn.lpstrTitle = titleW.c_str();
+}
+else ofn.lpstrTitle=NULL;
+	if(filename.empty()) {
+	int len = MultiByteToWideChar(CP_UTF8, 0, filename.c_str(), -1, nullptr, 0);
+    std::wstring filenameW(len, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, filename.c_str(), -1, &filenameW[0], len);
+	ofn.lpstrFileTitle = filenameW.c_str();
+	}
+	else ofn.lpstrFileTitle = NULL;
+	if(GetSaveFileNameW(&ofn)) {
+		int len = WideCharToMultiByte(CP_UTF8, 0, buffer, -1, nullptr, 0, nullptr, nullptr);
+							std::string bufferA(len, '\0');
+                            WideCharToMultiByte(CP_UTF8, 0, buffer, -1, &bufferA[0], len, nullptr, nullptr);
+        return bufferA;
+    return "";
+	}
+	else return "";
+	#elif defined(__APPLE__)
+	return saveFileDialog(title, filename);
+	#else
+	return ""; //not implemented
+	#endif
+}
 
 // The following function contributed to NVGT by silak
 uint64_t idle_ticks() {
@@ -372,6 +448,8 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("int message_box(const string& in, const string& in, string[]@, uint = 0)"), asFUNCTION(message_box_script), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int alert(const string &in, const string &in, bool = false, uint = 0)"), asFUNCTION(alert), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int question(const string& in, const string& in, bool = false, uint = 0)"), asFUNCTION(question), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string open_file_dialog(const string &in = \"\")"), asFUNCTION(open_file_Dialog), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string save_file_dialog(const string &in = \"\", const string &in = \"\")"), asFUNCTION(save_file_dialog), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction(_O("string clipboard_get_text()"), asFUNCTION(ClipboardGetText), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool clipboard_set_text(const string& in)"), asFUNCTION(ClipboardSetText), asCALL_CDECL);

@@ -1,0 +1,8 @@
+void main()
+{
+show_window("test");
+string open_file = open_file_dialog();
+alert("path found successfully", "your file selected is "+open_file);
+string saved_file = save_file_dialog();
+alert("File saved successfully", "your file was saved to "+saved_file);
+}
