@@ -24,7 +24,7 @@ In this case, the constructor of the mutex_lock class will automatically call th
 
 The class contains a single method, void unlock(), which allows you to unlock the mutex prematurely before the scope actually exits.
 
-There is a very good reason for using this class sometimes as aposed to calling mutex.lock directly. Consider:
+There is a very good reason for using this class sometimes as opposed to calling mutex.lock directly. Consider:
 
 ```
 my_mutex.lock();
@@ -40,9 +40,9 @@ throw("Oh no, this code is broken!");
 exclusive.unlock()
 ```
 
-The mutex_lock object will be destroyed as part of the exception handler unwinding the stack, because the handler already knows to destroy any objects it encounters along the way. However any code that handles exceptions certainly does not know it should specificly call the unlock method of a mutex, thus you could introduce a deadlock in your code if you lock a mutex and then run code that throws an exception without using this mutex_lock class.
+The mutex_lock object will be destroyed as part of the exception handler unwinding the stack, because the handler already knows to destroy any objects it encounters along the way. However any code that handles exceptions certainly does not know it should specifically call the unlock method of a mutex, thus you could introduce a deadlock in your code if you lock a mutex and then run code that throws an exception without using this mutex_lock class.
 
-A final hint, it is actually possible to create scopes in Angelscript and in many other languages as well without any preceeding conditions, so you do not need an if statement or a while loop to use this class.
+A final hint, it is actually possible to create scopes in Angelscript and in many other languages as well without any preceding conditions, so you do not need an if statement or a while loop to use this class.
 
 ```
 int var1 = 2;

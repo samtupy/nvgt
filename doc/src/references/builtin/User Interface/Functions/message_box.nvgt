@@ -11,7 +11,7 @@
 	## Remarks:
 		Notes on button syntax:
 		* A grave character (`) prepending button text is default enter key.
-		* A tilda character (~) before text means default cancel.
+		* A tilde character (~) before text means default cancel.
 */
 
 // Example:

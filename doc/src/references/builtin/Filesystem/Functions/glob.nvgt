@@ -9,7 +9,7 @@
 	## Remarks:
 		This function provides for one of the easiest ways to enumerate the filesystem in NVGT, particularly because the path patterns provided can actually cause semi-recursive directory searches. The search starts at the current working directory unless an absolute path is given.
 		The glob patterns have simple rules:
-		* path seperators must be matched exactly, \* will not cause a recursive lookup
+		* path separators must be matched exactly, \* will not cause a recursive lookup
 		* \* matches any sequence of characters
 		* ? matches any single character
 		* [set] matches any characters between the brackets

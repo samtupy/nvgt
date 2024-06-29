@@ -1,9 +1,9 @@
 /**
-	turn an array into a string, with each element being seperated by the given delimiter.
+	turn an array into a string, with each element being separated by the given delimiter.
 	string join(string[] elements, string delimiter);
 	## Arguments:
 		* string[] elements: the array to join.
-		* string delimiter: the delimiter used to seperate each element in the array (can be empty).
+		* string delimiter: the delimiter used to separate each element in the array (can be empty).
 	## Returns:
 		string: the given array as a string.
 	## Remarks:

@@ -11,7 +11,7 @@
 	## Returns:
 		double: the distance between the two points.
 	## Remarks:
-		This function uses the Euclidean distance formula, meaning it will return the possible closest distance bhetween the two points.
+		This function uses the Euclidean distance formula, meaning it will return the possible closest distance between the two points.
 */
 
 // Example:

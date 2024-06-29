@@ -1,5 +1,5 @@
 /**
-	Get a datetime object representing the creation date of a particula file.
+	Get a datetime object representing the creation date of a particular file.
 	datetime file_get_date_created(string filename);
 	## Arguments:
 		* string filename; the name of the file to check.

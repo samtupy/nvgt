@@ -1,5 +1,5 @@
 # get_current_focus
-Get the control index of the control with the keyboartd focus.
+Get the control index of the control with the keyboard focus.
 
 `int audio_form::get_current_focus();`
 

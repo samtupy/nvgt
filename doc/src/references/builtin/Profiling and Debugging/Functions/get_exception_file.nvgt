@@ -1,5 +1,5 @@
 /**
-	Get the name/path of the source file where the exception occured.
+	Get the name/path of the source file where the exception occurred.
 	string get_exception_file();
 	## Returns:
 		string: the name/path of the file where the exception was thrown.

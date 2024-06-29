@@ -16,8 +16,8 @@
 
 // Example:
 void main() {
-	alert("example 1", datetime_is_valid(2023, 2, 29)); // Will display false (not a leepyear!)
-	alert("example 2", datetime_is_valid(2020, 2, 29)); // Will display true, is a leapyear.
+	alert("example 1", datetime_is_valid(2023, 2, 29)); // Will display false (not a leap year!)
+	alert("example 2", datetime_is_valid(2020, 2, 29)); // Will display true, is a leap year.
 	alert("example 3", datetime_is_valid(2020, 6, 31)); // Will display false (June has 30 days).
 	alert("example 4", datetime_is_valid(2020, 7, 31, 13, 71, 59)); // Will display false (invalid time values).
 }

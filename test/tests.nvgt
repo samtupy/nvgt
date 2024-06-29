@@ -35,9 +35,9 @@ void main() {
 	// Very oversimplified command line parsing.
 	for (uint i = 1; i < ARGS.length(); i++) {
 		if (ARGS[i] == "-h") help();
-		else if(ARGS[i] == "-v") verbose = true;
-		else if(ARGS[i] == "-n") nonfatal = true;
-		else if(ARGS[i].starts_with("-d")) disabled_tests.set(ARGS[i].substr(2), true);
+		else if (ARGS[i] == "-v") verbose = true;
+		else if (ARGS[i] == "-n") nonfatal = true;
+		else if (ARGS[i].starts_with("-d")) disabled_tests.set(ARGS[i].substr(2), true);
 		else {
 			println("unknown command line option " + ARGS[i]);
 			exit(64);
@@ -46,9 +46,8 @@ void main() {
 	if (!directory_exists("tmp")) directory_create("tmp");
 	// These tests are either intended to run from source or along side the source.
 	string[]@ files = find_files("case/*.nvgt");
-	for (uint i = 0; i < files.length(); i++) {
+	for (uint i = 0; i < files.length(); i++)
 		test(spec::path(files[i]).basename);
-	}
 	if (tests_failed == 0)
 		println("%0 of %1 tests passed successfully in %2ms!".format(tests_passed, tests_total, timetracker.elapsed));
 	else

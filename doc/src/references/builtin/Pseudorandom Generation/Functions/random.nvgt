@@ -7,7 +7,7 @@
 	## Returns:
 		int: a random number in the given range.
 	## Remarks:
-		Note that this function is a pseudorandom number generator. To lern more, click [here](https://en.wikipedia.org/wiki/Pseudorandom_number_generator).
+		Note that this function is a pseudorandom number generator. To learn more, click [here](https://en.wikipedia.org/wiki/Pseudorandom_number_generator).
 */
 
 // Example:

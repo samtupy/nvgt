@@ -6,7 +6,7 @@ Fetch a boolean value from the INI data given a section and key.
 ## Arguments:
 * string section: the section to get the value from (if any).
 * string key: the key of the value.
-* bool default_value = aflse: the default value to return if the key isn't found.
+* bool default_value = false: the default value to return if the key isn't found.
 
 ## Returns:
 bool: the value at the particular key if found, the default value if not.

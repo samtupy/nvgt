@@ -1,5 +1,5 @@
 /**
-	Seed the random number generator with a new startingpoint value.
+	Seed the random number generator with a new starting point value.
 	void seed(uint new_seed = random_seed());
 	arguments:
 		* uint new_seed = random_seed(): The seed to use (may be uint64 depending on generator, if so will default to random_seed64).

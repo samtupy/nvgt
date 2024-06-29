@@ -1,8 +1,8 @@
 /**
-	Get the line an exception occured on.
+	Get the line an exception occurred on.
 	int get_exception_line();
 	## Returns:
-		int: the line number the exception occured on.
+		int: the line number the exception occurred on.
 */
 
 // Example:

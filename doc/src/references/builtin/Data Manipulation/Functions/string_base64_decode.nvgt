@@ -9,7 +9,7 @@
 	## Remarks:
 		The following options may be passed to the options argument of this function:
 			* STRING_BASE64_DEFAULT: The defaults passed to the string_base64_encode function.
-			* STRING_BASE64_URL: Use base64 URL encoding as aposed to the / and = characters.
+			* STRING_BASE64_URL: Use base64 URL encoding as opposed to the / and = characters.
 			* STRING_BASE64_PADLESS: Allows decoding even if the string does not end with = padding characters.
 		You can learn more about base64 [here.](https://en.wikipedia.org/wiki/Base64)
 */
