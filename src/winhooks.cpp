@@ -13,12 +13,12 @@
 #include "winhooks.h"
 #ifdef _WIN32
 #include <windows.h>
-#include <detours/detours.h>
 #include <accctrl.h>
 #include <aclapi.h>
 #include <sddl.h>
 #include <format>
 #include <stdexcept>
+#include <vector>
 #endif
 
 void apply_winapi_hooks() {
@@ -38,15 +38,20 @@ LocalFree(pSD);
 throw std::runtime_error(std::format("Cannot initialize SID, error code {}", res)); 
 }
 PACL pNewDACL = NULL;
+std::vector<EXPLICIT_ACCESS> eas;
+const std::vector<DWORD> denied_perms = {{PROCESS_ALL_ACCESS, PROCESS_CREATE_PROCESS, PROCESS_CREATE_THREAD, PROCESS_DUP_HANDLE, PROCESS_QUERY_INFORMATION, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_INFORMATION, PROCESS_SET_QUOTA, PROCESS_SUSPEND_RESUME, PROCESS_TERMINATE, PROCESS_VM_OPERATION, PROCESS_VM_READ, PROCESS_VM_WRITE, SYNCHRONIZE}};
+for (const auto& perm : denied_perms) {
 EXPLICIT_ACCESS ea;
-ZeroMemory(&ea, sizeof(EXPLICIT_ACCESS));
-ea.grfAccessPermissions = PROCESS_ALL_ACCESS | PROCESS_CREATE_PROCESS | PROCESS_CREATE_THREAD | PROCESS_DUP_HANDLE | PROCESS_SET_INFORMATION | PROCESS_SET_QUOTA | PROCESS_SUSPEND_RESUME | PROCESS_TERMINATE | PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE | SYNCHRONIZE;
+ZeroMemory(&ea, sizeof(ea));
+ea.grfAccessPermissions = perm;
 ea.grfAccessMode = DENY_ACCESS;
 ea.grfInheritance = NO_INHERITANCE;
 ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
 ea.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
 ea.Trustee.ptstrName = (LPWSTR)pEveryoneSID;
-res = SetEntriesInAcl(1, &ea, pOldDACL, &pNewDACL);
+eas.emplace_back(ea);
+}
+res = SetEntriesInAcl(eas.size(), eas.data(), pOldDACL, &pNewDACL);
 if (res != ERROR_SUCCESS) {
 FreeSid(pEveryoneSID);
 LocalFree(pSD);
