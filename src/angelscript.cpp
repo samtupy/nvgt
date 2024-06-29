@@ -80,6 +80,7 @@
 #include "scriptmathcomplex.h"
 #include "contextmgr.h"
 #include "weakref.h"
+#include "winhooks.h"
 #ifndef NVGT_STUB
 	int PragmaCallback(const std::string& pragmaText, CScriptBuilder& builder, void* /*userParam*/);
 #endif
@@ -485,6 +486,8 @@ int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
 		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "No entry point found (either 'int main()' or 'void main()'.)");
 		return -1;
 	}
+	// Apply windows hooks
+	apply_winapi_hooks();
 	return 0;
 }
 int SaveCompiledScript(asIScriptEngine* engine, unsigned char** output) {
@@ -590,6 +593,7 @@ int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size
 	if (mod->LoadByteCode(&codestream, &g_debug) < 0)
 		return -1;
 	//engine->SetEngineProperty(asEP_PROPERTY_ACCESSOR_MODE, 2);
+	apply_winapi_hooks();
 	return 0;
 }
 int LoadCompiledExecutable(asIScriptEngine* engine) {
