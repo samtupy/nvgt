@@ -2714,9 +2714,9 @@ class control {
 		int max_col = col;
 		int pos = 0;
 		if (line > 1)
-			pos = text.find("\n", line - 1);
+			pos = bgt_string_contains(text, "\n", line - 1);
 		if (pos > -1) {
-			int pos2 = text.find("\n", line);
+			int pos2 = bgt_string_contains(text, "\n", line);
 			if (pos2 > -1) max_col = pos2 - pos - 1;
 		} else {
 			if (!silent) speak("line number out of range");
@@ -3758,3 +3758,16 @@ bool key_repeating(int key, int repeat_delay, int prerepeat_delay) {
 	return false;
 }
 
+// BGT's string_contains function takes a number of occurances as a second argument, while string.find takes an offset in bytes. A couple features in audio form use occurances, in which ase providing bgt_string_contains as a utility function is more useful than hacking it's functionality into the places in audio form that need it.
+shared int bgt_string_contains(const string& in str, const string& in search, int occurance = 1) {
+	uint c = 0;
+	int pos = -1;
+	while (c < occurance) {
+		pos = str.find_first(search, pos + 1);
+		if (pos > -1)
+			c++;
+		else
+			break;
+	}
+	return c == occurance ? pos : -1;
+}
