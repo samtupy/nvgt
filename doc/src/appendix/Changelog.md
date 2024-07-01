@@ -1,6 +1,43 @@
 # Changelog
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
+## New in 0.88.0-beta (07/01/2024):
+* several improvements to the audio form:
+    * fix the go to line dialog, it had broken a few versions ago when converting the form to no longer need bgt_compat.
+    * adds method `bool is_disallowed_char(int control_index, string char, bool search_all=true);` which checks whether the given characters are allowed. It is also possible to make the search_all parameter to true or false to toggle whether the method should search to match full text, or every character. You can also omit the control_index parameter, in which case the method is used internally in the control class.
+    * adds method `bool set_disallowed_chars(int control_index, string chars, bool use_only_disallowed_chars=false, string char_disallowed_description="");` which sets the disallowed characters in a given control. Setting the use_only_disallowed_chars parameter to true will restrict to use only characters that have been set into this list. The char_disallowed_description parameter is also optional and sets the description or the text to speak when the user types the character that isn't allowed. Default is set to empty, meaning there will be silent when the user types the not allowed character. Setting the chars parameter to empty string will clear the list, thus setting to its original state.
+    * Adds methods is_list_item_checked and get_checked_list_items, also made the get_list_selections function return a handle to the array.
+    * Add a type of list called tab panel. This does not include the ability to assign controls to each tab automatically right now, but instead just the facility to create a list that acts more like a tab control.
+* adds blocking functions to and exposes the pause functionality in the music manager include.
+* adds a boolean to sound.play (true by default) which controls whether to reset the loop state on sound resume, so it's now possible to pause a looping sound and resume it without knowing whether the sound loops.
+* add functions to var type such as is_integer, is_boolean, is_string and more to determine what is stored in the var, also var.clear().
+* Added `sound_pool_default_y_elevation` property into sound_pool. This property will be useful to set default `y_is_elevation` property of each sound pool without having to change later for every sound pool you declare. Note, however, that it will only work for sound_pools declared after the variable is set, for example a global sound_pool variable will likely initialize before any function in your code could set the property.
+* improve passing arguments to async calls.
+* Fix critical bug if using network_event by handle that could allow the static none event to get value assigned to! Also better type info caching during the creation of some arrays.
+* improve the speed of stream::read() when the stream size can be determined, which can be done automatically for files.
+* users should no longer need to install libgit2 and openssl in order to run NVGT games on MacOS!
+* Implement the recently contributed AVTTSVoice class into nvgt's tts_voice object, meaning we now have AVSpeechSynthesizer support for MacOS in NVGT! Temporary caveats:
+    * Though this works well enough for people to start playing with, it still needs more testing. In particular, too much switching of voices followed by speech could cause a tts_voice object to break, calling refresh would probably fix it. Exact condition to reproduce unknown.
+    * We also still need to figure out how to clamp the MacOS rate/pitch/volume parameters into the -10 to +10 that is typically used in the tts_voice class, so parameter adjustment may be rough for a short time.
+    * The contributed class provides methods to handle languages, but the nvgt tts_voice class does not yet have these, as such voices just have raw names for now until we brainstorm more API.
+    * For now this class speaks using the operating system directly and does not interact with bass, and so speak_to_memory is not yet supported. This will be addressed as the AVSpeech API does give us methods to do this.
+* It is now possible to open .nvgt scripts directly within finder with the MacOS app bundle!
+* array.insert_last can now take a handle to another array.
+* Documentation:
+    * major spell checking session as well as some formatting.
+    * array::insert_last method.
+    * sound::loaded_filename method.
+    * string::format method.
+    * get_characters function
+    * idle_ticks function.
+    * mutex class
+    * concurrency article
+    * Game programming tutorial updates
+    * Clarifies some information in the distrobution topic.
+    * Include direct links to MacOS and Linux build scripts.
+    * Minor updates to contributors topic.
+    * Updates to the todo and bgt upgrading topics.
+
 ## New in 0.87.2-beta (06/17/2024):
 * Hopefully removed the need for the user to run `xattr -c` on the mac app bundle!
 * Fix an accidental UTF8 conversion issue introduced into screen reader speech that took place when implementing speech dispatcher.
