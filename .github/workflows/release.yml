@@ -41,7 +41,7 @@ jobs:
         choco install -y upx
         curl -s -O https://nvgt.gg/windev.zip
         7z x windev.zip -owindev
-        scons -s
+        scons -s no_upx=0
         cd release
         tar -czf ../windows_release.tar.gz *
         cd ..
