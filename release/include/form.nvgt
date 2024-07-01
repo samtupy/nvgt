@@ -99,7 +99,7 @@ enum control_event_type {
 	event_slider
 }
 //characters that should be considered word boundaries.
-string audioform_word_separators  = "_ .,!\\\"/[{()}]=\n";
+string audioform_word_separators = "_ .,!\\\"/[{()}]=\n";
 //prespeech callback, if set the given function will be called right before the form speaks.
 funcdef void prespeech_callback(audio_form@ f);
 //control event callback
@@ -638,6 +638,32 @@ class audio_form {
 	bool focus_silently(int control_id) {
 		return focus(control_id, false, true);
 	}
+	bool is_disallowed_char(int control_index, string char, bool search_all = true) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (char.length() < 1) {
+			form_error = form_error_invalid_value;
+			return false;
+		}
+		if (search_all) {
+			for (uint i = 0; i < char.length(); i++) {
+				if (c_form[control_index].disallowed_chars.find(char[i]) < 0) return false;
+			}
+			return true;
+		}
+		return c_form[control_index].disallowed_chars.find(char) > -1;
+	}
 	bool is_visible(int control_index) {
 		form_error = 0;
 		if (!active) {
@@ -1037,6 +1063,30 @@ class audio_form {
 		}
 		c_form[control_index].enabled = enabled;
 		c_form[control_index].visible = visible;
+		return true;
+	}
+	bool set_disallowed_chars(int control_index, string chars, bool use_only_disallowed_chars = false, string char_disallowed_description = "") {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (chars.length() < 1)
+			c_form[control_index].disallowed_chars.resize(0);
+		else {
+			for (uint i = 0; i < chars.length(); i++)
+				c_form[control_index].disallowed_chars.insert_last(chars[i]);
+		}
+		c_form[control_index].use_only_disallowed_chars = use_only_disallowed_chars;
+		c_form[control_index].char_disallowed_description = char_disallowed_description;
 		return true;
 	}
 	bool set_overwrite_mode(int control_index, bool overwrite) {
@@ -2213,6 +2263,9 @@ class control {
 	bool multinav_numbers;
 	tts_voice@ ui_speech;
 	audio_form@ subform = null;
+	string[] disallowed_chars;
+	bool use_only_disallowed_chars;
+	string char_disallowed_description;
 	control() {
 		progress_time.restart();
 		progress_time.pause();
@@ -2260,6 +2313,9 @@ class control {
 		list_position = -1;
 		list_repeat_boundary_items = false;
 		@ui_speech = null;
+		this.disallowed_chars.resize(0);
+		this.use_only_disallowed_chars = false;
+		this.char_disallowed_description = "";
 	}
 	void focus(bool interrupt_previous_speech, bool separate_attributes, bool silent = false) {
 		if (silent == true) {
@@ -2324,6 +2380,17 @@ class control {
 		if ((type == ct_list) && (list_position > -1)) speak_list_item(false);
 		focused = true;
 	}
+	bool is_disallowed_char(string char, bool search_all = true) {
+		if (char.length() < 1)
+			return false;
+		if (search_all) {
+			for (uint i = 0; i < char.length(); i++) {
+				if (this.disallowed_chars.find(char[i]) < 0) return false;
+			}
+			return true;
+		}
+		return this.disallowed_chars.find(char) > -1;
+	}
 	void check(audio_form@ f, int tab_index) {
 		if (type == ct_keyboard_area)
 			return;
@@ -2332,6 +2399,15 @@ class control {
 		if ((type == ct_input) && key_up(KEY_LALT) && (focused)) {
 			if (!read_only) {
 				if (char != "") {
+					if (this.disallowed_chars.length() > 0) {
+						if (this.use_only_disallowed_chars && !this.is_disallowed_char(char)) {
+							if (this.char_disallowed_description != "") speak(this.char_disallowed_description);
+							return;
+						} else if (!this.use_only_disallowed_chars && this.is_disallowed_char(char)) {
+							if (this.char_disallowed_description != "") speak(this.char_disallowed_description);
+							return;
+						}
+					}
 					if (overwrite)
 						edit(char);
 					else
