@@ -19,6 +19,6 @@ def UPX_builder(target, source, env):
 			f.seek(0)
 			f.write(b"NV")
 
-if upx and ARGUMENTS.get("no_upx", "0") != "1":
+if upx and ARGUMENTS.get("no_upx", "1") != "1":
 	env["upx"] = UPX_builder
 	env.Append(BUILDERS = {"UPX": Builder(action = UPX_builder)})

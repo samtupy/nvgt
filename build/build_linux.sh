@@ -112,7 +112,7 @@ function setup_nvgt {
 	if ! which scons &> /dev/null; then
 		pip3 install --user scons
 	fi
-	scons -s
+	scons -s no_upx=0
 	echo NVGT built.
 }
 
