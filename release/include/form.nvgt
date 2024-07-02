@@ -107,7 +107,7 @@ funcdef int on_control_event_callback(audio_form@ f, int c, control_event_type e
 
 //can make this a member of the audio form class as soon as even one person suggests seriously wanting to change on a form by form basis I guess
 bool audioform_input_disable_ralt = true;
-
+int audioform_keyboard_echo=textflag_characters;
 //main window class
 class audio_form {
 	bool active;
@@ -2020,6 +2020,15 @@ class audio_form {
 					search_for(this, tab_index);
 			}
 		}
+		if (c_form[tab_index].type==ct_input) {
+			if (key_pressed(KEY_F2)) {
+				int dir=1;
+				if (keyboard_modifiers & KEYMOD_SHIFT!=0) dir=-1;
+				audioform_keyboard_echo=change_keyboard_echo(audioform_keyboard_echo, dir);
+				this.set_default_keyboard_echo(audioform_keyboard_echo);
+				speak(keyboard_echo_string(audioform_keyboard_echo));
+			}
+		}
 		if (@utility_form == null)
 			c_form[tab_index].check(this, tab_index);
 	}
@@ -2197,7 +2206,7 @@ class audio_form {
 	//internal properties
 	bool subform = false;
 	private int speech_output;
-	int default_echo_flag = textflag_characters;
+	int default_echo_flag = audioform_keyboard_echo;
 	private control[] c_form;
 	private int form_error;
 	private int control_counter;
@@ -3770,4 +3779,17 @@ shared int bgt_string_contains(const string& in str, const string& in search, in
 			break;
 	}
 	return c == occurance ? pos : -1;
+}
+//Wrapper functions for keyboard echo changing.
+shared uint change_keyboard_echo(int keyboard_echo, int dir=1) {
+	keyboard_echo+=dir;
+	if (keyboard_echo<textflag_none) keyboard_echo=textflag_characters_words;
+	else if (keyboard_echo>textflag_characters_words) keyboard_echo=textflag_none;
+	return keyboard_echo;
+}
+shared string keyboard_echo_string(int keyboard_echo) {
+	if (keyboard_echo==textflag_characters) return "characters";
+	else if (keyboard_echo==textflag_words) return "words";
+	else if (keyboard_echo==textflag_characters_words) return "characters and words";
+	else return "none";
 }
