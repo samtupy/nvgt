@@ -1,0 +1,14 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+alert("", is_admin());
+}
+
+bool is_admin() {
+library l;
+l.load("shell32.dll");
+dictionary@ d = l.call("bool IsUserAnAdmin()");
+return bool(d["0"]);
+}
