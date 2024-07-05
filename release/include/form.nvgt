@@ -1929,8 +1929,9 @@ class audio_form {
 		@ui_speech = @handle;
 		return true;
 	}
-	void reset() {
+	void reset(bool reset_to_default_keyboard_echo=true) {
 		form_error = 0;
+		if(reset_to_default_keyboard_echo) default_echo_flag=audioform_keyboard_echo;
 		active = false;
 		control_focus = -1;
 		control_counter = -1;
