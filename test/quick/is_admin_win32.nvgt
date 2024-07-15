@@ -3,12 +3,12 @@
 // License: zlib (see license.md in the root of the NVGT distribution)
 
 void main() {
-alert("", is_admin());
+	alert("Info", "The script " + (is_admin() ? "is being " : "is not being") + " run as admin");
 }
 
 bool is_admin() {
-library l;
-l.load("shell32.dll");
-dictionary@ d = l.call("bool IsUserAnAdmin()");
-return bool(d["0"]);
+	library l;
+	l.load("shell32.dll");
+	dictionary@ d = l.call("bool IsUserAnAdmin()");
+	return bool(d["0"]);
 }
