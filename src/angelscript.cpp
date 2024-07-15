@@ -27,6 +27,7 @@
 #include <Poco/Glob.h>
 #include <Poco/Mutex.h>
 #include <Poco/Path.h>
+#include <Poco/Timestamp.h>
 #include <Poco/UnbufferedStreamBuf.h>
 #include <Poco/zlib.h>
 #include <Poco/Util/Application.h>
@@ -115,6 +116,7 @@ std::string g_stub = "";
 std::string g_platform = "auto";
 bool g_make_console = false;
 std::unordered_map<std::string, asITypeInfo*> g_TypeInfoCache;
+Timestamp g_script_build_time;
 
 class NVGTBytecodeStream : public asIBinaryStream {
 	unsigned char* content;
@@ -496,6 +498,7 @@ int SaveCompiledScript(asIScriptEngine* engine, unsigned char** output) {
 	BinaryWriter bw(ostr);
 	serialize_nvgt_plugins(bw);
 	for(int i = 0; i < asEP_LAST_PROPERTY; i++) bw.write7BitEncoded(UInt64(engine->GetEngineProperty(asEEngineProp(i))));
+	bw << Timestamp().raw();
 	if (mod->SaveByteCode(&codestream, !g_debug) < 0)
 		return -1;
 	return codestream.get(output);
@@ -586,6 +589,9 @@ int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size
 		br.read7BitEncoded(val);
 		engine->SetEngineProperty(asEEngineProp(i), asPWORD(val));
 	}
+	Int64 build_time;
+	br >> build_time;
+	g_script_build_time = build_time;
 	codestream.reset_cursor(); // Angelscript can produce bytecode load failures as a result of user misconfigurations or bugs, and such failures only include an offset of bytes read maintained by Angelscript internally. The solution in such cases is to breakpoint NVGTBytecodeStream::Read if cursor is greater than the offset given, then one can get more debug info. For that to work, we make sure that the codestream's variable that tracks number of bytes written does not include the count of those written by engine properties, plugins etc. We could theoretically store such data at the end of the stream instead of the beginning and avoid this, but then we are trusting Angelscript to read exactly the number of bytes it's written, and since I don't know how much of a gamble that is, I opted for this instead.
 	if (mod->LoadByteCode(&codestream, &g_debug) < 0)
 		return -1;
@@ -901,4 +907,5 @@ void RegisterUnsorted(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("void debug_add_file_breakpoint(const string&in, int)", asFUNCTION(asDebuggerAddFileBreakpoint), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void debug_add_func_breakpoint(const string&in)", asFUNCTION(asDebuggerAddFuncBreakpoint), asCALL_CDECL);
 	engine->RegisterGlobalProperty("const string[]@ ARGS", &g_command_line_args);
+	engine->RegisterGlobalProperty("const timestamp SCRIPT_BUILD_TIME", &g_script_build_time);
 }

@@ -1,0 +1,15 @@
+/**
+	Contains the timestamp when the calling nvgt program was compiled.
+	const timestamp SCRIPT_BUILD_TIME;
+	## Remarks:
+		This property will be set to the time when NVGT launched if it is accessed by a script running from source. Otherwise, it will contain a timestamp set to when the .nvgt script was compiled into an executable.
+*/
+
+// Example:
+void main() {
+	if (!SCRIPT_COMPILED) {
+		alert("oops", "This only works in compiled scripts.");
+		return;
+	}
+	alert("Script compiled on", datetime(SCRIPT_BUILD_TIME).format(DATE_TIME_FORMAT_RFC850));
+}
