@@ -170,7 +170,7 @@ public:
 	BOOL push_string(const std::string& buffer, BOOL stream_end = FALSE, int pcm_rate = 0, int pcm_chans = 0);
 	BOOL postload(const std::string& filename = std::string(""));
 	BOOL close();
-	int set_fx(std::string& fx, int idx = -1);
+	int set_fx(const std::string& fx, int idx = -1);
 	void set_length(float len) {
 		if (len >= 0) length = len;
 	}
@@ -229,7 +229,7 @@ public:
 	BOOL add_sound(sound& s, BOOL internal = FALSE);
 	BOOL remove_sound(sound& s, BOOL internal = FALSE);
 	bool set_impulse_response(const std::string& response, float dry, float wet);
-	int set_fx(std::string& fx, int idx = -1);
+	int set_fx(const std::string& fx, int idx = -1);
 	BOOL set_mixer(mixer* m);
 	BOOL is_sliding();
 	BOOL is_pan_sliding();

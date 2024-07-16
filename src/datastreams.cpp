@@ -418,9 +418,14 @@ unsigned long long file_stream_size(datastream* ds) {
 bool stringstream_open(datastream* ds, const std::string& initial = "", f_streamargs) {
 	return ds->open(new std::stringstream(initial), p_streamargs, nullptr);
 }
-datastream* stringstream_factory(const std::string& initial = "", const std::string& encoding = "", int byteorder = BinaryReader::NATIVE_BYTE_ORDER) {
+datastream* stringstream_factory(const std::string& initial, const std::string& encoding, int byteorder = BinaryReader::NATIVE_BYTE_ORDER) {
 	datastream* ds = new datastream();
 	stringstream_open(ds, initial, encoding, byteorder);
+	return ds;
+}
+datastream* stringstream_implicit_factory(const std::string& initial = "") {
+	datastream* ds = new datastream();
+	stringstream_open(ds, initial, "", BinaryReader::NATIVE_BYTE_ORDER);
 	return ds;
 }
 std::string stringstream_str(datastream* ds) {
@@ -550,7 +555,8 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty("const string NEWLINE_LF", (void*)&LineEnding::NEWLINE_LF);
 	engine->SetDefaultNamespace("");
 	RegisterDatastreamType<std::stringstream, datastream_factory_none>(engine, "datastream");
-	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in = \"\", const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in = \"\")", asFUNCTION(stringstream_implicit_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in, const string&in encoding, int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_factory), asCALL_CDECL);
 	engine->RegisterObjectMethod("datastream", "bool open(const string&in = \"\", const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_open), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datastream", "string str()", asFUNCTION(stringstream_str), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_TERMINAL);

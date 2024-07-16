@@ -1150,7 +1150,7 @@ BOOL sound::close() {
 	return false;
 }
 
-int sound::set_fx(std::string& fx, int idx) {
+int sound::set_fx(const std::string& fx, int idx) {
 	if (!output_mixer)
 		output_mixer = new mixer(parent_mixer, TRUE);
 	if (!output_mixer)
@@ -1557,7 +1557,7 @@ BOOL mixer::remove_sound(sound& s, BOOL internal) {
 	return TRUE;
 }
 
-int mixer::set_fx(std::string& fx, int idx) {
+int mixer::set_fx(const std::string& fx, int idx) {
 	if(fx.size()<1) {
 		if(idx>=0&&idx<effects.size()) {
 			for(DWORD i=idx+1; i<effects.size(); i++)

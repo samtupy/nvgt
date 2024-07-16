@@ -90,7 +90,9 @@ protected:
 		#elif defined(__APPLE__)
 		if (Environment::has("MACOS_BUNDLED_APP")) { // Use GUI instead of stdout and chdir to Resources directory.
 			config().setString("application.gui", "");
-			chdir(Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString().c_str());
+			#ifdef NVGT_STUB
+				chdir(Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString().c_str());
+			#endif
 		}
 		#endif
 		srand(random_seed()); // Random bits of NVGT if not it's components might use the c rand function.

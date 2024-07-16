@@ -67,7 +67,7 @@ CScriptArray* FindFiles(const string& path) {
 	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
 
 	WIN32_FIND_DATAW ffd;
-	HANDLE hFind = FindFirstFileW(bufUTF16, &ffd);
+	HANDLE hFind = FindFirstFileExW(bufUTF16, FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
 	if (INVALID_HANDLE_VALUE == hFind)
 		return array;
 
@@ -146,7 +146,7 @@ CScriptArray* FindDirectories(const string& path) {
 	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
 
 	WIN32_FIND_DATAW ffd;
-	HANDLE hFind = FindFirstFileW(bufUTF16, &ffd);
+	HANDLE hFind = FindFirstFileExW(bufUTF16, FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
 	if (INVALID_HANDLE_VALUE == hFind)
 		return array;
 
@@ -213,7 +213,7 @@ CScriptArray* FindDirectories(const string& path) {
 
 CScriptArray* script_glob(const string& pattern, int options) {
 	// Expected to have been called from a script.
-	CScriptArray* array = CScriptArray::Create(asGetActiveContext()->GetEngine()->GetTypeInfoByDecl("array<string>"));
+	CScriptArray* array = CScriptArray::Create(get_array_type("array<string>"));
 	set<string> files;
 	try {
 		Glob::glob(pattern, files, options);
