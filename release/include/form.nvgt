@@ -116,6 +116,7 @@ class audio_form {
 	on_control_event_callback@ event_callback = null;
 	utility_form@ utility_form = null;
 	dictionary utility_form_data;
+	bool enable_go_to_index=true; //This is mostly used to disable go to line feature for all controls. This is mostly used on go to index field where it prevents the key from pressing again.
 	//constructor
 	audio_form() {
 		reset();
@@ -2006,8 +2007,8 @@ class audio_form {
 		return true;
 	}
 	private void check(int tab_index) {
-		if (c_form[tab_index].multiline or c_form[tab_index].type == ct_list) {
-			if (keyboard_modifiers & KEYMOD_CTRL != 0 and key_pressed(KEY_G))
+		if (c_form[tab_index].type==ct_input or c_form[tab_index].type == ct_list) {
+			if (keyboard_modifiers & KEYMOD_CTRL != 0 and key_pressed(KEY_G) and this.enable_go_to_index)
 				go_to_index(this, tab_index);
 		}
 		if ((c_form[tab_index].type == ct_input && c_form[tab_index].multiline && c_form[tab_index].text != "") or c_form[tab_index].type == ct_list) {
@@ -2719,7 +2720,7 @@ class control {
 		return col;
 	}
 	bool set_line(int line, int col = 1, bool silent = false) {
-		if (type != ct_input or !multiline) return false;
+		if (type != ct_input) return false;
 		if (col < 1) col = 1;
 		int max_col = col;
 		int pos = 0;
@@ -3631,22 +3632,24 @@ class go_to_index : utility_form {
 		int type = parent.get_control_type(control_index);
 		if (type < 0) return;
 		this.control_index = control_index;
-		if (!parent.is_multiline(control_index) and type != ct_list) {
-			if (type == ct_input)
-				speak("not a multiline text field");
+		if (type!=ct_input and type != ct_list) {
 			return;
 		}
 		int current = type == ct_list ? parent.get_list_position(control_index) + 1 : parent.get_line_number(control_index);
+		f.enable_go_to_index=false;
 		f.create_window((type == ct_list ? "go to item" : "go to line"), false, true);
 		f_index = f.create_input_box((type == ct_list ? "item number" : "line number"), current, "", 6);
 		f.select_text(f_index, 0, -1);
+		int index_to_focus=f_index;
 		if (type == ct_input) {
+			if (!parent.is_multiline(control_index)) f.set_state(f_index,false,false); //Set to hidden because not multiline input.
 			f_col = f.create_input_box("line column", parent.get_line_column(control_index), "", 6);
 			f.select_text(f_col, 0, -1);
+			index_to_focus=f_col;
 		}
 		f_ok = f.create_button("ok", true);
 		f_cancel = f.create_button("cancel", false, true);
-		f.focus(f_index);
+		f.focus(index_to_focus);
 		@parent.utility_form = this;
 	}
 	void monitor() {
