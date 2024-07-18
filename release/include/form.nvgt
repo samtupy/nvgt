@@ -3660,11 +3660,13 @@ class go_to_index : utility_form {
 		f.select_text(f_index, 0, -1);
 		int index_to_focus=f_index;
 		if (type == ct_input) {
-			if (!parent.is_multiline(control_index)) f.set_state(f_index,false,false); //Set to hidden because not multiline input.
 			f_col = f.create_input_box("line column", parent.get_line_column(control_index), "", 6);
 			f.select_text(f_col, 0, -1);
-			index_to_focus=f_col;
 			f.set_enable_go_to_index(f_col,false);
+			if (!parent.is_multiline(control_index)) {
+				index_to_focus=f_col;
+				f.set_state(f_index,false,false); //Set to hidden because not multiline input.
+			}
 		}
 		f_ok = f.create_button("ok", true);
 		f_cancel = f.create_button("cancel", false, true);
