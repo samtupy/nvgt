@@ -583,7 +583,7 @@ while(counter < 5);
 as we had done with our while loop, the code would have only counted to 4, since the counter gets updated after it speaks its current value.
 
 #### For Loops
-One of the most common types of loops is something similar to our counter example from earlier in this chapter.
+One of the most-used types of loop is something similar to our counter example from earlier in this chapter.
 
 There are a lot of lines here which for loops can compress into just one line; they make code easier to write as well as read later on.
 
@@ -618,6 +618,7 @@ void main(){
         wait(1000);
     }
 }
+```
 
 This example will yield the same results as the previous one, but it does it in a way which is more concise. Pretty code is very important for your sanity!
 
