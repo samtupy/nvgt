@@ -555,10 +555,6 @@ true
 ```
 as the condition, since it will logically always return true, every time.
 
-Here is a more complicated example (with a way to get out, this time, since we obviously don't want this to run forever - that would get boring really fast!):
-```
-// not complete yet
-```
 #### Do-While Loops
 In while loops, the condition is checked before the code is run. This means that, just like an if statement, there is always the possibility that the code may never run at all.
 
@@ -586,6 +582,67 @@ while(counter < 5);
 ```
 as we had done with our while loop, the code would have only counted to 4, since the counter gets updated after it speaks its current value.
 
+#### For Loops
+One of the most common types of loops is something similar to our counter example from earlier in this chapter.
+
+There are a lot of lines here which for loops can compress into just one line; they make code easier to write as well as read later on.
+
+For loops also have an additional unique property, which is extremely useful, but will be discussed in a moment after some background.
+
+However, they are  admittedly difficult to grasp at first, because they're very different than both the while and do-while loops.
+
+Consisting of four parts, a for loop might look like this:
+```
+for(declarations; condition; final)
+statement/block
+```
+
+How it works:
+
+1. The declarations code is run, and a variable (or more) is declared.
+2. The loop starts to run.
+3. At the beginning of each loop iteration, the condition is checked. If false, the loop stops, potentially even before it has run once.
+4. Assuming the condition is true, The code inside the for loop is run.
+5. After that code has finished, the final step is run.
+6. Repeat steps 3-5
+
+Note: all three parts of a for-loop are optional. For instance, you may omit the declaration by simply writing nothing before the first ;
+
+As you can imagine, a for loop would help us rewrite our counter example in a much more readable way.
+
+Let's go ahead and do this now:
+```
+void main(){
+    for(uint i = 1; i < 6; i ++){
+        screen_reader_speak(i, false);
+        wait(1000);
+    }
+}
+
+This example will yield the same results as the previous one, but it does it in a way which is more concise. Pretty code is very important for your sanity!
+
+#### Break And Continue Statements
+There are times when you might want to get out of loops completely. This is called "breaking out", and it's very easy to do:
+
+```
+break;
+```
+There are no additional components to this statement, as there are in some other languages such as rust.
+
+This is particularly useful in infinite loops (typically created by simply using true as the condition in a while loop)
+
+When this is done, the loop immediately ends, and will iterate no longer.
+
+If you want to break out of a loop, but still want it to try and run again (IE. not run the rest of this iteration), the continue statement can help.
+
+As is the break statement, the continue statement is simply written on a line by itself:
+```
+continue;
+```
+This immediately ends the current iteration. For while and do-while loops, nothing more happens, and the final component in a for loop is run. Then, the next iteration may begin.
+
+The reason that for loops behave differently is by design. It is not possible to achieve this behaviour in any other way.
+
 ### functions
 Functions in nvgt are pieces of code that can be "called" or executed by other parts of the code. They take parameters (or arguments) as input, and output a value, called the "return value".
 
@@ -596,39 +653,32 @@ Let's use baking a cake as an example: in the process of baking a cake (simplify
 You can't do something else related to baking a cake while the oven is baking, because you don't have the cake: the oven does. In the same vein, only one function can be running at once, and we say that function is currently executing.
 
 When a function ends, execution returns to the function from which it was called, just like taking the cake back out of the oven. It returns, along with execution, whatever is specified using a return statement (discussed shortly).
+
 Here is a snippet for the purpose of example:
 ```
-int add(const int&in a, const int&in b){
+int add(int a, int b){
     return a + b;
 }
 ```
-Frankly, this code is a needless abstraction over an already-simple thing (the addition operator) and you should almost never do it like this in production. Nonetheless, it's a good example of what a function can do. It takes data in, and then outputs some other data.
+Frankly, this code is a needless abstraction over an already-simple task (the addition operator) and you should almost never do it like this in production. Nonetheless, it's a good example of what a function can do. It takes data in, and then outputs some other data.
+
 The way we declare functions is a little bit strange, and this example is packed with new ideas, so let's break it down piece by piece:
 
 int add(
 
 The beginning of the function's declaration, letting the compiler know that it is a function with the return datatype (int), the name (add) and the left parenthesis
 
-const
-
-a guarantee to the compiler that this variable will not be re-assigned
-
 int
 
 the type of the first variable
-
-&in
-
-Denotes a reference, specifically an input-only (or read-only) reference. Since the compiler knows we won't change the data (we used const), this reference can improve performance, because the value doesn't need to be copied for our function.
-
 
 a, 
 
 the name (identifier) of the first parameter/argument variable, and a comma and space to separate it from the next variable, just as we use when calling functions
 
-const int&in b)
+int b)
 
-The declaration of the second parameter/argument variable, a read-only integer reference, and a right parenthesis to tell the compiler there are no more parameter variables
+The declaration of the second parameter/argument variable, another integer, and a right parenthesis to tell the compiler there are no more parameter variables
 
 {
 
@@ -644,6 +694,43 @@ This is the only line in our function, and returns an expression evaluating to a
 
 The end of our function, which lets the compiler know that we're back in the outer scope (probably global)
 
-* arrays/lists
+#### Bonus: Some notes About References (Advanced)
+
+If you are new, you can skip this brief section for now, as it's discussed in another article in great depth for easier understanding.
+
+There are a couple of  common misconceptions and mistakes made by even experienced coders when it comes to function parameters.
+
+For performance, it may seem intuitive to declare your primitive functions as const x &in references, but this is almost always useless, except in the case of strings.
+
+The reason for this is the fundamental property of a reference: a pointer itself is a value of 8 bytes storing a memory address. As opposed to most primitives (ints etc), there is no advantage, as the new bytes still need to be allocated - it is just a different value that is placed into them (the address instead of a copy of the value).
+
+### Arrays (Lists)
+If you have programmed prior to reading this manual, you may have seen them before: an array is angelscript's equivalent to a vector or a list.
+
+Via this powerful data structure, we can store lots of the same type of variable in one neat package.
+
+In NVGT, arrays are dynamic. This means that you can add and remove from them at any time you'd like, as opposed to arrays in c or rust, which are trickier to expand or remove from.
+
+Before we move on, here is a quick example:
+```
+void main(){
+    int[] scores = {20, 30};
+    scores.insert_last(50);
+    screen_reader_speak("The scores of the playres in this game are:", false);
+    for(uint i = 0; i < scores.length()l i ++)
+        screen_reader_speak(scores[i], false);
+}
+```
+
+The variables in an array are called "items" or "elements", and you can imagine them as being stored in a line (ordered).
+
+As a consequence, we can access the 1st, 2nd, or any other item in our line of elements, via "indexing".
+
+Slightly more complicated to think about, however, is that nvgt-based arrays are "0-based".
+
+This is true of most programming languages, with a notable exception being lua.
+
+0-based indexing means that, instead of the 1st item being at index 1, it is at index 0. Item 2 would be at index 1, item 3 at 2, and item 20 at 19.
+
 * classes (methods and properties)
 * datastreams and files
