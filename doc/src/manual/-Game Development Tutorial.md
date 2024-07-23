@@ -344,7 +344,7 @@ Concatenation is the process of stringing strings together. The + symbol is used
 Let's see how it works:
 ```
 string sentence = "The quick brown fox";
-message += " jumps over the lazy dog";
+sentence += " jumps over the lazy dog";
 ```
 To give you some familiarity with string concatenation, let's go over a full example. Copy this into an NVGT script, and run it:
 ```
