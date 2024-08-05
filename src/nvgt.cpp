@@ -16,6 +16,7 @@
 #ifdef _WIN32
 	#include <windows.h>
 	#include <locale.h>
+	#include <roapi.h>
 #else
 	#include <time.h>
 	#include <unistd.h>
@@ -87,6 +88,7 @@ protected:
 		wstring dir_u;
 		UnicodeConverter::convert(Path(config().getString("application.dir")).append("lib").toString(), dir_u);
 		SetDllDirectoryW(dir_u.c_str());
+		Windows::Foundation::Initialize(RO_INIT_MULTITHREADED);
 		#elif defined(__APPLE__)
 		if (Environment::has("MACOS_BUNDLED_APP")) { // Use GUI instead of stdout and chdir to Resources directory.
 			config().setString("application.gui", "");
