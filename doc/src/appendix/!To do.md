@@ -32,6 +32,9 @@ Either we will see if SDL will improve message boxes soon, or switch to somethin
 ### Switch to miniaudio
 Currently we use the Bass audio library for sound output, which functionally speaking does work great. However Bass is not open source, and a commercial license must be purchased from [Un4seen](https://www.un4seen.com/bass.html) in order to sell commercial projects. For NVGT, this is not ideal and Bass was only used because it worked quite well at the time that NVGT was only being used to bolster Survive the Wild development with no opensource intentions. Instead, we plan to switch to [miniaudio](https://github.com/mackron/miniaudio) which is open source and in the public domain, and thus which will solve such commercial licensing issues.
 
+### Recording from a microphone
+Especially since Survive the Wild has implemented voice chat support, people rightfully wonder how to record audio in NVGT. Survive the Wild does this with a plugin specifically designed for it's voice chat. The API is not one which we wish to support publicly as it is very limited and confined to stw's use case. Potentially after the switch to miniaudio but maybe before, we will wrap a microphone class in NVGT which will provide a stable API to capturing system audio.
+
 ### Build for both Intel and ARM Mac's
 Currently, NVGT only natively runs on ARM macOS. We plan to create a universal build in the near future that can run on both Intel and ARM simultaneously.
 

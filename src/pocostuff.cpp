@@ -171,6 +171,9 @@ bool string_is_lower(std::string* str, const std::string& encoding) {
 bool string_is_upper(std::string* str, const std::string& encoding) {
 	return string_is(str, encoding, Unicode::isUpper);
 }
+bool string_is_whitespace(std::string* str, const std::string& encoding) {
+	return string_is(str, encoding, Unicode::isSpace);
+}
 bool string_is_punct(std::string* str, const std::string& encoding) {
 	return string_is(str, encoding, Unicode::isPunct);
 }
@@ -714,6 +717,7 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->RegisterObjectMethod("string", _O("bool is_upper(const string&in = \"\") const"), asFUNCTION(string_is_upper), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("string", _O("bool is_lower(const string&in = \"\") const"), asFUNCTION(string_is_lower), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("string", _O("bool is_whitespace(const string&in = \"\") const"), asFUNCTION(string_is_whitespace), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("string", _O("bool is_punctuation(const string&in = \"\") const"), asFUNCTION(string_is_punct), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("string", _O("bool is_alphabetic(const string&in = \"\") const"), asFUNCTION(string_is_alpha), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("string", _O("bool is_digits(const string&in = \"\") const"), asFUNCTION(string_is_digits), asCALL_CDECL_OBJFIRST);
