@@ -550,15 +550,18 @@ class sound_pool {
 	void update_listener_2d(float listener_x, float listener_y, double rotation = 0.0) {
 		update_listener_3d(listener_x, listener_y, 0, rotation);
 	}
-	void update_listener_3d(float listener_x, float listener_y, float listener_z, double rotation = 0.0) {
+	void update_listener_3d(float listener_x, float listener_y, float listener_z, double rotation = 0.0, bool refresh_y_is_elevation=true) {
 		if (items.length() == 0)
 			return;
 		last_listener_x = listener_x;
 		last_listener_y = listener_y;
 		last_listener_z = listener_z;
 		last_listener_rotation = rotation;
-		for (uint i = 0; i <= highest_slot; i++)
+		if (refresh_y_is_elevation) this.y_is_elevation=sound_pool_default_y_elevation;
+		for (uint i = 0; i <= highest_slot; i++) {
+			if (refresh_y_is_elevation) items[i].y_is_elevation=this.y_is_elevation;
 			items[i].update(listener_x, listener_y, listener_z, rotation, max_distance);
+		}
 	}
 
 	bool set_sound_owner(int slot, string owner, int priority = 0) {
