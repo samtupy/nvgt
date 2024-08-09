@@ -107,7 +107,7 @@ funcdef int on_control_event_callback(audio_form@ f, int c, control_event_type e
 
 //can make this a member of the audio form class as soon as even one person suggests seriously wanting to change on a form by form basis I guess
 bool audioform_input_disable_ralt = true;
-
+int audioform_keyboard_echo = textflag_characters;
 //main window class
 class audio_form {
 	bool active;
@@ -1065,6 +1065,23 @@ class audio_form {
 		c_form[control_index].visible = visible;
 		return true;
 	}
+	bool set_enable_go_to_index(int control_index, bool enabled) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_index].enable_go_to_index = enabled;
+		return true;
+	}
 	bool set_disallowed_chars(int control_index, string chars, bool use_only_disallowed_chars = false, string char_disallowed_description = "") {
 		form_error = 0;
 		if (!active) {
@@ -1929,8 +1946,9 @@ class audio_form {
 		@ui_speech = @handle;
 		return true;
 	}
-	void reset() {
+	void reset(bool reset_to_default_keyboard_echo = true) {
 		form_error = 0;
+		if (reset_to_default_keyboard_echo) default_echo_flag = audioform_keyboard_echo;
 		active = false;
 		control_focus = -1;
 		control_counter = -1;
@@ -2005,8 +2023,8 @@ class audio_form {
 		return true;
 	}
 	private void check(int tab_index) {
-		if (c_form[tab_index].multiline or c_form[tab_index].type == ct_list) {
-			if (keyboard_modifiers & KEYMOD_CTRL != 0 and key_pressed(KEY_G))
+		if (c_form[tab_index].type == ct_input or c_form[tab_index].type == ct_list) {
+			if (keyboard_modifiers & KEYMOD_CTRL != 0 and key_pressed(KEY_G) and c_form[tab_index].enable_go_to_index)
 				go_to_index(this, tab_index);
 		}
 		if ((c_form[tab_index].type == ct_input && c_form[tab_index].multiline && c_form[tab_index].text != "") or c_form[tab_index].type == ct_list) {
@@ -2018,6 +2036,15 @@ class audio_form {
 					c_form[tab_index].search(last_search, keyboard_modifiers & KEYMOD_SHIFT == 0 ? 1 : -1, false);
 				else
 					search_for(this, tab_index);
+			}
+		}
+		if (c_form[tab_index].type == ct_input) {
+			if (key_pressed(KEY_F2)) {
+				int dir = 1;
+				if (keyboard_modifiers & KEYMOD_SHIFT != 0) dir = -1;
+				audioform_keyboard_echo = audioform_change_keyboard_echo(audioform_keyboard_echo, dir);
+				this.set_default_keyboard_echo(audioform_keyboard_echo);
+				speak(audioform_keyboard_echo_string(audioform_keyboard_echo));
 			}
 		}
 		if (@utility_form == null)
@@ -2197,7 +2224,7 @@ class audio_form {
 	//internal properties
 	bool subform = false;
 	private int speech_output;
-	int default_echo_flag = textflag_characters;
+	int default_echo_flag = audioform_keyboard_echo;
 	private control[] c_form;
 	private int form_error;
 	private int control_counter;
@@ -2266,6 +2293,7 @@ class control {
 	string[] disallowed_chars;
 	bool use_only_disallowed_chars;
 	string char_disallowed_description;
+	bool enable_go_to_index; //This is mostly used on go to index field where it prevents the key from pressing again.
 	control() {
 		progress_time.restart();
 		progress_time.pause();
@@ -2316,6 +2344,7 @@ class control {
 		this.disallowed_chars.resize(0);
 		this.use_only_disallowed_chars = false;
 		this.char_disallowed_description = "";
+		this.enable_go_to_index = true;
 	}
 	void focus(bool interrupt_previous_speech, bool separate_attributes, bool silent = false) {
 		if (silent == true) {
@@ -2709,7 +2738,7 @@ class control {
 		return col;
 	}
 	bool set_line(int line, int col = 1, bool silent = false) {
-		if (type != ct_input or !multiline) return false;
+		if (type != ct_input) return false;
 		if (col < 1) col = 1;
 		int max_col = col;
 		int pos = 0;
@@ -3621,22 +3650,26 @@ class go_to_index : utility_form {
 		int type = parent.get_control_type(control_index);
 		if (type < 0) return;
 		this.control_index = control_index;
-		if (!parent.is_multiline(control_index) and type != ct_list) {
-			if (type == ct_input)
-				speak("not a multiline text field");
+		if (type != ct_input and type != ct_list)
 			return;
-		}
 		int current = type == ct_list ? parent.get_list_position(control_index) + 1 : parent.get_line_number(control_index);
 		f.create_window((type == ct_list ? "go to item" : "go to line"), false, true);
 		f_index = f.create_input_box((type == ct_list ? "item number" : "line number"), current, "", 6);
+		f.set_enable_go_to_index(f_index, false);
 		f.select_text(f_index, 0, -1);
+		int index_to_focus = f_index;
 		if (type == ct_input) {
 			f_col = f.create_input_box("line column", parent.get_line_column(control_index), "", 6);
 			f.select_text(f_col, 0, -1);
+			f.set_enable_go_to_index(f_col, false);
+			if (!parent.is_multiline(control_index)) {
+				index_to_focus = f_col;
+				f.set_state(f_index, false, false); //Set to hidden because not multiline input.
+			}
 		}
 		f_ok = f.create_button("ok", true);
 		f_cancel = f.create_button("cancel", false, true);
-		f.focus(f_index);
+		f.focus(index_to_focus);
 		@parent.utility_form = this;
 	}
 	void monitor() {
@@ -3770,4 +3803,17 @@ shared int bgt_string_contains(const string& in str, const string& in search, in
 			break;
 	}
 	return c == occurance ? pos : -1;
+}
+//Wrapper functions for keyboard echo changing.
+shared uint audioform_change_keyboard_echo(int keyboard_echo, int dir = 1) {
+	keyboard_echo += dir;
+	if (keyboard_echo < textflag_none) keyboard_echo = textflag_characters_words;
+	else if (keyboard_echo > textflag_characters_words) keyboard_echo = textflag_none;
+	return keyboard_echo;
+}
+shared string audioform_keyboard_echo_string(int keyboard_echo) {
+	if (keyboard_echo == textflag_characters) return "characters";
+	else if (keyboard_echo == textflag_words) return "words";
+	else if (keyboard_echo == textflag_characters_words) return "characters and words";
+	else return "none";
 }
