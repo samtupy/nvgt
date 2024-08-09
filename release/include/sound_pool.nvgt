@@ -6,7 +6,7 @@ sound Pool Class
 This class provides a convenient way of managing sounds in an environment, both with 1 and 2 dimensions. It uses the functions found in sound_positioning.bgt to do the actual sound adjustments, so modifying these functions will affect the entire system. The sound_pool_item class holds all the information necessary for one single sound in the game world. Note that you should not make instances of the sound_pool_item class directly but always use the methods and properties provided in the sound_pool class.
 */
 #include "rotation.nvgt"
-bool sound_pool_default_y_elevation=false;
+bool sound_pool_default_y_elevation = false;
 class sound_pool_item {
 	sound@ handle;
 	string filename;
@@ -92,7 +92,7 @@ class sound_pool_item {
 				return;
 			}
 			if (total_distance <= max_distance and handle.active == false) {
-				handle.load(filename, @packfile != null? @packfile : @sound_default_pack);
+				handle.load(filename, @packfile != null ? @packfile : @sound_default_pack);
 				if (handle.active == true) {
 					if (start_offset > 0)
 						handle.seek(start_offset);
@@ -157,7 +157,7 @@ class sound_pool_item {
 		while (rotation < 0) rotation += 2 * pi;
 		//if(theta!=0)
 		//speak("old_listener="+listener_x+", "+listener_y+". new_listener="+r_listener.x+", "+r_listener.y+". pivit="+pivit.x+", "+pivit.y);
-		handle.set_position(r_listener.x, y_is_elevation==false?r_listener.y:listener_z, y_is_elevation==false?listener_z:r_listener.y, true_x, y_is_elevation==false?true_y:true_z, y_is_elevation==false?true_z:true_y, rotation, pan_step, volume_step);
+		handle.set_position(r_listener.x, y_is_elevation == false ? r_listener.y : listener_z, y_is_elevation == false ? listener_z : r_listener.y, true_x, y_is_elevation == false ? true_y : true_z, y_is_elevation == false ? true_z : true_y, rotation, pan_step, volume_step);
 		/*if(occlude)
 		{
 		int[] factors=occlusion_factors(r_listener.x, r_listener.y, listener_z, true_x, true_y, true_z);
@@ -243,7 +243,7 @@ class sound_pool_item {
 This is the actual sound_pool class. For more information on how to use the class, please see the BGT documentation.
 */
 class sound_pool {
-	bool y_is_elevation=sound_pool_default_y_elevation;
+	bool y_is_elevation = sound_pool_default_y_elevation;
 	int max_distance;
 	float pan_step;
 	float volume_step;
@@ -273,7 +273,7 @@ class sound_pool {
 		int slot = reserve_slot();
 		if (slot == -1)
 			return -1;
-		items[slot].y_is_elevation=y_is_elevation;
+		items[slot].y_is_elevation = y_is_elevation;
 		items[slot].filename = filename;
 		items[slot].x = sound_x;
 		items[slot].y = sound_y;
@@ -319,23 +319,21 @@ class sound_pool {
 					items[slot].reset();
 					return -2;
 				} else {
-					if (dimension > 0){
+					if (dimension > 0)
 						last_listener_x = listener_x;
-					}
-					if (dimension > 1){
+					if (dimension > 1) {
 						last_listener_y = listener_y;
 						last_listener_rotation = rotation;
 						items[slot].update(listener_x, listener_y, (dimension == 2 ? 0 : listener_z), rotation, max_distance);
 					}
-					if (dimension > 2){
+					if (dimension > 2)
 						last_listener_z = listener_z;
-					}
 					if (slot > highest_slot)
 						highest_slot = slot;
 					return slot;
 				}
 			}
-			items[slot].handle.load(items[slot].filename, @items[slot].packfile != null? @items[slot].packfile : @sound_default_pack);
+			items[slot].handle.load(items[slot].filename, @items[slot].packfile != null ? @items[slot].packfile : @sound_default_pack);
 			if (items[slot].handle.active == false) {
 				items[slot].reset();
 				return -1;
@@ -348,16 +346,14 @@ class sound_pool {
 				items[slot].handle.set_volume(start_volume);
 			items[slot].handle.set_pitch(start_pitch);
 		}
-		if (dimension > 0){
+		if (dimension > 0)
 			last_listener_x = listener_x;
-}
-		if (dimension > 1){
+		if (dimension > 1) {
 			last_listener_y = listener_y;
 			last_listener_rotation = rotation;
-}
-		if (dimension > 2){
+		}
+		if (dimension > 2)
 			last_listener_z = listener_z;
-}
 		if (filename != "") {
 			items[slot].update(listener_x, listener_y, listener_z, rotation, max_distance);
 			if (!start_playing)
@@ -550,16 +546,16 @@ class sound_pool {
 	void update_listener_2d(float listener_x, float listener_y, double rotation = 0.0) {
 		update_listener_3d(listener_x, listener_y, 0, rotation);
 	}
-	void update_listener_3d(float listener_x, float listener_y, float listener_z, double rotation = 0.0, bool refresh_y_is_elevation=true) {
+	void update_listener_3d(float listener_x, float listener_y, float listener_z, double rotation = 0.0, bool refresh_y_is_elevation = true) {
 		if (items.length() == 0)
 			return;
 		last_listener_x = listener_x;
 		last_listener_y = listener_y;
 		last_listener_z = listener_z;
 		last_listener_rotation = rotation;
-		if (refresh_y_is_elevation) this.y_is_elevation=sound_pool_default_y_elevation;
+		if (refresh_y_is_elevation) this.y_is_elevation = sound_pool_default_y_elevation;
 		for (uint i = 0; i <= highest_slot; i++) {
-			if (refresh_y_is_elevation) items[i].y_is_elevation=this.y_is_elevation;
+			if (refresh_y_is_elevation) items[i].y_is_elevation = this.y_is_elevation;
 			items[i].update(listener_x, listener_y, listener_z, rotation, max_distance);
 		}
 	}
