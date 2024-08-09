@@ -1,5 +1,5 @@
 /**
-	This property returns the number of bytes immedietly available to be read from a stream.
+	This property returns the number of bytes immediately available to be read from a stream.
 	const int available;
 	## Remarks:
 		This property may not be implemented in all streams, for example decoders. If it is unavailable, it will return 0.

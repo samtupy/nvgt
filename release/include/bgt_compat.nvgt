@@ -83,7 +83,7 @@ string get_last_error_text() {
 	return "";
 }
 shared double string_to_number(const string& in num) {
-	return parse_float(num);
+	return parse_float(num.trim_whitespace_left());
 }
 bool show_game_window(const string& in title) {
 	return show_window(title);
@@ -348,6 +348,7 @@ bool set_sound_storage(const string&in filename, bool reset = false) {
 	pack@p = open_pack(filename);
 	if(@p == null) return false;
 	@sound_default_pack = p;
+	sound_storage = filename;
 	return true;
 }
 

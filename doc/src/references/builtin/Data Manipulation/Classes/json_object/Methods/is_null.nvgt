@@ -11,5 +11,5 @@
 void main() {
 	string data = """{"brain": null}""";
 	json_object@ o = parse_json(data);
-	alert("Info", o.is_null("brain") ? "null" : "nonull");
+	alert("Info", o.is_null("brain") ? "null" : "not null");
 }

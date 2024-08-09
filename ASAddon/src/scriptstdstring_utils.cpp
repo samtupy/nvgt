@@ -1,3 +1,5 @@
+// All functions other than string.split and join were written by Sam Tupy for NVGT and fall under that project's zlib license.
+
 #include <assert.h>
 #include "scriptstdstring.h"
 #include "scriptarray.h"
@@ -358,6 +360,30 @@ if(!isalpha(str[i])&&!isdigit(str[i])) return false;
 return true;
 }
 
+static string string_multiply(const string& str, asUINT multiplier)
+{
+	if (multiplier == 0) return "";
+	else if (multiplier == 1) return str;
+	string result = str;
+	result.reserve(str.size() * multiplier);
+	for (asUINT i = 0; i < multiplier -1; i++) result += str;
+	return result;
+}
+static string& string_multiply_assign(string& str, asUINT multiplier)
+{
+	if (multiplier == 0)
+	{
+		str = "";
+		str.shrink_to_fit();
+		return str;
+	}
+	else if (multiplier == 1) return str;
+	str.reserve(str.size() * multiplier);
+	string tmp = str;
+	for (asUINT i = 0; i < multiplier -1; i++) str += tmp;
+	return str;
+}
+
 // This is where the utility functions are registered.
 // The string type must have been registered first.
 void RegisterStdStringUtils(asIScriptEngine *engine)
@@ -381,6 +407,8 @@ void RegisterStdStringUtils(asIScriptEngine *engine)
 		r = engine->RegisterObjectMethod("string", "string replace(const string& in, const string& in, bool = true, uint = 0) const", asFUNCTION(StringReplace), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 		r = engine->RegisterObjectMethod("string", "string& replace_this(const string& in, const string& in, bool = true, uint = 0) const", asFUNCTION(StringReplaceThis), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 		r = engine->RegisterObjectMethod("string", "string reverse_bytes() const", asFUNCTION(StringReverse), asCALL_CDECL_OBJLAST); assert( r >= 0 );
+		r = engine->RegisterObjectMethod("string", "string opMul(uint) const", asFUNCTION(string_multiply), asCALL_CDECL_OBJFIRST); assert( r >= 0 );
+		r = engine->RegisterObjectMethod("string", "string& opMulAssign(uint)", asFUNCTION(string_multiply_assign), asCALL_CDECL_OBJFIRST); assert( r >= 0 );
 		// r = engine->RegisterObjectMethod("string", "string lower() const", asFUNCTION(StringLower), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 		// r = engine->RegisterObjectMethod("string", "string upper() const", asFUNCTION(StringUpper), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 		// r = engine->RegisterObjectMethod("string", "bool is_lower() const", asFUNCTION(StringIsLower), asCALL_CDECL_OBJLAST); assert( r >= 0 );

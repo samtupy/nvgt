@@ -495,7 +495,7 @@ bool CDebugger::InterpretCommand(const string &cmd, asIScriptContext *ctx)
 		// Evaluate a statement.
 		string rettype, statement;
 		size_t p = cmd.find_first_not_of(" \t", 1);
-		size_t p2;
+		size_t p2 = 0;
 		if( p != string::npos && p > 1 )
 		{
 			p2 = cmd.find_first_of(" \t", p + 1);

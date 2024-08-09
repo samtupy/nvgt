@@ -12,13 +12,14 @@
 */
 
 #include <string>
-#include <angelscript.h>
+#include <angelscript.h> // the actual Angelscript header
 #include <scriptarray.h>
 #include <Poco/Exception.h>
 #include <Poco/File.h>
 #include <Poco/Glob.h>
 #include <Poco/Timestamp.h>
 #include <Poco/UnicodeConverter.h>
+#include "angelscript.h" // nvgt's Angelscript implementation needed for get_array_type
 
 using namespace std;
 using namespace Poco;
@@ -55,7 +56,7 @@ CScriptArray* FindFiles(const string& path) {
 
 	// TODO: This should only be done once
 	// TODO: This assumes that CScriptArray was already registered
-	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
+	asITypeInfo* arrayType = get_array_type("array<string>");
 
 	// Create the array object
 	CScriptArray* array = CScriptArray::Create(arrayType);
@@ -66,7 +67,7 @@ CScriptArray* FindFiles(const string& path) {
 	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
 
 	WIN32_FIND_DATAW ffd;
-	HANDLE hFind = FindFirstFileW(bufUTF16, &ffd);
+	HANDLE hFind = FindFirstFileExW(bufUTF16, FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
 	if (INVALID_HANDLE_VALUE == hFind)
 		return array;
 
@@ -91,8 +92,11 @@ CScriptArray* FindFiles(const string& path) {
 	string currentPath = path;
 	string Wildcard = "*";
 	if (wildcard != std::string::npos) {
-		currentPath = path.substr(0, wildcard);
+		currentPath = path.substr(0, wildcard + 1);
 		Wildcard = path.substr(wildcard + 1);
+	} else {
+		currentPath = "./";
+		Wildcard = path;
 	}
 	dirent* ent = 0;
 	DIR* dir = opendir(currentPath.c_str());
@@ -105,17 +109,15 @@ CScriptArray* FindFiles(const string& path) {
 			continue;
 
 		// Skip sub directories
-		currentPath += '/';
-		currentPath.append(filename);
+		string fullname = currentPath + filename;
 		struct stat st;
-		if (stat(currentPath.c_str(), &st) == -1)
+		if (stat(fullname.c_str(), &st) == -1)
 			continue;
 		if ((st.st_mode & S_IFDIR) != 0)
 			continue;
 
 		// wildcard matching
-		if (FNMatch(filename, Wildcard) != 0)
-			continue;
+		if (!FNMatch(filename, Wildcard)) continue;
 
 		// Add the file to the array
 		array->Resize(array->GetSize() + 1);
@@ -132,9 +134,8 @@ CScriptArray* FindDirectories(const string& path) {
 	asIScriptContext* ctx = asGetActiveContext();
 	asIScriptEngine* engine = ctx->GetEngine();
 
-	// TODO: This should only be done once
 	// TODO: This assumes that CScriptArray was already registered
-	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
+	asITypeInfo* arrayType = get_array_type("array<string>");
 
 	// Create the array object
 	CScriptArray* array = CScriptArray::Create(arrayType);
@@ -145,7 +146,7 @@ CScriptArray* FindDirectories(const string& path) {
 	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
 
 	WIN32_FIND_DATAW ffd;
-	HANDLE hFind = FindFirstFileW(bufUTF16, &ffd);
+	HANDLE hFind = FindFirstFileExW(bufUTF16, FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
 	if (INVALID_HANDLE_VALUE == hFind)
 		return array;
 
@@ -173,8 +174,11 @@ CScriptArray* FindDirectories(const string& path) {
 	string currentPath = path;
 	string Wildcard = "*";
 	if (wildcard != std::string::npos) {
-		currentPath = path.substr(0, wildcard);
+		currentPath = path.substr(0, wildcard + 1);
 		Wildcard = path.substr(wildcard + 1);
+	} else {
+		currentPath = "./";
+		Wildcard = path;
 	}
 	dirent* ent = 0;
 	DIR* dir = opendir(currentPath.c_str());
@@ -187,17 +191,15 @@ CScriptArray* FindDirectories(const string& path) {
 			continue;
 
 		// Skip files
-		currentPath += '/';
-		currentPath.append(filename);
+		string fullname = currentPath + filename;
 		struct stat st;
-		if (stat(currentPath.c_str(), &st) == -1)
+		if (stat(fullname.c_str(), &st) == -1)
 			continue;
 		if ((st.st_mode & S_IFDIR) == 0)
 			continue;
 
 		// wildcard matching
-		if (FNMatch(filename, Wildcard) != 0)
-			continue;
+		if (!FNMatch(filename, Wildcard)) continue;
 
 		// Add the dir to the array
 		array->Resize(array->GetSize() + 1);
@@ -209,6 +211,17 @@ CScriptArray* FindDirectories(const string& path) {
 	return array;
 }
 
+CScriptArray* script_glob(const string& pattern, int options) {
+	// Expected to have been called from a script.
+	CScriptArray* array = CScriptArray::Create(get_array_type("array<string>"));
+	set<string> files;
+	try {
+		Glob::glob(pattern, files, options);
+		array->Reserve(files.size());
+		for (const std::string& path : files) array->InsertLast((void*)&path);
+	} catch(Exception&) {}
+	return array;
+}
 bool DirectoryExists(const string& path) {
 	try {
 		File f(path);
@@ -307,6 +320,11 @@ Timestamp FileGetModified(const string& path) {
 
 
 void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
+	engine->RegisterEnum("glob_options");
+	engine->RegisterEnumValue("glob_options", "GLOB_DEFAULT", Glob::GLOB_DEFAULT);
+	engine->RegisterEnumValue("glob_options", "GLOB_IGNORE_HIDDEN", Glob::GLOB_DOT_SPECIAL);
+	engine->RegisterEnumValue("glob_options", "GLOB_FOLLOW_SYMLINKS", Glob::GLOB_FOLLOW_SYMLINKS);
+	engine->RegisterEnumValue("glob_options", "GLOB_CASELESS", Glob::GLOB_CASELESS);
 	engine->RegisterGlobalFunction("bool directory_exists(const string& in)", asFUNCTION(DirectoryExists), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool directory_create(const string& in)", asFUNCTION(DirectoryCreate), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool directory_delete(const string& in)", asFUNCTION(DirectoryDelete), asCALL_CDECL);
@@ -317,6 +335,7 @@ void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool file_move(const string& in, const string& in)", asFUNCTION(FileMove), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string[]@ find_directories(const string& in)", asFUNCTION(FindDirectories), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string[]@ find_files(const string& in)", asFUNCTION(FindFiles), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string[]@ glob(const string& in, glob_options = GLOB_DEFAULT)", asFUNCTION(script_glob), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int64 file_get_size(const string& in)", asFUNCTION(FileGetSize), asCALL_CDECL);
 	engine->RegisterGlobalFunction("timestamp file_get_date_created(const string& in)", asFUNCTION(FileGetCreated), asCALL_CDECL);
 	engine->RegisterGlobalFunction("timestamp file_get_date_modified(const string& in)", asFUNCTION(FileGetModified), asCALL_CDECL);

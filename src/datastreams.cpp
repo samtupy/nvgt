@@ -97,7 +97,7 @@ std::ios* datastream::stream() {
 bool datastream::seek(unsigned long long offset) {
 	if (!r && !w) return false;
 	if (_istr) {
-		if (r->eof() && offset < _istr->tellg()) _istr->clear();
+		if (r && r->eof() && offset < _istr->tellg()) _istr->clear();
 		_istr->seekg(offset, std::ios::beg);
 	}
 	if (_ostr) _ostr->seekp(offset, std::ios::beg);
@@ -106,7 +106,7 @@ bool datastream::seek(unsigned long long offset) {
 bool datastream::seek_end(unsigned long long offset) {
 	if (!r && !w) return false;
 	if (_istr) {
-		if (r->eof() && offset > 0) _istr->clear();
+		if (r && r->eof() && offset > 0) _istr->clear();
 		_istr->seekg(offset, std::ios::end);
 	}
 	if (_ostr) _ostr->seekp(offset, std::ios::end);
@@ -115,7 +115,7 @@ bool datastream::seek_end(unsigned long long offset) {
 bool datastream::seek_relative(long long offset) {
 	if (!r && !w) return false;
 	if (_istr) {
-		if (r->eof() && offset < 0) _istr->clear();
+		if (r && r->eof() && offset < 0) _istr->clear();
 		_istr->seekg(offset, std::ios::cur);
 	}
 	if (_ostr) _ostr->seekp(offset, std::ios::cur);
@@ -168,9 +168,20 @@ long long datastream::get_wpos() {
 std::string datastream::read(unsigned int size) {
 	if (!r) return "";
 	std::string output;
+	if (!size) {
+		std::streampos pos = _istr->tellg();
+		if (pos > -1) {
+			_istr->seekg(0, std::ios::end);
+			size = _istr->tellg();
+			_istr->seekg(pos, std::ios::beg);
+		}
+	}
 	try {
-		if (size > 0) r->readRaw(size, output);
-		else StreamCopier::copyToString(*_istr, output);
+		if (size > 0) {
+			output.resize(size);
+			r->readRaw(&output[0], size);
+			output.resize(r->stream().gcount());
+		} else StreamCopier::copyToString(*_istr, output);
 	} catch (std::exception) {
 		return "";
 	}
@@ -407,9 +418,14 @@ unsigned long long file_stream_size(datastream* ds) {
 bool stringstream_open(datastream* ds, const std::string& initial = "", f_streamargs) {
 	return ds->open(new std::stringstream(initial), p_streamargs, nullptr);
 }
-datastream* stringstream_factory(const std::string& initial = "", const std::string& encoding = "", int byteorder = BinaryReader::NATIVE_BYTE_ORDER) {
+datastream* stringstream_factory(const std::string& initial, const std::string& encoding, int byteorder = BinaryReader::NATIVE_BYTE_ORDER) {
 	datastream* ds = new datastream();
 	stringstream_open(ds, initial, encoding, byteorder);
+	return ds;
+}
+datastream* stringstream_implicit_factory(const std::string& initial = "") {
+	datastream* ds = new datastream();
+	stringstream_open(ds, initial, "", BinaryReader::NATIVE_BYTE_ORDER);
 	return ds;
 }
 std::string stringstream_str(datastream* ds) {
@@ -539,7 +555,8 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty("const string NEWLINE_LF", (void*)&LineEnding::NEWLINE_LF);
 	engine->SetDefaultNamespace("");
 	RegisterDatastreamType<std::stringstream, datastream_factory_none>(engine, "datastream");
-	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in = \"\", const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in = \"\")", asFUNCTION(stringstream_implicit_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in, const string&in encoding, int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_factory), asCALL_CDECL);
 	engine->RegisterObjectMethod("datastream", "bool open(const string&in = \"\", const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_open), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datastream", "string str()", asFUNCTION(stringstream_str), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_TERMINAL);

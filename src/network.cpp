@@ -10,10 +10,12 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "network.h"
 #include <obfuscate.h>
+#include "angelscript.h" // get_array_type
+#include "network.h"
 
 bool g_enet_initialized = false;
+network_event g_enet_none_event; // The none event is static and never changes, why reallocate it every time network::request() doesn't come up with an event?
 ENetPeer* network::get_peer(asQWORD peer_id) {
 	std::unordered_map<asQWORD, ENetPeer*>::iterator i = peers.find(peer_id);
 	if (i == peers.end())
@@ -31,6 +33,7 @@ network::network() {
 	channel_count = 0;
 	is_client = false;
 	RefCount = 1;
+	reset_totals();
 }
 void network::addRef() {
 	asAtomicInc(RefCount);
@@ -42,8 +45,9 @@ void network::release() {
 	}
 }
 
-void network::destroy() {
+void network::destroy(bool flush) {
 	if (host) {
+		if (flush) enet_host_flush(host);
 		enet_host_destroy(host);
 		host = NULL;
 	}
@@ -51,6 +55,7 @@ void network::destroy() {
 	next_peer = 1;
 	channel_count = 0;
 	is_client = false;
+	reset_totals();
 }
 
 bool network::setup_client(unsigned char max_channels, unsigned short max_peers) {
@@ -97,13 +102,19 @@ asQWORD network::connect(const std::string& hostname, unsigned short port) {
 	return next_peer - 1;
 }
 
-network_event* network::request(uint32_t timeout) {
-	network_event* e = new network_event();
-	if (!host)
-		return e;
+const network_event* network::request(uint32_t timeout) {
+	if (!host) {
+		g_enet_none_event.addRef();
+			return &g_enet_none_event;
+		}
 	ENetEvent event;
 	int r = enet_host_service(host, &event, timeout);
-	if (r < 1) return e;
+	if (r < 1) {
+		g_enet_none_event.addRef();
+			return &g_enet_none_event;
+		}
+	update_totals(); // total_sent, total_received...
+	network_event* e = new network_event();
 	e->type = event.type;
 	e->channel = event.channelID;
 	if (event.type == ENET_EVENT_TYPE_CONNECT) {
@@ -151,11 +162,9 @@ bool network::send(asQWORD peer_id, const std::string& message, unsigned char ch
 	ENetPacket* packet = enet_packet_create(message.c_str(), message.size(), (reliable ? ENET_PACKET_FLAG_RELIABLE : 0));
 	if (!packet) return false;
 	bool r = true;
-	if (peer_id)
-		r = enet_peer_send(peer, channel, packet) == 0;
-	else
-		enet_host_broadcast(host, channel, packet);
-		if (!r) enet_packet_destroy(packet);
+	if (peer_id) r = enet_peer_send(peer, channel, packet) == 0;
+	else enet_host_broadcast(host, channel, packet);
+	if (!r) enet_packet_destroy(packet);
 	return r;
 }
 bool network::send_peer(asQWORD peer, const std::string& message, unsigned char channel, bool reliable) {
@@ -165,6 +174,7 @@ bool network::send_peer(asQWORD peer, const std::string& message, unsigned char 
 	ENetPacket* packet = enet_packet_create(message.c_str(), message.size(), (reliable ? ENET_PACKET_FLAG_RELIABLE : 0));
 	if (!packet) return false;
 	bool r = enet_peer_send(peer_obj, channel, packet) == 0;
+	if (!r) enet_packet_destroy(packet);
 	return r;
 }
 
@@ -194,9 +204,7 @@ bool network::disconnect_peer_forcefully(asQWORD peer_id) {
 }
 
 CScriptArray* network::list_peers() {
-	asIScriptContext* ctx = asGetActiveContext();
-	asIScriptEngine* engine = ctx->GetEngine();
-	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("uint64[]");
+	asITypeInfo* arrayType = get_array_type("uint64[]");
 	CScriptArray* array = CScriptArray::Create(arrayType);
 	if (!host) return array;
 	array->Reserve(peers.size());
@@ -211,6 +219,11 @@ bool network::set_bandwidth_limits(unsigned int incoming, unsigned int outgoing)
 	if (!host) return false;
 	enet_host_bandwidth_limit(host, incoming, outgoing);
 	return true;
+}
+void network::set_packet_compression(bool flag) {
+	if (!host) return;
+	if (flag) enet_host_compress_with_range_coder(host);
+	else enet_host_compress(host, nullptr);
 }
 
 
@@ -263,12 +276,12 @@ void RegisterScriptNetwork(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("network"), asBEHAVE_FACTORY, _O("network @n()"), asFUNCTION(ScriptNetwork_Factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour(_O("network"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(network, addRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("network"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(network, release), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("void destroy()"), asMETHOD(network, destroy), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("void destroy(bool = true)"), asMETHOD(network, destroy), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool setup_client(uint8, uint16)"), asMETHOD(network, setup_client), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool setup_server(uint16, uint8, uint16)"), asMETHOD(network, setup_server), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool setup_local_server(uint16, uint8, uint16)"), asMETHOD(network, setup_local_server), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint64 connect(const string& in, uint16)"), asMETHOD(network, connect), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("network_event@ request(uint = 0)"), asMETHOD(network, request), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("const network_event@ request(uint = 0)"), asMETHOD(network, request), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("string get_peer_address(uint64) const"), asMETHOD(network, get_peer_address), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint get_peer_average_round_trip_time(uint64) const"), asMETHOD(network, get_peer_average_round_trip_time), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool send(uint64, const string& in, uint8, bool = true)"), asMETHOD(network, send), asCALL_THISCALL);
@@ -282,10 +295,14 @@ void RegisterScriptNetwork(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("network"), _O("bool disconnect_peer_forcefully(uint64)"), asMETHOD(network, disconnect_peer_forcefully), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint64[]@ get_peer_list() const"), asMETHOD(network, list_peers), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint64 get_connected_peers() const property"), asMETHOD(network, get_connected_peers), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool get_packet_compression() const property"), asMETHOD(network, get_packet_compression), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("void set_packet_compression(bool) property"), asMETHOD(network, set_packet_compression), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint get_duplicate_peers() const property"), asMETHOD(network, get_duplicate_peers), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("void set_duplicate_peers(uint) property"), asMETHOD(network, set_duplicate_peers), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint get_bytes_received() const property"), asMETHOD(network, get_bytes_received), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint get_bytes_sent() const property"), asMETHOD(network, get_bytes_sent), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("uint get_packets_received() const property"), asMETHOD(network, get_packets_received), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("uint get_packets_sent() const property"), asMETHOD(network, get_packets_sent), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("void set_bandwidth_limits(uint, uint)"), asMETHOD(network, set_bandwidth_limits), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool get_active() const property"), asMETHOD(network, active), asCALL_THISCALL);
 }

@@ -34,17 +34,29 @@ class network {
 	asQWORD next_peer;
 	unsigned char channel_count;
 	ENetPeer* get_peer(asQWORD peer_id);
+	// Enet's total_sent/received counters are 32 bit integers that can overflow, work around that
+	asQWORD total_sent_data, total_sent_packets, total_received_data, total_received_packets;
+	void update_totals() {
+		if (!host) return;
+		total_sent_data += host->totalSentData; host->totalSentData = 0;
+		total_sent_packets += host->totalSentPackets; host->totalSentPackets = 0;
+		total_received_data += host->totalReceivedData; host->totalReceivedData = 0;
+		total_received_packets += host->totalReceivedPackets; host->totalReceivedPackets = 0;
+	}
+	void reset_totals() {
+		total_sent_data = total_sent_packets = total_received_data = total_received_packets = 0;
+	}
 public:
 	bool is_client;
 	network();
 	void addRef();
 	void release();
-	void destroy();
+	void destroy(bool flush = true);
 	bool setup_client(unsigned char max_channels, unsigned short max_peers);
 	bool setup_server(unsigned short port, unsigned char max_channels, unsigned short max_peers);
 	bool setup_local_server(unsigned short port, unsigned char max_channels, unsigned short max_peers);
 	asQWORD connect(const std::string& hostname, unsigned short port);
-	network_event* request(uint32_t timeout = 0);
+	const network_event* request(uint32_t timeout = 0);
 	std::string get_peer_address(asQWORD peer_id);
 	unsigned int get_peer_average_round_trip_time(asQWORD peer_id);
 	bool send(asQWORD peer_id, const std::string& message, unsigned char channel, bool reliable = true);
@@ -66,14 +78,28 @@ public:
 	bool disconnect_peer_forcefully(asQWORD peer_id);
 	CScriptArray* list_peers();
 	bool set_bandwidth_limits(unsigned int incoming, unsigned int outgoing);
+	void set_packet_compression(bool flag);
+	bool get_packet_compression() {
+		return host && host->compressor.context;
+	}
 	size_t get_connected_peers() {
 		return host ? host->connectedPeers : -1;
 	}
 	size_t get_bytes_received() {
-		return host ? host->totalReceivedData : -1;
+		update_totals();
+		return host ? total_received_data : -1;
 	}
 	size_t get_bytes_sent() {
-		return host ? host->totalSentData : -1;
+		update_totals();
+		return host ? total_sent_data : -1;
+	}
+	size_t get_packets_received() {
+		update_totals();
+		return host ? total_received_packets : -1;
+	}
+	size_t get_packets_sent() {
+		update_totals();
+		return host ? total_sent_packets : -1;
 	}
 	size_t get_duplicate_peers() {
 		return host ? host->duplicatePeers : -1;

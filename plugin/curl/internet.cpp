@@ -140,7 +140,7 @@ int internet_request_thread(void* raw_request) {
 		curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, internet_request_curl_progress);
 		curl_easy_setopt(curl, CURLOPT_XFERINFODATA, request);
 		long proto;
-		curl_easy_getinfo(curl, CURLINFO_PROTOCOL, &proto);
+		curl_easy_getinfo(curl, CURLINFO_SCHEME, &proto);
 		curl_slist* mail_rcpt = NULL;
 		if (request->payload != "") {
 			if (request->mail_from == "" && request->mail_to == "" && !ftp) {

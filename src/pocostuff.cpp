@@ -22,19 +22,15 @@
 #include <Poco/Base32Encoder.h>
 #include <Poco/Base64Decoder.h>
 #include <Poco/Base64Encoder.h>
-#include <Poco/Dynamic/Var.h>
 #include <Poco/Debugger.h>
 #include <Poco/Environment.h>
 #include <Poco/Format.h>
 #include <Poco/Glob.h>
 #include <Poco/HexBinaryDecoder.h>
 #include <Poco/HexBinaryEncoder.h>
-#include <Poco/JSON/Array.h>
-#include <Poco/JSON/Object.h>
 #include <Poco/JSON/Parser.h>
 #include <Poco/JSON/Query.h>
 #include <Poco/Path.h>
-#include <Poco/RefCountedObject.h>
 #include <Poco/RegularExpression.h>
 #include <Poco/SharedPtr.h>
 #include <Poco/String.h>
@@ -48,15 +44,6 @@
 #include "nvgt.h" // subsystem constants
 #include "pocostuff.h"
 using namespace Poco;
-
-// I wonder if this is gonna be one of those things I'll look back at in a year and lament the fact that I couldn't have found a better way before spending the same amount of time then that I'm about to spend now finding a better way to wrap Poco's shared pointers in a simplistic enough way for real use. These SharedPtr's literally have reference counting that we can't use because the pointers' reference counter is private, and I'm not sure I can use Angelscri'ts composition features directly either because raw access to the underlying pointer is also private! Maybe I can specify my own reference counter when constructing these pointers (not sure I could count on that for all pointers being received), I could mess with Angelscript scoped reference types (not sure how the user could choose between assigning a new reference or value to a variable), and I could try using angelscripts opHndlAssign thing but based on the docs I would need to do more research to answer questions about that as well! So we're left with this, a duplicate reference counter and a duplicate copy of any raw pointer assigned just so that the user gets to type @my_var=handle vs. my_var=variable to deepcopy.
-template <class T>
-class poco_shared : public RefCountedObject {
-public:
-	SharedPtr<T> shared;
-	T* ptr;
-	poco_shared(SharedPtr<T> shared) : shared(shared), ptr(shared.get()) {}
-};
 
 // Various string related functions.
 std::string string_to_hex(const std::string& str) {
@@ -184,6 +171,9 @@ bool string_is_lower(std::string* str, const std::string& encoding) {
 bool string_is_upper(std::string* str, const std::string& encoding) {
 	return string_is(str, encoding, Unicode::isUpper);
 }
+bool string_is_whitespace(std::string* str, const std::string& encoding) {
+	return string_is(str, encoding, Unicode::isSpace);
+}
 bool string_is_punct(std::string* str, const std::string& encoding) {
 	return string_is(str, encoding, Unicode::isPunct);
 }
@@ -290,6 +280,11 @@ poco_shared<Dynamic::Var>* poco_var_dec(poco_shared<Dynamic::Var>* var) {
 	var->ptr->operator--();
 	return var;
 }
+int poco_var_cmp(poco_shared<Dynamic::Var>* var, const poco_shared<Dynamic::Var>& other) {
+	if ((*var->ptr) < *(other.ptr)) return -1;
+	else if ((*var->ptr) > *(other.ptr)) return -1;
+	else return 0;
+}
 template<typename T> T poco_var_sub_assign(poco_shared<Dynamic::Var>* var, const T& val) {
 	var->ptr->template operator-=<T>(val);
 	return var->ptr->template convert<T>();
@@ -334,74 +329,97 @@ poco_shared<Dynamic::Var>* json_parse_datastream(datastream* input) {
 	return new poco_shared<Dynamic::Var>(new Dynamic::Var(parser.parse(*istr)));
 }
 // We make a custom json_object class for a couple reasons, mostly so that we can build in poco's json querying as well as other more easily wrapped functions. We'll do very similar for arrays below, I'm not even remotely good enough at this c++ templating thing to avoid this duplicated code and I don't want to meld it all into one class.
-class poco_json_object : public poco_shared<JSON::Object> {
-public:
-	poco_json_object(JSON::Object::Ptr o) : poco_shared<JSON::Object>(std::move(o)) {}
-	poco_shared<Dynamic::Var>* get(const std::string& key) {
-		return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(key)))); // Oof, more duplication that I like probably?
-	}
-	poco_shared<Dynamic::Var>* query(const std::string& path) {
-		JSON::Query q(shared); // I tried to cache the query object in the class variable above, and spent an hour or 2 figuring out that this causes a memory access violation in Poco::Dynamic::Var::Var.
-		return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(q.find(path))));
-	}
-	void set(const std::string& key, poco_shared<Dynamic::Var>* v) {
-		ptr->set(key, *v->ptr);
-	}
-	bool is_array(const std::string& key) {
-		return ptr->isArray(key);
-	}
-	bool is_null(const std::string& key) {
-		return ptr->isNull(key);
-	}
-	bool is_object(const std::string& key) {
-		return ptr->isObject(key);
-	}
-	std::string stringify(unsigned int indent = 0, int step = -1) {
-		std::ostringstream ostr;
-		ptr->stringify(ostr, indent, step);
-		return ostr.str();
-	}
-	CScriptArray* get_keys() {
-		asIScriptContext* ctx = asGetActiveContext();
-		asIScriptEngine* engine = ctx->GetEngine();
-		asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
-		CScriptArray* array = CScriptArray::Create(arrayType, ptr->size());
-		int c = 0;
-		for (JSON::Object::ConstIterator i = ptr->begin(); i != ptr->end(); i++, c++)((std::string*)(array->At(c)))->assign(i->first);
-		return array;
-	}
-};
-class poco_json_array : public poco_shared<JSON::Array> {
-public:
-	poco_json_array(JSON::Array::Ptr a) : poco_shared<JSON::Array>(std::move(a)) {}
-	poco_shared<Dynamic::Var>* get(unsigned int index) {
-		return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(index))));
-	}
-	poco_shared<Dynamic::Var>* query(const std::string& path) {
-		JSON::Query q(shared);
-		return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(q.find(path))));
-	}
-	void set(unsigned int index, poco_shared<Dynamic::Var>* v) {
-		ptr->set(index, *v->ptr);
-	}
-	void add(poco_shared<Dynamic::Var>* v) {
-		ptr->add(*v->ptr);
-	}
-	bool is_array(unsigned int index) {
-		return ptr->isArray(index);
-	}
-	bool is_null(unsigned int index) {
-		return ptr->isNull(index);
-	}
-	bool is_object(unsigned int index) {
-		return ptr->isObject(index);
-	}
-	std::string stringify(unsigned int indent = 0, int step = -1) {
-		std::ostringstream ostr;
-		ptr->stringify(ostr, indent, step);
-		return ostr.str();
-	}
-};
+poco_json_object::poco_json_object(JSON::Object::Ptr o) : poco_shared<JSON::Object>(std::move(o)) {}
+poco_shared<Dynamic::Var>* poco_json_object::get(const std::string& key) const {
+	return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(key)))); // Oof, more duplication that I like probably?
+}
+poco_shared<Dynamic::Var>* poco_json_object::query(const std::string& path) const {
+	JSON::Query q(shared); // I tried to cache the query object in the class variable above, and spent an hour or 2 figuring out that this causes a memory access violation in Poco::Dynamic::Var::Var.
+	return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(q.find(path))));
+}
+poco_json_array* poco_json_object::get_array(const std::string& key) const {
+	JSON::Array::Ptr obj = ptr->getArray(key);
+	if (!obj) return nullptr;
+	return new poco_json_array(obj);
+}
+poco_json_object* poco_json_object::get_object(const std::string& key) const {
+	JSON::Object::Ptr obj = ptr->getObject(key);
+	if (!obj) return nullptr;
+	return new poco_json_object(obj);
+}
+void poco_json_object::set(const std::string& key, poco_shared<Dynamic::Var>* v) {
+	ptr->set(key, *v->ptr);
+}
+bool poco_json_object::is_array(const std::string& key) const {
+	return ptr->isArray(key);
+}
+bool poco_json_object::is_null(const std::string& key) const {
+	return ptr->isNull(key);
+}
+bool poco_json_object::is_object(const std::string& key) const {
+	return ptr->isObject(key);
+}
+std::string poco_json_object::stringify(unsigned int indent, int step) const {
+	std::ostringstream ostr;
+	ptr->stringify(ostr, indent, step);
+	return ostr.str();
+}
+void poco_json_object::stringify(datastream* ds, unsigned int indent, int step) const {
+	if (!ds || !ds->get_ostr()) throw InvalidArgumentException("stream not opened for writing");
+	ptr->stringify(*ds->get_ostr(), indent, step);
+}
+CScriptArray* poco_json_object::get_keys() const {
+	asIScriptContext* ctx = asGetActiveContext();
+	asIScriptEngine* engine = ctx->GetEngine();
+	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
+	CScriptArray* array = CScriptArray::Create(arrayType, ptr->size());
+	int c = 0;
+	for (JSON::Object::ConstIterator i = ptr->begin(); i != ptr->end(); i++, c++)((std::string*)(array->At(c)))->assign(i->first);
+	return array;
+}
+
+poco_json_array::poco_json_array(JSON::Array::Ptr a) : poco_shared<JSON::Array>(std::move(a)) {}
+poco_shared<Dynamic::Var>* poco_json_array::get(unsigned int index) const {
+	return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(index))));
+}
+poco_shared<Dynamic::Var>* poco_json_array::query(const std::string& path) const {
+	JSON::Query q(shared);
+	return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(q.find(path))));
+}
+poco_json_array* poco_json_array::get_array(unsigned int index) const {
+	JSON::Array::Ptr obj = ptr->getArray(index);
+	if (!obj) return nullptr;
+	return new poco_json_array(obj);
+}
+poco_json_object* poco_json_array::get_object(unsigned int index) const {
+	JSON::Object::Ptr obj = ptr->getObject(index);
+	if (!obj) return nullptr;
+	return new poco_json_object(obj);
+}
+void poco_json_array::set(unsigned int index, poco_shared<Dynamic::Var>* v) {
+	ptr->set(index, *v->ptr);
+}
+void poco_json_array::add(poco_shared<Dynamic::Var>* v) {
+	ptr->add(*v->ptr);
+}
+bool poco_json_array::is_array(unsigned int index) const {
+	return ptr->isArray(index);
+}
+bool poco_json_array::is_null(unsigned int index) const {
+	return ptr->isNull(index);
+}
+bool poco_json_array::is_object(unsigned int index) const {
+	return ptr->isObject(index);
+}
+std::string poco_json_array::stringify(unsigned int indent, int step) const {
+	std::ostringstream ostr;
+	ptr->stringify(ostr, indent, step);
+	return ostr.str();
+}
+void poco_json_array::stringify(datastream* ds, unsigned int indent, int step) const {
+	if (!ds || !ds->get_ostr()) throw InvalidArgumentException("stream not opened for writing");
+	ptr->stringify(*ds->get_ostr(), indent, step);
+}
 
 // Some functions needed to wrap poco regular expression.
 static asITypeInfo* StringArrayType = NULL;
@@ -549,6 +567,7 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("var", "var& opAssign(const var&in)", asFUNCTION(poco_var_assign_var), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("var", "var& opPostInc()", asFUNCTION(poco_var_inc), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("var", "var& opPostDec()", asFUNCTION(poco_var_dec), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("var", "int opCmp(const var&in) const", asFUNCTION(poco_var_cmp), asCALL_CDECL_OBJFIRST);
 	RegisterPocoVarType<int>(engine, "int");
 	RegisterPocoVarType<unsigned int>(engine, "uint");
 	RegisterPocoVarType<short>(engine, "int16");
@@ -562,6 +581,13 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("string", "string opAdd(const var&in) const", asFUNCTION(poco_var_add_string), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("string", "string& opAssign(const var&in)", asFUNCTION(poco_var_assign_string), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("string", "string& opAddAssign(const var&in)", asFUNCTION(poco_var_add_assign_string), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("var", "void clear()", asMETHOD(Dynamic::Var, clear), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
+	engine->RegisterObjectMethod("var", "bool get_empty() const property", asMETHOD(Dynamic::Var, isEmpty), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
+	engine->RegisterObjectMethod("var", "bool get_is_integer() const property", asMETHOD(Dynamic::Var, isInteger), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
+	engine->RegisterObjectMethod("var", "bool get_is_signed() const property", asMETHOD(Dynamic::Var, isSigned), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
+	engine->RegisterObjectMethod("var", "bool get_is_numeric() const property", asMETHOD(Dynamic::Var, isNumeric), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
+	engine->RegisterObjectMethod("var", "bool get_is_boolean() const property", asMETHOD(Dynamic::Var, isBoolean), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
+	engine->RegisterObjectMethod("var", "bool get_is_string() const property", asMETHOD(Dynamic::Var, isString), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
 	engine->RegisterObjectBehaviour("var", asBEHAVE_FACTORY, "var @v(json_object@)", asFUNCTION(poco_var_factory_value_shared<JSON::Object>), asCALL_CDECL);
 	engine->RegisterObjectMethod("var", "var& opAssign(const json_object&in) const", asFUNCTION(poco_var_assign_shared<JSON::Object>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("var", "json_object@ opImplCast() const", asFUNCTION(poco_var_extract_shared<JSON::Object>), asCALL_CDECL_OBJFIRST);
@@ -575,7 +601,10 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("json_object", "void set_opIndex(const string&in, const var&in) property", asMETHOD(poco_json_object, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_object", "void set(const string&in, const var&in)", asMETHOD(poco_json_object, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_object", "var@ opCall(const string&in) const", asMETHOD(poco_json_object, query), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_object", "string stringify(int indent = 0, int step = -1) const", asMETHOD(poco_json_object, stringify), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "json_array@ get_array(const string&in) const", asMETHOD(poco_json_object, get_array), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "json_object@ get_object(const string&in) const", asMETHOD(poco_json_object, get_object), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "string stringify(uint indent = 0, int step = -1) const", asMETHODPR(poco_json_object, stringify, (unsigned int, int) const, std::string), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "void stringify(datastream@, uint indent = 0, int step = -1) const", asMETHODPR(poco_json_object, stringify, (datastream*, unsigned int, int) const, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_object", "uint size() const", asMETHOD(JSON::Object, size), asCALL_THISCALL, 0, asOFFSET(poco_json_object, ptr), true);
 	engine->RegisterObjectMethod("json_object", "bool get_escape_unicode() const property", asMETHOD(JSON::Object, getEscapeUnicode), asCALL_THISCALL, 0, asOFFSET(poco_json_object, ptr), true);
 	engine->RegisterObjectMethod("json_object", "void set_escape_unicode(bool) property", asMETHOD(JSON::Object, setEscapeUnicode), asCALL_THISCALL, 0, asOFFSET(poco_json_object, ptr), true);
@@ -593,7 +622,10 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("json_array", "void set_opIndex(uint, const var&in) property", asMETHOD(poco_json_array, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "void add(var@)", asMETHOD(poco_json_array, add), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "var@ opCall(const string&in) const", asMETHOD(poco_json_array, query), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_array", "string stringify(int indent = 0, int step = -1)", asMETHOD(poco_json_array, stringify), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "json_array@ get_array(uint) const", asMETHOD(poco_json_array, get_array), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "json_object@ get_object(uint) const", asMETHOD(poco_json_array, get_object), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "string stringify(uint indent = 0, int step = -1)", asMETHODPR(poco_json_array, stringify, (unsigned int, int) const, std::string), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "void stringify(datastream@, uint indent = 0, int step = -1)", asMETHODPR(poco_json_array, stringify, (datastream*, unsigned int, int) const, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "uint length()", asMETHOD(JSON::Array, size), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
 	engine->RegisterObjectMethod("json_array", "uint size()", asMETHOD(JSON::Array, size), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
 	engine->RegisterObjectMethod("json_array", "bool get_escape_unicode() property", asMETHOD(JSON::Array, getEscapeUnicode), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
@@ -685,6 +717,7 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->RegisterObjectMethod("string", _O("bool is_upper(const string&in = \"\") const"), asFUNCTION(string_is_upper), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("string", _O("bool is_lower(const string&in = \"\") const"), asFUNCTION(string_is_lower), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("string", _O("bool is_whitespace(const string&in = \"\") const"), asFUNCTION(string_is_whitespace), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("string", _O("bool is_punctuation(const string&in = \"\") const"), asFUNCTION(string_is_punct), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("string", _O("bool is_alphabetic(const string&in = \"\") const"), asFUNCTION(string_is_alpha), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("string", _O("bool is_digits(const string&in = \"\") const"), asFUNCTION(string_is_digits), asCALL_CDECL_OBJFIRST);

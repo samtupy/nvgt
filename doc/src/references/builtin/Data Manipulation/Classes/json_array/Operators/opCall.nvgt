@@ -6,7 +6,7 @@
 	## Returns:
 		var@: a handle to the object, or null if it couldn't be found.
 	## Remarks:
-		Queries are formatted like so, using key names and indexes seperated with ".":
+		Queries are formatted like so, using key names and indexes separated with ".":
 		> world.player.0
 		It can be as nested as you like.
 */

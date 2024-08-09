@@ -1,5 +1,5 @@
 # save_robust
-This function is similar to `ini::save()`, but it first performs a temporary backup of any existing data, then restores that backup if the saving fails. This is slower and should only be used when necissary, but should insure 0 data loss.
+This function is similar to `ini::save()`, but it first performs a temporary backup of any existing data, then restores that backup if the saving fails. This is slower and should only be used when necessary, but should insure 0 data loss.
 
 `bool ini::save_robust(string filename, bool indent = false);`
 

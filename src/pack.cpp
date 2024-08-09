@@ -98,7 +98,7 @@ bool pack::open(const string& filename_in, pack_open_mode mode, bool memload) {
 		fptr = fopen(filename.c_str(), mode == PACK_OPEN_MODE_APPEND ? "rb+" : "rb");
 		if (!fptr)
 			return false;
-		unsigned int total_size;
+		unsigned int total_size = 0;
 		#ifdef _WIN32
 		total_size = filelength(fileno(fptr));
 		#else
@@ -121,7 +121,6 @@ bool pack::open(const string& filename_in, pack_open_mode mode, bool memload) {
 			return false;
 		}
 		for (unsigned int c = 0; c < h.filecount; c++) {
-			unsigned int current_pos = ftell(fptr);
 			pack_item i;
 			memset(&i, 0, sizeof(pack_item));
 			if (fread(&i, sizeof(unsigned int), 3, fptr) < 3) {
@@ -165,7 +164,6 @@ bool pack::open(const string& filename_in, pack_open_mode mode, bool memload) {
 bool pack::close() {
 	while (delay_close) Poco::Thread::sleep(5);
 	delay_close = false;
-	bool was_opened = fptr || mptr;
 	bool ret = false;
 	if (fptr && (open_mode == PACK_OPEN_MODE_APPEND || open_mode == PACK_OPEN_MODE_CREATE)) {
 		pack_header h;
@@ -310,7 +308,6 @@ bool pack::delete_file(const string& pack_filename) {
 	}
 	if (idx >= pack_filenames.size())
 		return false;
-	unsigned int oldsize = pack_items[pack_filename].filesize;
 	unsigned int oldblock = pack_items[pack_filename].namelen + pack_items[pack_filename].filesize + (sizeof(unsigned int) * 3);
 	unsigned int oldnlen = pack_items[pack_filename].namelen;
 	unsigned int oldoff = pack_items[pack_filename].offset;
@@ -384,7 +381,7 @@ unsigned int pack::get_file_name(int idx, char* buffer, unsigned int size) {
 }
 string pack::get_file_name(int idx) {
 	if (idx < 0 || idx >= pack_filenames.size())
-		return 0;
+		return "";
 	return pack_filenames[idx];
 }
 CScriptArray* pack::list_files() {

@@ -152,7 +152,7 @@ private:
 template<typename CBType>
 class TimerEvent : public TimerEventInterface {
 public:
-    explicit TimerEvent<CBType>(const CBType& callback)
+    explicit TimerEvent(const CBType& callback)
       : callback_(callback) {
     }
 

@@ -1,6 +1,6 @@
 /* Note that better methods for this probably exist in nvgt, keeping it for backwards compatibility.
     This is an attempt to give bgt the ability to support easy conversion from 32 bit intigers to the 4 bytes but in a binary format. This could be used to access data from dll structures, to compress data instead of using string_to_number, or to access data from binary files. For example, you should be able to use this to parse a PCM wave header, etc.
-    Note: I can't promase that this will be 100 percent, but I will make it as close as possible to the real thing, such as what you could do in c++, python, or most every language accept bgt. All I'm saying is to not be surprised if I mess something up. Feel free to distribute or modify this code in any way shape or form you wish unless otherwise spesified, though credit would be apreciated if you use it.
+    Note: I can't promise that this will be 100 percent, but I will make it as close as possible to the real thing, such as what you could do in c++, python, or most every language accept bgt. All I'm saying is to not be surprised if I mess something up. Feel free to distribute or modify this code in any way shape or form you wish unless otherwise spesified, though credit would be apreciated if you use it.
 */
 
 //Just a couple of globals.

@@ -27,6 +27,7 @@
 
 static unsigned char g_KeysPressed[512];
 static unsigned char g_KeysRepeating[512];
+static unsigned char g_KeysForced[512];
 static const unsigned char* g_KeysDown = NULL;
 static int g_KeysDownArrayLen = 0;
 static unsigned char g_KeysReleased[512];
@@ -39,10 +40,15 @@ int g_MousePrevX = 0, g_MousePrevY = 0, g_MousePrevZ = 0;
 bool g_KeyboardStateChange = false;
 static asITypeInfo* key_code_array_type = nullptr;
 static asITypeInfo* joystick_mapping_array_type = nullptr;
+#ifdef _WIN32
+static HHOOK g_keyhook_hHook = nullptr;
+bool g_keyhook_active = false;
+#endif
 void InputInit() {
 	if (SDL_WasInit(0)&SDL_INIT_VIDEO) return;
 	memset(g_KeysPressed, 0, 512);
 	memset(g_KeysRepeating, 0, 512);
+	memset(g_KeysForced, 0, 512);
 	memset(g_KeysReleased, 0, 512);
 	SDL_Init(SDL_INIT_VIDEO);
 	g_KeysDown = SDL_GetKeyboardState(&g_KeysDownArrayLen);
@@ -78,6 +84,20 @@ void InputEvent(SDL_Event* evt) {
 		g_MouseButtonsReleased[evt->button.button] = 1;
 	} else if (evt->type == SDL_MOUSEWHEEL)
 		g_MouseAbsZ += evt->wheel.y;
+}
+
+void remove_keyhook();
+bool install_keyhook(bool allow_reinstall = true);
+void lost_window_focus() {
+	SDL_ResetKeyboard();
+	#ifdef _WIN32
+	if (g_keyhook_active) remove_keyhook();
+	#endif
+}
+void regained_window_focus() {
+	#ifdef _WIN32
+	if (g_keyhook_active) install_keyhook();
+	#endif
 }
 bool KeyPressed(unsigned int key) {
 	if (key > 511) return false;
@@ -274,15 +294,13 @@ bool joystick::vibrate_triggers(unsigned short left, unsigned short right, int d
 
 #ifdef _WIN32
 // Thanks Quentin Cosendey (Universal Speech) for this jaws keyboard hook code as well as to male-srdiecko and silak for various improvements and fixes that have taken place since initial implementation.
-static HHOOK hHook = nullptr;
-bool keyhook_active = true;
 bool altPressed = false;
 bool capsPressed = false;
 bool insertPressed = false;
 
 LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	if (nCode != HC_ACTION)
-		return CallNextHookEx(hHook, nCode, wParam, lParam);
+		return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 
 	PKBDLLHOOKSTRUCT p = reinterpret_cast<PKBDLLHOOKSTRUCT>(lParam);
 	UINT vkCode = p->vkCode;
@@ -292,46 +310,52 @@ LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	altPressed = altDown;
 
 	if (vkCode != VK_CAPITAL && vkCode != VK_INSERT && (capsPressed || insertPressed))
-		return CallNextHookEx(hHook, nCode, wParam, lParam);
+		return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 
 	switch (vkCode) {
 		case VK_INSERT:
 			insertPressed = keyDown;
-			return CallNextHookEx(hHook, nCode, wParam, lParam);
+			return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 		case VK_CAPITAL:
 			capsPressed = keyDown;
-			return CallNextHookEx(hHook, nCode, wParam, lParam);
+			return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 		case VK_NUMLOCK:
 		case VK_LCONTROL:
 		case VK_RCONTROL:
 		case VK_LSHIFT:
 		case VK_RSHIFT:
-			return CallNextHookEx(hHook, nCode, wParam, lParam);
+			return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 		default:
 			return 0; // Do nothing for other keys
 	}
 
-	return CallNextHookEx(hHook, nCode, wParam, lParam);
+	return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 }
 #endif
 
 void uninstall_keyhook();
 bool install_keyhook(bool allow_reinstall) {
 	#ifdef _WIN32
-	if (hHook && !allow_reinstall) return false;
-	if (hHook) uninstall_keyhook();
-	if (hHook) return true;
-	hHook = SetWindowsHookEx(WH_KEYBOARD_LL, HookKeyboardProc, GetModuleHandle(NULL), NULL);
-	return hHook ? true : false;
+	if (g_keyhook_hHook && !allow_reinstall) return false;
+	if (g_keyhook_hHook) uninstall_keyhook();
+	g_keyhook_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, HookKeyboardProc, GetModuleHandle(NULL), NULL);
+	g_keyhook_active = true;
+	return g_keyhook_hHook ? true : false;
 	#else
 	return false;
 	#endif
 }
+void remove_keyhook() {
+	#ifdef _WIN32
+	if (!g_keyhook_hHook) return;
+	UnhookWindowsHookEx(g_keyhook_hHook);
+	g_keyhook_hHook = NULL;
+	#endif
+}
 void uninstall_keyhook() {
 	#ifdef _WIN32
-	if (!hHook) return;
-	UnhookWindowsHookEx(hHook);
-	hHook = NULL;
+	remove_keyhook();
+	g_keyhook_active = false;
 	#endif
 }
 

@@ -6,7 +6,7 @@
 	## Returns:
 		Bool: true on success, false on failure.
 	## Remarks:
-		To copy UTF-8 textt, see clipboard_set_text().
+		To copy UTF-8 text, see clipboard_set_text().
 */
 
 // Example:
@@ -16,5 +16,5 @@ void main() {
 	if (text == "")
 		alert("Info", "Your clipboard has been cleared.");
 	else
-		alert("Info", "Text coppied");
+		alert("Info", "Text copied");
 }

@@ -4,7 +4,7 @@
 	## Remarks:
 		This is the simplest way to wait for the execution of an async function to complete, however it does not allow you to execute any of your own code while doing so. The execution of your program or the thread you called the wait function on will be completely blocked until the async function returns. This also means that window events cannot be received while the wait function is executing, so you should be very careful about using this from an environment with a game window especially on the thread that created it.
 		For more control such as the ability to execute your own code during the wait, check out the try_wait() function.
-		If the async object this function is called on is executed with a default constructor and thus has no function call in progress, this function will return immedietly as there is nothing to wait for.
+		If the async object this function is called on is executed with a default constructor and thus has no function call in progress, this function will return immediately as there is nothing to wait for.
 */
 
 // Example:

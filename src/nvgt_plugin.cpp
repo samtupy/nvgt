@@ -27,7 +27,8 @@ std::unordered_map<std::string, nvgt_plugin_entry*>* static_plugins = NULL; // C
 bool load_nvgt_plugin(const std::string& name, void* user) {
 	nvgt_plugin_entry* entry = NULL;
 	void* obj = NULL;
-	if (static_plugins && static_plugins->find(name) != static_plugins->end())
+	if (loaded_plugins.contains(name)) return true; // plugin already loaded
+	if (static_plugins && static_plugins->contains(name))
 		entry = (nvgt_plugin_entry*)(*static_plugins)[name];
 	else {
 		std::string dllname = name;
@@ -70,7 +71,7 @@ bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
 		std::string name;
 		br >> name;
 		if (!load_nvgt_plugin(name)) {
-			alert("Error", Poco::format("Unable to load %s, exiting.", name));
+			message(Poco::format("Unable to load %s, exiting.", name), "error");
 			return false;
 		}
 	}

@@ -1,7 +1,7 @@
 # datetime
 This class stores an instance in time represented as years, months, days, hours, minutes, seconds, milliseconds and microseconds.
 
-The class stores time independent of timezone, and thus uses UTC by default. You can use a calendar object in place of this one if you need to check local time, however it is faster to calculate time without needing to consider the timezone and thus any time difference calculations should be done with this object instead of calander.
+The class stores time independent of timezone, and thus uses UTC by default. You can use a calendar object in place of this one if you need to check local time, however it is faster to calculate time without needing to consider the timezone and thus any time difference calculations should be done with this object instead of calendar.
 
 1. `datetime();`
 2. datetime(double julian_day);

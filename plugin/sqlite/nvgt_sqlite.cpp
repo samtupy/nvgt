@@ -191,6 +191,7 @@ sqlite3statement* sqlite3DB::prepare(const std::string& statement, int* statemen
 	const char* tail = NULL;
 	if (!db) return NULL;
 	int err = sqlite3_prepare_v2(db, statement.c_str(), statement.size(), &st, &tail);
+	if (err != SQLITE_OK) return nullptr;
 	sqlite3statement* ret = NULL;
 	if (st)
 		ret = new sqlite3statement(this, st);

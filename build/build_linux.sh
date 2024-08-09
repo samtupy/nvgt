@@ -112,7 +112,7 @@ function setup_nvgt {
 	if ! which scons &> /dev/null; then
 		pip3 install --user scons
 	fi
-	scons -s
+	scons -s no_upx=0
 	echo NVGT built.
 }
 
@@ -122,7 +122,7 @@ function main {
 	cd deps
 	
 	# Insure required packages are installed for building.
-	sudo apt install build-essential gcc g++ make cmake autoconf libtool python3 python3-pip libsystemd-dev -y
+	sudo apt install build-essential gcc g++ make cmake autoconf libtool python3 python3-pip libsystemd-dev libspeechd-dev -y
 	
 	setup_angelscript
 	setup_bullet

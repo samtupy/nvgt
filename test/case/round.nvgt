@@ -1,0 +1,3 @@
+void test_round() {
+	assert(string(round(23.9517412, 3)) == "23.952");
+}

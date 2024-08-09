@@ -132,7 +132,14 @@ public:
 			arg_typeid = gen->GetArgTypeId(i + 2);
 			arg_type = engine->GetTypeInfoById(arg_typeid);
 			success = asINVALID_ARG;
-			if (arg_typeid & asTYPEID_MASK_OBJECT && arg_typeid & asTYPEID_OBJHANDLE) success = ctx->SetArgObject(i, gen->GetArgObject(i + 2));
+			if (arg_typeid == asTYPEID_VOID) success = ctx->SetArgAddress(i, nullptr);
+			else if (arg_typeid == asTYPEID_BOOL || arg_typeid == asTYPEID_INT8 || arg_typeid == asTYPEID_UINT8) success = ctx->SetArgByte(i, *(asBYTE*)gen->GetArgAddress(i + 2));
+			else if (arg_typeid == asTYPEID_INT16 || arg_typeid == asTYPEID_UINT16) success = ctx->SetArgWord(i, *(asWORD*)gen->GetArgAddress(i + 2));
+			else if (arg_typeid == asTYPEID_INT32 || arg_typeid == asTYPEID_UINT32) success = ctx->SetArgDWord(i, *(asDWORD*)gen->GetArgAddress(i + 2));
+			else if (arg_typeid == asTYPEID_INT64 || arg_typeid == asTYPEID_UINT64) success = ctx->SetArgQWord(i, *(asQWORD*)gen->GetArgAddress(i + 2));
+			else if (arg_typeid == asTYPEID_FLOAT) success = ctx->SetArgFloat(i, *(float*)gen->GetArgAddress(i + 2));
+			else if (arg_typeid == asTYPEID_DOUBLE) success = ctx->SetArgDouble(i, *(double*)gen->GetArgAddress(i + 2));
+			else if (arg_typeid & asTYPEID_MASK_OBJECT && arg_typeid & asTYPEID_OBJHANDLE) success = ctx->SetArgObject(i, gen->GetArgObject(i + 2));
 			else if (arg_typeid & asTYPEID_MASK_OBJECT) {
 				void* obj = engine->CreateScriptObjectCopy(gen->GetArgAddress(i + 2), arg_type);
 				if (!obj) {
@@ -143,13 +150,7 @@ public:
 				success = ctx->SetArgObject(i, obj);
 				if (success >= 0) value_args[obj] = arg_type;
 				else engine->ReleaseScriptObject(obj, arg_type);
-			} else if (arg_typeid & asTYPEID_VOID) success = ctx->SetArgAddress(i, nullptr);
-			else if (arg_typeid == asTYPEID_BOOL || arg_typeid == asTYPEID_INT8 || arg_typeid == asTYPEID_UINT8) success = ctx->SetArgByte(i, gen->GetArgByte(i + 2));
-			else if (arg_typeid == asTYPEID_INT16 || arg_typeid == asTYPEID_UINT16) success = ctx->SetArgWord(i, gen->GetArgWord(i + 2));
-			else if (arg_typeid == asTYPEID_INT32 || arg_typeid == asTYPEID_UINT32) success = ctx->SetArgDWord(i, gen->GetArgDWord(i + 2));
-			else if (arg_typeid == asTYPEID_INT64 || arg_typeid == asTYPEID_UINT64) success = ctx->SetArgQWord(i, gen->GetArgQWord(i + 2));
-			else if (arg_typeid == asTYPEID_FLOAT) success = ctx->SetArgFloat(i, gen->GetArgFloat(i + 2));
-			else if (arg_typeid == asTYPEID_DOUBLE) success = ctx->SetArgDouble(i, gen->GetArgDouble(i + 2));
+			}
 			if (success < 0) {
 				aCtx->SetException(format("Angelscript error %d while setting argument %u in async call to %s", success, i + 1, std::string(func->GetDeclaration())).c_str());
 				engine->ReturnContext(ctx);
@@ -229,7 +230,7 @@ public:
 		if (!ctx) goto finish;
 		if (ctx->Prepare(func) < 0) goto finish;
 		if (ctx->SetArgObject(0, args) < 0) goto finish;
-		execution_result = ctx->Execute(); // Todo: Work out what we want to do with exceptions or errors that take place in threads.
+		ctx->Execute(); // Todo: Work out what we want to do with exceptions or errors that take place in threads.
 	finish:
 		if (ctx && !g_shutting_down) g_ScriptEngine->ReturnContext(ctx); // We only do this when the engine is not shutting down because the angelscript could get partially destroyed on the main thread before this point in the shutdown case.
 		if (thread) angelscript_refcounted_release<Thread>(thread);

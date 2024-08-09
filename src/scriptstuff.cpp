@@ -36,7 +36,6 @@
 // The seemingly pointless few lines of code that follow are just a bit of structure that can be used to aid in some types of debugging if needed. Extra code can be added temporarily in the line callback that sets any needed info in the g_DebugInfo string which can easily be read by a c debugger.
 std::string g_DebugInfo;
 void debug_callback(asIScriptContext* ctx, void* obj) {
-	asIScriptFunction* func = ctx->GetFunction();
 }
 
 int g_GCMode = 2;
@@ -231,6 +230,7 @@ std::string get_script_executable() {
 }
 std::string get_function_signature(void* function, int type_id) {
 	asIScriptContext* ctx = asGetActiveContext();
+	if (!ctx) return "";
 	asIScriptEngine* engine = ctx ? ctx->GetEngine() : g_ScriptEngine;
 	asITypeInfo* t = engine->GetTypeInfoById(type_id);
 	asIScriptFunction* sig = t->GetFuncdefSignature();

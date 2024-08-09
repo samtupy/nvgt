@@ -1,4 +1,4 @@
-# pset_pack_identifier
+# set_pack_identifier
 Set the identifier of this pack object (e.g. the first 8-bytes that determine if you have a valid pack or not).
 
 `bool pack::set_pack_identifier(string ident);`

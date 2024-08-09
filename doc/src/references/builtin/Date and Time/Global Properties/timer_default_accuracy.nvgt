@@ -4,7 +4,7 @@
 	## Remarks:
 		Internally NVGT always uses a clock with microsecond accuracy to track time, meaning that microseconds is the highest accuracy that timer objects support. However in many cases, microsecond accuracy is not desired and causes a user to need to type far too many 0s than they would desire when handling elapsed time. Therefor NVGT allows you to set a devisor/multiplier that is applied to any timer operation as it passes between NVGT and your script.
 		The accuracy represented here is just a number of microseconds to divide values returned from timer.elapsed by before returning them to your script, as well as the number of microseconds to multiply by if one uses the timer.force function.
-		If this property is changed, any timers that already exist will remain uneffected, and only newly created timers will use the updated value.
+		If this property is changed, any timers that already exist will remain unaffected, and only newly created timers will use the updated value.
 		Some useful constants are provided to make this property more useful:
 		* MILLISECONDS: 1000 microseconds
 		* SECONDS: 1000 MILLISECONDS

@@ -1,0 +1,4 @@
+void test_numwords() {
+	assert(number_to_words(172745, false) == "one hundred seventy two thousand seven hundred forty five");
+	assert(number_to_words(172745) == "one hundred and seventy two thousand seven hundred and forty five");
+}

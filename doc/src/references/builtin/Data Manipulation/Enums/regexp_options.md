@@ -31,5 +31,5 @@ See the PCRE documentation for more information.
 * RE_NEWLINE_CRLF: assume newline is CRLF ("\r\n") [ctor]
 * RE_NEWLINE_ANY: assume newline is any valid Unicode newline character [ctor]
 * RE_NEWLINE_ANY_CRLF: assume newline is any of CR, LF, CRLF [ctor]
-* RE_GLOBAL: replace all occurences (/g) [subst]
+* RE_GLOBAL: replace all occurrences (/g) [subst]
 * RE_NO_VARS: treat dollar in replacement string as ordinary character [subst]

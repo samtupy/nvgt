@@ -1,5 +1,5 @@
 /**
-	This type is escentially just a more convenient 2d array. One place it's super useful is when representing a game board.
+	This type is essentially just a more convenient 2d array. One place it's super useful is when representing a game board.
 	1. grid();
 	2. grid(uint width, uint height);
 	3. grid({repeat {repeat_same T}});

@@ -24,6 +24,9 @@
 #include <Poco/Util/Application.h>
 #include <Poco/Util/HelpFormatter.h>
 #include <Poco/Util/OptionSet.h>
+#include <Poco/Util/IntValidator.h>
+#include <Poco/Util/IniFileConfiguration.h>
+#include <Poco/Util/RegExpValidator.h>
 #include <Poco/Environment.h>
 #include <Poco/File.h>
 #include <Poco/Path.h>
@@ -33,6 +36,9 @@
 #include "scriptarray.h"
 #define NVGT_LOAD_STATIC_PLUGINS
 #include "angelscript.h" // nvgt's angelscript implementation
+#ifdef __APPLE__
+#include "apple.h" // apple_requested_file
+#endif
 #include "input.h"
 #include "nvgt.h"
 #ifndef NVGT_USER_CONFIG
@@ -65,7 +71,14 @@ public:
 protected:
 	void initialize(Application& self) override {
 		#ifndef NVGT_STUB
-		loadConfiguration();
+		loadConfiguration(); // This will load config files with the basename of the currently running executable.
+		// We also want to look for config.json/.ini/.properties so that the user can create global configuration properties despite whether nvgt.exe or nvgtw.exe is being run.
+		Path confpath = Path(config().getString("application.dir")).setFileName("config.ini");
+		if (File(confpath).exists()) loadConfiguration(confpath.toString(), 1);
+		confpath.setExtension("properties");
+		if (File(confpath).exists()) loadConfiguration(confpath.toString(), 1);
+		confpath.setExtension("json");
+		if (File(confpath).exists()) loadConfiguration(confpath.toString(), 1);
 		#endif
 		Application::initialize(self);
 		#ifdef _WIN32
@@ -77,7 +90,9 @@ protected:
 		#elif defined(__APPLE__)
 		if (Environment::has("MACOS_BUNDLED_APP")) { // Use GUI instead of stdout and chdir to Resources directory.
 			config().setString("application.gui", "");
-			chdir(Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString().c_str());
+			#ifdef NVGT_STUB
+				chdir(Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString().c_str());
+			#endif
 		}
 		#endif
 		srand(random_seed()); // Random bits of NVGT if not it's components might use the c rand function.
@@ -103,9 +118,11 @@ protected:
 		Application::defineOptions(options);
 		options.addOption(Option("compile", "c", "compile script in release mode").group("compiletype"));
 		options.addOption(Option("compile-debug", "C", "compile script in debug mode").group("compiletype"));
+		options.addOption(Option("platform", "p", "select target platform to compile for (auto|windows|linux|mac)", false, "platform", true).validator(new RegExpValidator("^(auto|windows|linux|mac)$")));
 		options.addOption(Option("quiet", "q", "do not output anything upon successful compilation").binding("application.quiet").group("quiet"));
 		options.addOption(Option("QUIET", "Q", "do not output anything (work in progress), error status must be determined by process exit code (intended for automation)").binding("application.QUIET").group("quiet"));
 		options.addOption(Option("debug", "d", "run with the Angelscript debugger").binding("application.as_debug"));
+		options.addOption(Option("warnings", "w", "select how script warnings should be handled (0 ignore (default), 1 print, 2 treat as error)", false, "level", true).binding("scripting.compiler_warnings").validator(new IntValidator(0, 2)));
 		options.addOption(Option("include", "i", "include an aditional script similar to the #include directive", false, "script", true).repeatable(true));
 		options.addOption(Option("include-directory", "I", "add an aditional directory to the search path for included scripts", false, "directory", true).repeatable(true));
 		options.addOption(Option("version", "V", "print version information and exit"));
@@ -124,6 +141,7 @@ protected:
 			g_debug = name == "compile-debug";
 		} else if (name == "include-directory") g_IncludeDirs.push_back(value);
 		else if (name == "include") g_IncludeScripts.push_back(value);
+		else if (name == "platform") g_platform = value;
 	}
 	void displayHelp() {
 		HelpFormatter hf(options());
@@ -141,6 +159,12 @@ protected:
 		}
 	}
 	virtual int main(const std::vector<std::string>& args) override {
+		// Determine the script file that is to be executed.
+		string scriptfile = "";
+		#ifdef __APPLE__
+			scriptfile = apple_requested_file(); // Files opened from finder on mac do not use command line arguments.
+		#endif
+		if (scriptfile.empty() && args.size() > 0) scriptfile = args[0];
 		if (mode == NVGT_HELP) {
 			displayHelp();
 			return Application::EXIT_OK;
@@ -149,28 +173,32 @@ protected:
 			if (config().hasOption("application.gui")) message(ver, "version information");
 			else cout << ver << endl;
 			return Application::EXIT_OK;
-		} else if (args.size() < 1) {
+		} else if (scriptfile.empty()) {
 			message("error, no input files.\nType " + commandName() + " --help for usage instructions\n", commandName());
 			return Application::EXIT_USAGE;
 		}
-		string scriptfile = args[0];
 		try {
 			// Parse the provided script path to insure it is valid and check if it is a file.
 			if (!File(Path(scriptfile)).isFile()) throw Exception("Expected a file", scriptfile);
 			// The scripter is able to create configuration files that can change some behaviours of the engine, such files are named after the script that is to be run.
 			Path conf_file(scriptfile);
 			conf_file.setExtension("properties");
-			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
+			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -2);
 			conf_file.setExtension("ini");
-			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
+			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -2);
 			conf_file.setExtension("json");
-			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -1);
+			if (File(conf_file).exists()) loadConfiguration(conf_file.toString(), -2);
+			// The user can also place a .nvgtrc file in the current directory of their script or any parent of it, expected to be in ini format.
+			conf_file.setFileName(".nvgtrc");
+			while (conf_file.depth() > 0 && !File(conf_file).exists()) conf_file.popDirectory();
+			if (File(conf_file).exists()) config().addWriteable(new IniFileConfiguration(conf_file.toString()), -1);
 		} catch (Poco::Exception& e) {
 			message(e.displayText(), "error");
 			return Application::EXIT_CONFIG;
 		}
 		setupCommandLineProperty(args, 1);
 		g_command_line_args->InsertAt(0, (void*)&scriptfile);
+		ConfigureEngineOptions(g_ScriptEngine);
 		if (CompileScript(g_ScriptEngine, scriptfile.c_str()) < 0) {
 			ShowAngelscriptMessages();
 			return Application::EXIT_DATAERR;

@@ -1,6 +1,9 @@
 #include "scriptbuilder.h"
 #include <vector>
 #include <assert.h>
+#ifdef _WIN32
+#include <windows.h> // MultiByteToWideChar()
+#endif
 using namespace std;
 
 #include <stdio.h>
@@ -170,13 +173,24 @@ bool CScriptBuilder::IncludeIfNotAlreadyIncluded(const char *filename)
 	return true;
 }
 
-int CScriptBuilder::LoadScriptSection(const char *filename)
+int CScriptBuilder::LoadScriptSection(const char* filename)
 {
 	// Open the script file
 	string scriptFile = filename;
 #if _MSC_VER >= 1500 && !defined(__S3E__)
+  #ifdef _WIN32
+	// Convert the filename from UTF8 to UTF16
+	wchar_t bufUTF16_name[10000] = {0};
+	wchar_t bufUTF16_mode[10] = {0};
+	MultiByteToWideChar(CP_UTF8, 0, filename, -1, bufUTF16_name, 10000);
+	MultiByteToWideChar(CP_UTF8, 0, "rb", -1, bufUTF16_mode, 10);
+
 	FILE *f = 0;
+	_wfopen_s(&f, bufUTF16_name, bufUTF16_mode);
+  #else
+	FILE* f = 0;
 	fopen_s(&f, scriptFile.c_str(), "rb");
+  #endif
 #else
 	FILE *f = fopen(scriptFile.c_str(), "rb");
 #endif
@@ -472,11 +486,22 @@ int CScriptBuilder::ProcessScriptSection(const char *script, unsigned int length
 						includefile.assign(&modifiedScript[pos + 1], len - 2);
 						pos += len;
 
-						// Store it for later processing
-						includes.push_back(includefile);
+						// Make sure the includeFile doesn't contain any line breaks
+						size_t p = includefile.find('\n');
+						if (p != string::npos)
+						{
+							// TODO: Show the correct line number for the error
+							string str = "Invalid file name for #include; it contains a line-break: '" + includefile.substr(0, p) + "'";
+							engine->WriteMessage(sectionname, 0, 0, asMSGTYPE_ERROR, str.c_str());
+						}
+						else
+						{
+							// Store it for later processing
+							includes.push_back(includefile);
 
-						// Overwrite the include directive with space characters to avoid compiler error
-						OverwriteCode(start, pos - start);
+							// Overwrite the include directive with space characters to avoid compiler error
+							OverwriteCode(start, pos - start);
+						}
 					}
 				}
 				else if (token == "pragma")
@@ -749,7 +774,6 @@ int CScriptBuilder::Build()
 					// Look for the matching method instead
 					asITypeInfo *type = engine->GetTypeInfoById(typeId);
 					asIScriptFunction *func = type->GetMethodByDecl(decl->declaration.c_str());
-					assert(func);
 					if (func)
 						it->second.funcMetadataMap.insert(map<int, vector<string> >::value_type(func->GetId(), decl->metadata));
 				}
@@ -1023,7 +1047,7 @@ int CScriptBuilder::ExtractDeclaration(int pos, string &name, string &declaratio
 				}
 
 				// Skip trailing decorators
-				if( !hasParenthesis || nestedParenthesis > 0 || t != asTC_IDENTIFIER || (token != "final" && token != "override") )
+				if( !hasParenthesis || nestedParenthesis > 0 || t != asTC_IDENTIFIER || (token != "final" && token != "override" && token != "delete" && token != "property"))
 					declaration += token;
 
 				pos += len;

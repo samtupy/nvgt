@@ -31,12 +31,12 @@ if env["PLATFORM"] == "darwin":
 	# homebrew paths and other libraries/flags for MacOS
 	env.Append(CPPPATH = ["/opt/homebrew/include"], CCFLAGS = ["-mmacosx-version-min=14.0"], LIBPATH = ["/opt/homebrew/lib"])
 	# The following, to say the least, is absolutely not ideal. In some cases we have both static and dynamic libraries on the system and must explicitly choose the static one. The normal :libname.a trick doesn't seem to work on clang, we're just informed that libs couldn't be found. If anybody knows a better way to force static library linkage on MacOS particularly without the absolute paths, please let me know!
-	env.Append(LIBS = [File("/usr/local/lib/libangelscript.a"), File("/usr/local/lib/libenet.a"), File("/opt/homebrew/lib/libSDL2.a"), "iconv"])
+	env.Append(LIBS = [File("/usr/local/lib/libangelscript.a"), File("/usr/local/lib/libenet.a"), File("/opt/homebrew/lib/libcrypto.a"), File("/opt/homebrew/lib/libSDL2.a"), File("/opt/homebrew/lib/libssl.a"), "iconv"])
 elif env["PLATFORM"] == "posix":
 	# enable the gold linker to silence seemingly pointless warnings about symbols in the bass libraries, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
 	env.Append(CPPPATH = ["/usr/local/include"], LIBPATH = ["/usr/local/lib"], LINKFLAGS = ["-fuse-ld=gold", "-s"])
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
-	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL2.a"])
+	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL2.a", "crypto", "ssl"])
 env.Append(CPPDEFINES = ["POCO_STATIC", "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
@@ -56,14 +56,15 @@ if "version.cpp" in sources: sources.remove("version.cpp")
 env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
 version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.
 VariantDir("build/obj_src", "src", duplicate = 0)
-env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoNetSSLWinMT", "PocoUtilMT"] if env["PLATFORM"] == "win32" else ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoFoundation", "crypto", "ssl"], "phonon", "bass", "bass_fx", "bassmix", "SDL2main"])
+env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoNetSSLWinMT", "PocoUtilMT"] if env["PLATFORM"] == "win32" else ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoFoundation"], "phonon", "bass", "bass_fx", "bassmix", "SDL2main"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(LINKFLAGS = ["/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll", "/delayload:Tolk.dll"])
 elif env["PLATFORM"] == "darwin":
+	sources.append("apple.mm")
 	sources.append("macos.mm")
 	env["FRAMEWORKPREFIX"] = "-weak_framework"
-	env.Append(FRAMEWORKS = ["CoreAudio",  "CoreFoundation", "CoreHaptics", "CoreVideo", "AudioToolbox", "AppKit", "IOKit", "Carbon", "Cocoa", "ForceFeedback", "GameController", "QuartzCore", "Metal"])
+	env.Append(FRAMEWORKS = ["CoreAudio",  "CoreFoundation", "CoreHaptics", "CoreVideo", "AudioToolbox", "AVFoundation", "AppKit", "IOKit", "Carbon", "Cocoa", "ForceFeedback", "GameController", "QuartzCore", "Metal"])
 	env.Append(LIBS = ["objc"])
 	env.Append(LINKFLAGS = ["-Wl,-rpath,'@loader_path',-rpath,'@loader_path/lib',-rpath,'@loader_path/../Frameworks',-dead_strip_dylibs", "-mmacosx-version-min=14.0"])
 elif env["PLATFORM"] == "posix":

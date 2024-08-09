@@ -1,0 +1,15 @@
+/**
+	Check if the text to speech voice is currently speaking.
+	bool tts_voice::get_speaking();
+	## Returns:
+		* bool: whether the tts voice is speaking. True if so, false if not.
+*/
+
+// Example:
+void main() {
+	tts_voice v;
+	alert("Is it speaking right now?", v.get_speaking());
+	v.speak("I'm now saying something, I think...");
+	wait(250);
+	alert("How about now?", v.get_speaking());
+}

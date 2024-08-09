@@ -1,5 +1,5 @@
 /**
-	Return the next random floatingpoint number from the generator.
+	Return the next random floating point number from the generator.
 	float nextf();
 	## Returns:
 		float: The next random float (between 0.0 and 1.0).

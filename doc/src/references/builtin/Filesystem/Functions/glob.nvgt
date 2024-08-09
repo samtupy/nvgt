@@ -1,0 +1,31 @@
+/**
+	Return a list of files and directories on the filesystem given a path glob.
+	string[]@ glob(string path_pattern, glob_options options = GLOB_DEFAULT);
+	## Arguments:
+		* string path_pattern: The pattern to match files and directories with (Unix shell like, see remarks).
+		* glob_options options: A bitwise of glob_options enum constants that influence the behavior of this function (see remarks).
+	## Returns:
+		string[]@: A list of all matching files and directories that match the given path pattern, an empty array on no matches or failure.
+	## Remarks:
+		This function provides for one of the easiest ways to enumerate the filesystem in NVGT, particularly because the path patterns provided can actually cause semi-recursive directory searches. The search starts at the current working directory unless an absolute path is given.
+		The glob patterns have simple rules:
+		* path separators must be matched exactly, \* will not cause a recursive lookup
+		* \* matches any sequence of characters
+		* ? matches any single character
+		* [set] matches any characters between the brackets
+		* [!set] matches any characters that are not listed between the brackets
+		* `\*, \[, \] etc` exactly match a special character usually used as part of the glob expression
+		There is no guarantee that the items returned will appear in any particular order in the array.
+		The following glob_options constance are defined:
+		* GLOB_DEFAULT: the default options
+		* GLOB_IGNORE_HIDDEN: do not match when directory entries begin with a .
+		* GLOB_FOLLOW_SYMLINKS: traverse even across symbolic links if the given pattern demands it
+		* GLOB_CASELESS: match case insensitively
+*/
+
+// Example:
+void main() {
+	// List all .nvgt files within the filesystem documentation directory.
+	string[]@ items = glob("../*/*.nvgt");
+	alert("files found", string(items));
+}

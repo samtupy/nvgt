@@ -27,6 +27,7 @@ extern CContextMgr* g_ctxMgr;
 
 void ShowAngelscriptMessages();
 int ConfigureEngine(asIScriptEngine* engine);
+void ConfigureEngineOptions(asIScriptEngine* engine);
 int ExecuteScript(asIScriptEngine* engine, const std::string& scriptFile);
 #ifndef NVGT_STUB
 	int               CompileScript(asIScriptEngine* engine, const std::string& scriptFile);
@@ -42,4 +43,5 @@ asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* param);
 void ReturnContextCallback(asIScriptEngine* engine, asIScriptContext* ctx, void* param);
 void ExceptionHandlerCallback(asIScriptContext* ctx, void* obj);
 asUINT GetTimeCallback();
+asITypeInfo* get_array_type(const std::string& decl);
 void RegisterUnsorted(asIScriptEngine* engine);

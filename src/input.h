@@ -19,7 +19,6 @@
 
 union SDL_Event;
 extern std::string g_UserInput;
-extern bool keyhook_active;
 
 class joystick : Poco::RefCountedObject {
 	SDL_GameController* stick;
@@ -97,4 +96,6 @@ public:
 void InputInit();
 void InputDestroy();
 void InputEvent(SDL_Event* evt);
+void lost_window_focus();
+void regained_window_focus();
 void RegisterInput(asIScriptEngine* engine);
