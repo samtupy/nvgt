@@ -70,7 +70,7 @@ void library::call(asIScriptGeneric* gen) {
 		gen->SetReturnAddress(NULL);
 		return;
 	}
-	if (!g_StringTypeid) g_StringTypeid = g_ScriptEngine->GetStringFactoryReturnTypeId();
+	if (!g_StringTypeid) g_StringTypeid = g_ScriptEngine->GetStringFactory();
 	asIScriptContext* ACtx = asGetActiveContext();
 	std::string* sig = (std::string*)gen->GetArgObject(0);
 	asIScriptFunction* func;

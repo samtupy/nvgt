@@ -6,6 +6,7 @@
 namespace AngelScript { class asIScriptEngine; }
 #else
 class asIScriptEngine;
+class asIScriptGeneric;
 #endif
 
 namespace Print
@@ -24,17 +25,12 @@ extern PrintNonPrimitiveType* g_PrintRegisteredType;
 extern PrintNonPrimitiveType* g_PrintScriptObjectType;
 
 void PrintTemplate(std::ostream & dst, void const *objPtr, int typeId, int depth = 0);
-void PrintFormat(std::ostream & stream, std::string const& in, std::pair<void const*, int> const* args, int argc);
+void PrintFormat(std::ostream & stream, std::string const& in, asIScriptGeneric * generic, int offset = 0);
+void PrintTemplate(std::ostream & stream, asIScriptGeneric * generic, int offset = 0);
 
 //currently only string and array
 bool PrintAddonTypes(std::ostream & dst, void const *objPtr, int typeId, int depth);
 
-template<typename... Args>
-inline void PrintTemplate(std::ostream & dst, void const *objPtr, int typeId, Args... args)
-{
-	PrintTemplate(dst, objPtr, typeId, 0);
-	PrintTemplate(dst, std::move(args)...);
-}
 
 void asRegister( asIScriptEngine * engine, bool registerStdStringFormatter = true);
 
