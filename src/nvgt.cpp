@@ -105,7 +105,7 @@ protected:
 	void setupCommandLineProperty(const vector<string>& argv, int offset = 0) {
 		// Prepare the COMMAND_LINE property used by scripts by combining all arguments into one string, for bgt backwards compatibility. NVGT also has a new ARGS array which we will also set up here.
 		if (!g_StringTypeid)
-			g_StringTypeid = g_ScriptEngine->GetStringFactoryReturnTypeId();
+			g_StringTypeid = g_ScriptEngine->GetStringFactory();
 		g_command_line_args = CScriptArray::Create(g_ScriptEngine->GetTypeInfoByDecl("string[]"));
 		for (unsigned int i = offset; i < argv.size(); i++) {
 			g_CommandLine += argv[i];

@@ -1,4 +1,4 @@
-/*
+/**
 	This class provides a convenient way to communicate with all of the text-to-speech voices a user has installed on their system.
 	tts_voice();
 	## Remarks:

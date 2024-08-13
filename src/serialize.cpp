@@ -55,7 +55,7 @@ size_t cmp_write_bytes(cmp_ctx_t* ctx, const void* input, size_t len) {
 
 bool serialize_value(const void* value, int type_id, cmp_ctx_t* ctx) {
 	if (!g_StringTypeid)
-		g_StringTypeid = g_ScriptEngine->GetStringFactoryReturnTypeId();
+		g_StringTypeid = g_ScriptEngine->GetStringFactory();
 	if (type_id == asTYPEID_BOOL) return cmp_write_bool(ctx, *(bool*)value);
 	else if (type_id == asTYPEID_INT8) return cmp_write_integer(ctx, *(int8_t*)value);
 	else if (type_id == asTYPEID_UINT8) return cmp_write_uinteger(ctx, *(uint8_t*)value);
@@ -105,7 +105,7 @@ bool serialize_value(const void* value, int type_id, cmp_ctx_t* ctx) {
 bool deserialize_value(void* value, int type_id, cmp_ctx_t* ctx, cmp_object_t* obj = NULL) {
 	cmp_object_t default_obj;
 	if (!g_StringTypeid)
-		g_StringTypeid = g_ScriptEngine->GetStringFactoryReturnTypeId();
+		g_StringTypeid = g_ScriptEngine->GetStringFactory();
 	if (!obj) {
 		obj = &default_obj;
 		if (!cmp_read_object(ctx, obj)) return false;
@@ -161,7 +161,7 @@ std::string serialize(CScriptDictionary& dict) {
 	asUINT size = dict.GetSize();
 	if (size < 1) return "";
 	if (!g_StringTypeid)
-		g_StringTypeid = g_ScriptEngine->GetStringFactoryReturnTypeId();
+		g_StringTypeid = g_ScriptEngine->GetStringFactory();
 	std::stringstream ss;
 	ss.write("\x0e\x16\x07\x14", 4);
 	ss.write((char*)&size, 4);
@@ -221,7 +221,7 @@ CScriptDictionary* deserialize(const std::string& input) {
 	ss.read((char*)&size, 4);
 	if (size < 1) return dict;
 	if (!g_StringTypeid)
-		g_StringTypeid = g_ScriptEngine->GetStringFactoryReturnTypeId();
+		g_StringTypeid = g_ScriptEngine->GetStringFactory();
 	for (int i = 0; i < size; i++) {
 		unsigned short keylen = 0;
 		ss.read((char*)&keylen, 2);
