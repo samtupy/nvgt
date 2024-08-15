@@ -87,7 +87,7 @@ void library::call(asIScriptGeneric* gen) {
 		}
 		engine->EndConfigGroup();
 		func = engine->GetFunctionById(id);
-		void* addr = SDL_LoadFunction(shared_object, func->GetName());
+		void* addr = (void*)SDL_LoadFunction(shared_object, func->GetName());
 		if (!addr) {
 			engine->RemoveConfigGroup("parse_decl");
 			ACtx->SetException("can't find function");

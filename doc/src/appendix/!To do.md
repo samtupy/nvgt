@@ -66,5 +66,3 @@ Along the same line, partly due to initial closed source intentions and also par
 ### Rewrite system_fingerprint.cpp
 Currently we are using parts of an apache2 licensed library for system fingerprint generation. Not only is it a bit rough but it also uses several architecture specific assembly instructions at times when we probably don't need any. We should rewrite this to use our own system instead comprised of calls into Poco, SDL and other libraries that can return various bits of system information, or at the very least find a solid tiny dependency that can handle it for us.
 
-### SDL3 upgrade
-At some point we do indeed intend to upgrade to SDL3 instead of sticking with SDL2. The priority of this task is somewhat unknown and at least partially revolves around making sure SDL3 is easy to acquire/build/install on all the platforms we're interested in using it on. So long as we manually build one of the prereleases, we're probably OK though it would be nice to wait until it shows up on brew, apt and other package managers.
