@@ -1,7 +1,7 @@
 #!/bin/zsh
 
 function setup_homebrew {
-	brew install autoconf automake libtool openssl sdl2 libgit2 bullet upx
+	brew install autoconf automake libtool openssl libgit2 bullet upx
 }
 
 function setup_angelscript {
@@ -55,6 +55,20 @@ function setup_poco {
 	rm poco-1.13.3-all.tar.gz
 }
 
+function setup_sdl {
+	echo Installing SDL...
+	# Install SDL this way to get many SDL deps. It is too old so we remove SDL itself and build from source, however.
+	sudo apt install libssl-dev libcurl4-openssl-dev libopus-dev libsdl2-dev -y
+	sudo apt remove libsdl2-dev -y
+	git clone --depth 1 https://github.com/libsdl-org/SDL||true
+	mkdir -p SDL/build
+	cd SDL/build
+	cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST_LIBRARY=OFF ..
+	cmake --build . --config MinSizeRel
+	sudo make install
+	cd ../..
+	echo SDL installed.
+}
 function setup_nvgt {
 	echo Building NVGT...
 	
@@ -91,6 +105,7 @@ function main {
 	setup_enet
 	#setup_libgit2
 	setup_poco
+	setup_sdl
 	setup_nvgt
 	echo Success!
 	exit 0
