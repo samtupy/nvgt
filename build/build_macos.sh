@@ -57,13 +57,10 @@ function setup_poco {
 
 function setup_sdl {
 	echo Installing SDL...
-	# Install SDL this way to get many SDL deps. It is too old so we remove SDL itself and build from source, however.
-	sudo apt install libssl-dev libcurl4-openssl-dev libopus-dev libsdl2-dev -y
-	sudo apt remove libsdl2-dev -y
 	git clone --depth 1 https://github.com/libsdl-org/SDL||true
 	mkdir -p SDL/build
 	cd SDL/build
-	cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST_LIBRARY=OFF ..
+	cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST_LIBRARY=OFF -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" ..
 	cmake --build . --config MinSizeRel
 	sudo make install
 	cd ../..
