@@ -14,7 +14,7 @@
 #include <obfuscate.h>
 #include <scriptarray.h>
 #include <scriptdictionary.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "library.h"
 #include "nvgt.h" // g_ScriptEngine, NVGT_SUBSYSTEM_DLLCALL
 #include "serialize.h" // g_StringTypeid.
@@ -87,7 +87,7 @@ void library::call(asIScriptGeneric* gen) {
 		}
 		engine->EndConfigGroup();
 		func = engine->GetFunctionById(id);
-		void* addr = SDL_LoadFunction(shared_object, func->GetName());
+		void* addr = (void*)SDL_LoadFunction(shared_object, func->GetName());
 		if (!addr) {
 			engine->RemoveConfigGroup("parse_decl");
 			ACtx->SetException("can't find function");

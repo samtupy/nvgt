@@ -31,7 +31,7 @@
 #include <Poco/File.h>
 #include <Poco/Path.h>
 #include <Poco/UnicodeConverter.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "filesystem.h"
 #include "scriptarray.h"
 #define NVGT_LOAD_STATIC_PLUGINS
@@ -249,7 +249,7 @@ protected:
 #if !defined(_WIN32) || defined(NVGT_WIN_APP) || defined(NVGT_STUB)
 #undef SDL_MAIN_HANDLED
 #undef SDL_main_h_
-#include <SDL2/SDL_main.h>
+#include <SDL3/SDL_main.h>
 int main(int argc, char** argv) {
 	AutoPtr<Application> app = new nvgt_application();
 	try {

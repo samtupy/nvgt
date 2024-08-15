@@ -104,7 +104,9 @@ void ScreenReaderUnload() {
 std::string ScreenReaderDetect() {
 	#if defined(_WIN32)
 	if (!ScreenReaderLoad()) return "";
-	const std::wstring srname = speechGetString(SP_ENGINE);
+	int engine = speechGetValue(SP_ENGINE);
+	if (engine < 0) return "";
+	const std::wstring srname = speechGetString(SP_ENGINE + engine);
 	std::string result;
 	Poco::UnicodeConverter::convert(srname, result);
 	return result;

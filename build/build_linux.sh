@@ -70,16 +70,11 @@ function setup_sdl {
 	# Install SDL this way to get many SDL deps. It is too old so we remove SDL itself and build from source, however.
 	sudo apt install libssl-dev libcurl4-openssl-dev libopus-dev libsdl2-dev -y
 	sudo apt remove libsdl2-dev -y
-	
-	wget https://github.com/libsdl-org/SDL/releases/download/release-2.30.2/SDL2-2.30.2.tar.gz
-	tar -xvf SDL2-2.30.2.tar.gz
-	rm SDL2-2.30.2.tar.gz
-	cd SDL2-2.30.2
-	
-	mkdir -p build
-	cd build
-	cmake ..
-	cmake --build .
+	git clone --depth 1 https://github.com/libsdl-org/SDL||true
+	mkdir -p SDL/build
+	cd SDL/build
+	cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST_LIBRARY=OFF ..
+	cmake --build . --config MinSizeRel
 	sudo make install
 	cd ../..
 	echo SDL installed.
@@ -93,8 +88,7 @@ function setup_nvgt {
 		echo Not running on CI.
 		cd ..	
 		
-		# TODO - make `git clone` when public, CI most likely won't have gh.
-		gh repo clone https://github.com/samtupy/nvgt
+		git clone --depth 1 https://github.com/samtupy/nvgt||true
 		cd nvgt
 	
 	else
@@ -110,6 +104,7 @@ function setup_nvgt {
 	cd ..
 	rm lindev.tar.gz
 	if ! which scons &> /dev/null; then
+		export PIP_BREAK_SYSTEM_PACKAGES=1
 		pip3 install --user scons
 	fi
 	scons -s no_upx=0

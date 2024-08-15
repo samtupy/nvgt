@@ -31,7 +31,7 @@
 #include <Poco/UnbufferedStreamBuf.h>
 #include <Poco/zlib.h>
 #include <Poco/Util/Application.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "angelscript.h"
 #include "bullet3.h"
 #include "compression.h"

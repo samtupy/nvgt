@@ -16,7 +16,7 @@
 #include <Poco/BinaryReader.h>
 #include <Poco/BinaryWriter.h>
 #include <Poco/Format.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "nvgt.h"
 #include "nvgt_plugin.h"
 #include "UI.h"

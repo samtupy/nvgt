@@ -31,7 +31,7 @@
 #include <sstream>
 #include <angelscript.h>
 #include <scriptarray.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <tinyexpr.h>
 #include <dbgtools.h>
 #include "angelscript.h"
@@ -276,11 +276,12 @@ int utf8next(const std::string& text, int offset = 0) {
 CScriptArray* get_preferred_locales() {
 	asITypeInfo* arrayType = get_array_type("array<string>");
 	CScriptArray* array = CScriptArray::Create(arrayType);
-	SDL_Locale* locales = SDL_GetPreferredLocales();
+	int count;
+	SDL_Locale** locales = SDL_GetPreferredLocales(&count);
 	if (!locales) return array;
-	for (int i = 0; locales[i].language; i++) {
-		std::string tmp = locales[i].language;
-		if (locales[i].country) tmp += std::string("-") + locales[i].country;
+	for (int i = 0; i < count; i++) {
+		std::string tmp = locales[i]->language;
+		if (locales[i]->country) tmp += std::string("-") + locales[i]->country;
 		array->Resize(array->GetSize() + 1);
 		((std::string*)(array->At(array->GetSize() - 1)))->assign(tmp);
 	}
