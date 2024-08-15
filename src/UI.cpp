@@ -18,7 +18,7 @@
 	#define VC_EXTRALEAN
 	#include <windows.h>
 	#include "InputBox.h"
-#elif defined(SDL_PLATFORM_APPLE)
+#elif defined(__APPLE__)
 #include <IOKit/IOKitLib.h>
 #include <IOKit/IOCFBundle.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -153,7 +153,7 @@ std::string input_box(const std::string& title, const std::string& text, const s
 	std::string resultA;
 	Poco::UnicodeConverter::convert(r, resultA);
 	return resultA;
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	std::string r = apple_input_box(title, text, default_value, false, false);
 	if (g_WindowHandle) SDL_RaiseWindow(g_WindowHandle);
 	if (r == "\xff") {
@@ -172,7 +172,7 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 	Poco::UnicodeConverter::convert(text, textU);
 	Poco::UnicodeConverter::convert(value, valueU);
 	return InfoBox(titleU, textU, valueU);
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	apple_input_box(title, text, value, false, false);
 	return true;
 	#else
@@ -183,7 +183,7 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 SDL_Window* g_WindowHandle = 0;
 #ifdef _WIN32
 	HWND g_OSWindowHandle = NULL;
-#elif defined(SDL_PLATFORM_APPLE)
+#elif defined(__APPLE__)
 	#include "apple.h"
 	NSWindow* g_OSWindowHandle = NULL;
 #else
@@ -198,7 +198,7 @@ SDL_bool sdl_windows_messages(void* udata, MSG* msg) {
 	if (msg->message == WM_KEYDOWN && msg->wParam == 'V' && msg->lParam == 1) {
 		SDL_Event e{};
 		e.type = SDL_EVENT_KEY_DOWN;
-		e.key.timestamp = SDL_GetTicks();
+		e.common.timestamp = SDL_GetTicksNS();
 		e.key.scancode = SDL_SCANCODE_PASTE;
 		e.key.key = SDLK_PASTE;
 		SDL_PushEvent(&e);
@@ -232,7 +232,7 @@ bool ShowNVGTWindow(std::string& window_title) {
 	#ifdef _WIN32
 	g_OSWindowHandle = (HWND)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
 	#elif defined(__APPLE__) // Will probably need to fix for IOS
-	g_OSWindowHandle = (HWND)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
+	g_OSWindowHandle = (NSWindow*)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
 	SDL_ShowWindow(g_WindowHandle);
 	SDL_RaiseWindow(g_WindowHandle);
 	voice_over_window_created();
@@ -291,20 +291,20 @@ void wait(int ms) {
 		if (ms < 1) break;
 	}
 	SDL_Event evt;
-	#ifdef SDL_PLATFORM_APPLE
+	#ifdef __APPLE__
 	bool left_just_pressed = false, right_just_pressed = false;
 	#endif
 	while (SDL_PollEvent(&evt)) {
-		#ifdef SDL_PLATFORM_APPLE
+		#ifdef __APPLE__
 		// Hack to fix voiceover's weird handling of the left and right arrow keys. If a left/right arrow down/up event get generated in the same frame, we need to move the up event to the next frame.
 		bool evt_handled = false;
 		if (evt.type == SDL_EVENT_KEY_DOWN) {
-			if (evt.key.keysym.scancode == SDL_SCANCODE_LEFT) left_just_pressed = true;
-			if (evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) right_just_pressed = true;
+			if (evt.key.scancode == SDL_SCANCODE_LEFT) left_just_pressed = true;
+			if (evt.key.scancode == SDL_SCANCODE_RIGHT) right_just_pressed = true;
 		} else if ((left_just_pressed || right_just_pressed) && evt.type == SDL_EVENT_KEY_UP) {
 			evt_handled = true;
-			if (left_just_pressed && evt.key.keysym.scancode == SDL_SCANCODE_LEFT) post_events.push_back(evt);
-			else if (right_just_pressed && evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) post_events.push_back(evt);
+			if (left_just_pressed && evt.key.scancode == SDL_SCANCODE_LEFT) post_events.push_back(evt);
+			else if (right_just_pressed && evt.key.scancode == SDL_SCANCODE_RIGHT) post_events.push_back(evt);
 			else evt_handled = false;
 		}
 		if (evt_handled) continue;
@@ -326,7 +326,7 @@ uint64_t idle_ticks() {
 		GetLastInputInfo(&lii);
 		DWORD currentTick = GetTickCount();
 		return (currentTick - lii.dwTime);
-	#elif SDL_PLATFORM_APPLE
+	#elif __APPLE__
 		io_iterator_t iter;
 		io_registry_entry_t entry;
 		CFMutableDictionaryRef matching = IOServiceMatching("IOHIDSystem");

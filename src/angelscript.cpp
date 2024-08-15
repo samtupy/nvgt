@@ -508,13 +508,13 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 	if (g_platform == "auto") g_platform = "windows";
 	#elif defined(__linux__)
 	if (g_platform == "auto") g_platform = "linux";
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	if (g_platform == "auto") g_platform = "mac"; // Todo: detect difference between IOS and macos (need to look up the correct macros).
 	#else
 	return -1;
 	#endif
 	Path stubspath = Util::Application::instance().config().getString("application.dir");
-	#ifdef SDL_PLATFORM_APPLE // Stub may be in Resources directory of an app bundle.
+	#ifdef __APPLE__ // Stub may be in Resources directory of an app bundle.
 	if (!File(Path(stubspath).pushDirectory("stub")).exists() && stubspath[stubspath.depth() -1] == "MacOS" && stubspath[stubspath.depth() -2] == "Contents") stubspath.makeParent().pushDirectory("Resources");
 	#endif
 	stubspath.pushDirectory("stub");

@@ -19,7 +19,7 @@
 
 #ifdef _WIN32
 struct blastspeak;
-#elif defined(SDL_PLATFORM_APPLE)
+#elif defined(__APPLE__)
 class AVTTSVoice;
 #endif
 
@@ -27,7 +27,7 @@ class tts_voice {
 	int RefCount;
 	#ifdef _WIN32
 	blastspeak* inst;
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	AVTTSVoice* inst;
 	#endif
 	bool destroyed;

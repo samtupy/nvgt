@@ -36,7 +36,7 @@
 #include "scriptarray.h"
 #define NVGT_LOAD_STATIC_PLUGINS
 #include "angelscript.h" // nvgt's angelscript implementation
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
 #include "apple.h" // apple_requested_file
 #endif
 #include "input.h"
@@ -87,7 +87,7 @@ protected:
 		wstring dir_u;
 		UnicodeConverter::convert(Path(config().getString("application.dir")).append("lib").toString(), dir_u);
 		SetDllDirectoryW(dir_u.c_str());
-		#elif defined(SDL_PLATFORM_APPLE)
+		#elif defined(__APPLE__)
 		if (Environment::has("MACOS_BUNDLED_APP")) { // Use GUI instead of stdout and chdir to Resources directory.
 			config().setString("application.gui", "");
 			#ifdef NVGT_STUB
@@ -161,7 +161,7 @@ protected:
 	virtual int main(const std::vector<std::string>& args) override {
 		// Determine the script file that is to be executed.
 		string scriptfile = "";
-		#ifdef SDL_PLATFORM_APPLE
+		#ifdef __APPLE__
 			scriptfile = apple_requested_file(); // Files opened from finder on mac do not use command line arguments.
 		#endif
 		if (scriptfile.empty() && args.size() > 0) scriptfile = args[0];

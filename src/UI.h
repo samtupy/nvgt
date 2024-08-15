@@ -16,7 +16,7 @@
 	#define VC_EXTRALEAN
 	#include <windows.h>
 	extern HWND g_OSWindowHandle;
-#elif defined(SDL_PLATFORM_APPLE)
+#elif defined(__APPLE__)
 	typedef struct _NSWindow NSWindow;
 	extern NSWindow* g_OSWindowHandle;
 #else

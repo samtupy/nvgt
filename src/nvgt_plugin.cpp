@@ -34,7 +34,7 @@ bool load_nvgt_plugin(const std::string& name, void* user) {
 		std::string dllname = name;
 		#ifdef _WIN32
 		dllname += ".dll";
-		#elif defined(SDL_PLATFORM_APPLE)
+		#elif defined(__APPLE__)
 		dllname += ".dylib";
 		#else
 		dllname += ".so";

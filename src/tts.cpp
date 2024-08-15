@@ -16,7 +16,7 @@
 	#include <blastspeak.h>
 #endif
 #include <obfuscate.h>
-#ifdef SDL_PLATFORM_APPLE
+#ifdef __APPLE__
 #include "apple.h"
 #endif
 #include "riffheader.h"
@@ -72,7 +72,7 @@ void tts_voice::setup() {
 		inst = NULL;
 		voice_index = builtin_index;
 	}
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	inst = new AVTTSVoice();
 	voice_index = inst->getVoiceIndex(inst->getCurrentVoice());
 	#else
@@ -89,7 +89,7 @@ void tts_voice::destroy() {
 	blastspeak_destroy(inst);
 	if (inst) free(inst);
 	inst = NULL;
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	if (!inst) return;
 	delete inst;
 	inst = nullptr;
@@ -134,7 +134,7 @@ bool tts_voice::speak(const std::string& text, bool interrupt) {
 			audioout = 0;
 		}
 	}
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	else {
 		return inst->speak(text, interrupt);
 	}
@@ -190,7 +190,7 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 			audioout = 0;
 		}
 	}
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	else {
 		return false; // not implemented yet.
 	}
@@ -235,7 +235,7 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 			audioout = 0;
 		}
 	}
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	else {
 		return ""; // Not implemented yet.
 	}
@@ -251,7 +251,7 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 bool tts_voice::speak_wait(const std::string& text, bool interrupt) {
 	if (!speak(text, interrupt))
 		return false;
-	#ifdef SDL_PLATFORM_APPLE
+	#ifdef __APPLE__
 	while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || inst->isSpeaking())
 	#else
 	while (BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING)
@@ -270,7 +270,7 @@ int tts_voice::get_rate() {
 	if (!blastspeak_get_voice_rate(inst, &result))
 		return 0;
 	return result;
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	return inst->getRate() * 7;
 	#endif
 	return 0;
@@ -279,7 +279,7 @@ int tts_voice::get_pitch() {
 	//if(voice_index == builtin_index) return builtin_pitch;
 	#ifdef _WIN32
 	// not implemented yet
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	return inst->getPitch();
 	#endif
 	return 0;
@@ -292,7 +292,7 @@ int tts_voice::get_volume() {
 	if (!blastspeak_get_voice_volume(inst, &result))
 		return 0;
 	return result;
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	return inst->getRate();
 	#endif
 	return 0;
@@ -302,7 +302,7 @@ void tts_voice::set_rate(int rate) {
 	#ifdef _WIN32
 	if (!inst && !refresh()) return;
 	blastspeak_set_voice_rate(inst, rate);
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	inst->setRate(rate / 7.0);
 	#endif
 }
@@ -310,7 +310,7 @@ void tts_voice::set_pitch(int pitch) {
 	// if(voice_index == builtin_index) builtin_pitch = pitch;
 	#ifdef _WIN32
 	// not implemented
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	inst->setPitch(pitch);
 	#endif
 	return;
@@ -320,7 +320,7 @@ void tts_voice::set_volume(int volume) {
 	#ifdef _WIN32
 	if (!inst && !refresh()) return;
 	blastspeak_set_voice_volume(inst, volume);
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	inst->setVolume(volume);
 	#endif
 }
@@ -335,7 +335,7 @@ bool tts_voice::set_voice(int voice) {
 		voice_index = voice;
 		return true;
 	}
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	bool r = inst->setVoiceByIndex(voice - (builtin_index + 1));
 	if (!r) return false;
 	voice_index = voice;
@@ -344,7 +344,7 @@ bool tts_voice::set_voice(int voice) {
 	return false;
 }
 bool tts_voice::get_speaking() {
-	#ifdef SDL_PLATFORM_APPLE
+	#ifdef __APPLE__
 	if (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING) return true;
 	return inst->isSpeaking();
 	#else
@@ -370,7 +370,7 @@ CScriptArray* tts_voice::list_voices() {
 		else
 			((std::string*)(array->At(array_idx)))->assign("");
 	}
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	array->InsertLast(*inst->getAllVoices());
 	#endif
 	return array;
@@ -379,7 +379,7 @@ int tts_voice::get_voice_count() {
 	#ifdef _WIN32
 	if (!inst && !refresh()) return builtin_index + 1;
 	return inst ? inst->voice_count + (builtin_index + 1) : builtin_index + 1;
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	return inst->getVoicesCount() + (builtin_index + 1);
 	#endif
 	return builtin_index + 1;
@@ -394,7 +394,7 @@ std::string tts_voice::get_voice_name(int index) {
 	const char* result = blastspeak_get_voice_description(inst, index);
 	if (result)
 		return std::string(result);
-	#elif defined(SDL_PLATFORM_APPLE)
+	#elif defined(__APPLE__)
 	return inst->getVoiceName(index);
 	#endif
 	return "";
