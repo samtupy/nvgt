@@ -14,6 +14,7 @@
 #include "bullet3.h" // Vector3
 
 class asIScriptEngine;
+class audio_engine;
 class mixer;
 class sound;
 
@@ -21,7 +22,27 @@ bool init_sound();
 bool refresh_audio_devices();
 
 class audio_node {
-	
+	public:
+		virtual void duplicate(); // reference counting
+		virtual void release();
+		virtual audio_engine* get_engine() const;
+		virtual unsigned int get_input_bus_count();
+		virtual unsigned int get_output_bus_count();
+		virtual unsigned int get_input_channels(unsigned int bus);
+		virtual unsigned int get_output_channels(unsigned int bus);
+		virtual bool attach_output_bus(unsigned int output_bus, audio_node* destination, unsigned int destination_input_bus);
+		virtual bool detach_output_bus(unsigned int bus);
+		virtual bool detach_all_output_busses();
+		virtual bool set_output_bus_volume(unsigned int bus, float volume);
+		virtual float get_output_bus_volume(unsigned int bus);
+		virtual bool set_state(ma_node_state state);
+		virtual ma_node_state get_state();
+		virtual bool set_state_time(ma_node_state state, unsigned long long time);
+		virtual unsigned long long get_state_time(ma_node_state state);
+		virtual ma_node_state get_state_by_time(unsigned long long global_time);
+		virtual ma_node_state get_state_by_time_range(unsigned long long global_time_begin, unsigned long long global_time_end);
+		virtual unsigned long long get_time();
+		virtual bool set_time(unsigned long long local_time);
 };
 class audio_engine {
 	public:
@@ -68,14 +89,12 @@ class audio_engine {
 		virtual mixer* new_mixer();
 		virtual sound* new_sound();
 };
-class sound {
+class mixer {
 	public:
+		virtual void duplicate(); // reference counting
+		virtual void release();
 		virtual audio_engine* get_engine();
 		virtual bool play();
-		virtual bool pause();
-		virtual bool pause_fade(unsigned long long length); // depends on the DURATIONS_IN_FRAMES engine flag.
-		virtual bool pause_fade_in_frames(unsigned long long frames);
-		virtual bool pause_fade_in_milliseconds(unsigned long long milliseconds);
 		virtual bool stop();
 		virtual void set_volume(float volume);
 		virtual float get_volume();
@@ -120,9 +139,43 @@ class sound {
 		virtual void set_fade(float start_volume, float end_volume, unsigned long long length); // depends on DURATIONS_IN_FRAMES flag in parent engine
 		virtual void set_fade_in_frames(float start_volume, float end_volume, unsigned long long frames);
 		virtual void set_fade_in_milliseconds(float start_volume, float end_volume, unsigned long long milliseconds);
+		virtual float get_current_fade_volume();
+		virtual void set_start_time(unsigned long long absolute_time); // DURATIONS_IN_FRAMES
+		virtual void set_start_time_in_frames(unsigned long long absolute_time);
+		virtual void set_start_time_in_milliseconds(unsigned long long absolute_time);
+		virtual void set_stop_time(unsigned long long absolute_time); // DURATIONS_IN_FRAMES
+		virtual void set_stop_time_in_frames(unsigned long long absolute_time);
+		virtual void set_stop_time_in_milliseconds(unsigned long long absolute_time);
+		virtual unsigned long long get_time(); // DURATIONS_IN_FRAMES
+		virtual unsigned long long get_time_in_frames();
+		virtual unsigned long long get_time_in_milliseconds();
+		virtual bool get_playing();
+};
+class sound : public mixer {
+	public:
+		virtual bool pause();
+		virtual bool pause_fade(unsigned long long length); // depends on the DURATIONS_IN_FRAMES engine flag.
+		virtual bool pause_fade_in_frames(unsigned long long frames);
+		virtual bool pause_fade_in_milliseconds(unsigned long long milliseconds);
 		virtual void set_timed_fade(float start_volume, float end_volume, unsigned long long length, unsigned long long absolute_time); // depends on DURATIONS_IN_FRAMES flag in parent engine
 		virtual void set_timed_fade_in_frames(float start_volume, float end_volume, unsigned long long frames, unsigned long long absolute_time_in_frames);
 		virtual void set_timed_fade_in_milliseconds(float start_volume, float end_volume, unsigned long long milliseconds, unsigned long long absolute_time_in_milliseconds);
-}
+		virtual void set_stop_time_with_fade(unsigned long long absolute_time, unsigned long long fade_length); // DURATIONS_IN_FRAMES
+		virtual void set_stop_time_with_fade_in_frames(unsigned long long absolute_time, unsigned long long fade_length);
+		virtual void set_stop_time_with_fade_in_milliseconds(unsigned long long absolute_time, unsigned long long fade_length);
+		virtual void set_looping(bool looping);
+		virtual bool get_looping();
+		virtual bool get_at_end();
+		virtual bool seek(unsigned long long position); // DURATION_IN_FRAMES
+		virtual bool seek_in_frames(unsigned long long position);
+		virtual bool seek_in_milliseconds(unsigned long long position);
+		virtual unsigned long long get_position(); // DURATION_IN_FRAMES
+		virtual unsigned long long get_position_in_frames();
+		virtual unsigned long long get_position_in_milliseconds();
+		virtual unsigned long long get_length(); // DURATION_IN_FRAMES
+		virtual unsigned long long get_length_in_frames();
+		virtual unsigned long long get_length_in_milliseconds();
+		virtual bool get_data_format(ma_format* format, unsigned int* channels, unsigned int* sample_rate);
+};
 
 void RegisterSoundsystem(asIScriptEngine* engine);
