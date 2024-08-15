@@ -118,11 +118,11 @@ function main {
 	# Insure required packages are installed for building.
 	sudo apt install build-essential gcc g++ make cmake autoconf libtool python3 python3-pip libsystemd-dev libspeechd-dev -y
 	
-	#setup_angelscript
-	#setup_bullet
-	#setup_enet
-	#setup_libgit2
-	#setup_poco
+	setup_angelscript
+	setup_bullet
+	setup_enet
+	setup_libgit2
+	setup_poco
 	setup_sdl
 	setup_nvgt
 	echo Success!
