@@ -104,7 +104,8 @@ function setup_nvgt {
 	cd ..
 	rm lindev.tar.gz
 	if ! which scons &> /dev/null; then
-		pip3 install --user --break-system-packages scons
+		export PIP_BREAK_SYSTEM_PACKAGES=1
+		pip3 install --user scons
 	fi
 	scons -s no_upx=0
 	echo NVGT built.
