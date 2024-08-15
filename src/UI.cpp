@@ -18,7 +18,7 @@
 	#define VC_EXTRALEAN
 	#include <windows.h>
 	#include "InputBox.h"
-#elif defined(__APPLE__)
+#elif defined(SDL_PLATFORM_APPLE)
 #include <IOKit/IOKitLib.h>
 #include <IOKit/IOCFBundle.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -31,8 +31,7 @@
 #ifndef _WIN32
 #include <sys/time.h>
 #endif
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_syswm.h>
+#include <SDL3/SDL.h>
 #include <obfuscate.h>
 #include <thread.h>
 #include <string>
@@ -63,7 +62,7 @@ int message_box(const std::string& title, const std::string& text, const std::ve
 		}
 		SDL_MessageBoxButtonData& sdlbtn = sdlbuttons.emplace_back();
 		sdlbtn.flags = button_flag;
-		sdlbtn.buttonid = i + 1;
+		sdlbtn.buttonID = i + 1;
 		sdlbtn.text = buttons[i].c_str() + skip;
 	}
 	SDL_MessageBoxData box = {mb_flags, g_WindowHandle, title.c_str(), text.c_str(), int(sdlbuttons.size()), sdlbuttons.data(), NULL};
@@ -154,7 +153,7 @@ std::string input_box(const std::string& title, const std::string& text, const s
 	std::string resultA;
 	Poco::UnicodeConverter::convert(r, resultA);
 	return resultA;
-	#elif defined(__APPLE__)
+	#elif defined(SDL_PLATFORM_APPLE)
 	std::string r = apple_input_box(title, text, default_value, false, false);
 	if (g_WindowHandle) SDL_RaiseWindow(g_WindowHandle);
 	if (r == "\xff") {
@@ -173,7 +172,7 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 	Poco::UnicodeConverter::convert(text, textU);
 	Poco::UnicodeConverter::convert(value, valueU);
 	return InfoBox(titleU, textU, valueU);
-	#elif defined(__APPLE__)
+	#elif defined(SDL_PLATFORM_APPLE)
 	apple_input_box(title, text, value, false, false);
 	return true;
 	#else
@@ -184,7 +183,7 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 SDL_Window* g_WindowHandle = 0;
 #ifdef _WIN32
 	HWND g_OSWindowHandle = NULL;
-#elif defined(__APPLE__)
+#elif defined(SDL_PLATFORM_APPLE)
 	#include "apple.h"
 	NSWindow* g_OSWindowHandle = NULL;
 #else
@@ -195,17 +194,18 @@ bool g_WindowHidden = false;
 
 static std::vector<SDL_Event> post_events; // holds events that should be processed after the next wait() call.
 #ifdef _WIN32
-void sdl_windows_messages(void* udata, void* hwnd, unsigned int message, uint64_t wParam, int64_t lParam) {
-	if (message == WM_KEYDOWN && wParam == 'V' && lParam == 1) {
+SDL_bool sdl_windows_messages(void* udata, MSG* msg) {
+	if (msg->message == WM_KEYDOWN && msg->wParam == 'V' && msg->lParam == 1) {
 		SDL_Event e{};
-		e.type = SDL_KEYDOWN;
+		e.type = SDL_EVENT_KEY_DOWN;
 		e.key.timestamp = SDL_GetTicks();
-		e.key.keysym.scancode = SDL_SCANCODE_PASTE;
-		e.key.keysym.sym = SDLK_PASTE;
+		e.key.scancode = SDL_SCANCODE_PASTE;
+		e.key.key = SDLK_PASTE;
 		SDL_PushEvent(&e);
-		e.type = SDL_KEYUP;
+		e.type = SDL_EVENT_KEY_UP;
 		post_events.push_back(e);
 	}
+	return SDL_TRUE;
 }
 #endif
 bool set_application_name(const std::string& name) {
@@ -225,15 +225,14 @@ bool ShowNVGTWindow(std::string& window_title) {
 	#ifdef _WIN32
 	SDL_SetWindowsMessageHook(sdl_windows_messages, NULL);
 	#endif
-	g_WindowHandle = SDL_CreateWindow(window_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 640, 0);
+	g_WindowHandle = SDL_CreateWindow(window_title.c_str(), 640, 640, 0);
 	if (!g_WindowHandle) return false;
-	SDL_SysWMinfo winf;
-	SDL_VERSION(&winf.version);
-	SDL_GetWindowWMInfo(g_WindowHandle, &winf);
+	if (!SDL_HasScreenKeyboardSupport()) SDL_StartTextInput(g_WindowHandle);
+	SDL_PropertiesID window_props = SDL_GetWindowProperties(g_WindowHandle);
 	#ifdef _WIN32
-	g_OSWindowHandle = winf.info.win.window;
-	#elif defined(SDL_VIDEO_DRIVER_COCOA)
-	g_OSWindowHandle = winf.info.cocoa.window;
+	g_OSWindowHandle = (HWND)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+	#elif defined(__APPLE__) // Will probably need to fix for IOS
+	g_OSWindowHandle = (HWND)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
 	SDL_ShowWindow(g_WindowHandle);
 	SDL_RaiseWindow(g_WindowHandle);
 	voice_over_window_created();
@@ -270,11 +269,11 @@ std::string get_window_text() {
 }
 void* get_window_os_handle() { return reinterpret_cast<void*>(g_OSWindowHandle); }
 void handle_sdl_event(SDL_Event* evt) {
-	if (evt->type == SDL_KEYDOWN || evt->type == SDL_KEYUP || evt->type == SDL_TEXTINPUT || evt->type == SDL_MOUSEMOTION || evt->type == SDL_MOUSEBUTTONDOWN || evt->type == SDL_MOUSEBUTTONUP || evt->type == SDL_MOUSEWHEEL)
+	if (evt->type == SDL_EVENT_KEY_DOWN || evt->type == SDL_EVENT_KEY_UP || evt->type == SDL_EVENT_TEXT_INPUT || evt->type == SDL_EVENT_MOUSE_MOTION || evt->type == SDL_EVENT_MOUSE_BUTTON_DOWN || evt->type == SDL_EVENT_MOUSE_BUTTON_UP || evt->type == SDL_EVENT_MOUSE_WHEEL)
 		InputEvent(evt);
-	else if (evt->type == SDL_WINDOWEVENT && evt->window.event == SDL_WINDOWEVENT_FOCUS_LOST)
+	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_LOST)
 		lost_window_focus();
-	else if (evt->type == SDL_WINDOWEVENT && evt->window.event == SDL_WINDOWEVENT_FOCUS_GAINED)
+	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_GAINED)
 		regained_window_focus();
 }
 void wait(int ms) {
@@ -292,17 +291,17 @@ void wait(int ms) {
 		if (ms < 1) break;
 	}
 	SDL_Event evt;
-	#ifdef __APPLE__
+	#ifdef SDL_PLATFORM_APPLE
 	bool left_just_pressed = false, right_just_pressed = false;
 	#endif
 	while (SDL_PollEvent(&evt)) {
-		#ifdef __APPLE__
+		#ifdef SDL_PLATFORM_APPLE
 		// Hack to fix voiceover's weird handling of the left and right arrow keys. If a left/right arrow down/up event get generated in the same frame, we need to move the up event to the next frame.
 		bool evt_handled = false;
-		if (evt.type == SDL_KEYDOWN) {
+		if (evt.type == SDL_EVENT_KEY_DOWN) {
 			if (evt.key.keysym.scancode == SDL_SCANCODE_LEFT) left_just_pressed = true;
 			if (evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) right_just_pressed = true;
-		} else if ((left_just_pressed || right_just_pressed) && evt.type == SDL_KEYUP) {
+		} else if ((left_just_pressed || right_just_pressed) && evt.type == SDL_EVENT_KEY_UP) {
 			evt_handled = true;
 			if (left_just_pressed && evt.key.keysym.scancode == SDL_SCANCODE_LEFT) post_events.push_back(evt);
 			else if (right_just_pressed && evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) post_events.push_back(evt);
@@ -327,7 +326,7 @@ uint64_t idle_ticks() {
 		GetLastInputInfo(&lii);
 		DWORD currentTick = GetTickCount();
 		return (currentTick - lii.dwTime);
-	#elif __APPLE__
+	#elif SDL_PLATFORM_APPLE
 		io_iterator_t iter;
 		io_registry_entry_t entry;
 		CFMutableDictionaryRef matching = IOServiceMatching("IOHIDSystem");

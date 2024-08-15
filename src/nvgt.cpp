@@ -31,12 +31,12 @@
 #include <Poco/File.h>
 #include <Poco/Path.h>
 #include <Poco/UnicodeConverter.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "filesystem.h"
 #include "scriptarray.h"
 #define NVGT_LOAD_STATIC_PLUGINS
 #include "angelscript.h" // nvgt's angelscript implementation
-#ifdef __APPLE__
+#ifdef SDL_PLATFORM_APPLE
 #include "apple.h" // apple_requested_file
 #endif
 #include "input.h"
@@ -87,7 +87,7 @@ protected:
 		wstring dir_u;
 		UnicodeConverter::convert(Path(config().getString("application.dir")).append("lib").toString(), dir_u);
 		SetDllDirectoryW(dir_u.c_str());
-		#elif defined(__APPLE__)
+		#elif defined(SDL_PLATFORM_APPLE)
 		if (Environment::has("MACOS_BUNDLED_APP")) { // Use GUI instead of stdout and chdir to Resources directory.
 			config().setString("application.gui", "");
 			#ifdef NVGT_STUB
@@ -161,7 +161,7 @@ protected:
 	virtual int main(const std::vector<std::string>& args) override {
 		// Determine the script file that is to be executed.
 		string scriptfile = "";
-		#ifdef __APPLE__
+		#ifdef SDL_PLATFORM_APPLE
 			scriptfile = apple_requested_file(); // Files opened from finder on mac do not use command line arguments.
 		#endif
 		if (scriptfile.empty() && args.size() > 0) scriptfile = args[0];
@@ -249,7 +249,7 @@ protected:
 #if !defined(_WIN32) || defined(NVGT_WIN_APP) || defined(NVGT_STUB)
 #undef SDL_MAIN_HANDLED
 #undef SDL_main_h_
-#include <SDL2/SDL_main.h>
+#include <SDL3/SDL_main.h>
 int main(int argc, char** argv) {
 	AutoPtr<Application> app = new nvgt_application();
 	try {

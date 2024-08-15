@@ -21,7 +21,7 @@ union SDL_Event;
 extern std::string g_UserInput;
 
 class joystick : Poco::RefCountedObject {
-	SDL_GameController* stick;
+	SDL_Gamepad* stick;
 
 public:
 	unsigned int type() const;

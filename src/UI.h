@@ -16,7 +16,7 @@
 	#define VC_EXTRALEAN
 	#include <windows.h>
 	extern HWND g_OSWindowHandle;
-#elif defined(__APPLE__)
+#elif defined(SDL_PLATFORM_APPLE)
 	typedef struct _NSWindow NSWindow;
 	extern NSWindow* g_OSWindowHandle;
 #else
@@ -24,7 +24,7 @@
 #endif
 #include <angelscript.h>
 #include <string>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 extern SDL_Window* g_WindowHandle;
 

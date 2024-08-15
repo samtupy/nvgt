@@ -16,7 +16,7 @@
 #include <Poco/BinaryReader.h>
 #include <Poco/BinaryWriter.h>
 #include <Poco/Format.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "nvgt.h"
 #include "nvgt_plugin.h"
 #include "UI.h"
@@ -34,7 +34,7 @@ bool load_nvgt_plugin(const std::string& name, void* user) {
 		std::string dllname = name;
 		#ifdef _WIN32
 		dllname += ".dll";
-		#elif defined(__APPLE__)
+		#elif defined(SDL_PLATFORM_APPLE)
 		dllname += ".dylib";
 		#else
 		dllname += ".so";

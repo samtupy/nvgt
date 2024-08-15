@@ -20,7 +20,7 @@
 	#include <intrin.h>
 	#include <iphlpapi.h>
 #endif
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 unsigned short hashMacAddress(PIP_ADAPTER_INFO info) {
 	unsigned short hash = 0;
@@ -88,15 +88,15 @@ const char* getMachineName() {
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 
-#ifdef __APPLE__
+#ifdef SDL_PLATFORM_APPLE
 	#include <net/if_dl.h>
 	#include <ifaddrs.h>
 	#include <net/if_types.h>
 	#include <IOKit/IOKitLib.h>
-#else //!__APPLE__
+#else //!SDL_PLATFORM_APPLE
 	#include <linux/if.h>
 	#include <linux/sockios.h>
-#endif //!__APPLE__
+#endif //!SDL_PLATFORM_APPLE
 
 const char* getMachineName() {
 	static struct utsname u;
@@ -119,7 +119,7 @@ void getMacHash(unsigned short& mac1, unsigned short& mac2) {
 	mac1 = 0;
 	mac2 = 0;
 
-	#ifdef __APPLE__
+	#ifdef SDL_PLATFORM_APPLE
 	struct ifaddrs* ifaphead;
 	if (getifaddrs(&ifaphead) != 0)
 		return;
@@ -138,7 +138,7 @@ void getMacHash(unsigned short& mac1, unsigned short& mac2) {
 		}
 	}
 	freeifaddrs(ifaphead);
-	#else // !__APPLE__
+	#else // !SDL_PLATFORM_APPLE
 	int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
 	if (sock < 0)
 		return;
@@ -167,7 +167,7 @@ void getMacHash(unsigned short& mac1, unsigned short& mac2) {
 		}
 	}
 	close(sock);
-	#endif // !__APPLE__
+	#endif // !SDL_PLATFORM_APPLE
 	if (mac1 > mac2) {
 		unsigned short tmp = mac2;
 		mac2 = mac1;
@@ -175,7 +175,7 @@ void getMacHash(unsigned short& mac1, unsigned short& mac2) {
 	}
 }
 
-#ifdef __APPLE__
+#ifdef SDL_PLATFORM_APPLE
 unsigned long long getSystemSerialNumberHash() {
 	unsigned long long hash = 0;
 	unsigned char* phash = (unsigned char*)&hash;
@@ -196,7 +196,7 @@ unsigned long long getSystemSerialNumberHash() {
 #endif
 
 unsigned short getVolumeHash() {
-	#ifdef __APPLE__
+	#ifdef SDL_PLATFORM_APPLE
 	return (unsigned short)getSystemSerialNumberHash();
 	#else
 	unsigned char* sysname = (unsigned char*)getMachineName();
@@ -207,14 +207,14 @@ unsigned short getVolumeHash() {
 	#endif
 }
 
-#ifdef __APPLE__
+#ifdef SDL_PLATFORM_APPLE
 #include <mach-o/arch.h>
 unsigned short getCpuHash() {
 	unsigned short val = SDL_GetCPUCount() + SDL_GetCPUCacheLineSize();
 	return val;
 }
 
-#else // !__APPLE__
+#else // !SDL_PLATFORM_APPLE
 
 static void getCpuid(unsigned int* eax, unsigned int* ebx, unsigned int* ecx, unsigned int* edx) {
 	#ifdef __arm__
@@ -242,7 +242,7 @@ unsigned short getCpuHash() {
 		hash += (ptr[i] & 0xFFFF) + (ptr[i] >> 16);
 	return hash;
 }
-#endif // !__APPLE__
+#endif // !SDL_PLATFORM_APPLE
 #endif
 
 
