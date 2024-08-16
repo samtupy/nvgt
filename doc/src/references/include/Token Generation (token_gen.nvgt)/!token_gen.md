@@ -1,2 +1,2 @@
 # Token generation include
-Allows you to easily generate random strings of characters of any length.
+Allows you to easily generate random strings of characters of any length in a given mode.
