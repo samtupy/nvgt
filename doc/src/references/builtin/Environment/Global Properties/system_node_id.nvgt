@@ -1,0 +1,9 @@
+/**
+	This property returns the node ID, or another word, host ID, of your system.
+	const string system_node_id;
+*/
+
+// example:
+void main() {
+	alert("Your system node/host ID is", system_node_id);
+}

@@ -1,0 +1,9 @@
+/**
+	This property returns a string containing the current platform display name, such as "Windows 8".
+	const string PLATFORM_DISPLAY_NAME;
+*/
+
+// example:
+void main() {
+	alert("Your current Platform display name is", PLATFORM_DISPLAY_NAME);
+}

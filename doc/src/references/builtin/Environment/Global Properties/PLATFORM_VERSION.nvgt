@@ -1,0 +1,9 @@
+/**
+	This property returns a string containing the current platform version, such as "6.2 (Build 9200)".
+	const string PLATFORM_VERSION;
+*/
+
+// example:
+void main() {
+	alert("Your current Platform version is", PLATFORM_VERSION);
+}
