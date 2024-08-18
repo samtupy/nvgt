@@ -1,11 +1,11 @@
 /**
 	Formats a string with placeholders.
 	string string::format(const ?& in = null...);
-	## Arguments
+	## Arguments:
 		* const ?& in = null: Any stringable value. You can pass up to 16 parameters.
-	## Returns
+	## Returns:
 		Returns the formatted string.
-	## Remarks
+	## Remarks:
 		This method is useful in situations when:
 		1. You want to have multiple formats for messages, such as short and long messages.
 		2. You don't want to use concatenation.
