@@ -1,7 +1,7 @@
 /**
 	Returns whether the dictionary is empty.
 	bool dictionary::is_empty();
-	## Returns
+	## Returns:
 		bool: true if the dictionary is empty, false otherwise.
 */
 

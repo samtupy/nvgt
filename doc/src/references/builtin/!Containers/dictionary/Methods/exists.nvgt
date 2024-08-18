@@ -1,9 +1,9 @@
 /**
 	Returns whether a given key exists in the dictionary.
 	bool dictionary::exists(const string &in key);
-	## Arguments
+	## Arguments:
 		* const string &in key: the key to look for.
-	## Returns
+	## Returns:
 		bool: true if the key exists, false otherwise.
 */
 

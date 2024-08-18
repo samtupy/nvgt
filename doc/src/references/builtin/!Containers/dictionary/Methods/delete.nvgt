@@ -1,9 +1,9 @@
 /**
 	This method deletes the given key from the dictionary.
 	bool dictionary::delete(const string &in key);
-	## Arguments
+	## Arguments:
 		* const string &in key: the key to delete.
-	## Returns
+	## Returns:
 		bool: true if the key was successfully deleted, false otherwise.
 */
 

@@ -1,12 +1,12 @@
 /**
 	Gets the data from a given key.
 	bool dictionary::get(const string &in key, ?&out value);
-	## Arguments
+	## Arguments:
 		* const string &in key: the key to look for.
 		* ?&out value: the variable for the value to be associated, see remarks.
-	## Returns
+	## Returns:
 		bool: true if the dictionary retrieves the value of the key, false otherwise.
-	## Remarks
+	## Remarks:
 		Please note that the value parameter should be a variable to receive the value. This means that dictionary will write to the variable, not read from.
 */
 

@@ -1,14 +1,14 @@
 /**
 	Appends an element to an array at a given position.
 	void array::insert_at(uint index, const T&in value);
-	## Arguments
+	## Arguments:
 		* uint index: the position to insert at.
 		* const T&in value: the element to be inserted.
-	## Remarks
+	## Remarks:
 		This method adds an element to the given position of an array.
 */
 
-// Example
+// Example:
 void main() {
 	string[] names = {"HTML", "CSS"};
 	names.insert_at(0,"Java Script");
