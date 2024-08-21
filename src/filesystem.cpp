@@ -327,7 +327,7 @@ void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("glob_options", "GLOB_CASELESS", Glob::GLOB_CASELESS);
 	engine->RegisterGlobalFunction("bool directory_exists(const string& in)", asFUNCTION(DirectoryExists), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool directory_create(const string& in)", asFUNCTION(DirectoryCreate), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool directory_delete(const string& in)", asFUNCTION(DirectoryDelete), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool directory_delete(const string& in, bool = true)", asFUNCTION(DirectoryDelete), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_exists(const string& in)", asFUNCTION(FileExists), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_delete(const string& in)", asFUNCTION(FileDelete), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_copy(const string& in, const string& in, bool)", asFUNCTION(FileCopy), asCALL_CDECL);

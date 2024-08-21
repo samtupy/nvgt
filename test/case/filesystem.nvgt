@@ -1,0 +1,9 @@
+void test_filesystem() {
+	assert(directory_create("tmp/fstest"));
+	assert(directory_exists("tmp/fstest"));
+	assert(directory_create("tmp/fstest/a/b/c")); // Works recursively
+	assert(directory_exists("tmp/fstest/a/b/c"));
+	assert(!directory_delete("tmp/fstest/a", false)); // Should fail due to non-recursive
+	assert(directory_delete("tmp/fstest/a/b/c", false)); // c is empty so should succeed
+	assert(directory_delete("tmp/fstest"));
+}
