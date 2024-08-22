@@ -1,0 +1,17 @@
+/**
+	This method will read the file currently associated.
+	string file::read(uint count = 0);
+	## Arguments:
+		* uint count = 0: the number of characters that is to be read.
+	## Returns:
+		string: the contents of the file on success, an empty string otherwise.
+*/
+
+// Example:
+void main() {
+	file f;
+	f.open("test.txt", "rb");
+	string r = f.read();
+	f.close();
+	alert("The file contents", r);
+}

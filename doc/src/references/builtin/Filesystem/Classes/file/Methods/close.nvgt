@@ -1,0 +1,14 @@
+/**
+	This method will close the current object associations.
+	bool file::close();
+	## Returns:
+		bool: true on success, false on failure.
+*/
+
+// Example:
+void main() {
+	file f;
+	f.open("test.txt", "wb");
+	f.write("This is a test");
+	f.close();
+}
