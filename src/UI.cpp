@@ -36,6 +36,8 @@
 #include <thread.h>
 #include <string>
 #include <vector>
+#include <Poco/StringTokenizer.h>
+#include <Poco/SynchronizedObject.h>
 #include <Poco/Thread.h>
 #include <Poco/UnicodeConverter.h>
 #include <Poco/Util/Application.h>
@@ -52,6 +54,7 @@ int message_box(const std::string& title, const std::string& text, const std::ve
 		const std::string& btn = buttons[i];
 		int skip = 0;
 		unsigned int button_flag = 0;
+		if (!btn.empty() && !btn[0]) continue; // Don't show this button while still increasing button ID, useful for disabling options without modifying result checking code that may contain magic button ID numbers.
 		if (btn.substr(0, 1) == "`") {
 			button_flag |= SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
 			skip += 1;
@@ -130,6 +133,36 @@ bool ClipboardSetRawText(const std::string& text) {
 	#else
 	return FALSE;
 	#endif
+}
+class nvgt_file_dialog_info : public Poco::SynchronizedObject {
+public:
+	std::string data;
+};
+void nvgt_file_dialog_callback(void* user, const char* const * files, int filter) {
+	if (!files) alert("Open file error", SDL_GetError()); // This will probably change to silently setting an error string or something.
+	nvgt_file_dialog_info* fdi = reinterpret_cast<nvgt_file_dialog_info*>(user);
+	if (files && *files) fdi->data = *files;
+	fdi->notify();
+}
+std::string simple_file_open_dialog(const std::string& filters, const std::string& default_location) {
+	// We need to parse the filters provided by the user. Format is name:extension_wildcard1;extension_wildcard2|name:ext1;ext2|etc files:etc
+	Poco::StringTokenizer filterstrings(filters, "|");
+	std::vector<SDL_DialogFileFilter> filter_objects;
+	std::vector<std::string> filter_parts; // Welcome to low level programming/c++ communicating with c/Sam being dumb/whatever where we need to keep several null terminated string fragments in memory until this function returns, kinda wish SDL3 just did this parsing for us honestly.
+	filter_parts.reserve(filterstrings.count() * 2); // avoid reallocation as items are added
+	for (size_t i = 0; i < filterstrings.count(); i++) {
+		if (filterstrings[i].find(":") == std::string::npos) continue; // Invalid filter, should we error here or something?
+		SDL_DialogFileFilter& f = filter_objects.emplace_back();
+		f.name = filter_parts.emplace_back(filterstrings[i].substr(0, filterstrings[i].rfind(":"))).c_str();
+		f.pattern = filter_parts.emplace_back(filterstrings[i].substr(filterstrings[i].rfind(":") + 1)).c_str();
+	}
+	SDL_DialogFileFilter& end = filter_objects.emplace_back(); // Not doing this results in bogus filters at the end of the list in the dialog, I can see why at sdl_dialog_utils.c:62 and might open an issue on sdl's repo about it because either this or filter count, not both?
+	end.name = nullptr;
+	end.pattern = nullptr;
+	nvgt_file_dialog_info fdi;
+	SDL_ShowOpenFileDialog(nvgt_file_dialog_callback, &fdi, nullptr, filter_objects.data(), filter_objects.size() -1, nullptr, SDL_FALSE);
+	while (!fdi.tryWait(5)) SDL_PumpEvents();
+	return fdi.data;
 }
 bool urlopen(const std::string& url) {
 	return !SDL_OpenURL(url.c_str());
