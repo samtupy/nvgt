@@ -12,7 +12,7 @@
 		3. You want to use a placeholder more than once in a string.
 */
 
-// Example
+// Example:
 void main() {
 	string[] greetings = {"Hello %0! How are you?", "Hola %0! ¿Cómo estás?"};
 	string[] messages = {"You have %0 health", "%0 health"};

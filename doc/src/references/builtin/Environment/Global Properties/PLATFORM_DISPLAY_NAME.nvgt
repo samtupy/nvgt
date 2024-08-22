@@ -1,0 +1,11 @@
+/**
+	This property returns a string containing the current platform display name, such as "Windows 8".
+	const string PLATFORM_DISPLAY_NAME;
+	## Remarks:
+		Due to a backwards compatibility problem in windows, this function by default will cap out at Windows 8 even if the user is running a newer version of Windows. If determining the most modern windows version on the user's system is important to you, you can create a gamename.exe.manifest file to target your app for modern windows. Here is some [microsoft documentation](https://learn.microsoft.com/en-us/windows/win32/sysinfo/targeting-your-application-at-windows-8-1) that explains how, you can probably just use the example manifest provided there.
+*/
+
+// example:
+void main() {
+	alert("Your current Platform display name is", PLATFORM_DISPLAY_NAME);
+}

@@ -1,0 +1,9 @@
+/**
+	This property returns the node name, or another word, host name, of your system.
+	const string system_node_name;
+*/
+
+// example:
+void main() {
+	alert("Your system node/host name is", system_node_name);
+}

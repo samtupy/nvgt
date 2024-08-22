@@ -1,0 +1,27 @@
+/**
+	This method will open a file for reading or writing.
+	bool file::open(string filename, string open_mode);
+	## Arguments:
+		* string filename: the name of the file to open. This can be either an absolute or relative path.
+		* string open_mode: the mode to open, see remarks.
+	## Returns:
+		bool: true on success, false on failure.
+	## Remarks:
+		While on some operating systems (mostly windows) both the slash(`/`), and the backslash(`\`) can be used to specify the filename, it is very strongly recommended to use the / character for greatest cross platform compatibility.
+		The following is a list of valid open modes.
+		* a: append.
+		* w: write.
+		* r: read.
+		* r+: read and write.
+		For backwards compatibility with code that used a version of the file object from when there was a difference between text and binary file open modes, a b character is also accepted (for example rb) to indicate binary. The current stream implementation ignores this character other than to gracefully accept it rather than complaining that it is an invalid mode. You can use other text encoding APIs such as string_recode and the line_converting_reader if you really need to try recreating something similar to the old behavior.
+		The file will be created if the file does not exist if opened in either write or append mode. When opened in read mode, the file must exist in order to be successful.
+*/
+
+// Example:
+void main() {
+	file f;
+	f.open("test.txt", "wb");
+	f.write("This is a test");
+	f.close();
+	alert("Information", "The file has been written");
+}

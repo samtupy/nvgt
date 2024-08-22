@@ -1,0 +1,20 @@
+/**
+	Write raw bytes to a stream.
+	uint write(string content);
+	## Arguments:
+		* string content: the content that is to be written.
+	## Returns:
+		uint: the number of bytes written.
+	## Remarks:
+		If needed, you can use the returned value to verify whether the data you intended to write to the stream was written successfully by checking whether the return value of this function matches the length of the data you passed to it.
+*/
+
+// Example:
+void main() {
+	// This time we'll use a file which is another type of datastream to show how the functions in this datastream class work on it's children.
+	file f("test.txt", "wb");
+	string data = "This is a test file";
+	bool success = f.write(data) == data.length();
+	f.close();
+	alert("Information", "The file with the data has been " + (success? "successfully" : "unsuccessfully") + " written");
+}
