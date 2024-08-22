@@ -10,7 +10,7 @@
 // Example:
 void main() {
 	dictionary data;
-	data.set("nvgt", "An audiogame engine written in AngelScript");
+	data.set("nvgt", "An audiogame engine using AngelScript");
 	alert("Information", data.delete("nvgt")); //true
 	alert("Information", data.delete("nvgt")); //false because the key is already deleted, another word, it does not exist.
 }

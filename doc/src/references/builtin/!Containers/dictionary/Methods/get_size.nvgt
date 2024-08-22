@@ -8,6 +8,6 @@
 // Example:
 void main() {
 	dictionary data;
-	data.set("nvgt", "An audiogame engine written in AngelScript");
+	data.set("nvgt", "An audiogame engine using AngelScript");
 	alert("Dictionary size is", data.get_size());
 }

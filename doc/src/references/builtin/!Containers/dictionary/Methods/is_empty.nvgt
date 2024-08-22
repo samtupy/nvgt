@@ -8,7 +8,7 @@
 // Example:
 void main() {
 	dictionary data;
-	data.set("nvgt", "An audiogame engine written in AngelScript");
+	data.set("nvgt", "An audiogame engine using AngelScript");
 	alert("Information", data.is_empty()); //false
 	data.delete_all();
 	alert("Information", data.is_empty()); //true

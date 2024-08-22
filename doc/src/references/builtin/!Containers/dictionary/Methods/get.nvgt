@@ -13,7 +13,7 @@
 // Example:
 void main() {
 	dictionary data;
-	data.set("nvgt", "An audiogame engine written in AngelScript");
+	data.set("nvgt", "An audiogame engine using AngelScript");
 	string result;
 	if (!data.get("nvgt", result))
 		alert("Error", "Failed to retrieve the value of the key");

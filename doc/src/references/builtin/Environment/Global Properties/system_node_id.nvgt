@@ -1,5 +1,5 @@
 /**
-	This property returns the node ID, or another word, host ID, of your system.
+	This property returns the node ID, or another words, primary MAC address, of your system.
 	const string system_node_id;
 */
 
