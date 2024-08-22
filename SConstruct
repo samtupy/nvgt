@@ -5,6 +5,21 @@
 
 import os, multiprocessing
 
+Help("""
+	Available custom build switches for NVGT:
+		copylibs=0 or 1 (default 1): Copy shared libraries to release/lib after building?
+		debug=0 or 1 (default 0): Include debug symbols in the resulting binaries?
+		no_upx=0 or 1 (defaulot 1): Disable UPX stubs?
+		no_plugins=0 or 1 (default 0): Disable the plugin system entirely?
+		no_shared_plugins=0 or 1 (default 0): Only compile plugins statically?
+		no_stubs=0 or 1 (default 0): Disable compilation of all stubs?
+		no_user=0 or 1 (default 0): Pretend that the user directory doesn't exist?
+		no_<plugname>_plugin=1: Disable a plugin by name.
+		stub_obfuscation=0 or 1 (default 0): Obfuscate some Angelscript function registration strings in the resulting stubs? Could make them bigger.
+	You can also run scons install (for now only on windows) to install the build into C:/nvgt. STILL WIP!
+	Note that custom switches or targets may be added by any plugin SConscript and may not be documented here.
+""")
+
 # setup
 env = Environment()
 # Prevent scons from wiping out the environment for certain tools, e.g. scan-build
@@ -17,9 +32,10 @@ SConscript("build/upx_sconscript.py", exports = ["env"])
 SConscript("build/version_sconscript.py", exports = ["env"])
 env.SetOption("num_jobs", multiprocessing.cpu_count())
 SConscript("build/osdev_sconscript.py", exports = ["env"])
-env.Tool('compilation_db')
-cdb = env.CompilationDatabase()
-Alias('cdb', cdb)
+if ARGUMENTS.get("debug", "0") == "1":
+	env.Tool('compilation_db')
+	cdb = env.CompilationDatabase()
+	Alias('cdb', cdb)
 if env["PLATFORM"] == "win32":
 	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/O2", "/bigobj", "/permissive-"])
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
@@ -34,10 +50,10 @@ if env["PLATFORM"] == "darwin":
 	env.Append(LIBS = [File("/usr/local/lib/libangelscript.a"), File("/usr/local/lib/libenet.a"), File("/usr/local/lib/libSDL3.a"), File("/opt/homebrew/lib/libcrypto.a"), File("/opt/homebrew/lib/libssl.a"), "iconv"])
 elif env["PLATFORM"] == "posix":
 	# enable the gold linker to silence seemingly pointless warnings about symbols in the bass libraries, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
-	env.Append(CPPPATH = ["/usr/local/include"], LIBPATH = ["/usr/local/lib"], LINKFLAGS = ["-fuse-ld=gold", "-s"])
+	env.Append(CPPPATH = ["/usr/local/include"], LIBPATH = ["/usr/local/lib"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
 	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL3.a", "crypto", "ssl"])
-env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "NDEBUG", "UNICODE"])
+env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
 # plugins
