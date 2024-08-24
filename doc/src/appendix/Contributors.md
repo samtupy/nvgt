@@ -9,5 +9,6 @@ This file contains the names of anyone who has helped contribute to the NVGT eng
 * [Ethin Probst](https://github.com/ethindp): major optimizations to parts of the code, rewrote sound effect parsing, libspeechd integration, docs.
 * Valiant8086: Documentation on game distribution.
 * Gruia Chiscop: AVSpeech implementation.
+* [Abdullah Tepeli](https://github.com/colonel-official): Delete-by-word support for the audio_form include.
 * Beta testers including but not limited to Patrick Wilson, Quin G, Steven D, Lucas Brown, Liam Erven, DJWolfy, Lukáš Hosnedl, Heaven Games, Pragma and Day Garwood, without the valuable feedback and suggestions provided by these people NVGT would have never gotten this far.
 * Last but not least, nothing is worth maintaining or developing without users, and so thank you to everyone who uses this engine and gives it their feedback, time and attention!
