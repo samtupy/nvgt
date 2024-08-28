@@ -60,7 +60,7 @@ string tts_dump_config(tts_voice@ v) {
 	if (v.voice < 0) return "default";
 	else o = v.get_voice_name(v.voice) + "||";
 	if (o == "||") o = "default||";
-	return o + v.rate + "||0||" + v.volume;
+	return o + v.rate + "||0||" + v.volume + "||" + use_sr;
 }
 bool tts_load_config(string c, tts_voice@ v) {
 	string[] args = c.split("||");
@@ -73,6 +73,8 @@ bool tts_load_config(string c, tts_voice@ v) {
 	}
 	v.set_rate(parse_float(args[1]));
 	v.set_volume(parse_float(args[3]));
+	if(args[4]=="true") use_sr = true;
+	else use_sr = false;
 	return true;
 }
 
