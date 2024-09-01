@@ -717,8 +717,8 @@ Before we move on, here is a quick example:
 void main(){
     int[] scores = {20, 30};
     scores.insert_last(50);
-    screen_reader_speak("The scores of the playres in this game are:", false);
-    for(uint i = 0; i < scores.length()l i ++)
+    screen_reader_speak("The scores of the players in this game are:", false);
+    for(uint i = 0; i < scores.length(); i ++)
         screen_reader_speak(scores[i], false);
 }
 ```
@@ -727,7 +727,7 @@ The variables in an array are called "items" or "elements", and you can imagine 
 
 As a consequence, we can access the 1st, 2nd, or any other item in our line of elements, via "indexing".
 
-Slightly more complicated to think about, however, is that nvgt-based arrays are "0-based".
+Slightly more complicated to think about, however, is that arrays in NVGT use "0-based indexing".
 
 This is true of most programming languages, with a notable exception being lua.
 

@@ -18,7 +18,7 @@ Other than scons, the following libraries are needed to build NVGT:
 * bullet3 physics library, though at the time of writing only some headers (the Bullet3Common and LinearMath folders) are neded
 * enet networking library
 * Poco C++ portable components
-* SDL2
+* SDL3
 
 You also need to locate headers and binaries for the bass audio library (bass, bassmix and bass_fx) and for phonon (steam audio) though some are provided if you want to use those.
 
@@ -38,6 +38,8 @@ If you don't want to build plugins, you can run, for example, `scons -s no_curl_
 You can disable the creation of shared plugin dlls with the option no_shared_plugins=1.
 
 If you do not want to build the stubs, such as for active development where generating them would be time consuming, you can pass no_stubs=1 to the scons command.
+
+If you want to see what other custom switches are available in NVGT's SConstruct file, you can run scons -s -h or even just scons -h if you want a bit of extra useless verbosity.
 
 You can omit the -s from the build command if you want to get spammed with the outputting of every internal build command used, which is hundreds of them.
 

@@ -1,0 +1,9 @@
+/**
+	This property returns a string containing the current platform, such as "Windows NT".
+	const string PLATFORM;
+*/
+
+// example:
+void main() {
+	alert("Your current Platform  is", PLATFORM);
+}

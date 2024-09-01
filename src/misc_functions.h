@@ -12,9 +12,6 @@
 
 #pragma once
 #include <string>
-#ifdef _WIN32
-	#include <windows.h>
-#endif
 #include <angelscript.h>
 #include "nvgt.h"
 

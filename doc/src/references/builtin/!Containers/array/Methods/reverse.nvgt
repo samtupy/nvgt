@@ -1,6 +1,8 @@
 /**
 	Reverses the array, so the last item becomes the first and vice versa.
 	void array::reverse();
+	## Remarks:
+		This method reverses the array in place rather than creating a new array and returning it.
 */
 
 // Example:

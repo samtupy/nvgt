@@ -1,0 +1,14 @@
+/**
+	Returns a string array containing the key names in the dictionary.
+	string[]@ dictionary::get_keys();
+	## Returns:
+		string[]@: the  list of keys in the dictionary on success, 0 otherwise.
+*/
+
+// Example:
+void main() {
+	dictionary data;
+	data.set("nvgt", "An audiogame engine using AngelScript");
+	string[]@ keys = data.get_keys();
+	alert("Keys", join(keys, ", "));
+}

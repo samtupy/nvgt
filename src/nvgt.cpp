@@ -31,15 +31,17 @@
 #include <Poco/File.h>
 #include <Poco/Path.h>
 #include <Poco/UnicodeConverter.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "filesystem.h"
 #include "scriptarray.h"
 #define NVGT_LOAD_STATIC_PLUGINS
 #include "angelscript.h" // nvgt's angelscript implementation
 #ifdef __APPLE__
+#include <TargetConditionals.h>
 #include "apple.h" // apple_requested_file
 #endif
 #include "input.h"
+#include "misc_functions.h" // ChDir
 #include "nvgt.h"
 #ifndef NVGT_USER_CONFIG
 	#include "nvgt_config.h"
@@ -53,13 +55,12 @@
 #include "UI.h" // message
 #include "version.h"
 
-
 using namespace std;
 using namespace Poco;
 using namespace Poco::Util;
 
 class nvgt_application : public Poco::Util::Application {
-	enum run_mode {NVGT_RUN, NVGT_COMPILE, NVGT_HELP, NVGT_VERSIONINFO};
+	enum run_mode {NVGT_RUN, NVGT_COMPILE, NVGT_HELP, NVGT_VERSIONINFO, NVGT_EXIT};
 	run_mode mode;
 public:
 	nvgt_application() : mode(NVGT_RUN) {
@@ -91,7 +92,7 @@ protected:
 		if (Environment::has("MACOS_BUNDLED_APP")) { // Use GUI instead of stdout and chdir to Resources directory.
 			config().setString("application.gui", "");
 			#ifdef NVGT_STUB
-				chdir(Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString().c_str());
+				ChDir(Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString());
 			#endif
 		}
 		#endif
@@ -105,7 +106,7 @@ protected:
 	void setupCommandLineProperty(const vector<string>& argv, int offset = 0) {
 		// Prepare the COMMAND_LINE property used by scripts by combining all arguments into one string, for bgt backwards compatibility. NVGT also has a new ARGS array which we will also set up here.
 		if (!g_StringTypeid)
-			g_StringTypeid = g_ScriptEngine->GetStringFactoryReturnTypeId();
+			g_StringTypeid = g_ScriptEngine->GetStringFactory();
 		g_command_line_args = CScriptArray::Create(g_ScriptEngine->GetTypeInfoByDecl("string[]"));
 		for (unsigned int i = offset; i < argv.size(); i++) {
 			g_CommandLine += argv[i];
@@ -158,6 +159,40 @@ protected:
 			message(ss.str(), "help");
 		}
 	}
+	std::string UILauncher() {
+		// If the user launches NVGT's compiler without a terminal, let them select what to do from various options provided by simple dialogs. Currently the choice selection is one-shot and then we exit, but it might be turned into some sort of do-loop later so that the user can perform multiple selections in one application run.
+		std::vector<string> options = {"`Run a script", "Compile a script in release mode", "Compile a script in debug mode", "View version information", "View command line options", "Visit nvgt.gg on the web", "~Exit"};
+		#if defined(__ANDROID__) || defined(__APPLE__) && TARGET_OS_IPHONE // disable compile options on these platforms
+			options[1].insert(0, '\0');
+			options[2].insert(0, '\0');
+		#endif
+		int option = message_box("NVGT Compiler", "Please select what you would like to do.", options, SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT);
+		if (option <= 0 || option >= 7) {
+			mode = NVGT_EXIT;
+			return "";
+		} else if(option >= 1 && option <= 3) {
+			std::string script = simple_file_open_dialog("NVGT scripts:nvgt");
+			if (script.empty()) {
+				mode = NVGT_EXIT;
+				return "";
+			}
+			if (option > 1) g_debug = option == 3;
+			mode = option == 1? NVGT_RUN : NVGT_COMPILE;
+			try {
+				// Try to change to the directory containing the selected script.
+				ChDir(Poco::Path(script).parent().toString().c_str());
+			} catch(...) {} // If it fails, so be it.
+			return script;
+		} else if (option == 4 || option == 5) {
+			mode = option == 4? NVGT_VERSIONINFO : NVGT_HELP;
+			return "";
+		} else if (option == 6) {
+			mode = NVGT_EXIT;
+			urlopen("https://nvgt.gg");
+			return "";
+		}
+		return ""; // How did we get here?
+	}
 	virtual int main(const std::vector<std::string>& args) override {
 		// Determine the script file that is to be executed.
 		string scriptfile = "";
@@ -165,7 +200,9 @@ protected:
 			scriptfile = apple_requested_file(); // Files opened from finder on mac do not use command line arguments.
 		#endif
 		if (scriptfile.empty() && args.size() > 0) scriptfile = args[0];
-		if (mode == NVGT_HELP) {
+		if (scriptfile.empty() && config().hasOption("application.gui")) scriptfile = UILauncher();
+		if (mode == NVGT_EXIT) return Application::EXIT_OK;
+		else if (mode == NVGT_HELP) {
 			displayHelp();
 			return Application::EXIT_OK;
 		} else if (mode == NVGT_VERSIONINFO) {
@@ -249,7 +286,7 @@ protected:
 #if !defined(_WIN32) || defined(NVGT_WIN_APP) || defined(NVGT_STUB)
 #undef SDL_MAIN_HANDLED
 #undef SDL_main_h_
-#include <SDL2/SDL_main.h>
+#include <SDL3/SDL_main.h>
 int main(int argc, char** argv) {
 	AutoPtr<Application> app = new nvgt_application();
 	try {

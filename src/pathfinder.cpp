@@ -145,7 +145,6 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	int result = pf->Solve(start, end, &path, &total_cost);
 	solving = false;
 	callback_data = NULL;
-	if (data) data->Release();
 	if (abort || must_reset || result != micropather::MicroPather::SOLVED) {
 		abort = false;
 		total_cost = 0;
@@ -153,10 +152,10 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 		return array;
 	}
 	array->Reserve(path.size());
+	Vector3 v;
+	int x, y, z;
 	for (int i = 0; i < path.size(); i++) {
-		int x, y, z;
 		decode_state(path[i], &x, &y, &z);
-		Vector3 v;
 		v.setValue(x, y, z);
 		array->InsertLast(&v);
 	}
@@ -225,5 +224,5 @@ void RegisterScriptPathfinder(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback@)", asMETHOD(pathfinder, set_callback_function), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void cancel()", asMETHOD(pathfinder, cancel), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void reset()", asMETHOD(pathfinder, reset), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int, int, int, int, int, int, any@ = null)", asMETHOD(pathfinder, find), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int, int, int, int, int, int, any@+ = null)", asMETHOD(pathfinder, find), asCALL_THISCALL);
 }

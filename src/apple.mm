@@ -20,7 +20,7 @@
 #include <Poco/Environment.h>
 #include <Poco/Thread.h>
 #include <scriptarray.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "apple.h"
 #include "UI.h"
 
@@ -31,17 +31,16 @@ std::string apple_requested_file() {
 	InputInit();
 	std::string result;
 	Poco::Clock timeout;
-	Uint8 old_dropfile_state = SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
+	SDL_bool old_dropfile_state = SDL_EventEnabled(SDL_EVENT_DROP_FILE);
 	while (!timeout.isElapsed(50000)) {
 		Poco::Thread::sleep(5);
 		SDL_Event e;
 		SDL_PumpEvents();
-		if (SDL_PeepEvents(&e, 1, SDL_GETEVENT, SDL_DROPFILE, SDL_DROPFILE) < 1) continue;
-		result = e.drop.file;
-		SDL_free(e.drop.file);
+		if (SDL_PeepEvents(&e, 1, SDL_GETEVENT, SDL_EVENT_DROP_FILE, SDL_EVENT_DROP_FILE) < 1) continue;
+		result = e.drop.data;
 		break;
 	}
-	SDL_EventState(SDL_DROPFILE, old_dropfile_state);
+	SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, old_dropfile_state);
 	return result;
 }
 

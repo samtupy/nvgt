@@ -12,7 +12,7 @@ def UPX_builder(target, source, env):
 			replace_with_nv.append(s)
 			f.seek(0)
 			f.write(b"MZ")
-	r = env.Execute(f"{upx} --best -q -o {target[0]} {source[0]}>nul")
+	r = env.Execute(f"\"{upx}\" --best -q -o \"{target[0]}\" \"{source[0]}\"" + (">nul" if env["PLATFORM"] == "win32" else ">/dev/null"))
 	if r: return r
 	for s in replace_with_nv:
 		with open(str(s), "rb+") as f:

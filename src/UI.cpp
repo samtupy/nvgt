@@ -33,12 +33,13 @@
 #include <sys/time.h>
 
 #endif
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_syswm.h>
+#include <SDL3/SDL.h>
 #include <obfuscate.h>
 #include <thread.h>
 #include <string>
 #include <vector>
+#include <Poco/StringTokenizer.h>
+#include <Poco/SynchronizedObject.h>
 #include <Poco/Thread.h>
 #include <Poco/UnicodeConverter.h>
 #include <Poco/Util/Application.h>
@@ -55,6 +56,7 @@ int message_box(const std::string& title, const std::string& text, const std::ve
 		const std::string& btn = buttons[i];
 		int skip = 0;
 		unsigned int button_flag = 0;
+		if (!btn.empty() && !btn[0]) continue; // Don't show this button while still increasing button ID, useful for disabling options without modifying result checking code that may contain magic button ID numbers.
 		if (btn.substr(0, 1) == "`") {
 			button_flag |= SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
 			skip += 1;
@@ -65,7 +67,7 @@ int message_box(const std::string& title, const std::string& text, const std::ve
 		}
 		SDL_MessageBoxButtonData& sdlbtn = sdlbuttons.emplace_back();
 		sdlbtn.flags = button_flag;
-		sdlbtn.buttonid = i + 1;
+		sdlbtn.buttonID = i + 1;
 		sdlbtn.text = buttons[i].c_str() + skip;
 	}
 	SDL_MessageBoxData box = {mb_flags, g_WindowHandle, title.c_str(), text.c_str(), int(sdlbuttons.size()), sdlbuttons.data(), NULL};
@@ -134,6 +136,36 @@ bool ClipboardSetRawText(const std::string& text) {
 	return FALSE;
 	#endif
 }
+class nvgt_file_dialog_info : public Poco::SynchronizedObject {
+public:
+	std::string data;
+};
+void nvgt_file_dialog_callback(void* user, const char* const * files, int filter) {
+	if (!files) alert("Open file error", SDL_GetError()); // This will probably change to silently setting an error string or something.
+	nvgt_file_dialog_info* fdi = reinterpret_cast<nvgt_file_dialog_info*>(user);
+	if (files && *files) fdi->data = *files;
+	fdi->notify();
+}
+std::string simple_file_open_dialog(const std::string& filters, const std::string& default_location) {
+	// We need to parse the filters provided by the user. Format is name:extension_wildcard1;extension_wildcard2|name:ext1;ext2|etc files:etc
+	Poco::StringTokenizer filterstrings(filters, "|");
+	std::vector<SDL_DialogFileFilter> filter_objects;
+	std::vector<std::string> filter_parts; // Welcome to low level programming/c++ communicating with c/Sam being dumb/whatever where we need to keep several null terminated string fragments in memory until this function returns, kinda wish SDL3 just did this parsing for us honestly.
+	filter_parts.reserve(filterstrings.count() * 2); // avoid reallocation as items are added
+	for (size_t i = 0; i < filterstrings.count(); i++) {
+		if (filterstrings[i].find(":") == std::string::npos) continue; // Invalid filter, should we error here or something?
+		SDL_DialogFileFilter& f = filter_objects.emplace_back();
+		f.name = filter_parts.emplace_back(filterstrings[i].substr(0, filterstrings[i].rfind(":"))).c_str();
+		f.pattern = filter_parts.emplace_back(filterstrings[i].substr(filterstrings[i].rfind(":") + 1)).c_str();
+	}
+	SDL_DialogFileFilter& end = filter_objects.emplace_back(); // Not doing this results in bogus filters at the end of the list in the dialog, I can see why at sdl_dialog_utils.c:62 and might open an issue on sdl's repo about it because either this or filter count, not both?
+	end.name = nullptr;
+	end.pattern = nullptr;
+	nvgt_file_dialog_info fdi;
+	SDL_ShowOpenFileDialog(nvgt_file_dialog_callback, &fdi, nullptr, filter_objects.data(), filter_objects.size() -1, nullptr, SDL_FALSE);
+	while (!fdi.tryWait(5)) SDL_PumpEvents();
+	return fdi.data;
+}
 bool urlopen(const std::string& url) {
 	return !SDL_OpenURL(url.c_str());
 }
@@ -197,17 +229,18 @@ bool g_WindowHidden = false;
 
 static std::vector<SDL_Event> post_events; // holds events that should be processed after the next wait() call.
 #ifdef _WIN32
-void sdl_windows_messages(void* udata, void* hwnd, unsigned int message, uint64_t wParam, int64_t lParam) {
-	if (message == WM_KEYDOWN && wParam == 'V' && lParam == 1) {
+SDL_bool sdl_windows_messages(void* udata, MSG* msg) {
+	if (msg->message == WM_KEYDOWN && msg->wParam == 'V' && msg->lParam == 1) {
 		SDL_Event e{};
-		e.type = SDL_KEYDOWN;
-		e.key.timestamp = SDL_GetTicks();
-		e.key.keysym.scancode = SDL_SCANCODE_PASTE;
-		e.key.keysym.sym = SDLK_PASTE;
+		e.type = SDL_EVENT_KEY_DOWN;
+		e.common.timestamp = SDL_GetTicksNS();
+		e.key.scancode = SDL_SCANCODE_PASTE;
+		e.key.key = SDLK_PASTE;
 		SDL_PushEvent(&e);
-		e.type = SDL_KEYUP;
+		e.type = SDL_EVENT_KEY_UP;
 		post_events.push_back(e);
 	}
+	return SDL_TRUE;
 }
 #endif
 bool set_application_name(const std::string& name) {
@@ -227,15 +260,14 @@ bool ShowNVGTWindow(std::string& window_title) {
 	#ifdef _WIN32
 	SDL_SetWindowsMessageHook(sdl_windows_messages, NULL);
 	#endif
-	g_WindowHandle = SDL_CreateWindow(window_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 640, 0);
+	g_WindowHandle = SDL_CreateWindow(window_title.c_str(), 640, 640, 0);
 	if (!g_WindowHandle) return false;
-	SDL_SysWMinfo winf;
-	SDL_VERSION(&winf.version);
-	SDL_GetWindowWMInfo(g_WindowHandle, &winf);
+	if (!SDL_HasScreenKeyboardSupport()) SDL_StartTextInput(g_WindowHandle);
+	SDL_PropertiesID window_props = SDL_GetWindowProperties(g_WindowHandle);
 	#ifdef _WIN32
-	g_OSWindowHandle = winf.info.win.window;
-	#elif defined(SDL_VIDEO_DRIVER_COCOA)
-	g_OSWindowHandle = winf.info.cocoa.window;
+	g_OSWindowHandle = (HWND)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+	#elif defined(__APPLE__) // Will probably need to fix for IOS
+	g_OSWindowHandle = (NSWindow*)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
 	SDL_ShowWindow(g_WindowHandle);
 	SDL_RaiseWindow(g_WindowHandle);
 	voice_over_window_created();
@@ -272,11 +304,11 @@ std::string get_window_text() {
 }
 void* get_window_os_handle() { return reinterpret_cast<void*>(g_OSWindowHandle); }
 void handle_sdl_event(SDL_Event* evt) {
-	if (evt->type == SDL_KEYDOWN || evt->type == SDL_KEYUP || evt->type == SDL_TEXTINPUT || evt->type == SDL_MOUSEMOTION || evt->type == SDL_MOUSEBUTTONDOWN || evt->type == SDL_MOUSEBUTTONUP || evt->type == SDL_MOUSEWHEEL)
+	if (evt->type == SDL_EVENT_KEY_DOWN || evt->type == SDL_EVENT_KEY_UP || evt->type == SDL_EVENT_TEXT_INPUT || evt->type == SDL_EVENT_MOUSE_MOTION || evt->type == SDL_EVENT_MOUSE_BUTTON_DOWN || evt->type == SDL_EVENT_MOUSE_BUTTON_UP || evt->type == SDL_EVENT_MOUSE_WHEEL)
 		InputEvent(evt);
-	else if (evt->type == SDL_WINDOWEVENT && evt->window.event == SDL_WINDOWEVENT_FOCUS_LOST)
+	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_LOST)
 		lost_window_focus();
-	else if (evt->type == SDL_WINDOWEVENT && evt->window.event == SDL_WINDOWEVENT_FOCUS_GAINED)
+	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_GAINED)
 		regained_window_focus();
 }
 void wait(int ms) {
@@ -301,13 +333,13 @@ void wait(int ms) {
 		#ifdef __APPLE__
 		// Hack to fix voiceover's weird handling of the left and right arrow keys. If a left/right arrow down/up event get generated in the same frame, we need to move the up event to the next frame.
 		bool evt_handled = false;
-		if (evt.type == SDL_KEYDOWN) {
-			if (evt.key.keysym.scancode == SDL_SCANCODE_LEFT) left_just_pressed = true;
-			if (evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) right_just_pressed = true;
-		} else if ((left_just_pressed || right_just_pressed) && evt.type == SDL_KEYUP) {
+		if (evt.type == SDL_EVENT_KEY_DOWN) {
+			if (evt.key.scancode == SDL_SCANCODE_LEFT) left_just_pressed = true;
+			if (evt.key.scancode == SDL_SCANCODE_RIGHT) right_just_pressed = true;
+		} else if ((left_just_pressed || right_just_pressed) && evt.type == SDL_EVENT_KEY_UP) {
 			evt_handled = true;
-			if (left_just_pressed && evt.key.keysym.scancode == SDL_SCANCODE_LEFT) post_events.push_back(evt);
-			else if (right_just_pressed && evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) post_events.push_back(evt);
+			if (left_just_pressed && evt.key.scancode == SDL_SCANCODE_LEFT) post_events.push_back(evt);
+			else if (right_just_pressed && evt.key.scancode == SDL_SCANCODE_RIGHT) post_events.push_back(evt);
 			else evt_handled = false;
 		}
 		if (evt_handled) continue;
