@@ -14,6 +14,9 @@
 
 #include <string>
 #include <Poco/Path.h>
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
 
 bool running_on_mobile();
 #ifndef NVGT_STUB

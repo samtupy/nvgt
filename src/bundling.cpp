@@ -187,25 +187,28 @@ protected:
 	void finalize_output_stream() override {} // Don't write payload offset on this platform.
 };
 class nvgt_compilation_output_mac : public nvgt_compilation_output_impl {
-	SharedPtr<File> workplace;
+	SharedPtr<File> workplace_tmp;
+	File workplace;
 	Path final_output_path;
 	int bundle_mode;
 	using nvgt_compilation_output_impl::nvgt_compilation_output_impl;
 protected:
 	void alter_output_path(Path& output_path) override {
 		bundle_mode = config.getInt("build.mac_bundle", 2); // 0 no bundle, 1 .app, 2 .dmg/.zip, 3 both .app and .dmg/.zip.
-		if (bundle_mode == 2) workplace = new TemporaryFile();
-		else if(bundle_mode > 0) workplace = new File(Path(output_path).makeFile().setExtension("app"));
-		if (workplace) {
-			Path tmp = Path(workplace->path()).append("Contents/MacOS");
+		if (bundle_mode == 2) {
+			workplace_tmp = new TemporaryFile();
+			workplace = Path(workplace_tmp->path()).append(Path(output_path).makeFile().getFileName()).setExtension("app");
+		} else if(bundle_mode > 0) workplace = Path(output_path).makeFile().setExtension("app");
+		if (bundle_mode) {
+			Path tmp = Path(workplace.path()).append("Contents/MacOS");
 			File(tmp).createDirectories();
 			tmp.append(output_path.getBaseName()).makeFile();
 			final_output_path = output_path;
 			output_path = tmp;
 		}
 	}
-	void finalize_product(Path& output_path) {
-		if (!workplace) return; // We are not creating a bundle in this condition.
+	void finalize_product(Path& output_path) override {
+		if (!bundle_mode) return; // We are not creating a bundle in this condition.
 		string product_name = config.getString("build.product_name", Path(get_input_file()).getBaseName());
 		string product_identifier = config.getString("build.product_identifier", make_product_id());
 		// Write out info.plist.
@@ -222,13 +225,13 @@ protected:
 		char* plist_xml;
 		uint32_t plist_len;
 		if (plist_to_xml(plist, &plist_xml, &plist_len) != PLIST_ERR_SUCCESS) throw Exception("Unable to create info.plist");
-		FileOutputStream plist_out(Path(workplace->path()).append("Contents/info.plist").toString());
+		FileOutputStream plist_out(Path(workplace.path()).append("Contents/info.plist").toString());
 		plist_out.write(plist_xml, plist_len);
 		plist_out.close();
 		plist_mem_free(plist_xml);
 		plist_free(plist);
 		// Now copy shared libraries.
-		File frameworks_location = Path(workplace->path()).append("Contents/Frameworks").toString();
+		File frameworks_location = Path(workplace.path()).append("Contents/Frameworks").toString();
 		if (frameworks_location.exists()) frameworks_location.remove(true);
 		File(get_nvgt_lib_directory(g_platform)).copyTo(frameworks_location.path());
 		if (bundle_mode > 1) {
@@ -237,17 +240,17 @@ protected:
 				string sout, serr;
 				File dmg_out = Path(final_output_path).makeFile().setExtension("dmg").toString();
 				if (dmg_out.exists()) dmg_out.remove(true);
-				if (!system_command("hdiutil", {"create", "-srcfolder", workplace->path(), dmg_out.path()}, sout, serr)) throw Exception(format("Unable to execute hdiutil for .dmg generation: %s", serr));
+				if (!system_command("hdiutil", {"create", "-srcfolder", workplace.path(), dmg_out.path()}, sout, serr)) throw Exception(format("Unable to execute hdiutil for .dmg generation: %s", serr));
 				output_path = dmg_out.path();
 			#else
 				File zip_out = Path(final_output_path).makeFile().setExtension("app.zip").toString();
 				FileOutputStream zip_out_stream(zip_out.path());
 				Zip::Compress zcpr(zip_out_stream, true);
-				zcpr.addRecursive(workplace->path());
+				zcpr.addRecursive(workplace.path());
 				Zip::ZipArchive za = zcpr.close();
 				output_path = zip_out.path();
 			#endif
-		} else output_path = workplace->path();
+		} else output_path = workplace.path();
 	}
 };
 class nvgt_compilation_output_android : public nvgt_compilation_output_impl {

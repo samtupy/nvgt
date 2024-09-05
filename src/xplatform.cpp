@@ -12,9 +12,6 @@
 */
 
 #include <SDL3/SDL.h>
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#endif
 #ifndef _WIN32
 #include <dlfcn.h>
 #endif
@@ -24,6 +21,7 @@
 #include <Poco/Path.h>
 #include <Poco/Thread.h>
 #include "nvgt.h"
+#include "xplatform.h"
 
 using namespace Poco;
 
@@ -55,7 +53,7 @@ std::string get_nvgt_lib_directory(const std::string& platform) {
 	// The directory containing the libraries for the NVGT currently running is usually just called lib, while all other directories are lib_platform. In any case try to return an absolute path to the libraries given a platform.
 	std::string dir;
 	if (platform == "windows") dir = Poco::Environment::isWindows()? "lib" : "lib_windows";
-	else if (platform == "mac") dir = Poco::Environment::os() == POCO_OS_MAC_OS_X? "Frameworks" : "lib_mac";
+	else if (platform == "mac") dir = Environment::os() == POCO_OS_MAC_OS_X? (Environment::has("MACOS_BUNDLED_APP")? "Frameworks" : "lib") : "lib_mac";
 	else if (platform == "linux") dir = Poco::Environment::os() == POCO_OS_LINUX? "lib" : "lib_linux";
 	else return ""; // libs not applicable for this platform.
 	Path result(Path::self());

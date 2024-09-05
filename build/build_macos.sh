@@ -1,7 +1,7 @@
 #!/bin/zsh
 
 function setup_homebrew {
-	brew install autoconf automake libtool openssl libgit2 bullet upx
+	brew install autoconf automake libtool openssl libgit2 bullet upx libplist
 }
 
 function setup_angelscript {
