@@ -1,5 +1,5 @@
 /* bullet3.cpp - bulletphysics integration code
- * At the monent, only contains a wrapper for bullet3's vector class and is pending expansion.
+ * At the moment, only contains a wrapper for bullet3's vector class and is pending expansion or outright replacement.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy

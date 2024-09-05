@@ -157,7 +157,7 @@ int callstack_symbols( void** addresses, callstack_symbol_t* out_syms, int num_a
 	}
 
 #endif
-#if defined( __unix__ ) || defined(unix) || defined(__unix) || ( defined(__APPLE__) && defined(__MACH__) )
+#if !defined(__ANDROID__) && (defined( __unix__ ) || defined(unix) || defined(__unix) || ( defined(__APPLE__) && defined(__MACH__) ))
 #  define DBG_TOOLS_CALLSTACK_UNIX
 #endif
 

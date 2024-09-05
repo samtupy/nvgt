@@ -290,21 +290,16 @@ CScriptArray* get_preferred_locales() {
 }
 
 float parse_float(const std::string& val) {
-float res = 0.0;
-const auto [valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
-if (valEc != std::errc()) {
-return 0.0;
+	float res = 0.0;
+	const auto [valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
+	if (valEc != std::errc()) return 0.0;
+	return res;
 }
-return res;
-}
-
 double parse_double(const std::string& val) {
-double res = 0.0;
-const auto [valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
-if (valEc != std::errc()) {
-return 0.0;
-}
-return res;
+	double res = 0.0;
+	const auto [valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
+	if (valEc != std::errc()) return 0.0;
+	return res;
 }
 
 void RegisterMiscFunctions(asIScriptEngine* engine) {

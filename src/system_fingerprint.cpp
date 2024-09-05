@@ -217,6 +217,9 @@ unsigned short getCpuHash() {
 #else // !__APPLE__
 
 static void getCpuid(unsigned int* eax, unsigned int* ebx, unsigned int* ecx, unsigned int* edx) {
+	#ifdef __ANDROID__
+		return;
+	#else
 	#ifdef __arm__
 	*eax = 0xFD;
 	*ebx = 0xC1;
@@ -229,6 +232,7 @@ static void getCpuid(unsigned int* eax, unsigned int* ebx, unsigned int* ecx, un
 	             "=b"(*ebx),
 	             "=c"(*ecx),
 	             "=d"(*edx) : "0"(*eax), "2"(*ecx));
+	#endif
 	#endif
 }
 

@@ -18,12 +18,20 @@ build/windev_path
 src/version.cpp
 .sconsign.dblite
 *.orig
+jni/.gradle
+jni/build
 install/nvgt_version.nsh
+libs
+obj
 release/lib/3rd_party_licenses.html
+release/lib_*
 
 # private user space and dependencies
 user/**
 !user/readme.md
+jni/Custom.mk
+droidev
+iosdev
 lindev
 macosdev
 windev

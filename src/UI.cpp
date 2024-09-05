@@ -244,7 +244,7 @@ SDL_bool sdl_windows_messages(void* udata, MSG* msg) {
 bool set_application_name(const std::string& name) {
 	return SDL_SetHintWithPriority(SDL_HINT_APP_NAME, name.c_str(), SDL_HINT_OVERRIDE);
 }
-bool ShowNVGTWindow(std::string& window_title) {
+bool ShowNVGTWindow(const std::string& window_title) {
 	if (g_WindowHandle) {
 		SDL_SetWindowTitle(g_WindowHandle, window_title.c_str());
 		if (g_WindowHidden) {
@@ -295,6 +295,10 @@ BOOL FocusNVGTWindow() {
 BOOL WindowIsFocused() {
 	if (!g_WindowHandle) return false;
 	return g_WindowHandle == SDL_GetKeyboardFocus();
+}
+bool WindowIsHidden() {
+	if (!g_WindowHandle) return false;
+	return (SDL_GetWindowFlags(g_WindowHandle) & SDL_WINDOW_HIDDEN) != 0;
 }
 std::string get_window_text() {
 	if (!g_WindowHandle) return "";
@@ -419,6 +423,7 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool hide_window()", asFUNCTION(HideNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool focus_window()", asFUNCTION(FocusNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_window_active()", asFUNCTION(WindowIsFocused), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool is_window_hidden()", asFUNCTION(WindowIsHidden), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_window_text()", asFUNCTION(get_window_text), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 get_window_os_handle()", asFUNCTION(get_window_os_handle), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void wait(int)", asFUNCTIONPR(wait, (int), void), asCALL_CDECL);

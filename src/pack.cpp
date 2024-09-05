@@ -31,6 +31,7 @@
 	#include "../user/nvgt_config.h"
 #endif
 #include "pack.h"
+#include "xplatform.h"
 
 using namespace std;
 
@@ -606,7 +607,11 @@ bool find_embedded_pack(string& filename, unsigned int& file_offset) {
 	#else
 	const auto& it = filename == "*" ? embedded_packs.begin() : embedded_packs.find(filename.substr(1));
 	if (it == embedded_packs.end()) return false;
-	filename = Poco::Util::Application::instance().config().getString("application.path");
+	#ifndef __ANDROID__
+		filename = Poco::Util::Application::instance().config().getString("application.path");
+	#else
+		filename = android_get_main_shared_object();
+	#endif
 	file_offset = it->second;
 	return true;
 	#endif

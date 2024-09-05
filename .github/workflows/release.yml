@@ -69,7 +69,9 @@ jobs:
         cd ..
         python3 docgen.py
         cd ..
+        cp -r linux_release/lib release/lib_linux
         cp linux_release/stub/* release/stub
+        cp -r mac_release/lib release/lib_mac
         cp mac_release/stub/* release/stub
         cd install
         makensis nvgt.nsi
@@ -97,7 +99,9 @@ jobs:
         cd ..
         python3 docgen.py
         cd ..
+        cp -r linux_release/lib release/lib_linux
         cp linux_release/stub/* release/stub
+        cp -r windows_release/lib release/lib_windows
         cp windows_release/stub/* release/stub
         cd install
         python3 make_dmg.py ../release ${{secrets.CIFTP}}
@@ -127,7 +131,9 @@ jobs:
         cd ..
         python3 docgen.py
         cd ..
+        cp -r mac_release/lib release/lib_mac
         cp mac_release/stub/* release/stub
+        cp -r windows_release/lib release/lib_windows
         cp windows_release/stub/* release/stub
         cd release
         tar -czf "../nvgt_$nvgt_version.tar.gz" *

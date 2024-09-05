@@ -2,6 +2,7 @@
 !include "nvgt_version.nsh"
 !include "MUI2.nsh"
 !include "nsDialogs.nsh"
+!include "LogicLib.nsh"
 !include "Integration.nsh"
 !define /date COPYRIGHT_YEAR "%Y"
 Name "nvgt"
@@ -81,27 +82,39 @@ Section "Bundled include scripts"
 SectionEnd
 
 !ifdef have_windows_stubs
-Section "Windows compilation stubs"
+Section "Windows compilation stubs" SEC_WINDOWS
   SetOutPath $INSTDIR\stub
   File /a ..\release\stub\nvgt_windows*.bin
 SectionEnd
 !endif
 
 !ifdef have_linux_stubs
-Section /o "Linux cross-compilation stubs"
+Section /o "Linux cross-compilation stubs" SEC_LINUX
+  SetOutPath $INSTDIR
+  File /a /r ..\release\lib_linux
   SetOutPath $INSTDIR\stub
   File /a ..\release\stub\nvgt_linux*.bin
 SectionEnd
 !endif
 
 !ifdef have_macos_stubs
-Section /o "MacOS cross-compilation stubs"
+Section /o "MacOS cross-compilation stubs" SEC_MACOS
+  SetOutPath $INSTDIR
+  File /a /r ..\release\lib_mac
   SetOutPath $INSTDIR\stub
   File /a ..\release\stub\nvgt_mac*.bin
 SectionEnd
 !endif
 
+!ifdef have_android_stubs
+Section /o "Android cross-compilation stubs" SEC_ANDROID
+  SetOutPath $INSTDIR\stub
+  File /a ..\release\stub\nvgt_android*.bin
+SectionEnd
+!endif
+
 Section "File explorer context menu registration" SEC_CONTEXTMENU
+  Var /GLOBAL sectionFlags
   DeleteRegKey HKCR ".nvgt"
   DeleteRegKey HKCR "NVGTScript"
   WriteRegStr HKCR ".nvgt" "" "NVGTScript"
@@ -111,10 +124,42 @@ Section "File explorer context menu registration" SEC_CONTEXTMENU
   WriteRegStr HKCR "NVGTScript\shell\compile" "MUIVerb" "Compile Script"
   WriteRegStr HKCR "NVGTScript\shell\compile" "ExtendedSubCommandsKey" ""
   WriteRegStr HKCR "NVGTScript\shell\compile" "SubCommands" ""
-  WriteRegStr HKCR "NVGTScript\shell\compile\shell\debug" "" "Debug"
-  WriteRegStr HKCR "NVGTScript\shell\compile\shell\debug\command" "" '$INSTDIR\nvgtw.exe -C "%1"'
-  WriteRegStr HKCR "NVGTScript\shell\compile\shell\release" "" "Release"
-  WriteRegStr HKCR "NVGTScript\shell\compile\shell\release\command" "" '$INSTDIR\nvgtw.exe -c "%1"'
+  !ifdef have_windows_stubs
+    SectionGetFlags ${SEC_WINDOWS} $sectionFlags
+    ${If} $sectionFlags & ${SF_SELECTED}
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\windows_debug" "" "Windows (Debug)"
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\windows_debug\command" "" '$INSTDIR\nvgtw.exe -pwindows -C "%1"'
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\windows_release" "" "Windows (Release)"
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\windows_release\command" "" '$INSTDIR\nvgtw.exe -pwindows -c "%1"'
+    ${EndIf}
+  !endif
+  !ifdef have_macos_stubs
+    SectionGetFlags ${SEC_MACOS} $sectionFlags
+    ${If} $sectionFlags & ${SF_SELECTED}
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\mac_debug" "" "MacOS (Debug)"
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\mac_debug\command" "" '$INSTDIR\nvgtw.exe -pmac -C "%1"'
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\mac_release" "" "MacOS (Release)"
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\mac_release\command" "" '$INSTDIR\nvgtw.exe -pmac -c "%1"'
+    ${EndIf}
+  !endif
+  !ifdef have_linux_stubs
+    SectionGetFlags ${SEC_LINUX} $sectionFlags
+    ${If} $sectionFlags & ${SF_SELECTED}
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\linux_debug" "" "Linux (Debug)"
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\linux_debug\command" "" '$INSTDIR\nvgtw.exe -plinux -C "%1"'
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\linux_release" "" "Linux (Release)"
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\linux_release\command" "" '$INSTDIR\nvgtw.exe -plinux -c "%1"'
+    ${EndIf}
+  !endif
+  !ifdef have_android_stubs
+    SectionGetFlags ${SEC_ANDROID} $sectionFlags
+    ${If} $sectionFlags & ${SF_SELECTED}
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\android_debug" "" "Android (Debug)"
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\android_debug\command" "" '$INSTDIR\nvgtw.exe -pandroid -C "%1"'
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\android_release" "" "Android (Release)"
+      WriteRegStr HKCR "NVGTScript\shell\compile\shell\android_release\command" "" '$INSTDIR\nvgtw.exe -pandroid -c "%1"'
+    ${EndIf}
+  !endif
   WriteRegStr HKCR "NVGTScript\shell\edit" "" "Edit Script"
   WriteRegStr HKCR "NVGTScript\shell\edit\command" "" 'notepad "%1"'
   WriteRegStr HKCR "NVGTScript\shell\open" "" ""

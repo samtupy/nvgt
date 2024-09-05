@@ -34,6 +34,7 @@
 #include <SDL3/SDL.h>
 #include "angelscript.h"
 #include "bullet3.h"
+#include "bundling.h"
 #include "compression.h"
 #include "crypto.h"
 #include "datastreams.h"
@@ -63,6 +64,7 @@
 #include "timestuff.h"
 #include "tts.h"
 #include "version.h"
+#include "xplatform.h"
 
 #ifndef NVGT_STUB
 	#include "scriptbuilder.h"
@@ -97,7 +99,6 @@ CContextMgr* g_ctxMgr = nullptr;
 #endif
 int g_bcCompressionLevel = 9;
 string g_last_exception_callstack;
-string g_compiled_basename;
 vector<asIScriptContext*> g_ctxPool;
 Mutex g_ctxPoolMutex;
 vector<string> g_IncludeDirs;
@@ -512,7 +513,12 @@ void ConfigureEngineOptions(asIScriptEngine* engine) {
 	engine->SetEngineProperty(asEP_ALTER_SYNTAX_NAMED_ARGS, config.getInt("scripting.alter_syntax_named_args", 2));
 }
 int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
-	Path global_include(Path(Path::self()).parent().append("include"));
+	#ifndef __ANDROID__
+		Path global_include(Path(Path::self()).parent().append("include"));
+	#else
+		// Attempting to read default includes from assets directory of app, haven't succeeded yet.
+		Path global_include(Path(android_get_main_shared_object()).parent().parent().parent().append("assets"));
+	#endif
 	g_IncludeDirs.push_back(global_include.toString());
 	if (!g_debug)
 		engine->SetEngineProperty(asEP_BUILD_WITHOUT_LINE_CUES, true);
@@ -523,24 +529,29 @@ int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
 		return -1;
 	asIScriptModule* mod = builder.GetModule();
 	if (mod) mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
-	if (builder.AddSectionFromFile(scriptFile.c_str()) < 0)
-		return -1;
-	for (unsigned int i = 0; i < g_IncludeScripts.size(); i++) {
-		if (builder.AddSectionFromFile(g_IncludeScripts[i].c_str()) < 0)
+	try {
+		if (builder.AddSectionFromFile(scriptFile.c_str()) < 0)
 			return -1;
-	}
-	if (builder.BuildModule() < 0) {
-		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "Script failed to build");
-		return -1;
-	}
-	// Do not let the script compile if it contains no entry point.
-	if (!mod) return -1;
-	asIScriptFunction* func = mod->GetFunctionByDecl("int main()");
-	if (!func)
-		func = mod->GetFunctionByDecl("void main()");
-	if (!func) {
-		g_scriptMessagesInfo = "";
-		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "No entry point found (either 'int main()' or 'void main()'.)");
+		for (unsigned int i = 0; i < g_IncludeScripts.size(); i++) {
+			if (builder.AddSectionFromFile(g_IncludeScripts[i].c_str()) < 0)
+				return -1;
+		}
+		if (builder.BuildModule() < 0) {
+			engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "Script failed to build");
+			return -1;
+		}
+		// Do not let the script compile if it contains no entry point.
+		if (!mod) return -1;
+		asIScriptFunction* func = mod->GetFunctionByDecl("int main()");
+		if (!func)
+			func = mod->GetFunctionByDecl("void main()");
+		if (!func) {
+			g_scriptMessagesInfo = "";
+			engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "No entry point found (either 'int main()' or 'void main()'.)");
+			return -1;
+		}
+	} catch(Exception& e) {
+		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, e.displayText().c_str());
 		return -1;
 	}
 	return 0;
@@ -560,68 +571,31 @@ int SaveCompiledScript(asIScriptEngine* engine, unsigned char** output) {
 	return codestream.get(output);
 }
 int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
-	#ifdef _WIN32
-	if (g_platform == "auto") g_platform = "windows";
-	#elif defined(__linux__)
-	if (g_platform == "auto") g_platform = "linux";
-	#elif defined(__APPLE__)
-	if (g_platform == "auto") g_platform = "mac"; // Todo: detect difference between IOS and macos (need to look up the correct macros).
-	#else
-	return -1;
-	#endif
-	Path stubspath = Util::Application::instance().config().getString("application.dir");
-	#ifdef __APPLE__ // Stub may be in Resources directory of an app bundle.
-	if (!File(Path(stubspath).pushDirectory("stub")).exists() && stubspath[stubspath.depth() -1] == "MacOS" && stubspath[stubspath.depth() -2] == "Contents") stubspath.makeParent().pushDirectory("Resources");
-	#endif
-	stubspath.pushDirectory("stub");
-	Poco::File stub = format("%snvgt_%s%s.bin", stubspath.toString(), g_platform, (g_stub != "" ? string("_") + g_stub : ""));
-	Path outpath(!g_compiled_basename.empty() ? g_compiled_basename : Path(scriptFile).setExtension(""));
-	if (g_platform == "windows") outpath.setExtension("exe");
+	if (g_platform == "auto") determine_compile_platform();
+	if (g_platform == "auto") return -1; // Cannot compile for this platform.
+	SharedPtr<nvgt_compilation_output> output;
 	try {
-		stub.copyTo(outpath.toString());
-		File(outpath).setExecutable();
-	} catch (Exception& e) {
-		g_ScriptEngine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to copy %s to %s, %s", stub.path(), outpath.toString(), e.displayText()).c_str());
-		return -1;
-	}
-	FileStream fs;
-	try {
-		fs.open(outpath.toString(), std::ios::in | std::ios::out | std::ios::ate);
-		BinaryReader br(fs);
-		BinaryWriter bw(fs);
-		UInt64 stub_size = fs.size();
-		if (g_platform == "windows") {
-			// NVGT distributes windows stubs with the first 2 bytes of the PE header modified so that they are not recognised as executables, this avoids an extra AV scan when the stub is copied which may add a few hundred ms to compile times. Fix them now in the copied file.
-			fs.seekp(0);
-			bw.writeRaw("MZ");
-			if (g_make_console) { // The user wants to compile their app without /subsystem:windows
-				int subsystem_offset;
-				fs.seekg(60); // position of new PE header address.
-				br >> subsystem_offset;
-				subsystem_offset += 92; // offset in new PE header containing subsystem word. 2 for GUI, 3 for console.
-				fs.seekp(subsystem_offset);
-				bw << UInt16(3);
-			}
+		output = nvgt_init_compilation(scriptFile);
+		if (!output) {
+			engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "failed to initialize compilation output context");
+			return -1;
 		}
-		// Other code that does platform specific things can go here, for now the platforms we support do nearly the same from now on.
-		fs.seekp(0, std::ios::end);
-		write_embedded_packs(bw);
 		unsigned char* code = NULL;
 		UInt32 code_size = SaveCompiledScript(engine, &code);
 		if (code_size < 1) {
-			engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to retrieve bytecode while trying to compile %s", outpath.toString()).c_str());
+			engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to retrieve bytecode while trying to compile %s", output->get_output_file()).c_str());
 			return -1;
 		}
-		bw.write7BitEncoded(code_size ^ NVGT_BYTECODE_NUMBER_XOR);
-		bw.writeRaw((const char*)code, code_size);
-		if (g_platform != "windows") bw << int(stub_size); // All platforms but windows currently read our data offset from the end of the executable, but this is likely subject to change as we learn about any negative consequences of doing so on various platforms.
-		fs.close(); // Compilation success!
+		output->write_payload(code, code_size);
 		free(code);
+		output->finalize();
 		bool quiet = Util::Application::instance().config().hasOption("application.quiet") || Util::Application::instance().config().hasOption("application.QUIET"); // Maybe we should switch to a verbocity level?
-		if (quiet) return 0;
-		message(format("%s build succeeded in %?ums, saved to %s", string(g_debug ? "Debug" : "Release"), Util::Application::instance().uptime().totalMilliseconds(), outpath.toString()), "Success!");
+		if (!quiet) message(format("%s build succeeded in %?ums, saved to %s", string(g_debug ? "Debug" : "Release"), Util::Application::instance().uptime().totalMilliseconds(), output->get_output_file()), "Success!");
+		output->postbuild();
 	} catch (Exception& e) {
-		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s", outpath.toString(), e.displayText()).c_str());
+		if (output && !output->get_error_text().empty()) engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s, %s", output->get_output_file(), output->get_error_text(), e.displayText()).c_str());
+		else if (output) engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s", output->get_output_file(), e.displayText()).c_str());
+		else engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("exception while compiling, %s", e.displayText()).c_str());
 		return -1;
 	}
 	return 0;
@@ -655,7 +629,11 @@ int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size
 	return 0;
 }
 int LoadCompiledExecutable(asIScriptEngine* engine) {
-	FileInputStream fs(Util::Application::instance().commandPath());
+	#ifndef __ANDROID__
+		FileInputStream fs(Util::Application::instance().commandPath());
+	#else
+		FileInputStream fs(android_get_main_shared_object());
+	#endif
 	BinaryReader br(fs);
 	UInt32 data_location, code_size;
 	#ifdef _WIN32
@@ -781,6 +759,7 @@ int ExecuteScript(asIScriptEngine* engine, const string& scriptFile) {
 #ifndef NVGT_STUB
 int PragmaCallback(const string& pragmaText, CScriptBuilder& builder, void* /*userParam*/) {
 	asIScriptEngine* engine = builder.GetEngine();
+	Util::LayeredConfiguration& config = Util::Application::instance().config();
 	asUINT pos = 0;
 	asUINT length = 0;
 	string cleanText;
@@ -810,14 +789,15 @@ int PragmaCallback(const string& pragmaText, CScriptBuilder& builder, void* /*us
 		if (!load_nvgt_plugin(cleanText.substr(7)))
 			engine->WriteMessage(cleanText.substr(7).c_str(), -1, -1, asMSGTYPE_ERROR, "failed to load plugin");
 	} else if (cleanText.starts_with("compiled_basename ")) {
-		g_compiled_basename = cleanText.substr(18);
-		if (g_compiled_basename == "*") g_compiled_basename = "";
+		string bn = cleanText.substr(18);
+		if (bn == "*") bn.clear();
+		config.setString("build.output_basename", bn);
 	} else if (cleanText.starts_with("platform "))
 		g_platform = cleanText.substr(9);
 	else if (cleanText.starts_with("bytecode_compression ")) {
 		g_bcCompressionLevel = strtol(cleanText.substr(21).c_str(), NULL, 10);
 		if (g_bcCompressionLevel < 0 || g_bcCompressionLevel > 9) return -1;
-	} else if (cleanText == "console") g_make_console = true;
+	} else if (cleanText == "console") config.setString("build.windowsConsole", "");
 	else return -1;
 	return 0;
 }

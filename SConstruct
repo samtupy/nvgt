@@ -72,7 +72,7 @@ if "version.cpp" in sources: sources.remove("version.cpp")
 env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
 version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.
 VariantDir("build/obj_src", "src", duplicate = 0)
-env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoNetSSLWinMT", "PocoUtilMT"] if env["PLATFORM"] == "win32" else ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoFoundation"], "phonon", "bass", "bass_fx", "bassmix"])
+env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoNetSSLWinMT", "PocoUtilMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoZip", "PocoFoundation"], "phonon", "bass", "bass_fx", "bassmix"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(LINKFLAGS = ["/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll"])
@@ -94,7 +94,14 @@ if ARGUMENTS.get("no_user", "0") == "0":
 			break # only execute one script from here
 SConscript("ASAddon/_SConscript", variant_dir = "build/obj_ASAddon", duplicate = 0, exports = "env")
 SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, exports = "env")
+# We'll clone the environment for stubs now so that we can then add any extra libraries that are not needed for stubs to the main nvgt environment.
+stub_env = env.Clone(PROGSUFFIX = ".bin")
+if env["PLATFORM"] == "win32": env.Append(LINKFLAGS = ["/delayload:plist.dll"])
+env.Append(LIBS = ["plist-2.0" if env["PLATFORM"] != "win32" else "plist"])
 nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [version_object], PDB = "#build/debug/nvgt.pdb")
+if env["PLATFORM"] == "darwin":
+	# On Mac OS, we need to run install_name_tool to modify the paths of any dynamic libraries we link.
+	env.AddPostAction(nvgt, lambda target, source, env: env.Execute("install_name_tool -change /opt/homebrew/opt/libplist/lib/libplist-2.0.4.dylib @rpath/libplist-2.0.4.dylib " + str(target[0])))
 if env["PLATFORM"] == "win32":
 	# Only on windows we must go through the frustrating hastle of compiling a version of nvgt with no console E. the windows subsystem. It is at least set up so that we only need to recompile one object
 	if "nvgt.cpp" in sources: sources.remove("nvgt.cpp")
@@ -120,7 +127,6 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	elif env["PLATFORM"] == "posix": stub_platform = "linux"
 	else: stub_platform = env["PLATFORM"]
 	VariantDir("build/obj_stub", "src", duplicate = 0)
-	stub_env = env.Clone(PROGSUFFIX = ".bin")
 	stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
 	if env["PLATFORM"] == "win32": stub_env.Append(LINKFLAGS = ["/subsystem:windows"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")

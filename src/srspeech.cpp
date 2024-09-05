@@ -16,7 +16,7 @@
 	#include <UniversalSpeech.h>
 #elif defined(__APPLE__)
 	#include "apple.h"
-#elif defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
+#elif !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
 	#define using_speechd
 #endif
 #include <string>
