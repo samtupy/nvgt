@@ -13,6 +13,7 @@ class virtual_dialogs
 
 	private bool destroy_window()
 		{
+		this.was_window_active = is_window_active();
 		if (this.was_window_created) {
 			:: destroy_window();
 			this.was_window_created = false;
@@ -75,9 +76,19 @@ class virtual_dialogs
 
 	private void monitor()
 		{
+		bool window_status;
+
 		wait(5);
 		this.handle_arrow_keys();
 		this.form.monitor();
+		window_status = is_window_active();
+		if (window_status == this.was_window_active)
+			return;
+
+		if (window_status)
+			this.form.focus(this.form.get_current_focus());
+
+		this.was_window_active = window_status;
 	}
 
 	bool info_box(const string title, const string label, const string text)
@@ -219,7 +230,7 @@ bool virtual_info_box(const string title, const string label, const string text)
 string virtual_input_box(const string title, const string text, const string default_text = "", const int flags = 0)
 	{
 	virtual_dialogs vd;
-	return input_box(title, text, default_text, flags);
+	return vd.input_box(title, text, default_text, flags);
 }
 
 int virtual_message_box(const string title, const string caption, string[]@ buttons, const int flags = 0)
