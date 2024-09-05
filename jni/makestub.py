@@ -14,6 +14,7 @@ variant = sys.argv[1]
 variant_cap = variant[0].upper()+ variant[1:]
 build_dir = sys.argv[2]
 shutil.make_archive(os.path.join(build_dir, "tmp", "res"), "zip", os.path.join(build_dir, "intermediates", "merged_res", variant))
+if not os.path.isdir(os.path.join(os.path.dirname(__file__), "..", "release", "stub")): os.mkdir(os.path.join(os.path.dirname(__file__), "..", "release", "stub"))
 zip_out = zipfile.ZipFile(os.path.join(os.path.dirname(__file__), "..", "release", "stub", "nvgt_android" + ("_debug" if not variant.endswith("Release") else "") + ".bin"), "w", zipfile.ZIP_DEFLATED)
 zip_out.write(os.path.join(build_dir, "tmp", "res.zip"), "res.zip")
 if os.path.isfile(os.path.join("build", "intermediates", "dex", variant, "mergeDex" + variant_cap, "classes.dex")):

@@ -571,6 +571,9 @@ int SaveCompiledScript(asIScriptEngine* engine, unsigned char** output) {
 	return codestream.get(output);
 }
 int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
+	#ifdef NVGT_MOBILE
+	return -1; // Executable compilation is not supported on this platform, no need to compile this.
+	#else
 	if (g_platform == "auto") determine_compile_platform();
 	if (g_platform == "auto") return -1; // Cannot compile for this platform.
 	SharedPtr<nvgt_compilation_output> output;
@@ -599,6 +602,7 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 		return -1;
 	}
 	return 0;
+	#endif // !NVGT_MOBILE
 }
 #else
 int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size) {

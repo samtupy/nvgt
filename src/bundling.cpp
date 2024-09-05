@@ -14,8 +14,9 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-// This entire module is only needed assuming that NVGT is not being compiled as a stub. It's perfectly find to just not build bundling.cpp at all as long as NVGT_STUB is defined, but lets not error or risk including code in case of inclusion into a stub so that we can laisily feed the build system a wildcard to the src directory.
-#ifndef NVGT_STUB
+// This entire module is only needed assuming that NVGT is not being compiled as a stub, and also assuming that the runner application is not being built on mobile. It's perfectly find to just not build bundling.cpp at all as long as NVGT_STUB is defined, but lets not error or risk including code in case of inclusion into a stub so that we can laisily feed the build system a wildcard to the src directory.
+#include "xplatform.h"
+#if !defined(NVGT_STUB) && !defined(NVGT_MOBILE)
 #include <Poco/BinaryReader.h>
 #include <Poco/BinaryWriter.h>
 #include <Poco/Clock.h>
@@ -48,7 +49,6 @@
 #endif
 #include "pack.h" // write_embedded_packs
 #include "UI.h"
-#include "xplatform.h"
 using namespace std;
 using namespace Poco;
 
