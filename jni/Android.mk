@@ -1,6 +1,8 @@
 LOCAL_PATH := $(call my-dir)
 LIBPATH := ../droidev/libs/$(TARGET_ARCH_ABI)
+ifneq ($(wildcard Custom.mk),)
 include Custom.mk
+endif
 include $(CLEAR_VARS)
 
 # static libraries
@@ -115,7 +117,9 @@ LOCAL_LDLIBS := $(LOCAL_LDLIBS_COMMON)
 LOCAL_CPP_FEATURES := $(LOCAL_CPP_FEATURES_COMMON)
 LOCAL_DISABLE_FATAL_LINKER_WARNINGS := true
 LOCAL_LDFLAGS := $(LOCAL_LDFLAGS_COMMON)
+ifneq ($(wildcard Custom.mk),)
 include Custom.mk
+endif
 include $(BUILD_SHARED_LIBRARY)
 endif
 
@@ -132,6 +136,8 @@ LOCAL_LDLIBS := $(LOCAL_LDLIBS_COMMON)
 LOCAL_CPP_FEATURES := $(LOCAL_CPP_FEATURES_COMMON)
 LOCAL_DISABLE_FATAL_LINKER_WARNINGS := true
 LOCAL_LDFLAGS := $(LOCAL_LDFLAGS_COMMON)
+ifneq ($(wildcard Custom.mk),)
 include Custom.mk
+endif
 include $(BUILD_SHARED_LIBRARY)
 endif
