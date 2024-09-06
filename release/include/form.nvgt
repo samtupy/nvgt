@@ -936,6 +936,28 @@ class audio_form {
 		set_cancel(control_index, cancel, overwrite);
 		return true;
 	}
+	bool set_list_propertyes(int control_index, bool multiselect=false, bool repeat_boundary_items=false) {
+form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return false;
+		}
+		if (c_form[control_index].type != ct_list) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_counter].list_multiselect = multiselect;
+		c_form[control_counter].list_repeat_boundary_items = repeat_boundary_items;
+		return true;
+	}
 	bool delete_list_item(int control_index, int list_index, bool reset_cursor = true, bool speak_deletion_status = true) {
 		form_error = 0;
 		if (!active) {
