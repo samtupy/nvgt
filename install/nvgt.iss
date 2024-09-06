@@ -93,6 +93,7 @@ Name: "associate"; Description: "Associate files ending in .nvgt with the NVGT I
 name: "associate\run"; description: "Execute script when opened from file explorer"; flags: exclusive; GroupDescription: "Associations:"
 name: "associate\edit"; description: "Edit script when opened from file explorer"; flags: exclusive unchecked; GroupDescription: "Associations:"
 name: "androidtools"; description: "Install required Android tools for generating Android applications"; GroupDescription: "Cross-platform development:"
+name: "path"; description: "Add NVGT to the system path"; GroupDescription: "Miscellaneous:"
 
 [Files]
 ; Core
@@ -187,7 +188,7 @@ Root: HKA; subkey: "software\classes\NVGTScript\shell\run"; ValueType: string; V
 Root: HKA; subkey: "software\classes\NVGTScript\shell\run\command"; ValueType: string; ValueName: ""; ValueData: """{app}\nvgtw.exe"" ""%1"""; tasks: associate
 Root: HKA; subkey: "software\classes\NVGTScript\shell\debug"; ValueType: string; ValueName: ""; ValueData: "Debug Script"; tasks: associate
 Root: HKA; subkey: "software\classes\NVGTScript\shell\debug\command"; ValueType: string; ValueName: ""; ValueData: """{app}\nvgt.exe"" -d ""%1"""; tasks: associate
-
+    
 [Icons]
 Name: "{group}\NVGT Interpreter (GUI mode)"; Filename: "{app}\nvgtw.exe"
 Name: "{group}\NVGT Documentation"; Filename: "{app}\nvgt.chm"
@@ -200,10 +201,12 @@ type: files; name: "{app}\nvgt.chm"
 var
 AndroidSdkDownloadPage, DocsDownloadPage: TDownloadWizardPage;
 AndroidSDKExtractPage: TOutputProgressWizardPage;
+DoubleClickBehaviorPage: TInputOptionWizardPage;
 
 const
   SHCONTCH_NOPROGRESSBOX = 4;
   SHCONTCH_RESPONDYESTOALL = 16;
+  EnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
 
 procedure UnZipFile(ZipPath, TargetPath, FileName: string);
 var
@@ -228,12 +231,58 @@ Item := ZipFile.ParseName(FileName);
   RaiseException(Format('File "%s" not found', [FileName]));
 end;
 
+procedure EnvAddPath(Path: string);
+var
+    Paths: string;
+begin
+    // Retrieve current path (use empty string if entry not exists)
+    if not RegQueryStringValue(HKLM, EnvironmentKey, 'Path', Paths)
+    then Paths := '';
+
+    // Skip if string already found in path
+    if Pos(';' + Uppercase(Path) + ';', ';' + Uppercase(Paths) + ';') > 0 then exit;
+
+    // Append string to the end of the path variable
+    Paths := Paths + ';'+ Path +';'
+
+    // Overwrite (or create if missing) path environment variable
+    if RegWriteStringValue(HKLM, EnvironmentKey, 'Path', Paths)
+    then Log(Format('The [%s] added to PATH: [%s]', [Path, Paths]))
+    else Log(Format('Error while adding the [%s] to PATH: [%s]', [Path, Paths]));
+end;
+
+procedure EnvRemovePath(Path: string);
+var
+    Paths: string;
+    P: Integer;
+begin
+    // Skip if registry entry not exists
+    if not RegQueryStringValue(HKLM, EnvironmentKey, 'Path', Paths) then
+        exit;
+
+    // Skip if string not found in path
+    P := Pos(';' + Uppercase(Path) + ';', ';' + Uppercase(Paths) + ';');
+    if P = 0 then exit;
+
+    // Update path variable
+    Delete(Paths, P - 1, Length(Path) + 1);
+
+    // Overwrite path environment variable
+    if RegWriteStringValue(HKLM, EnvironmentKey, 'Path', Paths)
+    then Log(Format('The [%s] removed from PATH: [%s]', [Path, Paths]))
+    else Log(Format('Error while removing the [%s] from PATH: [%s]', [Path, Paths]));
+end;
+
 procedure InitializeWizard;
 begin
   AndroidSdkDownloadPage := CreateDownloadPage('Installing Android SDK', 'Please wait while the SDK for Android is installed', nil);
   AndroidSdkDownloadPage.ShowBaseNameInsteadOfUrl := True;
   DocsDownloadPage := CreateDownloadPage('Downloading documentation', 'Please wait while the documentation is acquired', nil);
   DocsDownloadPage.ShowBaseNameInsteadOfUrl := True;
+  DoubleClickBehaviorPage := CreateInputOptionPage(wpSelectComponents, 'Select double-click/open behavior', 'How would you like the system to behave when opening an NVGT script?', 'If you select "Run script," the script will be executed by the NVGT interpreter; if you select "Edit script," the script will be opened in your default text editor.', true, false);
+  DoubleClickBehaviorPage.Add('Run Script');
+  DoubleClickBehaviorPage.Add('Edit Script');
+    DoubleClickBehaviorPage.SelectedValueIndex := StrToInt(GetPreviousData('DefaultDoubleClickBehavior', '0'));
 end;
 
 procedure DownloadAndroidSDK;
@@ -307,7 +356,42 @@ if CurStep = ssPostInstall then
 begin
 if WizardIsTaskSelected('androidtools') or SameText(WizardSetupType(false), 'full') then
 DownloadAndroidSDK;
-if WizardIsComponentSelected('docs_download') or SameText(WizardSetupType(false), 'full') then
+if WizardIsComponentSelected('docs_download') then
 DownloadDocs;
+if WizardIsTaskSelected('path') or SameText(WizardSetupType(false), 'full') then
+EnvAddPath(ExpandConstant('{app}'));
 end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+    if CurUninstallStep = usPostUninstall then
+        EnvRemovePath(ExpandConstant('{app}'));
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := false;
+  if (PageID = wpSelectTasks) and SameText(WizardSetupType(false), 'full') then
+    Result := true;
+  if (PageID = DoubleClickBehaviorPage.ID) and not SameText(WizardSetupType(false), 'full') then
+    Result := true;
+end;
+
+procedure RegisterPreviousData(PreviousDataKey: Integer);
+begin
+if not SetPreviousData(PreviousDataKey, 'DefaultDoubleClickBehavior', IntToStr(DoubleClickBehaviorPage.SelectedValueIndex)) then
+SuppressibleMsgBox('Could not register previous data for double click behavior', mbInformation, MB_OK, IDOK);
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+if (CurPageID = wpSelectComponents) and SameText(WizardSetupType(false), 'full') then
+WizardSelectTasks('path');
+if (CurPageID = DoubleClickBehaviorPage.id) and SameText(WizardSetupType(false), 'full') then
+if DoubleClickBehaviorPage.SelectedValueIndex = 0 then
+WizardSelectTasks('associate\run')
+else
+WizardSelectTasks('associate\edit');
+Result := true;
 end;
