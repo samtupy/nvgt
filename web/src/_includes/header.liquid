@@ -5,7 +5,10 @@
 {% if page.published_date -%}
 <title>{{ page.title }} &ndash; {{ collections.posts.title }}</title>
 {%- else -%}
-<title>{{ page.title }} &ndash; {{ site.title }}</title>
+{% capture page_title %}
+{{ page.title}}{% if paginator and paginator.index > 1 %} (page {{ paginator.index }}){%endif%} &ndash; {{ site.title }}
+{% endcapture %}
+<title>{{ page_title }}</title>
 {%- endif %}
 <style>
 details summary
@@ -17,6 +20,7 @@ details summary > *
 display: inline;
 }
 </style>
+<script src = "/js/functions.js"></script>
 </head>
 <body>
 <a href="#content-anchor">Skip to content</a>

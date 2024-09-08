@@ -22,3 +22,6 @@ posts:
  dir: blog
  rss: blog.xml
  jsonfeed: blog.json
+ publish_date_in_filename: false
+ default:
+  permalink: /{{parent}}/{{name}}
