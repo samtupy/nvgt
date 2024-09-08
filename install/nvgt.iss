@@ -44,13 +44,13 @@ UsePreviousSetupType = yes
 UsePreviousTasks = yes
 UsePreviousUserInfo = yes
 AppCopyright = Copyright (c) 2024 Sam Tupy and the NVGT developers
-ShowTasksTreeLines = no
+ShowTasksTreeLines = yes
 WindowShowCaption = no
 WizardStyle = modern
 DefaultDirName = c:\nvgt
 DefaultGroupName = NVGT
 DisableFinishedPage = no
-DisableStartupPrompt = no
+DisableStartupPrompt = yes
 DisableWelcomePage = no
 FlatComponentsList = no
 OutputDir = install
@@ -148,6 +148,7 @@ source: "release\include\*.nvgt"; DestDir: "{app}\include"; components: includes
 #ifdef have_docs
 source: "docs\nvgt.chm"; DestDir: "{app}"; components: docs
 #endif
+source: "install\InnoCallback.dll"; DestDir: "{tmp}"; flags: dontcopy
 
 [Registry]
 Root: HKA; subkey: "software\classes\.nvgt"; ValueType: string; ValueName: ""; ValueData: "NVGTScript"; Flags: uninsdeletevalue; tasks: associate
@@ -207,6 +208,18 @@ const
   SHCONTCH_NOPROGRESSBOX = 4;
   SHCONTCH_RESPONDYESTOALL = 16;
   EnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
+
+type
+ TTimerProc=procedure(h:longword; msg:longword; idevent:longword; dwTime:longword);
+
+function WrapTimerProc(callback:TTimerProc; paramcount:integer):longword;
+  external 'wrapcallback@files:innocallback.dll stdcall';
+
+function SetTimer(hWnd: longword; nIDEvent, uElapse: longword; lpTimerFunc: longword): longword;
+  external 'SetTimer@user32.dll stdcall';
+
+function KillTimer(hWnd: longword; nIDEvent: longword): longword;
+  external 'KillTimer@user32.dll stdcall';
 
 procedure UnZipFile(ZipPath, TargetPath, FileName: string);
 var
@@ -279,13 +292,22 @@ begin
   AndroidSdkDownloadPage.ShowBaseNameInsteadOfUrl := True;
   DocsDownloadPage := CreateDownloadPage('Downloading documentation', 'Please wait while the documentation is acquired', nil);
   DocsDownloadPage.ShowBaseNameInsteadOfUrl := True;
+  AndroidSDKExtractPage := CreateOutputProgressPage('Installing Android SDK', 'Please wait while the Android SDK is being installed.');
   DoubleClickBehaviorPage := CreateInputOptionPage(wpSelectComponents, 'Select double-click/open behavior', 'How would you like the system to behave when opening an NVGT script?', 'If you select "Run script," the script will be executed by the NVGT interpreter; if you select "Edit script," the script will be opened in your default text editor.', true, false);
   DoubleClickBehaviorPage.Add('Run Script');
   DoubleClickBehaviorPage.Add('Edit Script');
     DoubleClickBehaviorPage.SelectedValueIndex := StrToInt(GetPreviousData('DefaultDoubleClickBehavior', '0'));
 end;
 
+procedure RunAppLoop(h:longword; msg:longword; idevent:longword; dwTime:longword);
+begin
+AndroidSDKExtractPage.SetProgress(AndroidSDKExtractPage.ProgressBar.Position, AndroidSDKExtractPage.ProgressBar.Max);
+end;
+
 procedure DownloadAndroidSDK;
+var
+TimerCallback: longword;
+Timer: longword;
 begin
 AndroidSdkDownloadPage.Clear;
 AndroidSdkDownloadPage.Add('https://dl.google.com/android/repository/platform-tools-latest-windows.zip', 'platform-tools-latest-windows.zip', '');
@@ -295,8 +317,9 @@ AndroidSdkDownloadPage.Show;
 try
 try
 AndroidSdkDownloadPage.Download;
-AndroidSDKExtractPage := CreateOutputProgressPage('Installing Android SDK', 'Please wait while the Android SDK is being installed.');
 try
+TimerCallback := WrapTimerProc(@RunAppLoop, 4);
+Timer := SetTimer(0, 0, $0000000A, TimerCallback);
 AndroidSDKExtractPage.Show;
 ForceDirectories(ExpandConstant('{app}\android-tools'));
 AndroidSDKExtractPage.SetProgress(0, 6);
@@ -313,6 +336,7 @@ AndroidSDKExtractPage.SetProgress(0, 6);
                         UnZipFile(ExpandConstant('{tmp}\platform-35_r01.zip'), ExpandConstant('{app}\android-tools'), 'android-35\android.jar');
                         AndroidSDKExtractPage.SetProgress(6, 6);
 finally
+KillTimer(0, timer);
 AndroidSDKExtractPage.Hide;
 end;
 except
