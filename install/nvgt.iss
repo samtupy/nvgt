@@ -55,6 +55,7 @@ DisableWelcomePage = no
 FlatComponentsList = no
 OutputDir = install
 ShowLanguageDialog = yes
+InfoAfterFile = install\postinst.txt
 
 [Types]
 Name: "full"; Description: "Full installation"
