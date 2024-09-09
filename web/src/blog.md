@@ -22,7 +22,7 @@ pagination:
 {% assign posttitle = posttitle | append: " (" | append: post.description | append: ")" %}
 {% endif %}
 ### [{{posttitle}}](/{{post.permalink}})
-Published on: <script>document.write(convertrdate("{{ post.published_date}}"));</script>
+Published on <script>document.write(local_datetime_string("{{ post.published_date}}"));</script>
 
 {{post.excerpt | strip_html}}
 
