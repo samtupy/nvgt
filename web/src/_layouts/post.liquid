@@ -1,6 +1,18 @@
 {% include "header.liquid" %}
 <h1>{{ page.title }}</h1>
-<p> on {{ page.published_date | date: "%A, %B %d %Y at %r" }} </p>
+<p>Published on <script>document.write(local_datetime_string("{{ page.published_date}}"));</script></p>
+{% assign reading_wpm = 200 %}
+{% assign word_count = page.content | split: " " | size %}
+{% assign reading_time = word_count | divided_by: reading_wpm %}
+{% case reading_time %}
+{% when 0 %}
+{% assign phrase = "less than a minute." %}
+{% when 1 %}
+{% assign phrase = "about a minute." %}
+{% else %}
+{% assign phrase = " minutes." | prepend: reading_time | prepend: "about " %}
+{% endcase %}
+<p>Contains {{ word_count }} words, with an estimated reading time of {{ phrase }}</p>
 
 {{ page.content }}
 
