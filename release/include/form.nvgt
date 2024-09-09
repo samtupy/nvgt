@@ -332,7 +332,7 @@ class audio_form {
 		@c_form[control_counter].ui_speech = ui_speech;
 		return control_counter;
 	}
-	int create_slider(string caption, int default_value = 50, int minimum_value = 0, int maximum_value = 100, string text = "") {
+	int create_slider(string caption, float default_value = 50, float minimum_value = 0, float maximum_value = 100, string text = "", float step_size = 1) {
 		form_error = 0;
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
@@ -351,6 +351,7 @@ class audio_form {
 		c_form[control_counter].slider_value = default_value;
 		c_form[control_counter].slider_minimum_value = minimum_value;
 		c_form[control_counter].slider_maximum_value = maximum_value;
+		c_form[control_counter].slider_step_size = step_size;
 		c_form[control_counter].text = text;
 		c_form[control_counter].speech_output = speech_output;
 		@c_form[control_counter].ui_speech = ui_speech;
@@ -2293,9 +2294,10 @@ class control {
 	bool list_nav_translate;
 	int type;
 	int progress;
-	int slider_value;
-	int slider_minimum_value;
-	int slider_maximum_value;
+	float slider_value;
+	float slider_minimum_value;
+	float slider_maximum_value;
+	float slider_step_size;
 	dictionary slider_text_values;
 	int echo_flag;
 	int speak_interval;
@@ -2599,31 +2601,31 @@ class control {
 			}
 		}
 		if (type == ct_slider) {
-			int increment = 0;
+			float increment = 0;
 			if (key_repeating(KEY_LEFT) || key_repeating(KEY_DOWN))
-				increment = -1;
+				increment = -slider_step_size;
 			else if (key_repeating(KEY_RIGHT) || key_repeating(KEY_UP))
-				increment = 1;
+				increment = slider_step_size;
 			else if (key_repeating(KEY_PAGEUP))
-				increment = 5;
+				increment = 5 * slider_step_size;
 			else if (key_repeating(KEY_PAGEDOWN))
-				increment = -5;
+				increment = 5 * -slider_step_size;
 			else if (key_repeating(KEY_HOME))
 				increment = slider_maximum_value;
 			else if (key_repeating(KEY_END))
-				increment = -slider_maximum_value;
-			if (increment == 0)
+				increment = slider_minimum_value;
+			else if (increment == 0)
 				return;
-			int width = slider_maximum_value - slider_minimum_value;
-			if (!key_down(KEY_LCTRL) && !key_down(KEY_RCTRL) && width > 100)
+			int width = floor((slider_maximum_value - slider_minimum_value) / slider_step_size);
+			if (keyboard_modifiers & KEYMOD_CTRL == 0 && width > 100)
 				increment *= (width * 0.025);
-			int new_value = slider_value + increment;
+			float new_value = (increment != 0) ? slider_value + increment : 0;
 			if (new_value < slider_minimum_value)
 				new_value = slider_minimum_value;
 			if (new_value > slider_maximum_value)
 				new_value = slider_maximum_value;
 			if (new_value != slider_value) {
-				int old = slider_value;
+				float old = slider_value;
 				slider_value = new_value;
 				if (@event_callback != null and event_callback(f, tab_index, event_slider, {{"increment", increment}, {"value", slider_value}}) == 1) {
 					slider_value = old;
