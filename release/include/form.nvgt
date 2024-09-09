@@ -57,8 +57,7 @@ enum control_types {
 	ct_list,
 	ct_slider,
 	ct_form,
-	ct_keyboard_area,
-	ct_link
+	ct_keyboard_area
 }
 //form_errors
 enum audioform_errorcodes {
@@ -439,26 +438,6 @@ class audio_form {
 		c_form[control_counter].enabled = true;
 		c_form[control_counter].checked = initial_value;
 		c_form[control_counter].read_only = read_only;
-		c_form[control_counter].speech_output = speech_output;
-		@c_form[control_counter].ui_speech = ui_speech;
-		return control_counter;
-	}
-	int create_link(string caption) {
-		form_error = 0;
-		if (active_controls >= 50) {
-			form_error = form_error_window_full;
-			return -1;
-		}
-		control_counter++;
-		active_controls++;
-		c_form.resize(control_counter + 1);
-		c_form[control_counter].type = ct_link;
-		@c_form[control_counter].event_callback = event_callback;
-		c_form[control_counter].hotkey = shortcut(caption);
-		c_form[control_counter].hotkey_letter = shortcut_letter(caption);
-		c_form[control_counter].caption = caption.replace("&", "", true);
-		c_form[control_counter].visible = true;
-		c_form[control_counter].enabled = true;
 		c_form[control_counter].speech_output = speech_output;
 		@c_form[control_counter].ui_speech = ui_speech;
 		return control_counter;
@@ -3267,8 +3246,6 @@ class control {
 			name = "Status Bar";
 		if (type == ct_keyboard_area)
 			name = "Keyboard Area";
-		if (type == ct_link)
-			name = "Link";
 		if (enabled == false)
 			name = "Disabled " + name;
 		if (read_only == true)
