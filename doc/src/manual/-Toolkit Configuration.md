@@ -20,7 +20,7 @@ Finally, a special argument, two hyphens without any following text, indicates t
 The following is a list of all available command line arguments, though note that it is best to directly run `nvgt --help` yourself encase this list is in any way out of date as nvgt's --help argument will always be more accurate because the text it prints is dynamically generated.
 * -c, --compile: compile script in release mode
 * -C, --compile-debug: compile script in debug mode
-* -pplatform, --platform=platform: select target platform to compile for (auto|windows|linux|mac)
+* -pplatform, --platform=platform: select target platform to compile for (auto|android|windows|linux|mac)
 * -q, --quiet: do not output anything upon successful compilation
 * -Q, --QUIET: do not output anything (work in progress), error status must be determined by process exit code (intended for automation)
 * -d, --debug: run with the Angelscript debugger
@@ -168,7 +168,7 @@ The syntax for a pragma directive looks like `#pragma name value` or sometimes j
 
 ### Available directives
 * `#pragma include <directory>`: search for includes in the given directory (directive can be repeated)
-* `#pragma platform <platform>`: select what platform to compile for same as -p argument (auto, linux, mac, windows)
+* `#pragma platform <platform>`: select what platform to compile for same as -p argument (auto, android, linux, mac, windows)
 * `#pragma stub <stubname>`: select what stub to compile using (see remarks at the bottom of this article)
 * `#pragma embed <packname>`: embed the given pack into the compiled executable
 * `#pragma plugin <plugname>`: load and activate a plugin given it's dll basename
