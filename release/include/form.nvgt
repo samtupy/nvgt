@@ -57,7 +57,8 @@ enum control_types {
 	ct_list,
 	ct_slider,
 	ct_form,
-	ct_keyboard_area
+	ct_keyboard_area,
+	ct_link
 }
 //form_errors
 enum audioform_errorcodes {
@@ -167,6 +168,28 @@ class audio_form {
 			return false;
 		}
 		c_form[control_index].checked = checked;
+		return true;
+	}
+	bool set_custom_type(int control_index, string custom_type)
+		{
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (custom_type.empty()) {
+			form_error = form_error_invalid_value;
+			return false;
+		}
+		c_form[control_index].custom_type = custom_type;
 		return true;
 	}
 	bool set_subform(int control_index, audio_form@ f) {
@@ -442,6 +465,27 @@ class audio_form {
 		@c_form[control_counter].ui_speech = ui_speech;
 		return control_counter;
 	}
+	int create_link(string caption, string url) {
+		form_error = 0;
+		if (active_controls >= 50) {
+			form_error = form_error_window_full;
+			return -1;
+		}
+		control_counter++;
+		active_controls++;
+		c_form.resize(control_counter + 1);
+		c_form[control_counter].type = ct_link;
+		@c_form[control_counter].event_callback = event_callback;
+		c_form[control_counter].hotkey = shortcut(caption);
+		c_form[control_counter].hotkey_letter = shortcut_letter(caption);
+		c_form[control_counter].caption = caption.replace("&", "", true);
+		c_form[control_counter].link_url = url;
+		c_form[control_counter].visible = true;
+		c_form[control_counter].enabled = true;
+		c_form[control_counter].speech_output = speech_output;
+		@c_form[control_counter].ui_speech = ui_speech;
+		return control_counter;
+	}
 	bool activate_progress_timer(int control_index) {
 		form_error = 0;
 		if (!active) {
@@ -604,7 +648,7 @@ class audio_form {
 		if ((focused < 0 || c_form[focused].type != ct_keyboard_area) && (focused < 0 || (c_form[focused].multiline == false) || (c_form[focused].multiline_enter == false && (key_up(KEY_LCTRL)) && (key_up(KEY_RCTRL)) && (key_up(KEY_LSHIFT)) && (key_up(KEY_RSHIFT)))) && ((key_pressed(KEY_RETURN)) || (key_pressed(KEY_NUMPAD_ENTER)) || (autotab == 3))) {
 			stop_speech();
 			if ((defaults == -1) && (focused > -1)) {
-				if (c_form[focused].type == ct_button)
+				if (c_form[focused].type == ct_button || c_form[focused].type == ct_link)
 					c_form[focused].pressed = true;
 				else if (subform)
 					return 3;
@@ -935,28 +979,6 @@ class audio_form {
 		}
 		set_primary(control_index, primary, overwrite);
 		set_cancel(control_index, cancel, overwrite);
-		return true;
-	}
-	bool set_list_propertyes(int control_index, bool multiselect=false, bool repeat_boundary_items=false) {
-form_error = 0;
-		if (!active) {
-			form_error = form_error_no_window;
-			return false;
-		}
-		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
-			form_error = form_error_invalid_index;
-			return false;
-		}
-		if (c_form[control_index].type != ct_list) {
-			form_error = form_error_invalid_control;
-			return false;
-		}
-		if (!c_form[control_index].active) {
-			form_error = form_error_invalid_control;
-			return false;
-		}
-		c_form[control_counter].list_multiselect = multiselect;
-		c_form[control_counter].list_repeat_boundary_items = repeat_boundary_items;
 		return true;
 	}
 	bool delete_list_item(int control_index, int list_index, bool reset_cursor = true, bool speak_deletion_status = true) {
@@ -2260,6 +2282,8 @@ form_error = 0;
 class control {
 	string caption;
 	string text;
+	string custom_type;
+	string link_url;
 	string password_mask;
 	string highlight_selection_speech_text;
 	string highlight_unselection_speech_text;
@@ -2593,7 +2617,7 @@ class control {
 				increment = slider_maximum_value;
 			else if (key_repeating(KEY_END))
 				increment = slider_minimum_value;
-			else if (increment == 0)
+			else
 				return;
 			int width = floor((slider_maximum_value - slider_minimum_value) / slider_step_size);
 			if (keyboard_modifiers & KEYMOD_CTRL == 0 && width > 100)
@@ -2746,6 +2770,21 @@ class control {
 				if (focused == true)
 					speak_progress();
 			}
+		}
+		if (type == ct_link) {
+			if (!key_pressed(KEY_SPACE) && !pressed)
+				return;
+			pressed = false;
+			if (link_url.empty()) {
+				speak("Error, link url is empty!");
+				return;
+			}
+			if (regexp_match(link_url, "^(https?:\/\/)?(?:[a-zA-Z0-9_-]+(?::[a-zA-Z0-9._%+-]+)?@)?([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(:\d{2,5})?(\/[^\s?#]*)?(\?[^\s#]*)?(#[^\s]*)?$")) {
+			speak("Invalid url (%0)".format(link_url));
+				return;
+			}
+			bool open_response = urlopen(link_url);
+			speak(open_response ? "Opening %0".format(link_url) : "Couldn't open the url. Unexpected error occured!");
 		}
 	}
 	string slider_value_string() {
@@ -3218,13 +3257,15 @@ class control {
 	}
 	string type_to_name() {
 		string name;
-		if (type == ct_button)
+		if (!custom_type.empty())
+			name = custom_type;
+		else if (type == ct_button)
 			name = "Button";
-		if (type == ct_list) {
+		else if (type == ct_list) {
 			if (list_is_tab_panel) name = "Tab panel";
 			else name = "List";
 		}
-		if (type == ct_input) {
+		else if (type == ct_input) {
 			if (multiline == false)
 				name = "Edit";
 			if (multiline == true)
@@ -3232,20 +3273,22 @@ class control {
 			if (password_mask != "")
 				name = name + " Characters Hidden";
 		}
-		if (type == ct_checkbox) {
+		else if (type == ct_checkbox) {
 			if (checked)
 				name = "Check Box Checked";
 			else
 				name = "Check Box Not Checked";
 		}
-		if (type == ct_progress)
+		else if (type == ct_progress)
 			name = "Progress Bar";
-		if (type == ct_slider)
+		else if (type == ct_slider)
 			name = "Slider";
-		if (type == ct_status_bar)
+		else if (type == ct_status_bar)
 			name = "Status Bar";
-		if (type == ct_keyboard_area)
+		else if (type == ct_keyboard_area)
 			name = "Keyboard Area";
+		else if (type == ct_link)
+			name = "Link";
 		if (enabled == false)
 			name = "Disabled " + name;
 		if (read_only == true)
