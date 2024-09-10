@@ -28,8 +28,8 @@ void android_setup_jni() {
 	if (!TTSClass) throw Poco::Exception("cannot find TTS class");
 	TTSClass = (jclass)env->NewGlobalRef(TTSClass);
 	midIsScreenReaderActive = env->GetStaticMethodID(TTSClass, "isScreenReaderActive", "()Z");
-	midScreenReaderDetect = env->GetStaticMethodID(TTSClass, "screenReaderDetect", "()Ljava/lang/string;");
-	midScreenReaderSpeak = env->GetStaticMethodID(TTSClass, "screenReaderSpeak", "(Ljava/lang/String;)Z");
+	midScreenReaderDetect = env->GetStaticMethodID(TTSClass, "screenReaderDetect", "()Ljava/lang/String;");
+	midScreenReaderSpeak = env->GetStaticMethodID(TTSClass, "screenReaderSpeak", "(Ljava/lang/String;Z)Z");
 	midScreenReaderSilence = env->GetStaticMethodID(TTSClass, "screenReaderSilence", "()Z");
 }
 

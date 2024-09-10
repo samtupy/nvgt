@@ -18,6 +18,8 @@
 	#include "apple.h"
 #elif !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
 	#define using_speechd
+#elif defined(__ANDROID__)
+	#include "android.h"
 #endif
 #include <string>
 #include <Poco/AtomicFlag.h>
@@ -54,9 +56,9 @@ bool ScreenReaderLoad() {
 	g_SRSpeechAvailable.set();
 	g_SRSpeechLoaded.set();
 	return true;
-	#elif defined(__APPLE__)
+	#elif defined(__APPLE__) || defined(__ANDROID__)
 	g_SRSpeechLoaded.set();
-	return true; // Voice over or libraries to access it don't need loading.
+	return true; // Voice over or libraries to access it don't need loading, same with Android accessibility manager.
 	#elif defined(using_speechd)
 	if (g_SRSpeechLoaded) return true;
 	try {
@@ -114,6 +116,8 @@ std::string ScreenReaderDetect() {
 	return voice_over_is_running() ? "VoiceOver" : "";
 	#elif defined(using_speechd)
 	return g_SpeechdConn != nullptr ? "Speech dispatcher" : "";
+	#elif defined(__ANDROID__)
+	return android_screen_reader_detect();
 	#else
 	return "";
 	#endif
@@ -127,6 +131,8 @@ bool ScreenReaderHasSpeech() {
 	return voice_over_is_running();
 	#elif defined(using_speechd)
 	return g_SpeechdConn != nullptr;
+	#elif defined(__ANDROID__)
+	return android_is_screen_reader_active();
 	#else
 	return false;
 	#endif
@@ -166,6 +172,8 @@ bool ScreenReaderOutput(std::string& text, bool interrupt) {
 		spd_cancel(g_SpeechdConn);
 	}
 	return spd_say(g_SpeechdConn, interrupt ? SPD_IMPORTANT : SPD_TEXT, text.c_str());
+	#elif defined(__ANDROID__)
+	return android_screen_reader_speak(text, interrupt);
 	#else
 	return false;
 	#endif
@@ -185,6 +193,8 @@ bool ScreenReaderSpeak(std::string& text, bool interrupt) {
 		spd_cancel(g_SpeechdConn);
 	}
 	return spd_say(g_SpeechdConn, interrupt ? SPD_IMPORTANT : SPD_TEXT, text.c_str());
+	#elif defined(__ANDROID__)
+	return android_screen_reader_speak(text, interrupt);
 	#else
 	return false;
 	#endif
@@ -210,6 +220,8 @@ bool ScreenReaderSilence() {
 	spd_cancel(g_SpeechdConn);
 	spd_stop(g_SpeechdConn);
 	return true;
+	#elif defined(__ANDROID__)
+	return android_screen_reader_silence();
 	#else
 	return false;
 	#endif
