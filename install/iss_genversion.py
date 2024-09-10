@@ -1,13 +1,7 @@
 # Create a .ish file containing NVGT version information and other constants retrieved from ../version
 
 import os
-import io
-import zipfile
-import urllib.request as ur
 
-archive_data = io.BytesIO(ur.urlopen("https://github.com/thenickdude/InnoCallback/releases/download/v0.1/innocallback.zip").read())
-archive = zipfile.ZipFile(archive_data)
-archive.extract("InnoCallback.dll")
 with open("../version", "r") as vf:
 	ver_string = vf.read().rstrip()
 	ver_filename_string = ver_string.replace("-", "_")

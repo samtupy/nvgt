@@ -134,12 +134,14 @@ source: "release\stub\nvgt_windows_upx.bin"; DestDir: "{app}\stub"; components: 
 #endif
 #ifdef have_macos_stubs
 source: "release\stub\nvgt_mac.bin"; DestDir: "{app}\stub"; components: stubs\macos
+source: "release\lib_mac"; DestDir: "{app}"; components: stubs\macos
 #endif
 #ifdef have_linux_stubs
 source: "release\stub\nvgt_linux.bin"; DestDir: "{app}\stub"; components: stubs\linux
 #ifdef have_linux_upx_stubs
 source: "release\stub\nvgt_linux_upx.bin"; DestDir: "{app}\stub"; components: stubs\linux
 #endif
+source: "release\lib_linux"; DestDir: "{app}"; components: stubs\linux
 #endif
 #ifdef have_android_stubs
 source: "release\stub\nvgt_android.bin"; DestDir: "{app}\stub"; components: stubs\android
@@ -212,9 +214,6 @@ const
 
 type
  TTimerProc=procedure(h:longword; msg:longword; idevent:longword; dwTime:longword);
-
-function WrapTimerProc(callback:TTimerProc; paramcount:integer):longword;
-  external 'wrapcallback@files:innocallback.dll stdcall';
 
 function SetTimer(hWnd: longword; nIDEvent, uElapse: longword; lpTimerFunc: longword): longword;
   external 'SetTimer@user32.dll stdcall';
@@ -307,7 +306,6 @@ end;
 
 procedure DownloadAndroidSDK;
 var
-TimerCallback: longword;
 Timer: longword;
 begin
 AndroidSdkDownloadPage.Clear;
@@ -319,8 +317,7 @@ try
 try
 AndroidSdkDownloadPage.Download;
 try
-TimerCallback := WrapTimerProc(@RunAppLoop, 4);
-Timer := SetTimer(0, 0, $0000000A, TimerCallback);
+Timer := SetTimer(0, 0, $0000000A, CreateCallback(@RunAppLoop));
 AndroidSDKExtractPage.Show;
 ForceDirectories(ExpandConstant('{app}\android-tools'));
 AndroidSDKExtractPage.SetProgress(0, 6);
