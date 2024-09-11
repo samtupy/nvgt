@@ -34,14 +34,15 @@ public:
 	void* user; // Free for advanced streams to use.
 	bool no_close; // If set to true, the close function becomes a no-op for singleton streams like stdin/stdout.
 	bool binary; // If set to false, the template read/write functions will write formatted text output instead of binary data, used by default for console streams.
+	bool sync_rw_cursors; // If true (the default) and if this is an iostream, sink the write and read cursor so that they appear as one cursor.
 	// Empty constructor (internal stream is nonexistent/closed).
-	datastream() : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true) {}
+	datastream() : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true), sync_rw_cursors(true) {}
 	// Low level constructor (Allows passing separate shared pointers to input and output stream).
-	datastream(std::istream* istr, std::ostream* ostr, const std::string& encoding, int byteorder, datastream* obj) : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true) {
+	datastream(std::istream* istr, std::ostream* ostr, const std::string& encoding, int byteorder, datastream* obj) : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true), sync_rw_cursors(true) {
 		open(istr, ostr, encoding, byteorder, obj);
 	}
 	// Higher level constructor (Creates shared pointers for given std::ios pointer and has default arguments).
-	datastream(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = nullptr) : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true) {
+	datastream(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = nullptr) : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true), sync_rw_cursors(true) {
 		open(stream, encoding, byteorder, obj);
 	}
 	~datastream() {
