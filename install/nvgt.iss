@@ -19,7 +19,7 @@
 ASLRCompatible = yes
 Compression = lzma2/ultra64
 DEPCompatible = yes
-OutputBaseFilename = NVGT_{#NVGTVerFilenameString}_Setup
+OutputBaseFilename = NVGT_{#NVGTVerFilenameString}
 SourceDir = ..
 TerminalServicesAware = yes
 UseSetupLdr = yes
@@ -56,6 +56,7 @@ FlatComponentsList = no
 OutputDir = install
 ShowLanguageDialog = yes
 InfoAfterFile = install\postinst.txt
+AlwaysShowComponentsList = no
 
 [Types]
 Name: "full"; Description: "Full installation"
