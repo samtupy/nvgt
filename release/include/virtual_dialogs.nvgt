@@ -13,19 +13,16 @@
 
 #include "form.nvgt"
 
-class virtual_dialogs
-	{
+class virtual_dialogs {
 	private audio_form form;
 	private bool was_window_active = false, was_window_created = false, was_window_hidden = false;
 	private string last_title = "";
 
-	private void create_dialog(const string title)
-		{
+	private void create_dialog(const string title) {
 		this.form.create_window(title, this.create_window(title));
 	}
 
-	private bool destroy_window()
-		{
+	private bool destroy_window() {
 		this.was_window_active = is_window_active();
 		if (this.was_window_created) {
 			:: destroy_window();
@@ -41,8 +38,7 @@ class virtual_dialogs
 		return false;
 	}
 
-	private bool create_window(const string title)
-		{
+	private bool create_window(const string title) {
 		if (get_window_os_handle() == 0) {
 			show_window(title);
 			this.was_window_created = true;
@@ -57,8 +53,7 @@ class virtual_dialogs
 		return false;
 	}
 
-	private void handle_arrow_keys()
-		{
+	private void handle_arrow_keys() {
 		int focus, count, type;
 
 		focus = this.form.get_current_focus();
@@ -70,25 +65,23 @@ class virtual_dialogs
 		if (count < 3)
 			return;
 
-		if (key_repeating(KEY_LEFT) || key_repeating(KEY_UP)) {
+		if (key_repeating(KEY_LEFT) || key_repeating(KEY_UP))
 			focus --;
-		} else if (key_repeating(KEY_RIGHT) || key_repeating(KEY_DOWN)) {
+		else if (key_repeating(KEY_RIGHT) || key_repeating(KEY_DOWN))
 			focus ++;
-		}
 
 		if (focus == this.form.get_current_focus())
 			return;
 
 		if (focus < 1)
-			focus = count -1;
+			focus = count - 1;
 		else if (focus >= count)
 			focus = 1;
 
 		this.form.focus_interrupt(focus);
 	}
 
-	private void monitor()
-		{
+	private void monitor() {
 		bool window_status;
 
 		wait(5);
@@ -104,10 +97,9 @@ class virtual_dialogs
 		this.was_window_active = window_status;
 	}
 
-	bool info_box(const string title, const string label, const string text)
-		{
+	bool info_box(const string title, const string label, const string text) {
 		int text_box, close_button, cancel_button;
-	bool result = false;
+		bool result = false;
 
 		this.form.reset();
 		this.create_dialog(title);
@@ -130,8 +122,7 @@ class virtual_dialogs
 		return result;
 	}
 
-	string input_box(const string title, const string text, const string default_text = "", const int flags = 0)
-		{
+	string input_box(const string title, const string text, const string default_text = "", const int flags = 0) {
 		string result;
 		int text_box, ok_button, cancel_button;
 
@@ -155,8 +146,7 @@ class virtual_dialogs
 		return result;
 	}
 
-	int message_box(const string title, const string caption, string[]@ buttons, int flags = 0)
-		{
+	int message_box(const string title, const string caption, string[]@ buttons, int flags = 0) {
 		int control;
 		int[] controls;
 		bool primary, secondary;
@@ -209,8 +199,7 @@ class virtual_dialogs
 		return control;
 	}
 
-	int question(const string title, const string text, const bool can_cancel = false, const int flags = 0)
-		{
+	int question(const string title, const string text, const bool can_cancel = false, const int flags = 0) {
 		string[] controls = {"Yes", "No"};
 		if (can_cancel)
 			controls.insert_last("Cancel");
@@ -218,8 +207,7 @@ class virtual_dialogs
 		return this.message_box(title, text, controls, flags);
 	}
 
-	int alert(const string title, const string text, const bool can_cancel = false, const int flags = 0)
-		{
+	int alert(const string title, const string text, const bool can_cancel = false, const int flags = 0) {
 		string[] controls = {"OK"};
 		if (can_cancel)
 			controls.insert_last("Cancel");
@@ -228,32 +216,27 @@ class virtual_dialogs
 	}
 }
 
-int virtual_alert(const string title, const string text, const bool can_cancel = false, const int flags = 0)
-	{
+int virtual_alert(const string title, const string text, const bool can_cancel = false, const int flags = 0) {
 	virtual_dialogs vd;
 	return vd.alert(title, text, can_cancel, flags);
 }
 
-bool virtual_info_box(const string title, const string label, const string text)
-	{
+bool virtual_info_box(const string title, const string label, const string text) {
 	virtual_dialogs vd;
 	return vd.info_box(title, label, text);
 }
 
-string virtual_input_box(const string title, const string text, const string default_text = "", const int flags = 0)
-	{
+string virtual_input_box(const string title, const string text, const string default_text = "", const int flags = 0) {
 	virtual_dialogs vd;
 	return vd.input_box(title, text, default_text, flags);
 }
 
-int virtual_message_box(const string title, const string caption, string[]@ buttons, const int flags = 0)
-	{
+int virtual_message_box(const string title, const string caption, string[]@ buttons, const int flags = 0) {
 	virtual_dialogs vd;
 	return vd.message_box(title, caption, buttons, flags);
 }
 
-int virtual_question(const string title, const string text, const bool can_cancel = false, const int flags = 0)
-	{
+int virtual_question(const string title, const string text, const bool can_cancel = false, const int flags = 0) {
 	virtual_dialogs vd;
 	return vd.question(title, text, can_cancel, flags);
 }
