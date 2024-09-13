@@ -28,9 +28,12 @@ string generate_token(int token_length, int mode = token_gen_flag_all) {
 	else if (mode == token_gen_flag_symbols) token_sims = symbols;
 	else if (mode == token_gen_flag_numbers_symbols) token_sims = numbers + symbols;
 	else if (mode == token_gen_flag_characters_symbols) token_sims = chars + symbols;
-
+	return generate_custom_token(token_length, token_sims);
+}
+string generate_custom_token(int token_length, string characters) {
+	if (characters.empty() || token_length <= 0) return "";
 	string final_token;
 	for (uint i = 0; i < token_length; i++)
-		final_token += token_sims[random(0, token_sims.length() - 1)];
-	return final_token;
+		final_token += characters[random(0, characters.length() - 1)];
+		return final_token;
 }
