@@ -9,7 +9,8 @@
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
 */
-//Possible token mode.
+
+//Possible token modes.
 enum token_gen_flag {
 	token_gen_flag_all = 0,
 	token_gen_flag_characters,
@@ -18,11 +19,12 @@ enum token_gen_flag {
 	token_gen_flag_numbers_symbols,
 	token_gen_flag_characters_symbols
 }
+
 string generate_token(int token_length, int mode = token_gen_flag_all) {
 	string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	string numbers = "1234567890";
 	string symbols = "`~!@#$%^&*()_+=-[]{}/.,;:|?><";
-	string token_sims = chars + numbers + symbols;
+	string token_sims;
 	if (mode == token_gen_flag_characters) token_sims = chars;
 	else if (mode == token_gen_flag_numbers) token_sims = numbers;
 	else if (mode == token_gen_flag_symbols) token_sims = symbols;
@@ -30,10 +32,11 @@ string generate_token(int token_length, int mode = token_gen_flag_all) {
 	else if (mode == token_gen_flag_characters_symbols) token_sims = chars + symbols;
 	return generate_custom_token(token_length, token_sims);
 }
+
 string generate_custom_token(int token_length, string characters) {
 	if (characters.empty() || token_length <= 0) return "";
 	string final_token;
 	for (uint i = 0; i < token_length; i++)
 		final_token += characters[random(0, characters.length() - 1)];
-		return final_token;
+	return final_token;
 }
