@@ -14,7 +14,7 @@ void main() {
 			exit();
 		if (key_pressed(KEY_S)) {
 			sound s;
-			s.load("notify.wav");
+			s.load("../data/audio/sonar.ogg");
 			s.play_wait();
 		}
 		if (key_pressed(KEY_UP)) v.speak("up arrow", true);

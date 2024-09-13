@@ -397,6 +397,14 @@ uint64_t idle_ticks() {
 	#endif
 }
 
+bool is_console_available() {
+	#if defined (_WIN32)
+		return GetConsoleWindow() != nullptr;
+	#else
+		return Poco::Util::Application::instance().config().hasOption("application.gui");
+	#endif
+}
+
 void RegisterUI(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UI);
 	engine->RegisterEnum(_O("message_box_flags"));
@@ -428,4 +436,5 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("uint64 get_window_os_handle()", asFUNCTION(get_window_os_handle), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void wait(int)", asFUNCTIONPR(wait, (int), void), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 idle_ticks()", asFUNCTION(idle_ticks), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool is_console_available()", asFUNCTION(is_console_available), asCALL_CDECL);
 }

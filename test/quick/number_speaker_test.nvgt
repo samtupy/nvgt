@@ -11,12 +11,13 @@ sound test;
 number_speaker speaker;
 // speaker.include_and = true;
 speaker.append=".ogg";
+speaker.prepend = "../data/audio/";
 
 sound points;
 sound finalscore;
 
-finalscore.load("yfs.ogg");
-points.load("points.ogg");
+finalscore.load("../data/audio/yfs.ogg");
+points.load("../data/audio/points.ogg");
 finalscore.play_wait();
 
 speaker.speak_wait(1880);
