@@ -282,7 +282,7 @@ bool pack::add_memory(const string& pack_filename, unsigned char* data, unsigned
 	for (uint64_t p = 0; p < size; p += bufsize) {
 		if (p + bufsize >= size) bufsize = size - p;
 		for (unsigned int j = 0; j < bufsize; j++)
-			tmp[j] = pack_char_encrypt(data[(p * bufsize) + j], (p * bufsize) + j, i.namelen);
+			tmp[j] = pack_char_encrypt(data[p + j], p + j, i.namelen);
 		if (fwrite(tmp, 1, bufsize, fptr) != bufsize) {
 			fseek(fptr, cur_pos, SEEK_SET);
 			return false;
@@ -633,22 +633,22 @@ void RegisterScriptPack(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("pack"), _O("bool set_pack_identifier(const string&in)"), asMETHOD(pack, set_pack_identifier), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("pack"), _O("bool open(const string &in, uint = PACK_OPEN_MODE_READ, bool = false)"), asMETHOD(pack, open), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("pack"), _O("bool close()"), asMETHOD(pack, close), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool add_file(const string &in, const string& in, bool = false)"), asMETHOD(pack, add_file), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool add_memory(const string &in, const string& in, bool = false)"), asMETHODPR(pack, add_memory, (const string&, const string&, bool), bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool delete_file(const string &in)"), asMETHOD(pack, delete_file), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool file_exists(const string &in) const"), asMETHOD(pack, file_exists), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("string get_file_name(int) const"), asMETHODPR(pack, get_file_name, (int), string), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool add_file(const string &in disc_filename, const string& in pack_filename, bool allow_replace = false)"), asMETHOD(pack, add_file), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool add_memory(const string &in pack_filename, const string& in data, bool allow_replace = false)"), asMETHODPR(pack, add_memory, (const string&, const string&, bool), bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool delete_file(const string &in pack_filename)"), asMETHOD(pack, delete_file), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool file_exists(const string &in pack_filename) const"), asMETHOD(pack, file_exists), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("string get_file_name(int index) const"), asMETHODPR(pack, get_file_name, (int), string), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("pack"), _O("string[]@ list_files() const"), asMETHODPR(pack, list_files, (), CScriptArray*), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint get_file_size(const string &in) const"), asMETHOD(pack, get_file_size), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint get_file_offset(const string &in) const"), asMETHOD(pack, get_file_offset), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("string read_file(const string &in, uint, uint) const"), asMETHOD(pack, read_file_string), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool raw_seek(int)"), asMETHOD(pack, raw_seek), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool stream_close(uint)"), asMETHOD(pack, stream_close_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_open(const string &in, uint) const"), asMETHOD(pack, stream_open_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("string stream_read(uint, uint) const"), asMETHOD(pack, stream_read), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_pos(uint) const"), asMETHOD(pack, stream_pos_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_seek(uint, uint, int) const"), asMETHOD(pack, stream_seek_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_size(uint) const"), asMETHOD(pack, stream_size_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint get_file_size(const string &in pack_filename) const"), asMETHOD(pack, get_file_size), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint get_file_offset(const string &in pack_filename) const"), asMETHOD(pack, get_file_offset), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("string read_file(const string &in pack_filename, uint offset_in_file, uint read_byte_count) const"), asMETHOD(pack, read_file_string), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool raw_seek(int offset)"), asMETHOD(pack, raw_seek), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool stream_close(uint index)"), asMETHOD(pack, stream_close_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_open(const string &in pack_filename, uint offset_in_file) const"), asMETHOD(pack, stream_open_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("string stream_read(uint index, uint read_byte_count) const"), asMETHOD(pack, stream_read), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_pos(uint index) const"), asMETHOD(pack, stream_pos_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_seek(uint index, uint offset, int origin) const"), asMETHOD(pack, stream_seek_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_size(uint index) const"), asMETHOD(pack, stream_size_script), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("pack"), _O("bool get_active() const property"), asMETHOD(pack, is_active), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("pack"), _O("uint get_size() const property"), asMETHOD(pack, size), asCALL_THISCALL);
 }

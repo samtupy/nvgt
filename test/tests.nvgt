@@ -31,6 +31,10 @@ void help() {
 	exit();
 }
 void main() {
+	if (SCRIPT_COMPILED) {
+		println("sorry, currently tests must be run from source");
+		exit(64);
+	}
 	timer timetracker;
 	// Very oversimplified command line parsing.
 	for (uint i = 1; i < ARGS.length(); i++) {
