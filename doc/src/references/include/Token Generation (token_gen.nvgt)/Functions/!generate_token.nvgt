@@ -7,7 +7,7 @@
 	## returns:
 		String: a random token depending on the mode.
 	## Remarks:
-		The characters used to generate the token will depend on the mode you set. See `token_gen_flags` enum constants.
+		This function uses `generate_custom_token` function to generate. The characters used to generate the token will depend on the mode you set. See `token_gen_flags` enum constants.
 */
 
 // Example:
