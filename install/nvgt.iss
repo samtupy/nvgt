@@ -13,6 +13,7 @@
 ; File: nvgt.iss
 ; Description: NVGT InnoSetup installation utility
 
+#expr Exec("py", "iss_genversion.py", ".", 1, SW_HIDE)
 #include "nvgt_version.ish"
 
 [Setup]
@@ -135,14 +136,14 @@ source: "release\stub\nvgt_windows_upx.bin"; DestDir: "{app}\stub"; components: 
 #endif
 #ifdef have_macos_stubs
 source: "release\stub\nvgt_mac.bin"; DestDir: "{app}\stub"; components: stubs\macos
-source: "release\lib_mac"; DestDir: "{app}"; components: stubs\macos
+source: "release\lib_mac\*"; DestDir: "{app}\lib_mac"; components: stubs\macos
 #endif
 #ifdef have_linux_stubs
 source: "release\stub\nvgt_linux.bin"; DestDir: "{app}\stub"; components: stubs\linux
 #ifdef have_linux_upx_stubs
 source: "release\stub\nvgt_linux_upx.bin"; DestDir: "{app}\stub"; components: stubs\linux
 #endif
-source: "release\lib_linux"; DestDir: "{app}"; components: stubs\linux
+source: "release\lib_linux\*"; DestDir: "{app}\lib_linux"; components: stubs\linux
 #endif
 #ifdef have_android_stubs
 source: "release\stub\nvgt_android.bin"; DestDir: "{app}\stub"; components: stubs\android
@@ -150,9 +151,8 @@ source: "release\stub\nvgt_android.bin"; DestDir: "{app}\stub"; components: stub
 ; Includes
 source: "release\include\*.nvgt"; DestDir: "{app}\include"; components: includes
 #ifdef have_docs
-source: "docs\nvgt.chm"; DestDir: "{app}"; components: docs
+source: "doc\nvgt.chm"; DestDir: "{app}"; components: docs
 #endif
-source: "install\InnoCallback.dll"; DestDir: "{tmp}"; flags: dontcopy
 
 [Registry]
 Root: HKA; subkey: "software\classes\.nvgt"; ValueType: string; ValueName: ""; ValueData: "NVGTScript"; Flags: uninsdeletevalue; tasks: associate

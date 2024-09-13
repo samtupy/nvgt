@@ -18,6 +18,7 @@ build/windev_path
 src/version.cpp
 .sconsign.dblite
 *.orig
+install/nvgt_version.ish
 install/nvgt_version.nsh
 release/lib/3rd_party_licenses.html
 
