@@ -1,13 +1,13 @@
 /**
-	Generates a string of random characters, or token.
+	Generates a random string of characters (a token).
 	string generate_token(int token_length, int mode = token_gen_flag_all)
 	## Arguments:
 		* int token_length: the length of the token to generate.
-		* int mode = token_gen_flag_all: the mode to generate.
+		* int mode = token_gen_flag_all: allows you to specify which characters you would like in the generated token (see remarks).
 	## returns:
 		String: a random token depending on the mode.
 	## Remarks:
-		This function uses `generate_custom_token` function to generate. The characters used to generate the token will depend on the mode you set. See `token_gen_flags` enum constants.
+		This function uses the `generate_custom_token` function to generate. The characters used to generate the token will depend on the mode you specified. See `token_gen_flags` enum constants.
 */
 
 // Example:

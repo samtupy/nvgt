@@ -1,13 +1,13 @@
 /**
-	Generates a string of random characters, or token base on the characters you set.
-	string generate_custom_token(int token_length, characters);
+	Generates a random string of characters (a token) while allowing you to directly specify the characters you wish to use in the generation.
+	string generate_custom_token(int token_length, string characters);
 	## Arguments:
 		* int token_length: the length of the token to generate.
 		* string characters: a list of characters to generate.
 	## returns:
 		String: a random token.
 	## Remarks:
-		If characters list is empty or token length is set to 0 or less, an empty string is returned.
+		If the `characters` string is empty or `token_length` is set to 0 or less, an empty string is returned.
 */
 
 // Example:
