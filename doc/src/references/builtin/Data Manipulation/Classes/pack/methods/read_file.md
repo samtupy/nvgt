@@ -5,7 +5,7 @@ Get the contents of a file contained in a pack.
 
 ## Arguments:
 * string pack_filename: the name of the file to be read.
-* uint offset: the offset within the file to begin reading data from (do not confuse this with pack::get_file_offset)
+* uint offset_in_file: the offset within the file to begin reading data from (do not confuse this with pack::get_file_offset)
 * uint size: the number of bytes to read (see `pack::get_file_size` to read the entire file).
 
 ## Returns:
