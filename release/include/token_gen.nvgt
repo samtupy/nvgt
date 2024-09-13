@@ -24,7 +24,7 @@ string generate_token(int token_length, int mode = token_gen_flag_all) {
 	string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	string numbers = "1234567890";
 	string symbols = "`~!@#$%^&*()_+=-[]{}/.,;:|?><";
-	string token_sims;
+	string token_sims = chars + numbers + symbols;
 	if (mode == token_gen_flag_characters) token_sims = chars;
 	else if (mode == token_gen_flag_numbers) token_sims = numbers;
 	else if (mode == token_gen_flag_symbols) token_sims = symbols;
