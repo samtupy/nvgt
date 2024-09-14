@@ -35,6 +35,7 @@
 #include <obfuscate.h>
 #include <thread.h>
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include <Poco/StringTokenizer.h>
 #include <Poco/SynchronizedObject.h>
@@ -226,21 +227,6 @@ thread_id_t g_WindowThreadId = 0;
 bool g_WindowHidden = false;
 
 static std::vector<SDL_Event> post_events; // holds events that should be processed after the next wait() call.
-#ifdef _WIN32
-SDL_bool sdl_windows_messages(void* udata, MSG* msg) {
-	if (msg->message == WM_KEYDOWN && msg->wParam == 'V' && msg->lParam == 1) {
-		SDL_Event e{};
-		e.type = SDL_EVENT_KEY_DOWN;
-		e.common.timestamp = SDL_GetTicksNS();
-		e.key.scancode = SDL_SCANCODE_PASTE;
-		e.key.key = SDLK_PASTE;
-		SDL_PushEvent(&e);
-		e.type = SDL_EVENT_KEY_UP;
-		post_events.push_back(e);
-	}
-	return SDL_TRUE;
-}
-#endif
 bool set_application_name(const std::string& name) {
 	return SDL_SetHintWithPriority(SDL_HINT_APP_NAME, name.c_str(), SDL_HINT_OVERRIDE);
 }
@@ -255,9 +241,6 @@ bool ShowNVGTWindow(const std::string& window_title) {
 		return true;
 	}
 	InputInit();
-	#ifdef _WIN32
-	SDL_SetWindowsMessageHook(sdl_windows_messages, NULL);
-	#endif
 	g_WindowHandle = SDL_CreateWindow(window_title.c_str(), 640, 640, 0);
 	if (!g_WindowHandle) return false;
 	if (!SDL_HasScreenKeyboardSupport()) SDL_StartTextInput(g_WindowHandle);
@@ -328,25 +311,16 @@ void wait(int ms) {
 		if (ms < 1) break;
 	}
 	SDL_Event evt;
-	#ifdef __APPLE__
-	bool left_just_pressed = false, right_just_pressed = false;
-	#endif
+	std::unordered_set<int> keys_pressed_this_frame;
 	while (SDL_PollEvent(&evt)) {
-		#ifdef __APPLE__
-		// Hack to fix voiceover's weird handling of the left and right arrow keys. If a left/right arrow down/up event get generated in the same frame, we need to move the up event to the next frame.
 		bool evt_handled = false;
-		if (evt.type == SDL_EVENT_KEY_DOWN) {
-			if (evt.key.scancode == SDL_SCANCODE_LEFT) left_just_pressed = true;
-			if (evt.key.scancode == SDL_SCANCODE_RIGHT) right_just_pressed = true;
-		} else if ((left_just_pressed || right_just_pressed) && evt.type == SDL_EVENT_KEY_UP) {
+		// If a key_down and then a key_up from the same key gets received in one frame, we need to move the key_up to the next frame to make sure that nvgt code can detect the keydown between calls to wait.
+		if (evt.type == SDL_EVENT_KEY_DOWN) keys_pressed_this_frame.insert(evt.key.scancode);
+		else if (evt.type == SDL_EVENT_KEY_UP && keys_pressed_this_frame.find(evt.key.scancode) != keys_pressed_this_frame.end()) {
 			evt_handled = true;
-			if (left_just_pressed && evt.key.scancode == SDL_SCANCODE_LEFT) post_events.push_back(evt);
-			else if (right_just_pressed && evt.key.scancode == SDL_SCANCODE_RIGHT) post_events.push_back(evt);
-			else evt_handled = false;
+			post_events.push_back(evt);
 		}
-		if (evt_handled) continue;
-		#endif
-		handle_sdl_event(&evt);
+		if (!evt_handled) handle_sdl_event(&evt);
 	}
 	if (post_events.size() > 0) {
 		for (SDL_Event& e : post_events)
