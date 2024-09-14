@@ -6,7 +6,7 @@ NVGT is a cross platform audio game development engine reminiscent of and mostly
 
 It aims to remove some of the headaches that anyone interested in audio game development may be likely to face when trying to get an audio game design project off the ground. Particularly in the field of audio game development, there are not very many easy and well known paths to get started like there are for a sighted person interested in video game design who can download a massive gaming engine like unity or unreal and have more than they need to get started at their fingertips. Mind you NVGT is not even remotely trying to compare with large video gaming engines written by giant AAA studios, but instead it tries to free particularly someone new to programming or someone who isn't interested in such details from having to search for sound system/input/windowing/etc libraries and frameworks, learning how to get apps running on multiple operating systems and generally from doing much of the other lower level heavy lifting that may otherwise prevent someone from developing a great game.
 
-Find out more at nvgt.gg.
+Find out more at [nvgt.gg](https://nvgt.gg).
 
 ## building
 You will need a c++ build toolchain if you want to build NVGT from source. On windows we recommend the visual studio build command line tools or the very latest version of visual studio 2022. On macos you will need at least the command line development tools if not xcode, and a functioning GNU/g++ compiler collection is expected to be available on Linux.
