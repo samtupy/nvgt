@@ -1,0 +1,12 @@
+/**
+	Determines a UTC based time point based on the value stored in the timestamp object.
+	const int64 UTC_time;
+	## Remarks:
+		UTC based time begins on October 15, 1582 at 12 AM and uses an accuracy of 100 nanoseconds.
+*/
+
+// Example:
+void main() {
+	timestamp ts;
+	alert("example", "The current UTC time value is " + ts.UTC_time);
+}

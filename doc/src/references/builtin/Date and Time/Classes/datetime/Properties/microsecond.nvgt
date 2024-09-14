@@ -7,5 +7,5 @@
 void main() {
 	datetime d;
 	d.set(d.year, d.month, d.day, 12, 47, 19, 217, 962);
-	alert("The current microsecond value of the datetime object is", d.microsecond);
+	alert("The set microsecond value of the datetime object is", d.microsecond);
 }

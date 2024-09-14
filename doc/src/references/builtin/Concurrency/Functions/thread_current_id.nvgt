@@ -1,0 +1,11 @@
+/**
+	Determine the operating system specific ID of the currently executing thread.
+	uint thread_current_id();
+	## Returns:
+		uint: The ID of the thread that this function was called on.
+*/
+
+// Example
+void main() {
+	alert("Current thread ID is", thread_current_id());
+}

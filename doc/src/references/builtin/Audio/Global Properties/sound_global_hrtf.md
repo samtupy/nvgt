@@ -3,4 +3,4 @@ Controls weather to use steam audio's functionality. If this property is set to 
 
 `bool sound_global_hrtf;`
 
-Changes take nearly instant effect from the time this property is changed.
+Changes take nearly instant effect from the time this property is modified.

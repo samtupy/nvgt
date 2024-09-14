@@ -5,6 +5,9 @@
 		* string character: the character to convert.
 	## Returns:
 		uint8: the ascii value for the given character.
+	## Remarks:
+		If a string containing more than one character is passed as input to this function, only the left-most character is checked.
+		If an empty string is passed, the function returns 0.
 */
 
 // Example:

@@ -1,0 +1,36 @@
+/**
+	This concurrency primative implements a method by which one or more threads can safely wait on another thread for the event to become signaled.
+	thread_event(thread_event_type type = THREAD_EVENT_AUTO_RESET);
+	## Arguments:
+		thread_event_type type: The type of handling to perform when a waiting thread detects that the event has been set (see remarks).
+	## Remarks:
+		This primative can be used to make one thread inexpensively sleep until another thread wakes it up, or can more simply be used for some threads to monitor when a condition has been completed on another thread in a safe manner.
+		It is not a good idea to just use standard booleans in multithreaded situations where you want one thread to know when another thread has completed it's work because threads could be reading from the boolean as it is being written to by a worker thread, causing an undefined result. The thread_event object is one way around this issue, as it can signal when a standard boolean is safe to access or sometimes avoid their usage entirely.
+		Quite simply one thread can call the set() method on an event, and if another thread has previously called the wait() method on the same event, that wait method will return thus resuming the first thread. If the event was created with the THREAD_EVENT_AUTO_RESET type, the event will also be set to unsignaled as the waiting thread wakes up. Otherwise, the reset() method must be called manually.
+*/
+
+// Example:
+// Globals
+thread_event program_event;
+bool exit_program;
+string message;
+void message_thread() {
+	while (true) {
+		program_event.wait();
+		if (exit_program) return;
+		screen_reader_speak(message, true);
+	}
+}
+void main() {
+	show_window("press space to speak on another thread");
+	async<void>(message_thread);
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (key_repeating(KEY_SPACE)) {
+			message = "the date and time is " + calendar().format(DATE_TIME_FORMAT_RFC1123);
+			program_event.set();
+		}
+	}
+	exit_program = true;
+	program_event.set();
+}

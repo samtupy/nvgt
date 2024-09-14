@@ -7,5 +7,5 @@
 void main() {
 	datetime d;
 	d.set(d.year, d.month, d.day, 12, 47, 19);
-	alert("The current minute of the datetime object is", d.minute);
+	alert("The set minute of the datetime object is", d.minute);
 }
