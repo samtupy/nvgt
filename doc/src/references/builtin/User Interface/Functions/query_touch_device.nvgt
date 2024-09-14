@@ -1,0 +1,29 @@
+/**
+	Check what fingers are in contact with a touch device and where they are on the screen, if any.
+	vector[]@ query_touch_device(uint64 device_id = 0);
+	## Arguments:
+		* uint64 device_id = 0: The device to query, 0 for the last device that received input.
+	## Returns:
+		touch_finger[]@: An array of structures containing touch coordinates and pressure (see remarks).
+	## Remarks:
+		Each structure in the returned array represents a finger, thus the length of the array indicates how many fingers are touching the device.
+		Touch_finger objects contain only 4 properties. Int64 id is a unique identifier of the finger that will remain the same as long as the finger touches the devices, float x and float y contain the coordinates of the finger on the device, and the float pressure property indicates how much force or pressure the finger is being applied to the device with.
+		Usage of this structure other than to receive touch input is not endorsed by the NVGT developers and may lead to unexpected results, most notably creating a touch_finger instance manually will likely set it's properties to random uninitialized memory on the stack. You have been warned.
+*/
+
+// Example:
+void main() {
+	// Report the number of fingers touching the device.
+	show_window("touch example");
+tts_voice tts;
+	int prev_finger_count = 0;
+	tts.speak("ready", true);
+	while (!key_pressed(KEY_ESCAPE) and !key_pressed(KEY_AC_BACK)) {
+		wait(5);
+		touch_finger[]@ fingers = query_touch_device(); // This will query the last device that was touched.
+		if (fingers.length() != prev_finger_count) {
+			tts.speak(fingers.length() + (fingers.length() != 1? " fingers" : " finger"), true);
+			prev_finger_count = fingers.length();
+		}
+	}
+}

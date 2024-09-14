@@ -71,7 +71,7 @@ int message_box(const std::string& title, const std::string& text, const std::ve
 	}
 	SDL_MessageBoxData box = {mb_flags, g_WindowHandle, title.c_str(), text.c_str(), int(sdlbuttons.size()), sdlbuttons.data(), NULL};
 	int ret;
-	if (SDL_ShowMessageBox(&box, &ret) != 0) return 0; // failure.
+	if (!SDL_ShowMessageBox(&box, &ret)) return -1;
 	return ret;
 }
 int message_box_script(const std::string& title, const std::string& text, CScriptArray* buttons, unsigned int flags) {
@@ -289,8 +289,7 @@ std::string get_window_text() {
 }
 void* get_window_os_handle() { return reinterpret_cast<void*>(g_OSWindowHandle); }
 void handle_sdl_event(SDL_Event* evt) {
-	if (evt->type == SDL_EVENT_KEY_DOWN || evt->type == SDL_EVENT_KEY_UP || evt->type == SDL_EVENT_TEXT_INPUT || evt->type == SDL_EVENT_MOUSE_MOTION || evt->type == SDL_EVENT_MOUSE_BUTTON_DOWN || evt->type == SDL_EVENT_MOUSE_BUTTON_UP || evt->type == SDL_EVENT_MOUSE_WHEEL)
-		InputEvent(evt);
+		if (InputEvent(evt)) return;
 	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_LOST)
 		lost_window_focus();
 	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_GAINED)
