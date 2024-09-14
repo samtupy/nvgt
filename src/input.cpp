@@ -135,6 +135,17 @@ bool insure_key_up(unsigned short key) {
 		return false;
 	return true;
 }
+inline bool post_key_event(unsigned int key, SDL_EventType evt_type) {
+	if (key > 511 || !g_KeysDown) return false;
+	SDL_Event e{};
+	e.type = evt_type;
+	e.common.timestamp = SDL_GetTicksNS();
+	e.key.scancode = (SDL_Scancode)key;
+	e.key.key = SDL_GetKeyFromScancode(e.key.scancode, SDL_GetModState(), SDL_TRUE);
+	return SDL_PushEvent(&e);
+}
+bool simulate_key_down(unsigned int key) { return post_key_event(key, SDL_EVENT_KEY_DOWN); }
+bool simulate_key_up(unsigned int key) { return post_key_event(key, SDL_EVENT_KEY_UP); }
 CScriptArray* keys_pressed() {
 	asIScriptContext* ctx = asGetActiveContext();
 	asIScriptEngine* engine = ctx->GetEngine();
@@ -376,6 +387,8 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool key_released(uint)"), asFUNCTION(KeyReleased), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_up(uint)"), asFUNCTION(key_up), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool insure_key_up(uint)"), asFUNCTION(insure_key_up), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool simulate_key_down(uint)"), asFUNCTION(simulate_key_down), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool simulate_key_up(uint)"), asFUNCTION(simulate_key_up), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("key_code[]@ keys_pressed()"), asFUNCTION(keys_pressed), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("key_code[]@ keys_down()"), asFUNCTION(keys_down), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint total_keys_down()"), asFUNCTION(total_keys_down), asCALL_CDECL);

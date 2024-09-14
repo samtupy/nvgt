@@ -1,5 +1,6 @@
 # set
 Causes an event to become signaled, waking up any threads waiting for this condition.
+
 `void set();`
 
 ## Remarks:

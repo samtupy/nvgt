@@ -158,7 +158,7 @@ bool ScreenReaderIsSpeaking() {
 	#endif
 }
 
-bool ScreenReaderOutput(std::string& text, bool interrupt) {
+bool ScreenReaderOutput(const std::string& text, bool interrupt) {
 	if (!ScreenReaderLoad()) return false;
 	#if defined(_WIN32)
 	std::wstring textW;
@@ -179,7 +179,7 @@ bool ScreenReaderOutput(std::string& text, bool interrupt) {
 	#endif
 }
 
-bool ScreenReaderSpeak(std::string& text, bool interrupt) {
+bool ScreenReaderSpeak(const std::string& text, bool interrupt) {
 	if (!ScreenReaderLoad()) return false;
 	#if defined(_WIN32)
 	std::wstring textW;
@@ -200,7 +200,7 @@ bool ScreenReaderSpeak(std::string& text, bool interrupt) {
 	#endif
 }
 
-bool ScreenReaderBraille(std::string& text) {
+bool ScreenReaderBraille(const std::string& text) {
 	if (!ScreenReaderLoad()) return false;
 	#if defined(_WIN32)
 	std::wstring textW(text.begin(), text.end());

@@ -639,7 +639,7 @@ class audio_form {
 			}
 			focus(control_focus, true);
 		}
-		if ((cancels > -1) && (key_repeating(KEY_ESCAPE))) {
+		if ((cancels > -1) && (key_repeating(KEY_ESCAPE) || key_released(KEY_AC_BACK))) {
 			stop_speech();
 			c_form[cancels].pressed = true;
 			if (subform)

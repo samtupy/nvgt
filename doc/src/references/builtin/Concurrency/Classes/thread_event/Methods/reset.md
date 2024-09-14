@@ -1,5 +1,6 @@
 # reset
 Resets an event to an unsignaled state.
+
 `void reset();`
 
 ## Remarks:
