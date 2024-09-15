@@ -1,0 +1,19 @@
+/**
+	This method allows you to specify an existing sound object to be used for any auditory feedback in the number speaker.
+	bool number_speaker::set_sound_object(sound@ handle);
+	## Arguments:
+		* sound@ handle: a reference to an existing sound object that will be utilized for all future sound output.
+	## Returns:
+		bool: true on success, false on failure.
+## Remarks:
+		The object specified in this function will handle all future auditory feedback provided by the number speaker. If this method is not called, an internal sound object will be used by default for sound output.
+*/
+
+// Example:
+#include "number_speaker.nvgt"
+void main() {
+	sound test;
+	number_speaker number;
+	number.set_sound_object(test);
+	number.speak_wait(350);
+}
