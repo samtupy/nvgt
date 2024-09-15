@@ -1,0 +1,19 @@
+/**
+	This method will speak a number and wait until the number is fully read before returning.
+	int number_speaker::speak_wait(double the_number);
+	# Arguments:
+		* double the_number: the number to speak.
+	Returns:
+		int: 0 on success, -1 on failure.
+	## Remarks:
+		The speak_wait method searches for sound files based on the values stored in the prepend and append properties, determining the most appropriate sound files to use by performing multiple searches based on the given number.
+		The speak_wait function pauses execution until the number has been fully spoken before returning. This means that the script execution is halted for the duration of the reading. To avoid this, you can use the speak and speak_next methods instead.
+*/
+
+// Example:
+#include "number_speaker.nvgt"
+void main() {
+	// Speak a number using speak_wait.
+	number_speaker test;
+	test.speak_wait(350);
+}
