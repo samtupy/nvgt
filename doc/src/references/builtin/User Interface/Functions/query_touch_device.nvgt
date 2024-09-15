@@ -1,6 +1,6 @@
 /**
 	Check what fingers are in contact with a touch device and where they are on the screen, if any.
-	vector[]@ query_touch_device(uint64 device_id = 0);
+	touch_finger[]@ query_touch_device(uint64 device_id = 0);
 	## Arguments:
 		* uint64 device_id = 0: The device to query, 0 for the last device that received input.
 	## Returns:
@@ -15,7 +15,7 @@
 void main() {
 	// Report the number of fingers touching the device.
 	show_window("touch example");
-tts_voice tts;
+	tts_voice tts;
 	int prev_finger_count = 0;
 	tts.speak("ready", true);
 	while (!key_pressed(KEY_ESCAPE) and !key_pressed(KEY_AC_BACK)) {
