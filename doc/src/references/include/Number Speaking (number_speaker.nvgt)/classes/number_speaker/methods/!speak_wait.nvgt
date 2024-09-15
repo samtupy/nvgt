@@ -1,9 +1,9 @@
 /**
 	This method will speak a number and wait until the number is fully read before returning.
 	int number_speaker::speak_wait(double the_number);
-	# Arguments:
+	## Arguments:
 		* double the_number: the number to speak.
-	Returns:
+	## Returns:
 		int: 0 on success, -1 on failure.
 	## Remarks:
 		The speak_wait method searches for sound files based on the values stored in the prepend and append properties, determining the most appropriate sound files to use by performing multiple searches based on the given number.

@@ -5,7 +5,7 @@
 		* sound@ handle: a reference to an existing sound object that will be utilized for all future sound output.
 	## Returns:
 		bool: true on success, false on failure.
-## Remarks:
+	## Remarks:
 		The object specified in this function will handle all future auditory feedback provided by the number speaker. If this method is not called, an internal sound object will be used by default for sound output.
 */
 
