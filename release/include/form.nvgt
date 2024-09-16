@@ -2627,6 +2627,8 @@ class control {
 		}
 		if (type == ct_slider) {
 			float increment = 0;
+			// we don't want to add to the slider_value if it touches the edges.
+			bool slider_edge = false;
 			if (key_repeating(KEY_LEFT) || key_repeating(KEY_DOWN))
 				increment = -slider_step_size;
 			else if (key_repeating(KEY_RIGHT) || key_repeating(KEY_UP))
@@ -2635,16 +2637,27 @@ class control {
 				increment = 5 * slider_step_size;
 			else if (key_repeating(KEY_PAGEDOWN))
 				increment = 5 * -slider_step_size;
-			else if (key_repeating(KEY_HOME))
+			else if (key_repeating(KEY_HOME)) {
 				increment = slider_maximum_value;
-			else if (key_repeating(KEY_END))
+				slider_edge = true;
+			} else if (key_repeating(KEY_END)) {
 				increment = slider_minimum_value;
-			else
+				slider_edge = true;
+			} else
 				return;
 			int width = floor((slider_maximum_value - slider_minimum_value) / slider_step_size);
-			if (keyboard_modifiers & KEYMOD_CTRL == 0 && width > 100)
+			if (keyboard_modifiers & KEYMOD_CTRL == 0 && width > 100 && !slider_edge) {
 				increment *= (width * 0.025);
-			float new_value = (increment != 0) ? slider_value + increment : 0;
+				// Because we now support floating points, increment multiplication can return numbers with decimal points.
+				// It can set unexpected values if step size is without decimal points.
+				if (slider_step_size % 1 == 0)
+					increment -= increment % 1;
+			}
+			float new_value;
+			if (slider_edge)
+				new_value = increment;
+			else
+				new_value = (increment != 0) ? slider_value + increment : 0;
 			if (new_value < slider_minimum_value)
 				new_value = slider_minimum_value;
 			if (new_value > slider_maximum_value)
