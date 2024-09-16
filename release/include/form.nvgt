@@ -2642,8 +2642,13 @@ class control {
 			else
 				return;
 			int width = floor((slider_maximum_value - slider_minimum_value) / slider_step_size);
-			if (keyboard_modifiers & KEYMOD_CTRL == 0 && width > 100)
+			if (keyboard_modifiers & KEYMOD_CTRL == 0 && width > 100) {
 				increment *= (width * 0.025);
+				// Because we now support floating points, increment multiplication can return numbers with decimal points.
+				// It can set unexpected values if step size is without decimal points.
+				if (slider_step_size % 1 == 0)
+					increment -= increment % 1;
+			}
 			float new_value = (increment != 0) ? slider_value + increment : 0;
 			if (new_value < slider_minimum_value)
 				new_value = slider_minimum_value;
