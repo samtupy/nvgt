@@ -1848,7 +1848,7 @@ class audio_form {
 		}
 		return true;
 	}
-	bool set_slider(int control_index, int value, int min = -1, int max = -1) {
+	bool set_slider(int control_index, double value, double min = -1, double max = -1) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
@@ -1881,7 +1881,7 @@ class audio_form {
 		c_form[control_index].slider_value = value;
 		return true;
 	}
-	float get_slider(int control_index) {
+	double get_slider(int control_index) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
