@@ -202,10 +202,6 @@ class audio_form {
 			form_error = form_error_invalid_index;
 			return "";
 		}
-		if (c_form[control_index].type != ct_slider) {
-			form_error = form_error_invalid_control;
-			return "";
-		}
 		return c_form[control_index].custom_type;
 	}
 	bool has_custom_type(int control_index) {
@@ -216,10 +212,6 @@ class audio_form {
 		}
 		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
 			form_error = form_error_invalid_index;
-			return false;
-		}
-		if (c_form[control_index].type != ct_slider) {
-			form_error = form_error_invalid_control;
 			return false;
 		}
 		return !c_form[control_index].custom_type.empty();
@@ -1846,6 +1838,39 @@ class audio_form {
 	}
 	int get_last_error() {
 		return form_error;
+	}
+	bool set_link_url(int control_index, string new_url) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return false;
+		}
+		if (c_form[control_index].type != ct_link) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_index].link_url = new_url;
+		return true;
+	}
+	string get_link_url(int control_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return "";
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return "";
+		}
+		if (c_form[control_index].type != ct_link) {
+			form_error = form_error_invalid_control;
+			return "";
+		}
+		return c_form[control_index].link_url;
 	}
 	bool set_progress(int control_index, int value) {
 		form_error = 0;
