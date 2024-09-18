@@ -354,7 +354,7 @@ class audio_form {
 		@c_form[control_counter].ui_speech = ui_speech;
 		return control_counter;
 	}
-	int create_slider(string caption, float default_value = 50, float minimum_value = 0, float maximum_value = 100, string text = "", float step_size = 1) {
+	int create_slider(string caption, double default_value = 50, double minimum_value = 0, double maximum_value = 100, string text = "", double step_size = 1) {
 		form_error = 0;
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
@@ -1881,7 +1881,7 @@ class audio_form {
 		c_form[control_index].slider_value = value;
 		return true;
 	}
-	int get_slider(int control_index) {
+	float get_slider(int control_index) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
@@ -2319,10 +2319,10 @@ class control {
 	bool list_nav_translate;
 	int type;
 	int progress;
-	float slider_value;
-	float slider_minimum_value;
-	float slider_maximum_value;
-	float slider_step_size;
+	double slider_value;
+	double slider_minimum_value;
+	double slider_maximum_value;
+	double slider_step_size;
 	dictionary slider_text_values;
 	int echo_flag;
 	int speak_interval;
@@ -2626,7 +2626,7 @@ class control {
 			}
 		}
 		if (type == ct_slider) {
-			float increment = 0;
+			double increment = 0;
 			// we don't want to add to the slider_value if it touches the edges.
 			bool slider_edge = false;
 			if (key_repeating(KEY_LEFT) || key_repeating(KEY_DOWN))
@@ -2648,12 +2648,12 @@ class control {
 			int width = floor((slider_maximum_value - slider_minimum_value) / slider_step_size);
 			if (keyboard_modifiers & KEYMOD_CTRL == 0 && width > 100 && !slider_edge) {
 				increment *= (width * 0.025);
-				// Because we now support floating points, increment multiplication can return numbers with decimal points.
+				// Because we now support doubles, increment multiplication can return numbers with decimal points.
 				// It can set unexpected values if step size is without decimal points.
 				if (slider_step_size % 1 == 0)
 					increment -= increment % 1;
 			}
-			float new_value;
+			double new_value;
 			if (slider_edge)
 				new_value = increment;
 			else
@@ -2663,7 +2663,7 @@ class control {
 			if (new_value > slider_maximum_value)
 				new_value = slider_maximum_value;
 			if (new_value != slider_value) {
-				float old = slider_value;
+				double old = slider_value;
 				slider_value = new_value;
 				if (@event_callback != null and event_callback(f, tab_index, event_slider, {{"increment", increment}, {"value", slider_value}}) == 1) {
 					slider_value = old;
