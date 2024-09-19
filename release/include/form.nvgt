@@ -2200,7 +2200,7 @@ class audio_form {
 			}
 		}
 		if (c_form[tab_index].type == ct_input) {
-			if (key_pressed(KEY_F2)) {
+			if (key_repeating(KEY_F2)) {
 				int dir = 1;
 				if (keyboard_modifiers & KEYMOD_SHIFT != 0) dir = -1;
 				audioform_keyboard_echo = audioform_change_keyboard_echo(audioform_keyboard_echo, dir);
