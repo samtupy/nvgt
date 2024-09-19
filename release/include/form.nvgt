@@ -1972,6 +1972,43 @@ class audio_form {
 		if (c_form[control_index].slider_text_values.get(value, text)) return "";
 		return text;
 	}
+	bool set_slider_step_size(int control_index, double new_size) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return false;
+		}
+		if (c_form[control_index].type != ct_slider) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (new_size <= 0) {
+			form_error = form_error_invalid_value;
+			return false;
+		}
+		c_form[control_index].slider_step_size = new_size;
+		return true;
+	}
+	double get_slider_step_size(int control_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return -1;
+		}
+		if (c_form[control_index].type != ct_slider) {
+			form_error = form_error_invalid_control;
+			return -1;
+		}
+		return c_form[control_index].slider_step_size;
+	}
 	bool set_slider_text_value(int control_index, int value, const string& in text) {
 		form_error = 0;
 		if (!active) {
