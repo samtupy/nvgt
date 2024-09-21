@@ -412,27 +412,27 @@ tts_voice* Script_tts_voice_Factory(const std::string& builtin_voice_name) {
 }
 void RegisterTTSVoice(asIScriptEngine* engine) {
 	engine->RegisterObjectType("tts_voice", 0, asOBJ_REF);
-	engine->RegisterObjectBehaviour("tts_voice", asBEHAVE_FACTORY, _O("tts_voice @t(const string&in = \"builtin fallback voice\")"), asFUNCTION(Script_tts_voice_Factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("tts_voice", asBEHAVE_FACTORY, _O("tts_voice @t(const string&in fallback_voice_name = \"builtin fallback voice\")"), asFUNCTION(Script_tts_voice_Factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("tts_voice", asBEHAVE_ADDREF, "void f()", asMETHOD(tts_voice, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("tts_voice", asBEHAVE_RELEASE, "void f()", asMETHOD(tts_voice, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "bool speak(const string &in, bool = false)", asMETHOD(tts_voice, speak), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "bool speak_interrupt(const string &in)", asMETHOD(tts_voice, speak_interrupt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "bool speak_to_file(const string& in, const string &in)", asMETHOD(tts_voice, speak_to_file), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "bool speak_wait(const string &in, bool = false)", asMETHOD(tts_voice, speak_wait), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "string speak_to_memory(const string &in)", asMETHOD(tts_voice, speak_to_memory), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "bool speak_interrupt_wait(const string &in)", asMETHOD(tts_voice, speak_interrupt_wait), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "bool speak(const string &in text, bool interrupt = false)", asMETHOD(tts_voice, speak), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "bool speak_interrupt(const string &in text)", asMETHOD(tts_voice, speak_interrupt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "bool speak_to_file(const string& in filename, const string &in text)", asMETHOD(tts_voice, speak_to_file), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "bool speak_wait(const string &in text, bool interrupt = false)", asMETHOD(tts_voice, speak_wait), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "string speak_to_memory(const string &in text)", asMETHOD(tts_voice, speak_to_memory), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "bool speak_interrupt_wait(const string &in text)", asMETHOD(tts_voice, speak_interrupt_wait), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool refresh()", asMETHOD(tts_voice, refresh), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool stop()", asMETHOD(tts_voice, stop), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "array<string>@ list_voices() const", asMETHOD(tts_voice, list_voices), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "bool set_voice(int)", asMETHOD(tts_voice, set_voice), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "bool set_voice(int index)", asMETHOD(tts_voice, set_voice), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "int get_rate() const property", asMETHOD(tts_voice, get_rate), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "void set_rate(int) property", asMETHOD(tts_voice, set_rate), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "void set_rate(int rate) property", asMETHOD(tts_voice, set_rate), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "int get_pitch() const property", asMETHOD(tts_voice, get_pitch), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "void set_pitch(int) property", asMETHOD(tts_voice, set_pitch), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "void set_pitch(int pitch) property", asMETHOD(tts_voice, set_pitch), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "int get_volume() const property", asMETHOD(tts_voice, get_volume), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "void set_volume(int) property", asMETHOD(tts_voice, set_volume), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "void set_volume(int volume) property", asMETHOD(tts_voice, set_volume), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "int get_voice_count() const property", asMETHOD(tts_voice, get_voice_count), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "string get_voice_name(int) const", asMETHOD(tts_voice, get_voice_name), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "string get_voice_name(int index) const", asMETHOD(tts_voice, get_voice_name), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool get_speaking() const property", asMETHOD(tts_voice, get_speaking), asCALL_THISCALL);
 	engine->RegisterObjectProperty("tts_voice", "const int voice", asOFFSET(tts_voice, voice_index));
 }
