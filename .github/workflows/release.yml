@@ -50,7 +50,7 @@ jobs:
         python3 build/ci_set_version.py
     - name: build
       run: |
-      curl -s -O https://nvgt.gg/droidev.tar.gz
+        curl -s -O https://nvgt.gg/droidev.tar.gz
         mkdir -p droidev
         cd droidev
         tar -xvf ../droidev.tar.gz
