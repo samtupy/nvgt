@@ -31,6 +31,28 @@ jobs:
         cd ..
         curl -u "${{secrets.CIFTP}}" -s -T linux_release.tar.gz ftp://nvgt.gg
 
+  android_build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25c
+        link-to-sdk: true
+        add-to-path: true
+    - name: set_version
+      run: |
+        python3 build/ci_set_version.py
+    - name: build
+      run: |
+        cd jni
+        echo "$ANDROID_RUNNER_KEYSTORE" > android_enc.keystore
+        cat android_enc.keystore | base64 -d > android.keystore
+        ./gradlew assembleRunnerRelease AssembleStubRelease  -Pandroid.injected.signing.store.file=android.keystore -Pandroid.injected.signing.store.password=$ANDROID_RUNNER_KEYSTORE_PW -Pandroid.injected.signing.key.alias=app -Pandroid.injected.signing.key.password=$ANDROID_RUNNER_KEYSTORE_PW
+        mv build/outputs/apk/runner/release/nvgt-runner-release.apk ../nvgt_$nvgt_version.apk
+        curl -u "${{secrets.CIFTP}}" -s -T nvgt_$nvgt_version.apk ftp://nvgt.gg
+        curl -u "${{secrets.CIFTP}}" -s -T release/stub/nvgt_android.bin ftp://nvgt.gg
+
   windows_build:
     runs-on: windows-latest
     steps:
@@ -49,7 +71,7 @@ jobs:
 
   windows_package:
     runs-on: windows-latest
-    needs: ["linux_build", "mac_build", "windows_build"]
+    needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
     - name: package
@@ -73,13 +95,14 @@ jobs:
         cp linux_release/stub/* release/stub
         cp -r mac_release/lib release/lib_mac
         cp mac_release/stub/* release/stub
+        curl -s -o release/stub/nvgt_android.bin -u "${{secrets.CIFTP}}" ftp://nvgt.gg/nvgt_android.bin
         cd install
         makensis nvgt.nsi
         python3 upload_windows_installer.py ${{secrets.CIFTP}}
 
   mac_package:
     runs-on: macos-latest
-    needs: ["linux_build", "mac_build", "windows_build"]
+    needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
     - name: package
@@ -103,12 +126,13 @@ jobs:
         cp linux_release/stub/* release/stub
         cp -r windows_release/lib release/lib_windows
         cp windows_release/stub/* release/stub
+        curl -s -o release/stub/nvgt_android.bin -u "${{secrets.CIFTP}}" ftp://nvgt.gg/nvgt_android.bin
         cd install
         python3 make_dmg.py ../release ${{secrets.CIFTP}}
 
   linux_package:
     runs-on: ubuntu-latest
-    needs: ["linux_build", "mac_build", "windows_build"]
+    needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
     - name: set_version
@@ -135,6 +159,7 @@ jobs:
         cp mac_release/stub/* release/stub
         cp -r windows_release/lib release/lib_windows
         cp windows_release/stub/* release/stub
+        curl -s -o release/stub/nvgt_android.bin -u "${{secrets.CIFTP}}" ftp://nvgt.gg/nvgt_android.bin
         cd release
         tar -czf "../nvgt_$nvgt_version.tar.gz" *
         cd ..
