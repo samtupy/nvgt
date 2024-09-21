@@ -60,6 +60,7 @@ function setup_sdl {
 	git clone --depth 1 https://github.com/libsdl-org/SDL||true
 	mkdir -p SDL/build
 	cd SDL/build
+	git checkout 9dd8859240703d886941733ad32c1dc6f50d64f0
 	cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST_LIBRARY=OFF -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" ..
 	cmake --build . --config MinSizeRel
 	sudo make install
