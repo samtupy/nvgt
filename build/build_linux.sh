@@ -83,7 +83,7 @@ function setup_sdl {
 	# Install SDL this way to get many SDL deps. It is too old so we remove SDL itself and build from source, however.
 	sudo apt install libssl-dev libcurl4-openssl-dev libopus-dev libsdl2-dev -y
 	sudo apt remove libsdl2-dev -y
-	git clone --depth 1 https://github.com/libsdl-org/SDL||true
+	git clone https://github.com/libsdl-org/SDL||true
 	mkdir -p SDL/build
 	cd SDL/build
 	git checkout 9dd8859240703d886941733ad32c1dc6f50d64f0

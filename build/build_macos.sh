@@ -57,7 +57,7 @@ function setup_poco {
 
 function setup_sdl {
 	echo Installing SDL...
-	git clone --depth 1 https://github.com/libsdl-org/SDL||true
+	git clone https://github.com/libsdl-org/SDL||true
 	mkdir -p SDL/build
 	cd SDL/build
 	git checkout 9dd8859240703d886941733ad32c1dc6f50d64f0

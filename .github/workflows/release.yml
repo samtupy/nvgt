@@ -59,6 +59,7 @@ jobs:
         cat android_enc.keystore | base64 -d > android.keystore
         ./gradlew assembleRunnerRelease AssembleStubRelease --no-daemon -Pandroid.injected.signing.store.file=android.keystore -Pandroid.injected.signing.store.password=${{secrets.ANDROID_RUNNER_KEYSTORE_PW}} -Pandroid.injected.signing.key.alias=app -Pandroid.injected.signing.key.password="${{secrets.ANDROID_RUNNER_KEYSTORE_PW}}"
         mv build/outputs/apk/runner/release/nvgt-runner-release.apk ../nvgt_$nvgt_version.apk
+        cd ..
         curl -u "${{secrets.CIFTP}}" -s -T nvgt_$nvgt_version.apk ftp://nvgt.gg
         curl -u "${{secrets.CIFTP}}" -s -T release/stub/nvgt_android.bin ftp://nvgt.gg
 
