@@ -50,7 +50,11 @@ jobs:
         python3 build/ci_set_version.py
     - name: build
       run: |
-        cd jni
+      curl -s -O https://nvgt.gg/droidev.tar.gz
+      mkdir -p droidev
+      cd droidev
+      tar -xvf ../droidev.tar.gz
+        cd ../jni
         echo "$ANDROID_RUNNER_KEYSTORE" > android_enc.keystore
         cat android_enc.keystore | base64 -d > android.keystore
         ./gradlew assembleRunnerRelease AssembleStubRelease --no-daemon -Pandroid.injected.signing.store.file=android.keystore -Pandroid.injected.signing.store.password=$ANDROID_RUNNER_KEYSTORE_PW -Pandroid.injected.signing.key.alias=app -Pandroid.injected.signing.key.password=$ANDROID_RUNNER_KEYSTORE_PW
