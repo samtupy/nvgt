@@ -126,6 +126,7 @@ function setup_nvgt {
 }
 
 function main {
+	sudo apt update -y
 	set -e
 	mkdir -p deps
 	cd deps
