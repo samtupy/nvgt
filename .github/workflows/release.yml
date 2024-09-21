@@ -39,7 +39,7 @@ jobs:
       with:
         distribution: 'temurin'
         java-version: '17'
-    cache: 'gradle'
+        cache: 'gradle'
     - uses: nttld/setup-ndk@v1
       with:
         ndk-version: r25c
