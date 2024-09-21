@@ -50,10 +50,10 @@ jobs:
         python3 build/ci_set_version.py
     - name: build
       run: |
-        curl -s -O https://nvgt.gg/droidev.tar.gz
+        curl -s -O https://nvgt.gg/droidev.zip
         mkdir -p droidev
         cd droidev
-        tar -xvf ../droidev.tar.gz
+        unzip -q ../droidev.zip
         cd ../jni
         echo "$ANDROID_RUNNER_KEYSTORE" > android_enc.keystore
         cat android_enc.keystore | base64 -d > android.keystore
