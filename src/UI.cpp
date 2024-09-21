@@ -162,9 +162,9 @@ std::string simple_file_dialog(const std::string& filters, const std::string& de
 	end.name = nullptr;
 	end.pattern = nullptr;
 	nvgt_file_dialog_info fdi;
-	if (type == DIALOG_TYPE_OPEN) SDL_ShowOpenFileDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, filter_objects.data(), filter_objects.size() -1, default_location.empty()? nullptr : default_location.c_str(), SDL_FALSE);
+	if (type == DIALOG_TYPE_OPEN) SDL_ShowOpenFileDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, filter_objects.data(), filter_objects.size() -1, default_location.empty()? nullptr : default_location.c_str(), false);
 	else if (type == DIALOG_TYPE_SAVE) SDL_ShowSaveFileDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, filter_objects.data(), filter_objects.size() -1, default_location.empty()? nullptr : default_location.c_str());
-	else if (type == DIALOG_TYPE_FOLDER) SDL_ShowOpenFolderDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, default_location.empty()? nullptr : default_location.c_str(), SDL_FALSE);
+	else if (type == DIALOG_TYPE_FOLDER) SDL_ShowOpenFolderDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, default_location.empty()? nullptr : default_location.c_str(), false);
 	while (!fdi.tryWait(5)) SDL_PumpEvents();
 	return fdi.data;
 }

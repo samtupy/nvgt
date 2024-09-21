@@ -210,7 +210,7 @@ unsigned short getVolumeHash() {
 #ifdef __APPLE__
 #include <mach-o/arch.h>
 unsigned short getCpuHash() {
-	unsigned short val = SDL_GetCPUCount() + SDL_GetCPUCacheLineSize();
+	unsigned short val = SDL_GetNumLogicalCPUCores() + SDL_GetCPUCacheLineSize();
 	return val;
 }
 
