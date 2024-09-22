@@ -1954,7 +1954,7 @@ class audio_form {
 		}
 		return c_form[control_index].slider_value;
 	}
-	string get_slider_text_value(int control_index, int value) {
+	string get_slider_text_value(int control_index, double value) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
@@ -2009,7 +2009,7 @@ class audio_form {
 		}
 		return c_form[control_index].slider_step_size;
 	}
-	bool set_slider_text_value(int control_index, int value, const string& in text) {
+	bool set_slider_text_value(int control_index, double value, const string& in text) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
