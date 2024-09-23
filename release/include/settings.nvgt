@@ -1,0 +1,402 @@
+/* settings.nvgg - High level classes to quicly save and reload user data.
+ * This system was designed to replace the now empty settings object provided in BGT, however it has been rewritten and it is now quite flexible.
+ * Unlike the original settings object in BGT, this does not write to the windows registry, but supports saving your data in a serialized dictionary, INI format or JSON. It also includes some new functionality and changes.
+  * The all_users bool in the setup function is now bool local_path and controls where settings are saved. If this is set to true, settings will be in the same directory the program is being ran from. If set to false, settings will be stored in the application data directory under /company/product.
+  * added an extra argument to the setup function (string format) that will determine the format the save will use. Valid formats are ini, json and nvgt. Specifying the nvgt format will use a serialized dictionary.
+  * Added bool set_encryption(string&in key) which enables encryption for that settings file. Make sure that you call this function before calling the setup function if you wish to use encryption.
+  * Added new instant_save property that will determine if data instantly saves when calling the write_string or write_number functions. This is enabled by default, and will instantly save the data to disk.
+  * read_string and read_number can now have custom default values.
+  * Adds new dump function that will save all configuration data to disk. Returns true on success, false otherwise.
+ *
+ * NVGT - NonVisual Gaming Toolkit
+ * Copyright (c) 2022-2024 Sam Tupy
+ * https://nvgt.gg
+ * settings.nvgt - Copyright (C) 2024 Ivan Soto
+ * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+ * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+ * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+*/
+
+#include"bgt_compat.nvgt" //the INI include requires this include.
+#include"ini.nvgt"
+class settings_helper {
+	string company_name, product;
+	private bool can_encrypt_data = false;
+	bool local_path;
+	settings@parent;
+	settings_helper(settings@ parent) {
+		@this.parent = parent;
+	}
+	bool get_active() property {
+		return this.is_active();
+	}
+	bool is_active() {
+		return false;
+	}
+	bool get_encrypt_data() const property {
+		return (!this.encryption_key.empty() and this.can_encrypt_data);
+	}
+	string get_encryption_key() const property {
+		if (@this.parent == null) return "";
+		return this.parent.encryption_key;
+	}
+	bool get_instant_save() const property {
+		if (@this.parent == null) return true;
+		return this.parent.instant_save;
+	}
+	bool setup(string company, string product, bool local_path) {
+		this.company_name = company;
+		this.product = product;
+		this.local_path = local_path;
+		bool ensure = ensure_data_path(this.get_data_path());
+		if (ensure) return this.open();
+		else return false;
+	}
+	string get_data_path() {
+		if (this.local_path) return join({this.company_name, this.product, "settings" + this.get_file_extension()}, "/");
+		else return join({DIRECTORY_APPDATA, this.company_name, this.product, "settings" + this.get_file_extension()}, "/");
+	}
+	string get_file_extension() {
+		return "";
+	}
+	bool close(bool save = true) {
+		return false;
+	}
+	bool open() {
+		return false;
+	}
+	bool exists(const string&in key) {
+		return false;
+	}
+	bool remove_value(const string&in key) {
+		return false;
+	}
+	bool write_string(const string&in key, const string&in value) {
+		return false;
+	}
+	bool write_number(const string&in key, double number) {
+		return false;
+	}
+	string read_string(const string&in key) {
+		return "";
+	}
+	double read_number(const string&in key) {
+		return parse_float(this.read_string(key));
+	}
+	bool dump() {
+		return false;
+	}
+}
+class ini_settings_helper: settings_helper {
+	ini@config;
+	ini_settings_helper(settings@parent) {
+		super(@parent);
+		this.can_encrypt_data = true;
+	}
+	bool is_active() {
+		return @this.config != null;
+	}
+	bool open() {
+		@this.config = ini();
+		string filepath = this.get_data_path();
+		if (!file_exists(filepath))
+			return true;
+		file tempfile;
+		tempfile.open(filepath, "rb");
+		string final_data = tempfile.read();
+		tempfile.close();
+		if (this.encrypt_data) final_data = string_decrypt(final_data, this.encryption_key);
+		bool loaded = this.config.load_string(final_data, filepath);
+		return loaded;
+	}
+	string get_file_extension() {
+		return ".ini";
+	}
+	bool write_string(const string&in key, const string&in value) {
+		if (!this.active) return false;
+		bool set = this.config.set_string("", key, value);
+		bool save = (this.instant_save ? this.dump() : true);
+		return (set and save);
+	}
+	bool write_number(const string&in key, double number) {
+		if (!this.active) return false;
+		bool set = this.config.set_double("", key, number);
+		bool save = (this.instant_save ? this.dump() : true);
+		return (set and save);
+	}
+	string read_string(const string&in key) {
+		if (!this.active) return "";
+		return this.config.get_string("", key);
+	}
+	bool exists(const string&in key) {
+		if (!this.active) return false;
+		return this.config.key_exists("", key);
+	}
+	bool remove_value(const string&in key) {
+		if (!this.active) return false;
+		return this.config.delete_key("", key);
+	}
+	bool dump() {
+		if (!this.active) return false;
+		string filepath = this.get_data_path();
+		if (!ensure_data_path(filepath)) return false;
+		string final_data = this.config.dump();
+		file tempfile;
+		if (!tempfile.open(filepath, "wb")) return false;
+		if (this.encrypt_data) final_data = string_encrypt(final_data, this.encryption_key);
+		tempfile.write(final_data);
+		tempfile.close();
+		return true;
+	}
+	bool close(bool save = true) {
+		if (save and !this.dump()) return false;
+		this.config.reset();
+		return true;
+	}
+}
+class json_settings_helper: settings_helper {
+	json_object@config;
+	json_settings_helper(settings@parent) {
+		super(@parent);
+		this.can_encrypt_data = true;
+	}
+	bool is_active() {
+		return @this.config != null;
+	}
+	bool open() {
+		string filepath = this.get_data_path();
+		if (!file_exists(filepath)) {
+			@this.config = json_object();
+			return true;
+		}
+		file tempfile;
+		tempfile.open(filepath, "rb");
+		string final_data = tempfile.read();
+		tempfile.close();
+		if (this.encrypt_data) final_data = string_decrypt(final_data, this.encryption_key);
+		@this.config = parse_json(final_data);
+		return true;
+	}
+	string get_file_extension() {
+		return ".json";
+	}
+	bool write_string(const string&in key, const string&in value) {
+		if (!this.active) return false;
+		this.config.set(key, value);
+		return (this.instant_save ? this.dump() : true);
+	}
+	bool write_number(const string&in key, double number) {
+		if (!this.active) return false;
+		this.config.set(key, number);
+		return (this.instant_save ? this.dump() : true);
+	}
+	string read_string(const string&in key) {
+		return string(this.config[key]);
+	}
+	bool exists(const string&in key) {
+		if (!this.active) return false;
+		return this.config.exists(key);
+	}
+	bool remove_value(const string&in key) {
+		if (!this.active) return false;
+		if (!this.config.exists(key)) return false;
+		this.config.remove(key);
+		return true;
+	}
+	bool dump() {
+		if (!ensure_data_path(this.get_data_path())) return false;
+		file tempfile;
+		if (!tempfile.open(this.get_data_path(), "wb")) return false;
+		string final_data = this.config.stringify();
+		if (this.encrypt_data) final_data = string_encrypt(final_data, this.encryption_key);
+		tempfile.write(final_data);
+		tempfile.close();
+		return true;
+	}
+	bool close(bool save = true) {
+		if (save and !this.dump()) return false;
+		this.config.clear();
+		return true;
+	}
+}
+class nvgt_settings_helper: settings_helper {
+	dictionary@config;
+	nvgt_settings_helper(settings@parent) {
+		super(@parent);
+		this.can_encrypt_data = true;
+	}
+	bool is_active() {
+		return @this.config != null;
+	}
+	bool open() {
+		string filepath = this.get_data_path();
+		if (!file_exists(filepath)) {
+			@this.config = dictionary();
+			return true;
+		}
+		file tempfile;
+		tempfile.open(filepath, "rb");
+		string final_data = tempfile.read();
+		if (this.encrypt_data) final_data = string_decrypt(final_data, this.encryption_key);
+		@this.config = deserialize(final_data);
+		tempfile.close();
+		return true;
+	}
+	string get_file_extension() {
+		return ".dat";
+	}
+	bool write_string(const string&in key, const string&in value) {
+		if (!this.active) return false;
+		this.config.set(key, value);
+		return (this.instant_save ? this.dump() : true);
+	}
+	bool write_number(const string&in key, double number) {
+		if (!this.active) return false;
+		this.config.set(key, number);
+		return (this.instant_save ? this.dump() : true);
+	}
+	string read_string(const string&in key) {
+		if (!this.active) return "";
+		string ret;
+		this.config.get(key, ret);
+		return ret;
+	}
+	double read_number(const string&in key) {
+		if (!this.active) return 0;
+		double ret;
+		this.config.get(key, ret);
+		return ret;
+	}
+	bool exists(const string&in key) {
+		if (!this.active) return false;
+		return this.config.exists(key);
+	}
+	bool remove_value(const string&in key) {
+		if (!this.active) return false;
+		return this.config.delete(key);
+	}
+	bool dump() {
+		if (!this.active) return false;
+		if (!ensure_data_path(this.get_data_path())) return false;
+		file tempfile;
+		if (!tempfile.open(this.get_data_path(), "wb")) return false;
+		string final_data = this.config.serialize();
+		if (this.encrypt_data) final_data = string_encrypt(final_data, this.encryption_key);
+		tempfile.write(final_data);
+		tempfile.close();
+		return true;
+	}
+	bool close(bool save = true) {
+		if (save and !this.dump()) return false;
+		this.config.delete_all();
+		return true;
+	}
+}
+class settings {
+	string company_name, product;
+	bool local_path = false;
+	settings_helper@data_helper;
+	string encryption_key;
+	bool instant_save = true;
+	settings() {
+	}
+	bool get_active() const property {
+		if (@this.data_helper == null) return false;
+		return this.data_helper.active;
+	}
+	bool set_encryption(const string&in key) {
+		this.encryption_key = key;
+		return true;
+	}
+	bool close(bool save_data = true) {
+		if (!this.active) return false;
+		return this.data_helper.close(save_data);
+	}
+	bool exists(const string&in key) {
+		if (!this.active) return false;
+		return this.data_helper.exists(key);
+	}
+	string read_string(const string&in key, const string&in default_value = "") {
+		if (!this.exists(key)) return default_value;
+		return this.data_helper.read_string(key);
+	}
+	double read_number(const string&in key, double default_value = 0) {
+		if (!this.exists(key)) return default_value;
+		return this.data_helper.read_number(key);
+	}
+	bool write_string(const string&in key, const string&in value) {
+		if (!this.active) return false;
+		return this.data_helper.write_string(key, value);
+	}
+	bool write_number(const string&in key, double number) {
+		if (!this.active) return false;
+		return this.data_helper.write_number(key, number);
+	}
+	bool has_other_products() {
+		if (!this.active) return false;
+		string[]@ path = this.data_helper.get_data_path().split("/");
+		path.remove_range(path.length() - 2, path.length() - 1);
+		string final_path = join(path, "/");
+		return find_directories(final_path + "/*").length() > 1;
+	}
+	bool remove_product() {
+		if (!this.active) return false;
+		string file_path = this.data_helper.get_data_path();
+		if (!file_delete(file_path)) return false;
+		string[]@ path = file_path.split("/");
+		path.remove_at(path.length() - 1);
+		if (!this.has_other_products()) path.remove_at(path.length() - 1);
+		return directory_delete(join(path, "/"));
+	}
+	bool remove_value(const string&in value_name) {
+		if (!this.exists(value_name)) return false;
+		return this.data_helper.remove_value(value_name);
+	}
+	bool dump() {
+		if (!this.active) return false;
+		return this.data_helper.dump();
+	}
+	bool setup(const string company, const string product, const bool local_path, const string format = "ini") {
+		this.company_name = company;
+		this.product = product;
+		this.local_path = local_path;
+		settings_helper@temp = find_settings_helper(format, this);
+		if (@temp == null) return false;
+		bool success = temp.setup(company, product, local_path);
+		if (success) @this.data_helper = temp;
+		return success;
+	}
+}
+settings_helper@find_settings_helper(string&in format, settings@parent) {
+	if (format == "json") return json_settings_helper(parent);
+	else if (format == "ini") return ini_settings_helper(parent);
+	else if (format == "nvgt") return nvgt_settings_helper(parent);
+	return null;
+}
+bool ensure_data_path(string&in filename) {
+	//make sure that all directories within the given path exist.
+	string[] paths = filename.split("/", false);
+	paths.remove_at(paths.length() - 1);
+	if (paths.length() <= 0) return true; //if there is no more paths, this is probably a file with no path.
+	string[] p;
+	p.insert_last(paths[0]);
+	bool result = false;
+	string[] fpath;
+	for (uint i = 0; i < paths.length(); i += 1) {
+		if (i != 0) p.insert_last(paths[i]);
+		string workingpath;
+		workingpath = join(p, "/");
+		fpath = p;
+		if (!directory_exists(workingpath)) {
+			bool c = directory_create(workingpath);
+			if (!c) result = false;
+		}
+	}
+	if (!result) {
+		string final_path = join(fpath, "/");
+		if (directory_exists(final_path)) return true;
+	}
+	return result;
+}
