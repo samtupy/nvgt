@@ -1,0 +1,20 @@
+#include"dget.nvgt"
+#include"input_forms.nvgt"
+void main() {
+	show_window("test");
+	wait(350);
+	input_form input("profile registration");
+	input.add_text_field("first_name", "Enter your first name", "", true, false, " ");
+	input.add_text_field("last_name", "Enter your last name", "", true, false, " ");
+	input.add_number_field("age", "What's your age", -1, true);
+	input.add_text_field("location", "Where do you live? (optional)", "", false);
+	input.add_choice_field("platform", "Select your favorite platform", {"android", "iOS", "Mac", "Windows", "Linux"});
+	input.add_checkbox_field("agreement", "I agree to the rules", false, true, true);
+	input.description = "You will be asked the following questions to guide you in your profile setup";
+	dictionary@result = input.get_form_data();
+	if(input.user_canceled) {
+		alert("error", "The user canceled profile setup");
+		exit();
+	}
+	alert("profile", "The user is named "+dgets(result, "first_name")+" "+dgets(result, "last_name")+". They are from "+dgets(result, "location", "unknown")+" and are "+dgetn(result, "age", 1)+" years old. Their favorite operating system is "+dgets(result, "platform", "system7"));
+}
