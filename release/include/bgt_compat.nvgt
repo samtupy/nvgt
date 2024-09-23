@@ -14,346 +14,345 @@
 #include "instance.nvgt"
 string sound_storage;
 uint string_len(const string& in str) {
-		return str.length();
+	return str.length();
 }
 string string_replace(const string& in str, const string& in search, const string& in replace, bool replace_all) {
-		return str.replace(search, replace, replace_all);
+	return str.replace(search, replace, replace_all);
 }
 string string_left(const string& in str, uint count) {
-		if (str == "") return str;
-		return str.substr(0, count);
+	if (str == "") return str;
+	return str.substr(0, count);
 }
 string string_right(const string& in str, uint count) {
-		if (str == "") return str;
-		if (count >= str.length()) return str;
-		return str.slice(str.length() - count, 0);
+	if (str == "") return str;
+	if (count >= str.length()) return str;
+	return str.slice(str.length() - count, 0);
 }
 string string_trim_left(const string& in str, uint count) {
-		if (str == "") return str;
-		return str.substr(count);
+	if (str == "") return str;
+	return str.substr(count);
 }
 string string_trim_right(const string& in str, uint count) {
-		if (str == "") return str;
-		if (count > 0 and str.length() == 1) return "";
-		return str.slice(0, str.length() - count);
+	if (str == "") return str;
+	if (count > 0 and str.length() == 1) return "";
+	return str.slice(0, str.length() - count);
 }
 string string_mid(const string& in str, uint start, int count) {
-		if (start == 0) start = 1;
-		return str.substr(start - 1, count);
+	if (start == 0) start = 1;
+	return str.substr(start - 1, count);
 }
 bool string_is_lower_case(const string& in str) {
-		return str.is_lower();
+	return str.is_lower();
 }
 bool string_is_upper_case(const string& in str) {
-		return str.is_upper();
+	return str.is_upper();
 }
 bool string_is_alphabetic(const string& in str) {
-		return str.is_alphabetic();
+	return str.is_alphabetic();
 }
 bool string_is_digits(const string& in str) {
-		return str.is_digits();
+	return str.is_digits();
 }
 bool string_is_alphanumeric(const string& in str) {
-		return str.is_alphanumeric();
+	return str.is_alphanumeric();
 }
 string string_reverse(const string& in str) {
-		return str.reverse_bytes();
+	return str.reverse_bytes();
 }
 string string_to_lower_case(const string& in str) {
-		return str.lower();
+	return str.lower();
 }
 shared string string_to_upper_case(const string& in str) {
-		return str.upper();
+	return str.upper();
 }
 shared string[]@ string_split(const string& in str, const string& in delim, bool full = true) {
-		return str.split(delim, full);
+	return str.split(delim, full);
 }
 shared int string_contains(const string& in str, const string& in search, int occurance = 1) {
-		uint c = 0;
-		int pos = -1;
-		while (c < occurance) {
-				pos = str.find_first(search, pos + 1);
-				if (pos > -1)
-					c++;
-				else
-					break;
-			}
-			return c == occurance ? pos : -1;
+	uint c = 0;
+	int pos = -1;
+	while (c < occurance) {
+		pos = str.find_first(search, pos + 1);
+		if (pos > -1)
+			c++;
+		else
+			break;
 	}
-	string get_last_error_text() {
-			return "";
+	return c == occurance ? pos : -1;
+}
+string get_last_error_text() {
+	return "";
+}
+shared double string_to_number(const string& in num) {
+	return parse_float(num.trim_whitespace_left());
+}
+bool show_game_window(const string& in title) {
+	return show_window(title);
+}
+
+bool is_game_window_active() {
+	return (is_window_active());
+}
+
+// Just convert to internal functions instead this is probably slow!
+double cosine(double r) {
+	return cos(r);
+}
+
+double sine(double r) {
+	return sin(r);
+}
+
+double absolute(double x) {
+	return (abs(x));
+}
+
+double arc_cosine(double x) {
+	return (acos(x));
+}
+
+double arc_sine(double x) {
+	return (asin(x));
+}
+
+double arc_tangent(double x) {
+	return (atan(x));
+}
+
+double power(double x, double y) {
+	return (pow(x, y));
+}
+
+double square_root(double value) {
+	return (sqrt(value));
+}
+
+double ceiling(double x) {
+	return (ceil(x));
+}
+
+double tangent(double x) {
+	return (tan(x));
+}
+
+//dummy joystick class
+class joystick {
+	uint joysticks;
+	bool has_x;
+	bool has_y;
+	bool has_z;
+	bool has_r_x;
+	bool has_r_y;
+	bool has_r_z;
+	uint buttons;
+	uint sliders;
+	uint povs;
+	string name;
+	bool active;
+	int preferred_joystick;
+	uint x;
+	uint y;
+	uint z;
+	uint r_x;
+	uint r_y;
+	uint r_z;
+	uint slider_1;
+	uint slider_2;
+	uint pov_1;
+	uint pov_2;
+	uint pov_3;
+	uint pov_4;
+	uint v_x;
+	uint v_y;
+	uint v_z;
+	uint vr_x;
+	uint vr_y;
+	uint vr_z;
+	uint v_slider_1;
+	uint v_slider_2;
+	uint a_x;
+	uint a_y;
+	uint a_z;
+	uint ar_x;
+	uint ar_y;
+	uint ar_z;
+	uint a_slider_1;
+	uint a_slider_2;
+	uint f_x;
+	uint f_y;
+	uint f_z;
+	uint fr_x;
+	uint fr_y;
+	uint fr_z;
+	uint f_slider_1;
+	uint f_slider_2;
+	bool button_down(int button) {
+		return (false);
 	}
-	shared double string_to_number(const string& in num) {
-			return parse_float(num.trim_whitespace_left());
+	bool button_pressed(int button) {
+		return (false);
 	}
-	bool show_game_window(const string& in title) {
-			return show_window(title);
+	bool button_released(int button) {
+		return (false);
 	}
-	
-	bool is_game_window_active() {
-			return (is_window_active());
+	bool button_up(int button) {
+		return (false);
 	}
-	
-	// Just convert to internal functions instead this is probably slow!
-	double cosine(double r) {
-			return cos(r);
+	int[] buttons_down() {
+		return ({0});
 	}
-	
-	double sine(double r) {
-			return sin(r);
+	int[] buttons_pressed() {
+		return ({0});
 	}
-	
-	double absolute(double x) {
-			return (abs(x));
+	int[] buttons_released() {
+		return ({0});
 	}
-	
-	double arc_cosine(double x) {
-			return (acos(x));
+	int[] buttons_up() {
+		return ({0});
 	}
-	
-	double arc_sine(double x) {
-			return (asin(x));
+	string[] list_joysticks() {
+		return ({""});
 	}
-	
-	double arc_tangent(double x) {
-			return (atan(x));
+	bool pov_centered(int pov) {
+		return (true);
 	}
-	
-	double power(double x, double y) {
-			return (pow(x, y));
+	bool refresh_joystick_list() {
+		return (true);
 	}
-	
-	double square_root(double value) {
-			return (sqrt(value));
+	bool set(int index) {
+		return (true);
 	}
-	
-	double ceiling(double x) {
-			return (ceil(x));
+}
+// Most of these directory constants are functional.
+const string DIRECTORY_DESKTOP_VIRTUAL = "";
+const string DIRECTORY_DESKTOP = "";
+const string get_DIRECTORY_MY_DOCUMENTS() property {
+	return DIRECTORY_HOME + "Documents";
+}
+
+//screen reader legacy function
+// Try to use NVGT's screen reader functions where possible. They are both much more efficient, and more powerful.
+bool screen_reader_is_running(int reader) {
+	if (reader == 1 and screen_reader_detect() == "JAWS") return (true);
+	if (reader == 2 and screen_reader_detect() == "SYSTEM_ACCESS") return (true);
+	if (reader == 4 and screen_reader_detect() == "NVDA") return (true);
+	return (false);
+}
+//screen reader constants
+const int JAWS = 1, WINDOW_EYES = 2, SYSTEM_ACCESS = 3, NVDA = 4;
+
+bool screen_reader_speak(int reader, const string& in text) {
+	return (screen_reader_speak(text, false));
+}
+
+bool screen_reader_speak_interrupt(int reader, const string& in text) {
+	return (screen_reader_speak(text, true));
+}
+
+bool screen_reader_stop_speech(int reader) {
+	return screen_reader_silence();
+}
+
+//hashing
+string string_hash(const string& in data, int algorithm, bool binary) {
+	if (algorithm == 1) return (string_hash_sha256(data, binary));
+	if (algorithm == 2) return (string_hash_sha512(data, binary));
+	return ("");
+}
+string file_hash(const string& in filename, int algorithm, bool binary) {
+	file f;
+	if (!f.open(filename, "rb")) return "";
+	string data = f.read();
+	f.close();
+	return string_hash(data, algorithm, binary);
+}
+
+//string encryption and decryption. Does not work with existing bgt encrypted data
+string string_encrypt(const string& in the_string, const string& in encryption_key) {
+	return (string_aes_encrypt(the_string, encryption_key));
+}
+
+string string_decrypt(const string& in the_string, const string& in encryption_key) {
+	return (string_aes_decrypt(the_string, encryption_key));
+}
+
+//clipboard functions
+bool clipboard_copy_text(const string& in text) {
+	return (clipboard_set_text(text));
+}
+
+string clipboard_read_text() {
+	return (clipboard_get_text());
+}
+
+//serialize
+string serialize(dictionary@ the_data) {
+	return (the_data.serialize());
+}
+
+string generate_computer_id(const string& in application_id, bool hardware_only) {
+	return (generate_system_fingerprint(application_id));
+}
+
+
+//dummy sound storage functions
+
+string get_sound_storage() {
+	return sound_storage;
+}
+
+pack@open_pack(const string&in filename) {
+	if (filename.is_empty()) return null;
+	pack p;
+	if (p.open(filename, PACK_OPEN_MODE_READ)) return p;
+	else return null;
+}
+
+bool set_sound_storage(const string&in filename, bool reset = false) {
+	if (reset and filename.is_empty()) {
+		@sound_default_pack = null;
+		sound_storage = "";
 	}
-	
-	double tangent(double x) {
-			return (tan(x));
-	}
-	
-	//dummy joystick class
-	class joystick {
-			uint joysticks;
-			bool has_x;
-			bool has_y;
-			bool has_z;
-			bool has_r_x;
-			bool has_r_y;
-			bool has_r_z;
-			uint buttons;
-			uint sliders;
-			uint povs;
-			string name;
-			bool active;
-			int preferred_joystick;
-			uint x;
-			uint y;
-			uint z;
-			uint r_x;
-			uint r_y;
-			uint r_z;
-			uint slider_1;
-			uint slider_2;
-			uint pov_1;
-			uint pov_2;
-			uint pov_3;
-			uint pov_4;
-			uint v_x;
-			uint v_y;
-			uint v_z;
-			uint vr_x;
-			uint vr_y;
-			uint vr_z;
-			uint v_slider_1;
-			uint v_slider_2;
-			uint a_x;
-			uint a_y;
-			uint a_z;
-			uint ar_x;
-			uint ar_y;
-			uint ar_z;
-			uint a_slider_1;
-			uint a_slider_2;
-			uint f_x;
-			uint f_y;
-			uint f_z;
-			uint fr_x;
-			uint fr_y;
-			uint fr_z;
-			uint f_slider_1;
-			uint f_slider_2;
-			bool button_down(int button) {
-					return (false);
-				}
-				bool button_pressed(int button) {
-						return (false);
-					}
-					bool button_released(int button) {
-							return (false);
-						}
-						bool button_up(int button) {
-								return (false);
-							}
-							int[] buttons_down() {
-									return ({0});
-								}
-								int[] buttons_pressed() {
-										return ({0});
-									}
-									int[] buttons_released() {
-											return ({0});
-										}
-										int[] buttons_up() {
-												return ({0});
-											}
-											string[] list_joysticks() {
-													return ({""});
-												}
-												bool pov_centered(int pov) {
-														return (true);
-													}
-													bool refresh_joystick_list() {
-															return (true);
-														}
-														bool set(int index) {
-																return (true);
-															}
-													}
-													// Most of these directory constants are functional.
-													const string DIRECTORY_DESKTOP_VIRTUAL = "";
-													const string DIRECTORY_DESKTOP = "";
-													const string get_DIRECTORY_MY_DOCUMENTS() property {
-															return DIRECTORY_HOME + "Documents";
-													}
-													
-													//screen reader legacy function
-													// Try to use NVGT's screen reader functions where possible. They are both much more efficient, and more powerful.
-													bool screen_reader_is_running(int reader) {
-															if (reader == 1 and screen_reader_detect() == "JAWS") return (true);
-															if (reader == 2 and screen_reader_detect() == "SYSTEM_ACCESS") return (true);
-															if (reader == 4 and screen_reader_detect() == "NVDA") return (true);
-															return (false);
-													}
-													//screen reader constants
-													const int JAWS = 1, WINDOW_EYES = 2, SYSTEM_ACCESS = 3, NVDA = 4;
-													
-													bool screen_reader_speak(int reader, const string& in text) {
-															return (screen_reader_speak(text, false));
-													}
-													
-													bool screen_reader_speak_interrupt(int reader, const string& in text) {
-															return (screen_reader_speak(text, true));
-													}
-													
-													bool screen_reader_stop_speech(int reader) {
-															return screen_reader_silence();
-													}
-													
-													//hashing
-													string string_hash(const string& in data, int algorithm, bool binary) {
-															if (algorithm == 1) return (string_hash_sha256(data, binary));
-															if (algorithm == 2) return (string_hash_sha512(data, binary));
-															return ("");
-													}
-													string file_hash(const string& in filename, int algorithm, bool binary) {
-															file f;
-															if (!f.open(filename, "rb")) return "";
-															string data = f.read();
-															f.close();
-															return string_hash(data, algorithm, binary);
-													}
-													
-													//string encryption and decryption. Does not work with existing bgt encrypted data
-													string string_encrypt(const string& in the_string, const string& in encryption_key) {
-															return (string_aes_encrypt(the_string, encryption_key));
-													}
-													
-													string string_decrypt(const string& in the_string, const string& in encryption_key) {
-															return (string_aes_decrypt(the_string, encryption_key));
-													}
-													
-													//clipboard functions
-													bool clipboard_copy_text(const string& in text) {
-															return (clipboard_set_text(text));
-													}
-													
-													string clipboard_read_text() {
-															return (clipboard_get_text());
-													}
-													
-													//serialize
-													string serialize(dictionary@ the_data) {
-															return (the_data.serialize());
-													}
-													
-													string generate_computer_id(const string& in application_id, bool hardware_only) {
-															return (generate_system_fingerprint(application_id));
-													}
-													
-													
-													//dummy sound storage functions
-													
-													string get_sound_storage() {
-															return sound_storage;
-													}
-													
-													pack@open_pack(const string&in filename) {
-															if(filename.is_empty()) return null;
-															pack  p;
-															if(p.open(filename, PACK_OPEN_MODE_READ)) return p;
-															else return null;
-													}
-													
-													bool set_sound_storage(const string&in filename, bool reset = false) {
-															if(reset and filename.is_empty()) {
-																	@sound_default_pack = null;
-																	sound_storage = "";
-																}
-																pack@p = open_pack(filename);
-																if(@p == null) return false;
-																@sound_default_pack = p;
-																sound_storage = filename;
-																return true;
-														}
-														
-														bool set_sound_decryption_key(const string& in key, bool force_encryption) {
-																return (true);
-														}
-														
-														// legacy generate_profile
-														bool generate_profile(const string& in filename) {
-																string r = generate_profile();
-																if (r == "") return false;
-																file f;
-																if (!f.open(filename, "wb")) return false;
-																bool success = f.write(r) == r.length();
-																f.close();
-																return success;
-														}
-														
-														// wrappers for string_compress/decompress that use deflate.
-														string string_compress(string str) {
-																return string_deflate(str, 9);
-														}
-														string string_decompress(string str) {
-																return string_inflate(str);
-														}
-														
-														//key constants
-														const uint KEY_PRIOR = KEY_PAGEUP;
-														const uint KEY_NEXT = KEY_PAGEDOWN;
-														const uint KEY_LCONTROL = KEY_LCTRL;
-														const uint KEY_RCONTROL = KEY_RCTRL;
-														const uint KEY_LWIN = KEY_LGUI;
-														const uint KEY_RWIN = KEY_RGUI;
-														const uint KEY_LMENU = KEY_LALT;
-														const uint KEY_RMENU = KEY_RALT;
-														const uint KEY_LBRACKET = KEY_LEFTBRACKET;
-														const uint KEY_RBRACKET = KEY_RIGHTBRACKET;
-														const uint KEY_NUMPADENTER = KEY_NUMPAD_ENTER;
-														const uint KEY_DASH = KEY_MINUS;
-														
+	pack@p = open_pack(filename);
+	if (@p == null) return false;
+	@sound_default_pack = p;
+	sound_storage = filename;
+	return true;
+}
+
+bool set_sound_decryption_key(const string& in key, bool force_encryption) {
+	return (true);
+}
+
+// legacy generate_profile
+bool generate_profile(const string& in filename) {
+	string r = generate_profile();
+	if (r == "") return false;
+	file f;
+	if (!f.open(filename, "wb")) return false;
+	bool success = f.write(r) == r.length();
+	f.close();
+	return success;
+}
+
+// wrappers for string_compress/decompress that use deflate.
+string string_compress(string str) {
+	return string_deflate(str, 9);
+}
+string string_decompress(string str) {
+	return string_inflate(str);
+}
+
+//key constants
+const uint KEY_PRIOR = KEY_PAGEUP;
+const uint KEY_NEXT = KEY_PAGEDOWN;
+const uint KEY_LCONTROL = KEY_LCTRL;
+const uint KEY_RCONTROL = KEY_RCTRL;
+const uint KEY_LWIN = KEY_LGUI;
+const uint KEY_RWIN = KEY_RGUI;
+const uint KEY_LMENU = KEY_LALT;
+const uint KEY_RMENU = KEY_RALT;
+const uint KEY_LBRACKET = KEY_LEFTBRACKET;
+const uint KEY_RBRACKET = KEY_RIGHTBRACKET;
+const uint KEY_NUMPADENTER = KEY_NUMPAD_ENTER;
+const uint KEY_DASH = KEY_MINUS;
