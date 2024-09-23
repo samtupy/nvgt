@@ -7,5 +7,5 @@
 void main() {
 	datetime d;
 	d.set(2024, 5, 8, 14, 18);
-	alert("The datetime's PM value is", d.PM);
+	alert("The datetime's set PM value is", d.PM);
 }

@@ -1,0 +1,20 @@
+/**
+	This method is used to check the status of a number that is currently being spoken or has already been spoken, and, if necessary, initiates the playback of the next number.
+	int number_speaker::speak_next();
+	## Returns:
+		int: 0 if there are no more files to be played, 1 if there are more files to be played or if the last file is still playing, and -1 if an error occurs.
+	## Remarks:
+		The speak_next method works in conjunction with the speak method and should be used continuously while the number is being spoken.
+		This method functions not only as a status indicator but also as a trigger, checking and playing numbers as needed. To ensure that the numbers are spoken smoothly and fluently, it is essential to perform this check at regular intervals, approximately every 5 milliseconds.
+*/
+
+// Example:
+#include "number_speaker.nvgt"
+void main() {
+	// Speak a number using speak and speak_next.
+	number_speaker test;
+	test.speak(350);
+	while(test.speak_next()==1) {
+		wait(5);
+	}
+}

@@ -1,0 +1,20 @@
+/**
+	Returns the title of your window.
+	string get_window_text();
+	## Returns:
+		string: the title of your window.
+*/
+
+// Example:
+void main() {
+	string[] possible_titles = {"Hello world", "NVGT test", "My game", "Example", "Window title example"};
+	show_window(possible_titles[random(0, possible_titles.length() - 1)]);
+	while (true) {
+		wait(5);
+		if (key_pressed(KEY_ESCAPE)) exit();
+		if (key_pressed(KEY_SPACE)) {
+			screen_reader_output("The window title currently is: " + get_window_text(), true);
+			show_window(possible_titles[random(0, possible_titles.length() - 1)]); // Randomize the title again.
+		}
+	}
+}

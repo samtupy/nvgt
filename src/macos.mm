@@ -94,7 +94,7 @@ std::string apple_input_box(const std::string& title, const std::string& message
 	return "\xff"; // Either an error or we can't determine what was pressed. Should we throw an exception or something?
 }
 
-std::string openFileDialog(const std::string& title) {
+/*std::string openFileDialog(const std::string& title) {
 NSOpenPanel *panel = [NSOpenPanel openPanel];
     panel.canChooseFiles = YES;
     panel.allowsMultipleSelection = NO;
@@ -119,4 +119,4 @@ NSOpenPanel *panel = [NSOpenPanel openPanel];
         else return "";
     }
     else return "";
-	}
+	}*/

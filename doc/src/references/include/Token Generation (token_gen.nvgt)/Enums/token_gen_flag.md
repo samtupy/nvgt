@@ -1,5 +1,5 @@
 # token_gen_flag
-This enum holds various constants that can be passed to the mode parameter in order to change how tokens are generated.
+This enum holds various constants that can be passed to the mode parameter in order to change how tokens are generated in the `generate_token` function.
 
 * token_gen_flag_all: Uses all characters, numbers and symbols, see below.
 * token_gen_flag_characters: Uses only characters, a-z, A-Z

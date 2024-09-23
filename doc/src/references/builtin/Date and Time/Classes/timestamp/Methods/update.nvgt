@@ -1,0 +1,13 @@
+/**
+	Reset this timestamp to the system's current date and time.
+	void update();
+*/
+
+// Example:
+void main() {
+	timestamp ts;
+	ts -= 60 * SECONDS;
+	alert("timestamp before reset", ts / SECONDS);
+	ts.update();
+	alert("current timestamp", ts / SECONDS);
+}

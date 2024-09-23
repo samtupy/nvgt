@@ -36,10 +36,6 @@
 #include "scriptarray.h"
 #define NVGT_LOAD_STATIC_PLUGINS
 #include "angelscript.h" // nvgt's angelscript implementation
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#include "apple.h" // apple_requested_file
-#endif
 #include "input.h"
 #include "misc_functions.h" // ChDir
 #include "nvgt.h"
@@ -54,6 +50,7 @@
 #include "srspeech.h"
 #include "UI.h" // message
 #include "version.h"
+#include "xplatform.h"
 
 using namespace std;
 using namespace Poco;
@@ -95,6 +92,8 @@ protected:
 				ChDir(Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString());
 			#endif
 		}
+		#elif defined(__ANDROID__)
+		config().setString("application.gui", "");
 		#endif
 		srand(random_seed()); // Random bits of NVGT if not it's components might use the c rand function.
 		#if defined(NVGT_WIN_APP) || defined(NVGT_STUB)
@@ -119,7 +118,7 @@ protected:
 		Application::defineOptions(options);
 		options.addOption(Option("compile", "c", "compile script in release mode").group("compiletype"));
 		options.addOption(Option("compile-debug", "C", "compile script in debug mode").group("compiletype"));
-		options.addOption(Option("platform", "p", "select target platform to compile for (auto|windows|linux|mac)", false, "platform", true).validator(new RegExpValidator("^(auto|windows|linux|mac)$")));
+		options.addOption(Option("platform", "p", "select target platform to compile for (auto|windows|linux|mac|android)", false, "platform", true).validator(new RegExpValidator("^(auto|windows|linux|mac|android)$")));
 		options.addOption(Option("quiet", "q", "do not output anything upon successful compilation").binding("application.quiet").group("quiet"));
 		options.addOption(Option("QUIET", "Q", "do not output anything (work in progress), error status must be determined by process exit code (intended for automation)").binding("application.QUIET").group("quiet"));
 		options.addOption(Option("debug", "d", "run with the Angelscript debugger").binding("application.as_debug"));
@@ -162,9 +161,9 @@ protected:
 	std::string UILauncher() {
 		// If the user launches NVGT's compiler without a terminal, let them select what to do from various options provided by simple dialogs. Currently the choice selection is one-shot and then we exit, but it might be turned into some sort of do-loop later so that the user can perform multiple selections in one application run.
 		std::vector<string> options = {"`Run a script", "Compile a script in release mode", "Compile a script in debug mode", "View version information", "View command line options", "Visit nvgt.gg on the web", "~Exit"};
-		#if defined(__ANDROID__) || defined(__APPLE__) && TARGET_OS_IPHONE // disable compile options on these platforms
-			options[1].insert(0, '\0');
-			options[2].insert(0, '\0');
+		#ifdef NVGT_MOBILE
+			options[1].insert(options[1].begin(), '\0');
+			options[2].insert(options[2].begin(), '\0');
 		#endif
 		int option = message_box("NVGT Compiler", "Please select what you would like to do.", options, SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT);
 		if (option <= 0 || option >= 7) {
@@ -196,8 +195,8 @@ protected:
 	virtual int main(const std::vector<std::string>& args) override {
 		// Determine the script file that is to be executed.
 		string scriptfile = "";
-		#ifdef __APPLE__
-			scriptfile = apple_requested_file(); // Files opened from finder on mac do not use command line arguments.
+		#if defined(__APPLE__) || defined(__ANDROID__)
+			scriptfile = event_requested_file(); // Files opened from external apps on MacOS, IOS, and Android do not use command line arguments.
 		#endif
 		if (scriptfile.empty() && args.size() > 0) scriptfile = args[0];
 		if (scriptfile.empty() && config().hasOption("application.gui")) scriptfile = UILauncher();
@@ -214,6 +213,7 @@ protected:
 			message("error, no input files.\nType " + commandName() + " --help for usage instructions\n", commandName());
 			return Application::EXIT_USAGE;
 		}
+		#ifndef __ANDROID__ // for now the following code would be highly unstable on android due to it's content URIs.
 		try {
 			// Parse the provided script path to insure it is valid and check if it is a file.
 			if (!File(Path(scriptfile)).isFile()) throw Exception("Expected a file", scriptfile);
@@ -233,6 +233,7 @@ protected:
 			message(e.displayText(), "error");
 			return Application::EXIT_CONFIG;
 		}
+		#endif
 		setupCommandLineProperty(args, 1);
 		g_command_line_args->InsertAt(0, (void*)&scriptfile);
 		ConfigureEngineOptions(g_ScriptEngine);

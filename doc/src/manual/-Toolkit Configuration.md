@@ -20,7 +20,7 @@ Finally, a special argument, two hyphens without any following text, indicates t
 The following is a list of all available command line arguments, though note that it is best to directly run `nvgt --help` yourself encase this list is in any way out of date as nvgt's --help argument will always be more accurate because the text it prints is dynamically generated.
 * -c, --compile: compile script in release mode
 * -C, --compile-debug: compile script in debug mode
-* -pplatform, --platform=platform: select target platform to compile for (auto|windows|linux|mac)
+* -pplatform, --platform=platform: select target platform to compile for (auto|android|windows|linux|mac)
 * -q, --quiet: do not output anything upon successful compilation
 * -Q, --QUIET: do not output anything (work in progress), error status must be determined by process exit code (intended for automation)
 * -d, --debug: run with the Angelscript debugger
@@ -109,6 +109,25 @@ This section contains options that typically control some aspect of the user int
 * quiet: no output is printed upon successful compilation (same as -q argument)
 * QUIET: attempts to print as little to stdout and stderr as possible (though this option is still a work in progress)
 
+#### build
+This section contains options that are directly related to the compiling/bundling of an NVGT game into it's final package. It contains everything from options that help NVGT find extra build tools for certain platforms to those that define the name and version of your product.
+
+* android_home string defaults to %ANDROID_HOME%: path to the root directory of the Android sdk
+* android_install = integer default 1: should Android apks be installed onto connected devices if signing was successful, 0 no, 1 ask, 2 always
+* android_jaava_home string defaults to %JAVA_HOME%: path to the root of a java installation
+* android_manifest string defaults to prepackaged: path to a custom AndroidManifest.xml file that should be packaged with an APK file instead of the builtin template
+* android_path string defaults to %PATH%: where to look for android development tools
+* android_signature_cert = string: path to a .keystore file used to sign an Android apk bundle
+* android_signature_password = string: password used to access the given signing keystore (see remarks at the bottom of this article)
+* mac_bundle = integer default 2: 0 no bundle, 1 .app, 2 .dmg/.zip, 3 both .app and .dmg/.zip
+* output_basename = string default set from input filename: the output file or directory name of the final compiled package without an extension
+* product_identifier=string default com.NVGTUser.InputBasenameSlug: the reverse domain bundle identifier for your application (highly recommended to customize for mobile platforms, see remarks at the bottom of this article)
+* product_name=string defaults to input file basename: human friendly display name of your application
+* product_version = string default 1.0: human friendly version string to display to users in bundles
+* product_version_code = integer default (UnixEpoch / 60): an increasing 32 bit integer that programatically denotes the version of your application (default is usually ok)
+* product_version_semantic string default 1.0.0: a numeric version string in the form major.minor.patch used by some platforms
+* windows_console: when compiling for windows, build with the console subsystem instead of GUI
+
 #### scripting
 This section contains options that directly effect the Angelscript engine, almost always by tweaking a property with the SetEngineProperty function that Angelscript provides.
 
@@ -149,7 +168,7 @@ The syntax for a pragma directive looks like `#pragma name value` or sometimes j
 
 ### Available directives
 * `#pragma include <directory>`: search for includes in the given directory (directive can be repeated)
-* `#pragma platform <platform>`: select what platform to compile for same as -p argument (auto, linux, mac, windows)
+* `#pragma platform <platform>`: select what platform to compile for same as -p argument (auto, android, linux, mac, windows)
 * `#pragma stub <stubname>`: select what stub to compile using (see remarks at the bottom of this article)
 * `#pragma embed <packname>`: embed the given pack into the compiled executable
 * `#pragma plugin <plugname>`: load and activate a plugin given it's dll basename
@@ -174,11 +193,18 @@ It is not needed to understand how this c++ string formatting function works to 
 This example moves the line number and column to the beginning of the string, before printing the filename, the message type and the content all on a single line. NVGT automatically adds one new line between each engine message printed regardless of the template.
 
 ### platform and stub selection
-One possible area of confusion might be how the platform and stub pragma directives fit together. In short, the stub option lets you choose various features or qualities included in your target executable while platform determines what major platform (mac, windows) you are compiling for.
+One possible area of confusion might be how the platform and stub directives fit together. In short, the stub option lets you choose various features or qualities included in your target executable while platform determines what major platform (mac, windows) you are compiling for.
 
-Though explaining how NVGT's compilation process works is a bit beyond the scope of this article, the gist is that Angelscript bytecode is attached to an already compiled c++ program which is used to produce the final executable. There are several version of the c++ program (we call that the stub) available with more that could appear at any time. For example a stub called upx will produce an executable that has already been compressed with the UPX executable packer, while a stub available on windows called nc will insure that the Angelscript compiler is not included in your target application. In the future we hope to include several more stubs such as one focusing much more on performance over file size, one focusing on minimal dependencies to insure no third party code attributions are needed, etc.
+Though explaining how NVGT's compilation process works is a bit beyond the scope of this article, the gist is that Angelscript bytecode is attached to an already compiled c++ program which is used to produce the final executable. There are several versions of the c++ program (we call that the stub) available with more that could appear at any time. For example a stub called upx will produce an executable that has already been compressed with the UPX executable packer, while a stub available on windows called nc will insure that the Angelscript compiler is not included in your target application. In the future we hope to include several more stubs such as one focusing much more on performance over file size, one focusing on minimal dependencies to insure no third party code attributions are needed, etc.
 
 Internally, you can see this at play by looking in the stub directory of NVGT's installation. You can see several files with the format `nvgt_<platform>_<stubname>.bin`, or sometimes just `nvgt_<platform>.bin` which is the default stub for a given platform. Such files are used to create the final game executable produced by NVGT's compiler, and are selected exactly using the configuration pragmas and options described. If platform is set to windows and stub is set to nc, the file nvgt_windows_nc.bin is used to produce the compiled executable of your game. The only exception is if the platform is set to auto (the default), which will cause your executable to be compiled for the host platform you are compiling on.
+
+### bundle naming and versioning
+NVGT includes several directives particularly in the build configuration section that allow you to control how your product is identified to end users and to the systems the app is running on. While some are purely for display, others are manditory in certain situations especially when you plan to distribute your app on networks like the app store, google play and similar.
+
+If you plan to release your game on MacOS, IOS, or Android, it is highly recommended that you create what's known as a reverse domain identifier for your app by setting the build.product_identifier property. It's called the reverse domain identifier because the format is like a website in reverse, such as com.samtupy.nvgt. In mild cases it might be used to group similar apps together E. the operating system or distrobution service can implicitly tell that apps with an identifier starting with com.samtupy all belong to the same company, but in extreme cases this identifier might be used by the system as the main way your app is identified, such as on Android for example where the filesystem paths to the apps data folders actually include this identifier. The identifier can contain periods, uppercase / lowercase letters, and numbers, so long as a number is not the first character following a period. There should be at least 2 period delimited segments in this identifier (prefferably at minimum 3), and it might be a good idea to limit the first segment to popular top level domains like com, org, net etc. While in reality a couple of other characters like dashes and underscores might work in identifiers, they may not be as platform agnostic as the rules listed above. It is not important that the reverse website/app identifier you come up with here actually exists on the internet. If you do not provide this value, the default is com.NVGTUser.scriptname where scriptname is the name of the NVGT file passed to the compiler without the extension.
+
+Unfortunately, different operating systems and services use different versioning schemes. Windows and MacOS really want version numbers in major.minor.patch format, in fact the windows version resource actually contains 4 words in it's structure to store each period separated version component. While the parsed format isn't actually embedded into a binary structure on MacOS, it's still manditory as soon as you want to distribute your game in the app store, because that service reads such a property from the bundle to identify the version of the app to track updates. As such, the build.product_version_semantic property must be set for MacOS app store distrobutions, while on windows it is an optional display feature that will cause version information to show for your compiled executable. On the other hand, Android and the google play store use an integer version code to track when a given version of an APK is newer than any installed version. This simple requirement makes it very easy to manage this property automatically on android, it is done by dividing the unix timestamp in seconds by 60, you can also set the build.product_version_code property if you wish to control this manually. Finally, the build.product_version configuration option allows you to set, where possible, the version string that is actually displayed to end users.
 
 ## Conclusion
 Hopefully this tutorial has given you a good idea of how you can get NVGT to perform closer to how you would like in various areas from the user interface to the syntax handling. If you have any ideas as to configuration options you'd like to see added, please don't hesitate to reach out on github either with a discussion or pull request!

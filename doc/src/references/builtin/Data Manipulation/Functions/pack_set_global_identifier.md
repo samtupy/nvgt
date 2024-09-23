@@ -12,3 +12,4 @@ bool: true if the identifier was properly set, false otherwise.
 ## Remarks:
 * The default pack identifier is "NVPK" followed by 4 NULL bytes.
 * Your pack identifier should be 8 characters or less. If it's less than 8 characters, 0s will be added as padding on the end. If it's larger than 8, the first 8 characters will be used.
+* NVGT will refuse to open any pack files that do not match this identifier.

@@ -1,7 +1,5 @@
 //NVGT console
 //Do you want to know what a particular function does without having to write scripts to test it? Do you want to debug or test fast? Here is a simple editor with a couple of extra features for you to do any small tasks you might need to do with nvgt
-// fixes a temporary issue
-#pragma plugin nvgt_curl
 
 #include "nvgt_subsystems.nvgt" //for subscripting
 #include "form.nvgt"

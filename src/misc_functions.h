@@ -18,6 +18,8 @@
 asINT64 GetFileSize(const std::string& path);
 BOOL ChDir(const std::string& d);
 double range_convert(double old_value, double old_min, double old_max, double new_min, double new_max);
+float parse_float(const std::string& val);
+double parse_double(const std::string& val);
 class refstring {
 public:
 	int RefCount;

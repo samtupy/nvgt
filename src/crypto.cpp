@@ -1,5 +1,5 @@
 /* crypto.cpp - AES encryption and decryption functions code
- * Warning, the author of this code is not an expert on encryption. While the functions here will protect your data, they have by no means been battletested by a cryptography expert and/or they may not follow standards perfectly. Please feel free to report any vulterabilities.
+ * Warning, the author of this code is not an expert on encryption. While the functions here will protect your data, they have by no means been battletested by a cryptography expert and/or they may not follow standards perfectly. Please feel free to report any vulnerabilities.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy

@@ -7,5 +7,5 @@
 void main() {
 	datetime d;
 	d.set(d.year, d.month, d.day, 12, 47, 19);
-	alert("The current second of the datetime object is", d.second);
+	alert("The set second of the datetime object is", d.second);
 }

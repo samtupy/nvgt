@@ -40,6 +40,6 @@ std::string string_inflate(const std::string& str) {
 }
 
 void RegisterScriptCompression(asIScriptEngine* engine) {
-	engine->RegisterGlobalFunction("string string_deflate(const string& in, int = 9)", asFUNCTION(string_deflate), asCALL_CDECL);
-	engine->RegisterGlobalFunction("string string_inflate(const string& in)", asFUNCTION(string_inflate), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string string_deflate(const string& in data, int compression_level = 9)", asFUNCTION(string_deflate), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string string_inflate(const string& in deflated)", asFUNCTION(string_inflate), asCALL_CDECL);
 }

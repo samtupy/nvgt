@@ -1,0 +1,12 @@
+/**
+	Determine the difference of time in microseconds between this timestamp's value and now.
+	const int64 elapsed;
+	## Remarks:
+		This property is a shorthand version of the expression `int64 elapsed = timestamp() - this;`
+*/
+
+// Example:
+void main() {
+	datetime dt(2013, 11, 29, 1, 2, 3);
+	alert("example", dt.format(DATE_TIME_FORMAT_RFC850) + " was " + (dt.timestamp.elapsed / DAYS) + " days ago");
+}

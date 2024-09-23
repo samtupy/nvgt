@@ -1,0 +1,7 @@
+void test_clipboard() {
+	string org_text = clipboard_get_text();
+	clipboard_set_text(NVGT_VERSION_COMMIT_HASH);
+	string new_text = clipboard_get_text();
+	clipboard_set_text(org_text);
+	assert(new_text == NVGT_VERSION_COMMIT_HASH);
+}

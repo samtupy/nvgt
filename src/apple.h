@@ -21,8 +21,6 @@ void voice_over_window_created();
 void voice_over_speech_shutdown();
 std::string apple_input_box(const std::string& title, const std::string& message, const std::string& default_value = "", bool secure = false, bool readonly = false);
 std::string apple_requested_file();
-std::string openFileDialog(const std::string& title);
-std::string saveFileDialog(const std::string& title, const std::string& filename);
 
 // Definition for AVTTSVoice class created by Gruia Chiscop on 6/6/24.
 class AVTTSVoice {

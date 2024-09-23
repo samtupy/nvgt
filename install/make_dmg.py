@@ -24,6 +24,8 @@ def make_app_bundle(bundle_name, release_path, version):
 	os.rename(bundle_basename + "/MacOS/lib", bundle_basename + "/Frameworks")
 	os.rename(bundle_basename + "/MacOS/include", bundle_basename + "/Resources/include")
 	os.rename(bundle_basename + "/MacOS/stub", bundle_basename + "/Resources/stub")
+	if os.path.isdir(bundle_basename + "/MacOS/lib_linux"): os.rename(bundle_basename + "/MacOS/lib_linux", bundle_basename + "/Resources/lib_linux")
+	if os.path.isdir(bundle_basename + "/MacOS/lib_windows"): os.rename(bundle_basename + "/MacOS/lib_windows", bundle_basename + "/Resources/lib_windows")
 
 	# create an info.plist file for the app
 	plist_path = os.path.join(bundle_basename, "Info.plist")

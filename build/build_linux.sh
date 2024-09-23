@@ -48,6 +48,19 @@ function setup_libgit2 {
 	echo libgit2 installed.
 }
 
+function setup_libplist {
+	echo Installing libplist...
+	curl -s -O -L https://github.com/libimobiledevice/libplist/releases/download/2.6.0/libplist-2.6.0.tar.bz2
+	tar -xf libplist-2.6.0.tar.bz2
+	cd libplist-2.6.0
+	./configure --without-cython
+	make
+	sudo make install
+	cd ..
+	rm libplist-2.6.0.tar.bz2
+	echo libplist installed.
+}
+
 function setup_poco {
 	echo Installing poco...
 	curl -s -O https://pocoproject.org/releases/poco-1.13.3/poco-1.13.3-all.tar.gz
@@ -55,9 +68,9 @@ function setup_poco {
 	cd poco-1.13.3-all
 	mkdir -p cmake_build
 	cd cmake_build
-	export CFLAGS=-fPIC
-	export CXXFLAGS=-fPIC
-	cmake .. -DENABLE_TESTS=OFF -DENABLE_SAMPLES=OFF -DCMAKE_BUILD_TYPE=MinSizeRel -DENABLE_PAGECOMPILER=OFF -DENABLE_PAGECOMPILER_FILE2PAGE=OFF -DENABLE_ACTIVERECORD=OFF -DENABLE_ACTIVERECORD_COMPILER=OFF -DENABLE_XML=OFF -DENABLE_MONGODB=OFF -DBUILD_SHARED_LIBS=OFF
+	export CFLAGS="-fPIC -DPOCO_UTIL_NO_XMLCONFIGURATION"
+	export CXXFLAGS="-fPIC -DPOCO_UTIL_NO_XMLCONFIGURATION"
+	cmake .. -DENABLE_TESTS=OFF -DENABLE_SAMPLES=OFF -DCMAKE_BUILD_TYPE=MinSizeRel -DENABLE_PAGECOMPILER=OFF -DENABLE_PAGECOMPILER_FILE2PAGE=OFF -DENABLE_ACTIVERECORD=OFF -DENABLE_ACTIVERECORD_COMPILER=OFF -DENABLE_MONGODB=OFF -DBUILD_SHARED_LIBS=OFF
 	cmake --build .
 	sudo cmake --install .
 	cd ../..
@@ -70,9 +83,10 @@ function setup_sdl {
 	# Install SDL this way to get many SDL deps. It is too old so we remove SDL itself and build from source, however.
 	sudo apt install libssl-dev libcurl4-openssl-dev libopus-dev libsdl2-dev -y
 	sudo apt remove libsdl2-dev -y
-	git clone --depth 1 https://github.com/libsdl-org/SDL||true
+	git clone https://github.com/libsdl-org/SDL||true
 	mkdir -p SDL/build
 	cd SDL/build
+	git checkout 9dd8859240703d886941733ad32c1dc6f50d64f0
 	cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST_LIBRARY=OFF ..
 	cmake --build . --config MinSizeRel
 	sudo make install
@@ -112,6 +126,7 @@ function setup_nvgt {
 }
 
 function main {
+	sudo apt update -y
 	set -e
 	mkdir -p deps
 	cd deps
@@ -123,6 +138,7 @@ function main {
 	setup_bullet
 	setup_enet
 	setup_libgit2
+	setup_libplist
 	setup_poco
 	setup_sdl
 	setup_nvgt

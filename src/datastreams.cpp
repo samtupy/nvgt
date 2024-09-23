@@ -205,7 +205,7 @@ unsigned int datastream::write(const std::string& data) {
 	std::streamsize pos = _ostr->tellp();
 	try {
 		w->writeRaw(data);
-		if (r && w) _istr->seekg(_ostr->tellp()); // Make sure that read and write pointers are in sync.
+		if (r && w && sync_rw_cursors) _istr->seekg(_ostr->tellp()); // Make sure that read and write pointers are in sync.
 	} catch (std::exception) {
 		return long(_ostr->tellp()) - pos;
 	}
@@ -307,6 +307,7 @@ template <class T, datastream_factory_type factory> void RegisterDatastreamType(
 	RegisterDatastreamReadwrite<double>(engine, classname, "double");
 	RegisterDatastreamReadwrite<std::string>(engine, classname, "string");
 	engine->RegisterObjectProperty(classname.c_str(), "bool binary", asOFFSET(datastream, binary));
+	engine->RegisterObjectProperty(classname.c_str(), "bool sync_rw_cursors", asOFFSET(datastream, sync_rw_cursors));
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_good() const property", asMETHOD(datastream, good), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_bad() const property", asMETHOD(datastream, bad), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_fail() const property", asMETHOD(datastream, fail), asCALL_THISCALL);

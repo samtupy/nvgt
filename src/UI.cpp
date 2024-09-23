@@ -37,6 +37,7 @@
 #include <obfuscate.h>
 #include <thread.h>
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include <Poco/StringTokenizer.h>
 #include <Poco/SynchronizedObject.h>
@@ -72,7 +73,7 @@ int message_box(const std::string& title, const std::string& text, const std::ve
 	}
 	SDL_MessageBoxData box = {mb_flags, g_WindowHandle, title.c_str(), text.c_str(), int(sdlbuttons.size()), sdlbuttons.data(), NULL};
 	int ret;
-	if (SDL_ShowMessageBox(&box, &ret) != 0) return 0; // failure.
+	if (!SDL_ShowMessageBox(&box, &ret)) return -1;
 	return ret;
 }
 int message_box_script(const std::string& title, const std::string& text, CScriptArray* buttons, unsigned int flags) {
@@ -146,7 +147,8 @@ void nvgt_file_dialog_callback(void* user, const char* const * files, int filter
 	if (files && *files) fdi->data = *files;
 	fdi->notify();
 }
-std::string simple_file_open_dialog(const std::string& filters, const std::string& default_location) {
+enum simple_file_dialog_type {DIALOG_TYPE_OPEN, DIALOG_TYPE_SAVE, DIALOG_TYPE_FOLDER};
+std::string simple_file_dialog(const std::string& filters, const std::string& default_location, simple_file_dialog_type type) {
 	// We need to parse the filters provided by the user. Format is name:extension_wildcard1;extension_wildcard2|name:ext1;ext2|etc files:etc
 	Poco::StringTokenizer filterstrings(filters, "|");
 	std::vector<SDL_DialogFileFilter> filter_objects;
@@ -162,9 +164,20 @@ std::string simple_file_open_dialog(const std::string& filters, const std::strin
 	end.name = nullptr;
 	end.pattern = nullptr;
 	nvgt_file_dialog_info fdi;
-	SDL_ShowOpenFileDialog(nvgt_file_dialog_callback, &fdi, nullptr, filter_objects.data(), filter_objects.size() -1, nullptr, SDL_FALSE);
+	if (type == DIALOG_TYPE_OPEN) SDL_ShowOpenFileDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, filter_objects.data(), filter_objects.size() -1, default_location.empty()? nullptr : default_location.c_str(), false);
+	else if (type == DIALOG_TYPE_SAVE) SDL_ShowSaveFileDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, filter_objects.data(), filter_objects.size() -1, default_location.empty()? nullptr : default_location.c_str());
+	else if (type == DIALOG_TYPE_FOLDER) SDL_ShowOpenFolderDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, default_location.empty()? nullptr : default_location.c_str(), false);
 	while (!fdi.tryWait(5)) SDL_PumpEvents();
 	return fdi.data;
+}
+std::string simple_file_open_dialog(const std::string& filters, const std::string& default_location) {
+	return simple_file_dialog(filters, default_location, DIALOG_TYPE_OPEN);
+}
+std::string simple_file_save_dialog(const std::string& filters, const std::string& default_location) {
+	return simple_file_dialog(filters, default_location, DIALOG_TYPE_SAVE);
+}
+std::string simple_folder_select_dialog(const std::string& default_location) {
+	return simple_file_dialog("", default_location, DIALOG_TYPE_FOLDER);
 }
 bool urlopen(const std::string& url) {
 	return !SDL_OpenURL(url.c_str());
@@ -228,25 +241,10 @@ thread_id_t g_WindowThreadId = 0;
 bool g_WindowHidden = false;
 
 static std::vector<SDL_Event> post_events; // holds events that should be processed after the next wait() call.
-#ifdef _WIN32
-SDL_bool sdl_windows_messages(void* udata, MSG* msg) {
-	if (msg->message == WM_KEYDOWN && msg->wParam == 'V' && msg->lParam == 1) {
-		SDL_Event e{};
-		e.type = SDL_EVENT_KEY_DOWN;
-		e.common.timestamp = SDL_GetTicksNS();
-		e.key.scancode = SDL_SCANCODE_PASTE;
-		e.key.key = SDLK_PASTE;
-		SDL_PushEvent(&e);
-		e.type = SDL_EVENT_KEY_UP;
-		post_events.push_back(e);
-	}
-	return SDL_TRUE;
-}
-#endif
 bool set_application_name(const std::string& name) {
 	return SDL_SetHintWithPriority(SDL_HINT_APP_NAME, name.c_str(), SDL_HINT_OVERRIDE);
 }
-bool ShowNVGTWindow(std::string& window_title) {
+bool ShowNVGTWindow(const std::string& window_title) {
 	if (g_WindowHandle) {
 		SDL_SetWindowTitle(g_WindowHandle, window_title.c_str());
 		if (g_WindowHidden) {
@@ -257,9 +255,6 @@ bool ShowNVGTWindow(std::string& window_title) {
 		return true;
 	}
 	InputInit();
-	#ifdef _WIN32
-	SDL_SetWindowsMessageHook(sdl_windows_messages, NULL);
-	#endif
 	g_WindowHandle = SDL_CreateWindow(window_title.c_str(), 640, 640, 0);
 	if (!g_WindowHandle) return false;
 	if (!SDL_HasScreenKeyboardSupport()) SDL_StartTextInput(g_WindowHandle);
@@ -298,14 +293,17 @@ BOOL WindowIsFocused() {
 	if (!g_WindowHandle) return false;
 	return g_WindowHandle == SDL_GetKeyboardFocus();
 }
+bool WindowIsHidden() {
+	if (!g_WindowHandle) return false;
+	return (SDL_GetWindowFlags(g_WindowHandle) & SDL_WINDOW_HIDDEN) != 0;
+}
 std::string get_window_text() {
 	if (!g_WindowHandle) return "";
 	return std::string(SDL_GetWindowTitle(g_WindowHandle));
 }
 void* get_window_os_handle() { return reinterpret_cast<void*>(g_OSWindowHandle); }
 void handle_sdl_event(SDL_Event* evt) {
-	if (evt->type == SDL_EVENT_KEY_DOWN || evt->type == SDL_EVENT_KEY_UP || evt->type == SDL_EVENT_TEXT_INPUT || evt->type == SDL_EVENT_MOUSE_MOTION || evt->type == SDL_EVENT_MOUSE_BUTTON_DOWN || evt->type == SDL_EVENT_MOUSE_BUTTON_UP || evt->type == SDL_EVENT_MOUSE_WHEEL)
-		InputEvent(evt);
+		if (InputEvent(evt)) return;
 	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_LOST)
 		lost_window_focus();
 	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_GAINED)
@@ -326,25 +324,16 @@ void wait(int ms) {
 		if (ms < 1) break;
 	}
 	SDL_Event evt;
-	#ifdef __APPLE__
-	bool left_just_pressed = false, right_just_pressed = false;
-	#endif
+	std::unordered_set<int> keys_pressed_this_frame;
 	while (SDL_PollEvent(&evt)) {
-		#ifdef __APPLE__
-		// Hack to fix voiceover's weird handling of the left and right arrow keys. If a left/right arrow down/up event get generated in the same frame, we need to move the up event to the next frame.
 		bool evt_handled = false;
-		if (evt.type == SDL_EVENT_KEY_DOWN) {
-			if (evt.key.scancode == SDL_SCANCODE_LEFT) left_just_pressed = true;
-			if (evt.key.scancode == SDL_SCANCODE_RIGHT) right_just_pressed = true;
-		} else if ((left_just_pressed || right_just_pressed) && evt.type == SDL_EVENT_KEY_UP) {
+		// If a key_down and then a key_up from the same key gets received in one frame, we need to move the key_up to the next frame to make sure that nvgt code can detect the keydown between calls to wait.
+		if (evt.type == SDL_EVENT_KEY_DOWN) keys_pressed_this_frame.insert(evt.key.scancode);
+		else if (evt.type == SDL_EVENT_KEY_UP && keys_pressed_this_frame.find(evt.key.scancode) != keys_pressed_this_frame.end()) {
 			evt_handled = true;
-			if (left_just_pressed && evt.key.scancode == SDL_SCANCODE_LEFT) post_events.push_back(evt);
-			else if (right_just_pressed && evt.key.scancode == SDL_SCANCODE_RIGHT) post_events.push_back(evt);
-			else evt_handled = false;
+			post_events.push_back(evt);
 		}
-		if (evt_handled) continue;
-		#endif
-		handle_sdl_event(&evt);
+		if (!evt_handled) handle_sdl_event(&evt);
 	}
 	if (post_events.size() > 0) {
 		for (SDL_Event& e : post_events)
@@ -352,7 +341,7 @@ void wait(int ms) {
 		post_events.clear();
 	}
 }
-  std::string open_file_Dialog(const std::string& title) {
+  /*std::string open_file_Dialog(const std::string& title) {
 	#ifdef _WIN32
     OPENFILENAMEW ofn;
     ZeroMemory(&ofn, sizeof(ofn));
@@ -426,7 +415,7 @@ else ofn.lpstrTitle=NULL;
 	#else
 	return ""; //not implemented
 	#endif
-}
+}*/
 
 // The following function contributed to NVGT by silak
 uint64_t idle_ticks() {
@@ -469,6 +458,14 @@ uint64_t idle_ticks() {
 	#endif
 }
 
+bool is_console_available() {
+	#if defined (_WIN32)
+		return GetConsoleWindow() != nullptr;
+	#else
+		return Poco::Util::Application::instance().config().hasOption("application.gui");
+	#endif
+}
+
 void RegisterUI(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UI);
 	engine->RegisterEnum(_O("message_box_flags"));
@@ -477,28 +474,38 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterEnumValue(_O("message_box_flags"), _O("MESSAGE_BOX_INFORMATION"), SDL_MESSAGEBOX_INFORMATION);
 	engine->RegisterEnumValue(_O("message_box_flags"), _O("MESSAGE_BOX_BUTTONS_LEFT_TO_RIGHT"), SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT);
 	engine->RegisterEnumValue(_O("message_box_flags"), _O("MESSAGE_BOX_BUTTONS_RIGHT_TO_LEFT"), SDL_MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT);
+<<<<<<< HEAD
 	engine->RegisterGlobalFunction(_O("int message_box(const string& in, const string& in, string[]@, uint = 0)"), asFUNCTION(message_box_script), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int alert(const string &in, const string &in, bool = false, uint = 0)"), asFUNCTION(alert), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int question(const string& in, const string& in, bool = false, uint = 0)"), asFUNCTION(question), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string open_file_dialog(const string &in = \"\")"), asFUNCTION(open_file_Dialog), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string save_file_dialog(const string &in = \"\", const string &in = \"\")"), asFUNCTION(save_file_dialog), asCALL_CDECL);
+	//engine->RegisterGlobalFunction(_O("string open_file_dialog(const string &in = \"\")"), asFUNCTION(open_file_Dialog), asCALL_CDECL);
+	//engine->RegisterGlobalFunction(_O("string save_file_dialog(const string &in = \"\", const string &in = \"\")"), asFUNCTION(save_file_dialog), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int message_box(const string& in title, const string& in message, string[]@ buttons, uint flags = 0)"), asFUNCTION(message_box_script), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int alert(const string &in title, const string &in text, bool can_cancel = false, uint flags = 0)"), asFUNCTION(alert), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int question(const string& in title, const string& in text, bool can_cancel = false, uint flags = 0)"), asFUNCTION(question), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction(_O("string clipboard_get_text()"), asFUNCTION(ClipboardGetText), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool clipboard_set_text(const string& in)"), asFUNCTION(ClipboardSetText), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool clipboard_set_raw_text(const string& in)"), asFUNCTION(ClipboardSetRawText), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool urlopen(const string &in)"), asFUNCTION(urlopen), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool clipboard_set_text(const string& in text)"), asFUNCTION(ClipboardSetText), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool clipboard_set_raw_text(const string& in text)"), asFUNCTION(ClipboardSetRawText), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string open_file_dialog(const string &in filters = \"\", const string&in default_location = \"\")"), asFUNCTION(simple_file_open_dialog), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string save_file_dialog(const string &in filters = \"\", const string&in default_location = \"\")"), asFUNCTION(simple_file_save_dialog), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string select_folder_dialog(const string&in default_location = \"\")"), asFUNCTION(simple_folder_select_dialog), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool urlopen(const string &in url)"), asFUNCTION(urlopen), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UI);
-	engine->RegisterGlobalFunction(_O("string input_box(const string& in, const string& in, const string& in = '', uint64 = 0)"), asFUNCTION(input_box), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool info_box(const string& in, const string& in, const string& in, uint64 = 0)"), asFUNCTION(info_box), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string input_box(const string& in title, const string& in caption, const string& in default_value = '', uint64 flags = 0)"), asFUNCTION(input_box), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool info_box(const string& in title, const string& in caption, const string& in text, uint64 flags = 0)"), asFUNCTION(info_box), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void next_keyboard_layout()"), asFUNCTION(next_keyboard_layout), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool set_application_name(const string& in)", asFUNCTION(set_application_name), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool show_window(const string& in)", asFUNCTION(ShowNVGTWindow), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool set_application_name(const string& in name)", asFUNCTION(set_application_name), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool show_window(const string& in title)", asFUNCTION(ShowNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool destroy_window()", asFUNCTION(DestroyNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool hide_window()", asFUNCTION(HideNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool focus_window()", asFUNCTION(FocusNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_window_active()", asFUNCTION(WindowIsFocused), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool is_window_hidden()", asFUNCTION(WindowIsHidden), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_window_text()", asFUNCTION(get_window_text), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 get_window_os_handle()", asFUNCTION(get_window_os_handle), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void wait(int)", asFUNCTIONPR(wait, (int), void), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void wait(int ms)", asFUNCTIONPR(wait, (int), void), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 idle_ticks()", asFUNCTION(idle_ticks), asCALL_CDECL);
+}
+	engine->RegisterGlobalFunction("bool is_console_available()", asFUNCTION(is_console_available), asCALL_CDECL);
 }

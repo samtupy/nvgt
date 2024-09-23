@@ -18,6 +18,10 @@
 #include <cstdlib>
 #include <cstring>
 #endif
+#ifdef __ANDROID__
+#define ANDROID_FOPEN_IMPLEMENTATION
+#include "android_fopen.h"
+#endif
 
 #define BL_NUMWORDS_IMPLEMENTATION
 #include "bl_number_to_words.h"

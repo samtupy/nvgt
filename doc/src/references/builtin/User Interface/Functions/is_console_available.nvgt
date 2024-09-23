@@ -1,0 +1,14 @@
+/**
+	Determine if your application has access to a console window or not.
+	bool is_console_available();
+	## Returns:
+		bool: true if your application has access to a console window, false otherwise.
+	## Remarks:
+		If this function returns false, it is very likely that any output passed to the print or println functions or the cout/cerr datastreams will be silently dropped.
+*/
+
+// Example:
+void main() {
+	if (is_console_available()) println("hello from the console!");
+	else alert("console unavailable", "hello from the user interface!");
+}

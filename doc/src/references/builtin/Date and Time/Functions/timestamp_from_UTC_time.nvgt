@@ -1,0 +1,19 @@
+/**
+	Create a timestamp object from a UTC time point.
+	timestamp timestamp_from_UTC_time(int64 UTC_time);
+	## Arguments:
+		* int64 UTC_time: The UTC time point (see remarks).
+	## Returns:
+		timestamp: A timestamp derived from the given value.
+	## Remarks:
+		UTC based time begins on October 15, 1582 at 12 AM and uses an accuracy of 100 nanoseconds.
+*/
+
+// Example:
+void main() {
+	calendar c(2017, 2, 3, 4, 5, 6);
+	alert("initial calendar", c.format(DATE_TIME_FORMAT_RFC1123));
+	timestamp ts = timestamp_from_UTC_time(c.UTC_time);
+	calendar c2 = ts;
+	alert("new calendar", c2.format(DATE_TIME_FORMAT_RFC1123));
+}

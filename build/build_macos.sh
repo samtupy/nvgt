@@ -1,7 +1,7 @@
 #!/bin/zsh
 
 function setup_homebrew {
-	brew install autoconf automake libtool openssl libgit2 bullet upx
+	brew install autoconf automake libtool openssl libgit2 bullet upx libplist
 }
 
 function setup_angelscript {
@@ -48,7 +48,7 @@ function setup_poco {
 	cd poco-1.13.3-all
 	mkdir -p cmake_build
 	cd cmake_build
-	cmake .. -DENABLE_TESTS=OFF -DENABLE_SAMPLES=OFF -DCMAKE_BUILD_TYPE=MinSizeRel -DENABLE_PAGECOMPILER=OFF -DENABLE_PAGECOMPILER_FILE2PAGE=OFF -DENABLE_ACTIVERECORD=OFF -DENABLE_ACTIVERECORD_COMPILER=OFF -DENABLE_XML=OFF -DENABLE_MONGODB=OFF -DBUILD_SHARED_LIBS=OFF
+	cmake .. -DENABLE_TESTS=OFF -DENABLE_SAMPLES=OFF -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DENABLE_PAGECOMPILER=OFF -DENABLE_PAGECOMPILER_FILE2PAGE=OFF -DENABLE_ACTIVERECORD=OFF -DENABLE_ACTIVERECORD_COMPILER=OFF -DENABLE_MONGODB=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_CXX_FLAGS=-DPOCO_UTIL_NO_XMLCONFIGURATION
 	cmake --build .
 	sudo cmake --install .
 	cd ../..
@@ -57,9 +57,10 @@ function setup_poco {
 
 function setup_sdl {
 	echo Installing SDL...
-	git clone --depth 1 https://github.com/libsdl-org/SDL||true
+	git clone https://github.com/libsdl-org/SDL||true
 	mkdir -p SDL/build
 	cd SDL/build
+	git checkout 9dd8859240703d886941733ad32c1dc6f50d64f0
 	cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST_LIBRARY=OFF -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" ..
 	cmake --build . --config MinSizeRel
 	sudo make install

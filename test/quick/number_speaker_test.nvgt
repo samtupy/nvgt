@@ -1,0 +1,32 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+// The sounds used in this test are by Oriol Gomez. No copyright attribution needed
+
+#include "../../release/include/number_speaker.nvgt"
+
+void main() {
+show_window("test");
+sound test;
+number_speaker speaker;
+// speaker.include_and = true;
+speaker.append=".ogg";
+speaker.prepend = "../data/audio/";
+
+sound points;
+sound finalscore;
+
+finalscore.load("../data/audio/yfs.ogg");
+points.load("../data/audio/points.ogg");
+finalscore.play_wait();
+
+speaker.speak_wait(1880);
+points.play_wait();
+speaker.speak(80);
+
+while (speaker.speak_next() == 1) {
+wait(30);
+}
+
+points.play_wait();
+}
