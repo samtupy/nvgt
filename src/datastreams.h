@@ -94,7 +94,7 @@ public:
 	inline bool active() {
 		return r || w;
 	}
-	inline int available() {
+	inline unsigned long long available() {
 		return r ? r->available() : -1;
 	}
 	inline std::istream* get_istr() {
