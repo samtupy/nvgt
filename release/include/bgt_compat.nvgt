@@ -10,6 +10,7 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include"settings.nvgt"
 #include "instance.nvgt"
 string sound_storage;
 uint string_len(const string& in str) {
@@ -222,39 +223,6 @@ class joystick {
 		return (true);
 	}
 }
-
-//Dummy settings class
-class settings {
-	bool active;
-	bool close() {
-		return (true);
-	}
-	bool exists(string value_name) {
-		return (true);
-	}
-	double read_number(string value_name) {
-		return (0);
-	}
-	string read_string(string value_name) {
-		return (0);
-	}
-	bool remove_product() {
-		return (true);
-	}
-	bool remove_value(string value_name) {
-		return (true);
-	}
-	bool setup(string company, string product, bool all_users) {
-		return (true);
-	}
-	bool write_number(string value_name, double content) {
-		return (true);
-	}
-	bool write_string(string value_name, string content) {
-		return (true);
-	}
-}
-
 // Most of these directory constants are functional.
 const string DIRECTORY_DESKTOP_VIRTUAL = "";
 const string DIRECTORY_DESKTOP = "";
@@ -334,19 +302,19 @@ string get_sound_storage() {
 }
 
 pack@open_pack(const string&in filename) {
-	if(filename.is_empty()) return null;
-	pack  p;
-	if(p.open(filename, PACK_OPEN_MODE_READ)) return p;
+	if (filename.is_empty()) return null;
+	pack p;
+	if (p.open(filename, PACK_OPEN_MODE_READ)) return p;
 	else return null;
 }
 
 bool set_sound_storage(const string&in filename, bool reset = false) {
-	if(reset and filename.is_empty()) {
+	if (reset and filename.is_empty()) {
 		@sound_default_pack = null;
 		sound_storage = "";
 	}
 	pack@p = open_pack(filename);
-	if(@p == null) return false;
+	if (@p == null) return false;
 	@sound_default_pack = p;
 	sound_storage = filename;
 	return true;
@@ -388,4 +356,3 @@ const uint KEY_LBRACKET = KEY_LEFTBRACKET;
 const uint KEY_RBRACKET = KEY_RIGHTBRACKET;
 const uint KEY_NUMPADENTER = KEY_NUMPAD_ENTER;
 const uint KEY_DASH = KEY_MINUS;
-

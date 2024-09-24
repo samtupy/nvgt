@@ -269,6 +269,11 @@ class nvgt_compilation_output_android : public nvgt_compilation_output_impl {
 		if (!found) return false;
 		// Since this particular search was last in the Path::find calls above, located now contains a path to aapt2.exe, hopefully we can locate android.jar from it.
 		located.setFileName("");
+		if (File(Path(located).setFileName("android.jar")).exists()) {
+			android_jar = Path(located).setFileName("android.jar"); // This is likely from NVGT's minified set of Android tools provided for ease of use for beginners.
+			apksigner_jar = Path(located).setFileName("apksigner.jar");
+			return true;
+		}
 		apksigner_jar = Path(located).append("lib/apksigner.jar");
 		float buildtools_version = parse_float(located[located.depth() -1]);
 		if (buildtools_version < 1 || located[located.depth() -2] != "build-tools") return false; // Finding android.jar is hopeless given this non-standard location to aapt.
@@ -280,11 +285,16 @@ class nvgt_compilation_output_android : public nvgt_compilation_output_impl {
 		throw Exception(format("unable to locate android.jar in %s", located.toString())); // For now we'll assume that the build tools version is the same as the platform directory containing android.jar, if we get reports that this isn't the case for people we can update this code to glob the platforms directory to find one instead.
 	}
 	void find_android_sdk_tools() {
-		sign_cert = config.getString("build.android_signature_cert", "");
-		sign_password = config.getString("build.android_signature_password", "");
+		sign_cert = config.getString("build.android_signature_cert", Path::home() + ".nvgt_android.keystore");
+		sign_password = config.getString("build.android_signature_password", "pass:android");
 		do_install = config.getInt("build.android_install", 1);
-		string path = config.getString("build.android_path", Environment::get("PATH"));
-		if (android_sdk_tools_exist(path)) return;
+		string path = Path(config.getString("application.dir")).append("android-tools").toString() + Path::pathSeparator();
+		path += Path(config.getString("application.dir")).append("android-tools/java17/bin").toString() + Path::pathSeparator();
+		path += config.getString(Path::expand("build.android_path"), Environment::get("PATH"));
+		if (android_sdk_tools_exist(path)) {
+			Environment::set("PATH", path); // Encase the tools were in any of the custom paths we've just added.
+			return;
+		}
 		string android_home = Path::expand(config.getString("build.android_home", Environment::get("ANDROID_HOME", Environment::get("ANDROID_SDK_HOME", ""))));
 		// If we've still failed, maybe we can continue based on some default install locations?
 		if (android_home.empty() && Environment::isWindows()) {
@@ -378,8 +388,13 @@ protected:
 		if (!system_command(exe("zipalign"), {"-f", "-p", "16", zip_out_location.path(), output_path.toString()}, sout, serr)) throw Exception(format("failed to run zipalign on %s", zip_out_location.path()));
 		// If the correct information is provided, lets try to sign the app.
 		if (!sign_cert.empty() && !sign_password.empty()) {
+			if (!File(sign_cert).exists()) {
+				// Attempt to create a keystore at the given path with the given password.
+				sout = serr = "";
+				if (!system_command(exe("keytool"), {"-genkey", "-keyalg", "RSA", "-keysize", "2048", "-v", "-keystore", sign_cert, "-dname", config.getString("build.android_signature_info", "cn=NVGT"), "-storepass", sign_password.substr(sign_password.find(":") + 1), "-validity", "10000", "-alias", "game"}, sout, serr)) throw Exception(format("Failed to run keytool, %s%s", sout, serr));
+			}
 			sout = serr = "";
-			if (!system_command(exe("java"), {"-jar", apksigner_jar.toString(), "sign", "-ks", sign_cert, "--ks-pass", sign_password, output_path.toString()}, sout, serr)) throw Exception(format("Failed to run apksigner, %s%s", sout, serr));
+			if (!system_command(exe("java"), {"-jar", apksigner_jar.toString(), "sign", "-ks", sign_cert, "--ks-pass", sign_password, "--key-pass", sign_password, output_path.toString()}, sout, serr)) throw Exception(format("Failed to run apksigner, %s%s", sout, serr));
 		}
 	}
 	void postbuild(const Path& output_path) override {
