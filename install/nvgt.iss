@@ -60,56 +60,52 @@ InfoAfterFile = install\postinst.txt
 AlwaysShowComponentsList = no
 
 [Types]
-Name: "full"; Description: "Full installation"
-Name: "compact"; Description: "Compact installation"
 Name: "custom"; Description: "Custom installation"; Flags: iscustom
 
 [Components]
-name: "core"; description: "NVGT compiler and interpreter"; flags: fixed; types: full compact custom
-name: "includes"; description: "Includes"; types: full compact
-name: "plugins"; description: "Optional plugins"; types: full
-name: "plugins\curl"; description: "CURL"; types: full
-name: "plugins\git"; description: "Git"; types: full
-name: "plugins\sqlite"; description: "SQLite3"; types: full
-name: "plugins\systemd_notify"; description: "systemd-notify"; types: full
-name: "stubs"; description: "Stubs"; types: full
+name: "core"; description: "NVGT compiler and interpreter"; flags: fixed
+name: "includes"; description: "Includes"
+name: "plugins"; description: "Optional plugins"
+name: "plugins\curl"; description: "CURL"
+name: "plugins\git"; description: "Git"
+name: "plugins\sqlite"; description: "SQLite3"
+name: "plugins\systemd_notify"; description: "systemd-notify"
+name: "stubs"; description: "Stubs"
 #ifdef have_windows_stubs
-name: "stubs\windows"; description: "Windows binary stub"; flags: fixed; types: full compact custom
+name: "stubs\windows"; description: "Windows binary stub"
 #endif
 #ifdef have_macos_stubs
-name: "stubs\macos"; description: "MacOS binary stub"; types: full
+name: "stubs\macos"; description: "MacOS binary stub"
 #endif
 #ifdef have_linux_stubs
-name: "stubs\linux"; description: "Linux binary stub"; types: full
+name: "stubs\linux"; description: "Linux binary stub"
 #endif
 #ifdef have_android_stubs
-name: "stubs\android"; description: "Android binary stub"; types: full
+name: "stubs\android"; description: "Android binary stub"
+name: "androidtools"; description: "Android tools (external download required)"
 #endif
 #ifdef have_docs
-name: "docs"; description: "Documentation"; types: full
+name: "docs"; description: "Documentation"
 #else
-name: "docs_download"; description: "Documentation (download required)"; types: full
+name: "docs_download"; description: "Documentation (external download required)"
 #endif
-
-[Tasks]
-Name: "associate"; Description: "Associate files ending in .nvgt with the NVGT Interpreter"; GroupDescription: "Associations:"
-name: "associate\run"; description: "Execute script when opened from file explorer"; flags: exclusive; GroupDescription: "Associations:"
-name: "associate\edit"; description: "Edit script when opened from file explorer"; flags: exclusive unchecked; GroupDescription: "Associations:"
-name: "androidtools"; description: "Install required Android tools for generating Android applications"; GroupDescription: "Cross-platform development:"
-name: "path"; description: "Add NVGT to the system path"; GroupDescription: "Miscellaneous:"
+name: "associate"; description: "File associations and context menus"
+name: "associate\edit"; description: "Open NVGT scripts in the default text editor"; flags: exclusive
+name: "associate\run"; description: "Execute NVGT scripts within NVGT"; flags: exclusive
+name: "path"; description: "Add NVGT to the PATH environment variable"
 
 [Files]
 ; Core
-Source: "release\nvgt.exe"; DestDir: "{app}"; components: core
-Source: "release\nvgtw.exe"; DestDir: "{app}"; components: core
-source: "release\lib\bass.dll"; DestDir: "{app}\lib"; components: core
-source: "release\lib\bass_fx.dll"; DestDir: "{app}\lib"; components: core
-source: "release\lib\bassmix.dll"; DestDir: "{app}\lib"; components: core
-source: "release\lib\GPUUtilities.dll"; DestDir: "{app}\lib"; components: core
-source: "release\lib\nvdaControllerClient64.dll"; DestDir: "{app}\lib"; components: core
-source: "release\lib\phonon.dll"; DestDir: "{app}\lib"; components: core
-source: "release\lib\SAAPI64.dll"; DestDir: "{app}\lib"; components: core
-source: "release\lib\TrueAudioNext.dll"; DestDir: "{app}\lib"; components: core
+Source: "release\nvgt.exe"; DestDir: "{app}"
+Source: "release\nvgtw.exe"; DestDir: "{app}"
+source: "release\lib\bass.dll"; DestDir: "{app}\lib"
+source: "release\lib\bass_fx.dll"; DestDir: "{app}\lib"
+source: "release\lib\bassmix.dll"; DestDir: "{app}\lib"
+source: "release\lib\GPUUtilities.dll"; DestDir: "{app}\lib"
+source: "release\lib\nvdaControllerClient64.dll"; DestDir: "{app}\lib"
+source: "release\lib\phonon.dll"; DestDir: "{app}\lib"
+source: "release\lib\SAAPI64.dll"; DestDir: "{app}\lib"
+source: "release\lib\TrueAudioNext.dll"; DestDir: "{app}\lib"
 ; Plugins: curl
 source: "release\lib\nvgt_curl.dll"; DestDir: "{app}\lib"; components: plugins\curl
 ; Plugins: git
@@ -155,44 +151,44 @@ source: "doc\nvgt.chm"; DestDir: "{app}"; components: docs
 #endif
 
 [Registry]
-Root: HKA; subkey: "software\classes\.nvgt"; ValueType: string; ValueName: ""; ValueData: "NVGTScript"; Flags: uninsdeletevalue; tasks: associate
-Root: HKA; subkey: "software\classes\NVGTScript"; ValueType: string; ValueName: ""; ValueData: "NVGT Script"; Flags: uninsdeletekey; tasks: associate
-Root: HKA; subkey: "software\classes\NVGTScript\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe,0"; tasks: associate
-Root: HKA; subkey: "software\classes\NVGTScript\shell\compile"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Compile Script"; tasks: associate
-Root: HKA; subkey: "software\classes\NVGTScript\shell\compile"; ValueType: string; ValueName: "ExtendedSubCommandsKey"; ValueData: ""; tasks: associate
-Root: HKA; subkey: "software\classes\NVGTScript\shell\compile"; ValueType: string; ValueName: "SubCommands"; ValueData: ""; tasks: associate
+Root: HKA; subkey: "software\classes\.nvgt"; ValueType: string; ValueName: ""; ValueData: "NVGTScript"; Flags: uninsdeletevalue; components: associate
+Root: HKA; subkey: "software\classes\NVGTScript"; ValueType: string; ValueName: ""; ValueData: "NVGT Script"; Flags: uninsdeletekey; components: associate
+Root: HKA; subkey: "software\classes\NVGTScript\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe,0"; components: associate
+Root: HKA; subkey: "software\classes\NVGTScript\shell\compile"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Compile Script"; components: associate
+Root: HKA; subkey: "software\classes\NVGTScript\shell\compile"; ValueType: string; ValueName: "ExtendedSubCommandsKey"; ValueData: ""; components: associate
+Root: HKA; subkey: "software\classes\NVGTScript\shell\compile"; ValueType: string; ValueName: "SubCommands"; ValueData: ""; components: associate
 #ifdef have_windows_stubs
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\windows_debug"; ValueType: string; ValueName: ""; ValueData: "Windows (Debug)"; tasks: associate
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\windows_debug\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pwindows -C ""%1"""; tasks: associate
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\windows_release"; ValueType: string; ValueName: ""; ValueData: "Windows (Release)"; tasks: associate
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\windows_release\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pwindows -c ""%1"""; tasks: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\windows_debug"; ValueType: string; ValueName: ""; ValueData: "Windows (Debug)"; components: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\windows_debug\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pwindows -C ""%1"""; components: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\windows_release"; ValueType: string; ValueName: ""; ValueData: "Windows (Release)"; components: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\windows_release\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pwindows -c ""%1"""; components: associate
 #endif
 #ifdef have_macos_stubs
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\mac_debug"; ValueType: string; ValueName: ""; ValueData: "MacOS (Debug)"; tasks: associate
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\mac_debug\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pmac -C ""%1"""; tasks: associate
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\mac_release"; ValueType: string; ValueName: ""; ValueData: "MacOS (Release)"; tasks: associate
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\mac_release\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pmac -c ""%1"""; tasks: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\mac_debug"; ValueType: string; ValueName: ""; ValueData: "MacOS (Debug)"; components: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\mac_debug\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pmac -C ""%1"""; components: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\mac_release"; ValueType: string; ValueName: ""; ValueData: "MacOS (Release)"; components: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\mac_release\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pmac -c ""%1"""; components: associate
 #endif
 #ifdef have_linux_stubs
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\linux_debug"; ValueType: string; ValueName: ""; ValueData: "Linux (Debug)"; tasks: associate
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\linux_debug\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -plinux -C ""%1"""; tasks: associate
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\linux_release"; ValueType: string; ValueName: ""; ValueData: "Linux (Release)"; tasks: associate
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\linux_release\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -plinux -c ""%1"""; tasks: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\linux_debug"; ValueType: string; ValueName: ""; ValueData: "Linux (Debug)"; components: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\linux_debug\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -plinux -C ""%1"""; components: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\linux_release"; ValueType: string; ValueName: ""; ValueData: "Linux (Release)"; components: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\linux_release\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -plinux -c ""%1"""; components: associate
 #endif
 #ifdef have_android_stubs
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_debug"; ValueType: string; ValueName: ""; ValueData: "Android (Debug)"; tasks: associate
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_debug\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pandroid -C ""%1"""; tasks: associate
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_release"; ValueType: string; ValueName: ""; ValueData: "Android (Release)"; tasks: associate
-root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_release\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pandroid -c ""%1"""; tasks: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_debug"; ValueType: string; ValueName: ""; ValueData: "Android (Debug)"; components: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_debug\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pandroid -C ""%1"""; components: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_release"; ValueType: string; ValueName: ""; ValueData: "Android (Release)"; components: associate
+root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_release\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pandroid -c ""%1"""; components: associate
 #endif
-Root: HKA; subkey: "software\classes\NVGTScript\shell\edit"; ValueType: string; ValueName: ""; ValueData: "Edit Script"; tasks: associate
-Root: HKA; subkey: "software\classes\NVGTScript\shell\edit\command"; ValueType: string; ValueName: ""; ValueData: """notepad"" ""%1"""; tasks: associate
-Root: HKA; subkey: "software\classes\NVGTScript\shell\open\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe ""%1"""; tasks: associate\run
-Root: HKA; subkey: "software\classes\NVGTScript\shell\open\command"; ValueType: string; ValueName: ""; ValueData: "notepad ""%1"""; tasks: associate\edit
-Root: HKA; subkey: "software\classes\NVGTScript\shell\run"; ValueType: string; ValueName: ""; ValueData: "Run Script"; tasks: associate
-Root: HKA; subkey: "software\classes\NVGTScript\shell\run\command"; ValueType: string; ValueName: ""; ValueData: """{app}\nvgtw.exe"" ""%1"""; tasks: associate
-Root: HKA; subkey: "software\classes\NVGTScript\shell\debug"; ValueType: string; ValueName: ""; ValueData: "Debug Script"; tasks: associate
-Root: HKA; subkey: "software\classes\NVGTScript\shell\debug\command"; ValueType: string; ValueName: ""; ValueData: """{app}\nvgt.exe"" -d ""%1"""; tasks: associate
+Root: HKA; subkey: "software\classes\NVGTScript\shell\edit"; ValueType: string; ValueName: ""; ValueData: "Edit Script"; components: associate
+Root: HKA; subkey: "software\classes\NVGTScript\shell\edit\command"; ValueType: string; ValueName: ""; ValueData: """notepad"" ""%1"""; components: associate
+Root: HKA; subkey: "software\classes\NVGTScript\shell\open\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe ""%1"""; components: associate\run
+Root: HKA; subkey: "software\classes\NVGTScript\shell\open\command"; ValueType: string; ValueName: ""; ValueData: "notepad ""%1"""; components: associate\edit
+Root: HKA; subkey: "software\classes\NVGTScript\shell\run"; ValueType: string; ValueName: ""; ValueData: "Run Script"; components: associate
+Root: HKA; subkey: "software\classes\NVGTScript\shell\run\command"; ValueType: string; ValueName: ""; ValueData: """{app}\nvgtw.exe"" ""%1"""; components: associate
+Root: HKA; subkey: "software\classes\NVGTScript\shell\debug"; ValueType: string; ValueName: ""; ValueData: "Debug Script"; components: associate
+Root: HKA; subkey: "software\classes\NVGTScript\shell\debug\command"; ValueType: string; ValueName: ""; ValueData: """{app}\nvgt.exe"" -d ""%1"""; components: associate
     
 [Icons]
 Name: "{group}\NVGT Interpreter (GUI mode)"; Filename: "{app}\nvgtw.exe"
@@ -205,45 +201,9 @@ type: files; name: "{app}\nvgt.chm"
 [Code]
 var
 AndroidSdkDownloadPage, DocsDownloadPage: TDownloadWizardPage;
-AndroidSDKExtractPage: TOutputProgressWizardPage;
-DoubleClickBehaviorPage: TInputOptionWizardPage;
-
+ 
 const
-  SHCONTCH_NOPROGRESSBOX = 4;
-  SHCONTCH_RESPONDYESTOALL = 16;
   EnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
-
-type
- TTimerProc=procedure(h:longword; msg:longword; idevent:longword; dwTime:longword);
-
-function SetTimer(hWnd: longword; nIDEvent, uElapse: longword; lpTimerFunc: longword): longword;
-  external 'SetTimer@user32.dll stdcall';
-
-function KillTimer(hWnd: longword; nIDEvent: longword): longword;
-  external 'KillTimer@user32.dll stdcall';
-
-procedure UnZipFile(ZipPath, TargetPath, FileName: string);
-var
-  Shell: Variant;
-  ZipFile: Variant;
-  TargetFolder: Variant;
-  Item: Variant;
-begin
-  Shell := CreateOleObject('Shell.Application');  
-  ZipFile := Shell.NameSpace(ZipPath);
-  if VarIsClear(ZipFile) then
-    RaiseException('ZIP file cannot be opened');
-  TargetFolder := Shell.NameSpace(TargetPath);
-  if VarIsClear(TargetFolder) then
-    RaiseException('Target folder does not exist');
-Item := ZipFile.ParseName(FileName);
-        if not VarIsClear(Item) then
-        begin
-          TargetFolder.CopyHere(Item, SHCONTCH_NOPROGRESSBOX or SHCONTCH_RESPONDYESTOALL);
-          Exit;
-        end;
-  RaiseException(Format('File "%s" not found', [FileName]));
-end;
 
 procedure EnvAddPath(Path: string);
 var
@@ -293,50 +253,22 @@ begin
   AndroidSdkDownloadPage.ShowBaseNameInsteadOfUrl := True;
   DocsDownloadPage := CreateDownloadPage('Downloading documentation', 'Please wait while the documentation is acquired', nil);
   DocsDownloadPage.ShowBaseNameInsteadOfUrl := True;
-  AndroidSDKExtractPage := CreateOutputProgressPage('Installing Android SDK', 'Please wait while the Android SDK is being installed.');
-  DoubleClickBehaviorPage := CreateInputOptionPage(wpSelectComponents, 'Select double-click/open behavior', 'How would you like the system to behave when opening an NVGT script?', 'If you select "Run script," the script will be executed by the NVGT interpreter; if you select "Edit script," the script will be opened in your default text editor.', true, false);
-  DoubleClickBehaviorPage.Add('Run Script');
-  DoubleClickBehaviorPage.Add('Edit Script');
-    DoubleClickBehaviorPage.SelectedValueIndex := StrToInt(GetPreviousData('DefaultDoubleClickBehavior', '0'));
-end;
-
-procedure RunAppLoop(h:longword; msg:longword; idevent:longword; dwTime:longword);
-begin
-AndroidSDKExtractPage.SetProgress(AndroidSDKExtractPage.ProgressBar.Position, AndroidSDKExtractPage.ProgressBar.Max);
 end;
 
 procedure DownloadAndroidSDK;
 var
-Timer: longword;
+  ErrorCode: Integer;
 begin
 AndroidSdkDownloadPage.Clear;
-AndroidSdkDownloadPage.Add('https://dl.google.com/android/repository/platform-tools-latest-windows.zip', 'platform-tools-latest-windows.zip', '');
-AndroidSdkDownloadPage.Add('https://dl.google.com/android/repository/build-tools_r35_windows.zip', 'build-tools_r35_windows.zip', '');
-AndroidSdkDownloadPage.Add('https://dl.google.com/android/repository/platform-35_r01.zip', 'platform-35_r01.zip', '');
+AndroidSdkDownloadPage.Add('https://nvgt.gg/downloads/android-tools.exe', 'android-tools.exe', '');
 AndroidSdkDownloadPage.Show;
 try
 try
 AndroidSdkDownloadPage.Download;
-try
-Timer := SetTimer(0, 0, $0000000A, CreateCallback(@RunAppLoop));
-AndroidSDKExtractPage.Show;
-ForceDirectories(ExpandConstant('{app}\android-tools'));
-AndroidSDKExtractPage.SetProgress(0, 6);
-            UnZipFile(ExpandConstant('{tmp}\platform-tools-latest-windows.zip'), ExpandConstant('{app}\android-tools'), 'platform-tools\adb.exe');
-            AndroidSDKExtractPage.SetProgress(1, 6);
-            UnZipFile(ExpandConstant('{tmp}\platform-tools-latest-windows.zip'), ExpandConstant('{app}\android-tools'), 'platform-tools\AdbWinApi.dll');
-            AndroidSDKExtractPage.SetProgress(2, 6);
-            UnZipFile(ExpandConstant('{tmp}\platform-tools-latest-windows.zip'), ExpandConstant('{app}\android-tools'), 'platform-tools\AdbWinUsbApi.dll');
-            AndroidSDKExtractPage.SetProgress(3, 6);
-            UnZipFile(ExpandConstant('{tmp}\build-tools_r35_windows.zip'), ExpandConstant('{app}\android-tools'), 'android-15\lib\apksigner.jar');
-                        AndroidSDKExtractPage.SetProgress(4, 6);
-            UnZipFile(ExpandConstant('{tmp}\build-tools_r35_windows.zip'), ExpandConstant('{app}\android-tools'), 'android-15\aapt2.exe');
-                        AndroidSDKExtractPage.SetProgress(5, 6);
-                        UnZipFile(ExpandConstant('{tmp}\platform-35_r01.zip'), ExpandConstant('{app}\android-tools'), 'android-35\android.jar');
-                        AndroidSDKExtractPage.SetProgress(6, 6);
-finally
-KillTimer(0, timer);
-AndroidSDKExtractPage.Hide;
+if not ShellExec('', ExpandConstant('{tmp}\android-tools.exe'), ExpandConstant('-o{app}\android-tools -y'), '', SW_SHOWNORMAL, ewWaitUntilTerminated, ErrorCode) then
+begin
+SuppressibleMsgBox(Format('An error occurred when extracting the android tools: %s', [SysErrorMessage(ErrorCode)]), mbCriticalError, MB_OK, IDOK);
+exit;
 end;
 except
 if AndroidSdkDownloadPage.AbortedByUser then
@@ -377,11 +309,11 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
 if CurStep = ssPostInstall then
 begin
-if WizardIsTaskSelected('androidtools') or SameText(WizardSetupType(false), 'full') then
+if WizardIsComponentSelected('androidtools') then
 DownloadAndroidSDK;
 if WizardIsComponentSelected('docs_download') then
 DownloadDocs;
-if WizardIsTaskSelected('path') or SameText(WizardSetupType(false), 'full') then
+if WizardIsComponentSelected('path') then
 EnvAddPath(ExpandConstant('{app}'));
 end;
 end;
@@ -390,31 +322,4 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
     if CurUninstallStep = usPostUninstall then
         EnvRemovePath(ExpandConstant('{app}'));
-end;
-
-function ShouldSkipPage(PageID: Integer): Boolean;
-begin
-  Result := false;
-  if (PageID = wpSelectTasks) and SameText(WizardSetupType(false), 'full') then
-    Result := true;
-  if (PageID = DoubleClickBehaviorPage.ID) and not SameText(WizardSetupType(false), 'full') then
-    Result := true;
-end;
-
-procedure RegisterPreviousData(PreviousDataKey: Integer);
-begin
-if not SetPreviousData(PreviousDataKey, 'DefaultDoubleClickBehavior', IntToStr(DoubleClickBehaviorPage.SelectedValueIndex)) then
-SuppressibleMsgBox('Could not register previous data for double click behavior', mbInformation, MB_OK, IDOK);
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-if (CurPageID = wpSelectComponents) and SameText(WizardSetupType(false), 'full') then
-WizardSelectTasks('path');
-if (CurPageID = DoubleClickBehaviorPage.id) and SameText(WizardSetupType(false), 'full') then
-if DoubleClickBehaviorPage.SelectedValueIndex = 0 then
-WizardSelectTasks('associate\run')
-else
-WizardSelectTasks('associate\edit');
-Result := true;
 end;
