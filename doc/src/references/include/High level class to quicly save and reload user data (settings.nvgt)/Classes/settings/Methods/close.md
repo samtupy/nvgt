@@ -1,5 +1,5 @@
 # close
-Closes the settings object
+This method closes the settings object and therefore it will be deactivated.
 
 `bool settings::close(bool save_data = true);`
 

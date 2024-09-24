@@ -1,5 +1,5 @@
 # exists
-Checks whether the key exists in the data.
+This method checks whether the key exists in the data.
 
 `bool settings::exists(const string&in key);`
 
