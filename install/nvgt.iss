@@ -53,11 +53,11 @@ DefaultGroupName = NVGT
 DisableFinishedPage = no
 DisableStartupPrompt = yes
 DisableWelcomePage = no
-FlatComponentsList = no
+FlatComponentsList = yes
 OutputDir = install
 ShowLanguageDialog = yes
-InfoAfterFile = install\postinst.txt
-AlwaysShowComponentsList = no
+AlwaysShowComponentsList = yes
+DisableReadyMemo=yes
 
 [Types]
 Name: "custom"; Description: "Custom installation"; Flags: iscustom
@@ -196,6 +196,11 @@ Name: "{group}\NVGT Documentation"; Filename: "{app}\nvgt.chm"
 
 [UninstallDelete]
 type: filesandordirs; name: "{app}\android-tools"
+type: filesandordirs; name: "{app}\lib_mac"
+type: filesandordirs; name: "{app}\lib_linux"
+type: filesandordirs; name: "{app}\lib_android"
+type: filesandordirs; name: "{app}\lib"
+type: filesandordirs; name: "{app}\stub"
 type: files; name: "{app}\nvgt.chm"
 
 [Code]
