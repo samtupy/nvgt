@@ -1,0 +1,14 @@
+/**
+	Determines if your game's window is hidden or not.
+	bool is_window_hidden();
+	## Returns:
+		bool: true if your game window is hidden, false if it's shown.
+*/
+
+// Example:
+void main() {
+	show_window("Test");
+	bool hide = random_bool();
+	if (hide) hide_window();
+	alert("The window is", is_window_hidden() ? "hidden" : "shown");
+}

@@ -205,7 +205,7 @@ unsigned int datastream::write(const std::string& data) {
 	std::streamsize pos = _ostr->tellp();
 	try {
 		w->writeRaw(data);
-		if (r && w) _istr->seekg(_ostr->tellp()); // Make sure that read and write pointers are in sync.
+		if (r && w && sync_rw_cursors) _istr->seekg(_ostr->tellp()); // Make sure that read and write pointers are in sync.
 	} catch (std::exception) {
 		return long(_ostr->tellp()) - pos;
 	}
@@ -279,7 +279,7 @@ template <class T, datastream_factory_type factory> void RegisterDatastreamType(
 	engine->RegisterObjectMethod(classname.c_str(), "bool close(bool = false)", asMETHOD(datastream, close), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool close_all()", asMETHOD(datastream, close_all), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_active() const property", asMETHOD(datastream, active), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "int get_available() const property", asMETHOD(datastream, available), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "uint64 get_available() const property", asMETHOD(datastream, available), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool seek(uint64)", asMETHOD(datastream, seek), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool seek_end(uint64 = 0)", asMETHOD(datastream, seek_end), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool seek_relative(int64)", asMETHOD(datastream, seek_relative), asCALL_THISCALL);
@@ -307,6 +307,7 @@ template <class T, datastream_factory_type factory> void RegisterDatastreamType(
 	RegisterDatastreamReadwrite<double>(engine, classname, "double");
 	RegisterDatastreamReadwrite<std::string>(engine, classname, "string");
 	engine->RegisterObjectProperty(classname.c_str(), "bool binary", asOFFSET(datastream, binary));
+	engine->RegisterObjectProperty(classname.c_str(), "bool sync_rw_cursors", asOFFSET(datastream, sync_rw_cursors));
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_good() const property", asMETHOD(datastream, good), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_bad() const property", asMETHOD(datastream, bad), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_fail() const property", asMETHOD(datastream, fail), asCALL_THISCALL);

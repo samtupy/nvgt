@@ -1,0 +1,25 @@
+/**
+	Wait a given number of milliseconds for an event to become signaled.
+	bool try_wait(uint milliseconds);
+	## Arguments:
+		* uint milliseconds: The amount of time to wait, may be 0 to not wait at all.
+	## Returns:
+		bool: True if another thread has signaled the event, or false if the event is still unsignaled after the given number of milliseconds has elapsed.
+	## Remarks:
+		The semantics of this function are exactly the same as mutex::try_wait(), accept that this function waits on an event instead of a mutex.
+*/
+
+// Example:
+thread_event g_wait;
+void test_thread() {
+	screen_reader_speak("started", true);
+	while (!g_wait.try_wait(1000)) screen_reader_speak("waiting...", true);
+	screen_reader_speak("ah!", true);
+	g_wait.set();
+}
+void main() {
+	async<void>(test_thread);
+	wait(3500);
+	g_wait.set();
+	g_wait.wait(); // So we'll know the other thread has finished speaking it's final message.
+}

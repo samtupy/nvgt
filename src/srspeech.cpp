@@ -16,8 +16,10 @@
 	#include <UniversalSpeech.h>
 #elif defined(__APPLE__)
 	#include "apple.h"
-#elif defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
+#elif !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
 	#define using_speechd
+#elif defined(__ANDROID__)
+	#include "android.h"
 #endif
 #include <string>
 #include <Poco/AtomicFlag.h>
@@ -54,9 +56,9 @@ bool ScreenReaderLoad() {
 	g_SRSpeechAvailable.set();
 	g_SRSpeechLoaded.set();
 	return true;
-	#elif defined(__APPLE__)
+	#elif defined(__APPLE__) || defined(__ANDROID__)
 	g_SRSpeechLoaded.set();
-	return true; // Voice over or libraries to access it don't need loading.
+	return true; // Voice over or libraries to access it don't need loading, same with Android accessibility manager.
 	#elif defined(using_speechd)
 	if (g_SRSpeechLoaded) return true;
 	try {
@@ -114,6 +116,8 @@ std::string ScreenReaderDetect() {
 	return voice_over_is_running() ? "VoiceOver" : "";
 	#elif defined(using_speechd)
 	return g_SpeechdConn != nullptr ? "Speech dispatcher" : "";
+	#elif defined(__ANDROID__)
+	return android_screen_reader_detect();
 	#else
 	return "";
 	#endif
@@ -127,6 +131,8 @@ bool ScreenReaderHasSpeech() {
 	return voice_over_is_running();
 	#elif defined(using_speechd)
 	return g_SpeechdConn != nullptr;
+	#elif defined(__ANDROID__)
+	return android_is_screen_reader_active();
 	#else
 	return false;
 	#endif
@@ -152,7 +158,7 @@ bool ScreenReaderIsSpeaking() {
 	#endif
 }
 
-bool ScreenReaderOutput(std::string& text, bool interrupt) {
+bool ScreenReaderOutput(const std::string& text, bool interrupt) {
 	if (!ScreenReaderLoad()) return false;
 	#if defined(_WIN32)
 	std::wstring textW;
@@ -166,12 +172,14 @@ bool ScreenReaderOutput(std::string& text, bool interrupt) {
 		spd_cancel(g_SpeechdConn);
 	}
 	return spd_say(g_SpeechdConn, interrupt ? SPD_IMPORTANT : SPD_TEXT, text.c_str());
+	#elif defined(__ANDROID__)
+	return android_screen_reader_speak(text, interrupt);
 	#else
 	return false;
 	#endif
 }
 
-bool ScreenReaderSpeak(std::string& text, bool interrupt) {
+bool ScreenReaderSpeak(const std::string& text, bool interrupt) {
 	if (!ScreenReaderLoad()) return false;
 	#if defined(_WIN32)
 	std::wstring textW;
@@ -185,12 +193,14 @@ bool ScreenReaderSpeak(std::string& text, bool interrupt) {
 		spd_cancel(g_SpeechdConn);
 	}
 	return spd_say(g_SpeechdConn, interrupt ? SPD_IMPORTANT : SPD_TEXT, text.c_str());
+	#elif defined(__ANDROID__)
+	return android_screen_reader_speak(text, interrupt);
 	#else
 	return false;
 	#endif
 }
 
-bool ScreenReaderBraille(std::string& text) {
+bool ScreenReaderBraille(const std::string& text) {
 	if (!ScreenReaderLoad()) return false;
 	#if defined(_WIN32)
 	std::wstring textW(text.begin(), text.end());
@@ -210,6 +220,8 @@ bool ScreenReaderSilence() {
 	spd_cancel(g_SpeechdConn);
 	spd_stop(g_SpeechdConn);
 	return true;
+	#elif defined(__ANDROID__)
+	return android_screen_reader_silence();
 	#else
 	return false;
 	#endif
@@ -221,8 +233,8 @@ void RegisterScreenReaderSpeech(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool screen_reader_has_speech()", asFUNCTION(ScreenReaderHasSpeech), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool screen_reader_has_braille()", asFUNCTION(ScreenReaderHasBraille), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool screen_reader_is_speaking()", asFUNCTION(ScreenReaderIsSpeaking), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool screen_reader_output(const string &in, bool)", asFUNCTION(ScreenReaderOutput), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool screen_reader_speak(const string &in, bool)", asFUNCTION(ScreenReaderSpeak), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool screen_reader_braille(const string &in)", asFUNCTION(ScreenReaderBraille), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool screen_reader_output(const string &in text, bool interrupt = true)", asFUNCTION(ScreenReaderOutput), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool screen_reader_speak(const string &in text, bool interrupt = true)", asFUNCTION(ScreenReaderSpeak), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool screen_reader_braille(const string &in text)", asFUNCTION(ScreenReaderBraille), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool screen_reader_silence()", asFUNCTION(ScreenReaderSilence), asCALL_CDECL);
 }

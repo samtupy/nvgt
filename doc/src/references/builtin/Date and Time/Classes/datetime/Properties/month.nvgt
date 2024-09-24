@@ -7,5 +7,5 @@
 void main() {
 	datetime d;
 	d.set(2024, 5, 8);
-	alert("The datetime's current month is", d.month);
+	alert("The datetime's set month is", d.month);
 }

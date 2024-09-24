@@ -1,0 +1,38 @@
+#include "file_contents.nvgt"
+
+void test_pack() {
+	put_file_contents("tmp/pack.dat", "test overwrite: lets start with bogus data");
+	dictionary cases;
+	pack p;
+	assert(p.open("tmp/pack.dat", PACK_OPEN_MODE_CREATE));
+	string[]@ case_list = find_files("case/*.nvgt");
+	for (uint i = 0; i < case_list.length(); i++) {
+		string case_data = get_file_contents("case/" + case_list[i]);
+		if (case_data.empty()) {
+			case_list.remove_at(i);
+			i--;
+			continue;
+		}
+		assert(p.add_file("case/" + case_list[i], case_list[i]));
+		assert(!case_data.empty());
+		assert(p.add_memory("mem/" + case_list[i], case_data));
+		cases.set(case_list[i], case_data);
+	}
+	p.close();
+	assert(p.open("tmp/pack.dat", PACK_OPEN_MODE_READ));
+	assert(p.size == cases.get_size() * 2);
+	@case_list = p.list_files();
+	assert(case_list.length() == p.size);
+	for (uint i = 0; i < case_list.length(); i++) {
+		int size = p.get_file_size(case_list[i]);
+		string pack_content = p.read_file(case_list[i], 0, size);
+		string case_name = case_list[i];
+		if (case_name.starts_with("mem/")) case_name.erase(0, 4);
+		string disc_content;
+		assert(cases.get(case_name, disc_content));
+		assert(!disc_content.empty() and !pack_content.empty());
+		assert(disc_content == pack_content);
+	}
+	p.close();
+	file_delete("tmp/pack.dat");
+}

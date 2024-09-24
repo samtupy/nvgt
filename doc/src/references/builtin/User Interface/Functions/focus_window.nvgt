@@ -1,0 +1,20 @@
+/**
+	Attempt to bring your NVGT window to the foreground.
+	bool focus_window();
+	## Returns:
+		bool: true if the window was successfully focused, false otherwise.
+*/
+
+// Example:
+void main() {
+	timer focuser;
+	show_window("Focus every 5 seconds example");
+	while (true) {
+		wait(5);
+		if (key_pressed(KEY_ESCAPE)) exit();
+		if (focuser.has_elapsed(5000)) {
+			focuser.restart();
+			focus_window();
+		}
+	}
+}

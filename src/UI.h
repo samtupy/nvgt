@@ -38,6 +38,7 @@ bool ClipboardSetText(const std::string& text);
 std::string simple_file_open_dialog(const std::string& filters = "All files:*", const std::string& default_location = "");
 bool urlopen(const std::string& url);
 
-asINT64 ShowWindow(std::string& window_title);
+bool ShowNVGTWindow(const std::string& window_title);
+bool DestroyNVGTWindow();
 void wait(int ms);
 void RegisterUI(asIScriptEngine* engine);

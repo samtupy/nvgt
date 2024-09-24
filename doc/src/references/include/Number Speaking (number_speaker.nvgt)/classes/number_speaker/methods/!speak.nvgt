@@ -1,0 +1,21 @@
+/**
+	This method will speak a number.
+	int number_speaker::speak(double the_number);
+	## Arguments:
+		* double the_number: the number to speak.
+	## Returns:
+		int: 0 on success, -1 on failure.
+	## Remarks:
+		The speak method searches for sound files based on the values stored in the prepend and append properties, determining the most appropriate sound files to use by performing multiple searches based on the given number.
+		When this function is called, it returns immediately, allowing the script to continue running while the number is being spoken. To ensure that numbers are spoken smoothly and fluently, it is necessary to call the speak_next method continuously.
+*/
+
+// Example:
+#include "number_speaker.nvgt"
+void main() {
+	number_speaker number;
+	number.speak(350);
+	while(number.speak_next()==1) {
+		wait(5);
+	}
+}

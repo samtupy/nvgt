@@ -1,0 +1,13 @@
+/**
+	Represents the current timestamp held by the datetime object in julian days.
+	const double julian_day;
+	## Remarks:
+		The [julian day](http://en.wikipedia.org/wiki/Julian_day) measures, including decimal fractions, the amount of time that has passed (in years) since Monday, January 1st, 4713 BC at 12 PM Universal Time.
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set(2024, 5, 8, 16, 17, 18);
+	alert("The julian day represented by this datetime object is", d.julian_day);
+}

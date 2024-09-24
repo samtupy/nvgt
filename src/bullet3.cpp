@@ -1,5 +1,5 @@
 /* bullet3.cpp - bulletphysics integration code
- * At the monent, only contains a wrapper for bullet3's vector class and is pending expansion.
+ * At the moment, only contains a wrapper for bullet3's vector class and is pending expansion or outright replacement.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -76,9 +76,15 @@ void RegisterScriptBullet3(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("vector", "vector opMul(float) const", asFUNCTION(Vector3OpMulN), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("vector", "vector opDiv(float) const", asFUNCTION(Vector3OpDivN), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("vector", "float length() const", asMETHOD(Vector3, length), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "float dot() const", asMETHOD(Vector3, dot), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "float length2() const", asMETHOD(Vector3, length2), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "bool get_is_zero() const property", asMETHOD(Vector3, isZero), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "float dot(const vector&in) const", asMETHOD(Vector3, dot), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "float distance(const vector&in) const", asMETHOD(Vector3, distance), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "float distance2(const vector&in) const", asMETHOD(Vector3, distance2), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector cross(const vector&in) const", asMETHOD(Vector3, cross), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "vector& normalize()", asMETHOD(Vector3, normalize), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "vector normalized() const", asMETHOD(Vector3, normalized), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector absolute() const", asMETHOD(Vector3, absolute), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "vector rotate(const vector&in, const float) const", asMETHOD(Vector3, rotate), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "float angle(const vector&in) const", asMETHOD(Vector3, angle), asCALL_THISCALL);
 }

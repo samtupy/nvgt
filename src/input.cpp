@@ -21,6 +21,7 @@
 #include <obfuscate.h>
 #include <sstream>
 #include <string>
+#include "angelscript.h"
 #include "input.h"
 #include "misc_functions.h"
 #include "nvgt.h"
@@ -28,7 +29,7 @@
 static unsigned char g_KeysPressed[512];
 static unsigned char g_KeysRepeating[512];
 static unsigned char g_KeysForced[512];
-static const unsigned char* g_KeysDown = NULL;
+static const SDL_bool* g_KeysDown = NULL;
 static int g_KeysDownArrayLen = 0;
 static unsigned char g_KeysReleased[512];
 static unsigned char g_MouseButtonsPressed[32];
@@ -38,6 +39,7 @@ float g_MouseX = 0, g_MouseY = 0, g_MouseZ = 0;
 float g_MouseAbsX = 0, g_MouseAbsY = 0, g_MouseAbsZ = 0;
 float g_MousePrevX = 0, g_MousePrevY = 0, g_MousePrevZ = 0;
 bool g_KeyboardStateChange = false;
+SDL_TouchID g_TouchLastDevice = 0;
 static asITypeInfo* key_code_array_type = nullptr;
 static asITypeInfo* joystick_mapping_array_type = nullptr;
 #ifdef _WIN32
@@ -57,7 +59,7 @@ void InputDestroy() {
 	SDL_Quit();
 	g_KeysDown = NULL;
 }
-void InputEvent(SDL_Event* evt) {
+bool InputEvent(SDL_Event* evt) {
 	if (evt->type == SDL_EVENT_KEY_DOWN) {
 		if (!evt->key.repeat)
 			g_KeysPressed[evt->key.scancode] = 1;
@@ -84,6 +86,9 @@ void InputEvent(SDL_Event* evt) {
 		g_MouseButtonsReleased[evt->button.button] = 1;
 	} else if (evt->type == SDL_EVENT_MOUSE_WHEEL)
 		g_MouseAbsZ += evt->wheel.y;
+	else if (evt->type == SDL_EVENT_FINGER_DOWN) g_TouchLastDevice = evt->tfinger.touchID;
+	else return false;
+	return true;
 }
 
 void remove_keyhook();
@@ -135,6 +140,17 @@ bool insure_key_up(unsigned short key) {
 		return false;
 	return true;
 }
+inline bool post_key_event(unsigned int key, SDL_EventType evt_type) {
+	if (key > 511 || !g_KeysDown) return false;
+	SDL_Event e{};
+	e.type = evt_type;
+	e.common.timestamp = SDL_GetTicksNS();
+	e.key.scancode = (SDL_Scancode)key;
+	e.key.key = SDL_GetKeyFromScancode(e.key.scancode, SDL_GetModState(), SDL_TRUE);
+	return SDL_PushEvent(&e);
+}
+bool simulate_key_down(unsigned int key) { return post_key_event(key, SDL_EVENT_KEY_DOWN); }
+bool simulate_key_up(unsigned int key) { return post_key_event(key, SDL_EVENT_KEY_UP); }
 CScriptArray* keys_pressed() {
 	asIScriptContext* ctx = asGetActiveContext();
 	asIScriptEngine* engine = ctx->GetEngine();
@@ -363,9 +379,56 @@ void uninstall_keyhook() {
 	#endif
 }
 
+// Low level touch interface
+CScriptArray* get_touch_devices() {
+	asITypeInfo* array_type = get_array_type("uint64[]");
+	if (!array_type) return nullptr;
+	int device_count;
+	SDL_TouchID* devices = SDL_GetTouchDevices(&device_count);
+	if (!devices) return nullptr;
+	CScriptArray* array = CScriptArray::Create(array_type);
+	if (!array) {
+		SDL_free(devices);
+		return nullptr;;
+	}
+	array->Reserve(device_count);
+	for (int i = 0; i < device_count; i++) array->InsertLast(devices + i);
+	SDL_free(devices);
+	return array;
+}
+std::string get_touch_device_name(uint64_t device_id) {
+	const char* result = SDL_GetTouchDeviceName((SDL_TouchID)device_id);
+	if (!result) return "";
+	return result;
+}
+int get_touch_device_type(uint64_t device_id) {
+	return SDL_GetTouchDeviceType((SDL_TouchID)device_id);
+}
+CScriptArray* query_touch_device(uint64_t device_id) {
+	asITypeInfo* array_type = get_array_type("touch_finger[]");
+	if (!array_type) return nullptr;
+	CScriptArray* array = CScriptArray::Create(array_type);
+	if (!array) return nullptr;
+	if (!device_id && g_TouchLastDevice) device_id = g_TouchLastDevice;
+	if (!device_id) return array;
+	int finger_count;
+	SDL_Finger** fingers = SDL_GetTouchFingers(device_id, &finger_count);
+	if (!fingers) return array;
+	array->Reserve(finger_count);
+	for (int i = 0; i < finger_count; i++) array->InsertLast(fingers + i);
+	SDL_free(fingers);
+	return array;
+}
+
 void RegisterInput(asIScriptEngine* engine) {
+	engine->RegisterObjectType("touch_finger", sizeof(SDL_Finger), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<SDL_Finger>());
+	engine->RegisterObjectProperty("touch_finger", "const uint64 id", asOFFSET(SDL_Finger, id));
+	engine->RegisterObjectProperty("touch_finger", "const float x", asOFFSET(SDL_Finger, x));
+	engine->RegisterObjectProperty("touch_finger", "const float y", asOFFSET(SDL_Finger, y));
+	engine->RegisterObjectProperty("touch_finger", "const float pressure", asOFFSET(SDL_Finger, pressure));
 	engine->RegisterEnum(_O("key_modifier"));
 	engine->RegisterEnum(_O("key_code"));
+	engine->RegisterEnum(_O("touch_device_type"));
 	engine->RegisterEnum(_O("joystick_type"));
 	engine->RegisterEnum(_O("joystick_bind_type"));
 	engine->RegisterEnum(_O("joystick_power_level"));
@@ -376,6 +439,8 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool key_released(uint)"), asFUNCTION(KeyReleased), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_up(uint)"), asFUNCTION(key_up), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool insure_key_up(uint)"), asFUNCTION(insure_key_up), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool simulate_key_down(uint)"), asFUNCTION(simulate_key_down), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool simulate_key_up(uint)"), asFUNCTION(simulate_key_up), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("key_code[]@ keys_pressed()"), asFUNCTION(keys_pressed), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("key_code[]@ keys_down()"), asFUNCTION(keys_down), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint total_keys_down()"), asFUNCTION(total_keys_down), asCALL_CDECL);
@@ -391,12 +456,20 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("string get_characters()"), asFUNCTION(get_characters), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool install_keyhook(bool=true)"), asFUNCTION(install_keyhook), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void uninstall_keyhook()"), asFUNCTION(uninstall_keyhook), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64[]@ get_touch_devices()"), asFUNCTION(get_touch_devices), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string get_touch_device_name(uint64 device_id)"), asFUNCTION(get_touch_device_name), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("touch_device_type get_touch_device_type(uint64 device_id)"), asFUNCTION(get_touch_device_type), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("touch_finger[]@ query_touch_device(uint64 device_id = 0)"), asFUNCTION(query_touch_device), asCALL_CDECL);
 	engine->RegisterGlobalProperty(_O("const float MOUSE_X"), &g_MouseX);
 	engine->RegisterGlobalProperty(_O("const float MOUSE_Y"), &g_MouseY);
 	engine->RegisterGlobalProperty(_O("const float MOUSE_Z"), &g_MouseZ);
 	engine->RegisterGlobalProperty(_O("const float MOUSE_ABSOLUTE_X"), &g_MouseAbsX);
 	engine->RegisterGlobalProperty(_O("const float MOUSE_ABSOLUTE_Y"), &g_MouseAbsY);
 	engine->RegisterGlobalProperty(_O("const float MOUSE_ABSOLUTE_Z"), &g_MouseAbsZ);
+	engine->RegisterEnumValue("touch_device_type", "TOUCH_DEVICE_TYPE_INVLAID", SDL_TOUCH_DEVICE_INVALID);
+	engine->RegisterEnumValue("touch_device_type", "TOUCH_DEVICE_DIRECT", SDL_TOUCH_DEVICE_DIRECT);
+	engine->RegisterEnumValue("touch_device_type", "TOUCH_DEVICE_INDIRECT_ABSOLUTE", SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE);
+	engine->RegisterEnumValue("touch_device_type", "TOUCH_DEVICE_INDIRECT_RELATIVE", SDL_TOUCH_DEVICE_INDIRECT_RELATIVE);
 	engine->RegisterEnumValue("key_modifier", "KEYMOD_NONE", SDL_KMOD_NONE);
 	engine->RegisterEnumValue("key_modifier", "KEYMOD_LSHIFT", SDL_KMOD_LSHIFT);
 	engine->RegisterEnumValue("key_modifier", "KEYMOD_RSHIFT", SDL_KMOD_RSHIFT);

@@ -1,0 +1,21 @@
+/**
+	Displays a dialog from which a user may select a file to open.
+	string open_file_dialog(string filters = "", string default_location = "")
+	## Arguments:
+		* string filters = "": A list of file extension filters (see remarks).
+		* string default_location = "": The absolute initial directory to select files from (empty for OS default).
+	## Returns:
+		string: The path to a file or an empty string on failure/cancelation.
+	## Remarks:
+		The file extension filters are specified in the format description:extension|description:extension|description:extension1;extension2;extension3... You can also use the filter \* as an all files filter. for example: audio files:mp3;wav;ogg|text files:txt;rtf;md|all files:* would produce 3 items in the file type combo box, those being audio files, text files and all files.
+		On some platforms it might be possible for the user to select a file that does not yet exist, so you should check for that condition yourself after the user selects a file just to be safe if that is important to you.
+		This function is blocking, though we plan to add a version of the API in the future that uses a callback function or an event you can wait on if you wish to use this dialog asynchronously.
+		You should only call this function on your application's main thread, which is what happens by default unless you use any of NVGT's threading facilities.
+*/
+
+// Example:
+void main() {
+	string location = open_file_dialog("NVGT scripts:nvgt", cwdir());
+	if (location.empty()) return;
+	alert("example", "you selected " + location);
+}

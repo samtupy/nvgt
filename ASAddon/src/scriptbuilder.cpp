@@ -1,4 +1,7 @@
 #include "scriptbuilder.h"
+#ifdef __ANDROID__
+#include "android_fopen.h"
+#endif
 #include <vector>
 #include <assert.h>
 #ifdef _WIN32
@@ -191,6 +194,8 @@ int CScriptBuilder::LoadScriptSection(const char* filename)
 	FILE* f = 0;
 	fopen_s(&f, scriptFile.c_str(), "rb");
   #endif
+#elif defined(__ANDROID__)
+	FILE *f = fdopen(android_fopen(scriptFile.c_str(), "rb"), "rb");
 #else
 	FILE *f = fopen(scriptFile.c_str(), "rb");
 #endif
