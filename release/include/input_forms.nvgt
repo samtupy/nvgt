@@ -1,0 +1,257 @@
+/*input_forms.nvgt - Quickly setup and retrieve user-forms using an audio form.
+ * This script makes it very simple to request large amounts of data in an easy to navigate audio form.
+ * It was also coded with extendability in mind, so one can very easily create their own custom input fields.
+ *
+ * NVGT - NonVisual Gaming Toolkit
+ * Copyright (c) 2022-2024 Sam Tupy
+ * https://nvgt.gg
+ * input_forms.nvgt - Copyright (C) 2024 Ivan Soto
+ * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+ * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+ * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+*/
+#include"form.nvgt"
+class input_field {
+	int control_id;
+	string name, label;
+	input_form@parent;
+	bool required = false;
+	input_field(input_form@parent, string name, string label, bool required = false) {
+		this.name = name;
+		this.label = label;
+		this.required = required;
+		@this.parent = parent;
+	}
+	bool fill(dictionary@d) {
+		//if this function is being called, it must be a required input field.
+		//check if our input is valid. If not, jump the user straight back to that control.
+		if (!this.valid_input) {
+			this.parent.main_form.focus(this.control_id);
+			return false;
+		}
+		return this.set_value(d);
+	}
+	bool set_value(dictionary@d) {
+		//overwrite this in your child class with your own logic for getting the value from that field.
+		return false;
+	}
+	bool configure() {
+		//overwrite this function in your child class with your own logic for creating it's control.
+		return false;
+	}
+	bool get_valid_input() property {
+		if (this.required) return this.is_ok();
+		return true;
+	}
+	bool is_ok() {
+		//overwrite this in your child class to make sure this field is ok to be included in the form's output.
+		return false;
+	}
+}
+class checkbox_field: input_field {
+	bool require_check = true;
+	bool default_value = false;
+	checkbox_field(input_form@parent, string name, string label, bool default_value = false, bool required = false, bool require_check = true) {
+		super(parent, name, label, required);
+		this.default_value = default_value;
+		this.require_check = require_check;
+	}
+	bool is_ok() {
+		bool status = this.parent.main_form.is_checked(this.control_id);
+		if (this.require_check and !status) return false;
+		return true;
+	}
+	bool configure() {
+		this.control_id = this.parent.main_form.create_checkbox(this.label, this.default_value);
+		return true;
+	}
+	bool set_value(dictionary@d) {
+		d.set(this.name, this.parent.main_form.is_checked(this.control_id));
+		return true;
+	}
+}
+class choice_input_field: input_field {
+	string[] choices;
+	choice_input_field(input_form@parent, string name, string label, bool required = false, string[] choices = {}) {
+		super(parent, name, label, required);
+		this.choices = choices;
+	}
+	void add_choice(string choice) {
+		this.choices.insert_last(choice);
+	}
+	bool configure() {
+		this.control_id = this.parent.main_form.create_list(this.label, 0, false, false);
+		for (uint i = 0; i < this.choices.length(); i += 1) {
+			if (!this.parent.main_form.add_list_item(this.control_id, this.choices[i])) {
+				break;
+				return false;
+			}
+		}
+		return true;
+	}
+	bool set_value(dictionary@d) {
+		int pos = this.parent.main_form.get_list_position(this.control_id);
+		if (pos == -1) return false;
+		string selected = this.parent.main_form.get_list_item(this.control_id, pos);
+		d.set(this.name, selected);
+		return true;
+	}
+	bool is_ok() {
+		return this.parent.main_form.get_list_position(this.control_id) != -1;
+	}
+}
+class text_field: input_field {
+	string default_value;
+	bool secure = false;
+	bool multiline = false, readonly = false;
+	int min_length = 0, max_length = 0;
+	string disallowed_chars = "", char_disallowed_description;
+	bool only_use_disallowed_chars = false;
+	text_field(input_form@parent, string name, string label, string default_value = "", bool required = false) {
+		super(parent, name, label, required);
+		this.default_value = default_value;
+	}
+	bool set_disallowed_chars(string chars, bool only_use_disallowed_chars, string char_disallowed_description = "") {
+		if (!char_disallowed_description.empty()) this.char_disallowed_description = char_disallowed_description;
+		else this.char_disallowed_description = this.parent.char_disallowed_description;
+		this.disallowed_chars = chars;
+		this.only_use_disallowed_chars = only_use_disallowed_chars;
+		return true;
+	}
+	bool configure() {
+		this.control_id = this.parent.main_form.create_input_box(this.label, this.default_value, (this.secure ? "*" : ""), this.max_length, this.readonly, this.multiline);
+		if (!this.disallowed_chars.empty()) {
+			if (!this.parent.main_form.set_disallowed_chars(this.control_id, this.disallowed_chars, this.only_use_disallowed_chars, this.char_disallowed_description))
+				return false;
+		}
+		return true;
+	}
+	bool is_ok() {
+		return this.is_valid_text();
+	}
+	bool set_value(dictionary@d) {
+		d.set(this.name, this.parent.main_form.get_text(this.control_id));
+		return true;
+	}
+	bool is_valid_text() {
+		string text = this.parent.main_form.get_text(this.control_id);
+		if (text.empty() or (this.min_length > 0 and text.length() < this.min_length)) return false;
+		return true;
+	}
+}
+class number_text_field: text_field {
+	number_text_field(input_form@parent, string name, string label, int default_value = -1, bool required = false) {
+		super(parent, name, label, (default_value > -1 ? default_value : ""), required);
+		this.set_disallowed_chars("1234567890", true);
+	}
+	bool is_valid_text() {
+		string text = this.parent.main_form.get_text_reference(this.control_id);
+		if (text.empty() or !text.is_digits()) return false;
+		return true;
+	}
+	bool set_value(dictionary@d) {
+		d.set(this.name, parse_float(this.parent.main_form.get_text(this.control_id)));
+		return true;
+	}
+}
+class input_form {
+	audio_form@main_form;
+	string title;
+	input_field@[]fields;
+	string ok_button_label = "&ok", cancel_button_label = "&cancel";
+	bool is_dialog = true;
+	int ok_btn = -1, cancel_btn = -1;
+	string char_disallowed_description = "you can't  type this here";
+	string invalid_input_message = "invalid input";
+	string description = "";
+	bool user_canceled = false;
+	private bool active = false;
+	input_form(string title, audio_form@form = null) {
+		this.title = title;
+		if (@form != null) @this.main_form = form;
+		else @this.main_form = audio_form();
+		this.setup();
+	}
+	bool configure() {
+		if (this.fields.length() <= 0) return false;
+		for (uint i = 0; i < this.fields.length(); i += 1) {
+			if (!this.fields[i].configure()) return false;
+		}
+		return true;
+	}
+	bool setup() {
+		this.main_form.reset();
+		this.main_form.create_window(this.title, false, this.is_dialog);
+		if (!this.description.empty()) speak(this.description, false);
+		if (!this.configure()) return false;
+		this.ok_btn = this.main_form.create_button(this.ok_button_label, true);
+		this.cancel_btn = this.main_form.create_button(this.cancel_button_label, false, true);
+		return true;
+	}
+	bool add_text_field(string name, string label, string default_value = "", bool required = false, bool secure = false, string disallowed_chars = "") {
+		text_field@field = text_field(this, name, label, default_value, required);
+		if (@field == null) return false;
+		field.secure = secure;
+		this.fields.insert_last(field);
+		if (!disallowed_chars.empty()) field.disallowed_chars = disallowed_chars;
+		return true;
+	}
+	bool add_number_field(string name, string label, int default_value = -1, bool required = false) {
+		text_field@field = number_text_field(this, name, label, default_value, required);
+		if (@field == null) return false;
+		this.fields.insert_last(field);
+		return true;
+	}
+	bool add_checkbox_field(string name, string label, bool default_value = false, bool required = false, bool require_check = true) {
+		checkbox_field@field = checkbox_field(this, name, label, default_value, required, require_check);
+		if (@field == null) return false;
+		this.fields.insert_last(field);
+		return true;
+	}
+	bool add_choice_field(string name, string label, string[] choices, bool required = false) {
+		choice_input_field@field = choice_input_field(this, name, label, required, choices);
+		if (@field == null) return false;
+		this.fields.insert_last(field);
+		return true;
+	}
+	dictionary@ monitor() {
+		this.user_canceled = false;
+		if (!this.active) {
+			if (!this.setup()) return {};
+			this.main_form.focus(this.fields[0].control_id);
+			this.active = true;
+		}
+		this.main_form.monitor();
+		if (this.main_form.is_pressed(this.cancel_btn)) {
+			this.user_canceled = true;
+			this.active = false;
+			return {};
+		}
+		if (this.main_form.is_pressed(this.ok_btn)) {
+			dictionary result;
+			bool success = this.fill_form(result);
+			if (!success) {
+				speak(this.invalid_input_message, false);
+				return null;
+			} else {
+				this.active = false;
+				return result;
+			}
+		}
+		return null;
+	}
+	dictionary@ run() {
+		dictionary@ result = null;
+		while ((@result = this.monitor()) == null) wait(5);
+		return result;
+	}
+	bool fill_form(dictionary@d) {
+		if (this.fields.length() <= 0) return false;
+		for (uint i = 0; i < this.fields.length(); i += 1) {
+			if (!this.fields[i].fill(d)) return false;
+		}
+		return true;
+	}
+}
