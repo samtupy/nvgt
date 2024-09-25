@@ -1,0 +1,39 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#include "ini.nvgt"
+void main() {
+	ini test;
+	test.set_string("", "sectionless", "This key is sectionless!");
+	test.create_section("numbers");
+	test.set_double("numbers", "num1", 123);
+	test.set_double("numbers", "num2", -4.6);
+	test.create_section("bools");
+	test.set_bool("bools", "is_true", true);
+	test.set_bool("bools", "is_false", false);
+	test.create_section("lists");
+	string[] string_list = {"hi", "how ya doing?", "I hope this works!"};
+	test.set_string_list("lists", "strings", string_list);
+	double[] double_list = {31, 98.2, 13, 523.43654, 76};
+	test.set_double_list("lists", "doubles", double_list);
+	bool[] bool_list = {true, false, true, false, true};
+	test.set_bool_list("lists", "bools", bool_list);
+	test.save("../tmp/test.ini");
+	test.reset();
+	bool s = test.load("../tmp/test.ini");
+	if (!s) {
+		int line = test.get_error_line();
+		alert("error", test.get_error_text() + " on line " + line);
+		exit();
+	}
+	alert("test", test.get_string("", "sectionless"));
+	alert("test", test.get_double("numbers", "num2"));
+	string[] lst = test.get_string_list("lists", "strings");
+	alert("error text (should be empty)", test.get_error_text());
+	for (uint i = 0; i < lst.length(); i++)
+		alert("item " + i, lst[i]);
+	test.reset();
+	string large_ini_path = "C:\\cygwin\\etc\\php.ini";
+	if (file_exists(large_ini_path) and !test.load(large_ini_path)) alert("aww", "can't load large ini file with comments... " + test.get_error_text());
+}

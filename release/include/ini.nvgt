@@ -66,7 +66,7 @@ class ini {
 		file tmp;
 		bool ok = tmp.open(filename, "rb");
 		if (!ok) {
-			this.set_error("open file failure, " + get_last_error_text());
+			this.set_error("open file failure");
 			return false;
 		}
 		if (tmp.size < 1) {
@@ -92,16 +92,10 @@ class ini {
 			if (l.length() == 0 or l == " ")
 				continue; // Blank line, skip it.
 			// We need to deal with comments. We do this by searching for semicolon characters. If a backslash proceeds the semicolon, we ignore it and continue searching for semicolons until there are none left, at which case we have the position in the string the comment starts, so we can slice it off and possibly handle later.
-			int semi_count = 1;
-			int comment_pos = string_contains(l, ";", semi_count);
-			if (comment_pos == 0)
-				continue; // entire line is a comment
-			while (comment_pos > -1 and l[comment_pos - 1] == "\\") {
-				semi_count += 1;
-				comment_pos = string_contains(l, ";", semi_count);
-			}
-			if (comment_pos > -1)
-				l = string_left(l, comment_pos); // slice the comment from the line, leaving us with what should just be configuration data.
+			int comment_pos = l.find(";");
+			if (comment_pos == 0) continue; // entire line is a comment
+			while (comment_pos > 0 and l[comment_pos - 1] == "\\") comment_pos = l.find(";", comment_pos + 1);
+			if (comment_pos > -1) l.resize(comment_pos); // slice the comment from the line, leaving us with what should just be configuration data.
 			// Now figure out where the actual data begins and any user added whitespace ends.
 			int line_start_pos = -1;
 			for (uint j = 0; j < l.length(); j++) {
@@ -130,7 +124,7 @@ class ini {
 			// Is this a section identifier? If so, add the tmp_session to the ini_sections array and start a new one since this means the previous section has finished loading.
 			if (l[0] == "[") {
 				// Lets make sure a right bracket even exists before performing more expensive parsing, because if it doesn't then this data is invalid.
-				if (string_contains(l, "]", 1) < 0) {
+				if (l.find("]") < 0) {
 					this.reset();
 					this.set_error("invalid section declaration", i + 1);
 					return false;
@@ -212,11 +206,11 @@ class ini {
 		file tmp;
 		bool ok = tmp.open(filename, "wb");
 		if (!ok) {
-			this.set_error("open file failure, " + get_last_error_text());
+			this.set_error("open file failure");
 			return false;
 		}
 		if (tmp.write(data) < 1) {
-			this.set_error("file write failure, " + get_last_error_text());
+			this.set_error("file write failure");
 			return false;
 		}
 		tmp.close();
@@ -239,11 +233,11 @@ class ini {
 				file_copy(filename + "_robust", filename, true);
 				file_delete(filename + "_robust");
 			}
-			this.set_error("open file failure, " + get_last_error_text());
+			this.set_error("open file failure");
 			return false;
 		}
 		if (tmp.write(data) < data.length()) {
-			this.set_error("file write failure, " + get_last_error_text());
+			this.set_error("file write failure");
 			if (file_exists(filename + "_robust")) {
 				file_copy(filename + "_robust", filename, true);
 				file_delete(filename + "_robust");
@@ -440,7 +434,7 @@ class ini {
 	double get_double(const string& in section, const string& in key, double default_value = 0) {
 		ini_section@ tmp = this.get_section_verified(section, key, true, "get double");
 		if (@tmp != null)
-			return string_to_number(tmp.get_string(key));
+			return parse_double(tmp.get_string(key));
 		else
 			return default_value;
 	}
@@ -460,7 +454,7 @@ class ini {
 			return default_value;
 		string[] is_true = {"1", "t", "true", "on", "enabled", "yes"};
 		string value = tmp.get_string(key);
-		return is_true.find(string_to_lower_case(value)) > -1;
+		return is_true.find(value.lower()) > -1;
 	}
 
 	// Set an array of strings, we will use camas as our delimiter.
@@ -493,7 +487,7 @@ class ini {
 		for (uint c = 0; c < raw.length(); c++) {
 			if ((raw[c] == "," or raw[c] == ":") and (c < 1 or raw[c - 1] != "\\") or c == raw.length() - 1) {
 				int item_len = c - last_item_start_pos;
-				string val = INI_UNESCAPE_STRING(string_mid(raw, last_item_start_pos + 1, item_len));
+				string val = INI_UNESCAPE_STRING(raw.substr(last_item_start_pos, item_len));
 				if (val != "")
 					result.insert_last(val);
 				last_item_start_pos = c + 1;
@@ -528,7 +522,7 @@ class ini {
 		for (uint c = 0; c < raw.length(); c++) {
 			if ((raw[c] == "," or raw[c] == ":") and (c < 1 or raw[c - 1] != "\\") or c == raw.length() - 1) {
 				int item_len = c - last_item_start_pos;
-				result.insert_last(string_to_number(INI_UNESCAPE_STRING(string_mid(raw, last_item_start_pos + 1, item_len))));
+				result.insert_last(parse_double(INI_UNESCAPE_STRING(raw.substr(last_item_start_pos, item_len))));
 				last_item_start_pos = c + 1;
 			}
 		}
@@ -562,7 +556,7 @@ class ini {
 		for (uint c = 0; c < raw.length(); c++) {
 			if ((raw[c] == "," or raw[c] == ":") and (c < 1 or raw[c - 1] != "\\") or c == raw.length() - 1) {
 				int item_len = c - last_item_start_pos;
-				result.insert_last(is_true.find(string_to_lower_case(INI_UNESCAPE_STRING(string_mid(raw, last_item_start_pos + 1, item_len)))) > -1);
+				result.insert_last(is_true.find(INI_UNESCAPE_STRING(raw.substr(last_item_start_pos, item_len)).lower()) > -1);
 				last_item_start_pos = c + 1;
 			}
 		}
@@ -676,10 +670,10 @@ string[]@ get_lines(const string& in the_string) {
 	int line_start_pos = 0;
 	for (uint i = 0; i < the_string.length(); i++) {
 		if (the_string[i] == "\n" or i == the_string.length() - 1) {
-			string line = string_mid(the_string, line_start_pos + 1, i + 1 - line_start_pos);
-			if (string_right(line, 1) == "\n")
+			string line = the_string.substr(line_start_pos, i + 1 - line_start_pos);
+			if (line.ends_with("\n"))
 				line.resize(line.length() - 1);
-			if (string_right(line, 1) == "\r")
+			if (line.ends_with("\r"))
 				line.resize(line.length() - 1);
 			result.insert_last(line);
 			line_start_pos = i + 1;
