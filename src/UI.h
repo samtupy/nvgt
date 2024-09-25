@@ -40,5 +40,7 @@ bool urlopen(const std::string& url);
 
 bool ShowNVGTWindow(const std::string& window_title);
 bool DestroyNVGTWindow();
+bool WindowIsFocused();
+void refresh_window();
 void wait(int ms);
 void RegisterUI(asIScriptEngine* engine);

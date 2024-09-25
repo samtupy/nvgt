@@ -27,6 +27,8 @@
 #include <Poco/Glob.h>
 #include <Poco/Mutex.h>
 #include <Poco/Path.h>
+#include <Poco/Runnable.h>
+#include <Poco/Thread.h>
 #include <Poco/Timestamp.h>
 #include <Poco/UnbufferedStreamBuf.h>
 #include <Poco/zlib.h>
@@ -570,35 +572,92 @@ int SaveCompiledScript(asIScriptEngine* engine, unsigned char** output) {
 		return -1;
 	return codestream.get(output);
 }
+#ifndef NVGT_MOBILE
+class CompileExecutableTask : public Runnable {
+	// NVGT shows a status window as compilation is proceeding. That window must be pulled for events on the main thread so it won't hang, but compilation requires a lot of I/O (enough that pulling the window during compilation often enough is not viable). Thus we create this task so that the heavy lifting of the compilation can happen on another thread while we pull the status window in the main one.
+	// To further complicate things, sometimes a success message or an extra question might pop up during compilation, and as with most UI stuff, such alert dialogs also must be shown on the main thread. For now we just split the task into 2 segments with the option of showing messages in between, and if we find we need more in the future, we'll create a queue of callables instead.
+	string script_file;
+	asIScriptEngine* engine;
+	int stage;
+	SharedPtr<Thread> worker;
+public:
+	SharedPtr<nvgt_compilation_output> output;
+	bool fail, isUI, quiet;
+	CompileExecutableTask(asIScriptEngine* engine, const string& script_file) : stage(0), fail(false), isUI(Util::Application::instance().config().has("application.gui")), quiet(Util::Application::instance().config().has("application.quiet") || Util::Application::instance().config().has("application.QUIET")), engine(engine), script_file(script_file), output(nvgt_init_compilation(script_file, false)) {}
+	void handle_exception(const Exception& e) {
+		if (output && !output->get_error_text().empty()) engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s, %s", output->get_output_file(), output->get_error_text(), e.displayText()).c_str());
+		else if (output) engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s", output->get_output_file(), e.displayText()).c_str());
+		else engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("exception while compiling, %s", e.displayText()).c_str());
+		fail = true;
+	}
+	void compile() {
+		try {
+			output->prepare();
+			if (!output) {
+				engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, "failed to initialize compilation output context");
+				fail = true;
+				return;
+			}
+			unsigned char* code = NULL;
+			UInt32 code_size = SaveCompiledScript(engine, &code);
+			if (code_size < 1) {
+				engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to retrieve bytecode while trying to compile %s", output->get_output_file()).c_str());
+				fail = true;
+				return;
+			}
+			output->write_payload(code, code_size);
+			free(code);
+			output->finalize();
+		} catch (Exception& e) {
+			handle_exception(e);
+			return;
+		}
+	}
+	void postbuild() {
+		try {
+			output->postbuild();
+		} catch (Exception& e) {
+			handle_exception(e);
+			return;
+		}
+	}
+	void run() {
+		stage++;
+		if (stage == 1) compile();
+		else if (stage == 2) postbuild();
+	}
+	bool next() {
+		// Calls the run method and waits for it to complete, this is the main glue function called from outside this task to make it work. Calling this out of sequence is undefined!
+		worker = new Thread();
+		worker->start(*this);
+		while (!worker->tryJoin(5)) {
+			string status = output->get_status();
+			if (!quiet && !status.empty()) {
+				if (isUI) {
+					if (WindowIsFocused()) ScreenReaderSilence(); // We want to speak window changes interrupting.
+					ShowNVGTWindow(status);
+				} else cout << status << endl;
+			}
+			refresh_window();
+		}
+		return !fail;
+	}
+};
+#endif
 int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 	#ifdef NVGT_MOBILE
 	return -1; // Executable compilation is not supported on this platform, no need to compile this.
 	#else
-	if (g_platform == "auto") determine_compile_platform();
-	if (g_platform == "auto") return -1; // Cannot compile for this platform.
-	SharedPtr<nvgt_compilation_output> output;
+	CompileExecutableTask t(engine, scriptFile);
 	try {
-		output = nvgt_init_compilation(scriptFile);
-		if (!output) {
-			engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "failed to initialize compilation output context");
-			return -1;
-		}
-		unsigned char* code = NULL;
-		UInt32 code_size = SaveCompiledScript(engine, &code);
-		if (code_size < 1) {
-			engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to retrieve bytecode while trying to compile %s", output->get_output_file()).c_str());
-			return -1;
-		}
-		output->write_payload(code, code_size);
-		free(code);
-		output->finalize();
-		bool quiet = Util::Application::instance().config().hasOption("application.quiet") || Util::Application::instance().config().hasOption("application.QUIET"); // Maybe we should switch to a verbocity level?
-		if (!quiet) message(format("%s build succeeded in %?ums, saved to %s", string(g_debug ? "Debug" : "Release"), Util::Application::instance().uptime().totalMilliseconds(), output->get_output_file()), "Success!");
-		output->postbuild();
+		if (g_platform == "auto") determine_compile_platform();
+		if (g_platform == "auto") return -1; // Cannot compile for this platform.
+		if (!t.next()) return -1; // compile and bundle
+		t.output->postbuild_interface(); // First call shows compilation success dialog.
+		if (!t.next()) return -1; // postbuild, such as install
+		t.output->postbuild_interface(); // Second call shows any potential success dialogs from any postbuild steps.
 	} catch (Exception& e) {
-		if (output && !output->get_error_text().empty()) engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s, %s", output->get_output_file(), output->get_error_text(), e.displayText()).c_str());
-		else if (output) engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s", output->get_output_file(), e.displayText()).c_str());
-		else engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, format("exception while compiling, %s", e.displayText()).c_str());
+		t.handle_exception(e);
 		return -1;
 	}
 	return 0;
