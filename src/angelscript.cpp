@@ -584,47 +584,35 @@ public:
 	SharedPtr<nvgt_compilation_output> output;
 	bool fail, isUI, quiet;
 	CompileExecutableTask(asIScriptEngine* engine, const string& script_file) : stage(0), fail(false), isUI(Util::Application::instance().config().has("application.gui")), quiet(Util::Application::instance().config().has("application.quiet") || Util::Application::instance().config().has("application.QUIET")), engine(engine), script_file(script_file), output(nvgt_init_compilation(script_file, false)) {}
-	void handle_exception(const Exception& e) {
-		if (output && !output->get_error_text().empty()) engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s, %s", output->get_output_file(), output->get_error_text(), e.displayText()).c_str());
-		else if (output) engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s", output->get_output_file(), e.displayText()).c_str());
-		else engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("exception while compiling, %s", e.displayText()).c_str());
-		fail = true;
-	}
 	void compile() {
-		try {
-			output->prepare();
-			if (!output) {
-				engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, "failed to initialize compilation output context");
-				fail = true;
-				return;
-			}
-			unsigned char* code = NULL;
-			UInt32 code_size = SaveCompiledScript(engine, &code);
-			if (code_size < 1) {
-				engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to retrieve bytecode while trying to compile %s", output->get_output_file()).c_str());
-				fail = true;
-				return;
-			}
-			output->write_payload(code, code_size);
-			free(code);
-			output->finalize();
-		} catch (Exception& e) {
-			handle_exception(e);
+		output->prepare();
+		if (!output) {
+			engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, "failed to initialize compilation output context");
+			fail = true;
 			return;
 		}
-	}
-	void postbuild() {
-		try {
-			output->postbuild();
-		} catch (Exception& e) {
-			handle_exception(e);
+		unsigned char* code = NULL;
+		UInt32 code_size = SaveCompiledScript(engine, &code);
+		if (code_size < 1) {
+			engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to retrieve bytecode while trying to compile %s", output->get_output_file()).c_str());
+			fail = true;
 			return;
 		}
+		output->write_payload(code, code_size);
+		free(code);
+		output->finalize();
 	}
 	void run() {
 		stage++;
-		if (stage == 1) compile();
-		else if (stage == 2) postbuild();
+		try {
+			if (stage == 1) compile();
+			else if (stage == 2) output->postbuild();
+		} catch(Exception& e) {
+			if (output && !output->get_error_text().empty()) engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s, %s", output->get_output_file(), output->get_error_text(), e.displayText()).c_str());
+			else if (output) engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s", output->get_output_file(), e.displayText()).c_str());
+			else engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("exception while compiling, %s", e.displayText()).c_str());
+			fail = true;
+		}
 	}
 	bool next() {
 		// Calls the run method and waits for it to complete, this is the main glue function called from outside this task to make it work. Calling this out of sequence is undefined!
@@ -648,18 +636,13 @@ int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
 	#ifdef NVGT_MOBILE
 	return -1; // Executable compilation is not supported on this platform, no need to compile this.
 	#else
+	if (g_platform == "auto") determine_compile_platform();
+	if (g_platform == "auto") return -1; // Cannot compile for this platform.
 	CompileExecutableTask t(engine, scriptFile);
-	try {
-		if (g_platform == "auto") determine_compile_platform();
-		if (g_platform == "auto") return -1; // Cannot compile for this platform.
-		if (!t.next()) return -1; // compile and bundle
-		t.output->postbuild_interface(); // First call shows compilation success dialog.
-		if (!t.next()) return -1; // postbuild, such as install
-		t.output->postbuild_interface(); // Second call shows any potential success dialogs from any postbuild steps.
-	} catch (Exception& e) {
-		t.handle_exception(e);
-		return -1;
-	}
+	if (!t.next()) return -1; // compile and bundle
+	t.output->postbuild_interface(); // First call shows compilation success dialog.
+	if (!t.next()) return -1; // postbuild, such as install
+	t.output->postbuild_interface(); // Second call shows any potential success dialogs from any postbuild steps.
 	return 0;
 	#endif // !NVGT_MOBILE
 }
