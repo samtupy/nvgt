@@ -13,9 +13,11 @@
 __pycache__
 
 # other intermediet build
+build/config.log
 build/lastbuild
 build/windev_path
 src/version.cpp
+.sconf_temp
 .sconsign.dblite
 *.orig
 jni/.gradle
