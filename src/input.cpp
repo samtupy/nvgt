@@ -415,7 +415,7 @@ CScriptArray* query_touch_device(uint64_t device_id) {
 	SDL_Finger** fingers = SDL_GetTouchFingers(device_id, &finger_count);
 	if (!fingers) return array;
 	array->Reserve(finger_count);
-	for (int i = 0; i < finger_count; i++) array->InsertLast(fingers + i);
+	for (int i = 0; i < finger_count; i++) array->InsertLast(*(fingers + i));
 	SDL_free(fingers);
 	return array;
 }
