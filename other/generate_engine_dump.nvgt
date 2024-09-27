@@ -3,184 +3,183 @@
 #pragma plugin nvgt_sqlite
 string[] global_vars;
 class exported_enum {
-dictionary properties;
-string name;
-exported_enum(string name) {
-this.name = name;
-}
-void export(string&in path) {
-file tempfile;
-tempfile.open(path+"/"+this.name+".txt", "wb");
-string[] k = this.properties.get_keys();
-for(uint i = 0; i<k.length(); i+=1) {
-int val;
-this.properties.get(k[i], val);
-tempfile.write(k[i]+" = "+val+";\r\n");
-}
-tempfile.close();
-}
+	dictionary properties;
+	string name;
+	exported_enum(string name) {
+		this.name = name;
+	}
+	void export(string&in path) {
+		file tempfile;
+		tempfile.open(path + "/" + this.name + ".txt", "wb");
+		string[] k = this.properties.get_keys();
+		for (uint i = 0; i < k.length(); i += 1) {
+			int val;
+			this.properties.get(k[i], val);
+			tempfile.write(k[i] + " = " + val + ";\r\n");
+		}
+		tempfile.close();
+	}
 }
 void add_enum_property(string name, string what, int value) {
-exported_enum@e = get_exported_enum(name);
-e.properties.set(what, value);
+	exported_enum@e = get_exported_enum(name);
+	e.properties.set(what, value);
 }
 
 class nvgt_class {
-dictionary variables;
-string[] methods;
-string name;
-nvgt_class(string name) {
-this.name = name;
-}
-string[]@ get_variables(bool include_values = true) {
-string[] ret;
-if(this.variables.get_size()<=0) return ret;
-string[] k = this.variables.get_keys();
-for(uint i = 0; i<k.length(); i+=1) {
-if(include_values) {
-string s;
-this.variables.get(k[i], s);
-ret.insert_last(k[i]+" = "+s+";");
-}
-else ret.insert_last(k[i]+";");
-}
-return ret;
-}
+	dictionary variables;
+	string[] methods;
+	string name;
+	nvgt_class(string name) {
+		this.name = name;
+	}
+	string[]@ get_variables(bool include_values = true) {
+		string[] ret;
+		if (this.variables.get_size() <= 0) return ret;
+		string[] k = this.variables.get_keys();
+		for (uint i = 0; i < k.length(); i += 1) {
+			if (include_values) {
+				string s;
+				this.variables.get(k[i], s);
+				ret.insert_last(k[i] + " = " + s + ";");
+			} else ret.insert_last(k[i] + ";");
+		}
+		return ret;
+	}
 }
 string[] functions;
 dictionary classes;
 dictionary exported_enums;
 exported_enum@get_exported_enum(string&in name) {
-exported_enum@temp;
-if(exported_enums.get(name, @temp)) return @temp;
-exported_enum e(name);
-exported_enums.set(name, @e);
-return @e;
+	exported_enum@temp;
+	if (exported_enums.get(name, @temp)) return @temp;
+	exported_enum e(name);
+	exported_enums.set(name, @e);
+	return @e;
 }
 nvgt_class@get_nvgt_class(string&in classname) {
-if(classes.exists(classname)) {
-nvgt_class@ret;
-classes.get(classname, @ret);
-return ret;
-}
-nvgt_class ret(classname);
-classes.set(classname, @ret);
-return ret;
+	if (classes.exists(classname)) {
+		nvgt_class@ret;
+		classes.get(classname, @ret);
+		return ret;
+	}
+	nvgt_class ret(classname);
+	classes.set(classname, @ret);
+	return ret;
 }
 void add_nvgt_class_method(string&in classname, string method) {
-nvgt_class@ nvgtcl = get_nvgt_class(classname);
-if(@nvgtcl != null) nvgtcl.methods.insert_last(method);
-else alert("error", "Couldn't add NVGT class "+classname);
+	nvgt_class@ nvgtcl = get_nvgt_class(classname);
+	if (@nvgtcl != null) nvgtcl.methods.insert_last(method);
+	else alert("error", "Couldn't add NVGT class " + classname);
 }
 void add_nvgt_class_property(string&in classname, string property, string value) {
-nvgt_class@ nvgtcl = get_nvgt_class(classname);
-if(@nvgtcl != null) nvgtcl.variables.set(property, value);
+	nvgt_class@ nvgtcl = get_nvgt_class(classname);
+	if (@nvgtcl != null) nvgtcl.variables.set(property, value);
 }
 void main() {
-datastream ds;
-counting_writer f(ds);
-script_dump_engine_configuration(f);
-string data = ds.str();
-string[] lines = data.split("\n");
-output_dir = input_box("where", "", output_dir);
-if(output_dir.is_empty()) exit();
-uint len = lines.length();
-if(directory_exists(output_dir)) directory_delete(output_dir);
-directory_create(output_dir);
-file tempfile;
-tempfile.open(output_dir+"/engine_dump.log", "wb");
-tempfile.write(data);
-tempfile.close();
-for(uint i = 0; i<len; i+=1) {
-string line = lines[i];
-if(line.starts_with("objmthd ")) parse_class_method(line);
-else if(line.starts_with("func")) parse_nvgt_function(line);
-else if(line.starts_with("prop")) add_global_var(line);
-else if(line.starts_with("enumval")) parse_enum_value(line);
-else if(line.starts_with("objprop")) parse_class_property(line);
-}
-write_global_vars();
-write_classes();
-write_functions();
-write_exported_enums();
+	datastream ds;
+	counting_writer f(ds);
+	script_dump_engine_configuration(f);
+	string data = ds.str();
+	string[] lines = data.split("\n");
+	output_dir = input_box("where", "", output_dir);
+	if (output_dir.is_empty()) exit();
+	uint len = lines.length();
+	if (directory_exists(output_dir)) directory_delete(output_dir);
+	directory_create(output_dir);
+	file tempfile;
+	tempfile.open(output_dir + "/engine_dump.log", "wb");
+	tempfile.write(data);
+	tempfile.close();
+	for (uint i = 0; i < len; i += 1) {
+		string line = lines[i];
+		if (line.starts_with("objmthd ")) parse_class_method(line);
+		else if (line.starts_with("func")) parse_nvgt_function(line);
+		else if (line.starts_with("prop")) add_global_var(line);
+		else if (line.starts_with("enumval")) parse_enum_value(line);
+		else if (line.starts_with("objprop")) parse_class_property(line);
+	}
+	write_global_vars();
+	write_classes();
+	write_functions();
+	write_exported_enums();
 }
 string output_dir = "nvgtexport";
 void write_global_vars() {
-file tempfile;
-tempfile.open(output_dir+"/globals.txt", "wb");
-tempfile.write(join(global_vars, ";\r\n"));
-tempfile.close();
+	file tempfile;
+	tempfile.open(output_dir + "/globals.txt", "wb");
+	tempfile.write(join(global_vars, ";\r\n"));
+	tempfile.close();
 }
 void write_classes() {
-if(!directory_exists(output_dir+"/classes")) directory_create(output_dir+"/classes");
-alert("classes", classes.get_size()+" in writing");
-string[] lst = classes.get_keys();
-for(uint i = 0; i<lst.length(); i+=1) {
-nvgt_class@c;
-classes.get(lst[i], @c);
-string[] props = c.get_variables();
-string[] o;
-if(props.length()>0) o.insert_last(join(props, "\r\n"));
-o.insert_last(join(c.methods, "\r\n"));
-string output = join(o, "\r\n");
-file tempfile;
-string name = c.name;
-name = name.replace("<T>", "Template", true);
-tempfile.open(output_dir+"/classes/"+name+".txt", "wb");
-tempfile.write(output);
-tempfile.close();
-}
+	if (!directory_exists(output_dir + "/classes")) directory_create(output_dir + "/classes");
+	alert("classes", classes.get_size() + " in writing");
+	string[] lst = classes.get_keys();
+	for (uint i = 0; i < lst.length(); i += 1) {
+		nvgt_class@c;
+		classes.get(lst[i], @c);
+		string[] props = c.get_variables();
+		string[] o;
+		if (props.length() > 0) o.insert_last(join(props, "\r\n"));
+		o.insert_last(join(c.methods, "\r\n"));
+		string output = join(o, "\r\n");
+		file tempfile;
+		string name = c.name;
+		name = name.replace("<T>", "Template", true);
+		tempfile.open(output_dir + "/classes/" + name + ".txt", "wb");
+		tempfile.write(output);
+		tempfile.close();
+	}
 }
 void write_functions() {
-file tempfile;
-tempfile.open(output_dir+"/functions.txt", "wb");
-tempfile.write(join(functions, "\r\n"));
-tempfile.close();
+	file tempfile;
+	tempfile.open(output_dir + "/functions.txt", "wb");
+	tempfile.write(join(functions, "\r\n"));
+	tempfile.close();
 }
 void write_exported_enums() {
-string path = output_dir+"/enums";
-if(!directory_exists(path)) directory_delete(path); //this will probably not happen because we clear this directory, but ah well.
-directory_create(path);
-string[] k = exported_enums.get_keys();
-for(uint i = 0; i<k.length(); i+=1) {
-exported_enum@e;
-exported_enums.get(k[i], @e);
-if(@e == null) continue;
-e.export(path);
-}
+	string path = output_dir + "/enums";
+	if (!directory_exists(path)) directory_delete(path); //this will probably not happen because we clear this directory, but ah well.
+	directory_create(path);
+	string[] k = exported_enums.get_keys();
+	for (uint i = 0; i < k.length(); i += 1) {
+		exported_enum@e;
+		exported_enums.get(k[i], @e);
+		if (@e == null) continue;
+		e.export(path);
+	}
 }
 void parse_class_method(string data) {
-if(data.is_empty()) return;
-string[] p = data.split(" ");
-string classname = p[1].replace("\"", "", true);
-p.remove_at(0);
-//p.remove_at(1);
-p[1] = p[1].substr(1);
-string func = join(p, " ");
-func = func.replace("\"", "", true);
-func = func.replace(" ", "::", false);
-add_nvgt_class_method(classname, func);
+	if (data.is_empty()) return;
+	string[] p = data.split(" ");
+	string classname = p[1].replace("\"", "", true);
+	p.remove_at(0);
+	//p.remove_at(1);
+	p[1] = p[1].substr(1);
+	string func = join(p, " ");
+	func = func.replace("\"", "", true);
+	func = func.replace(" ", "::", false);
+	add_nvgt_class_method(classname, func);
 }
 void parse_class_property(string data) {
-if(data.is_empty()) return;
-string[] p = data.split(" ");
-string classname = p[1].replace("\"", "", true);
-string varname = p[2].replace("\"", "", true);
-string value = p[3].replace("\"", "", true)+" "+p[4].replace("\"", "", true);
-add_nvgt_class_property(classname, varname, value);
+	if (data.is_empty()) return;
+	string[] p = data.split(" ");
+	string classname = p[1].replace("\"", "", true);
+	string varname = p[2].replace("\"", "", true);
+	string value = p[3].replace("\"", "", true) + " " + p[4].replace("\"", "", true);
+	add_nvgt_class_property(classname, varname, value);
 }
 void parse_nvgt_function(string data) {
-string[]@ p = data.split(" ");
-p.remove_at(0);
-string func = join(p, " ");
-functions.insert_last(func);
+	string[]@ p = data.split(" ");
+	p.remove_at(0);
+	string func = join(p, " ");
+	functions.insert_last(func);
 }
 void add_global_var(string data) {
-data = data.replace("prop ", "", false);
-data = data.replace("\"", "", true);
-global_vars.insert_last(data);
+	data = data.replace("prop ", "", false);
+	data = data.replace("\"", "", true);
+	global_vars.insert_last(data);
 }
 void parse_enum_value(string data) {
-string[] c = data.split(" ");
-add_enum_property(c[1], c[2], parse_float(c[3]));
+	string[] c = data.split(" ");
+	add_enum_property(c[1], c[2], parse_float(c[3]));
 }
