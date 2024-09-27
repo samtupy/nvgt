@@ -372,7 +372,7 @@ int WriteConfigToStream(asIScriptEngine *engine, ostream &strm)
 			strm << "access " << hex << (unsigned int)(accessMask) << dec << "\n";
 			currAccessMask = accessMask;
 		}
-		strm << "funcdef \"" << funcDef->GetFuncdefSignature()->GetDeclaration() << "\"\n";
+		strm << "funcdef \"" << funcDef->GetFuncdefSignature()->GetDeclaration(true, false, true) << "\"\n";
 	}
 
 	// A helper for writing object type members
@@ -399,7 +399,7 @@ int WriteConfigToStream(asIScriptEngine *engine, ostream &strm)
 						strm << "access " << hex << (unsigned int)(accessMask) << dec << "\n";
 						currAccessMask = accessMask;
 					}
-					strm << "intfmthd " << typeDecl.c_str() << " \"" << Escape::Quotes(func->GetDeclaration(false)).c_str() << (func->IsProperty() ? " property" : "") << "\"\n";
+					strm << "intfmthd " << typeDecl.c_str() << " \"" << Escape::Quotes(func->GetDeclaration(false, false, true)).c_str() << (func->IsProperty() ? " property" : "") << "\"\n";
 				}
 			}
 			else
@@ -414,7 +414,7 @@ int WriteConfigToStream(asIScriptEngine *engine, ostream &strm)
 						strm << "access " << hex << (unsigned int)(accessMask) << dec << "\n";
 						currAccessMask = accessMask;
 					}
-					strm << "objbeh \"" << typeDecl.c_str() << "\" " << asBEHAVE_FACTORY << " \"" << Escape::Quotes(func->GetDeclaration(false)).c_str() << "\"\n";
+					strm << "objbeh \"" << typeDecl.c_str() << "\" " << asBEHAVE_FACTORY << " \"" << Escape::Quotes(func->GetDeclaration(false, false, true)).c_str() << "\"\n";
 				}
 				for( m = 0; m < type->GetBehaviourCount(); m++ )
 				{
@@ -423,12 +423,12 @@ int WriteConfigToStream(asIScriptEngine *engine, ostream &strm)
 
 					if( beh == asBEHAVE_CONSTRUCT )
 						// Prefix 'void'
-						strm << "objbeh \"" << typeDecl.c_str() << "\" " << beh << " \"void " << Escape::Quotes(func->GetDeclaration(false)).c_str() << "\"\n";
+						strm << "objbeh \"" << typeDecl.c_str() << "\" " << beh << " \"void " << Escape::Quotes(func->GetDeclaration(false, false, true)).c_str() << "\"\n";
 					else if( beh == asBEHAVE_DESTRUCT )
 						// Prefix 'void' and remove ~
-						strm << "objbeh \"" << typeDecl.c_str() << "\" " << beh << " \"void " << Escape::Quotes(func->GetDeclaration(false)).c_str()+1 << "\"\n";
+						strm << "objbeh \"" << typeDecl.c_str() << "\" " << beh << " \"void " << Escape::Quotes(func->GetDeclaration(false, false, true)).c_str()+1 << "\"\n";
 					else
-						strm << "objbeh \"" << typeDecl.c_str() << "\" " << beh << " \"" << Escape::Quotes(func->GetDeclaration(false)).c_str() << "\"\n";
+						strm << "objbeh \"" << typeDecl.c_str() << "\" " << beh << " \"" << Escape::Quotes(func->GetDeclaration(false, false, true)).c_str() << "\"\n";
 				}
 				for( m = 0; m < type->GetMethodCount(); m++ )
 				{
@@ -439,7 +439,7 @@ int WriteConfigToStream(asIScriptEngine *engine, ostream &strm)
 						strm << "access " << hex << (unsigned int)(accessMask) << dec << "\n";
 						currAccessMask = accessMask;
 					}
-					strm << "objmthd \"" << typeDecl.c_str() << "\" \"" << Escape::Quotes(func->GetDeclaration(false)).c_str() << (func->IsProperty() ? " property" : "") << "\"\n";
+					strm << "objmthd \"" << typeDecl.c_str() << "\" \"" << Escape::Quotes(func->GetDeclaration(false, false, true)).c_str() << (func->IsProperty() ? " property" : "") << "\"\n";
 				}
 				for( m = 0; m < type->GetPropertyCount(); m++ )
 				{
@@ -502,7 +502,7 @@ int WriteConfigToStream(asIScriptEngine *engine, ostream &strm)
 			strm << "access " << hex << (unsigned int)(accessMask) << dec << "\n";
 			currAccessMask = accessMask;
 		}
-		strm << "func \"" << Escape::Quotes(func->GetDeclaration()).c_str() << (func->IsProperty() ? " property" : "") << "\"\n";
+		strm << "func \"" << Escape::Quotes(func->GetDeclaration(true, false, true)).c_str() << (func->IsProperty() ? " property" : "") << "\"\n";
 	}
 
 	// Write global properties
