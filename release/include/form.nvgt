@@ -2954,6 +2954,7 @@ class control {
 			return false;
 		}
 		if (col > max_col) col = max_col;
+		if (pos==0) col--;
 		pos += col;
 		cursor = pos;
 		sel_start = -1;
