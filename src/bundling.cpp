@@ -71,6 +71,21 @@ bool system_command(const string& command, const Process::Args& args = {}) {
 	string std_out, std_err;
 	return system_command(command, args, std_out, std_err);
 }
+// Similar to above, but this function handles a single command string intended to come from the user and does not redirect pipes.
+bool user_command(const std::string& command) {
+	string appname, current_arg;
+	vector<string> args;
+	bool in_quotes = false;
+	for (size_t i = 0; i <= command.length(); i++) {
+		if (i == command.length() || command[i] == ' ' && !in_quotes) {
+			if (appname.empty()) appname = current_arg;
+			else args.push_back(current_arg);
+			current_arg = "";
+		} else if (command[i] == '"') in_quotes = !in_quotes;
+		else current_arg += command[i];
+	}
+	return Process::wait(Process::launch(appname, args)) == 0;
+}
 
 class nvgt_compilation_output_impl : public virtual nvgt_compilation_output {
 	string platform, stub, input_file, output_file;
@@ -118,6 +133,11 @@ public:
 		stubpath = format("%snvgt_%s%s.bin", stubpath.toString(), platform, (stub != "" ? string("_") + stub : ""));
 		outpath = config.getString("build.output_basename", Path(input_file).setExtension("").toString());
 		alter_output_path(outpath);
+		string precommand = config.getString("build.precommand", "");
+		if (!precommand.empty()) {
+			set_status("executing prebuild command...");
+			if (!user_command(precommand)) throw Exception("prebuild command failed");
+		}
 		set_status("copying stub...");
 		try {
 			copy_stub(stubpath, outpath);
@@ -141,10 +161,15 @@ public:
 		fs.close();
 		finalize_product(outpath);
 		output_file = outpath.toString();
+		string postcommand = config.getString("build.postcommand", "");
+		if (!postcommand.empty()) {
+			set_status("executing postbuild command...");
+			if (!user_command(postcommand)) throw Exception("postbuild command failed");
+		}
 	}
 	void postbuild_interface() {
 		if (!postbuild_complete) {
-			bool quiet = config.hasOption("application.quiet") || config.hasOption("application.QUIET"); // Maybe we should switch to a verbocity level?
+			bool quiet = config.hasOption("application.quiet") || config.hasOption("application.QUIET") || config.hasOption("build.no_success_message"); // Maybe we should switch to a verbocity level?
 			if (!quiet) message(format("%s build succeeded in %?ums, saved to %s", string(g_debug ? "Debug" : "Release"), Util::Application::instance().uptime().totalMilliseconds(), output_file), "Success!");
 			postbuild_interface(false);
 			postbuild_complete = true;
@@ -165,7 +190,7 @@ protected:
 			if (i >= 'A' && i <= 'Z' || i >= 'a' && i <= 'z' || i >= '0' && i <= '9') output += i;
 			else output += (output.empty()? "g" : format("%d", int(i)));
 		}
-		return "com.NVGTUser." + output;
+		return format("%s.%s", config.getString("build.product_identifier_domain", "com.NVGTUser"), output);
 	}
 	virtual void alter_stub_path(Path& stubpath) {
 		// This method can be overwritten by subclasses to modify the location that stubs are selected from. Throw an exception to abort the compilation.

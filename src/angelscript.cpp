@@ -621,10 +621,8 @@ public:
 		while (!worker->tryJoin(5)) {
 			string status = output->get_status();
 			if (!quiet && !status.empty()) {
-				if (isUI) {
-					if (WindowIsFocused()) ScreenReaderSilence(); // We want to speak window changes interrupting.
-					ShowNVGTWindow(status);
-				} else cout << status << endl;
+				if (isUI) ShowNVGTWindow(status);
+				else cout << status << endl;
 			}
 			refresh_window();
 		}
