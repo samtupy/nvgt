@@ -57,9 +57,10 @@ function setup_poco {
 
 function setup_sdl {
 	echo Installing SDL...
-	git clone --depth 1 https://github.com/libsdl-org/SDL||true
+	git clone https://github.com/libsdl-org/SDL||true
 	mkdir -p SDL/build
 	cd SDL/build
+	git checkout 4e09e58f62e95a66125dae9ddd3e302603819ffd
 	cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST_LIBRARY=OFF -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" ..
 	cmake --build . --config MinSizeRel
 	sudo make install

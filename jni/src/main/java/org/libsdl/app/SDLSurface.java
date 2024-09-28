@@ -15,6 +15,7 @@ import android.view.Display;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.accessibility.AccessibilityManager;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -30,7 +31,7 @@ import android.view.WindowManager;
     Because of this, that's where we set up the SDL thread
 */
 public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
-    View.OnApplyWindowInsetsListener, View.OnKeyListener, View.OnTouchListener, SensorEventListener  {
+    View.OnApplyWindowInsetsListener, View.OnKeyListener, View.OnHoverListener, View.OnTouchListener, SensorEventListener  {
 
     // Sensors
     protected SensorManager mSensorManager;
@@ -41,6 +42,9 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
 
     // Is SurfaceView ready for rendering
     public boolean mIsSurfaceReady;
+
+    // Accessibility manager
+    protected AccessibilityManager mAccessibilityManager;
 
     // Startup
     public SDLSurface(Context context) {
@@ -53,9 +57,11 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
         setOnApplyWindowInsetsListener(this);
         setOnKeyListener(this);
         setOnTouchListener(this);
+        setOnHoverListener(this);
 
         mDisplay = ((WindowManager)context.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
         mSensorManager = (SensorManager)context.getSystemService(Context.SENSOR_SERVICE);
+        mAccessibilityManager = (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
 
         setOnGenericMotionListener(SDLActivity.getMotionListener());
 
@@ -234,6 +240,14 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
 
     // Touch events
     @Override
+    public boolean onHover(View v, MotionEvent event) {
+       if (mAccessibilityManager.isTouchExplorationEnabled()) {
+            return onTouch(v, event);
+        } else {
+            return super.onHoverEvent(event);
+        }
+    }
+    @Override
     public boolean onTouch(View v, MotionEvent event) {
         /* Ref: http://developer.android.com/training/gestures/multi.html */
         int touchDevId = event.getDeviceId();
@@ -242,6 +256,11 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
         int pointerFingerId;
         int i = -1;
         float x,y,p;
+        
+        // Convert hover events to touch events if we've received them. Should we only do this if accessibility manager?
+        if (action == MotionEvent.ACTION_HOVER_ENTER) action = MotionEvent.ACTION_DOWN;
+        else if (action == MotionEvent.ACTION_HOVER_MOVE) action = MotionEvent.ACTION_MOVE;
+        else if (action == MotionEvent.ACTION_HOVER_EXIT) action = MotionEvent.ACTION_UP;
 
         // 12290 = Samsung DeX mode desktop mouse
         // 12290 = 0x3002 = 0x2002 | 0x1002 = SOURCE_MOUSE | SOURCE_TOUCHSCREEN

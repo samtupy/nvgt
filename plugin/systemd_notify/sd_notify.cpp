@@ -1,11 +1,12 @@
 #include <string>
 #include "../../src/nvgt_plugin.h"
-#ifdef __linux__
+#if __has_include(<systemd/sd-daemon.h>)
 #include <systemd/sd-daemon.h>
+#define systemd_available
 #endif
 
 int systemd_notify(const std::string& state) {
-	#ifdef __linux__
+	#ifdef systemd_available
 		return sd_notify(0, state.c_str());
 	#else
 		return 0;

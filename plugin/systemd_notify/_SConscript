@@ -1,8 +1,13 @@
 Import("env")
 
+systemd_avail = False
+conf = Configure(env, log_file = "#build/config.log")
+if conf.CheckLib("systemd"): systemd_avail = True
+env = conf.Finish()
+
 if ARGUMENTS.get("no_shared_plugins", "0") == "0":
-	env.SharedLibrary("#release/lib/systemd_notify", ["sd_notify.cpp"], LIBS = ["systemd"] if env["PLATFORM"] == "posix" else [])
+	env.SharedLibrary("#release/lib/systemd_notify", ["sd_notify.cpp"], LIBS = ["systemd"] if systemd_avail else [])
 static = env.Object("sd_notify_static", "sd_notify.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "systemd_notify")])
 static = env.StaticLibrary("#build/lib/systemd_notify", [static])
-if env["PLATFORM"] == "posix": static = [static, "systemd"]
+if systemd_avail: static = [static, "systemd"]
 Return("static")

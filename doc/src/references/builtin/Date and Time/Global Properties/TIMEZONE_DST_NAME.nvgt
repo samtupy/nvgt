@@ -1,0 +1,12 @@
+/**
+	Retrieve the name of the timezone currently set on the system that is displayed when daylight saving time is in effect.
+	const string TIMEZONE_STANDARD_NAME;
+	## Remarks:
+		This will always return the version of the timezone name that is shown when daylight saving time is active, even if daylight saving time is not actually in effect.
+		If the current timezone does not use daylight saving time, the value of this property is somewhat undefined but is most likely to equal TIMEZONE_STANDARD_NAME. The undefined value condition is a result of directly querying the operating system's API for this information, different platforms might react in slightly different ways to the absants of daylight savings support in a timezone.
+*/
+
+// Example:
+void main() {
+	alert("timezone example", "Currently in " + TIMEZONE_NAME + ", which is usually called " + TIMEZONE_STANDARD_NAME + " though it is known as " + TIMEZONE_DST_NAME + "when daylight saving time is in effect.");
+}

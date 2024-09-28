@@ -1,0 +1,12 @@
+/**
+	Determine the DST alteration offset in seconds if daylight saving time is active in the system's current timezone.
+	const int TIMEZONE_DST_OFFSET;
+	## Remarks:
+		If daylight saving time usually moves the clock an hour forward in your timezone when it is active, for example, this value will return 3600.
+*/
+
+// Example:
+void main() {
+	timespan t(TIMEZONE_DST_OFFSET, 0);
+	alert(TIMEZONE_NAME, "The clock is being altered by " + t.hours + " hours, " + t.minutes + " minutes, and " + t.seconds + " seconds due to daylight saving time.");
+}

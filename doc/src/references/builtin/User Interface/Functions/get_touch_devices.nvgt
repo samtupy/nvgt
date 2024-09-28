@@ -1,0 +1,20 @@
+/**
+	Enumerate all available touch input devices on the system.
+	uint64[]@ get_touch_devices();
+	## Returns:
+		uint64[]@: An array of touch device IDs, may be empty of no touch devices are available.
+	## Remarks:
+		You can pass any of the IDs returned from this function to the get_touch_device_type, get_touch_device_name, or query_touch_device functions.
+		Note that on some platforms, certain touch devices might not become available until they first receive input. For example this is true with the Android touch screen.
+*/
+
+// Example:
+void main() {
+	uint64[]@ devices = get_touch_devices();
+	if (devices.length() < 1) {
+		alert("no devices", "There are no detectable touch devices on your system.");
+		exit();
+	}
+	for (uint i = 0; i < devices.length(); i++)
+		alert("device " + devices[i], get_touch_device_name(devices[i]));
+}
