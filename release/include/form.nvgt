@@ -192,6 +192,30 @@ class audio_form {
 		c_form[control_index].custom_type = custom_type;
 		return true;
 	}
+	string get_custom_type(int control_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return "";
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return "";
+		}
+		return c_form[control_index].custom_type;
+	}
+	bool has_custom_type(int control_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return false;
+		}
+		return !c_form[control_index].custom_type.empty();
+	}
 	bool set_subform(int control_index, audio_form@ f) {
 		form_error = 0;
 		if (!active) {
@@ -354,7 +378,7 @@ class audio_form {
 		@c_form[control_counter].ui_speech = ui_speech;
 		return control_counter;
 	}
-	int create_slider(string caption, float default_value = 50, float minimum_value = 0, float maximum_value = 100, string text = "", float step_size = 1) {
+	int create_slider(string caption, double default_value = 50, double minimum_value = 0, double maximum_value = 100, string text = "", double step_size = 1) {
 		form_error = 0;
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
@@ -1815,6 +1839,39 @@ class audio_form {
 	int get_last_error() {
 		return form_error;
 	}
+	bool set_link_url(int control_index, string new_url) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return false;
+		}
+		if (c_form[control_index].type != ct_link) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_index].link_url = new_url;
+		return true;
+	}
+	string get_link_url(int control_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return "";
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return "";
+		}
+		if (c_form[control_index].type != ct_link) {
+			form_error = form_error_invalid_control;
+			return "";
+		}
+		return c_form[control_index].link_url;
+	}
 	bool set_progress(int control_index, int value) {
 		form_error = 0;
 		if (!active) {
@@ -1848,7 +1905,7 @@ class audio_form {
 		}
 		return true;
 	}
-	bool set_slider(int control_index, int value, int min = -1, int max = -1) {
+	bool set_slider(int control_index, double value, double min = -1, double max = -1) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
@@ -1881,7 +1938,7 @@ class audio_form {
 		c_form[control_index].slider_value = value;
 		return true;
 	}
-	int get_slider(int control_index) {
+	double get_slider(int control_index) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
@@ -1897,7 +1954,7 @@ class audio_form {
 		}
 		return c_form[control_index].slider_value;
 	}
-	string get_slider_text_value(int control_index, int value) {
+	string get_slider_text_value(int control_index, double value) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
@@ -1915,7 +1972,44 @@ class audio_form {
 		if (c_form[control_index].slider_text_values.get(value, text)) return "";
 		return text;
 	}
-	bool set_slider_text_value(int control_index, int value, const string& in text) {
+	bool set_slider_step_size(int control_index, double new_size) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return false;
+		}
+		if (c_form[control_index].type != ct_slider) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (new_size <= 0) {
+			form_error = form_error_invalid_value;
+			return false;
+		}
+		c_form[control_index].slider_step_size = new_size;
+		return true;
+	}
+	double get_slider_step_size(int control_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return -1;
+		}
+		if (c_form[control_index].type != ct_slider) {
+			form_error = form_error_invalid_control;
+			return -1;
+		}
+		return c_form[control_index].slider_step_size;
+	}
+	bool set_slider_text_value(int control_index, double value, const string& in text) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
@@ -2106,7 +2200,7 @@ class audio_form {
 			}
 		}
 		if (c_form[tab_index].type == ct_input) {
-			if (key_pressed(KEY_F2)) {
+			if (key_repeating(KEY_F2)) {
 				int dir = 1;
 				if (keyboard_modifiers & KEYMOD_SHIFT != 0) dir = -1;
 				audioform_keyboard_echo = audioform_change_keyboard_echo(audioform_keyboard_echo, dir);
@@ -2319,10 +2413,10 @@ class control {
 	bool list_nav_translate;
 	int type;
 	int progress;
-	float slider_value;
-	float slider_minimum_value;
-	float slider_maximum_value;
-	float slider_step_size;
+	double slider_value;
+	double slider_minimum_value;
+	double slider_maximum_value;
+	double slider_step_size;
 	dictionary slider_text_values;
 	int echo_flag;
 	int speak_interval;
@@ -2626,7 +2720,7 @@ class control {
 			}
 		}
 		if (type == ct_slider) {
-			float increment = 0;
+			double increment = 0;
 			// we don't want to add to the slider_value if it touches the edges.
 			bool slider_edge = false;
 			if (key_repeating(KEY_LEFT) || key_repeating(KEY_DOWN))
@@ -2648,12 +2742,12 @@ class control {
 			int width = floor((slider_maximum_value - slider_minimum_value) / slider_step_size);
 			if (keyboard_modifiers & KEYMOD_CTRL == 0 && width > 100 && !slider_edge) {
 				increment *= (width * 0.025);
-				// Because we now support floating points, increment multiplication can return numbers with decimal points.
+				// Because we now support doubles, increment multiplication can return numbers with decimal points.
 				// It can set unexpected values if step size is without decimal points.
 				if (slider_step_size % 1 == 0)
 					increment -= increment % 1;
 			}
-			float new_value;
+			double new_value;
 			if (slider_edge)
 				new_value = increment;
 			else
@@ -2663,7 +2757,7 @@ class control {
 			if (new_value > slider_maximum_value)
 				new_value = slider_maximum_value;
 			if (new_value != slider_value) {
-				float old = slider_value;
+				double old = slider_value;
 				slider_value = new_value;
 				if (@event_callback != null and event_callback(f, tab_index, event_slider, {{"increment", increment}, {"value", slider_value}}) == 1) {
 					slider_value = old;
