@@ -1,0 +1,39 @@
+atomic_flag continue_main_thread;
+atomic_int counter1;
+atomic_uint counter2;
+void do_something_really_complicated() {
+wait(3); // Do something really complicated...
+continue_main_thread.test_and_set();
+continue_main_thread.notify_all();
+}
+
+void test_atomic_flag() {
+async<void>(do_something_really_complicated);
+continue_main_thread.wait(false);
+}
+
+void test_atomic_counters() {
+counter1 = 0;
+++counter1;
+--counter1;
+counter1 += 10;
+counter1 -= 1;
+counter1 |= 0x30;
+counter1 &= 0xff;
+assert(counter1.is_lock_free());
+assert(counter1.is_always_lock_free);
+counter2 = 0;
+++counter2;
+--counter2;
+counter2 += 10;
+counter2 -= 1;
+counter2 |= 0x30;
+counter2 &= 0xff;
+assert(counter2.is_lock_free());
+assert(counter2.is_always_lock_free);
+}
+
+void test_atomic() {
+test_atomic_flag();
+test_atomic_counters();
+}

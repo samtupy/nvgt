@@ -13,4 +13,4 @@
 #pragma once
 #include <angelscript.h>
 
-void register_atomics(IScriptEngine* engine);
+void register_atomics(asIScriptEngine* engine);
