@@ -25,6 +25,7 @@
 #include <Poco/FileStream.h>
 #include <Poco/Format.h>
 #include <Poco/Glob.h>
+#include <Poco/Mutex.h>
 #include <Poco/Path.h>
 #include <Poco/PipeStream.h>
 #include <Poco/Process.h>
@@ -70,18 +71,35 @@ bool system_command(const string& command, const Process::Args& args = {}) {
 	string std_out, std_err;
 	return system_command(command, args, std_out, std_err);
 }
+// Similar to above, but this function handles a single command string intended to come from the user and does not redirect pipes.
+bool user_command(const std::string& command) {
+	string appname, current_arg;
+	vector<string> args;
+	bool in_quotes = false;
+	for (size_t i = 0; i <= command.length(); i++) {
+		if (i == command.length() || command[i] == ' ' && !in_quotes) {
+			if (appname.empty()) appname = current_arg;
+			else args.push_back(current_arg);
+			current_arg = "";
+		} else if (command[i] == '"') in_quotes = !in_quotes;
+		else current_arg += command[i];
+	}
+	return Process::wait(Process::launch(appname, args)) == 0;
+}
 
 class nvgt_compilation_output_impl : public virtual nvgt_compilation_output {
 	string platform, stub, input_file, output_file;
-	string stub_location, error_text;
+	string stub_location, error_text, status_text;
 	UInt64 stub_size;
 	Path outpath;
+	Mutex status_text_mtx;
+	bool postbuild_complete;
 	void error(const exception& exc, const std::string& error) {
 		error_text = error;
 		throw;
 	}
 public:
-	nvgt_compilation_output_impl(const string& input_file) : input_file(input_file), platform(g_platform), stub(g_stub), stub_size(0), config(Util::Application::instance().config()) {}
+	nvgt_compilation_output_impl(const string& input_file) : input_file(input_file), platform(g_platform), stub(g_stub), stub_size(0), postbuild_complete(false), config(Util::Application::instance().config()) {}
 	const string& get_error_text() {
 		return error_text;
 	}
@@ -91,7 +109,23 @@ public:
 	const string& get_output_file() {
 		return output_file;
 	}
+	void set_status(const std::string& message) {
+		{
+			Mutex::ScopedLock l(status_text_mtx);
+			status_text = message;
+		}
+	}
+	std::string get_status() {
+		string result;
+		{
+			Mutex::ScopedLock l(status_text_mtx);
+			result = status_text;
+			status_text = "";
+		}
+		return result;
+	}
 	void prepare() {
+		set_status("initializing...");
 		Path stubpath = config.getString("application.dir");
 		stubpath.pushDirectory("stub");
 		xplatform_correct_path_to_stubs(stubpath);
@@ -99,6 +133,12 @@ public:
 		stubpath = format("%snvgt_%s%s.bin", stubpath.toString(), platform, (stub != "" ? string("_") + stub : ""));
 		outpath = config.getString("build.output_basename", Path(input_file).setExtension("").toString());
 		alter_output_path(outpath);
+		string precommand = config.getString("build.precommand", "");
+		if (!precommand.empty()) {
+			set_status("executing prebuild command...");
+			if (!user_command(precommand)) throw Exception("prebuild command failed");
+		}
+		set_status("copying stub...");
 		try {
 			copy_stub(stubpath, outpath);
 		} catch(exception& e) { error(e, format("failed to copy %s to %s", stubpath.toString(), outpath.toString())); }
@@ -108,6 +148,7 @@ public:
 	}
 	void write_payload(const unsigned char* payload, unsigned int size) {
 		if (!fs.good()) error(Exception("stream is not ready"), "error writing payload");
+		set_status("writing payload...");
 		BinaryWriter bw(fs);
 		write_embedded_packs(bw);
 		bw.write7BitEncoded(size ^ NVGT_BYTECODE_NUMBER_XOR);
@@ -115,10 +156,24 @@ public:
 	}
 	void finalize() {
 		if (!fs.good()) return; // This shouldn't be called in this condition!
+		set_status("finalizing product...");
 		finalize_output_stream();
 		fs.close();
 		finalize_product(outpath);
 		output_file = outpath.toString();
+		string postcommand = config.getString("build.postcommand", "");
+		if (!postcommand.empty()) {
+			set_status("executing postbuild command...");
+			if (!user_command(postcommand)) throw Exception("postbuild command failed");
+		}
+	}
+	void postbuild_interface() {
+		if (!postbuild_complete) {
+			bool quiet = config.hasOption("application.quiet") || config.hasOption("application.QUIET") || config.hasOption("build.no_success_message"); // Maybe we should switch to a verbocity level?
+			if (!quiet) message(format("%s build succeeded in %?ums, saved to %s", string(g_debug ? "Debug" : "Release"), Util::Application::instance().uptime().totalMilliseconds(), output_file), "Success!");
+			postbuild_interface(false);
+			postbuild_complete = true;
+		} else postbuild_interface(true);
 	}
 	void postbuild() {
 		postbuild(outpath);
@@ -135,7 +190,7 @@ protected:
 			if (i >= 'A' && i <= 'Z' || i >= 'a' && i <= 'z' || i >= '0' && i <= '9') output += i;
 			else output += (output.empty()? "g" : format("%d", int(i)));
 		}
-		return "com.NVGTUser." + output;
+		return format("%s.%s", config.getString("build.product_identifier_domain", "com.NVGTUser"), output);
 	}
 	virtual void alter_stub_path(Path& stubpath) {
 		// This method can be overwritten by subclasses to modify the location that stubs are selected from. Throw an exception to abort the compilation.
@@ -159,6 +214,9 @@ protected:
 	}
 	virtual void finalize_product(Path& outpath) {
 		// Subclasses can override this method as a final hook into the bundling process after bytecode has been written to the stub but before build success is reported to the user. If any final packaging steps performed here modify the final output path, update the outpath parameter accordingly so that the correct path of the final product package will be shown to the user.
+	}
+	virtual void postbuild_interface(bool after_postbuild) {
+		// This serves as the point where any platforms can ask post build questions, such as whether the user would like to install the build etc. It exists because it is specifically executed on the main thread of NVGT's application as opposed to everything else in this class which is not. The method is called twice, once before the postbuild task and once after.
 	}
 	virtual void postbuild(const Path& output_path) {
 		// This is the very last method called on the bundling object before it is destroyed only assuming the build was successful. It was originally added to support output installation tasks on certain platforms.
@@ -231,11 +289,13 @@ protected:
 		plist_mem_free(plist_xml);
 		plist_free(plist);
 		// Now copy shared libraries.
+		set_status("copying libraries...");
 		File frameworks_location = Path(workplace.path()).append("Contents/Frameworks").toString();
 		if (frameworks_location.exists()) frameworks_location.remove(true);
 		File(get_nvgt_lib_directory(g_platform)).copyTo(frameworks_location.path());
 		if (bundle_mode > 1) {
 			// On the mac, we can execute the hdiutil command to create a .dmg file. Otherwise, we must create a .zip instead, as it can portably store unix file attributes.
+			set_status("packaging product...");
 			#ifdef __APPLE__
 				string sout, serr;
 				File dmg_out = Path(final_output_path).makeFile().setExtension("dmg").toString();
@@ -257,6 +317,7 @@ class nvgt_compilation_output_android : public nvgt_compilation_output_impl {
 	TemporaryFile workplace;
 	Path final_output_path, android_jar, apksigner_jar;
 	int do_install; // 0 no, 1 ask, 2 always.
+	Clock install_timer;
 	string sign_cert, sign_password;
 	using nvgt_compilation_output_impl::nvgt_compilation_output_impl;
 	string exe(const std::string& path) {
@@ -269,6 +330,11 @@ class nvgt_compilation_output_android : public nvgt_compilation_output_impl {
 		if (!found) return false;
 		// Since this particular search was last in the Path::find calls above, located now contains a path to aapt2.exe, hopefully we can locate android.jar from it.
 		located.setFileName("");
+		if (File(Path(located).setFileName("android.jar")).exists()) {
+			android_jar = Path(located).setFileName("android.jar"); // This is likely from NVGT's minified set of Android tools provided for ease of use for beginners.
+			apksigner_jar = Path(located).setFileName("apksigner.jar");
+			return true;
+		}
 		apksigner_jar = Path(located).append("lib/apksigner.jar");
 		float buildtools_version = parse_float(located[located.depth() -1]);
 		if (buildtools_version < 1 || located[located.depth() -2] != "build-tools") return false; // Finding android.jar is hopeless given this non-standard location to aapt.
@@ -280,11 +346,16 @@ class nvgt_compilation_output_android : public nvgt_compilation_output_impl {
 		throw Exception(format("unable to locate android.jar in %s", located.toString())); // For now we'll assume that the build tools version is the same as the platform directory containing android.jar, if we get reports that this isn't the case for people we can update this code to glob the platforms directory to find one instead.
 	}
 	void find_android_sdk_tools() {
-		sign_cert = config.getString("build.android_signature_cert", "");
-		sign_password = config.getString("build.android_signature_password", "");
+		sign_cert = config.getString("build.android_signature_cert", Path::home() + ".nvgt_android.keystore");
+		sign_password = config.getString("build.android_signature_password", "pass:android");
 		do_install = config.getInt("build.android_install", 1);
-		string path = config.getString("build.android_path", Environment::get("PATH"));
-		if (android_sdk_tools_exist(path)) return;
+		string path = Path(config.getString("application.dir")).append("android-tools").toString() + Path::pathSeparator();
+		path += Path(config.getString("application.dir")).append("android-tools/java17/bin").toString() + Path::pathSeparator();
+		path += config.getString(Path::expand("build.android_path"), Environment::get("PATH"));
+		if (android_sdk_tools_exist(path)) {
+			Environment::set("PATH", path); // Encase the tools were in any of the custom paths we've just added.
+			return;
+		}
 		string android_home = Path::expand(config.getString("build.android_home", Environment::get("ANDROID_HOME", Environment::get("ANDROID_SDK_HOME", ""))));
 		// If we've still failed, maybe we can continue based on some default install locations?
 		if (android_home.empty() && Environment::isWindows()) {
@@ -353,6 +424,7 @@ protected:
 		output_manifest.write(manifest.c_str(), manifest.size());
 		output_manifest.close();
 		// Next, run aapt2 to link our modified AndroidManifest.xml and the flat resource files provided by the stub into the beginnings of our APK.
+		set_status("creating APK structure...");
 		string sout, serr;
 		vector<string> aapt2args = {"link", "-I", android_jar.toString(), "--manifest", "AndroidManifest.xml", "--rename-manifest-package", product_identifier, "", "--rename-resources-package", product_identifier, "--version-code", config.getString("build.product_version_code", format("%u", uint32_t(Timestamp().epochTime()) / 60)), "--version-name", config.getString("build.product_version", "1.0"), "res.zip", "-o", "tmp.apk"};
 		if (config.getString("build.android_manifest", "").empty()) aapt2args.push_back("--replace-version");
@@ -367,6 +439,7 @@ protected:
 		tmp_apk.close();
 		File(Path(workplace.path()).append("tmp.apk")).remove();
 		// OK! At this point, we have the final contents of our APK file, though extracted and lacking a signature. Lets zip it up, though we can't place the temporary zip file in the directory we want to zip up so we'll need a temporary file.
+		set_status("packaging APK...");
 		TemporaryFile zip_out_location;
 		FileOutputStream zip_out(zip_out_location.path());
 		Zip::Compress zcpr(zip_out, true);
@@ -374,24 +447,36 @@ protected:
 		zcpr.addRecursive(workplace.path(), Zip::ZipCommon::CM_AUTO);
 		zcpr.close();
 		// Now we need to align the zip file we just created using the Android sdk's zipalign tool, this will also be responsible for creating our final actual output file as it's the last operation that cannot be performed in place.
+		set_status("aligning APK...");
 		sout = serr = "";
 		if (!system_command(exe("zipalign"), {"-f", "-p", "16", zip_out_location.path(), output_path.toString()}, sout, serr)) throw Exception(format("failed to run zipalign on %s", zip_out_location.path()));
 		// If the correct information is provided, lets try to sign the app.
 		if (!sign_cert.empty() && !sign_password.empty()) {
+			if (!File(sign_cert).exists()) {
+				// Attempt to create a keystore at the given path with the given password.
+				set_status("creating signature keystore...");
+				sout = serr = "";
+				if (!system_command(exe("keytool"), {"-genkey", "-keyalg", "RSA", "-keysize", "2048", "-v", "-keystore", sign_cert, "-dname", config.getString("build.android_signature_info", "cn=NVGT"), "-storepass", sign_password.substr(sign_password.find(":") + 1), "-validity", "10000", "-alias", "game"}, sout, serr)) throw Exception(format("Failed to run keytool, %s%s", sout, serr));
+			}
+			set_status("signing APK...");
 			sout = serr = "";
-			if (!system_command(exe("java"), {"-jar", apksigner_jar.toString(), "sign", "-ks", sign_cert, "--ks-pass", sign_password, output_path.toString()}, sout, serr)) throw Exception(format("Failed to run apksigner, %s%s", sout, serr));
+			if (!system_command(exe("java"), {"-jar", apksigner_jar.toString(), "sign", "-ks", sign_cert, "--ks-pass", sign_password, "--key-pass", sign_password, output_path.toString()}, sout, serr)) throw Exception(format("Failed to run apksigner, %s%s", sout, serr));
+		}
+	}
+	void postbuild_interface(bool after_postbuild) override {
+		bool quiet = config.hasOption("application.quiet") || config.hasOption("application.QUIET");
+		if (!after_postbuild) {
+			do_install = do_install > 0 && system_command(exe("adb"), {"shell", "-n"}) && (do_install == 2 || !quiet && question("install app", "An android device is connected to this computer in debug mode, do you want to install the generated APK onto it?") == 1)? 2 : 0;
+		} else {
+			if (do_install == 2 && !quiet) message(format("The application %s (%s) was installed on all connected devices in %ums.", config.getString("build.product_name"), config.getString("build.product_identifier"), uint32_t(install_timer.elapsed() / 1000)), "Success!");
 		}
 	}
 	void postbuild(const Path& output_path) override {
-		bool quiet = config.hasOption("application.quiet") || config.hasOption("application.QUIET");
+		if (do_install < 2) return;
 		string sout, serr;
-		if (do_install) {
-			if (system_command(exe("adb"), {"shell", "-n"}) && (do_install == 2 || quiet ||question("install app", "An android device is connected to this computer in debug mode, do you want to install the generated APK onto it?"))) {
-				Clock install_timer;
-				if (!system_command(exe("adb"), {"install", "-f", output_path.toString()}, sout, serr)) throw Exception(format("Unable to install APK onto connected device, %s", serr));
-				else if (!quiet) message(format("The application %s (%s) was installed on all connected devices in %ums.", config.getString("build.product_name"), config.getString("build.product_identifier"), uint32_t(install_timer.elapsed() / 1000)), "Success!");
-			}
-		}
+		set_status("installing APK...");
+		install_timer.update();
+		if (!system_command(exe("adb"), {"install", "-f", output_path.toString()}, sout, serr)) throw Exception(format("Unable to install APK onto connected device, %s", serr));
 	}
 };
 nvgt_compilation_output* nvgt_init_compilation(const string& input_file, bool auto_prepare) {

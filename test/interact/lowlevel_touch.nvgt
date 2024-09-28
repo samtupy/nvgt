@@ -17,6 +17,7 @@ tts_voice tts;
 		touch_finger[]@ fingers = query_touch_device();
 		if (fingers.length() != prev_finger_count) {
 			tts.speak(fingers.length() + " fingers", true);
+			if (fingers.length() > 0) tts.speak(round(fingers[-1].x, 2) + ", " + round(fingers[-1].y, 2));
 			prev_finger_count = fingers.length();
 		}
 	}

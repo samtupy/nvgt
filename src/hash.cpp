@@ -120,12 +120,12 @@ unsigned int crc32(const std::string& data) {
 }
 
 void RegisterScriptHash(asIScriptEngine* engine) {
-	engine->RegisterGlobalFunction(_O("string string_hash_md5(const string& in, bool = false)"), asFUNCTION(md5), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_hash_sha1(const string& in, bool = false)"), asFUNCTION(sha1), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_hash_sha224(const string& in, bool = false)"), asFUNCTION(sha224), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_hash_sha256(const string& in, bool = false)"), asFUNCTION(sha256), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_hash_sha384(const string& in, bool = false)"), asFUNCTION(sha384), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_hash_sha512(const string& in, bool = false)"), asFUNCTION(sha512), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("uint crc32(const string& in)"), asFUNCTION(crc32), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("uint HOTP(const string& in, uint64, uint = 6)"), asFUNCTION(hotp), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_hash_md5(const string& in data, bool binary = false)"), asFUNCTION(md5), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_hash_sha1(const string& in data, bool binary = false)"), asFUNCTION(sha1), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_hash_sha224(const string& in data, bool binary = false)"), asFUNCTION(sha224), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_hash_sha256(const string& in data, bool binary = false)"), asFUNCTION(sha256), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_hash_sha384(const string& in data, bool binary = false)"), asFUNCTION(sha384), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_hash_sha512(const string& in data, bool binary = false)"), asFUNCTION(sha512), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint crc32(const string& in data)"), asFUNCTION(crc32), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint HOTP(const string& in key, uint64 counter, uint digits = 6)"), asFUNCTION(hotp), asCALL_CDECL);
 }

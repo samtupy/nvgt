@@ -286,8 +286,8 @@ static void RegisterScriptArray_Native(asIScriptEngine *engine)
 	r = engine->RegisterObjectBehaviour("array<T>", asBEHAVE_RELEASE, "void f()", asMETHOD(CScriptArray,Release), asCALL_THISCALL); assert( r >= 0 );
 
 	// The index operator returns the template subtype
-	r = engine->RegisterObjectMethod("array<T>", "T &opIndex(uint index)", asMETHODPR(CScriptArray, At, (asUINT), void*), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("array<T>", "const T &opIndex(uint index) const", asMETHODPR(CScriptArray, At, (asUINT) const, const void*), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("array<T>", "T &opIndex(int64 index)", asMETHODPR(CScriptArray, At, (asINT64), void*), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("array<T>", "const T &opIndex(int64 index) const", asMETHODPR(CScriptArray, At, (asINT64) const, const void*), asCALL_THISCALL); assert( r >= 0 );
 
 	// The assignment operator
 	r = engine->RegisterObjectMethod("array<T>", "array<T> &opAssign(const array<T>&in)", asMETHOD(CScriptArray, operator=), asCALL_THISCALL); assert( r >= 0 );
@@ -558,7 +558,7 @@ CScriptArray::CScriptArray(asUINT length, void *defVal, asITypeInfo *ti)
 		SetValue(n, defVal);
 }
 
-void CScriptArray::SetValue(asUINT index, void *value)
+void CScriptArray::SetValue(asINT64 index, void *value)
 {
 	// At() will take care of the out-of-bounds checking, though
 	// if called from the application then nothing will be done
@@ -926,9 +926,10 @@ void CScriptArray::RemoveLast()
 }
 
 // Return a pointer to the array element. Returns 0 if the index is out of bounds
-const void *CScriptArray::At(asUINT index) const
+const void *CScriptArray::At(asINT64 index) const
 {
-	if( buffer == 0 || index >= buffer->numElements )
+	if( index < 0) index = buffer->numElements + index;
+	if( buffer == 0 || index < 0 || index >= buffer->numElements )
 	{
 		// If this is called from a script we raise a script exception
 		asIScriptContext *ctx = asGetActiveContext();
@@ -942,7 +943,7 @@ const void *CScriptArray::At(asUINT index) const
 	else
 		return buffer->data + elementSize*index;
 }
-void *CScriptArray::At(asUINT index)
+void *CScriptArray::At(asINT64 index)
 {
 	return const_cast<void*>(const_cast<const CScriptArray *>(this)->At(index));
 }
@@ -2046,7 +2047,7 @@ static void ScriptArrayFindByRef2_Generic(asIScriptGeneric *gen)
 
 static void ScriptArrayAt_Generic(asIScriptGeneric *gen)
 {
-	asUINT index = gen->GetArgDWord(0);
+	asINT64 index = gen->GetArgQWord(0);
 	CScriptArray *self = (CScriptArray*)gen->GetObject();
 
 	gen->SetReturnAddress(self->At(index));
@@ -2227,8 +2228,8 @@ static void RegisterScriptArray_Generic(asIScriptEngine *engine)
 	r = engine->RegisterObjectBehaviour("array<T>", asBEHAVE_LIST_FACTORY, "array<T>@ f(int&in, int&in) {repeat T}", asFUNCTION(ScriptArrayListFactory_Generic), asCALL_GENERIC); assert( r >= 0 );
 	r = engine->RegisterObjectBehaviour("array<T>", asBEHAVE_ADDREF, "void f()", asFUNCTION(ScriptArrayAddRef_Generic), asCALL_GENERIC); assert( r >= 0 );
 	r = engine->RegisterObjectBehaviour("array<T>", asBEHAVE_RELEASE, "void f()", asFUNCTION(ScriptArrayRelease_Generic), asCALL_GENERIC); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("array<T>", "T &opIndex(uint index)", asFUNCTION(ScriptArrayAt_Generic), asCALL_GENERIC); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("array<T>", "const T &opIndex(uint index) const", asFUNCTION(ScriptArrayAt_Generic), asCALL_GENERIC); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("array<T>", "T &opIndex(int64 index)", asFUNCTION(ScriptArrayAt_Generic), asCALL_GENERIC); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("array<T>", "const T &opIndex(int64 index) const", asFUNCTION(ScriptArrayAt_Generic), asCALL_GENERIC); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "array<T> &opAssign(const array<T>&in)", asFUNCTION(ScriptArrayAssignment_Generic), asCALL_GENERIC); assert( r >= 0 );
 
 	r = engine->RegisterObjectMethod("array<T>", "void insert_at(uint index, const T&in value)", asFUNCTION(ScriptArrayInsertAt_Generic), asCALL_GENERIC); assert( r >= 0 );

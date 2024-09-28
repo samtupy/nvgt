@@ -29,7 +29,7 @@
 static unsigned char g_KeysPressed[512];
 static unsigned char g_KeysRepeating[512];
 static unsigned char g_KeysForced[512];
-static const SDL_bool* g_KeysDown = NULL;
+static const bool* g_KeysDown = NULL;
 static int g_KeysDownArrayLen = 0;
 static unsigned char g_KeysReleased[512];
 static unsigned char g_MouseButtonsPressed[32];
@@ -146,7 +146,7 @@ inline bool post_key_event(unsigned int key, SDL_EventType evt_type) {
 	e.type = evt_type;
 	e.common.timestamp = SDL_GetTicksNS();
 	e.key.scancode = (SDL_Scancode)key;
-	e.key.key = SDL_GetKeyFromScancode(e.key.scancode, SDL_GetModState(), SDL_TRUE);
+	e.key.key = SDL_GetKeyFromScancode(e.key.scancode, SDL_GetModState(), true);
 	return SDL_PushEvent(&e);
 }
 bool simulate_key_down(unsigned int key) { return post_key_event(key, SDL_EVENT_KEY_DOWN); }
@@ -415,7 +415,7 @@ CScriptArray* query_touch_device(uint64_t device_id) {
 	SDL_Finger** fingers = SDL_GetTouchFingers(device_id, &finger_count);
 	if (!fingers) return array;
 	array->Reserve(finger_count);
-	for (int i = 0; i < finger_count; i++) array->InsertLast(fingers + i);
+	for (int i = 0; i < finger_count; i++) array->InsertLast(*(fingers + i));
 	SDL_free(fingers);
 	return array;
 }

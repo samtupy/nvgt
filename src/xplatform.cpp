@@ -79,8 +79,8 @@ std::string event_requested_file() {
 	InputInit();
 	std::string result;
 	Poco::Clock timeout;
-	SDL_bool old_dropfile_state = SDL_EventEnabled(SDL_EVENT_DROP_FILE);
-	SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, SDL_TRUE);
+	bool old_dropfile_state = SDL_EventEnabled(SDL_EVENT_DROP_FILE);
+	SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, true);
 	while (!timeout.isElapsed(50000)) {
 		Poco::Thread::sleep(5);
 		SDL_Event e;

@@ -1,0 +1,9 @@
+/**
+	Determine the system's timezone offset from UTC in seconds, excluding any daylight saving time alterations.
+	const int TIMEZONE_BASE_OFFSET;
+*/
+
+// Example:
+void main() {
+	alert(TIMEZONE_NAME, "base offset is " + TIMEZONE_BASE_OFFSET);
+}
