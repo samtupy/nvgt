@@ -116,7 +116,7 @@ def parse_nvgt_markdown(tree, path, data):
 	markdown = "# " + tree[path]["name"] + "\n"
 	lines = data.split("\n")
 	in_markdown = data.startswith("/**")
-	if not in_markdown: markdown += "\n```\n" # Starting with code block.
+	if not in_markdown: markdown += "\n```NVGT\n" # Starting with code block.
 	linebreaks = False # if false each line is a paragraph.
 	started_codeblock = False # A codeblock could start after a // Example comment or before the start of code if such a comment is missing.
 	for l in lines:
@@ -136,11 +136,11 @@ def parse_nvgt_markdown(tree, path, data):
 			if not was_codeblock and not started_codeblock and not linebreaks: markdown += "\n"
 			markdown += l.lstrip() + "\n"
 		elif not started_codeblock and (l.lower().startswith("// example") or l.lower().startswith("//example")):
-			markdown += "\n## Example:\n\n```\n"
+			markdown += "\n## Example:\n\n```NVGT\n"
 			started_codeblock = True
 		else:
 			if not started_codeblock:
-				markdown += "```\n"
+				markdown += "```NVGT\n"
 				started_codeblock = True
 			# Todo: The markdown parser is ending codeblocks if # characters are in code sometimes such as #include. For now we hack around that, but it should be properly fixed later if possible.
 			markdown += l.replace("#", "!!!") + "\n"
