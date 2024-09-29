@@ -67,7 +67,6 @@
 #include "tts.h"
 #include "version.h"
 #include "xplatform.h"
-#include "atomics.h"
 
 #ifndef NVGT_STUB
 	#include "scriptbuilder.h"
@@ -485,9 +484,6 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	g_ctxMgr->RegisterCoRoutineSupport(engine);
 	engine->SetContextCallbacks(RequestContextCallback, ReturnContextCallback, 0);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
-	engine->BeginConfigGroup("atomics");
-	register_atomics(engine);
-	engine->EndConfigGroup();
 	return 0;
 }
 #ifndef NVGT_STUB
