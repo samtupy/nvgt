@@ -394,7 +394,7 @@ bool is_console_available() {
 	#if defined (_WIN32)
 		return GetConsoleWindow() != nullptr;
 	#else
-		return isatty(stdin) || isatty(stdout) || isatty(stderr);
+		return isatty(fileno(stdin)) || isatty(fileno(stdout)) || isatty(fileno(stderr));
 	#endif
 }
 
