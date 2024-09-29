@@ -47,6 +47,10 @@
 #include "scriptstuff.h"
 #include "timestuff.h"
 #include "UI.h"
+#if defined(__APPLE__) || (!defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))) || defined(__ANDROID__)
+#include <unistd.h>
+#include <cstdio>
+#endif
 
 int message_box(const std::string& title, const std::string& text, const std::vector<std::string>& buttons, unsigned int mb_flags) {
 	// Start with the buttons.
@@ -390,7 +394,7 @@ bool is_console_available() {
 	#if defined (_WIN32)
 		return GetConsoleWindow() != nullptr;
 	#else
-		return Poco::Util::Application::instance().config().hasOption("application.gui");
+		return isatty(stdin) || isatty(stdout) || isatty(stderr);
 	#endif
 }
 
