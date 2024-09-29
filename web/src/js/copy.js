@@ -8,7 +8,7 @@ document.querySelectorAll("pre").forEach(pre => {
 	// Extract the language from <pre>"s data-lang or <code>"s class
 	let language = pre.getAttribute("data-lang");
 	if (!language && codeBlock && codeBlock.className) {
-		const match = codeBlock.className.match( / language - (\w +) /);
+		const match = codeBlock.className.match(/language-(\w+)/);
 		language = match ? match[1] : "";
 	}
 	// If language is found, create and insert a language label
