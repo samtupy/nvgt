@@ -11,15 +11,9 @@ document.querySelectorAll("pre").forEach(pre => {
 		const match = codeBlock.className.match(/language-(\w+)/);
 		language = match ? match[1] : "";
 	}
-	// If language is found, create and insert a language label
-	if (language) {
-		const langLabel = document.createElement("span");
-		langLabel.textContent = `$ {language} `;
-		container.appendChild(langLabel); // Add language label before the button
-	}
 	// Create the copy button
 	const copyButton = document.createElement("button");
-	const copy_text = "Copy " + (language ? language + " " : "") + "code to clipboard";
+	const copy_text = "Copy" + (language ? " " + language : "");
 	copyButton.textContent = copy_text;
 	container.appendChild(copyButton); // Add the button to the container
 	// Insert the container before the <pre> tag
@@ -29,7 +23,7 @@ document.querySelectorAll("pre").forEach(pre => {
 	copyButton.addEventListener("click", () => {
 		navigator.clipboard.writeText(codeContent)
 		.then(() => {
-			copyButton.textContent = "Copied!";
+			copyButton.textContent = "Copied " + codeContent.length + " characters";
 			setTimeout(() => {
 				copyButton.textContent = copy_text;
 			}, 1500);
