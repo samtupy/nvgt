@@ -274,57 +274,39 @@ template<typename atomic_type, typename divisible_type> void register_atomic_typ
 	engine->RegisterObjectType(type_name.c_str(), sizeof(atomic_type), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<atomic_type>());
 	engine->RegisterObjectBehaviour(type_name.c_str(), asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(atomics_construct<atomic_type>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour(type_name.c_str(), asBEHAVE_DESTRUCT, "void f()", asFUNCTION(atomics_destruct<atomic_type>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type_name.c_str(), "bool is_lock_free()", asMETHODPR(atomic_type, is_lock_free, () const volatile noexcept, bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("void store(%s val, memory_order order = memory_order_seq_cst)", regular_type_name).c_str(), asMETHODPR(atomic_type, store, (divisible_type, std::memory_order) volatile noexcept, void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opAssign(%s val)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator=, (divisible_type) volatile noexcept, divisible_type), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s load(memory_order order = memory_order_seq_cst)", regular_type_name).c_str(), asMETHODPR(atomic_type, load, (std::memory_order) const volatile noexcept, divisible_type), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opImplConv()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator divisible_type, () const volatile noexcept, divisible_type), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s exchange(%s desired, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, exchange, (divisible_type, std::memory_order) volatile noexcept, divisible_type), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool compare_exchange_weak(%s& expected, %s desired, memory_order success, memory_order failure)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, compare_exchange_weak, (divisible_type&, divisible_type, std::memory_order, std::memory_order) volatile noexcept, bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool compare_exchange_weak(%s& expected, %s desired, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, compare_exchange_weak, (divisible_type&, divisible_type, std::memory_order) volatile noexcept, bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool compare_exchange_strong(%s& expected, %s desired, memory_order success, memory_order failure)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, compare_exchange_strong, (divisible_type&, divisible_type, std::memory_order, std::memory_order) volatile noexcept, bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool compare_exchange_strong(%s& expected, %s desired, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, compare_exchange_strong, (divisible_type&, divisible_type, std::memory_order) volatile noexcept, bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("void wait(%s old, memory_order order = memory_order_seq_cst)", regular_type_name).c_str(), asMETHODPR(atomic_type, wait, (divisible_type, std::memory_order) const volatile noexcept, void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), "void notify_one()", asMETHODPR(atomic_type, notify_one, () volatile noexcept, void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), "void notify_all()", asMETHODPR(atomic_type, notify_all, () volatile noexcept, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), "bool is_lock_free()", asMETHODPR(atomic_type, is_lock_free, () const noexcept, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("void store(%s val, memory_order order = memory_order_seq_cst)", regular_type_name).c_str(), asMETHODPR(atomic_type, store, (divisible_type, std::memory_order) noexcept, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opAssign(%s val)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s load(memory_order order = memory_order_seq_cst)", regular_type_name).c_str(), asMETHODPR(atomic_type, load, (std::memory_order) const noexcept, divisible_type), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opImplConv()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator divisible_type, () const noexcept, divisible_type), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s exchange(%s desired, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, exchange, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool compare_exchange_weak(%s& expected, %s desired, memory_order success, memory_order failure)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, compare_exchange_weak, (divisible_type&, divisible_type, std::memory_order, std::memory_order) noexcept, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool compare_exchange_weak(%s& expected, %s desired, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, compare_exchange_weak, (divisible_type&, divisible_type, std::memory_order) noexcept, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool compare_exchange_strong(%s& expected, %s desired, memory_order success, memory_order failure)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, compare_exchange_strong, (divisible_type&, divisible_type, std::memory_order, std::memory_order) noexcept, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool compare_exchange_strong(%s& expected, %s desired, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, compare_exchange_strong, (divisible_type&, divisible_type, std::memory_order) noexcept, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("void wait(%s old, memory_order order = memory_order_seq_cst)", regular_type_name).c_str(), asMETHODPR(atomic_type, wait, (divisible_type, std::memory_order) const noexcept, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), "void notify_one()", asMETHODPR(atomic_type, notify_one, () noexcept, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), "void notify_all()", asMETHODPR(atomic_type, notify_all, () noexcept, void), asCALL_THISCALL);
 	// Begin type-specific atomics
 	if constexpr(std::is_integral_v<divisible_type>) {
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_add(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_add, (divisible_type, std::memory_order) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_sub(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_sub, (divisible_type, std::memory_order) volatile noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_add(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_add, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_sub(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_sub, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
 		#ifdef __cpp_lib_atomic_min_max // Only available in C++26 mode or later
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_max(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_max, (divisible_type, std::memory_order) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_min(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_min, (divisible_type, std::memory_order) volatile noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_max(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_max, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_min(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_min, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
 		#endif
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opAddAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator+=, (divisible_type) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opSubAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator-=, (divisible_type) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPreInc()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator++, () volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPostInc(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator++, (int) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPreDec()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator--, () volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPostDec(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator--, (int) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_and(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_and, (divisible_type, std::memory_order) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_or(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_or, (divisible_type, std::memory_order) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_xor(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_xor, (divisible_type, std::memory_order) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opAndAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator&=, (divisible_type) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opOrAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator|=, (divisible_type) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opXorAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator^=, (divisible_type) volatile noexcept, divisible_type), asCALL_THISCALL);
-	} else if constexpr(std::is_floating_point_v<divisible_type>) {
-		#if defined(__STDCPP_FLOAT32_T__) && defined(__STDCPP_FLOAT64_T__) // C++23 mode or later required
-		static_assert(std::disjunction_v<std::float32_t, std::float64_t> != std::false_type, "Must specify either std::float32_t or std::float64_t when instantiating floating-point atomics classes");
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_add(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_add, (divisible_type, std::memory_order) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_sub(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_sub, (divisible_type, std::memory_order) volatile noexcept, divisible_type), asCALL_THISCALL);
-		#ifdef __cpp_lib_atomic_min_max // Only available in C++26 mode or later
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_max(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_max, (divisible_type, std::memory_order) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_min(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_min, (divisible_type, std::memory_order) volatile noexcept, divisible_type), asCALL_THISCALL);
-		#endif
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opAddAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator+=, (divisible_type) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opSubAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator-=, (divisible_type) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPreInc()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator++, () volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPostInc(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator++, (divisible_type) volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPreDec()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator--, () volatile noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name..c_str(), Poco::format("%s opPostDec(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator--, (divisible_type) volatile noexcept, divisible_type), asCALL_THISCALL);
-		#else
-		static_assert(0, "Floating-point atomics are not supported on this implementation");
-		#endif
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opAddAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator+=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opSubAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator-=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPreInc()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator++, () noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPostInc(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator++, (int) noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPreDec()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator--, () noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPostDec(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator--, (int) noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_and(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_and, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_or(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_or, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_xor(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_xor, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opAndAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator&=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opOrAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator|=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opXorAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator^=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
 	}
 	engine->RegisterObjectMethod(type_name.c_str(), "bool get_is_always_lock_free() property", asFUNCTION(is_always_lock_free<atomic_type>), asCALL_CDECL_OBJFIRST);
 }
@@ -342,10 +324,10 @@ void RegisterAtomics(asIScriptEngine* engine) {
 	engine->RegisterObjectType("atomic_flag", sizeof(std::atomic_flag), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<std::atomic_flag>());
 	engine->RegisterObjectBehaviour("atomic_flag", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(atomics_construct<std::atomic_flag>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("atomic_flag", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(atomics_destruct<std::atomic_flag>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("atomic_flag", "bool test(memory_order order = memory_order_seq_cst)", asMETHODPR(std::atomic_flag, test, (std::memory_order) const volatile noexcept, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("atomic_flag", "bool test(memory_order order = memory_order_seq_cst)", asMETHODPR(std::atomic_flag, test, (std::memory_order) const noexcept, bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("atomic_flag", "void clear(memory_order order = memory_order_seq_cst)", asMETHODPR(std::atomic_flag, clear, (std::memory_order), void), asCALL_THISCALL);
-	engine->RegisterObjectMethod("atomic_flag", "bool test_and_set(memory_order order = memory_order_seq_cst)", asMETHODPR(std::atomic_flag, test_and_set, (std::memory_order) volatile noexcept, bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod("atomic_flag", "void wait(bool old, memory_order order = memory_order_seq_cst)", asMETHODPR(std::atomic_flag, wait, (bool, std::memory_order) const volatile noexcept, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("atomic_flag", "bool test_and_set(memory_order order = memory_order_seq_cst)", asMETHODPR(std::atomic_flag, test_and_set, (std::memory_order) noexcept, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("atomic_flag", "void wait(bool old, memory_order order = memory_order_seq_cst)", asMETHODPR(std::atomic_flag, wait, (bool, std::memory_order) const noexcept, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("atomic_flag", "void notify_one()", asMETHOD(std::atomic_flag, notify_one), asCALL_THISCALL);
 	engine->RegisterObjectMethod("atomic_flag", "void notify_all()", asMETHOD(std::atomic_flag, notify_all), asCALL_THISCALL);
 	register_atomic_type<std::atomic_int, int>(engine, "atomic_int", "int");
@@ -358,10 +340,6 @@ void RegisterAtomics(asIScriptEngine* engine) {
 	register_atomic_type<std::atomic_uint32_t, std::uint32_t>(engine, "atomic_uint32", "uint32");
 	register_atomic_type<std::atomic_int64_t, std::int64_t>(engine, "atomic_int64", "int64");
 	register_atomic_type<std::atomic_uint64_t, std::uint64_t>(engine, "atomic_uint64", "uint64");
-	#if defined(__STDCPP_FLOAT32_T__) && defined(__STDCPP_FLOAT64_T__) // C++23 mode or later required
-	register_atomic_type<std::atomic<std::float32_t>, std::float32_t>(engine, "atomic_float", "float");
-	register_atomic_type<std::atomic<std::float64_t>, std::float64_t>(engine, "atomic_float", "double");
-	#endif
 }
 
 template <class T> void scoped_lock_construct(void* mem, T* mutex) {
