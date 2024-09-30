@@ -721,17 +721,7 @@ class audio_form {
 			form_error = form_error_invalid_control;
 			return false;
 		}
-		if (char.length() < 1) {
-			form_error = form_error_invalid_value;
-			return false;
-		}
-		if (search_all) {
-			for (uint i = 0; i < char.length(); i++) {
-				if (c_form[control_index].disallowed_chars.find(char[i]) < 0) return false;
-			}
-			return true;
-		}
-		return c_form[control_index].disallowed_chars.find(char) > -1;
+		return c_form[control_index].is_disallowed_char(char, search_all);
 	}
 	bool is_visible(int control_index) {
 		form_error = 0;
@@ -2578,11 +2568,12 @@ class control {
 			return false;
 		if (search_all) {
 			for (uint i = 0; i < char.length(); i++) {
-				if (this.disallowed_chars.find(char[i]) < 0) return false;
+				if (this.disallowed_chars.find(char[i]) < 0 && this.use_only_disallowed_chars) return true;
+				else if (this.disallowed_chars.find(char[i]) > -1 && !this.use_only_disallowed_chars) return true;
 			}
-			return true;
+			return false;
 		}
-		return this.disallowed_chars.find(char) > -1;
+		return (this.disallowed_chars.find(char) > -1 && !this.use_only_disallowed_chars) or (this.disallowed_chars.find(char) < 0 && this.use_only_disallowed_chars);
 	}
 	void check(audio_form@ f, int tab_index) {
 		string char;
@@ -2590,14 +2581,9 @@ class control {
 		if ((type == ct_input) && key_up(KEY_LALT) && (focused)) {
 			if (!read_only) {
 				if (char != "") {
-					if (this.disallowed_chars.length() > 0) {
-						if (this.use_only_disallowed_chars && !this.is_disallowed_char(char)) {
-							if (this.char_disallowed_description != "") speak(this.char_disallowed_description);
-							return;
-						} else if (!this.use_only_disallowed_chars && this.is_disallowed_char(char)) {
-							if (this.char_disallowed_description != "") speak(this.char_disallowed_description);
-							return;
-						}
+					if (this.disallowed_chars.length() > 0 && this.is_disallowed_char(char)) {
+						if (this.char_disallowed_description != "") speak(this.char_disallowed_description);
+						return;
 					}
 					if (overwrite)
 						edit(char);
@@ -3282,6 +3268,10 @@ class control {
 		}
 		if ((max_length > 0) && ((text + paste).length() - (sel_end - sel_start) > max_length)) {
 			speak("clipboard data can't fit", true);
+			return;
+		}
+		if (this.disallowed_chars.length() > 0 && this.is_disallowed_char(paste)) {
+			if (this.char_disallowed_description != "") speak(this.char_disallowed_description);
 			return;
 		}
 		string new_text = text;

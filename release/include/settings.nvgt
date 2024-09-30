@@ -19,7 +19,6 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-#include"bgt_compat.nvgt" //the INI include requires this include.
 #include"ini.nvgt"
 class settings_helper {
 	string company_name, product;
@@ -107,7 +106,7 @@ class ini_settings_helper: settings_helper {
 		tempfile.open(filepath, "rb");
 		string final_data = tempfile.read();
 		tempfile.close();
-		if (this.encrypt_data) final_data = string_decrypt(final_data, this.encryption_key);
+		if (this.encrypt_data) final_data = string_aes_decrypt(final_data, this.encryption_key);
 		bool loaded = this.config.load_string(final_data, filepath);
 		return loaded;
 	}
@@ -145,7 +144,7 @@ class ini_settings_helper: settings_helper {
 		string final_data = this.config.dump();
 		file tempfile;
 		if (!tempfile.open(filepath, "wb")) return false;
-		if (this.encrypt_data) final_data = string_encrypt(final_data, this.encryption_key);
+		if (this.encrypt_data) final_data = string_aes_encrypt(final_data, this.encryption_key);
 		tempfile.write(final_data);
 		tempfile.close();
 		return true;
@@ -175,7 +174,7 @@ class json_settings_helper: settings_helper {
 		tempfile.open(filepath, "rb");
 		string final_data = tempfile.read();
 		tempfile.close();
-		if (this.encrypt_data) final_data = string_decrypt(final_data, this.encryption_key);
+		if (this.encrypt_data) final_data = string_aes_decrypt(final_data, this.encryption_key);
 		@this.config = parse_json(final_data);
 		return true;
 	}
@@ -210,7 +209,7 @@ class json_settings_helper: settings_helper {
 		file tempfile;
 		if (!tempfile.open(this.get_data_path(), "wb")) return false;
 		string final_data = this.config.stringify();
-		if (this.encrypt_data) final_data = string_encrypt(final_data, this.encryption_key);
+		if (this.encrypt_data) final_data = string_aes_encrypt(final_data, this.encryption_key);
 		tempfile.write(final_data);
 		tempfile.close();
 		return true;
@@ -239,7 +238,7 @@ class nvgt_settings_helper: settings_helper {
 		file tempfile;
 		tempfile.open(filepath, "rb");
 		string final_data = tempfile.read();
-		if (this.encrypt_data) final_data = string_decrypt(final_data, this.encryption_key);
+		if (this.encrypt_data) final_data = string_aes_decrypt(final_data, this.encryption_key);
 		@this.config = deserialize(final_data);
 		tempfile.close();
 		return true;
@@ -283,7 +282,7 @@ class nvgt_settings_helper: settings_helper {
 		file tempfile;
 		if (!tempfile.open(this.get_data_path(), "wb")) return false;
 		string final_data = this.config.serialize();
-		if (this.encrypt_data) final_data = string_encrypt(final_data, this.encryption_key);
+		if (this.encrypt_data) final_data = string_aes_encrypt(final_data, this.encryption_key);
 		tempfile.write(final_data);
 		tempfile.close();
 		return true;
