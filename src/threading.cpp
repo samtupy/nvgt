@@ -288,25 +288,29 @@ template<typename atomic_type, typename divisible_type> void register_atomic_typ
 	engine->RegisterObjectMethod(type_name.c_str(), "void notify_one()", asMETHODPR(atomic_type, notify_one, () noexcept, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type_name.c_str(), "void notify_all()", asMETHODPR(atomic_type, notify_all, () noexcept, void), asCALL_THISCALL);
 	// Begin type-specific atomics
-	if constexpr(std::is_integral_v<divisible_type>) {
+	if constexpr((std::is_integral_v<divisible_type> || std::is_floating_point_v<divisible_type>) && !std::is_same_v<divisible_type, bool>) {
 		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_add(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_add, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
 		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_sub(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_sub, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
 		#ifdef __cpp_lib_atomic_min_max // Only available in C++26 mode or later
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_max(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_max, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
+		if constexpr(std::is_integral_v<divisible_type>) {
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_max(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_max, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
 		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_min(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_min, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
+	}
 		#endif
 		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opAddAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator+=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
 		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opSubAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator-=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPreInc()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator++, () noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPostInc(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator++, (int) noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPreDec()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator--, () noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPostDec(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator--, (int) noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_and(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_and, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_or(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_or, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_xor(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_xor, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opAndAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator&=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opOrAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator|=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opXorAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator^=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
+		if constexpr(std::is_integral_v<divisible_type>) {
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPreInc()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator++, () noexcept, divisible_type), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPostInc(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator++, (int) noexcept, divisible_type), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPreDec()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator--, () noexcept, divisible_type), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opPostDec(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator--, (int) noexcept, divisible_type), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_and(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_and, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_or(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_or, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s fetch_xor(%s arg, memory_order order = memory_order_seq_cst)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, fetch_xor, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opAndAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator&=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opOrAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator|=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opXorAssign(%s arg)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator^=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
+		}
 	}
 	engine->RegisterObjectMethod(type_name.c_str(), "bool get_is_always_lock_free() property", asFUNCTION(is_always_lock_free<atomic_type>), asCALL_CDECL_OBJFIRST);
 }
@@ -339,6 +343,10 @@ void RegisterAtomics(asIScriptEngine* engine) {
 	register_atomic_type<std::atomic_uint32_t, std::uint32_t>(engine, "atomic_uint32", "uint32");
 	register_atomic_type<std::atomic_int64_t, std::int64_t>(engine, "atomic_int64", "int64");
 	register_atomic_type<std::atomic_uint64_t, std::uint64_t>(engine, "atomic_uint64", "uint64");
+	register_atomic_type<std::atomic_bool, bool>(engine, "atomic_bool", "bool");
+	// Apparently the below types are (not) C++23, but C++20
+	register_atomic_type<std::atomic<float>, float>(engine, "atomic_float", "float");
+	register_atomic_type<std::atomic<double>, double>(engine, "atomic_double", "double");
 }
 
 template <class T> void scoped_lock_construct(void* mem, T* mutex) {
