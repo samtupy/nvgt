@@ -150,6 +150,24 @@ And with that, nvgt is ready for the private development of STW all with the cus
 
 Remember, you should use this example as a possible idea as to how you could potentially make use of NVGT's user directory, not as a guide you must follow exactly. Feel free to create your own entirely different workspace in here or if you want, forgo use of the user directory entirely.
 
+### Angelscript addon shims
+When creating a shared/dynamic plugin made up of more than 1 cpp file, you must `#define NVGT_PLUGIN_INCLUDE` and then `#include "nvgt_plugin.h"` before you `#include <angelscript.h>`. This is to make sure that any additional units you build will use the manually imported Angelscript symbols that were passed to the plugin from NVGT, a multiple defined symbol error might appear otherwise or if your code compiles, 2 different versions of the Angelscript functions could be used which would be very unsafe. To make it easier to include Angelscript addons into your plugins, little shims are provided for the common addons in the nvgt repository in the ASAddon/plugin directory. You can simply compile ASAddon/plugin/scriptarray.cpp, for example, and the scriptarray plugin will safely be included into your plugin. nvgt_plugin.h should still be included before scriptarray.h in any of your plugin source files, however.
+
+When compiling a static plugin, you do not need to bother linking with these addon shims, because in that case your plugin's static library will be linked with NVGT when NVGT is next recompiled, and NVGT already contains working addons.
+
+## plugin dll loading
+A common sanario is that you may wish to make a plugin that then loads another shared library. This happens already in nvgt, particularly with the git2 plugin. The plugin itself is called git2nvgt, but it loads git2.dll. This calls for some consideration.
+
+NVGT applications generally put their libraries in a lib folder to reduce clutter in the applications main directory. This isn't required, and in fact if you want to move all shared objects out of the lib folder and put them along side your game executable, you actually tend to avoid the small issue mentioned here. The problem is that sometimes, we need to explicitly tell the operating system about the lib directory at runtime (right now true on windows) in order for it to find the shared libraries there.
+
+For shared/dynamic plugins, this isn't really an issue. NVGT has launched, informed the system of the lib directory, and loaded your plugin in that order meaning that any dll your plugin imports can already be located and imported just fine.
+
+With static plugins, on the other hand, we must work around the fact that the operating system will generally try loading all libraries that the program uses before any of that program's code executes, and will show the user an error message and abort the program if it can't find one. Returning to the git2 example from earlier, if you were to ship this plugin with your game, a file would exist called lib/git2.dll on windows. When the static library git2nvgt.lib is created, it will add git2.dll to it's import table but with no knowledge of the lib folder at that point. When the custom build of NVGT which includes this plugin tries to run, an error message will appear because git2.dll can't be found, on account of NVGT never being able to tell the system about the lib directory before the operating system evaluates nvgt's import table and tries to load the libraries found within.
+
+The solution, at least on windows, is delayed dll loading. It is demonstrated above in the user directory example, but it's easy to gloss over considering it's level of importants. If you add the linkflag `/delayload:libname.dll` to your static plugin's build script, now NVGT's code is allowed to execute meaning it can tell the system about the lib directory, and then the dll will load the first time a function is called from it. On MacOS/clang, there is the linkflag -weak_library which does something similar, used like `-weak_library /path/to/library.dylib`.
+
+Delay loading does has the disadvantage that the app tends to crash if the dll is not present when it is needed rather than giving the user a nice error message, but you can work around that by manually loading the dll with the LoadLibrary function on windows / similar facilities on other platforms then immediately unloading it just to see if the system will be able to find it, and you can choose to show an error message in that case if you wish.
+
 ## cross platform considerations
 If you are only building plugins for projects that are intended to run on one platform, this section may be safely skipped. However if your game runs on multiple platforms and if you intend to introduce custom plugins, you probably don't want to miss this.
 

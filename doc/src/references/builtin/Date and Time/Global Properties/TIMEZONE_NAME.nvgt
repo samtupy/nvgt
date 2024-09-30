@@ -1,0 +1,11 @@
+/**
+	Retrieve the name of the timezone currently set on the system.
+	const string TIMEZONE_NAME;
+	## Remarks:
+		This contains the value of either TIMEZONE_STANDARD_NAME or TIMEZONE_DST_NAME, depending on whether daylight saving time is currently in effect. If the timezone does not support daylight saving time, this always yields TIMEZONE_STANDARD_NAME.
+*/
+
+// Example:
+void main() {
+	alert("timezone example", "Currently in " + TIMEZONE_NAME + ", which is usually called " + TIMEZONE_STANDARD_NAME + " though it is known as " + TIMEZONE_DST_NAME + "when daylight saving time is in effect.");
+}

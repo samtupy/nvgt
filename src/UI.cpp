@@ -49,6 +49,10 @@
 #include "scriptstuff.h"
 #include "timestuff.h"
 #include "UI.h"
+#if defined(__APPLE__) || (!defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))) || defined(__ANDROID__)
+#include <unistd.h>
+#include <cstdio>
+#endif
 
 int message_box(const std::string& title, const std::string& text, const std::vector<std::string>& buttons, unsigned int mb_flags) {
 	// Start with the buttons.
@@ -289,7 +293,7 @@ BOOL FocusNVGTWindow() {
 	SDL_RaiseWindow(g_WindowHandle);
 	return true;
 }
-BOOL WindowIsFocused() {
+bool WindowIsFocused() {
 	if (!g_WindowHandle) return false;
 	return g_WindowHandle == SDL_GetKeyboardFocus();
 }
@@ -309,20 +313,8 @@ void handle_sdl_event(SDL_Event* evt) {
 	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_GAINED)
 		regained_window_focus();
 }
-void wait(int ms) {
-	if (!g_WindowHandle || g_WindowThreadId != thread_current_thread_id()) {
-		Poco::Thread::sleep(ms);
-		return;
-	}
-	while (ms >= 0) {
-		int MS = (ms > 25 ? 25 : ms);
-		if (g_GCMode == 2)
-			garbage_collect_action();
-		Poco::Thread::sleep(MS);
-		SDL_PumpEvents();
-		ms -= MS;
-		if (ms < 1) break;
-	}
+void refresh_window() {
+	SDL_PumpEvents();
 	SDL_Event evt;
 	std::unordered_set<int> keys_pressed_this_frame;
 	while (SDL_PollEvent(&evt)) {
@@ -341,81 +333,25 @@ void wait(int ms) {
 		post_events.clear();
 	}
 }
-  /*std::string open_file_Dialog(const std::string& title) {
-	#ifdef _WIN32
-    OPENFILENAMEW ofn;
-    ZeroMemory(&ofn, sizeof(ofn));
-     wchar_t buffer[260];
-    ofn.lStructSize = sizeof(ofn);
-    ofn.lpstrFile = buffer;
-    ofn.lpstrFile[0] = '\0';
-    ofn.nMaxFile = sizeof(buffer);
-    ofn.nFilterIndex = 1;
-    ofn.lpstrFileTitle = NULL;
-    ofn.nMaxFileTitle = 0;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-    ofn.hwndOwner = NULL;
-	if(!title.empty()) {}
-    int len = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
-    std::wstring titleW(len, L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, &titleW[0], len);
-    ofn.lpstrTitle = titleW.c_str();
-  }
-  else ofn.lpstrTitle=NULL;
-                        if (GetOpenFileName(&ofn)) {
-                            int len = WideCharToMultiByte(CP_UTF8, 0, buffer, -1, nullptr, 0, nullptr, nullptr);
-							std::string bufferA(len, '\0');
-                            WideCharToMultiByte(CP_UTF8, 0, buffer, -1, &bufferA[0], len, nullptr, nullptr);
-        return bufferA;
-    return "";
-	#elif defined(__APPLE__)
-	return openFileDialog(title);
-	#else
-	return ""; //not implemented yet
-	#endif
+
+void wait(int ms) {
+	if (!g_WindowHandle || g_WindowThreadId != thread_current_thread_id()) {
+		Poco::Thread::sleep(ms);
+		return;
+	}
+	while (ms >= 0) {
+		int MS = (ms > 25 ? 25 : ms);
+		if (g_GCMode == 2)
+			garbage_collect_action();
+		Poco::Thread::sleep(MS);
+		SDL_PumpEvents();
+		ms -= MS;
+		if (ms < 1) break;
+	}
+	refresh_window();
 }
 
-std::string save_file_dialog(const std::string& title, const std::string& filename) {
-	#ifdef _WIN32
-    OPENFILENAMEW ofn;
-    ZeroMemory(&ofn, sizeof(ofn));
-     wchar_t buffer[260];
-    ofn.lStructSize = sizeof(ofn);
-    ofn.lpstrFile = buffer;
-    ofn.lpstrFile[0] = '\0';
-    ofn.nMaxFile = sizeof(buffer);
-    ofn.nFilterIndex = 1;
-    ofn.nMaxFileTitle = 0;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-    ofn.hwndOwner = NULL;
-	if(!title.empty()) {}
-    int len = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
-    std::wstring titleW(len, L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, &titleW[0], len);
-    ofn.lpstrTitle = titleW.c_str();
-}
-else ofn.lpstrTitle=NULL;
-	if(filename.empty()) {
-	int len = MultiByteToWideChar(CP_UTF8, 0, filename.c_str(), -1, nullptr, 0);
-    std::wstring filenameW(len, L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, filename.c_str(), -1, &filenameW[0], len);
-	ofn.lpstrFileTitle = filenameW.c_str();
-	}
-	else ofn.lpstrFileTitle = NULL;
-	if(GetSaveFileNameW(&ofn)) {
-		int len = WideCharToMultiByte(CP_UTF8, 0, buffer, -1, nullptr, 0, nullptr, nullptr);
-							std::string bufferA(len, '\0');
-                            WideCharToMultiByte(CP_UTF8, 0, buffer, -1, &bufferA[0], len, nullptr, nullptr);
-        return bufferA;
-    return "";
-	}
-	else return "";
-	#elif defined(__APPLE__)
-	return saveFileDialog(title, filename);
-	#else
-	return ""; //not implemented
-	#endif
-}*/
+
 
 // The following function contributed to NVGT by silak
 uint64_t idle_ticks() {
@@ -462,7 +398,7 @@ bool is_console_available() {
 	#if defined (_WIN32)
 		return GetConsoleWindow() != nullptr;
 	#else
-		return Poco::Util::Application::instance().config().hasOption("application.gui");
+		return isatty(fileno(stdin)) || isatty(fileno(stdout)) || isatty(fileno(stderr));
 	#endif
 }
 
@@ -504,6 +440,7 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool is_window_hidden()", asFUNCTION(WindowIsHidden), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_window_text()", asFUNCTION(get_window_text), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 get_window_os_handle()", asFUNCTION(get_window_os_handle), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void refresh_window()", asFUNCTION(refresh_window), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void wait(int ms)", asFUNCTIONPR(wait, (int), void), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 idle_ticks()", asFUNCTION(idle_ticks), asCALL_CDECL);
 }

@@ -298,6 +298,6 @@ std::string generate_system_fingerprint(const std::string& identifier = "") {
 }
 
 void RegisterSystemFingerprintFunction(asIScriptEngine* engine) {
-	engine->RegisterGlobalFunction(_O("string generate_system_fingerprint(const string&in = "")"), asFUNCTION(generate_system_fingerprint), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string generate_system_fingerprint_legacy1(const string&in = "")"), asFUNCTION(generate_system_fingerprint_legacy1), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string generate_system_fingerprint(const string&in application_id = "")"), asFUNCTION(generate_system_fingerprint), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string generate_system_fingerprint_legacy1(const string&in application_id = "")"), asFUNCTION(generate_system_fingerprint_legacy1), asCALL_CDECL);
 }
