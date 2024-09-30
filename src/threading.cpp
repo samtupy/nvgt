@@ -314,12 +314,11 @@ template<typename atomic_type, typename divisible_type> void register_atomic_typ
 void RegisterAtomics(asIScriptEngine* engine) {
 	// Memory order
 	engine->RegisterEnum("memory_order");
-	engine->RegisterEnumValue("memory_order", "memory_order_relaxed", static_cast<std::underlying_type_t<std::memory_order>>(std::memory_order_relaxed));
-	engine->RegisterEnumValue("memory_order", "memory_order_consume", static_cast<std::underlying_type_t<std::memory_order>>(std::memory_order_consume));
-	engine->RegisterEnumValue("memory_order", "memory_order_acquire", static_cast<std::underlying_type_t<std::memory_order>>(std::memory_order_acquire));
-	engine->RegisterEnumValue("memory_order", "memory_order_release", static_cast<std::underlying_type_t<std::memory_order>>(std::memory_order_release));
-	engine->RegisterEnumValue("memory_order", "memory_order_acq_rel", static_cast<std::underlying_type_t<std::memory_order>>(std::memory_order_acq_rel));
-	engine->RegisterEnumValue("memory_order", "memory_order_seq_cst", static_cast<std::underlying_type_t<std::memory_order>>(std::memory_order_seq_cst));
+	engine->RegisterEnumValue("memory_order", "MEMORY_ORDER_RELAXED", static_cast<std::underlying_type_t<std::memory_order>>(std::memory_order_relaxed));
+	engine->RegisterEnumValue("memory_order", "MEMORY_ORDER_ACQUIRE", static_cast<std::underlying_type_t<std::memory_order>>(std::memory_order_acquire));
+	engine->RegisterEnumValue("memory_order", "MEMORY_ORDER_RELEASE", static_cast<std::underlying_type_t<std::memory_order>>(std::memory_order_release));
+	engine->RegisterEnumValue("memory_order", "MEMORY_ORDER_ACQ_REL", static_cast<std::underlying_type_t<std::memory_order>>(std::memory_order_acq_rel));
+	engine->RegisterEnumValue("memory_order", "MEMORY_ORDER_SEQ_CST", static_cast<std::underlying_type_t<std::memory_order>>(std::memory_order_seq_cst));
 	// Atomic flag
 	engine->RegisterObjectType("atomic_flag", sizeof(std::atomic_flag), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<std::atomic_flag>());
 	engine->RegisterObjectBehaviour("atomic_flag", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(atomics_construct<std::atomic_flag>), asCALL_CDECL_OBJFIRST);
