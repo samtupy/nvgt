@@ -1,11 +1,11 @@
+# opAssign
 Atomically assigns desired to the atomic variable. Equivalent to `store(desired)`.
 
 ```nvgt
 T opAssign(T desired);
 ```
 
-### Remarks
-
+## Remarks:
 This operator is available on all atomic types.
 
 Within the above function signature, `T` is used as a placeholder for the actual type. For example, if this object is an `atomic_int`, then `T` SHALL be `int`.

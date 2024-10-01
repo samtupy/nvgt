@@ -1,16 +1,15 @@
+# store
 Atomically replaces the current value with `desired`. Memory is affected according to the value of `order`.  If order is either MEMORY_ORDER_ACQUIRE or MEMORY_ORDER_ACQ_REL, the behavior is undefined. 
 
 ```nvgt
 void store(T desired, memory_order order = MEMORY_ORDER_SEQ_CST);
 ```
 
-## Parameters
+## Parameters:
+* `T desired`: the value that should be stored into this atomic object.
+* `memory_order order`: which memory ordering constraints should be enforced during this operation.
 
-* `desired`: the value that should be stored into this atomic object.
-* `order`: which memory ordering constraints should be enforced during this operation.
-
-## Remarks
-
+## Remarks:
 This function is available on all atomic types.
 
 Within the above function signature, `T` is used as a placeholder for the actual type. For example, if this object is an `atomic_int`, then `T` SHALL be `int`.

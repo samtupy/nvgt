@@ -1,3 +1,4 @@
+# compare_exchange_weak:
 Atomically compares the value representation of this atomic object with that of `expected`. If both are bitwise-equal, performs an atomic read-modify-write operation on this atomic object with `desired` (that is, replaces the current value of this atomic object with `desired`); otherwise, performs an atomic load of this atomic object and places it's actual value into `expected`. If failure is either `MEMORY_ORDER_RELEASE` or `MEMORY_ORDER_ACQ_REL`, the behavior is undefined. 
 
 ```nvgt
@@ -5,20 +6,17 @@ bool compare_exchange_weak(T& expected, T desired, memory_order success, memory_
 bool compare_exchange_weak(T& expected, T desired, memory_order order = MEMORY_ORDER_SEQ_CST);
 ```
 
-## Parameters
+## Parameters:
+* `T& expected`: reference to the value expected to be found in this atomic object.
+* `T desired`: the value that SHALL replace the one in this atomic object if and only if it is bitwise-equal to `expected`.
+* `memory_order success`: the memory synchronization ordering that SHALL be used for the read-modify-write operation if the comparison succeeds.
+* `memory_order failure`: the memory synchronization ordering that SHALL be used for the load operation if the comparison fails.
+* `memory_order order`: the memory synchronization order that SHALL be used for both the read-modify-write operation and the load operation depending on whether the comparison succeeds or fails.
 
-* `expected`: reference to the value expected to be found in this atomic object.
-* `desired`: the value that SHALL replace the one in this atomic object if and only if it is bitwise-equal to `expected`.
-* `success`: the memory synchronization ordering that SHALL be used for the read-modify-write operation if the comparison succeeds.
-* `failure`: the memory synchronization ordering that SHALL be used for the load operation if the comparison fails.
-* `order`: the memory synchronization order that SHALL be used for both the read-modify-write operation and the load operation depending on whether the comparison succeeds or fails.
+## Returns:
+bool: `true` if the atomic value was successfully changed, false otherwise.
 
-## Returns
-
-`true` if the atomic value was successfully changed, false otherwise.
-
-## Remarks
-
+## Remarks:
 This function is available on all atomic types.
 
 Within the above function signatures, `T` is used as a placeholder for the actual type. For example, if this object is an `atomic_int`, then `T` SHALL be `int`.

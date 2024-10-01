@@ -1,15 +1,14 @@
+# is_lock_free
 Checks whether the atomic operations on all objects of this type are lock-free.
 
 ``nvgt
 bool is_lock_free();
 ```
 
-## Returns
+## Returns:
+`bool: true` if the atomic operations on the objects of this type are lock-free, `false` otherwise.
 
-`true` if the atomic operations on the objects of this type are lock-free, `false` otherwise.
-
-## Notes
-
+## Remarks:
 This function is available on all atomic types.
 
 All atomic types, with the exception of `atomic_flag`, MAY be implemented utilizing mutexes or alternative locking mechanisms as opposed to employing lock-free atomic instructions provided by the CPU. This allows for the implementation flexibility where atomicity is achieved through synchronization primitives rather than hardware-based atomic instructions.

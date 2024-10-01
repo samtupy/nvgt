@@ -1,15 +1,14 @@
+# opOrAssign
 Atomically replaces the current value with the result of computation involving the previous value and `arg`. The operation is a read-modify-write operation. Specifically, performs atomic bitwise OR. Equivalent to `return fetch_or(arg) | arg;`.
 
 ```nvgt
 T opOrAssign(T arg);
 ```
 
-## Returns
+## Returns:
+T: The resulting value of this computation.
 
-The resulting value of this computation.
-
-## Remarks
-
+## Remarks:
 This operator is only available on integral atomic types.
 
 Within the above function signature, `T` is used as a placeholder for the actual type. For example, if this object is an `atomic_int`, then `T` SHALL be `int`.
