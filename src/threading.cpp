@@ -344,9 +344,6 @@ void RegisterAtomics(asIScriptEngine* engine) {
 	register_atomic_type<std::atomic_int64_t, std::int64_t>(engine, "atomic_int64", "int64");
 	register_atomic_type<std::atomic_uint64_t, std::uint64_t>(engine, "atomic_uint64", "uint64");
 	register_atomic_type<std::atomic_bool, bool>(engine, "atomic_bool", "bool");
-	// Apparently the below types are (not) C++23, but C++20
-	register_atomic_type<std::atomic<float>, float>(engine, "atomic_float", "float");
-	register_atomic_type<std::atomic<double>, double>(engine, "atomic_double", "double");
 }
 
 template <class T> void scoped_lock_construct(void* mem, T* mutex) {
