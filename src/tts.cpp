@@ -85,9 +85,9 @@ void tts_voice::setup() {
 	if (!env) throw Poco::Exception("cannot retrieve JNI environment");
 	TTSClass = env->FindClass("com/samtupy/nvgt/TTS");
 	if (!TTSClass) throw Poco::Exception("Cannot find NVGT TTS class!");
-	constructor = env->GetMethodID(cls, "<init>", "()V");
+	constructor = env->GetMethodID(TTSClass, "<init>", "()V");
 	if (!constructor) throw Poco::Exception("Cannot find NVGT TTS constructor!");
-	TTSObj = env->NewObject(cls, constructor);
+	TTSObj = env->NewObject(TTSClass, constructor);
 	if (!TTSObj) throw Poco::Exception("Can't instantiate TTS object!");
 	midIsActive = env->GetMethodID(TTSClass, "isActive", "()Z");
 	midIsSpeaking = env->GetMethodID(TTSClass, "isSpeaking", "()Z");

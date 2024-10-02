@@ -75,12 +75,12 @@ public class TTS {
 			@Override
 			public void onInit(int status) {
 				if (status == TextToSpeech.SUCCESS) {
-					this.isTTSInitialized = true;
+					isTTSInitialized = true;
 					tts.setLanguage(Locale.getDefault());
-					tts.setPitch(1.0);
-					tts.setSpeechRate(1.0);
+					tts.setPitch(1.0f);
+					tts.setSpeechRate(1.0f);
 				} else {
-					this.isTTSInitialized = false;
+					isTTSInitialized = false;
 				}
 			}
 		});
@@ -157,13 +157,13 @@ public class TTS {
 	}
 
 	public List<String> getVoices() {
-		return (tts != null && tts.isActive()) ? tts.getVoices().stream().map(Voice::getName).collect(Collectors.toList()) : null;
+		return (tts != null && isActive()) ? tts.getVoices().stream().map(Voice::getName).collect(Collectors.toList()) : null;
 	}
 
 	public Boolean setVoice(String name) {
 		if (tts != null && isActive()) {
 			Set<Voice> voices = tts.getVoices();
-			Optional<Voice> desiredVoice = voices.stream().filter(voice -> voice.getName().equals(desiredVoiceName)).findFirst();
+			Optional<Voice> desiredVoice = voices.stream().filter(voice -> voice.getName().equals(name)).findFirst();
 			if (desiredVoice.isPresent()) {
 				return tts.setVoice(desiredVoice.get()) == TextToSpeech.SUCCESS;
 			} else {
