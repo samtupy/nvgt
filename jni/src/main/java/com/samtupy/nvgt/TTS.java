@@ -18,10 +18,11 @@ import java.util.Optional;
 public class TTS {
 	private static String AvoidDuplicateSpeechHack; // Talkback unfortunately sets a flag that causes speech messages to not always be spoken over again in announcement events when the same message is repeated, we work around it by appending a changing number of spaces to the message and this variable stores those.
 	private TextToSpeech tts;
-	private float ttsPan = 0.0;
-	private float ttsVolume = 1.0;
-	private float ttsRate = 1.0;
-	private float ttsPitch = 1.0;
+	private float ttsPan = 0.0f;
+	private float ttsVolume = 1.0f;
+	private float ttsRate = 1.0f;
+	private float ttsPitch = 1.0f;
+	private Boolean isTTSInitialized = false;
 
 	public static boolean isScreenReaderActive() {
 		Context context = SDL.getContext();
@@ -148,7 +149,7 @@ public class TTS {
 		ttsVolume = volume;
 	}
 
-	@override
+	@Override
 	public void finalize() {
 		if (tts != null && isActive()) {
 			tts.shutdown();
@@ -170,6 +171,7 @@ public class TTS {
 			}
 		} else {
 			return false;
+		}
 	}
 
 	public int getMaxSpeechInputLength() {
