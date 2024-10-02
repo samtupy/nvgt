@@ -829,6 +829,8 @@ int PragmaCallback(const string& pragmaText, CScriptBuilder& builder, void* /*us
 		g_stub = cleanText.substr(5);
 	else if (cleanText.starts_with("embed "))
 		embed_pack(cleanText.substr(6), Path(cleanText.substr(6)).getFileName());
+	else if (cleanText.starts_with("asset")) add_game_asset_to_bundle(cleanText.substr(6));
+	else if (cleanText.starts_with("document")) add_game_asset_to_bundle(cleanText.substr(9), GAME_ASSET_DOCUMENT);
 	else if (cleanText.starts_with("plugin ")) {
 		if (!load_nvgt_plugin(cleanText.substr(7)))
 			engine->WriteMessage(cleanText.substr(7).c_str(), -1, -1, asMSGTYPE_ERROR, "failed to load plugin");

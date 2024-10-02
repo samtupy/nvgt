@@ -3,6 +3,7 @@
 // License: zlib (see license.md in the root of the NVGT distribution)
 
 void main() {
+	sdl_set_hint("SDL_ORIENTATIONS", "LandscapeLeft");
 	show_window("touch test");
 tts_voice tts;
 	uint64[]@ devs = get_touch_devices();
