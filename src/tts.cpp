@@ -22,6 +22,11 @@
 #include "riffheader.h"
 #include "tts.h"
 #include "UI.h"
+#ifdef __android__
+#include <jni.h>
+#include <Poco/Exception.h>
+#include <SDL3/SDL.h>
+#endif
 
 char* minitrim(char* data, unsigned long* bufsize, int bitrate, int channels) {
 	char* ptr = data;
@@ -75,6 +80,32 @@ void tts_voice::setup() {
 	#elif defined(__APPLE__)
 	inst = new AVTTSVoice();
 	voice_index = inst->getVoiceIndex(inst->getCurrentVoice());
+	#elif defined (__ANDROID__)
+	env = (JNIEnv*)SDL_GetAndroidJNIEnv();
+	if (!env) throw Poco::Exception("cannot retrieve JNI environment");
+	TTSClass = env->FindClass("com/samtupy/nvgt/TTS");
+	if (!TTSClass) throw Poco::Exception("Cannot find NVGT TTS class!");
+	constructor = env->GetMethodID(cls, "<init>", "()V");
+	if (!constructor) throw Poco::Exception("Cannot find NVGT TTS constructor!");
+	TTSObj = env->NewObject(cls, constructor);
+	if (!TTSObj) throw Poco::Exception("Can't instantiate TTS object!");
+	midIsActive = env->GetMethodID(TTSClass, "isActive", "()Z");
+	midIsSpeaking = env->GetMethodID(TTSClass, "isSpeaking", "()Z");
+	midSpeak = env->GetMethodID(TTSClass, "speak", "(Ljava/lang/String;Z)Z");
+	midSilence = env->GetMethodID(TTSClass, "silence", "()Z");
+	midGetVoice = env->GetMethodID(TTSClass, "getVoice", "()Ljava/lang/String;");
+	midSetRate = env->GetMethodID(TTSClass, "setRate", "(F)Z");
+	midSetPitch = env->GetMethodID(TTSClass, "setPitch", "(F)Z");
+	midSetPan = env->GetMethodID(TTSClass, "setPan", "(F)V");
+	midSetVolume = env->GetMethodID(TTSClass, "setVolume", "(F)V");
+	midGetVoices = env->GetMethodID(TTSClass, "getVoices", "()Ljava/util/List;");
+	midSetVoice = env->GetMethodID(TTSClass, "setVoice", "(Ljava/lang/String;)Z");
+	midGetMaxSpeechInputLength = env->GetMethodID(TTSClass, "getMaxSpeechInputLength", "()I");
+	midGetRate = env->GetMethodID(TTSClass, "getRate", "()F");
+	midGetPitch = env->GetMethodID(TTSClass, "getPitch", "()F");
+	midGetPan = env->GetMethodID(TTSClass, "getPan", "()F");
+	midGetVolume = env->GetMethodID(TTSClass, "getVolume", "()F");
+	if (!midIsActive || !midIsSpeaking || !midSpeak || !midSilence || !midGetVoice || !midSetRate || !midSetPitch || !midSetPan || !midSetVolume || !midGetVoices || !midSetVoice || !midGetMaxSpeechInputLength || !midGetPitch || !midGetPan || !midGetRate || !midGetVolume) throw Poco::Exception("One or more methods on the TTS class could not be retrieved from JNI!");
 	#else
 	voice_index = builtin_index;
 	#endif
@@ -138,6 +169,14 @@ bool tts_voice::speak(const std::string& text, bool interrupt) {
 	else {
 		return inst->speak(text, interrupt);
 	}
+	#elif defined (__android__)
+	else {
+		jint max_len = env->CallIntMethod(TTSObj, midGetMaxSpeechInputLength);
+		if (text.size() > max_len) {
+			return false;
+		}
+		return env->CallBooleanMethod(TTSObj, midSpeak, env->NewStringUTF(text.data()), interrupt ? JNI_TRUE : JNI_FALSE);
+	}
 	#endif
 	if (voice_index == builtin_index && !text.empty()) {
 		int samples;
@@ -194,6 +233,10 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 	else {
 		return false; // not implemented yet.
 	}
+	#elif defined(__android__)
+	else {
+		return false;
+	}
 	#endif
 	char* ptr = minitrim(data, &bufsize, bitrate, channels);
 	FILE* f = fopen(filename.c_str(), "wb");
@@ -235,7 +278,7 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 			audioout = 0;
 		}
 	}
-	#elif defined(__APPLE__)
+	#elif defined(__APPLE__) || defined(__android__)
 	else {
 		return ""; // Not implemented yet.
 	}
@@ -260,7 +303,11 @@ bool tts_voice::speak_wait(const std::string& text, bool interrupt) {
 	return true;
 }
 bool tts_voice::stop() {
+	#ifndef __android__
 	return speak("", true);
+	#else
+	return env->CallBooleanMethod(TTSObj, midStop);
+	#endif
 }
 int tts_voice::get_rate() {
 	if (voice_index == builtin_index) return builtin_rate;
@@ -272,6 +319,8 @@ int tts_voice::get_rate() {
 	return result;
 	#elif defined(__APPLE__)
 	return inst->getRate() * 7;
+	#elif defined (__android__)
+	return static_cast<int>(env->CallFloatMethod(TTSObj, midGetRate)*100.0);
 	#endif
 	return 0;
 }
@@ -281,6 +330,8 @@ int tts_voice::get_pitch() {
 	// not implemented yet
 	#elif defined(__APPLE__)
 	return inst->getPitch();
+	#elif defined (__android__)
+	return static_cast<int>(env->CallFloatMethod(TTSObj, midGetPitch)*100.0);
 	#endif
 	return 0;
 }
@@ -294,6 +345,8 @@ int tts_voice::get_volume() {
 	return result;
 	#elif defined(__APPLE__)
 	return inst->getRate();
+	#elif defined(__android__)
+	return static_cast<int>(env->CallFloatMethod(TTSObj, midGetVolume)*100.0);
 	#endif
 	return 0;
 }
@@ -304,6 +357,8 @@ void tts_voice::set_rate(int rate) {
 	blastspeak_set_voice_rate(inst, rate);
 	#elif defined(__APPLE__)
 	inst->setRate(rate / 7.0);
+	#elif defined(__android__)
+	env->CallFloatMethod(TTSObj, midSetRate, static_cast<float>(rate)/100.0);
 	#endif
 }
 void tts_voice::set_pitch(int pitch) {
@@ -312,6 +367,8 @@ void tts_voice::set_pitch(int pitch) {
 	// not implemented
 	#elif defined(__APPLE__)
 	inst->setPitch(pitch);
+	#elif defined(__android__)
+	env->CallFloatMethod(TTSObj, midSetPitch, static_cast<float>(pitch)/100.0);
 	#endif
 	return;
 }
@@ -322,6 +379,8 @@ void tts_voice::set_volume(int volume) {
 	blastspeak_set_voice_volume(inst, volume);
 	#elif defined(__APPLE__)
 	inst->setVolume(volume);
+	#elif defined(__android__)
+	env->CallFloatMethod(TTSObj, midSetVolume, static_cast<float>(volume)/100.0);
 	#endif
 }
 bool tts_voice::set_voice(int voice) {
@@ -347,6 +406,8 @@ bool tts_voice::get_speaking() {
 	#ifdef __APPLE__
 	if (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING) return true;
 	return inst->isSpeaking();
+	#elif defined(__android__)
+	return env->CallBooleanMethod(TTSObj, midIsSpeaking);
 	#else
 	if (!audioout) return false;
 	return BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING;
@@ -381,6 +442,8 @@ int tts_voice::get_voice_count() {
 	return inst ? inst->voice_count + (builtin_index + 1) : builtin_index + 1;
 	#elif defined(__APPLE__)
 	return inst->getVoicesCount() + (builtin_index + 1);
+	#elif defined(__android__)
+	return 1;
 	#endif
 	return builtin_index + 1;
 }
@@ -396,6 +459,9 @@ std::string tts_voice::get_voice_name(int index) {
 		return std::string(result);
 	#elif defined(__APPLE__)
 	return inst->getVoiceName(index);
+	#elif defined(__android__)
+	jboolean isCopy;
+	return env->GetStringUTFChars(env->CallObjectMethod(TTSObj, midGetVoice), &isCopy);
 	#endif
 	return "";
 }
