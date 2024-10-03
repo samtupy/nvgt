@@ -296,6 +296,8 @@ bool tts_voice::speak_wait(const std::string& text, bool interrupt) {
 		return false;
 	#ifdef __APPLE__
 	while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || inst->isSpeaking())
+	#elif defined (__android__)
+	while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || env->CallBooleanMethod(TTSObj, midIsSpeaking))
 	#else
 	while (BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING)
 	#endif
@@ -304,9 +306,9 @@ bool tts_voice::speak_wait(const std::string& text, bool interrupt) {
 }
 bool tts_voice::stop() {
 	#ifndef __android__
-	return speak("", true);
-	#else
 	return env->CallBooleanMethod(TTSObj, midStop);
+	#else
+	return speak("", true);
 	#endif
 }
 int tts_voice::get_rate() {
