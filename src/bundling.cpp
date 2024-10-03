@@ -612,4 +612,6 @@ nvgt_compilation_output* nvgt_init_compilation(const string& input_file, bool au
 	return output;
 }
 
+#elif defined(NVGT_MOBILE)
+void add_game_asset_to_bundle(const std::string& path, int flags) {} // Make this a linkable no-op on mobile.
 #endif // !NVGT_STUB
