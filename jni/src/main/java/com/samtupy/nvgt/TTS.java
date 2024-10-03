@@ -91,7 +91,7 @@ public class TTS {
 	}
 
 	public boolean isSpeaking() {
-		if (tts != null) {
+		if (isActive()) {
 			return tts.isSpeaking();
 		}
 		return false;
@@ -151,17 +151,17 @@ public class TTS {
 
 	@Override
 	public void finalize() {
-		if (tts != null && isActive()) {
+		if (isActive()) {
 			tts.shutdown();
 		}
 	}
 
 	public List<String> getVoices() {
-		return (tts != null && isActive()) ? tts.getVoices().stream().map(Voice::getName).collect(Collectors.toList()) : null;
+		return isActive() ? tts.getVoices().stream().map(Voice::getName).collect(Collectors.toList()) : null;
 	}
 
 	public boolean setVoice(String name) {
-		if (tts != null && isActive()) {
+		if (isActive()) {
 			Set<Voice> voices = tts.getVoices();
 			Optional<Voice> desiredVoice = voices.stream().filter(voice -> voice.getName().equals(name)).findFirst();
 			if (desiredVoice.isPresent()) {
@@ -175,7 +175,7 @@ public class TTS {
 	}
 
 	public int getMaxSpeechInputLength() {
-		return (tts != null && isActive()) ? tts.getMaxSpeechInputLength() : 0;
+		return isActive() ? tts.getMaxSpeechInputLength() : 0;
 	}
 
 	public float getRate() {

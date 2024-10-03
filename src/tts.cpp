@@ -25,6 +25,7 @@
 #ifdef __android__
 #include <jni.h>
 #include <Poco/Exception.h>
+#include <Poco/Format.h>
 #include <SDL3/SDL.h>
 #endif
 
@@ -106,6 +107,7 @@ void tts_voice::setup() {
 	midGetPan = env->GetMethodID(TTSClass, "getPan", "()F");
 	midGetVolume = env->GetMethodID(TTSClass, "getVolume", "()F");
 	if (!midIsActive || !midIsSpeaking || !midSpeak || !midSilence || !midGetVoice || !midSetRate || !midSetPitch || !midSetPan || !midSetVolume || !midGetVoices || !midSetVoice || !midGetMaxSpeechInputLength || !midGetPitch || !midGetPan || !midGetRate || !midGetVolume) throw Poco::Exception("One or more methods on the TTS class could not be retrieved from JNI!");
+	if (!env->CallBooleanMethod(TTSObj, midIsActive)) throw Poco::Exception("TTS engine could not be initialized!");
 	#else
 	voice_index = builtin_index;
 	#endif
@@ -173,7 +175,7 @@ bool tts_voice::speak(const std::string& text, bool interrupt) {
 	else {
 		jint max_len = env->CallIntMethod(TTSObj, midGetMaxSpeechInputLength);
 		if (text.size() > max_len) {
-			return false;
+			throw Poco::Exception(Poco::format("Maximum length of text for this engine must be no more than %d characters", max_len));
 		}
 		return env->CallBooleanMethod(TTSObj, midSpeak, env->NewStringUTF(text.data()), interrupt ? JNI_TRUE : JNI_FALSE);
 	}
@@ -305,8 +307,8 @@ bool tts_voice::speak_wait(const std::string& text, bool interrupt) {
 	return true;
 }
 bool tts_voice::stop() {
-	#ifndef __android__
-	return env->CallBooleanMethod(TTSObj, midStop);
+	#ifdef __android__
+	return env->CallBooleanMethod(TTSObj, midSilence);
 	#else
 	return speak("", true);
 	#endif
