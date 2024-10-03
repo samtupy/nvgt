@@ -22,7 +22,7 @@ public class TTS {
 	private float ttsVolume = 1.0f;
 	private float ttsRate = 1.0f;
 	private float ttsPitch = 1.0f;
-	private Boolean isTTSInitialized = false;
+	private boolean isTTSInitialized = false;
 
 	public static boolean isScreenReaderActive() {
 		Context context = SDL.getContext();
@@ -121,7 +121,7 @@ public class TTS {
 		return isActive() ? tts.getVoice().getName() : null;
 	}
 
-	public Boolean setRate(float rate) {
+	public boolean setRate(float rate) {
 		if (isActive()) {
 			if (tts.setSpeechRate(rate) == TextToSpeech.SUCCESS) {
 				ttsRate = rate;
@@ -131,7 +131,7 @@ public class TTS {
 		return false;
 	}
 
-	public Boolean setPitch(float pitch) {
+	public boolean setPitch(float pitch) {
 		if (isActive()) {
 			if (tts.setPitch(pitch) == TextToSpeech.SUCCESS) {
 				ttsPitch = pitch;
@@ -160,7 +160,7 @@ public class TTS {
 		return (tts != null && isActive()) ? tts.getVoices().stream().map(Voice::getName).collect(Collectors.toList()) : null;
 	}
 
-	public Boolean setVoice(String name) {
+	public boolean setVoice(String name) {
 		if (tts != null && isActive()) {
 			Set<Voice> voices = tts.getVoices();
 			Optional<Voice> desiredVoice = voices.stream().filter(voice -> voice.getName().equals(name)).findFirst();
