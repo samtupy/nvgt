@@ -13,6 +13,6 @@ Sets the whitelist/blacklist characters of a control.
 bool: true if the characters were successfully set, false otherwise.
 
 ## Remarks:
-Setting the use_only_disallowed_chars parameter to true will restrict all characters that are not in the list. This is useful to prevent other characters in number inputs.
+Setting the `use_only_disallowed_chars` parameter to true will restrict all characters that are not in the list. This is useful to prevent other characters in number inputs.
 
-Setting the chars parameter to blank will clear the characters and will switch back to default.
+Setting the chars parameter to empty will clear the characters and will switch back to default.
