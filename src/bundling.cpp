@@ -31,6 +31,7 @@
 #include <Poco/Process.h>
 #include <Poco/StreamCopier.h>
 #include <Poco/String.h>
+#include <Poco/StringTokenizer.h>
 #include <Poco/TemporaryFile.h>
 #include <Poco/Timestamp.h>
 #include <Poco/Util/Application.h>
@@ -52,6 +53,27 @@
 #include "UI.h"
 using namespace std;
 using namespace Poco;
+
+// Storage and routines for defining game assets that should be included.
+class game_asset {
+public:
+	std::string filesystem_path;
+	std::string bundled_path;
+	int flags;
+	game_asset(const std::string& filesystem_path, const std::string& bundled_path, int flags = 0) : filesystem_path(filesystem_path), bundled_path(bundled_path), flags(flags) {
+		if (bundled_path.empty()) this->bundled_path = Path(filesystem_path).getFileName();
+	}
+};
+vector<game_asset> g_game_assets;
+void add_game_asset_to_bundle(const string& filesystem_path, const string& bundled_path, int flags) {
+	g_game_assets.push_back(game_asset(filesystem_path, bundled_path, flags));
+}
+void add_game_asset_to_bundle(const string& path, int flags) {
+	// In this case the filesystem path and the bundled path are in the same string, separated by semicolon.
+	size_t semi = path.find_first_of(';');
+	while (semi && semi != string::npos && path[semi -1] == '\\' ) semi = path.find_first_of(';', semi + 1);
+	return add_game_asset_to_bundle(path.substr(0, semi), path.substr(semi +1 ), flags);
+}
 
 // Helper function to run a shell command that returns true if that command returns 0, false otherwise. Specifically intended for programatic use, this makes no attempt to print output or errors from the given command to the real stdout stream and instead captures all output for use in our program.
 bool system_command(const std::string& command, const Process::Args& args, const std::string& initial_directory, string& std_out, string& std_err) {
@@ -192,6 +214,41 @@ protected:
 		}
 		return format("%s.%s", config.getString("build.product_identifier_domain", "com.NVGTUser"), output);
 	}
+	void bundle_assets(const Path& resource_path, const Path& document_path) {
+		set_status("bundling assets...");
+		for (const game_asset& g : g_game_assets) {
+			Path p = Path(g.bundled_path).makeAbsolute(g.flags & GAME_ASSET_DOCUMENT? document_path : resource_path);
+			if (!File(p.parent()).exists()) File(p.parent()).createDirectories();
+			File(g.filesystem_path).copyTo(p.toString());
+		}
+	}
+	void copy_shared_libraries(const Path& libpath) {
+		// Copy any needed shared libraries to the output package, handling excludes and already existent files.
+		set_status("copying libraries...");
+		File libpathF(libpath);
+		// Determine whether to create, replace, or update shared libraries.
+		if (!libpathF.exists()) libpathF.createDirectories();
+		else if(config.hasOption("build.shared_library_recopy")) libpathF.remove(true);
+		StringTokenizer excludes(config.getString("build.shared_library_excludes", "plist TrueAudioNext GPUUtilities systemd_notify sqlite git2 curl"), " "); // Todo: Make this a whitelist once plugins have a way to communicate about extra libraries they load.
+		string source = get_nvgt_lib_directory(g_platform);
+		set<string> libs;
+		Glob::glob("*", source, libs, Glob::GLOB_DOT_SPECIAL | Glob::GLOB_FOLLOW_SYMLINKS | Glob::GLOB_CASELESS);
+		for (const string& library : libs) {
+			// First check if we wish to exclude this library.
+			bool excluded = false;
+			for (const string& e : excludes) {
+				if (library.find(e) == string::npos) continue;
+				excluded = true;
+				break;
+			}
+			if (excluded) continue;
+			// Now check if the same or a newer version of this library has already been copied and skip it if so, in order to save time.
+			File lib = library;
+			File destF = Path(libpath).append(Path(library).getFileName()).toString();
+			if (destF.exists() && destF.getLastModified() >= lib.getLastModified()) continue;
+			lib.copyTo(libpath.toString());
+		}
+	}
 	virtual void alter_stub_path(Path& stubpath) {
 		// This method can be overwritten by subclasses to modify the location that stubs are selected from. Throw an exception to abort the compilation.
 	}
@@ -223,9 +280,26 @@ protected:
 	}
 };
 class nvgt_compilation_output_windows : public nvgt_compilation_output_impl {
+	SharedPtr<File> workplace_tmp;
+	File workplace;
+	Path final_output_path;
+	int bundle_mode;
 	using nvgt_compilation_output_impl::nvgt_compilation_output_impl;
 protected:
-	void alter_output_path(Path& output_path) override { output_path.setExtension("exe"); }
+	void alter_output_path(Path& output_path) override {
+		bundle_mode = config.getInt("build.windows_bundle", 2); // 0 no bundle, 1 folder, 2 .zip, 3 both folder and .zip.
+		if (bundle_mode == 2) {
+			workplace_tmp = new TemporaryFile();
+			workplace = *workplace_tmp;
+		} else if(bundle_mode > 0) workplace = Path(output_path).makeFile().setExtension("");
+		else output_path.setExtension("exe");
+		if (bundle_mode) {
+			workplace.createDirectories();
+			Path tmp = Path(workplace.path()).append(output_path.getBaseName()).makeFile().setExtension("exe");
+			final_output_path = output_path;
+			output_path = tmp;
+		}
+	}
 	void open_output_stream(const Path& output_path) override {
 		nvgt_compilation_output_impl::open_output_stream(output_path);
 		BinaryReader br(fs);
@@ -243,6 +317,20 @@ protected:
 		}
 	}
 	void finalize_output_stream() override {} // Don't write payload offset on this platform.
+	void finalize_product(Path& output_path) override {
+		if (!bundle_mode) return; // We are not creating a bundle in this condition.
+		bundle_assets(workplace.path(), workplace.path());
+		copy_shared_libraries(Path(workplace.path()).append("lib"));
+		if (bundle_mode > 1) {
+			set_status("packaging product...");
+			File zip_out = Path(final_output_path).makeFile().setExtension("zip").toString();
+			FileOutputStream zip_out_stream(zip_out.path());
+			Zip::Compress zcpr(zip_out_stream, true);
+			zcpr.addRecursive(workplace.path());
+			zcpr.close();
+			output_path = zip_out.path();
+		} else output_path = workplace.path();
+	}
 };
 class nvgt_compilation_output_mac : public nvgt_compilation_output_impl {
 	SharedPtr<File> workplace_tmp;
@@ -288,11 +376,9 @@ protected:
 		plist_out.close();
 		plist_mem_free(plist_xml);
 		plist_free(plist);
-		// Now copy shared libraries.
-		set_status("copying libraries...");
-		File frameworks_location = Path(workplace.path()).append("Contents/Frameworks").toString();
-		if (frameworks_location.exists()) frameworks_location.remove(true);
-		File(get_nvgt_lib_directory(g_platform)).copyTo(frameworks_location.path());
+		// Bundle assets and copy shared libraries.
+		bundle_assets(Path(workplace.path()).append("Contents/Resources"), bundle_mode == 3? Path(workplace.path()).makeParent() : Path(workplace.path()).append("Contents/Resources"));
+		copy_shared_libraries(Path(workplace.path()).append("Contents/Frameworks"));
 		if (bundle_mode > 1) {
 			// On the mac, we can execute the hdiutil command to create a .dmg file. Otherwise, we must create a .zip instead, as it can portably store unix file attributes.
 			set_status("packaging product...");
@@ -300,16 +386,51 @@ protected:
 				string sout, serr;
 				File dmg_out = Path(final_output_path).makeFile().setExtension("dmg").toString();
 				if (dmg_out.exists()) dmg_out.remove(true);
-				if (!system_command("hdiutil", {"create", "-srcfolder", workplace.path(), dmg_out.path()}, sout, serr)) throw Exception(format("Unable to execute hdiutil for .dmg generation: %s", serr));
+				if (!system_command("hdiutil", {"create", "-srcfolder", bundle_mode < 3? workplace.path() : Path(workplace.Path()).makeParent().toString(), "-volname", Path(workplace.path()).makeFile.getBaseName(), dmg_out.path()}, sout, serr)) throw Exception(format("Unable to execute hdiutil for .dmg generation: %s", serr));
 				output_path = dmg_out.path();
 			#else
 				File zip_out = Path(final_output_path).makeFile().setExtension("app.zip").toString();
 				FileOutputStream zip_out_stream(zip_out.path());
 				Zip::Compress zcpr(zip_out_stream, true);
-				zcpr.addRecursive(workplace.path());
+				zcpr.addRecursive(Path(workplace.path()).makeParent().toString());
 				Zip::ZipArchive za = zcpr.close();
 				output_path = zip_out.path();
 			#endif
+		} else output_path = workplace.path();
+	}
+};
+class nvgt_compilation_output_linux : public nvgt_compilation_output_impl {
+	SharedPtr<File> workplace_tmp;
+	File workplace;
+	Path final_output_path;
+	int bundle_mode;
+	using nvgt_compilation_output_impl::nvgt_compilation_output_impl;
+protected:
+	void alter_output_path(Path& output_path) override {
+		bundle_mode = config.getInt("build.linux_bundle", 2); // 0 no bundle, 1 folder, 2 .zip, 3 both folder and .zip.
+		if (bundle_mode == 2) {
+			workplace_tmp = new TemporaryFile();
+			workplace = *workplace_tmp;
+		} else if(bundle_mode > 0) workplace = Path(output_path).makeFile().setExtension("");
+		if (bundle_mode) {
+			workplace.createDirectories();
+			Path tmp = Path(workplace.path()).append(output_path.getBaseName()).makeFile();
+			final_output_path = output_path;
+			output_path = tmp;
+		}
+	}
+	void finalize_product(Path& output_path) override {
+		if (!bundle_mode) return; // We are not creating a bundle in this condition.
+		bundle_assets(workplace.path(), workplace.path());
+		copy_shared_libraries(Path(workplace.path()).append("lib"));
+		if (bundle_mode > 1) {
+			set_status("packaging product...");
+			File zip_out = Path(final_output_path).makeFile().setExtension("zip").toString();
+			FileOutputStream zip_out_stream(zip_out.path());
+			Zip::Compress zcpr(zip_out_stream, true);
+			zcpr.addRecursive(workplace.path());
+			zcpr.close();
+			output_path = zip_out.path();
 		} else output_path = workplace.path();
 	}
 };
@@ -410,6 +531,7 @@ protected:
 	}
 	void finalize_product(Path& output_path) override {
 		output_path = final_output_path;
+		bundle_assets(Path(workplace.path()).append("assets"), Path(workplace.path()).append("assets"));
 		// Here we take the stub components and turn it all into a .apk with the bytecode now embedded. First lets replace the app label.
 		string product_name = config.getString("build.product_name", Path(get_input_file()).getBaseName());
 		config.setString("build.product_name", product_name);
@@ -483,10 +605,13 @@ nvgt_compilation_output* nvgt_init_compilation(const string& input_file, bool au
 	nvgt_compilation_output* output;
 	if (g_platform == "windows") output = new nvgt_compilation_output_windows(input_file);
 	else if (g_platform == "mac") output = new nvgt_compilation_output_mac(input_file);
+	else if (g_platform == "linux") output = new nvgt_compilation_output_linux(input_file);
 	else if (g_platform == "android") output = new nvgt_compilation_output_android(input_file);
 	else output = new nvgt_compilation_output_impl(input_file);
 	if (auto_prepare) output->prepare();
 	return output;
 }
 
+#elif defined(NVGT_MOBILE)
+void add_game_asset_to_bundle(const std::string& path, int flags) {} // Make this a linkable no-op on mobile.
 #endif // !NVGT_STUB

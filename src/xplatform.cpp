@@ -72,6 +72,7 @@ std::string get_nvgt_lib_directory(const std::string& platform) {
 #if defined(__APPLE__) || defined(__ANDROID__)
 // The following code allows nvgt's compiler to open files sent to it from finder or other android apps. SDL handles the needed event for us, so we just need to snatch it from the event queue before our normal cross platform sdl event handling takes over after the nvgt script has begun executing.
 void InputInit(); // Forward declared from input.cpp
+void InputDestroy();
 std::string event_requested_file() {
 	#ifdef __APPLE__
 		if (!Poco::Environment::has("MACOS_BUNDLED_APP")) return ""; // This will certainly not happen outside of the app bundle.
@@ -90,6 +91,7 @@ std::string event_requested_file() {
 		break;
 	}
 	SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, old_dropfile_state);
+	InputDestroy();
 	return result;
 }
 #endif

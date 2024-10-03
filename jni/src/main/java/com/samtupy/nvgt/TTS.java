@@ -24,6 +24,7 @@ import org.libsdl.app.SDL;
 
 public class TTS {
 	// First the static screen reader methods.
+	static String AvoidDuplicateSpeechHack = ""; // Talkback unfortunately sets a flag that causes speech messages to not always be spoken over again in announcement events when the same message is repeated, we work around it by appending a changing number of spaces to the message and this variable stores those.
 	public static boolean isScreenReaderActive() {
 		Context context = SDL.getContext();
 		AccessibilityManager am = (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
@@ -69,7 +70,6 @@ public class TTS {
 		return true;
 	}
 	// Then, the instantiable object that interfaces directly with the Android TextToSpeech system.
-	private static String AvoidDuplicateSpeechHack; // Talkback unfortunately sets a flag that causes speech messages to not always be spoken over again in announcement events when the same message is repeated, we work around it by appending a changing number of spaces to the message and this variable stores those.
 	private TextToSpeech tts;
 	private float ttsPan = 0.0f;
 	private float ttsVolume = 1.0f;

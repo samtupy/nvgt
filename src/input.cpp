@@ -119,7 +119,7 @@ bool KeyRepeating(unsigned int key) {
 }
 bool key_down(unsigned int key) {
 	if (key > 511 || !g_KeysDown) return false;
-	return g_KeysReleased[key] == 0 && g_KeysDown[key] == 1;
+	return g_KeysReleased[key] == 0 && (g_KeysDown[key] == 1 || g_KeysForced[key]);
 }
 bool KeyReleased(unsigned int key) {
 	if (key > 511 || !g_KeysDown) return false;
@@ -129,8 +129,7 @@ bool KeyReleased(unsigned int key) {
 	return r;
 }
 bool key_up(unsigned int key) {
-	if (key > 511 || !g_KeysDown) return false;
-	return g_KeysDown[key] == 0;
+	return !key_down(key);
 }
 bool insure_key_up(unsigned short key) {
 	if (key > 511 || !g_KeysDown) return false;
@@ -138,6 +137,7 @@ bool insure_key_up(unsigned short key) {
 		g_KeysReleased[key] = 1;
 	else
 		return false;
+	g_KeysForced[key] = false;
 	return true;
 }
 inline bool post_key_event(unsigned int key, SDL_EventType evt_type) {
@@ -146,6 +146,41 @@ inline bool post_key_event(unsigned int key, SDL_EventType evt_type) {
 	e.type = evt_type;
 	e.common.timestamp = SDL_GetTicksNS();
 	e.key.scancode = (SDL_Scancode)key;
+	g_KeysForced[key] = evt_type == SDL_EVENT_KEY_DOWN;
+	SDL_Keymod mods;
+	switch (key) {
+		case SDL_SCANCODE_LCTRL:
+			mods = SDL_KMOD_LCTRL;
+			break;
+		case SDL_SCANCODE_RCTRL:
+			mods = SDL_KMOD_RCTRL;
+			break;
+		case SDL_SCANCODE_LSHIFT:
+			mods = SDL_KMOD_LSHIFT;
+			break;
+		case SDL_SCANCODE_RSHIFT:
+			mods = SDL_KMOD_RSHIFT;
+			break;
+		case SDL_SCANCODE_LALT:
+			mods = SDL_KMOD_LALT;
+			break;
+		case SDL_SCANCODE_RALT:
+			mods = SDL_KMOD_RALT;
+			break;
+		case SDL_SCANCODE_LGUI:
+			mods = SDL_KMOD_LGUI;
+			break;
+		case SDL_SCANCODE_RGUI:
+			mods = SDL_KMOD_RGUI;
+			break;
+		case SDL_SCANCODE_MODE:
+			mods = SDL_KMOD_MODE;
+			break;
+		default:
+			mods = SDL_KMOD_NONE;
+			break;
+	}
+	evt_type == SDL_EVENT_KEY_DOWN? SDL_SetModState(SDL_GetModState() | mods) : SDL_SetModState(SDL_GetModState() & ~mods);
 	e.key.key = SDL_GetKeyFromScancode(e.key.scancode, SDL_GetModState(), true);
 	return SDL_PushEvent(&e);
 }
@@ -172,7 +207,7 @@ CScriptArray* keys_down() {
 	CScriptArray* array = CScriptArray::Create(key_code_array_type);
 	if (!g_KeysDown) return array;
 	for (int i = 0; i < g_KeysDownArrayLen; i++) {
-		if (g_KeysDown[i] == 1)
+		if (g_KeysDown[i] == 1 || g_KeysForced[i])
 			array->InsertLast(&i);
 	}
 	return array;

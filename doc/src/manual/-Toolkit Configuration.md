@@ -119,6 +119,7 @@ This section contains options that are directly related to the compiling/bundlin
 * android_path string defaults to %PATH%: where to look for android development tools
 * android_signature_cert = string: path to a .keystore file used to sign an Android apk bundle
 * android_signature_password = string: password used to access the given signing keystore (see remarks at the bottom of this article)
+* linux_bundle = integer default 2: 0 no bundle, 1 folder, 2 .zip, 3 both folder and .zip
 * mac_bundle = integer default 2: 0 no bundle, 1 .app, 2 .dmg/.zip, 3 both .app and .dmg/.zip
 * no_success_message: specifically hides the compilation success message if defined
 * output_basename = string default set from input filename: the output file or directory name of the final compiled package without an extension
@@ -129,7 +130,10 @@ This section contains options that are directly related to the compiling/bundlin
 * product_name=string defaults to input file basename: human friendly display name of your application
 * product_version = string default 1.0: human friendly version string to display to users in bundles
 * product_version_code = integer default (UnixEpoch / 60): an increasing 32 bit integer that programatically denotes the version of your application (default is usually ok)
-* product_version_semantic string default 1.0.0: a numeric version string in the form major.minor.patch used by some platforms
+* product_version_semantic = string default 1.0.0: a numeric version string in the form major.minor.patch used by some platforms
+* shared_library_excludes = string default "plist TrueAudioNext GPUUtilities systemd_notify sqlite git2 curl": Partial names of shared libraries that should not be copied from NVGT's source lib directory into the bundled product.
+* shared_library_recopy: If this is set, any shared libraries will be copied from scratch instead of only if they're newer than already copied.
+* windows_bundle = integer default 2: 0 no bundle, 1 folder, 2 .zip, 3 both folder and .zip
 * windows_console: when compiling for windows, build with the console subsystem instead of GUI
 
 #### scripting
@@ -174,7 +178,9 @@ The syntax for a pragma directive looks like `#pragma name value` or sometimes j
 * `#pragma include <directory>`: search for includes in the given directory (directive can be repeated)
 * `#pragma platform <platform>`: select what platform to compile for same as -p argument (auto, android, linux, mac, windows)
 * `#pragma stub <stubname>`: select what stub to compile using (see remarks at the bottom of this article)
-* `#pragma embed <packname>`: embed the given pack into the compiled executable
+* `#pragma embed <packname>`: embed the given pack into the compiled executable file itself
+* `#pragma asset pathname`: copy the given asset/assets into the bundled product as resources
+* `#pragma document pathname`: copy the given asset/assets into the bundled product as documents intended for the user to access rather than the programmer
 * `#pragma plugin <plugname>`: load and activate a plugin given it's dll basename
 * `#pragma compiled_basename <basename>`: the output filename of the compiled executable without the extension
 * `#pragma bytecode_compression <level from 0 to 9>`: controls the compression level for bytecode saved in the compiled executable (0 disabled 9 maximum)

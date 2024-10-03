@@ -398,6 +398,9 @@ bool is_console_available() {
 	#endif
 }
 
+bool sdl_set_hint(const std::string& hint, const std::string& value, int priority) { return SDL_SetHintWithPriority(hint.c_str(), value.c_str(), SDL_HintPriority(priority)); }
+std::string sdl_get_hint(const std::string& hint) { return SDL_GetHint(hint.c_str()); }
+
 void RegisterUI(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UI);
 	engine->RegisterEnum(_O("message_box_flags"));
@@ -406,6 +409,12 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterEnumValue(_O("message_box_flags"), _O("MESSAGE_BOX_INFORMATION"), SDL_MESSAGEBOX_INFORMATION);
 	engine->RegisterEnumValue(_O("message_box_flags"), _O("MESSAGE_BOX_BUTTONS_LEFT_TO_RIGHT"), SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT);
 	engine->RegisterEnumValue(_O("message_box_flags"), _O("MESSAGE_BOX_BUTTONS_RIGHT_TO_LEFT"), SDL_MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT);
+	engine->RegisterEnum("sdl_hint_priority");
+	engine->RegisterEnumValue("sdl_hint_priority", "SDL_HINT_DEFAULT", SDL_HINT_DEFAULT);
+	engine->RegisterEnumValue("sdl_hint_priority", "SDL_HINT_NORMAL", SDL_HINT_NORMAL);
+	engine->RegisterEnumValue("sdl_hint_priority", "SDL_HINT_OVERRIDE", SDL_HINT_OVERRIDE);
+	engine->RegisterGlobalFunction(_O("bool sdl_set_hint(const string&in hint, const string&in value, int priority = SDL_HINT_NORMAL)"), asFUNCTION(sdl_set_hint), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string sdl_get_hint(const string&in hint)"), asFUNCTION(sdl_get_hint), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int message_box(const string& in title, const string& in message, string[]@ buttons, uint flags = 0)"), asFUNCTION(message_box_script), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int alert(const string &in title, const string &in text, bool can_cancel = false, uint flags = 0)"), asFUNCTION(alert), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int question(const string& in title, const string& in text, bool can_cancel = false, uint flags = 0)"), asFUNCTION(question), asCALL_CDECL);
