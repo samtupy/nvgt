@@ -106,6 +106,7 @@ void tts_voice::setup() {
 	midGetPan = env->GetMethodID(TTSClass, "getPan", "()F");
 	midGetVolume = env->GetMethodID(TTSClass, "getVolume", "()F");
 	if (!midIsActive || !midIsSpeaking || !midSpeak || !midSilence || !midGetVoice || !midSetRate || !midSetPitch || !midSetPan || !midSetVolume || !midGetVoices || !midSetVoice || !midGetMaxSpeechInputLength || !midGetPitch || !midGetPan || !midGetRate || !midGetVolume) throw Poco::Exception("One or more methods on the TTS class could not be retrieved from JNI!");
+	voice_index = 1;
 	#else
 	voice_index = builtin_index;
 	#endif
@@ -169,13 +170,12 @@ bool tts_voice::speak(const std::string& text, bool interrupt) {
 	else {
 		return inst->speak(text, interrupt);
 	}
-	#elif defined (__android__)
+	#elif defined (__ANDROID__)
 	else {
-		jint max_len = env->CallIntMethod(TTSObj, midGetMaxSpeechInputLength);
-		if (text.size() > max_len) {
-			return false;
-		}
-		return env->CallBooleanMethod(TTSObj, midSpeak, env->NewStringUTF(text.data()), interrupt ? JNI_TRUE : JNI_FALSE);
+		jstring jtext = env->NewStringUTF(text.c_str());
+		bool r = env->CallBooleanMethod(TTSObj, midSpeak, jtext, interrupt ? JNI_TRUE : JNI_FALSE);
+		env->DeleteLocalRef(jtext);
+		return r;
 	}
 	#endif
 	if (voice_index == builtin_index && !text.empty()) {
@@ -296,6 +296,8 @@ bool tts_voice::speak_wait(const std::string& text, bool interrupt) {
 		return false;
 	#ifdef __APPLE__
 	while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || inst->isSpeaking())
+	#elif defined(__ANDROID__)
+		while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || get_speaking())
 	#else
 	while (BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING)
 	#endif
@@ -407,6 +409,7 @@ bool tts_voice::get_speaking() {
 	if (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING) return true;
 	return inst->isSpeaking();
 	#elif defined(__android__)
+	if (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING) return true;
 	return env->CallBooleanMethod(TTSObj, midIsSpeaking);
 	#else
 	if (!audioout) return false;

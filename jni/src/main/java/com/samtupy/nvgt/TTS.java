@@ -4,6 +4,8 @@ import android.content.Context;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.media.AudioManager;
+import android.media.AudioAttributes;
 import java.util.List;
 import org.libsdl.app.SDL;
 import android.os.Bundle;
@@ -79,6 +81,8 @@ public class TTS {
 					tts.setLanguage(Locale.getDefault());
 					tts.setPitch(1.0f);
 					tts.setSpeechRate(1.0f);
+					AudioAttributes audioAttributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build();
+					tts.setAudioAttributes(audioAttributes);
 				} else {
 					isTTSInitialized = false;
 				}
@@ -99,16 +103,13 @@ public class TTS {
 
 	public boolean speak(String text, boolean interrupt) {
 		if (isActive()) {
-			if (interrupt) {
-				tts.stop();
-			}
 			Bundle params = new Bundle();
 			params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, ttsVolume);
 			params.putFloat(TextToSpeech.Engine.KEY_PARAM_PAN, ttsPan);
 			if (text.length() > tts.getMaxSpeechInputLength()) {
 				return false;
 			}
-			return tts.speak(text, TextToSpeech.QUEUE_ADD, params, null) == TextToSpeech.SUCCESS;
+			return tts.speak(text, interrupt? TextToSpeech.QUEUE_FLUSH : TextToSpeech.QUEUE_ADD, params, null) == TextToSpeech.SUCCESS;
 		}
 		return false;
 	}
