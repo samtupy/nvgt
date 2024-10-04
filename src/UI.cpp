@@ -287,7 +287,7 @@ BOOL FocusNVGTWindow() {
 	SDL_RaiseWindow(g_WindowHandle);
 	return true;
 }
-BOOL WindowIsFocused() {
+bool WindowIsFocused() {
 	if (!g_WindowHandle) return false;
 	return g_WindowHandle == SDL_GetKeyboardFocus();
 }
@@ -307,20 +307,8 @@ void handle_sdl_event(SDL_Event* evt) {
 	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_GAINED)
 		regained_window_focus();
 }
-void wait(int ms) {
-	if (!g_WindowHandle || g_WindowThreadId != thread_current_thread_id()) {
-		Poco::Thread::sleep(ms);
-		return;
-	}
-	while (ms >= 0) {
-		int MS = (ms > 25 ? 25 : ms);
-		if (g_GCMode == 2)
-			garbage_collect_action();
-		Poco::Thread::sleep(MS);
-		SDL_PumpEvents();
-		ms -= MS;
-		if (ms < 1) break;
-	}
+void refresh_window() {
+	SDL_PumpEvents();
 	SDL_Event evt;
 	std::unordered_set<int> keys_pressed_this_frame;
 	while (SDL_PollEvent(&evt)) {
@@ -338,6 +326,22 @@ void wait(int ms) {
 			SDL_PushEvent(&e);
 		post_events.clear();
 	}
+}
+void wait(int ms) {
+	if (!g_WindowHandle || g_WindowThreadId != thread_current_thread_id()) {
+		Poco::Thread::sleep(ms);
+		return;
+	}
+	while (ms >= 0) {
+		int MS = (ms > 25 ? 25 : ms);
+		if (g_GCMode == 2)
+			garbage_collect_action();
+		Poco::Thread::sleep(MS);
+		SDL_PumpEvents();
+		ms -= MS;
+		if (ms < 1) break;
+	}
+	refresh_window();
 }
 
 
@@ -422,6 +426,7 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool is_window_hidden()", asFUNCTION(WindowIsHidden), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_window_text()", asFUNCTION(get_window_text), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 get_window_os_handle()", asFUNCTION(get_window_os_handle), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void refresh_window()", asFUNCTION(refresh_window), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void wait(int ms)", asFUNCTIONPR(wait, (int), void), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 idle_ticks()", asFUNCTION(idle_ticks), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_console_available()", asFUNCTION(is_console_available), asCALL_CDECL);

@@ -27,6 +27,7 @@
 #include <Poco/Mutex.h>
 #include <Poco/Timestamp.h>
 #include <Poco/Timezone.h>
+#include <SDL3/SDL.h>
 #include "nvgt.h"
 #include "scriptstuff.h"
 
@@ -317,9 +318,13 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("int get_TIME_HOUR() property", asFUNCTION(get_time_hour), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_TIME_MINUTE() property", asFUNCTION(get_time_minute), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_TIME_SECOND() property", asFUNCTION(get_time_second), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("uint64 ticks(bool = false)"), asFUNCTION(ticks), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 ticks(bool secure = false)"), asFUNCTION(ticks), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64 secure_ticks()"), asFUNCTION(secure_ticks), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("uint64 microticks(bool = false)"), asFUNCTION(microticks), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 microticks(bool secure = false)"), asFUNCTION(microticks), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 nanoticks()"), asFUNCTION(SDL_GetTicksNS), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 get_SYSTEM_PERFORMANCE_COUNTER() property"), asFUNCTION(SDL_GetPerformanceCounter), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 get_SYSTEM_PERFORMANCE_FREQUENCY() property"), asFUNCTION(SDL_GetPerformanceFrequency), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void nanosleep(uint64 ns)"), asFUNCTION(SDL_GetTicksNS), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction(_O("uint64 get_TIME_SYSTEM_RUNNING_MILLISECONDS() property"), asFUNCTION(system_running_milliseconds), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_TIMEZONE_BASE_OFFSET() property", asFUNCTION(Poco::Timezone::utcOffset), asCALL_CDECL);
@@ -335,43 +340,43 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("timer_queue"), asBEHAVE_FACTORY, _O("timer_queue @q()"), asFUNCTION(timestuff_factory<timer_queue>), asCALL_CDECL);
 	engine->RegisterObjectBehaviour(_O("timer_queue"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(timer_queue, add_ref), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("timer_queue"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(timer_queue, release), asCALL_THISCALL);
-	engine->RegisterFuncdef(_O("uint timer_callback(string, string)"));
+	engine->RegisterFuncdef(_O("uint timer_callback(string timer_id, string user_data)"));
 	engine->RegisterObjectProperty(_O("timer_queue"), _O("const string failures"), asOFFSET(timer_queue, failures));
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("void set(const string&in, timer_callback@, const string&in, uint64, bool = false)"), asMETHOD(timer_queue, set), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("void set(const string&in, timer_callback@, uint64, bool = false)"), asMETHOD(timer_queue, set_dataless), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint64 elapsed(const string&in) const"), asMETHOD(timer_queue, elapsed), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint64 timeout(const string&in) const"), asMETHOD(timer_queue, timeout), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool exists(const string&in) const"), asMETHOD(timer_queue, exists), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool restart(const string&in)"), asMETHOD(timer_queue, restart), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool is_repeating(const string&in) const"), asMETHOD(timer_queue, is_repeating), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool set_timeout(const string&in, uint64, bool = false)"), asMETHOD(timer_queue, set_timeout), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool delete(const string&in)"), asMETHOD(timer_queue, erase), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("void set(const string&in timer_id, timer_callback@ callback, const string&in callback_data, uint64 milliseconds, bool repeating = false)"), asMETHOD(timer_queue, set), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("void set(const string&in timer_id, timer_callback@ callback, uint64 milliseconds, bool repeating = false)"), asMETHOD(timer_queue, set_dataless), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint64 elapsed(const string&in timer_id) const"), asMETHOD(timer_queue, elapsed), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint64 timeout(const string&in timer_id) const"), asMETHOD(timer_queue, timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool exists(const string&in timer_id) const"), asMETHOD(timer_queue, exists), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool restart(const string&in timer_id)"), asMETHOD(timer_queue, restart), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool is_repeating(const string&in timer_id) const"), asMETHOD(timer_queue, is_repeating), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool set_timeout(const string&in timer_id, uint64 milliseconds, bool repeating = false)"), asMETHOD(timer_queue, set_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool delete(const string&in timer_id)"), asMETHOD(timer_queue, erase), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("void flush()"), asMETHOD(timer_queue, flush), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("void reset()"), asMETHOD(timer_queue, reset), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint size() const"), asMETHOD(timer_queue, size), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool loop(int = 0, int = 100)"), asMETHOD(timer_queue, loop), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool loop(int max_timers = 0, int max_catchup_milliseconds = 100)"), asMETHOD(timer_queue, loop), asCALL_THISCALL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
 	engine->RegisterObjectType(_O("timer"), 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_FACTORY, _O("timer@ t()"), asFUNCTION(timestuff_factory<timer>), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_FACTORY, _O("timer@ t(bool)"), asFUNCTION((timestuff_factory<timer, bool>)), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_FACTORY, _O("timer@ t(int64, bool = speedhack_protection)"), asFUNCTION((timestuff_factory<timer, int64_t, bool>)), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_FACTORY, _O("timer@ t(int64, uint64, bool = speedhack_protection)"), asFUNCTION((timestuff_factory<timer, int64_t, uint64_t, bool>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_FACTORY, _O("timer@ t(bool speedhack_protection)"), asFUNCTION((timestuff_factory<timer, bool>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_FACTORY, _O("timer@ t(int64 initial_elapsed, bool speedhack_protection = speedhack_protection)"), asFUNCTION((timestuff_factory<timer, int64_t, bool>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_FACTORY, _O("timer@ t(int64 initial_elapsed, uint64 accuracy, bool speedhack_protection = speedhack_protection)"), asFUNCTION((timestuff_factory<timer, int64_t, uint64_t, bool>)), asCALL_CDECL);
 	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(timer, duplicate), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(timer, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer"), _O("int64 get_elapsed() const property"), asMETHOD(timer, get_elapsed), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer"), _O("void set_elapsed(int64) property"), asMETHOD(timer, force), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer"), _O("bool has_elapsed(int64) const"), asMETHOD(timer, has_elapsed), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer"), _O("void force(int64)"), asMETHOD(timer, force), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer"), _O("void adjust(int64)"), asMETHOD(timer, adjust), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("void set_elapsed(int64 time_units) property"), asMETHOD(timer, force), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("bool has_elapsed(int64 time_units) const"), asMETHOD(timer, has_elapsed), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("void force(int64 elapsed)"), asMETHOD(timer, force), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("void adjust(int64 mod_elapsed)"), asMETHOD(timer, adjust), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer"), _O("void restart()"), asMETHOD(timer, restart), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer"), _O("bool get_secure() const property"), asMETHOD(timer, get_secure), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer"), _O("void set_secure(bool) property"), asMETHOD(timer, set_secure), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("void set_secure(bool secure) property"), asMETHOD(timer, set_secure), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer"), _O("bool get_paused() const property"), asMETHOD(timer, get_paused), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer"), _O("bool get_running() const property"), asMETHOD(timer, get_running), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer"), _O("void toggle_pause()"), asMETHOD(timer, toggle_pause), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer"), _O("bool pause()"), asMETHOD(timer, pause), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer"), _O("bool resume()"), asMETHOD(timer, resume), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("timer"), _O("bool set_paused(bool)"), asMETHOD(timer, set_paused), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer"), _O("bool set_paused(bool paused)"), asMETHOD(timer, set_paused), asCALL_THISCALL);
 	engine->RegisterObjectProperty(_O("timer"), _O("uint64 accuracy"), asOFFSET(timer, accuracy));
 	engine->RegisterGlobalProperty(_O("const int64 MILLISECONDS"), (void*)&Timespan::MILLISECONDS);
 	engine->RegisterGlobalProperty(_O("const int64 SECONDS"), (void*)&Timespan::SECONDS);
@@ -405,25 +410,27 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("timestamp", "int64 get_elapsed() const property", asMETHOD(Timestamp, elapsed), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timestamp", "bool has_elapsed(int64) const", asMETHOD(Timestamp, isElapsed), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timestamp", "int64 opImplConv() const", asMETHOD(Timestamp, raw), asCALL_THISCALL);
-	engine->RegisterGlobalFunction("timestamp timestamp_from_UTC_time(int64)", asFUNCTION(Timestamp::fromUtcTime), asCALL_CDECL);
+	engine->RegisterGlobalFunction("timestamp timestamp_from_UTC_time(int64 UTC)", asFUNCTION(Timestamp::fromUtcTime), asCALL_CDECL);
 
 	engine->RegisterObjectBehaviour("timespan", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(timestuff_construct<Timespan>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("timespan", asBEHAVE_CONSTRUCT, "void f(int64)", asFUNCTION((timestuff_construct<Timespan, Int64>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timespan", asBEHAVE_CONSTRUCT, "void f(int64 microseconds)", asFUNCTION((timestuff_construct<Timespan, Int64>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timespan", asBEHAVE_CONSTRUCT, "void f(int seconds, int microseconds)", asFUNCTION((timestuff_construct<Timespan, long, long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timespan", asBEHAVE_CONSTRUCT, "void f(int days, int hours, int minutes, int seconds, int microseconds)", asFUNCTION((timestuff_construct<Timespan, int, int, int, int, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("timespan", asBEHAVE_CONSTRUCT, "void f(const timespan&in)", asFUNCTION(timestuff_copy_construct<Timespan>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("timespan", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(timestuff_destruct<Timespan>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("timespan", "timespan& opAssign(const timespan&in)", asMETHODPR(Timespan, operator=, (const Timespan&), Timespan&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("timespan", "timespan& opAssign(int64)", asMETHODPR(Timespan, operator=, (Int64), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opAssign(int64 microseconds)", asMETHODPR(Timespan, operator=, (Int64), Timespan&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "bool opEquals(const timespan&in) const", asMETHODPR(Timespan, operator==, (const Timespan&) const, bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod("timespan", "bool opEquals(int64) const", asMETHODPR(Timespan, operator==, (Int64) const, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "bool opEquals(int64 microseconds) const", asMETHODPR(Timespan, operator==, (Int64) const, bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "int opCmp(const timespan&in) const", asFUNCTION((timestuff_opCmp<Timespan, const Timespan&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("timespan", "int opCmp(int64) const", asFUNCTION((timestuff_opCmp<Timespan, Int64>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("timespan", "timespan opAdd(int64) const", asMETHODPR(Timespan, operator+, (Int64) const, Timespan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "int opCmp(int64 microseconds) const", asFUNCTION((timestuff_opCmp<Timespan, Int64>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("timespan", "timespan opAdd(int64 microseconds) const", asMETHODPR(Timespan, operator+, (Int64) const, Timespan), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "timespan opAdd(const timespan&in) const", asMETHODPR(Timespan, operator+, (const Timespan&) const, Timespan), asCALL_THISCALL);
-	engine->RegisterObjectMethod("timespan", "timespan opSub(int64) const", asMETHODPR(Timespan, operator-, (Int64) const, Timespan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan opSub(int64 microseconds) const", asMETHODPR(Timespan, operator-, (Int64) const, Timespan), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "timespan opSub(const timespan&in) const", asMETHODPR(Timespan, operator-, (const Timespan&) const, Timespan), asCALL_THISCALL);
-	engine->RegisterObjectMethod("timespan", "timespan& opAddAssign(int64)", asMETHODPR(Timespan, operator+=, (Int64), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opAddAssign(int64 milliseconds)", asMETHODPR(Timespan, operator+=, (Int64), Timespan&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "timespan& opAddAssign(const timespan&in)", asMETHODPR(Timespan, operator+=, (const Timespan&), Timespan&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("timespan", "timespan& opSubAssign(int64)", asMETHODPR(Timespan, operator-=, (Int64), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opSubAssign(int64 milliseconds)", asMETHODPR(Timespan, operator-=, (Int64), Timespan&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "timespan& opSubAssign(const timespan&in)", asMETHODPR(Timespan, operator-=, (const Timespan&), Timespan&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "int get_days() const property", asMETHOD(Timespan, days), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "int get_hours() const property", asMETHOD(Timespan, hours), asCALL_THISCALL);
@@ -439,14 +446,14 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("timespan", "int get_total_microseconds() const property", asMETHOD(Timespan, totalMicroseconds), asCALL_THISCALL);
 
 	engine->RegisterObjectBehaviour("datetime", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(timestuff_construct<DateTime>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("datetime", asBEHAVE_CONSTRUCT, "void f(double)", asFUNCTION((timestuff_construct<DateTime, double>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("datetime", asBEHAVE_CONSTRUCT, "void f(double julian_day)", asFUNCTION((timestuff_construct<DateTime, double>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("datetime", asBEHAVE_CONSTRUCT, "void f(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION((timestuff_construct<DateTime, int, int, int, int, int, int, int, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("datetime", asBEHAVE_CONSTRUCT, "void f(const timestamp&in)", asFUNCTION((timestuff_construct<DateTime, const Timestamp&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("datetime", asBEHAVE_CONSTRUCT, "void f(const datetime&in)", asFUNCTION(timestuff_copy_construct<DateTime>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("datetime", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(timestuff_destruct<DateTime>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datetime", "datetime& opAssign(const datetime&in)", asMETHODPR(DateTime, operator=, (const DateTime&), DateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "datetime& opAssign(const timestamp&in)", asMETHODPR(DateTime, operator=, (const Timestamp&), DateTime&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("datetime", "datetime& opAssign(double)", asMETHODPR(DateTime, operator=, (double), DateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "datetime& opAssign(double julian_day)", asMETHODPR(DateTime, operator=, (double), DateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "datetime& set(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asMETHOD(DateTime, assign), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "int get_year() const property", asMETHOD(DateTime, year), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "int get_yearday() const property", asMETHOD(DateTime, dayOfYear), asCALL_THISCALL);
@@ -472,21 +479,21 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("datetime", "timespan opSub(const datetime&in) const", asMETHODPR(DateTime, operator-, (const DateTime&) const, Timespan), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "datetime& opAddAssign(const timespan&in)", asMETHODPR(DateTime, operator+=, (const Timespan&), DateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "datetime& opSubAssign(const timespan&in)", asMETHODPR(DateTime, operator-=, (const Timespan&), DateTime&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("datetime", "void make_UTC(int)", asMETHOD(DateTime, makeUTC), asCALL_THISCALL);
-	engine->RegisterObjectMethod("datetime", "void make_local(int)", asMETHOD(DateTime, makeLocal), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "void make_UTC(int timezone_offset)", asMETHOD(DateTime, makeUTC), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "void make_local(int timezone_offset)", asMETHOD(DateTime, makeLocal), asCALL_THISCALL);
 	engine->RegisterGlobalFunction("bool datetime_is_leap_year(int year)", asFUNCTION(DateTime::isLeapYear), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int datetime_days_of_month(int year, int month)", asFUNCTION(DateTime::daysOfMonth), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool datetime_is_valid(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION(DateTime::isValid), asCALL_CDECL);
 
 	engine->RegisterObjectBehaviour("calendar", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(timestuff_construct<LocalDateTime>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("calendar", asBEHAVE_CONSTRUCT, "void f(double)", asFUNCTION((timestuff_construct<LocalDateTime, double>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("calendar", asBEHAVE_CONSTRUCT, "void f(double julian_day)", asFUNCTION((timestuff_construct<LocalDateTime, double>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("calendar", asBEHAVE_CONSTRUCT, "void f(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION((timestuff_construct<LocalDateTime, int, int, int, int, int, int, int, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("calendar", asBEHAVE_CONSTRUCT, "void f(const datetime&in)", asFUNCTION((timestuff_construct<LocalDateTime, const DateTime&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("calendar", asBEHAVE_CONSTRUCT, "void f(const calendar&in)", asFUNCTION(timestuff_copy_construct<LocalDateTime>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("calendar", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(timestuff_destruct<LocalDateTime>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("calendar", "calendar& opAssign(const calendar&in)", asMETHODPR(LocalDateTime, operator=, (const LocalDateTime&), LocalDateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "calendar& opAssign(const timestamp&in)", asMETHODPR(LocalDateTime, operator=, (const Timestamp&), LocalDateTime&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("calendar", "calendar& opAssign(double)", asMETHODPR(LocalDateTime, operator=, (double), LocalDateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calendar", "calendar& opAssign(double julian_day)", asMETHODPR(LocalDateTime, operator=, (double), LocalDateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "calendar& set(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asMETHODPR(LocalDateTime, assign, (int, int, int, int, int, int, int, int), LocalDateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "int get_year() const property", asMETHOD(LocalDateTime, year), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "int get_yearday() const property", asMETHOD(LocalDateTime, dayOfYear), asCALL_THISCALL);
@@ -538,6 +545,6 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_ASCTIME", (void*)&DateTimeFormat::ASCTIME_REGEX);
 	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_SORTABLE", (void*)&DateTimeFormat::SORTABLE_FORMAT);
 	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_SORTABLE", (void*)&DateTimeFormat::SORTABLE_REGEX);
-	engine->RegisterGlobalFunction("bool datetime_is_valid_format_string(const string&in)", asFUNCTION(DateTimeFormat::hasFormat), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool datetime_is_valid_format(const string&in)", asFUNCTION(DateTimeFormat::isValid), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool datetime_is_valid_format_string(const string&in fmt)", asFUNCTION(DateTimeFormat::hasFormat), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool datetime_is_valid_format(const string&in datetime)", asFUNCTION(DateTimeFormat::isValid), asCALL_CDECL);
 }

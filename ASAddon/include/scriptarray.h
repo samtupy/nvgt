@@ -61,14 +61,14 @@ public:
 	void   Resize(asUINT numElements);
 
 	// Get a pointer to an element. Returns 0 if out of bounds
-	void       *At(asUINT index);
-	const void *At(asUINT index) const;
+	void       *At(asINT64 index);
+	const void *At(asINT64 index) const;
 
 	// Set value of an element. 
 	// The value arg should be a pointer to the value that will be copied to the element.
 	// Remember, if the array holds handles the value parameter should be the 
 	// address of the handle. The refCount of the object will also be incremented
-	void  SetValue(asUINT index, void *value);
+	void  SetValue(asINT64 index, void *value);
 
 	// Copy the contents of one array to another (only if the types are the same)
 	CScriptArray &operator=(const CScriptArray&);
