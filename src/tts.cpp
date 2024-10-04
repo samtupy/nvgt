@@ -27,6 +27,7 @@
 #include <Poco/Exception.h>
 #include <Poco/Format.h>
 #include <SDL3/SDL.h>
+#include <stdexcept>
 #endif
 
 char* minitrim(char* data, unsigned long* bufsize, int bitrate, int channels) {
@@ -106,7 +107,9 @@ void tts_voice::setup() {
 	midGetPitch = env->GetMethodID(TTSClass, "getPitch", "()F");
 	midGetPan = env->GetMethodID(TTSClass, "getPan", "()F");
 	midGetVolume = env->GetMethodID(TTSClass, "getVolume", "()F");
-	if (!midIsActive || !midIsSpeaking || !midSpeak || !midSilence || !midGetVoice || !midSetRate || !midSetPitch || !midSetPan || !midSetVolume || !midGetVoices || !midSetVoice || !midGetMaxSpeechInputLength || !midGetPitch || !midGetPan || !midGetRate || !midGetVolume) throw Poco::Exception("One or more methods on the TTS class could not be retrieved from JNI!");
+	midSpeakToFile = env->GetMethodID(TTSClass, "speakToFile", "(Ljava/lang/String;Ljava/lang/String)Z");
+	midSpeakToMemory = env->GetMethodID(TTSClass, "speakToMemory", "(Ljava/lang/String;)[B");
+	if (!midIsActive || !midIsSpeaking || !midSpeak || !midSilence || !midGetVoice || !midSetRate || !midSetPitch || !midSetPan || !midSetVolume || !midGetVoices || !midSetVoice || !midGetMaxSpeechInputLength || !midGetPitch || !midGetPan || !midGetRate || !midGetVolume || !midSpeakToFile || !midSpeakToMemory) throw Poco::Exception("One or more methods on the TTS class could not be retrieved from JNI!");
 	if (!env->CallBooleanMethod(TTSObj, midIsActive)) throw Poco::Exception("TTS engine could not be initialized!");
 	voice_index = 1;
 	#else
@@ -237,7 +240,26 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 	}
 	#elif defined(__ANDROID__)
 	else {
-		return false;
+		jstring jtext = env->NewStringUTF(text.c_str());
+		jstring jfile = env->NewStringUTF(filename.c_str());
+		auto res = env->CallBooleanMethod(TTSObj, midSpeakToFile, jfile, jtext);
+		if (auto exc = env->ExceptionOccurred(); exc) {
+			// Translate into C++ exception
+			jclass ThrowableClass = env->FindClass("java/lang/Throwable");
+			if (!ThrowableClass) throw Poco::Exception("This JVM implementation is broken: could not translate Java exception!");
+			jmethodID midGetMessage = env->GetMethodID(ThrowableClass, "getMessage", "()Ljava/lang/String;");
+			if (!midGetMessage) throw Poco::Exception("This JVM implementation is broken: Throwable does not have getMessage method!");
+			jstring message = static_cast<jstring>(env->CallObjectMethod(exc, midGetMessage));
+			const char* msg_chars = env->GetStringUTFChars(message, 0);
+			std::string msg(msg_chars);
+			env->ReleaseStringUTFChars(message, msg_chars);
+			env->DeleteLocalRef(jfile);
+			env->DeleteLocalRef(jtext);
+			throw std::runtime_error(msg);
+		}
+		env->DeleteLocalRef(jfile);
+		env->DeleteLocalRef(jtext);
+		return res;
 	}
 	#endif
 	char* ptr = minitrim(data, &bufsize, bitrate, channels);
@@ -254,6 +276,7 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 	if (text.empty()) return "";
 	unsigned long bufsize;
 	char* data;
+	std::string data_res;
 	if (voice_index == builtin_index) {
 		if (samprate != 48000 || bitrate != 16 || channels != 2) {
 			samprate = 48000;
@@ -283,6 +306,31 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 	#elif defined(__APPLE__) || defined(__ANDROID__)
 	else {
 		return ""; // Not implemented yet.
+	}
+	#elif defined(__ANDROID__)
+	else {
+		jstring jtext = env->NewStringUTF(text.c_str());
+		jarray jbytes = env->CallObjectMethod(TTSObj, midSpeakToMemory, jtext);
+		if (auto exc = env->ExceptionOccurred(); exc) {
+			// Translate into C++ exception
+			jclass ThrowableClass = env->FindClass("java/lang/Throwable");
+			if (!ThrowableClass) throw Poco::Exception("This JVM implementation is broken: could not translate Java exception!");
+			jmethodID midGetMessage = env->GetMethodID(ThrowableClass, "getMessage", "()Ljava/lang/String;");
+			if (!midGetMessage) throw Poco::exception("This JVM implementation is broken: Throwable does not have getMessage method!");
+			jstring message = env->CallObjectMethod(exc, midGetMessage);
+			const char* msg_chars = env->GetStringUTFChars(message, 0);
+			std::string msg(msg_chars);
+			env->ReleaseStringUTFChars(message, msg_chars);
+			throw std::runtime_error(msg);
+		}
+		env->DeleteLocalRef(jtext);
+		data_res.reserve(env->GetArrayLength(jbytes));
+		jbyte* bytes = env->GetByteArrayElements(jbytes, NULL);
+		for (auto i = 0; i < env->GetArrayLength(jbytes); ++i) {
+			data_res.append(static_cast<char>(bytes[i]));
+		}
+		env->ReleaseByteArrayElements(jbytes, bytes, JNI_ABORT);
+		data = data_res.c_str();
 	}
 	#endif
 	if (!data) return "";

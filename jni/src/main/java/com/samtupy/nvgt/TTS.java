@@ -21,6 +21,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.libsdl.app.SDL;
+import android.os.storage.StorageManager;
+import android.os.ProxyFileDescriptorCallback;
+import android.os.Handler;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.nio.file.Path;
+import android.os.ParcelFileDescriptor;
+import java.io.IOException;
 
 public class TTS {
 	// First the static screen reader methods.
@@ -204,5 +212,59 @@ public class TTS {
 
 	public float getPan() {
 		return ttsPan;
+	}
+
+	public boolean speakToFile(String filename, String text) throws IOException {
+		Path p = Path.of(filename);
+		Path actual_path;
+		if (p.isAbsolute()) {
+			actual_path = p;
+		} else {
+			actual_path = Path.of(SDL.getContext().getFilesDir().getAbsolutePath(), filename);
+		}
+		File f = actual_path.toFile();
+		f.createNewFile();
+		if (!f.canWrite()) return false;
+		Bundle params = new Bundle();
+		params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, ttsVolume);
+		params.putFloat(TextToSpeech.Engine.KEY_PARAM_PAN, ttsPan);
+		if (text.length() > tts.getMaxSpeechInputLength()) {
+			return false;
+		}
+		return tts.synthesizeToFile(text, params, f, null) == TextToSpeech.SUCCESS;
+	}
+
+	public byte[] speakToMemory(String text) throws IOException {
+		// It is much simpler to use the storage manager interface instead of memfd_create here
+		// To do: investigate whether it would be worth it creating a separate looper so we do not potentially risk blocking the main one
+		ByteArrayOutputStream stream = new ByteArrayOutputStream();
+		Handler handler = Handler.createAsync(SDL.getContext().getMainLooper());
+		Context context = SDL.getContext();
+		StorageManager manager = (StorageManager)context.getSystemService(context.STORAGE_SERVICE);
+		ParcelFileDescriptor pfd = manager.openProxyFileDescriptor(ParcelFileDescriptor.MODE_WRITE_ONLY, new ProxyFileDescriptorCallback() {
+			public void onFsync () { }
+
+			public long onGetSize () {
+				return stream.size();
+			}
+
+			public int onRead (long offset, int size, byte[] data) {
+				return 0;
+			}
+
+			public void onRelease () { }
+
+			public int onWrite (long offset, int size, byte[] data) {
+				stream.writeBytes(data);
+				return size;
+			}
+		}, handler);
+		Bundle params = new Bundle();
+		params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, ttsVolume);
+		params.putFloat(TextToSpeech.Engine.KEY_PARAM_PAN, ttsPan);
+		if (tts.synthesizeToFile(text, params, pfd, null) == TextToSpeech.SUCCESS) {
+			return stream.toByteArray();
+		}
+		return null;
 	}
 }
