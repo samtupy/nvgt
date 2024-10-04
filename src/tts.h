@@ -16,11 +16,12 @@
 #include <angelscript.h>
 #include <scriptarray.h>
 #include "sound.h"
-
 #ifdef _WIN32
 struct blastspeak;
 #elif defined(__APPLE__)
 class AVTTSVoice;
+#elif defined (__ANDROID__)
+#include <jni.h>
 #endif
 
 class tts_voice {
@@ -29,6 +30,11 @@ class tts_voice {
 	blastspeak* inst;
 	#elif defined(__APPLE__)
 	AVTTSVoice* inst;
+	#elifdef __ANDROID__
+	jclass TTSClass;
+	jmethodID constructor, midIsActive, midIsSpeaking, midSpeak, midSilence, midGetVoice, midSetRate, midSetPitch, midSetPan, midSetVolume, midGetVoices, midSetVoice, midGetMaxSpeechInputLength, midGetPitch, midGetPan, midGetRate, midGetVolume;
+	JNIEnv* env;
+	jobject TTSObj;
 	#endif
 	bool destroyed;
 	HSTREAM audioout;
