@@ -90,9 +90,8 @@ public class TTS {
 					tts.setSpeechRate(1.0f);
 					AudioAttributes audioAttributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build();
 					tts.setAudioAttributes(audioAttributes);
-				} else {
+				} else
 					isTTSInitialized = false;
-				}
 				isTTSInitializedLatch.countDown();
 			}
 		});
@@ -106,9 +105,8 @@ public class TTS {
 	}
 
 	public boolean isSpeaking() {
-		if (isActive()) {
+		if (isActive())
 			return tts.isSpeaking();
-		}
 		return false;
 	}
 
@@ -117,16 +115,15 @@ public class TTS {
 			Bundle params = new Bundle();
 			params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, ttsVolume);
 			params.putFloat(TextToSpeech.Engine.KEY_PARAM_PAN, ttsPan);
-			if (text.length() > tts.getMaxSpeechInputLength()) {
+			if (text.length() > tts.getMaxSpeechInputLength())
 				return false;
-			}
-			return tts.speak(text, interrupt? TextToSpeech.QUEUE_FLUSH : TextToSpeech.QUEUE_ADD, params, null) == TextToSpeech.SUCCESS;
+			return tts.speak(text, interrupt ? TextToSpeech.QUEUE_FLUSH : TextToSpeech.QUEUE_ADD, params, null) == TextToSpeech.SUCCESS;
 		}
 		return false;
 	}
 
 	public boolean silence() {
-		return isActive()? tts.stop() == TextToSpeech.SUCCESS : false;
+		return isActive() ? tts.stop() == TextToSpeech.SUCCESS : false;
 	}
 
 	public String getVoice() {
@@ -163,9 +160,8 @@ public class TTS {
 
 	@Override
 	public void finalize() {
-		if (isActive()) {
+		if (isActive())
 			tts.shutdown();
-		}
 	}
 
 	public List<String> getVoices() {
@@ -176,14 +172,12 @@ public class TTS {
 		if (isActive()) {
 			Set<Voice> voices = tts.getVoices();
 			Optional<Voice> desiredVoice = voices.stream().filter(voice -> voice.getName().equals(name)).findFirst();
-			if (desiredVoice.isPresent()) {
+			if (desiredVoice.isPresent())
 				return tts.setVoice(desiredVoice.get()) == TextToSpeech.SUCCESS;
-			} else {
+			else
 				return false;
-			}
-		} else {
+		} else
 			return false;
-		}
 	}
 
 	public int getMaxSpeechInputLength() {
