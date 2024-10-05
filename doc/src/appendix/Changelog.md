@@ -2,16 +2,17 @@
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
 ## New in 0.89.0-alpha (unreleased):
+* NVGT games now run on intel as well as arm mac computers!
 * The calendar object is now registered as a reference type with Angelscript meaning it now supports handles, for BGT backwards compatibility. The other datetime classes are still value types.
 * Added bool sdl_set_hint(const string&in hint, const string&in value, sdl_hint_priority priority = SDL_HINT_NORMAL) and string sdl_get_hint() functions, allowing the user to customize over 200 different SDL options from screen orientation to the video backend used and many more.
-* Adds atomic types, or in other words more concurrency primatives.
-* The array class can now work with negative indicies to access elements starting at the end of arrays, For example `array[1]` now returns the last element in the array.
+* Adds atomic types, or in other words more concurrency primitives.
+* The array class can now work with negative indicies to access elements starting at the end of arrays, For example `array[-1]` now returns the last element in the array.
 * Registered SYSTEM_PERFORMANCE_COUNTER and SYSTEM_PERFORMANCE_FREQUENCY properties as well as nanosleep and nanoticks functions, still needs documentation.
 * ini.nvgt include is now free of bgt_compat! Added quick test for it.
 * Fixed a bug in instance.nvgt include regarding automatic mutex name generation.
 * The compiler now includes a status window that continues getting updated with messages reporting what is currently happening during compilation.
 * Adds refresh_window() function.
-* Adds input_forms.nvgt include with functions to quicly retrieve information using an audio form, test/example in test/interact/test_input_forms.nvgt.
+* Adds input_forms.nvgt include with functions to quickly retrieve information using an audio form, test/example in test/interact/test_input_forms.nvgt.
 * Introduce new menu system based on audio form, in menu.nvgt. As a result, the old dynamic menu has been renamed to bgt_dynamic_menu.nvgt to make it clear what one is legacy.
 * Registered some new vector functions such as cross, length2, distance and distance2 etc.
 * datastream.available is now an uint64 rather than int.
@@ -20,15 +21,15 @@ This document lists all major changes that have taken place in NVGT since we sta
 * screen_reader_output/speak now have their interrupt booleans set to true by default.
 * Though a more advanced (multi-selection / non-blocking) API for this will be added in the future, simple open_file_dialog, save_file_dialog, and select_folder_dialog functions have now been added.
 * There are now 2 new functions which have yet to be documented, bool simulate_key_down(uint key) and bool simulate_key_up(uint key). These directly post SDL keydown/up events to the event queue.
-* Any key_up events with matching keycodes as any key_down event in the same frame will now be moved to the next frame. This previously only happened with a few specialized events (namely voice over arrow keys and windows clipboard history), but now this is done in all sanarios meaning that the Mac touch bar and other on screen or touch based keyboards should now function properly.
+* Any key_up events with matching keycodes as any key_down event in the same frame will now be moved to the next frame. This previously only happened with a few specialized events (namely voice over arrow keys and windows clipboard history), but now this is done in all scenarios meaning that the Mac touch bar and other on screen or touch based keyboards should now function properly.
 * adds is_console_available function.
 * Fixed a serious bug in pack::add_memory that caused adding large files to usually fail.
 * Adds the `string generate_custom_token(int token_length, string characters);` function to token_gen.nvgt include.
 * Add virtual_dialogs.nvgt include.
 * Add datastream.sync_rw_cursors property (true by default).
-* tts_dump_config and tts_load_config in speech.nvgt include can now save screen reader usage settting.
+* tts_dump_config and tts_load_config in speech.nvgt include can now save screen reader usage setting.
 * ADDED ANDROID PLATFORM SUPPORT, NVGT RUNS ON MOBILE! This includes gesture detection (touch.nvgt include or query_touch_device function), screen reader speech through Android's accessibility event API, and android TextToSpeech engine support through  the tts_voice class! The support is still young and there are many improvements still to be made (only the default tts voice can be used right now for example), but even running small nvgt scripts from source is possible at this point with NVGT's Android runner application, and one-click APK bundling is possible!
-* NVGT now has a bundling facility! It can create .apk packages for android (assuming the needed android tools are available), it can create MacOS app bundles on all platforms though only a .dmg on Mac (.app.zip on other platforms), and it can copy Windows/Linux libraries into place as well as bundle your asset files like sounds, readme and changelog all to create a fully distributable package in one click! It can even run custom prebuild and postbuild shell commands encase the bundling facility isn't quite doing enough for your needs. More information is in the compiling for distribution document. This means as an aside that NVGT's compiler application is significantly larger, as it must include the MacOS and Linux libraries on windows, the Windows and Linux libraries on Mac etc for the purposes of creating a fully functional app bundle no matter what platform it is compiled on.
+* NVGT now has a bundling facility! It can create .apk packages for android (assuming the needed android tools are available), it can create MacOS app bundles on all platforms though only a .dmg on Mac (.app.zip on other platforms), and it can copy Windows/Linux libraries into place as well as bundle your asset files like sounds, readme and changelog all to create a fully distributable package in one click! It can even run custom prebuild and postbuild shell commands in case the bundling facility isn't quite doing enough for your needs. More information is in the compiling for distribution document. This means as an aside that NVGT's compiler application is significantly larger, as it must include the MacOS and Linux libraries on windows, the Windows and Linux libraries on Mac etc for the purposes of creating a fully functional app bundle no matter what platform it is compiled on.
 * The compile script submenu has changed, it now contains options to compile for all platforms you have stubs for!
 * Trying to embed a pack that doesn't exist no longer makes NVGTW.exe silently exit.
 * Added the is_window_hidden function.
