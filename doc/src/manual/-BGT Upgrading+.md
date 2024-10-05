@@ -13,6 +13,7 @@ our goal is to make the transition as seamless as possible from BGT to NVGT, but
 * The `sound::stream()` method does exist in NVGT, but it's simply an alias to `sound::load()`. For this reason it is recommended that you change all your `stream()` calls to `load()` instead. The load function performs an  efficient combination of streaming and preloading by default.
 * Take care to check any method calls using the tts_voice object as a few methods such as set_voice have changed from their BGT counterparts.
 * When splitting a string, matching against \r\n is advised as BGT handles this differently. This will result in not having spurious line breaks at the ends of split text.
-* The settings object has been crafted as a ghost object. That is, it will not actually load or write any data from the registry. If you use the registry, consider using a data or ini file instead.
-* The joystick object is also a ghost object and does not currently function.
+* The settings object no longer writes to the registry, but instead has been replaced by the settings.nvgt include which wraps the previous settings object API, but instead writes to configuration files in various formats.
+* The joystick object is a ghost object and does not currently function.
 * There is a type called `var` in the engine now, so you may need to be careful if your project contains any variables named var.
+* It's worth noting that unlike BGT, NVGT by default attempts to fully package your game for you including sounds, libraries, documents and any other assets into a .zip file or similar on other platforms intended for distrobution. If you don't like this behavior, you can create a file next to nvgt.exe called config.properties and add the line build.windows_bundle = 0 which will cause NVGT to just produce a standalone executable like BGT did, though you now may need to copy some libraries from the lib folder for the compiled product to run.

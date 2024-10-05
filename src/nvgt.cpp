@@ -170,6 +170,15 @@ protected:
 			mode = NVGT_EXIT;
 			return "";
 		} else if(option >= 1 && option <= 3) {
+			if (option >= 2) { // compiling, select platform
+				vector<string> platforms = {"auto", "windows", "mac", "linux", "android"};
+				int platform_selection = message_box("NVGT Compiler", "Please select a platform to compile for.", {format("`Host platform (%s)", Environment::osName()), "Windows", "MacOS", "Linux", "Android", "~cancel"}, SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT);
+				if (platform_selection <= 0 || platform_selection > platforms.size()) {
+					mode = NVGT_EXIT;
+					return "";
+				}
+				g_platform = platforms[platform_selection -1];
+			}
 			std::string script = simple_file_open_dialog("NVGT scripts:nvgt");
 			if (script.empty()) {
 				mode = NVGT_EXIT;
