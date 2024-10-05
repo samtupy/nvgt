@@ -27,8 +27,8 @@ UseSetupLdr = yes
 AppMutex = NVGT
 AppName = NVGT
 AppVersion = {#NVGTVer}
-ArchitecturesAllowed = arm64 or x64compatible
-ArchitecturesInstallIn64BitMode = arm64 or x64compatible
+ArchitecturesAllowed = x64compatible
+ArchitecturesInstallIn64BitMode = x64compatible
 ChangesAssociations = yes
 ChangesEnvironment = yes
 CreateAppDir = yes
@@ -252,11 +252,18 @@ begin
     else Log(Format('Error while removing the [%s] from PATH: [%s]', [Path, Paths]));
 end;
 
+function OnDownloadProgress(const Url, FileName: String; const Progress, ProgressMax: Int64): Boolean;
+begin
+  if Progress = ProgressMax then
+    Log(Format('Successfully downloaded file to {tmp}: %s', [FileName]));
+  Result := True;
+end;
+
 procedure InitializeWizard;
 begin
-  AndroidSdkDownloadPage := CreateDownloadPage('Installing Android SDK', 'Please wait while the SDK for Android is installed', nil);
+  AndroidSdkDownloadPage := CreateDownloadPage('Downloading Android tools', 'Please wait while the subset of the Android SDK that NVGT uses is being downloaded', @OnDownloadProgress);
   AndroidSdkDownloadPage.ShowBaseNameInsteadOfUrl := True;
-  DocsDownloadPage := CreateDownloadPage('Downloading documentation', 'Please wait while the documentation is acquired', nil);
+  DocsDownloadPage := CreateDownloadPage('Downloading documentation', 'Please wait while the documentation is acquired', @OnDownloadProgress);
   DocsDownloadPage.ShowBaseNameInsteadOfUrl := True;
 end;
 
@@ -270,19 +277,19 @@ AndroidSdkDownloadPage.Show;
 try
 try
 AndroidSdkDownloadPage.Download;
-if not ShellExec('', ExpandConstant('{tmp}\android-tools.exe'), ExpandConstant('-o{app}\android-tools -y'), '', SW_SHOWNORMAL, ewWaitUntilTerminated, ErrorCode) then
-begin
-SuppressibleMsgBox(Format('An error occurred when extracting the android tools: %s', [SysErrorMessage(ErrorCode)]), mbCriticalError, MB_OK, IDOK);
-exit;
-end;
 except
 if AndroidSdkDownloadPage.AbortedByUser then
-SuppressibleMsgBox('The Android SDK installation was aborted. You will not be able to create Android apps with this installation unless you download the SDK in the future.', mbInformation, MB_OK, IDOK)
+SuppressibleMsgBox('The Android tools installation was aborted. You will not be able to create Android apps with this installation unless you download the tools in the future.', mbInformation, MB_OK, IDOK)
 else
 SuppressibleMsgBox(AddPeriod(GetExceptionMessage), mbCriticalError, MB_OK, IDOK);
 end;
 finally
 AndroidSdkDownloadPage.Hide;
+if not ShellExec('', ExpandConstant('{tmp}\android-tools.exe'), ExpandConstant('-o{app}\android-tools -y'), '', SW_SHOWNORMAL, ewWaitUntilTerminated, ErrorCode) then
+begin
+SuppressibleMsgBox(Format('An error occurred when extracting the android tools: %s', [SysErrorMessage(ErrorCode)]), mbCriticalError, MB_OK, IDOK);
+exit;
+end;
 end;
 end;
 
@@ -310,9 +317,7 @@ DocsDownloadPage.Hide;
 end;
 end;
 
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-if CurStep = ssPostInstall then
+function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
 if WizardIsComponentSelected('androidtools') then
 DownloadAndroidSDK;
@@ -320,7 +325,6 @@ if WizardIsComponentSelected('docs_download') then
 DownloadDocs;
 if WizardIsComponentSelected('path') then
 EnvAddPath(ExpandConstant('{app}'));
-end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
