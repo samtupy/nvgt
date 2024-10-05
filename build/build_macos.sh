@@ -1,20 +1,56 @@
 #!/bin/zsh
 
 function setup_homebrew {
-	brew install autoconf automake libtool openssl libgit2 bullet upx libplist
+	brew install autoconf automake libtool upx
+}
+
+function setup_openssl {
+	echo Installing OpenSSL...
+	curl -s -O -L https://github.com/openssl/openssl/releases/download/openssl-3.3.2/openssl-3.3.2.tar.gz
+	tar -xzf openssl-3.3.2.tar.gz
+	mv openssl-3.3.2 openssl-3.3.2-arm
+	tar -xzf openssl-3.3.2.tar.gz
+	mv openssl-3.3.2 openssl-3.3.2-x64
+	cd openssl-3.3.2-arm
+	./Configure enable-rc5 zlib darwin64-arm64-cc no-asm
+	make
+	sudo make install
+	cd ../openssl-3.3.2-x64
+	./Configure darwin64-x86_64-cc shared
+	make
+	cd ..
+	mkdir -p openssl-fat
+	lipo -create openssl-3.3.2-arm/libcrypto.a openssl-3.3.2-x64/libcrypto.a -output openssl-fat/libcrypto.a
+	lipo -create openssl-3.3.2-arm/libssl.a openssl-3.3.2-x64/libssl.a -output openssl-fat/libssl.a
+	sudo cp openssl-fat/*.a /usr/local/lib
+	rm openssl-3.3.2.tar.gz
+	echo OpenSSL installed.
 }
 
 function setup_angelscript {
 	echo Installing Angelscript...
-	git clone --depth 1 https://github.com/codecat/angelscript-mirror||true
+	git clone https://github.com/codecat/angelscript-mirror||true
 	cd "angelscript-mirror/sdk/angelscript/projects/cmake"
+	git checkout 270b98a332faa57a747c9265086c7bce49c041d9
 	mkdir -p build
 	cd build
-	cmake ..
+	cmake .. -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 	cmake --build .
 	sudo cmake --install .
 	cd ../../../../../..
 	echo Angelscript installed.
+}
+
+function setup_bullet {
+	echo Installing bullet3...
+	git clone --depth 1 https://github.com/bulletphysics/bullet3||true
+	cd bullet3
+	mkdir build_cmake
+	cd build_cmake
+	cmake -S.. -B. -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=MinSizeRel -DBUILD_UNIT_TESTS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_ENET=OFF -DBUILD_CLSOCKET=OFF -DBUILD_EGL=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_EXTRAS=OFF -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+	cmake --build .
+	sudo cmake --install .
+	cd ../..
 }
 
 function setup_enet {
@@ -22,7 +58,7 @@ function setup_enet {
 	git clone --depth 1 https://github.com/lsalzman/enet||true
 	cd enet
 	autoreconf -vfi
-	./configure
+	./configure CC="clang -arch x86_64 -arch arm64" CXX="clang++ -arch x86_64 -arch arm64" CPP="clang -E" CXXCPP="clang++ -E"
 	make -j$(nsysctl -n hw.ncpu)
 	sudo make install
 	cd ..
@@ -35,11 +71,24 @@ function setup_libgit2 {
 	cd libgit2-1.8.1
 	mkdir -p build
 	cd build
-	cmake .. -DBUILD_TESTS=OFF -DUSE_ICONV=OFF -DBUILD_CLI=OFF -DCMAKE_BUILD_TYPE=Release
+	cmake .. -DBUILD_TESTS=OFF -DUSE_ICONV=OFF -DBUILD_CLI=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 	cmake --build .
 	sudo cmake --install .
 	cd ../..
 	rm v1.8.1.tar.gz
+}
+
+function setup_libplist {
+	echo Installing libplist...
+	curl -s -O -L https://github.com/libimobiledevice/libplist/releases/download/2.6.0/libplist-2.6.0.tar.bz2
+	tar -xf libplist-2.6.0.tar.bz2
+	cd libplist-2.6.0
+	./configure --without-cython CC="clang -arch x86_64 -arch arm64" CXX="clang++ -arch x86_64 -arch arm64" CPP="clang -E" CXXCPP="clang++ -E"
+	make
+	sudo make install
+	cd ..
+	rm libplist-2.6.0.tar.bz2
+	echo libplist installed.
 }
 
 function setup_poco {
@@ -99,11 +148,14 @@ function main {
 	mkdir -p deps
 	cd deps
 	setup_homebrew
+	setup_openssl
 	setup_angelscript
+	setup_bullet
 	setup_enet
-	#setup_libgit2
+	setup_libgit2
 	setup_poco
 	setup_sdl
+	setup_libplist
 	setup_nvgt
 	echo Success!
 	exit 0

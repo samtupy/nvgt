@@ -30,7 +30,7 @@ class tts_voice {
 	blastspeak* inst;
 	#elif defined(__APPLE__)
 	AVTTSVoice* inst;
-	#elifdef __ANDROID__
+	#elif defined(__ANDROID__)
 	jclass TTSClass;
 	jmethodID constructor, midIsActive, midIsSpeaking, midSpeak, midSilence, midGetVoice, midSetRate, midSetPitch, midSetPan, midSetVolume, midGetVoices, midSetVoice, midGetMaxSpeechInputLength, midGetPitch, midGetPan, midGetRate, midGetVolume;
 	JNIEnv* env;
