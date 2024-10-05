@@ -8,16 +8,16 @@ function setup_openssl {
 	echo Installing OpenSSL...
 	curl -s -O -L https://github.com/openssl/openssl/releases/download/openssl-3.3.2/openssl-3.3.2.tar.gz
 	tar -xzf openssl-3.3.2.tar.gz
-	mv openssl-3.3.2 openssl-3.3.2-arm
+	mv openssl-3.3.2 openssl-3.3.2-arm||true
 	tar -xzf openssl-3.3.2.tar.gz
-	mv openssl-3.3.2 openssl-3.3.2-x64
+	mv openssl-3.3.2 openssl-3.3.2-x64||true
 	cd openssl-3.3.2-arm
 	./Configure enable-rc5 zlib darwin64-arm64-cc no-asm
-	make
+	make -j$(nsysctl -n hw.ncpu)
 	sudo make install
 	cd ../openssl-3.3.2-x64
 	./Configure darwin64-x86_64-cc shared
-	make
+	make -j$(nsysctl -n hw.ncpu)
 	cd ..
 	mkdir -p openssl-fat
 	lipo -create openssl-3.3.2-arm/libcrypto.a openssl-3.3.2-x64/libcrypto.a -output openssl-fat/libcrypto.a
