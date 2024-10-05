@@ -12,11 +12,11 @@ function setup_openssl {
 	tar -xzf openssl-3.3.2.tar.gz
 	mv openssl-3.3.2 openssl-3.3.2-x64||true
 	cd openssl-3.3.2-arm
-	./Configure enable-rc5 zlib darwin64-arm64-cc no-asm
+	./Configure enable-rc5 zlib darwin64-arm64-cc no-asm no-apps no-docs no-filenames no-shared --release
 	make -j$(nsysctl -n hw.ncpu)
 	sudo make install
 	cd ../openssl-3.3.2-x64
-	./Configure darwin64-x86_64-cc shared
+	./Configure darwin64-x86_64-cc no-apps no-docs no-filenames --release
 	make -j$(nsysctl -n hw.ncpu)
 	cd ..
 	mkdir -p openssl-fat
