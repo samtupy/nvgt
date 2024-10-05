@@ -1,0 +1,22 @@
+void mod_calendar(calendar@ c, int seconds) {
+	c += timespan(seconds, 0);
+}
+
+void test_calendar() {
+	calendar@ c = calendar();
+	assert(c.year == DATE_YEAR);
+	int m = c.minute;
+	mod_calendar(c, 120);
+	calendar c2;
+	assert(m + 2 == c.minute or c.minute < 2);
+	assert (c2 < c);
+	c.set(2020, 1, 1, 0, 0, 0);
+	assert (c.year == 2020 and c.hour == 0);
+	c = c2;
+	mod_calendar(c, -240);
+	assert (c < c2);
+	@c = c2;
+	assert (c == c2);
+	c2 += 10;
+	assert (c == c2);
+}
