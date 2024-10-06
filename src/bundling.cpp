@@ -386,7 +386,7 @@ protected:
 				string sout, serr;
 				File dmg_out = Path(final_output_path).makeFile().setExtension("dmg").toString();
 				if (dmg_out.exists()) dmg_out.remove(true);
-				if (!system_command("hdiutil", {"create", "-srcfolder", bundle_mode < 3? workplace.path() : Path(workplace.Path()).makeParent().toString(), "-volname", Path(workplace.path()).makeFile.getBaseName(), dmg_out.path()}, sout, serr)) throw Exception(format("Unable to execute hdiutil for .dmg generation: %s", serr));
+				if (!system_command("hdiutil", {"create", "-srcfolder", bundle_mode < 3? workplace.path() : Path(workplace.path()).makeParent().toString(), "-volname", Path(workplace.path()).makeFile().getBaseName(), dmg_out.path()}, sout, serr)) throw Exception(format("Unable to execute hdiutil for .dmg generation: %s", serr));
 				output_path = dmg_out.path();
 			#else
 				File zip_out = Path(final_output_path).makeFile().setExtension("app.zip").toString();

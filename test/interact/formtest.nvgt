@@ -6,7 +6,7 @@
 void main() {
 	audio_form f;
 	f.create_window("test");
-	int b = f.create_input_box("type text here", "or leave it alone");
+	int b = f.create_input_box("type text here", "or leave it alone", multiline: true, multiline_enter: false);
 	//Disallow characters field
 	int c = f.create_input_box("Text without spaces and quotes");
 	f.set_disallowed_chars(c, " \"", false, "Spaces and quotes are not allowed");

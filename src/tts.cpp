@@ -17,16 +17,16 @@
 #endif
 #include <obfuscate.h>
 #ifdef __APPLE__
-#include "apple.h"
+	#include "apple.h"
 #endif
 #include "riffheader.h"
 #include "tts.h"
 #include "UI.h"
 #ifdef __ANDROID__
-#include <jni.h>
-#include <Poco/Exception.h>
-#include <Poco/Format.h>
-#include <SDL3/SDL.h>
+	#include <jni.h>
+	#include <Poco/Exception.h>
+	#include <Poco/Format.h>
+	#include <SDL3/SDL.h>
 #endif
 
 char* minitrim(char* data, unsigned long* bufsize, int bitrate, int channels) {
@@ -127,6 +127,9 @@ void tts_voice::destroy() {
 	if (!inst) return;
 	delete inst;
 	inst = nullptr;
+	#elif defined(__ANDROID__)
+	env->DeleteLocalRef(TTSObj);
+	TTSObj = nullptr;
 	#endif
 	destroyed = true;
 	voice_index = -1;
@@ -169,9 +172,8 @@ bool tts_voice::speak(const std::string& text, bool interrupt) {
 		}
 	}
 	#elif defined(__APPLE__)
-	else {
+	else
 		return inst->speak(text, interrupt);
-	}
 	#elif defined (__ANDROID__)
 	else {
 		jstring jtext = env->NewStringUTF(text.c_str());
@@ -236,9 +238,8 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 		return false; // not implemented yet.
 	}
 	#elif defined(__ANDROID__)
-	else {
+	else
 		return false;
-	}
 	#endif
 	char* ptr = minitrim(data, &bufsize, bitrate, channels);
 	FILE* f = fopen(filename.c_str(), "wb");
@@ -298,7 +299,7 @@ bool tts_voice::speak_wait(const std::string& text, bool interrupt) {
 	#ifdef __APPLE__
 	while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || inst->isSpeaking())
 	#elif defined(__ANDROID__)
-		while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || get_speaking())
+	while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || get_speaking())
 	#else
 	while (BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING)
 	#endif
@@ -323,7 +324,7 @@ int tts_voice::get_rate() {
 	#elif defined(__APPLE__)
 	return inst->getRate() * 7;
 	#elif defined (__ANDROID__)
-	return static_cast<int>((env->CallFloatMethod(TTSObj, midGetRate) -1) * 10.0);
+	return static_cast<int>((env->CallFloatMethod(TTSObj, midGetRate) - 1) * 10.0);
 	#endif
 	return 0;
 }
@@ -334,7 +335,7 @@ int tts_voice::get_pitch() {
 	#elif defined(__APPLE__)
 	return inst->getPitch();
 	#elif defined (__ANDROID__)
-	return static_cast<int>((env->CallFloatMethod(TTSObj, midGetPitch) -1) * 10.0);
+	return static_cast<int>((env->CallFloatMethod(TTSObj, midGetPitch) - 1) * 10.0);
 	#endif
 	return 0;
 }
@@ -349,7 +350,7 @@ int tts_voice::get_volume() {
 	#elif defined(__APPLE__)
 	return inst->getRate();
 	#elif defined(__ANDROID__)
-	return static_cast<int>(env->CallFloatMethod(TTSObj, midGetVolume)-100.0);
+	return static_cast<int>(env->CallFloatMethod(TTSObj, midGetVolume) - 100.0);
 	#endif
 	return 0;
 }
@@ -361,7 +362,7 @@ void tts_voice::set_rate(int rate) {
 	#elif defined(__APPLE__)
 	inst->setRate(rate / 7.0);
 	#elif defined(__ANDROID__)
-	env->CallBooleanMethod(TTSObj, midSetRate, (static_cast<float>(rate)/10.0) +1.0);
+	env->CallBooleanMethod(TTSObj, midSetRate, (static_cast<float>(rate) / 10.0) + 1.0);
 	#endif
 }
 void tts_voice::set_pitch(int pitch) {
@@ -371,7 +372,7 @@ void tts_voice::set_pitch(int pitch) {
 	#elif defined(__APPLE__)
 	inst->setPitch(pitch);
 	#elif defined(__ANDROID__)
-	env->CallBooleanMethod(TTSObj, midSetPitch, (static_cast<float>(pitch)/10.0) +1.0);
+	env->CallBooleanMethod(TTSObj, midSetPitch, (static_cast<float>(pitch) / 10.0) + 1.0);
 	#endif
 	return;
 }
@@ -383,7 +384,7 @@ void tts_voice::set_volume(int volume) {
 	#elif defined(__APPLE__)
 	inst->setVolume(volume);
 	#elif defined(__ANDROID__)
-	env->CallBooleanMethod(TTSObj, midSetVolume, static_cast<float>(volume)+100.0);
+	env->CallBooleanMethod(TTSObj, midSetVolume, static_cast<float>(volume) + 100.0);
 	#endif
 }
 bool tts_voice::set_voice(int voice) {
