@@ -4,5 +4,7 @@
 
 void main() {
 	tts_voice v;
-	v.speak_wait("this is a test of speak_wait", true);
+	v.rate = 5;
+	v.speak("this is a test of speak_wait", true);
+	v.speak_wait("Well actually, this is the speak_wait test, we just needed to enqueue an item first.");
 }

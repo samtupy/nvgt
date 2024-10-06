@@ -6,7 +6,7 @@ if ARGUMENTS.get("no_shared_plugins", "0") == "0":
 static = env.Object("git_static", "git.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "git2nvgt")])
 static = env.StaticLibrary("#build/lib/git2nvgt", [static])
 if env["PLATFORM"] == "darwin":
-	nvgt_env.Append(LINKFLAGS = ["-weak_library", "/opt/homebrew/lib/libgit2.dylib"])
+	nvgt_env.Append(LINKFLAGS = ["-weak_library", "/usr/local/lib/libgit2.dylib"])
 else:
 	static = [static, "git2"]
 Return("static")

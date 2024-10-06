@@ -12,7 +12,12 @@
 
 #pragma once
 
-// This class has a specific use case in which prepare, write_payload, and finalize are expected to be called once and in order. Ignoring these conditions will result in negatively undefined behavior. It's functionality is split into 3 steps mostly in order to profile and/or error check at certain points or in other ways order execution from outside the class E. don't generate a payload in the first place unless prepare succeeds. This also handles the postbuild interface and any other postbuild steps, facilitated in the postbuild_interface() and postbuild methods. The class will throw exceptions on error and if this happens, the failed object instance should be discarded. This class is also expected to be used from a standalone thread, with the get_status() function being called in a loop on the main thread for updates. Usage is in CompileExecutableTask (angelscript.cpp).
+// Game asset management.
+enum game_asset_flags { GAME_ASSET_DOCUMENT = 1 << 0 };
+void add_game_asset_to_bundle(const std::string& filesystem_path, const std::string& bundled_path, int flags = 0);
+void add_game_asset_to_bundle(const std::string& path, int flags = 0);
+
+// The following class has a specific use case in which prepare, write_payload, and finalize are expected to be called once and in order. Ignoring these conditions will result in negatively undefined behavior. It's functionality is split into 3 steps mostly in order to profile and/or error check at certain points or in other ways order execution from outside the class E. don't generate a payload in the first place unless prepare succeeds. This also handles the postbuild interface and any other postbuild steps, facilitated in the postbuild_interface() and postbuild methods. The class will throw exceptions on error and if this happens, the failed object instance should be discarded. This class is also expected to be used from a standalone thread, with the get_status() function being called in a loop on the main thread for updates. Usage is in CompileExecutableTask (angelscript.cpp).
 class nvgt_compilation_output {
 public:
 	virtual ~nvgt_compilation_output() {}

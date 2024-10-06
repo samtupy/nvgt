@@ -13,6 +13,7 @@
 
 #import <AVFoundation/AVFoundation.h>
 #import <Foundation/Foundation.h>
+#import <Carbon/Carbon.h>
 #include <vector>
 #include <string>
 #include <angelscript.h>
@@ -140,12 +141,21 @@ public:
 	//this method returns the index of the voice, using its name. If more than a voice has the same name, like alex from eSpeak and Alex from Apple, the first voice index will be returned.
 	int getVoiceIndex(const std::string& name) {
 		NSArray<AVSpeechSynthesisVoice *> *voices = [AVSpeechSynthesisVoice speechVoices];
-		AVSpeechSynthesisVoice *voice = getVoiceObject([NSString stringWithUTF8String:name.c_str()]);
+NSString *nsname = [NSString stringWithUTF8String:name.c_str()];
+		/*AVSpeechSynthesisVoice *voice = getVoiceObject([NSString stringWithUTF8String:name.c_str()]);
 		if (voice) {
 			NSUInteger result = [voices indexOfObject:voice];
 			if (result == NSNotFound) return -1;
 			return result;
-		}
+		}*/
+for(NSUInteger i=00; i<voices.count; i++)
+{
+AVSpeechSynthesisVoice *voice = [voices objectAtIndex:i];
+if([voice.name isEqualToString:nsname])
+{
+return i;
+}
+}
 		return -1;
 	}
 	bool setVoiceByIndex(NSUInteger index) {

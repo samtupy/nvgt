@@ -1,12 +1,12 @@
 # is_lock_free
 Checks whether the atomic operations on all objects of this type are lock-free.
 
-``nvgt
+```nvgt
 bool is_lock_free();
 ```
 
 ## Returns:
-`bool: true` if the atomic operations on the objects of this type are lock-free, `false` otherwise.
+bool: true if the atomic operations on the objects of this type are lock-free, `false` otherwise.
 
 ## Remarks:
 This function is available on all atomic types.
