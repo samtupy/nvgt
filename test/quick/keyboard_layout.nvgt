@@ -1,0 +1,4 @@
+void main()
+{
+    next_keyboard_layout();
+}

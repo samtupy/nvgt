@@ -11,6 +11,7 @@
 */
 
 #import <AppKit/AppKit.h>
+#import <Carbon/Carbon.h>
 #include <string>
 #include <Poco/Event.h>
 #include <Poco/Mutex.h>
@@ -94,29 +95,33 @@ std::string apple_input_box(const std::string& title, const std::string& message
 	return "\xff"; // Either an error or we can't determine what was pressed. Should we throw an exception or something?
 }
 
-/*std::string openFileDialog(const std::string& title) {
-NSOpenPanel *panel = [NSOpenPanel openPanel];
-    panel.canChooseFiles = YES;
-    panel.allowsMultipleSelection = NO;
-    panel.canChooseDirectories = NO;
-    panel.title = title.empty()?@"Open file" : [NSString stringWithUTF8String:title.c_str()];
-    if([panel runModal] == NSModalResponseOK) {
-        NSURL *url = panel.URL;
-        if(url) return std::string([url.path UTF8String]);
-        else return "";
-    }
-    else return "";
+void nextMacInputSource() {
+	CFArrayRef inputSources = TISCreateInputSourceList(NULL, false);
+	TISInputSourceRef currentInput = TISCopyCurrentKeyboardInputSource();
+	NSInteger count = CFArrayGetCount(inputSources);
+	NSInteger currentIndex = -1;
+	for(int i=0; i<count; i++) {
+		TISInputSourceRef k = (TISInputSourceRef)CFArrayGetValueAtIndex(inputSources, i);
+		if(CFEqual(k, currentInput)) {
+			currentIndex = i;
+			break;	
+		}
 	}
-
-	std::string saveFileDialog(const std::string& title, const std::string& filename) {
-    NSSavePanel *panel = [NSSavePanel savePanel];
-    panel.title = title.empty()?@"Save file" : [NSString stringWithUTF8String:title.c_str()];
-    panel.canCreateDirectories = NO;
-    panel.nameFieldStringValue = filename.empty()?@"File" : [NSString stringWithUTF8String:filename.c_str()];
-    if([panel runModal] == NSModalResponseOK) {
-        NSURL *url = panel.URL;
-        if(url) return std::string([url.path UTF8String]);
-        else return "";
-    }
-    else return "";
-	}*/
+	if(currentIndex==-1) {
+	CFRelease(currentInput);
+	CFRelease(inputSources);
+	return;
+	}
+	for(int i=0; i<count; i++) {
+		TISInputSourceRef k = (TISInputSourceRef)CFArrayGetValueAtIndex(inputSources, i);
+		NSString *sourceName = (__bridge NSString *)(TISGetInputSourceProperty(k, kTISPropertyLocalizedName));
+		printf([sourceName UTF8String]);
+		printf("\n");
+	}
+	NSInteger nextIndex = (currentIndex+1)%count;
+	printf("%i \n %i \n", currentIndex, nextIndex);
+	TISInputSourceRef nextInput = (TISInputSourceRef)CFArrayGetValueAtIndex(inputSources, nextIndex);
+	TISSelectInputSource(nextInput);
+	CFRelease(currentInput);
+	CFRelease(inputSources);
+}

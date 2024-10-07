@@ -13,7 +13,6 @@
 
 #import <AVFoundation/AVFoundation.h>
 #import <Foundation/Foundation.h>
-#import <Carbon/Carbon.h>
 #include <vector>
 #include <string>
 #include <angelscript.h>
@@ -142,20 +141,12 @@ public:
 	int getVoiceIndex(const std::string& name) {
 		NSArray<AVSpeechSynthesisVoice *> *voices = [AVSpeechSynthesisVoice speechVoices];
 NSString *nsname = [NSString stringWithUTF8String:name.c_str()];
-		/*AVSpeechSynthesisVoice *voice = getVoiceObject([NSString stringWithUTF8String:name.c_str()]);
+		AVSpeechSynthesisVoice *voice = getVoiceObject([NSString stringWithUTF8String:name.c_str()]);
 		if (voice) {
 			NSUInteger result = [voices indexOfObject:voice];
 			if (result == NSNotFound) return -1;
 			return result;
-		}*/
-for(NSUInteger i=00; i<voices.count; i++)
-{
-AVSpeechSynthesisVoice *voice = [voices objectAtIndex:i];
-if([voice.name isEqualToString:nsname])
-{
-return i;
-}
-}
+		}
 		return -1;
 	}
 	bool setVoiceByIndex(NSUInteger index) {
