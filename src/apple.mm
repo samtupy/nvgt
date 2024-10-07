@@ -79,11 +79,11 @@ public:
 		utterance.voice = currentVoice;
 		this->utterance = utterance;
 		NSURL* nsFileNameURl = [NSURL fileURLWithPath:[NSString stringWithUTF8String:filename.c_str()]];
-		__block bool success = true;
+		__block Boolean success = YES;
 		[synth writeUtterance:utterance toBufferCallback:^(AVAudioBuffer* _Nonnull buffer) {
             AVAudioPCMBuffer* pcmBuffer = (AVAudioPCMBuffer*)buffer;
             if(!pcmBuffer) {
-				success= false;
+				success= NO;
                 return;;
             }
             if(pcmBuffer.frameLength != 0) {
@@ -91,22 +91,19 @@ public:
 					NSError *error = nil;
                     file = [[AVAudioFile alloc] initForWriting:nsFileNameURl settings:pcmBuffer.format.settings error:&error];
 					if(error) {
-						success = false;
+						success = NO;
 						return;;
 					}
                 }
 				NSError* writeError  = nil;
                 [file writeFromBuffer:pcmBuffer error:&writeError];
 				if(writeError) {
-					success = false;
+					success = NO;
 					return;
 				}
             }
         }];
-		NSLog(@"Success");
-		NSLog([nsFileNameURl absoluteString]);
-		//[synth speak:this->utterance];
-
+		
 		return success;
 	}
 
