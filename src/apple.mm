@@ -103,7 +103,8 @@ public:
 				}
             }
         }];
-		
+		[file close];
+		file = nil;
 		return success;
 	}
 
