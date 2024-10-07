@@ -48,3 +48,4 @@ web/src/docs
 
 # Compilation databases; easy to generate
 compile_commands.json
+release/nvgt

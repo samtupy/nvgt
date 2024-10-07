@@ -29,6 +29,7 @@ public:
 	AVSpeechSynthesizer* synth;
 	AVSpeechSynthesisVoice* currentVoice;
 	AVSpeechUtterance* utterance;
+	AVAudioFile* file;
 	Impl() {
 		currentVoice = [AVSpeechSynthesisVoice voiceWithLanguage:@"en-US"]; //choosing english as a default language
 		utterance = [[AVSpeechUtterance alloc] initWithString:@""];
@@ -36,6 +37,7 @@ public:
 		volume = utterance.volume;
 		pitch = utterance.pitchMultiplier;
 		synth = [[AVSpeechSynthesizer alloc] init];
+		file = nil;
 	}
 	Impl(const std::string& language) {
 		NSString *nslanguage = [NSString stringWithUTF8String:language.c_str()];
@@ -68,6 +70,46 @@ public:
 			wait(5);
 		return result; //If it executes, it means that the result is true and the utterance could speak
 	}
+	bool speakToFile(const std::string& filename, const std::string& text) {
+		NSString *nstext = [NSString stringWithUTF8String:text.c_str()];
+		AVSpeechUtterance *utterance = [[AVSpeechUtterance alloc] initWithString:nstext];
+		utterance.rate = rate;
+		utterance.volume = volume;
+		utterance.pitchMultiplier = pitch;
+		utterance.voice = currentVoice;
+		this->utterance = utterance;
+		NSURL* nsFileNameURl = [NSURL fileURLWithPath:[NSString stringWithUTF8String:filename.c_str()]];
+		__block bool success = true;
+		[synth writeUtterance:utterance toBufferCallback:^(AVAudioBuffer* _Nonnull buffer) {
+            AVAudioPCMBuffer* pcmBuffer = (AVAudioPCMBuffer*)buffer;
+            if(!pcmBuffer) {
+				success= false;
+                return;;
+            }
+            if(pcmBuffer.frameLength != 0) {
+                if(file==nil) {
+					NSError *error = nil;
+                    file = [[AVAudioFile alloc] initForWriting:nsFileNameURl settings:pcmBuffer.format.settings error:&error];
+					if(error) {
+						success = false;
+						return;;
+					}
+                }
+				NSError* writeError  = nil;
+                [file writeFromBuffer:pcmBuffer error:&writeError];
+				if(writeError) {
+					success = false;
+					return;
+				}
+            }
+        }];
+		NSLog(@"Success");
+		NSLog([nsFileNameURl absoluteString]);
+		//[synth speak:this->utterance];
+
+		return success;
+	}
+
 	bool stopSpeech() {
 		if (synth.isSpeaking) return [synth stopSpeakingAtBoundary:AVSpeechBoundaryImmediate];
 		return false;
@@ -189,6 +231,7 @@ bool AVTTSVoice::speak(const std::string& text, bool interrupt) {
 bool AVTTSVoice::speakWait(const std::string& text, bool interrupt) {
 	return impl->speakWait(text, interrupt);
 }
+bool AVTTSVoice::speakToFile(const std::string& filename, const std::string& text) { return impl->speakToFile(filename, text); }
 
 bool AVTTSVoice::pauseSpeech() {
 	return impl->pauseSpeech();

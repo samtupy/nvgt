@@ -33,6 +33,7 @@ public:
 	void deinit();
 	bool speak(const std::string& text, bool interrupt);
 	bool speakWait(const std::string& text, bool interrupt);
+	bool speakToFile(const std::string& fileName, const std::string& text);
 	bool stopSpeech();
 	bool pauseSpeech();
 	CScriptArray* getAllVoices() const;

@@ -235,7 +235,7 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 	}
 	#elif defined(__APPLE__)
 	else {
-		return false; // not implemented yet.
+		return inst->speakToFile(filename, text);
 	}
 	#elif defined(__ANDROID__)
 	else
