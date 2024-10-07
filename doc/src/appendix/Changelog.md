@@ -2,6 +2,7 @@
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
 ## New in 0.89.0-alpha (unreleased):
+* Including pack files via the `#include` directive has been removed in favor of being able to include scripts of any extension, you should use the `#pragma embed` directive to do this instead.
 * NVGT games now run on intel as well as arm mac computers!
 * The calendar object is now registered as a reference type with Angelscript meaning it now supports handles, for BGT backwards compatibility. The other datetime classes are still value types.
 * Added bool sdl_set_hint(const string&in hint, const string&in value, sdl_hint_priority priority = SDL_HINT_NORMAL) and string sdl_get_hint() functions, allowing the user to customize over 200 different SDL options from screen orientation to the video backend used and many more.
