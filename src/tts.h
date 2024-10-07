@@ -32,7 +32,7 @@ class tts_voice {
 	AVTTSVoice* inst;
 	#elifdef __ANDROID__
 	jclass TTSClass;
-	jmethodID constructor, midIsActive, midIsSpeaking, midSpeak, midSilence, midGetVoice, midSetRate, midSetPitch, midSetPan, midSetVolume, midGetVoices, midSetVoice, midGetMaxSpeechInputLength, midGetPitch, midGetPan, midGetRate, midGetVolume, midSpeakToFile, midSpeakToMemory;
+	jmethodID constructor, midIsActive, midIsSpeaking, midSpeak, midSilence, midGetVoice, midSetRate, midSetPitch, midSetPan, midSetVolume, midGetVoices, midSetVoice, midGetMaxSpeechInputLength, midGetPitch, midGetPan, midGetRate, midGetVolume, midSpeakToFile, midSpeakToMemory, midShutdown;
 	JNIEnv* env;
 	jobject TTSObj;
 	#endif

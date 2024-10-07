@@ -67,7 +67,12 @@ tts_voice::tts_voice(const std::string& builtin_voice_name) {
 	audioout = 0;
 }
 tts_voice::~tts_voice() {
-	//destroy();
+	#ifdef __ANDROID__
+	// Manually clean up here
+	if (env != NULL && TTSObj != NULL && midShutdown != NULL) {
+		env->CallVoidMethod(TTSObj, midShutdown);
+	}
+	#endif
 }
 void tts_voice::setup() {
 	#ifdef _WIN32
@@ -109,7 +114,8 @@ void tts_voice::setup() {
 	midGetVolume = env->GetMethodID(TTSClass, "getVolume", "()F");
 	midSpeakToFile = env->GetMethodID(TTSClass, "speakToFile", "(Ljava/lang/String;Ljava/lang/String)Z");
 	midSpeakToMemory = env->GetMethodID(TTSClass, "speakToMemory", "(Ljava/lang/String;)[B");
-	if (!midIsActive || !midIsSpeaking || !midSpeak || !midSilence || !midGetVoice || !midSetRate || !midSetPitch || !midSetPan || !midSetVolume || !midGetVoices || !midSetVoice || !midGetMaxSpeechInputLength || !midGetPitch || !midGetPan || !midGetRate || !midGetVolume || !midSpeakToFile || !midSpeakToMemory) throw Poco::Exception("One or more methods on the TTS class could not be retrieved from JNI!");
+	midShutdown = env->GetMethodID(TTSClass, "shutdown", "()V");
+	if (!midIsActive || !midIsSpeaking || !midSpeak || !midSilence || !midGetVoice || !midSetRate || !midSetPitch || !midSetPan || !midSetVolume || !midGetVoices || !midSetVoice || !midGetMaxSpeechInputLength || !midGetPitch || !midGetPan || !midGetRate || !midGetVolume || !midSpeakToFile || !midSpeakToMemory || !midShutdown) throw Poco::Exception("One or more methods on the TTS class could not be retrieved from JNI!");
 	if (!env->CallBooleanMethod(TTSObj, midIsActive)) throw Poco::Exception("TTS engine could not be initialized!");
 	voice_index = 1;
 	#else

@@ -169,8 +169,7 @@ public class TTS {
 		ttsVolume = volume;
 	}
 
-	@Override
-	public void finalize() {
+	public void shutdown() {
 		if (isActive()) {
 			tts.shutdown();
 		}
