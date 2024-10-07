@@ -60,39 +60,39 @@ AlwaysShowComponentsList = yes
 DisableReadyMemo=yes
 
 [Types]
-Name: "custom"; Description: "Custom installation"; Flags: iscustom
+Name: "custom"; Description: "Install only the components I select"; Flags: iscustom
 
 [Components]
-name: "core"; description: "NVGT compiler and interpreter"; flags: fixed
-name: "includes"; description: "Includes"
-name: "plugins"; description: "Optional plugins"
-name: "plugins\curl"; description: "CURL"
-name: "plugins\git"; description: "Git"
-name: "plugins\sqlite"; description: "SQLite3"
-name: "plugins\systemd_notify"; description: "systemd-notify"
-name: "stubs"; description: "Stubs"
+name: "core"; description: "NVGT compiler and interpreter"; flags: fixed; types: custom
+name: "includes"; description: "Includes"; types: custom
+name: "plugins"; description: "Optional plugins"; types: custom
+name: "plugins\curl"; description: "CURL"; types: custom
+name: "plugins\git"; description: "Git"; types: custom
+name: "plugins\sqlite"; description: "SQLite3"; types: custom
+name: "plugins\systemd_notify"; description: "systemd-notify"; types: custom
+name: "stubs"; description: "Stubs"; types: custom
 #ifdef have_windows_stubs
-name: "stubs\windows"; description: "Windows binary stub"
+name: "stubs\windows"; description: "Windows binary stub"; types: custom
 #endif
 #ifdef have_macos_stubs
-name: "stubs\macos"; description: "MacOS binary stub"
+name: "stubs\macos"; description: "MacOS binary stub"; types: custom
 #endif
 #ifdef have_linux_stubs
-name: "stubs\linux"; description: "Linux binary stub"
+name: "stubs\linux"; description: "Linux binary stub"; types: custom
 #endif
 #ifdef have_android_stubs
-name: "stubs\android"; description: "Android binary stub"
-name: "androidtools"; description: "Android tools (external download required)"
+name: "stubs\android"; description: "Android binary stub"; types: custom
+name: "androidtools"; description: "Android tools (external download required)"; types: custom
 #endif
 #ifdef have_docs
-name: "docs"; description: "Documentation"
+name: "docs"; description: "Documentation"; types: custom
 #else
-name: "docs_download"; description: "Documentation (external download required)"
+name: "docs_download"; description: "Documentation (external download required)"; types: custom
 #endif
 name: "associate"; description: "File associations and context menus"
 name: "associate\edit"; description: "Open NVGT scripts in the default text editor"; flags: exclusive
-name: "associate\run"; description: "Execute NVGT scripts within NVGT"; flags: exclusive
-name: "path"; description: "Add NVGT to the PATH environment variable"
+name: "associate\run"; description: "Execute NVGT scripts within NVGT"; flags: exclusive; types: custom
+name: "path"; description: "Add NVGT to the PATH environment variable"; types: custom
 
 [Files]
 ; Core
@@ -202,6 +202,15 @@ type: filesandordirs; name: "{app}\lib_android"
 type: filesandordirs; name: "{app}\lib"
 type: filesandordirs; name: "{app}\stub"
 type: files; name: "{app}\nvgt.chm"
+
+[Run]
+Filename: "{app}\nvgtw.exe"; description: "Run NVGT interpreter"; flags: postinstall nowait runasoriginaluser
+filename: "{app}\nvgt.chm"; description: "View documentation"; verb: "open"; flags: postinstall shellexec nowait runasoriginaluser
+filename: "https://nvgt.gg"; description: "View NVGT website"; verb: "open"; flags: postinstall shellexec nowait runasoriginaluser
+
+[Messages]
+SelectDirBrowseLabel = Select the directory in which you would like NVGT installed, then click Next to proceed. If you wish to browse for it, click Browse.
+SelectStartMenuFolderBrowseLabel = Select the start menu group where you would like NVGT's start menu icons to be placed, then click Next to proceed. If you wish to browse for it, click Browse.
 
 [Code]
 var
