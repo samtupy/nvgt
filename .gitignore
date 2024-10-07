@@ -27,6 +27,7 @@ libs
 obj
 release/lib/3rd_party_licenses.html
 release/lib_*
+release/nvgt
 
 # private user space and dependencies
 user/**
@@ -48,4 +49,3 @@ web/src/docs
 
 # Compilation databases; easy to generate
 compile_commands.json
-release/nvgt

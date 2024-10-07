@@ -17,7 +17,6 @@
 	#define WIN32_LEAN_AND_MEAN
 	#define VC_EXTRALEAN
 	#include <windows.h>
-	#include <commdlg.h>
 	#include "InputBox.h"
 #elif defined(__APPLE__)
 #include <IOKit/IOKitLib.h>
@@ -31,7 +30,6 @@
 #endif
 #ifndef _WIN32
 #include <sys/time.h>
-
 #endif
 #include <SDL3/SDL.h>
 #include <obfuscate.h>
