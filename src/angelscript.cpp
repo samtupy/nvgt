@@ -304,10 +304,6 @@ int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilde
 	try {
 		Path include(Path::expand(filename));
 		include.makeAbsolute();
-		if (include.getExtension() != "nvgt") { // Embedded pack
-			embed_pack(include.toString(), filename);
-			return 0;
-		}
 		include_file = include;
 		if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str());
 		include = Path(sectionname).parent().append(filename);
