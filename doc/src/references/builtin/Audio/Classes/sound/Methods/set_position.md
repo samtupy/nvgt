@@ -10,7 +10,7 @@ Sets the sound's position in 3d space.
 * float sound_x: the x position of the sound.
 * float sound_y: the y position of the sound.
 * float sound_z: the z position of the sound.
-* float rotation: the rotation of the listener (in degrees).
+* float rotation: the rotation of the listener (in radians).
 * float pan_step: the pan step (e.g. how extreme the panning is).
 * float volume_step: the volume step (very similar to pan_step but for volume).
 
