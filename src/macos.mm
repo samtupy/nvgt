@@ -112,14 +112,7 @@ void nextMacInputSource() {
 	CFRelease(inputSources);
 	return;
 	}
-	for(int i=0; i<count; i++) {
-		TISInputSourceRef k = (TISInputSourceRef)CFArrayGetValueAtIndex(inputSources, i);
-		NSString *sourceName = (__bridge NSString *)(TISGetInputSourceProperty(k, kTISPropertyLocalizedName));
-		printf([sourceName UTF8String]);
-		printf("\n");
-	}
 	NSInteger nextIndex = (currentIndex+1)%count;
-	printf("%i \n %i \n", currentIndex, nextIndex);
 	TISInputSourceRef nextInput = (TISInputSourceRef)CFArrayGetValueAtIndex(inputSources, nextIndex);
 	TISSelectInputSource(nextInput);
 	CFRelease(currentInput);
