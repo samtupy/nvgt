@@ -57,7 +57,7 @@ FlatComponentsList = yes
 OutputDir = install
 ShowLanguageDialog = yes
 AlwaysShowComponentsList = yes
-DisableReadyMemo=yes
+DisableReadyPage = yes
 
 [Types]
 Name: "custom"; Description: "Install only the components I select"; Flags: iscustom
@@ -98,14 +98,7 @@ name: "path"; description: "Add NVGT to the PATH environment variable"; types: c
 ; Core
 Source: "release\nvgt.exe"; DestDir: "{app}"
 Source: "release\nvgtw.exe"; DestDir: "{app}"
-source: "release\lib\bass.dll"; DestDir: "{app}\lib"
-source: "release\lib\bass_fx.dll"; DestDir: "{app}\lib"
-source: "release\lib\bassmix.dll"; DestDir: "{app}\lib"
-source: "release\lib\GPUUtilities.dll"; DestDir: "{app}\lib"
-source: "release\lib\nvdaControllerClient64.dll"; DestDir: "{app}\lib"
-source: "release\lib\phonon.dll"; DestDir: "{app}\lib"
-source: "release\lib\SAAPI64.dll"; DestDir: "{app}\lib"
-source: "release\lib\TrueAudioNext.dll"; DestDir: "{app}\lib"
+source: "release\lib\*.dll"; DestDir: "{app}\lib"
 ; Plugins: curl
 source: "release\lib\nvgt_curl.dll"; DestDir: "{app}\lib"; components: plugins\curl
 ; Plugins: git
@@ -117,28 +110,14 @@ source: "release\lib\nvgt_sqlite.dll"; DestDir: "{app}\lib"; components: plugins
 source: "release\lib\systemd_notify.dll"; DestDir: "{app}\lib"; components: plugins\systemd_notify
 ; Stubs
 #ifdef have_windows_stubs
-source: "release\stub\nvgt_windows.bin"; DestDir: "{app}\stub"; components: stubs\windows
-#ifdef have_windows_nc_stubs
-source: "release\stub\nvgt_windows_nc.bin"; DestDir: "{app}\stub"; components: stubs\windows
-#endif
-#ifdef have_windows_nc_upx_stubs
-source: "release\stub\nvgt_windows_nc_upx.bin"; DestDir: "{app}\stub"; components: stubs\windows
-#endif
-#ifdef have_windows_upx_stubs
-source: "release\stub\nvgt_windows_upx.bin"; DestDir: "{app}\stub"; components: stubs\windows
-#endif
-#else
-#error Windows stubs are required!
+source: "release\stub\nvgt_windows*.bin"; DestDir: "{app}\stub"; components: stubs\windows
 #endif
 #ifdef have_macos_stubs
 source: "release\stub\nvgt_mac.bin"; DestDir: "{app}\stub"; components: stubs\macos
 source: "release\lib_mac\*"; DestDir: "{app}\lib_mac"; components: stubs\macos
 #endif
 #ifdef have_linux_stubs
-source: "release\stub\nvgt_linux.bin"; DestDir: "{app}\stub"; components: stubs\linux
-#ifdef have_linux_upx_stubs
-source: "release\stub\nvgt_linux_upx.bin"; DestDir: "{app}\stub"; components: stubs\linux
-#endif
+source: "release\stub\nvgt_linux*.bin"; DestDir: "{app}\stub"; components: stubs\linux
 source: "release\lib_linux\*"; DestDir: "{app}\lib_linux"; components: stubs\linux
 #endif
 #ifdef have_android_stubs
@@ -198,7 +177,6 @@ Name: "{group}\NVGT Documentation"; Filename: "{app}\nvgt.chm"
 type: filesandordirs; name: "{app}\android-tools"
 type: filesandordirs; name: "{app}\lib_mac"
 type: filesandordirs; name: "{app}\lib_linux"
-type: filesandordirs; name: "{app}\lib_android"
 type: filesandordirs; name: "{app}\lib"
 type: filesandordirs; name: "{app}\stub"
 type: files; name: "{app}\nvgt.chm"
@@ -209,7 +187,7 @@ filename: "{app}\nvgt.chm"; description: "View documentation"; verb: "open"; fla
 filename: "https://nvgt.gg"; description: "View NVGT website"; verb: "open"; flags: postinstall shellexec nowait runasoriginaluser
 
 [Messages]
-SelectDirBrowseLabel = Select the directory in which you would like NVGT installed, then click Next to proceed. If you wish to browse for it, click Browse.
+SelectDirBrowseLabel = Select the directory in which you would like NVGT to be installed, then click Next to proceed. If you wish to browse for it, click Browse.
 SelectStartMenuFolderBrowseLabel = Select the start menu group where you would like NVGT's start menu icons to be placed, then click Next to proceed. If you wish to browse for it, click Browse.
 
 [Code]
@@ -274,6 +252,19 @@ begin
   AndroidSdkDownloadPage.ShowBaseNameInsteadOfUrl := True;
   DocsDownloadPage := CreateDownloadPage('Downloading documentation', 'Please wait while the documentation is acquired', @OnDownloadProgress);
   DocsDownloadPage.ShowBaseNameInsteadOfUrl := True;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+var
+  IsInstalled: Boolean;
+begin
+  IsInstalled := DirExists(WizardDirValue());
+  if (CurPageID in [wpSelectProgramGroup, wpReady]) or (IsInstalled and (CurPageID = wpSelectComponents)) then
+    WizardForm.NextButton.Caption := SetupMessage(msgButtonInstall)
+  else if CurPageID = wpFinished then
+    WizardForm.NextButton.Caption := SetupMessage(msgButtonFinish)
+  else
+    WizardForm.NextButton.Caption := SetupMessage(msgButtonNext);
 end;
 
 procedure DownloadAndroidSDK;
