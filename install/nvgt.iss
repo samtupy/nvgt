@@ -202,11 +202,12 @@ type: filesandordirs; name: "{app}\lib_android"
 type: filesandordirs; name: "{app}\lib"
 type: filesandordirs; name: "{app}\stub"
 type: files; name: "{app}\nvgt.chm"
+type: filesandordirs; name: "{app}"
 
 [Run]
-Filename: "{app}\nvgtw.exe"; description: "Run NVGT interpreter"; flags: postinstall nowait runasoriginaluser
-filename: "{app}\nvgt.chm"; description: "View documentation"; verb: "open"; flags: postinstall shellexec nowait runasoriginaluser
-filename: "https://nvgt.gg"; description: "View NVGT website"; verb: "open"; flags: postinstall shellexec nowait runasoriginaluser
+Filename: "{app}\nvgtw.exe"; description: "Run NVGT interpreter"; flags: postinstall nowait runasoriginaluser unchecked
+filename: "{app}\nvgt.chm"; description: "View documentation"; verb: "open"; flags: postinstall shellexec nowait runasoriginaluser unchecked
+filename: "https://nvgt.gg"; description: "View NVGT website"; verb: "open"; flags: postinstall shellexec nowait runasoriginaluser unchecked
 
 [Messages]
 SelectDirBrowseLabel = Select the directory in which you would like NVGT installed, then click Next to proceed. If you wish to browse for it, click Browse.
@@ -327,7 +328,16 @@ end;
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+uninstall_setup_res_code: integer;
+uninstall_string: string;
 begin
+if RegKeyExists(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NVGT') then
+if RegValueExists(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NVGT', 'UninstallString') then
+if RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NVGT', 'UninstallString', uninstall_string) then
+if not Exec(uninstall_string, '/S', '', SW_HIDE, ewWaitUntilTerminated, uninstall_setup_res_code) then
+Result := 'Setup cannot continue because it could not uninstall the prior version of NVGT. Please uninstall it manually and re-run setup.';
+
 if WizardIsComponentSelected('androidtools') then
 DownloadAndroidSDK;
 if WizardIsComponentSelected('docs_download') then
