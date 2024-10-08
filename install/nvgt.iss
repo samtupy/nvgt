@@ -15,49 +15,34 @@
 
 #expr Exec("py", "iss_genversion.py", ".", 1, SW_HIDE)
 #include "nvgt_version.ish"
+#define COPYRIGHT_YEAR GetDateTimeString("y", "", "");
 
 [Setup]
-ASLRCompatible = yes
-Compression = lzma2/ultra64
-DEPCompatible = yes
-OutputBaseFilename = NVGT_{#NVGTVerFilenameString}
-SourceDir = ..
-TerminalServicesAware = yes
-UseSetupLdr = yes
-AppMutex = NVGT
+AppCopyright = Copyright (c) 2022-{#COPYRIGHT_YEAR} Sam Tupy Productions, with contributions from the open source community
+AppMutex = NVGTApplication
 AppName = NVGT
 AppVersion = {#NVGTVer}
 ArchitecturesAllowed = x64compatible
 ArchitecturesInstallIn64BitMode = x64compatible
 ChangesAssociations = yes
 ChangesEnvironment = yes
-CreateAppDir = yes
-CreateUninstallRegKey = yes
-LicenseFile = install\license.txt
-PrivilegesRequired = admin
-SetupMutex = nvgtsetup
-TimeStampRounding = 0
-UsePreviousAppDir = yes
-UsePreviousGroup = yes
-UsePreviousLanguage = yes
-UsePreviousPrivileges = yes
-UsePreviousSetupType = yes
-UsePreviousTasks = yes
-UsePreviousUserInfo = yes
-AppCopyright = Copyright (c) 2024 Sam Tupy and the NVGT developers
-ShowTasksTreeLines = yes
-WindowShowCaption = no
-WizardStyle = modern
+Compression = lzma2/ultra64
 DefaultDirName = c:\nvgt
 DefaultGroupName = NVGT
-DisableFinishedPage = no
+DisableReadyPage = yes
 DisableStartupPrompt = yes
 DisableWelcomePage = no
-FlatComponentsList = yes
+LicenseFile = install\license.txt
+OutputBaseFilename = NVGT_{#NVGTVerFilenameString}
 OutputDir = install
-ShowLanguageDialog = yes
-AlwaysShowComponentsList = yes
-DisableReadyPage = yes
+PrivilegesRequired = admin
+SourceDir = ..
+SetupMutex = NVGTSetup
+TimeStampRounding = 0
+ShowTasksTreeLines = yes
+WindowShowCaption = no
+WindowVisible = yes
+WizardStyle = modern
 
 [Types]
 Name: "custom"; Description: "Install only the components I select"; Flags: iscustom
@@ -194,51 +179,8 @@ SelectStartMenuFolderBrowseLabel = Select the start menu group where you would l
 [Code]
 var
 AndroidSdkDownloadPage, DocsDownloadPage: TDownloadWizardPage;
- 
-const
-  EnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
 
-procedure EnvAddPath(Path: string);
-var
-    Paths: string;
-begin
-    // Retrieve current path (use empty string if entry not exists)
-    if not RegQueryStringValue(HKLM, EnvironmentKey, 'Path', Paths)
-    then Paths := '';
-
-    // Skip if string already found in path
-    if Pos(';' + Uppercase(Path) + ';', ';' + Uppercase(Paths) + ';') > 0 then exit;
-
-    // Append string to the end of the path variable
-    Paths := Paths + ';'+ Path +';'
-
-    // Overwrite (or create if missing) path environment variable
-    if RegWriteStringValue(HKLM, EnvironmentKey, 'Path', Paths)
-    then Log(Format('The [%s] added to PATH: [%s]', [Path, Paths]))
-    else Log(Format('Error while adding the [%s] to PATH: [%s]', [Path, Paths]));
-end;
-
-procedure EnvRemovePath(Path: string);
-var
-    Paths: string;
-    P: Integer;
-begin
-    // Skip if registry entry not exists
-    if not RegQueryStringValue(HKLM, EnvironmentKey, 'Path', Paths) then
-        exit;
-
-    // Skip if string not found in path
-    P := Pos(';' + Uppercase(Path) + ';', ';' + Uppercase(Paths) + ';');
-    if P = 0 then exit;
-
-    // Update path variable
-    Delete(Paths, P - 1, Length(Path) + 1);
-
-    // Overwrite path environment variable
-    if RegWriteStringValue(HKLM, EnvironmentKey, 'Path', Paths)
-    then Log(Format('The [%s] removed from PATH: [%s]', [Path, Paths]))
-    else Log(Format('Error while removing the [%s] from PATH: [%s]', [Path, Paths]));
-end;
+#include "pathmod.ish"
 
 function OnDownloadProgress(const Url, FileName: String; const Progress, ProgressMax: Int64): Boolean;
 begin
