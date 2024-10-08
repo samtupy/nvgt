@@ -253,6 +253,9 @@ begin
   AndroidSdkDownloadPage.ShowBaseNameInsteadOfUrl := True;
   DocsDownloadPage := CreateDownloadPage('Downloading documentation', 'Please wait while the documentation is acquired', @OnDownloadProgress);
   DocsDownloadPage.ShowBaseNameInsteadOfUrl := True;
+  WizardForm.LicenseNotAcceptedRadio.Hide;
+  WizardForm.LicenseAcceptedRadio.Hide;
+  WizardForm.LicenseAcceptedRadio.Checked := True;
 end;
 
 procedure CurPageChanged(CurPageID: Integer);
@@ -264,6 +267,8 @@ begin
     WizardForm.NextButton.Caption := SetupMessage(msgButtonInstall)
   else if CurPageID = wpFinished then
     WizardForm.NextButton.Caption := SetupMessage(msgButtonFinish)
+  else if CurPageID = wpLicense then
+    WizardForm.NextButton.Caption := SetupMessage(msgLicenseAccepted)
   else
     WizardForm.NextButton.Caption := SetupMessage(msgButtonNext);
 end;
