@@ -93,7 +93,7 @@ protected:
 			#ifdef NVGT_STUB
 				ChDir(resources_dir);
 			#else
-				g_IncludeDirs.push_back(resources_dir);
+				g_IncludeDirs.push_back(Path(resources_dir).pushDirectory("include").toString());
 			#endif
 		}
 		#elif defined(__ANDROID__)
