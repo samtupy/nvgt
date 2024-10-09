@@ -1,3 +1,7 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
 #include"dget.nvgt"
 #include"input_forms.nvgt"
 void main() {
@@ -12,9 +16,9 @@ void main() {
 	input.add_checkbox_field("agreement", "I agree to the rules", false, true, true);
 	input.description = "You will be asked the following questions to guide you in your profile setup";
 	dictionary@result = input.run();
-	if(input.user_canceled) {
+	if (input.user_canceled) {
 		alert("error", "The user canceled profile setup");
 		exit();
 	}
-	alert("profile", "The user is named "+dgets(result, "first_name")+" "+dgets(result, "last_name")+". They are from "+dgets(result, "location", "unknown")+" and are "+dgetn(result, "age", 1)+" years old. Their favorite operating system is "+dgets(result, "platform", "system7"));
+	alert("profile", "The user is named " + dgets(result, "first_name") + " " + dgets(result, "last_name") + ". They are from " + dgets(result, "location", "unknown") + " and are " + dgetn(result, "age", 1) + " years old. Their favorite operating system is " + dgets(result, "platform", "system7"));
 }
