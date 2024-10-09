@@ -1,4 +1,4 @@
-# Memory Management Information
+# Memory Management Information (incomplete)
 What is a handle? What are references? What is the difference between the stack and the heap and when/why should I care? What is a value typed object? What is a primative datatype, and when should or shouldn't one use the @ character in their code? When should I worry about garbage collection and what even is that? How much is it wise to bother with all this stuff anyway?
 
 If you've been having any such questions or similar, you've come to the right place. This tutorial will attempt to unravel and demystify all of the jargon behind various memory management techniques and structures as well as advice about when/how to use them. The goal is that by the end of this reading, you will have the knowledge to begin developing confidence particularly in the usage of handles and references in your games, while also learning a lot of interesting stuff about memory management along the way.

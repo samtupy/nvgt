@@ -58,7 +58,7 @@ bool android_screen_reader_speak(const std::string& text, bool interrupt) {
 	android_setup_jni();
 	JNIEnv* env = (JNIEnv*)SDL_GetAndroidJNIEnv();
 	jstring jtext = env->NewStringUTF(text.c_str());
-	bool result = env->CallStaticIntMethod(TTSClass, midScreenReaderSpeak, jtext, interrupt);
+	bool result = env->CallStaticBooleanMethod(TTSClass, midScreenReaderSpeak, jtext, interrupt);
 	env->DeleteLocalRef(jtext);
 	return result;
 }
