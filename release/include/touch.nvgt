@@ -16,7 +16,7 @@ enum swipe_touch_directions {
 	swipe_touch_direction_left = 0, swipe_touch_direction_right, swipe_touch_direction_up, swipe_touch_direction_down
 }
 funcdef void tap_func(touch_screen_finger@finger);
-const float TOUCH_UNCOORDINATED = TOUCH_UNCOORDINATED;
+const float TOUCH_UNCOORDINATED = -10.0f;
 class touch_interface {
 	touch_jesture_manager@parent;
 	float minx, maxx, miny, maxy;
