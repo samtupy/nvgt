@@ -15,22 +15,24 @@ enum swipe_touch_directions {
 	swipe_touch_direction_left = 0, swipe_touch_direction_right, swipe_touch_direction_up, swipe_touch_direction_down
 }
 funcdef void tap_func(touch_screen_finger@finger);
+const float TOUCH_UNCOORDINATED = TOUCH_UNCOORDINATED;
 class touch_interface {
 	touch_jesture_manager@parent;
 	float minx, maxx, miny, maxy;
 	bool coordinated = false;
-	touch_interface(touch_jesture_manager@parent, float minx = -10, float maxx = -10, float miny = -10, float maxy = -10) {
+	touch_interface(touch_jesture_manager@parent, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED) {
 		@this.parent = parent;
 		this.minx = minx;
 		this.maxx = maxx;
 		this.miny = miny;
 		this.maxy = maxy;
-		if (this.minx != -10 or this.maxx != -10 or this.miny != -10 or this.maxy != -10) this.coordinated = true;
+		if (this.minx != TOUCH_UNCOORDINATED or this.maxx != TOUCH_UNCOORDINATED or this.miny != TOUCH_UNCOORDINATED or this.maxy != TOUCH_UNCOORDINATED) this.coordinated = true;
 	}
 	void on_double_tap(touch_screen_finger@finger) {
 	}
 	void on_tripple_tap(touch_screen_finger@finger) {
 	}
+
 	bool in_bounds(float x, float y) {
 		if (!this.coordinated) return true;
 		if ((x<this.minx or x>this.maxx) or (y<this.miny or y>this.maxy)) return false;
@@ -49,7 +51,7 @@ class touch_interface {
 }
 class touch_keyboard_interface: touch_interface {
 	dictionary keymap;
-	touch_keyboard_interface(touch_jesture_manager@parent, dictionary@map, float minx = -10, float maxx = -10, float miny = -10, float maxy = -10) {
+	touch_keyboard_interface(touch_jesture_manager@parent, dictionary@map, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED) {
 		super(parent, minx, maxx, miny, maxy);
 		this.keymap = map;
 	}
@@ -132,6 +134,20 @@ class touch_jesture_manager {
 		if (@i == null) return false;
 		this.interfaces.insert_last(i);
 		return true;
+	}
+	bool set_touch_interfaces(touch_interface@[] interfaces, bool append = false) {
+		if(!append) {
+			this.interfaces = interfaces;
+			return true;
+		}
+			else {
+			if(interfaces.length()<=0) return false;
+			this.interfaces.insert_last(interfaces);
+		}
+		return true;
+	}
+	void clear_touch_interfaces() {
+		this.interfaces.resize(0);
 	}
 	touch_interface@get_touch_interface(float x, float y) {
 		uint len = this.interfaces.length();
