@@ -5,7 +5,7 @@
 void main() {
 	sdl_set_hint("SDL_ORIENTATIONS", "LandscapeLeft");
 	show_window("touch test");
-tts_voice tts;
+	tts_voice tts;
 	uint64[]@ devs = get_touch_devices();
 	if (devs.length() < 1) {
 		alert("oops", "no touch devices available");
