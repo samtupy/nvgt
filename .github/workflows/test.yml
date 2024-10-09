@@ -14,7 +14,7 @@ jobs:
         curl -s -O https://nvgt.gg/windev.zip
         7z x windev.zip -owindev
         scons -s no_upx=0
-        release\nvgt test/tests.nvgt
+        release\nvgt test/tests.nvgt -- -v
         cd doc
         pip3 install -r requirements.txt
         cd OSL
