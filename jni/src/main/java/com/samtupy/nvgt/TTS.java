@@ -159,9 +159,10 @@ public class TTS {
 	}
 
 	@Override
-	public void finalize() {
+	protected void finalize() throws Throwable {
 		if (isActive())
 			tts.shutdown();
+		super.finalize();
 	}
 
 	public List<String> getVoices() {

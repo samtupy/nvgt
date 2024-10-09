@@ -44,7 +44,8 @@ The NVGT engine advertises the following qualities and features:
 * script debugger; Find issues in your code like never before with standard debugging techniques like breakpoints, single instruction stepping, realtime expression evaluation and more.
 * ever expanding plugin system; Be free of the Angelscript sandbox and code whatever extensions to your game you want in c++ or another language.
 * subscripting; Add downloadable levels to your games or make them more dynamic with NVGT's ability to execute Angelscript code from within Angelscript code like the javascript or python eval function.
-* cross platform; Release your games for windows, as well as macOS and Linux!
+* cross platform; Distribute your games to a wide audience by easily compiling it for Windows, Mac OS, Linux and more.
+* games on the go; Let your players take your games with them on their Android devices, with IOS planned for the future. Mobile support still young.
 * 64-bit; Your old BGT projects can now utilize all system resources.
 * 3d pathfinder; Find intelligent paths in 3 dimensions with possibly more in the future.
 * builtin JSON support; Connect your projects to online services using one of the most widely recognized API data exchange languages.

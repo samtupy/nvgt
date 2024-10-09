@@ -1,0 +1,47 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#include"touch.nvgt"
+#include"speech.nvgt"
+timer xtimer;
+void main() {
+	show_window("touch screen test");
+	speak("please wait", true);
+	wait(1000);
+	touch_jesture_manager touch;
+	if (!touch.is_available()) {
+		alert("error", "This system does not support touch screen devices");
+		if (question("No touch", "There was no touch input on your system, which is what this program's use-case is for. Would you like to continue execution anyway?") != 1) exit();
+	}
+	//attach multiple keys to a single jesture.
+	int[] t = {KEY_TAB, KEY_LSHIFT};
+	touch_keyboard_interface testsim(touch, {{"swipe_left1f", KEY_LEFT}, {"swipe_right1f", KEY_RIGHT}, {"swipe_up1f", KEY_UP}, {"swipe_down1f", KEY_DOWN}, {"double_tap1f", KEY_RETURN}, {"tripple_tap1f", t}, {"swipe_left2f", KEY_ESCAPE}, {"swipe_right2f", KEY_Q}, {"double_tap2f", KEY_SPACE}});
+	touch.add_touch_interface(testsim);
+	dictionary@d = {{"double_tap1f", KEY_X}, {"double_tap2f", KEY_Z}};
+	//coordinates.
+	touch.add_touch_interface(touch_keyboard_interface(touch, d, 0.5, 1.0, 0.5, 1.0));
+	while (!key_pressed(KEY_ESCAPE) and !key_pressed(KEY_AC_BACK)) {
+		wait(5);
+		touch.monitor();
+		if (key_pressed(KEY_LEFT)) speak("left");
+		if (key_pressed(KEY_RIGHT)) speak("right");
+		if (key_pressed(KEY_DOWN)) speak("down");
+		if (key_pressed(KEY_UP)) speak("up");
+		if (key_pressed(KEY_TAB)) {
+			speak("tripple tap");
+			if (key_down(KEY_LSHIFT) or key_down(KEY_RSHIFT)) speak("you are holding down shift", false);
+		}
+		if (key_pressed(KEY_SPACE)) speak("double tap 2 fingers");
+		if (key_pressed(KEY_ESCAPE)) {
+			speak("exiting...");
+			wait(1500);
+			exit();
+		}
+		if (key_pressed(KEY_Q)) speak("swipe right 2 fingers");
+		if (key_pressed(KEY_RETURN))
+			speak("you just double tapped the screen!", false);
+		if (key_pressed(KEY_X)) speak("You just double tapped another part of the screen!");
+		if (key_pressed(KEY_Z)) speak("You just double tapped with 2 fingers on another part of the screen!");
+	}
+}

@@ -1,7 +1,9 @@
 # Changelog
 This document lists all major changes that have taken place in NVGT since we started keeping track.
 
-## New in 0.89.0-alpha (unreleased):
+## New in 0.89.0-alpha (10/09/2024):
+* NVGT has now switched to using InnoSetup for it's installer, adding several new options such as adding to path, start menu icons etc.
+* Added the script_function::get_namespace() method as well as script_function::retrieve() which takes a native function handle derived from a funcdef.
 * Including pack files via the `#include` directive has been removed in favor of being able to include scripts of any extension, you should use the `#pragma embed` directive to do this instead.
 * NVGT games now run on intel as well as arm mac computers!
 * The calendar object is now registered as a reference type with Angelscript meaning it now supports handles, for BGT backwards compatibility. The other datetime classes are still value types.
@@ -12,7 +14,7 @@ This document lists all major changes that have taken place in NVGT since we sta
 * ini.nvgt include is now free of bgt_compat! Added quick test for it.
 * Fixed a bug in instance.nvgt include regarding automatic mutex name generation.
 * The compiler now includes a status window that continues getting updated with messages reporting what is currently happening during compilation.
-* Adds refresh_window() function.
+* Adds refresh_window() function, allowing manual pulling for windows events encase you want to use your own sleeping methods.
 * Adds input_forms.nvgt include with functions to quickly retrieve information using an audio form, test/example in test/interact/test_input_forms.nvgt.
 * Introduce new menu system based on audio form, in menu.nvgt. As a result, the old dynamic menu has been renamed to bgt_dynamic_menu.nvgt to make it clear what one is legacy.
 * Registered some new vector functions such as cross, length2, distance and distance2 etc.
@@ -29,7 +31,7 @@ This document lists all major changes that have taken place in NVGT since we sta
 * Add virtual_dialogs.nvgt include.
 * Add datastream.sync_rw_cursors property (true by default).
 * tts_dump_config and tts_load_config in speech.nvgt include can now save screen reader usage setting.
-* ADDED ANDROID PLATFORM SUPPORT, NVGT RUNS ON MOBILE! This includes gesture detection (touch.nvgt include or query_touch_device function), screen reader speech through Android's accessibility event API, and android TextToSpeech engine support through  the tts_voice class! The support is still young and there are many improvements still to be made (only the default tts voice can be used right now for example), but even running small nvgt scripts from source is possible at this point with NVGT's Android runner application, and one-click APK bundling is possible!
+* ADDED ANDROID PLATFORM SUPPORT, NVGT RUNS ON MOBILE! This includes gesture detection (touch.nvgt include or query_touch_device function), screen reader speech through Android's accessibility event API, and android TextToSpeech engine support through  the tts_voice class! The support is still young and there are many improvements still to be made (only the default tts voice can be used right now and the only way to embed sounds is by using the `#pragma embed pack.dat` feature for example), but even running small nvgt scripts from source is possible at this point with NVGT's Android runner application, and one-click APK bundling is possible!
 * NVGT now has a bundling facility! It can create .apk packages for android (assuming the needed android tools are available), it can create MacOS app bundles on all platforms though only a .dmg on Mac (.app.zip on other platforms), and it can copy Windows/Linux libraries into place as well as bundle your asset files like sounds, readme and changelog all to create a fully distributable package in one click! It can even run custom prebuild and postbuild shell commands in case the bundling facility isn't quite doing enough for your needs. More information is in the compiling for distribution document. This means as an aside that NVGT's compiler application is significantly larger, as it must include the MacOS and Linux libraries on windows, the Windows and Linux libraries on Mac etc for the purposes of creating a fully functional app bundle no matter what platform it is compiled on.
 * The compile script submenu has changed, it now contains options to compile for all platforms you have stubs for!
 * Trying to embed a pack that doesn't exist no longer makes NVGTW.exe silently exit.

@@ -18,9 +18,8 @@ void main() {
 
 		if (keys.length() > 0) {
 			for (uint k = 0; k < keys.length(); k++) {
-				if (keys.find(KEY_ESCAPE) > -1) {
+				if (keys.find(KEY_ESCAPE) > -1)
 					escape_was_pressed = true;
-				}
 				speak(keys[k], false);
 			}
 		}
