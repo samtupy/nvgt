@@ -107,7 +107,7 @@ jobs:
         cp mac_release/stub/* release/stub
         curl -s -o release/stub/nvgt_android.bin -u "${{secrets.CIFTP}}" ftp://nvgt.gg/nvgt_android.bin
         cd install
-        makensis nvgt.nsi
+        iscc nvgt.iss
         python3 upload_windows_installer.py ${{secrets.CIFTP}}
 
   mac_package:
