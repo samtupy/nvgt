@@ -28,7 +28,9 @@
 #include <Poco/Timestamp.h>
 #include <Poco/Timezone.h>
 #include <SDL3/SDL.h>
+#include <scriptarray.h>
 #include "nvgt.h"
+#include "pocostuff.h" // angelscript_refcounted
 #include "scriptstuff.h"
 
 using namespace Poco;
@@ -384,7 +386,7 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty(_O("const int64 HOURS"), (void*)&Timespan::HOURS);
 	engine->RegisterGlobalProperty(_O("const int64 DAYS"), (void*)&Timespan::DAYS);
 	engine->RegisterGlobalProperty(_O("uint64 timer_default_accuracy"), &timer_default_accuracy);
-	engine->RegisterObjectType("calendar", sizeof(LocalDateTime), asOBJ_VALUE | asGetTypeTraits<LocalDateTime>());
+	angelscript_refcounted_register<LocalDateTime>(engine, "calendar");
 	engine->RegisterObjectType("datetime", sizeof(DateTime), asOBJ_VALUE | asGetTypeTraits<DateTime>());
 	engine->RegisterObjectType("timespan", sizeof(Timespan), asOBJ_VALUE | asGetTypeTraits<Timespan>());
 	engine->RegisterObjectType("timestamp", sizeof(Timestamp), asOBJ_VALUE | asGetTypeTraits<Timestamp>());
@@ -485,12 +487,11 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("int datetime_days_of_month(int year, int month)", asFUNCTION(DateTime::daysOfMonth), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool datetime_is_valid(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION(DateTime::isValid), asCALL_CDECL);
 
-	engine->RegisterObjectBehaviour("calendar", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(timestuff_construct<LocalDateTime>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("calendar", asBEHAVE_CONSTRUCT, "void f(double julian_day)", asFUNCTION((timestuff_construct<LocalDateTime, double>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("calendar", asBEHAVE_CONSTRUCT, "void f(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION((timestuff_construct<LocalDateTime, int, int, int, int, int, int, int, int>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("calendar", asBEHAVE_CONSTRUCT, "void f(const datetime&in)", asFUNCTION((timestuff_construct<LocalDateTime, const DateTime&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("calendar", asBEHAVE_CONSTRUCT, "void f(const calendar&in)", asFUNCTION(timestuff_copy_construct<LocalDateTime>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("calendar", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(timestuff_destruct<LocalDateTime>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("calendar", asBEHAVE_FACTORY, "calendar@ f()", asFUNCTION(angelscript_refcounted_factory<LocalDateTime>), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("calendar", asBEHAVE_FACTORY, "calendar@ f(double julian_day)", asFUNCTION((angelscript_refcounted_factory<LocalDateTime, double>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("calendar", asBEHAVE_FACTORY, "calendar@ f(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION((angelscript_refcounted_factory<LocalDateTime, int, int, int, int, int, int, int, int>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("calendar", asBEHAVE_FACTORY, "calendar@ f(const datetime&in)", asFUNCTION((angelscript_refcounted_factory<LocalDateTime, const DateTime&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("calendar", asBEHAVE_FACTORY, "calendar@ f(const calendar&in)", asFUNCTION((angelscript_refcounted_factory<LocalDateTime, const LocalDateTime&>)), asCALL_CDECL);
 	engine->RegisterObjectMethod("calendar", "calendar& opAssign(const calendar&in)", asMETHODPR(LocalDateTime, operator=, (const LocalDateTime&), LocalDateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "calendar& opAssign(const timestamp&in)", asMETHODPR(LocalDateTime, operator=, (const Timestamp&), LocalDateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "calendar& opAssign(double julian_day)", asMETHODPR(LocalDateTime, operator=, (double), LocalDateTime&), asCALL_THISCALL);
@@ -516,8 +517,8 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("calendar", "int64 get_UTC_time() const property", asMETHOD(LocalDateTime, utcTime), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "bool opEquals(const calendar&in) const", asMETHOD(LocalDateTime, operator==), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "int opCmp(const calendar&in) const", asFUNCTION((timestuff_opCmp<LocalDateTime, const LocalDateTime&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("calendar", "calendar opAdd(const timespan&in) const", asMETHODPR(LocalDateTime, operator+, (const Timespan&) const, LocalDateTime), asCALL_THISCALL);
-	engine->RegisterObjectMethod("calendar", "calendar opSub(const timespan&in) const", asMETHODPR(LocalDateTime, operator-, (const Timespan&) const, LocalDateTime), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calendar", "calendar@ opAdd(const timespan&in) const", asFUNCTION((angelscript_refcounted_duplicating_method<LocalDateTime, &LocalDateTime::operator+, const Timespan&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("calendar", "calendar@ opSub(const timespan&in) const", asFUNCTION((angelscript_refcounted_duplicating_method<LocalDateTime, static_cast<LocalDateTime (LocalDateTime::*)(const Timespan&) const>(&LocalDateTime::operator-), const Timespan&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("calendar", "timespan opSub(const calendar&in) const", asMETHODPR(LocalDateTime, operator-, (const LocalDateTime&) const, Timespan), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "calendar& opAddAssign(const timespan&in)", asMETHODPR(LocalDateTime, operator+=, (const Timespan&), LocalDateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "calendar& opSubAssign(const timespan&in)", asMETHODPR(LocalDateTime, operator-=, (const Timespan&), LocalDateTime&), asCALL_THISCALL);
