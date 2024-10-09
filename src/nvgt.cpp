@@ -85,11 +85,15 @@ protected:
 		wstring dir_u;
 		UnicodeConverter::convert(Path(config().getString("application.dir")).append("lib").toString(), dir_u);
 		SetDllDirectoryW(dir_u.c_str());
+		CreateMutexW(nullptr, false, L"NVGTApplication"); // This mutex will automatically be freed by the OS on process termination so we don't need a handle to it, this exists only so the NVGT windows installer or anything else on windows can tell that NVGT is running without process enumeration.
 		#elif defined(__APPLE__)
+			std::string resources_dir = Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString();
 		if (Environment::has("MACOS_BUNDLED_APP")) { // Use GUI instead of stdout and chdir to Resources directory.
 			config().setString("application.gui", "");
 			#ifdef NVGT_STUB
-				ChDir(Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString());
+				ChDir(resources_dir);
+			#else
+				g_IncludeDirs.push_back(Path(resources_dir).pushDirectory("include").toString());
 			#endif
 		}
 		#elif defined(__ANDROID__)

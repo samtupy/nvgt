@@ -102,7 +102,7 @@ env.Append(LIBS = ["plist-2.0" if env["PLATFORM"] != "win32" else "plist"])
 nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [version_object], PDB = "#build/debug/nvgt.pdb")
 if env["PLATFORM"] == "darwin":
 	# On Mac OS, we need to run install_name_tool to modify the paths of any dynamic libraries we link.
-	env.AddPostAction(nvgt, lambda target, source, env: env.Execute("install_name_tool -change /opt/homebrew/opt/libplist/lib/libplist-2.0.4.dylib @rpath/libplist-2.0.4.dylib " + str(target[0])))
+	env.AddPostAction(nvgt, lambda target, source, env: env.Execute("install_name_tool -change /usr/local/lib/libplist-2.0.4.dylib @rpath/libplist-2.0.4.dylib " + str(target[0])))
 if env["PLATFORM"] == "win32":
 	# Only on windows we must go through the frustrating hastle of compiling a version of nvgt with no console E. the windows subsystem. It is at least set up so that we only need to recompile one object
 	if "nvgt.cpp" in sources: sources.remove("nvgt.cpp")

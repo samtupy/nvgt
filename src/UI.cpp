@@ -396,7 +396,11 @@ uint64_t idle_ticks() {
 
 bool is_console_available() {
 	#if defined (_WIN32)
+		#ifdef NVGT_WIN_APP
 		return GetConsoleWindow() != nullptr;
+		#else
+		return true;
+		#endif
 	#else
 		return isatty(fileno(stdin)) || isatty(fileno(stdout)) || isatty(fileno(stderr));
 	#endif
