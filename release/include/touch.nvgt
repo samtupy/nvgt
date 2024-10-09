@@ -1,5 +1,5 @@
 /*touch.nvgt - high-level classes and interfaces for touch screen devices.
- * This script contains classes and functions to interact with a touch screen device.
+ * This allows a user to detect gestures and convert them into keyboard input or other events, including multi-finger swipes and taps over configurable areas of the screen.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -11,6 +11,7 @@
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
 */
+
 enum swipe_touch_directions {
 	swipe_touch_direction_left = 0, swipe_touch_direction_right, swipe_touch_direction_up, swipe_touch_direction_down
 }
