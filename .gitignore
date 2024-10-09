@@ -21,6 +21,7 @@ src/version.cpp
 install/nvgt_version.ish
 jni/.gradle
 jni/build
+install/nvgt_version.ish
 install/nvgt_version.nsh
 libs
 obj

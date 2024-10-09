@@ -155,7 +155,7 @@
 	Root: HKA; subkey: "software\classes\NVGTScript\shell\debug\command"; ValueType: string; ValueName: ""; ValueData: """{app}\nvgt.exe"" -d ""%1"""; components: associate
     
 [Icons]
-	Name: "{group}\NVGT Interpreter (GUI mode)"; Filename: "{app}\nvgtw.exe"
+	Name: "{group}\NVGT Compiler (GUI mode)"; Filename: "{app}\nvgtw.exe"
 	Name: "{group}\NVGT Documentation"; Filename: "{app}\nvgt.chm"
 
 [UninstallDelete]
@@ -168,7 +168,7 @@
 	type: filesandordirs; name: "{app}"
 
 [Run]
-	filename: "{app}\nvgtw.exe"; description: "Run NVGT interpreter"; flags: postinstall nowait runasoriginaluser unchecked
+	filename: "{app}\nvgtw.exe"; description: "Run NVGT Compiler"; flags: postinstall nowait runasoriginaluser unchecked
 	filename: "{app}\nvgt.chm"; description: "View documentation"; verb: "open"; flags: postinstall shellexec nowait runasoriginaluser unchecked
 	filename: "https://nvgt.gg"; description: "View NVGT website"; verb: "open"; flags: postinstall shellexec nowait runasoriginaluser unchecked
 
@@ -177,115 +177,115 @@
 	SelectStartMenuFolderBrowseLabel = Select the start menu group where you would like NVGT's start menu icons to be placed, then click Next to proceed. If you wish to browse for it, click Browse.
 
 [Code]
-var
-	AndroidSdkDownloadPage, DocsDownloadPage: TDownloadWizardPage;
+	var
+		AndroidSdkDownloadPage, DocsDownloadPage: TDownloadWizardPage;
 
-#include "pathmod.ish"
+	#include "pathmod.ish"
 
-function OnDownloadProgress(const Url, FileName: String; const Progress, ProgressMax: Int64): Boolean;
-begin
-	if Progress = ProgressMax then
-		Log(Format('Successfully downloaded file to {tmp}: %s', [FileName]));
-	Result := True;
-end;
-
-procedure InitializeWizard;
-begin
-	AndroidSdkDownloadPage := CreateDownloadPage('Downloading Android tools', 'Please wait while the subset of the Android SDK that NVGT uses is being downloaded', @OnDownloadProgress);
-	AndroidSdkDownloadPage.ShowBaseNameInsteadOfUrl := True;
-	DocsDownloadPage := CreateDownloadPage('Downloading documentation', 'Please wait while the documentation is acquired', @OnDownloadProgress);
-	DocsDownloadPage.ShowBaseNameInsteadOfUrl := True;
-	WizardForm.LicenseNotAcceptedRadio.Hide;
-	WizardForm.LicenseAcceptedRadio.Hide;
-	WizardForm.LicenseAcceptedRadio.Checked := True;
-end;
-
-procedure CurPageChanged(CurPageID: Integer);
-var
-	IsInstalled: Boolean;
-begin
-	IsInstalled := DirExists(WizardDirValue());
-	if (CurPageID in [wpSelectProgramGroup, wpReady]) or (IsInstalled and (CurPageID = wpSelectComponents)) then
-		WizardForm.NextButton.Caption := SetupMessage(msgButtonInstall)
-	else if CurPageID = wpFinished then
-		WizardForm.NextButton.Caption := SetupMessage(msgButtonFinish)
-	else if CurPageID = wpLicense then
-		WizardForm.NextButton.Caption := SetupMessage(msgLicenseAccepted)
-	else
-		WizardForm.NextButton.Caption := SetupMessage(msgButtonNext);
-end;
-
-procedure DownloadAndroidSDK;
-var
-	ErrorCode: Integer;
-begin
-	AndroidSdkDownloadPage.Clear;
-	AndroidSdkDownloadPage.Add('https://nvgt.gg/downloads/android-tools.exe', 'android-tools.exe', '');
-	AndroidSdkDownloadPage.Show;
-	try
-		try
-			AndroidSdkDownloadPage.Download;
-		except
-			if AndroidSdkDownloadPage.AbortedByUser then
-				SuppressibleMsgBox('The Android tools installation was aborted. You will not be able to create Android apps with this installation unless you download the tools in the future.', mbInformation, MB_OK, IDOK)
-			else
-				SuppressibleMsgBox(AddPeriod(GetExceptionMessage), mbCriticalError, MB_OK, IDOK);
-		end;
-	finally
-		AndroidSdkDownloadPage.Hide;
-		if not ShellExec('', ExpandConstant('{tmp}\android-tools.exe'), ExpandConstant('-o{app}\android-tools -y'), '', SW_SHOWNORMAL, ewWaitUntilTerminated, ErrorCode) then
-		begin
-			SuppressibleMsgBox(Format('An error occurred when extracting the android tools: %s', [SysErrorMessage(ErrorCode)]), mbCriticalError, MB_OK, IDOK);
-			exit;
-		end;
+	function OnDownloadProgress(const Url, FileName: String; const Progress, ProgressMax: Int64): Boolean;
+	begin
+		if Progress = ProgressMax then
+			Log(Format('Successfully downloaded file to {tmp}: %s', [FileName]));
+		Result := True;
 	end;
-end;
 
-procedure DownloadDocs;
-begin
-	DocsDownloadPage.Clear;
-	DocsDownloadPage.Add('https://nvgt.gg/docs/nvgt.chm', 'nvgt.chm', '');
-	DocsDownloadPage.Show;
-	try
+	procedure InitializeWizard;
+	begin
+		AndroidSdkDownloadPage := CreateDownloadPage('Downloading Android tools', 'Please wait while the subset of the Android SDK that NVGT uses is being downloaded', @OnDownloadProgress);
+		AndroidSdkDownloadPage.ShowBaseNameInsteadOfUrl := True;
+		DocsDownloadPage := CreateDownloadPage('Downloading documentation', 'Please wait while the documentation is acquired', @OnDownloadProgress);
+		DocsDownloadPage.ShowBaseNameInsteadOfUrl := True;
+		WizardForm.LicenseNotAcceptedRadio.Hide;
+		WizardForm.LicenseAcceptedRadio.Hide;
+		WizardForm.LicenseAcceptedRadio.Checked := True;
+	end;
+
+	procedure CurPageChanged(CurPageID: Integer);
+	var
+		IsInstalled: Boolean;
+	begin
+		IsInstalled := DirExists(WizardDirValue());
+		if (CurPageID in [wpSelectProgramGroup, wpReady]) or (IsInstalled and (CurPageID = wpSelectComponents)) then
+			WizardForm.NextButton.Caption := SetupMessage(msgButtonInstall)
+		else if CurPageID = wpFinished then
+			WizardForm.NextButton.Caption := SetupMessage(msgButtonFinish)
+		else if CurPageID = wpLicense then
+			WizardForm.NextButton.Caption := SetupMessage(msgLicenseAccepted)
+		else
+			WizardForm.NextButton.Caption := SetupMessage(msgButtonNext);
+	end;
+
+	procedure DownloadAndroidSDK;
+	var
+		ErrorCode: Integer;
+	begin
+		AndroidSdkDownloadPage.Clear;
+		AndroidSdkDownloadPage.Add('https://nvgt.gg/downloads/android-tools.exe', 'android-tools.exe', '');
+		AndroidSdkDownloadPage.Show;
 		try
-			DocsDownloadPage.Download;
-			if not FileCopy(ExpandConstant('{tmp}\nvgt.chm'), ExpandConstant('{app}\nvgt.chm'), false) then
-			begin
-				MsgBox(Format('Could not copy %s to %s', [ExpandConstant('{tmp}\nvgt.chm'), ExpandConstant('{app}\nvgt.chm')]), MbCriticalError, MB_OK);
-				abort;
+			try
+				AndroidSdkDownloadPage.Download;
+			except
+				if AndroidSdkDownloadPage.AbortedByUser then
+					SuppressibleMsgBox('The Android tools installation was aborted. You will not be able to create Android apps with this installation unless you download the tools in the future.', mbInformation, MB_OK, IDOK)
+				else
+					SuppressibleMsgBox(AddPeriod(GetExceptionMessage), mbCriticalError, MB_OK, IDOK);
 			end;
-		except
-			if DocsDownloadPage.AbortedByUser then
-				SuppressibleMsgBox('Downloading of the documentation was cancelled. This installation may have broken shortcuts pointing to documentation.', mbInformation, MB_OK, IDOK)
-			else
-				SuppressibleMsgBox(AddPeriod(GetExceptionMessage), mbCriticalError, MB_OK, IDOK);
+		finally
+			AndroidSdkDownloadPage.Hide;
+			if not ShellExec('', ExpandConstant('{tmp}\android-tools.exe'), ExpandConstant('-o{app}\android-tools -y'), '', SW_SHOWNORMAL, ewWaitUntilTerminated, ErrorCode) then
+			begin
+				SuppressibleMsgBox(Format('An error occurred when extracting the android tools: %s', [SysErrorMessage(ErrorCode)]), mbCriticalError, MB_OK, IDOK);
+				exit;
+			end;
 		end;
-	finally
-		DocsDownloadPage.Hide;
 	end;
-end;
 
-function PrepareToInstall(var NeedsRestart: Boolean): String;
-var
-	uninstall_setup_res_code: integer;
-	uninstall_string: string;
-begin
-	if RegKeyExists(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NVGT') then
-		if RegValueExists(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NVGT', 'UninstallString') then
-			if RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NVGT', 'UninstallString', uninstall_string) then
-				if not Exec(uninstall_string, '/S', '', SW_HIDE, ewWaitUntilTerminated, uninstall_setup_res_code) then
-					Result := 'Setup cannot continue because it could not uninstall the prior version of NVGT. Please uninstall it manually and re-run setup.';
+	procedure DownloadDocs;
+	begin
+		DocsDownloadPage.Clear;
+		DocsDownloadPage.Add('https://nvgt.gg/docs/nvgt.chm', 'nvgt.chm', '');
+		DocsDownloadPage.Show;
+		try
+			try
+				DocsDownloadPage.Download;
+				if not FileCopy(ExpandConstant('{tmp}\nvgt.chm'), ExpandConstant('{app}\nvgt.chm'), false) then
+				begin
+					MsgBox(Format('Could not copy %s to %s', [ExpandConstant('{tmp}\nvgt.chm'), ExpandConstant('{app}\nvgt.chm')]), MbCriticalError, MB_OK);
+					abort;
+				end;
+			except
+				if DocsDownloadPage.AbortedByUser then
+					SuppressibleMsgBox('Downloading of the documentation was cancelled. This installation may have broken shortcuts pointing to documentation.', mbInformation, MB_OK, IDOK)
+				else
+					SuppressibleMsgBox(AddPeriod(GetExceptionMessage), mbCriticalError, MB_OK, IDOK);
+			end;
+		finally
+			DocsDownloadPage.Hide;
+		end;
+	end;
 
-	if WizardIsComponentSelected('androidtools') then
-		DownloadAndroidSDK;
-	if WizardIsComponentSelected('docs_download') then
-		DownloadDocs;
-	if WizardIsComponentSelected('path') then
-		EnvAddPath(ExpandConstant('{app}'));
-end;
+	function PrepareToInstall(var NeedsRestart: Boolean): String;
+	var
+		uninstall_setup_res_code: integer;
+		uninstall_string: string;
+	begin
+		if RegKeyExists(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NVGT') then
+			if RegValueExists(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NVGT', 'UninstallString') then
+				if RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\NVGT', 'UninstallString', uninstall_string) then
+					if not Exec(uninstall_string, '/S', '', SW_HIDE, ewWaitUntilTerminated, uninstall_setup_res_code) then
+						Result := 'Setup cannot continue because it could not uninstall the prior version of NVGT. Please uninstall it manually and re-run setup.';
 
-procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-begin
-	if CurUninstallStep = usPostUninstall then
-		EnvRemovePath(ExpandConstant('{app}'));
-end;
+		if WizardIsComponentSelected('androidtools') then
+			DownloadAndroidSDK;
+		if WizardIsComponentSelected('docs_download') then
+			DownloadDocs;
+		if WizardIsComponentSelected('path') then
+			EnvAddPath(ExpandConstant('{app}'));
+	end;
+
+	procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+	begin
+		if CurUninstallStep = usPostUninstall then
+			EnvRemovePath(ExpandConstant('{app}'));
+	end;
