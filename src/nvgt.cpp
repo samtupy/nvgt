@@ -85,7 +85,7 @@ protected:
 		wstring dir_u;
 		UnicodeConverter::convert(Path(config().getString("application.dir")).append("lib").toString(), dir_u);
 		SetDllDirectoryW(dir_u.c_str());
-		CreateMutexW(nullptr, false, "NVGTApplication"); // This mutex will automatically be freed by the OS on process termination so we don't need a handle to it, this exists only so the NVGT windows installer or anything else on windows can tell that NVGT is running without process enumeration.
+		CreateMutexW(nullptr, false, L"NVGTApplication"); // This mutex will automatically be freed by the OS on process termination so we don't need a handle to it, this exists only so the NVGT windows installer or anything else on windows can tell that NVGT is running without process enumeration.
 		#elif defined(__APPLE__)
 		if (Environment::has("MACOS_BUNDLED_APP")) { // Use GUI instead of stdout and chdir to Resources directory.
 			config().setString("application.gui", "");
