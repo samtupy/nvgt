@@ -157,6 +157,7 @@ class menu {
 				return 0;
 			}
 			play(wrap_sound);
+			stop_speech();
 			wait(wrap_delay);
 			f.set_list_position(0, int(args["key"]) == KEY_DOWN? 0 : f.get_list_count(0) -1, true);
 			return 1;
