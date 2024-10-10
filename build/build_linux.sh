@@ -1,9 +1,10 @@
-#!/bin/bash
+F#!/bin/bash
 
 function setup_angelscript {
 	echo Installing Angelscript...
-	git clone --depth 1 https://github.com/codecat/angelscript-mirror||true
+	git clone https://github.com/codecat/angelscript-mirror||true
 	cd "angelscript-mirror/sdk/angelscript/projects/gnuc"
+	git checkout 270b98a332faa57a747c9265086c7bce49c041d9
 	make -j$(nproc)
 	sudo make install
 	cd ../../../../..

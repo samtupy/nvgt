@@ -669,7 +669,7 @@ class audio_form {
 			if (subform)
 				return 2;
 		}
-		if ((focused < 0 || c_form[focused].type != ct_keyboard_area) && (focused < 0 || ((!c_form[focused].multiline_enter || !c_form[focused].multiline) && c_form[focused].type == ct_input || c_form[focused].type == ct_button) && key_up(KEY_LCTRL) && key_up(KEY_RCTRL) && key_up(KEY_LSHIFT) && key_up(KEY_RSHIFT)) && (key_pressed(KEY_RETURN) || key_pressed(KEY_NUMPAD_ENTER) || (autotab == 3))) {
+		if ((focused < 0 || c_form[focused].type != ct_keyboard_area) && (focused < 0 || ((!c_form[focused].multiline_enter || !c_form[focused].multiline) && c_form[focused].type == ct_input || c_form[focused].type == ct_button || c_form[focused].type == ct_list) && key_up(KEY_LCTRL) && key_up(KEY_RCTRL) && key_up(KEY_LSHIFT) && key_up(KEY_RSHIFT)) && (key_pressed(KEY_RETURN) || key_pressed(KEY_NUMPAD_ENTER) || (autotab == 3))) {
 			stop_speech();
 			if ((defaults == -1) && (focused > -1)) {
 				if (c_form[focused].type == ct_button || c_form[focused].type == ct_link)

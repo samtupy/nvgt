@@ -270,8 +270,9 @@ int CScriptBuilder::ProcessScriptSection(const char *script, unsigned int length
 
 			pos += len;
 
-			if( token == "if" )
+			if( token == "if" || token == "if_not")
 			{
+				bool if_not = token == "if_not";
 				t = engine->ParseToken(&modifiedScript[pos], modifiedScript.size() - pos, &len);
 				if( t == asTC_WHITESPACE )
 				{
@@ -289,7 +290,8 @@ int CScriptBuilder::ProcessScriptSection(const char *script, unsigned int length
 					OverwriteCode(start, pos-start);
 
 					// Has this identifier been defined by the application or not?
-					if( definedWords.find(word) == definedWords.end() )
+					bool word_exists = definedWords.find(word) != definedWords.end();
+					if( if_not && word_exists || !if_not && !word_exists )
 					{
 						// Exclude all the code until and including the #endif
 						pos = ExcludeCode(pos);
@@ -848,7 +850,7 @@ int CScriptBuilder::ExcludeCode(int pos)
 			token.assign(&modifiedScript[pos], len);
 			OverwriteCode(pos, len);
 
-			if( token == "if" )
+			if( token == "if" || token == "if_not" )
 			{
 				nested++;
 			}

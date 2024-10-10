@@ -170,17 +170,16 @@ For more information on these properties, the [Angelscript custom options docume
 ## `#pragma` directives
 In a few cases, it is also possible to configure some aspects of NVGT's behavior directly from within nvgt scripts themselves using the `#pragma` preprocessor directive.
 
-This directive is used to safely tell the engine about anything that doesn't directly have to do with your script code but also without causing some sort of compilation error due to bad syntax. A pragma directive could do anything, from embedding a file to choosing a target platform to adding include directories and more.
+This directive is used to safely tell the engine about anything that doesn't directly have to do with your script code but also without causing some sort of compilation error due to bad syntax. A pragma directive could do anything, from embedding a file to selecting assets to choosing  to adding include directories and more.
 
 The syntax for a pragma directive looks like `#pragma name value` or sometimes just `#pragma name` if the option does not require a value. In some cases when a value is to contain a long or complex enough string such as a path, you may need to surround the value in quotes such as `#pragma name "value."`
 
 ### Available directives
 * `#pragma include <directory>`: search for includes in the given directory (directive can be repeated)
-* `#pragma platform <platform>`: select what platform to compile for same as -p argument (auto, android, linux, mac, windows)
 * `#pragma stub <stubname>`: select what stub to compile using (see remarks at the bottom of this article)
 * `#pragma embed <packname>`: embed the given pack into the compiled executable file itself
-* `#pragma asset pathname`: copy the given asset/assets into the bundled product as resources
-* `#pragma document pathname`: copy the given asset/assets into the bundled product as documents intended for the user to access rather than the programmer
+* `#pragma asset <pathname>`: copy the given asset/assets into the bundled product as resources
+* `#pragma document <pathname>`: copy the given asset/assets into the bundled product as documents intended for the user to access rather than the programmer
 * `#pragma plugin <plugname>`: load and activate a plugin given it's dll basename
 * `#pragma compiled_basename <basename>`: the output filename of the compiled executable without the extension
 * `#pragma bytecode_compression <level from 0 to 9>`: controls the compression level for bytecode saved in the compiled executable (0 disabled 9 maximum)

@@ -192,7 +192,7 @@ protected:
 			mode = option == 1? NVGT_RUN : NVGT_COMPILE;
 			try {
 				// Try to change to the directory containing the selected script.
-				ChDir(Poco::Path(script).parent().toString().c_str());
+				ChDir(Poco::Path(script).parent().toString());
 			} catch(...) {} // If it fails, so be it.
 			return script;
 		} else if (option == 4 || option == 5) {
@@ -210,6 +210,7 @@ protected:
 		string scriptfile = "";
 		#if defined(__APPLE__) || defined(__ANDROID__)
 			scriptfile = event_requested_file(); // Files opened from external apps on MacOS, IOS, and Android do not use command line arguments.
+			if (!scriptfile.empty()) ChDir(Path(scriptfile).makeParent().toString());
 		#endif
 		if (scriptfile.empty() && args.size() > 0) scriptfile = args[0];
 		if (scriptfile.empty() && config().hasOption("application.gui")) scriptfile = UILauncher();

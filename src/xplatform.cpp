@@ -41,6 +41,8 @@ void determine_compile_platform() {
 	g_platform = "linux";
 	#elif defined(__APPLE__)
 	g_platform = "mac"; // Todo: detect difference between IOS and macos (need to look up the correct macros).
+	#elif defined(__ANDROID__)
+	g_platform = "android";
 	#endif
 	// else compilation is not supported on this platform.
 }
