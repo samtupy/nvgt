@@ -518,13 +518,13 @@ int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
 		Path global_include(Path(android_get_main_shared_object()).parent().parent().parent().append("assets"));
 	#endif
 	g_IncludeDirs.push_back(global_include.toString());
-	if (!g_debug)
-		engine->SetEngineProperty(asEP_BUILD_WITHOUT_LINE_CUES, true);
+	if (!g_debug) engine->SetEngineProperty(asEP_BUILD_WITHOUT_LINE_CUES, true);
+	if (g_platform == "auto") determine_compile_platform(); // Insure that platform defines work whether compiling or executing a script.
 	CScriptBuilder builder;
 	builder.SetIncludeCallback(IncludeCallback, 0);
 	builder.SetPragmaCallback(PragmaCallback, 0);
-	if (builder.StartNewModule(engine, "nvgt_game") < 0)
-		return -1;
+	if (builder.StartNewModule(engine, "nvgt_game") < 0) return -1;
+	if (g_platform != "auto") builder.DefineWord(g_platform.c_str());
 	asIScriptModule* mod = builder.GetModule();
 	if (mod) mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
 	try {
@@ -834,9 +834,7 @@ int PragmaCallback(const string& pragmaText, CScriptBuilder& builder, void* /*us
 		string bn = cleanText.substr(18);
 		if (bn == "*") bn.clear();
 		config.setString("build.output_basename", bn);
-	} else if (cleanText.starts_with("platform "))
-		g_platform = cleanText.substr(9);
-	else if (cleanText.starts_with("bytecode_compression ")) {
+	} else if (cleanText.starts_with("bytecode_compression ")) {
 		g_bcCompressionLevel = strtol(cleanText.substr(21).c_str(), NULL, 10);
 		if (g_bcCompressionLevel < 0 || g_bcCompressionLevel > 9) return -1;
 	} else if (cleanText == "console") config.setString("build.windowsConsole", "");

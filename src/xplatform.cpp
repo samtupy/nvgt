@@ -41,6 +41,8 @@ void determine_compile_platform() {
 	g_platform = "linux";
 	#elif defined(__APPLE__)
 	g_platform = "mac"; // Todo: detect difference between IOS and macos (need to look up the correct macros).
+	#elif defined(__ANDROID__)
+	g_platform = "android";
 	#endif
 	// else compilation is not supported on this platform.
 }
@@ -52,14 +54,15 @@ void xplatform_correct_path_to_stubs(Poco::Path& stubpath) {
 std::string get_nvgt_lib_directory(const std::string& platform) {
 	// The directory containing the libraries for the NVGT currently running is usually just called lib, while all other directories are lib_platform. In any case try to return an absolute path to the libraries given a platform.
 	std::string dir;
+	bool apple_bundle = File(Path(Path::self()).makeParent().makeParent().pushDirectory("Frameworks").toString()).exists();
 	if (platform == "windows") dir = Poco::Environment::isWindows()? "lib" : "lib_windows";
-	else if (platform == "mac") dir = Environment::os() == POCO_OS_MAC_OS_X? (Environment::has("MACOS_BUNDLED_APP")? "Frameworks" : "lib") : "lib_mac";
+	else if (platform == "mac") dir = Environment::os() == POCO_OS_MAC_OS_X? (apple_bundle? "Frameworks" : "lib") : "lib_mac";
 	else if (platform == "linux") dir = Poco::Environment::os() == POCO_OS_LINUX? "lib" : "lib_linux";
 	else return ""; // libs not applicable for this platform.
 	Path result(Path::self());
 	result.makeParent();
 	#ifdef __APPLE__
-		if (Environment::has("MACOS_BUNDLED_APP")) {
+		if (apple_bundle) {
 			result.makeParent();
 			if (platform != "mac") result.append("Resources");
 		}
