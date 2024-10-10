@@ -18,10 +18,10 @@ enum swipe_touch_directions {
 funcdef void tap_func(touch_screen_finger@finger);
 const float TOUCH_UNCOORDINATED = -10.0f;
 class touch_interface {
-	touch_jesture_manager@parent;
+	touch_gesture_manager@parent;
 	float minx, maxx, miny, maxy;
 	bool coordinated = false;
-	touch_interface(touch_jesture_manager@parent, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED) {
+	touch_interface(touch_gesture_manager@parent, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED) {
 		@this.parent = parent;
 		this.minx = minx;
 		this.maxx = maxx;
@@ -52,7 +52,7 @@ class touch_interface {
 }
 class touch_keyboard_interface: touch_interface {
 	dictionary keymap;
-	touch_keyboard_interface(touch_jesture_manager@parent, dictionary@map, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED) {
+	touch_keyboard_interface(touch_gesture_manager@parent, dictionary@map, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED) {
 		super(parent, minx, maxx, miny, maxy);
 		this.keymap = map;
 	}
@@ -114,7 +114,7 @@ class touch_keyboard_interface: touch_interface {
 		}
 	}
 }
-class touch_jesture_manager {
+class touch_gesture_manager {
 	tap_func@last_tap_func;
 	bool no_touch = true;
 	timer input_timer, tap_timer;
@@ -125,7 +125,7 @@ class touch_jesture_manager {
 	touch_interface@[] interfaces;
 	touch_screen_finger@last_tapped_finger;
 	timer updatetimer;
-	touch_jesture_manager() {
+	touch_gesture_manager() {
 	}
 	bool is_available() {
 		uint64[]@ dev = get_touch_devices();

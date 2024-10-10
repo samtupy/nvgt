@@ -1,7 +1,7 @@
 # touch_keyboard_interface
 Convert gesture events to simulated keyboard input.
 
-`touch_keyboard_interface(touch_jesture_manager@parent, dictionary@map, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED);`
+`touch_keyboard_interface(touch_gesture_manager@parent, dictionary@map, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED);`
 
 ## Arguments:
 * touch_gesture_manager@ parent: A handle to the manager you intend to add this interface to, parameter subject for removal in future.
