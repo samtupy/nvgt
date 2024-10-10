@@ -36,7 +36,7 @@ When compiling on a non-windows platform, the executable permission bitt on the 
 	* Now run /path/to/nvgt -c scriptname.nvgt where scriptname.nvgt should of course be replaced with the name of your script file. You can select a platform with the -p argument E. -pwindows.
 * On Mac OS, it's best to just click on the NVGT application directly.
 	* After launching NVGT you can select compile a script in release/debug mode, choose a platform, and browse to your script file.
-	* If, however, you wish to build on MacOS using the command line, cd to the directory containing a .nvgt script and run the convoluted and to be improved command /applications/nvgt.app/Contents/MacOS/nvgt ``pwd``/scriptname.nvgt -I/applications/nvgt.app/Contents/Resources/include
+	* If, however, you wish to build on MacOS using the command line, cd to the directory containing a .nvgt script and run the command /applications/nvgt.app/Contents/MacOS/nvgt -c scriptname.nvgt, or alternatively open -a nvgt --args -c \`pwd\`/scriptname.nvgt
 
 You will receive a popup or STDOut print letting you know how long the compilation took. You should find a new file in the same folder you just compiled that has the same name it does but with a different extension e.g. when compiling my_game.nvgt you'll have my_game.exe. Distribute this along with the necessary libraries in what ever form is required. You can set it all up with an installer, such as Inno Setup, or if your game will be portable you can just zip it up, etc.
 

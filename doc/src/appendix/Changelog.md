@@ -3,7 +3,8 @@ This document lists all major changes that have taken place in NVGT since we sta
 
 ## New in 0.89.1-beta (10/09/2024):
 * Fixes copying of shared libraries while bundling on MacOS which was resulting in an assertion violation from Poco.
-* Fixes MacOS not changing to the directory of scripts launched from finder.
+* Fixes MacOS not changing to the directory of scripts launched from finder or the open command.
+* Hopefully we've finally resolved all of the MacOS includes resolution issues, there should be no more manually adding include paths to your scripts or command line invocations!
 * Fixes the enter key not pressing the default button in audio form lists.
 * Linux cross compilation should work again, the Linux build script was pulling down the wrong version of Angelscript.
 * `#pragma platform` has been deprecated, you should use the command line / menu options / UI to specify platforms instead.

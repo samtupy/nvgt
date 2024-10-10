@@ -92,10 +92,11 @@ protected:
 			config().setString("application.gui", "");
 			#ifdef NVGT_STUB
 				ChDir(resources_dir);
-			#else
-				g_IncludeDirs.push_back(Path(resources_dir).pushDirectory("include").toString());
 			#endif
 		}
+		#ifndef NVGT_STUB
+			if (File(resources_dir).exists()) g_IncludeDirs.push_back(Path(resources_dir).pushDirectory("include").toString());
+		#endif
 		#elif defined(__ANDROID__)
 		config().setString("application.gui", "");
 		#endif
@@ -210,7 +211,6 @@ protected:
 		string scriptfile = "";
 		#if defined(__APPLE__) || defined(__ANDROID__)
 			scriptfile = event_requested_file(); // Files opened from external apps on MacOS, IOS, and Android do not use command line arguments.
-			if (!scriptfile.empty()) ChDir(Path(scriptfile).makeParent().toString());
 		#endif
 		if (scriptfile.empty() && args.size() > 0) scriptfile = args[0];
 		if (scriptfile.empty() && config().hasOption("application.gui")) scriptfile = UILauncher();
@@ -227,6 +227,9 @@ protected:
 			message("error, no input files.\nType " + commandName() + " --help for usage instructions\n", commandName());
 			return Application::EXIT_USAGE;
 		}
+		#ifdef __APPLE__ // When run from an app bundle
+		if (!scriptfile.empty() && Path::current() == "/") ChDir(Path(scriptfile).makeParent().toString());
+		#endif
 		#ifndef __ANDROID__ // for now the following code would be highly unstable on android due to it's content URIs.
 		try {
 			// Parse the provided script path to insure it is valid and check if it is a file.
