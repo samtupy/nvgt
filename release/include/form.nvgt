@@ -1727,19 +1727,19 @@ class audio_form {
 		}
 		return c_form[control_index].get_line_column();
 	}
-	bool set_line(int control_index, int line, int col = 1, bool speak_result = false) {
+	int set_line(int control_index, int line, int col = 1, bool speak_result = true) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
-			return false;
+			return -1;
 		}
 		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
 			form_error = form_error_invalid_index;
-			return false;
+			return -1;
 		}
 		if (c_form[control_index].type != ct_input || !c_form[control_index].active) {
 			form_error = form_error_invalid_control;
-			return false;
+			return -1;
 		}
 		return c_form[control_index].set_line(line, col, !speak_result);
 	}
@@ -2923,10 +2923,10 @@ class control {
 		}
 		return col;
 	}
-	bool set_line(int line, int col = 1, bool silent = false) {
-		if (type != ct_input) return false;
+	int set_line(int line, int col = 1, bool silent = false) {
+		if (type != ct_input) return -1;
 		if (col < 1) col = 1;
-		int max_col = col;
+		int max_col = text.length() + 1;
 		int pos = 0;
 		if (line > 1)
 			pos = bgt_string_contains(text, "\n", line - 1);
@@ -2935,16 +2935,18 @@ class control {
 			if (pos2 > -1) max_col = pos2 - pos - 1;
 		} else {
 			if (!silent) speak("line number out of range");
-			return false;
+			return 1;
 		}
-		if (col > max_col) col = max_col;
+		if (col > max_col) {
+			if (!silent) speak("Column out of range");
+			return 2;
+		}
 		if (pos==0) col--;
 		pos += col;
 		cursor = pos;
 		sel_start = -1;
 		sel_end = -1;
-		if (!silent) speak(read_line(current_line_start_position()), false);
-		return true;
+		return 0;
 	}
 	bool search(const string& in text, int dir = 1, bool silent = false) {
 		if (type == ct_list) {
@@ -3909,9 +3911,9 @@ class go_to_index : utility_form {
 				f.focus(f_col);
 				return;
 			}
-			if (!parent.set_line(control_index, parse_int(idx), parse_int(col))) {
-				speak("invalid line number!");
-				f.focus(f_index);
+			int success = parent.set_line(control_index, parse_int(idx), parse_int(col));
+			if (success!=0) {
+				f.focus((success == 2 ? f_col : f_index));
 			} else {
 				@parent.utility_form = null;
 				parent.focus_interrupt(control_index);
