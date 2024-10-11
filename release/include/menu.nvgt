@@ -171,7 +171,7 @@ class menu {
 // learn_game_sounds: takes a dictionary of sound descriptions mapped to sound filenames or lists of sound filenames and displays a menu which allows users to press enter on sound descriptions to hear associated sounds.
 void learn_game_sounds_menu(dictionary@ sfx, const string&in audio_prefix = "", menu@ m = null) {
 	sound audio;
-	if (@m == null) m = menu();
+	if (@m == null) @m = menu();
 	if (m.intro_text.empty()) m.intro_text = "Select a sound with the up and down arrow keys and press enter to preview it.";
 	string select_sound = m.select_sound;
 	m.select_sound = "";

@@ -362,6 +362,11 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	RegisterStdString(engine);
 	RegisterScriptAny(engine);
 	RegisterScriptArray(engine, true);
+	engine->EndConfigGroup();
+	engine->BeginConfigGroup("random");
+	RegisterScriptRandom(engine); // Must be done here because functions in this module register array methods and that won't work after array template types are instantiated.
+	engine->EndConfigGroup();
+	engine->BeginConfigGroup("core");
 	RegisterStdStringUtils(engine);
 	RegisterScriptDictionary(engine);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
@@ -429,9 +434,6 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->BeginConfigGroup("poco");
 	RegisterPocostuff(engine);
-	engine->EndConfigGroup();
-	engine->BeginConfigGroup("random");
-	RegisterScriptRandom(engine);
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("subscripting");
 	RegisterScriptstuff(engine);
