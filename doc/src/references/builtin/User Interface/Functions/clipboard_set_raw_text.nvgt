@@ -1,8 +1,8 @@
 /**
 	Sets the text on the user's clipboard, using the system encoding.
-	bool clipboard_set_raw_text(string text);
+	bool clipboard_set_raw_text(const string&in text);
 	## Arguments:
-		* string text: the text to copy, assumed to be in the system's encoding.
+		* const string&in text: the text to copy, assumed to be in the system's encoding.
 	## Returns:
 		Bool: true on success, false on failure.
 	## Remarks:

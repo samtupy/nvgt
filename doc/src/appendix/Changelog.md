@@ -64,8 +64,7 @@ This document lists all major changes that have taken place in NVGT since we sta
     * The `reset` method now takes a new parameter, true by default, which resets the form's echo mode to default. This is useful to retrieve the value of the `audioform_keyboard_echo` property.
     * The go to line functionality can now be used on non multiline input fields as well. In non multiline fields, the line number field will be invisible.
     * Added a new method that allows you to toggle the go to line functionality. `bool set_enable_go_to_index(int control_index, bool enabled);`
-* sound_pool.nvgt modifications:
-    * Added a new parameter in `update_listener_3d` function called `refresh_y_is_elevation` (bool) which toggles whether the sound pool should refresh the global `sound_pool_default_y_is_elevation` property. This makes it possible to constantly change the global property for the sound elevation.
+* Added a new parameter in sound_pool's `update_listener_3d` function called `refresh_y_is_elevation` (bool) which toggles whether the sound pool should refresh the global `sound_pool_default_y_is_elevation` property. This makes it possible to constantly change the global property for the sound elevation.
 * token_gen.nvgt can now generate different token types, see the `token_gen_flag` enum.
 * Add string::is_whitespace method.
 * Fix small memory leak in pathfinder due to not releasing callback data reference on path calculation failure.

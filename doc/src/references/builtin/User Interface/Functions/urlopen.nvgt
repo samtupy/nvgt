@@ -1,8 +1,8 @@
 /**
 	Opens the specified URL in the appropriate application, for example an https:// link in your web browser, or a tt://link in TeamTalk.
-	bool urlopen(string url);
+	bool urlopen(const string&in url);
 	## Arguments:
-		* string url: The URL to open.
+		* const string&in url: The URL to open.
 	## Returns:
 		bool: true if the URl was successfully opened, false otherwise.
 	## Remarks:
