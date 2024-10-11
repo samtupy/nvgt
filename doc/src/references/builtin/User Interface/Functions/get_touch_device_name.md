@@ -5,4 +5,3 @@ Determine the name of a touch device given it's ID.
 
 ## Returns:
 string : The name of the given device, or an empty string on failure.
-

@@ -2,9 +2,9 @@
 	Change the current working directory.
 	bool chdir(const string&in new_directory);
 	## Arguments:
-		* new_directory: The directory you'd like to change into. Note that this directory must already exist.
+		* const string&in new_directory: The directory you'd like to change into. Note that this directory must already exist.
 	## Returns:
-		True if NVGT could set the current working directory to the specified directory; false otherwise.
+		bool: true if NVGT could set the current working directory to the specified directory; false otherwise.
 */
 
 // Example:

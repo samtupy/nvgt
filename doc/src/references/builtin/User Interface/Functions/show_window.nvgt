@@ -1,8 +1,8 @@
 /**
 	Shows a window with the specified title.
-	bool show_window(string title);
+	bool show_window(const string&in title);
 	## Arguments:
-		* string title: the title of the window.
+		* const string&in title: the title of the window.
 	## Returns:
 		bool: true if window creation was successful, false otherwise.
 	## Remarks:

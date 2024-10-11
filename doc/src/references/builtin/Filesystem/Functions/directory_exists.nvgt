@@ -1,10 +1,10 @@
 /**
-	Determine if a directory exists or not.
-	bool directory_exists(string directory);
+	Query whether or not a directory exists.
+	bool directory_exists(const string&in directory);
 	## Arguments:
-		* string directory: the directory whose existence will be checked (can be a relative or absolute path).
+		* const string&in directory: the directory whose existence will be checked (can be a relative or absolute path).
 	## Returns:
-		true if the directory exists, false otherwise.
+		bool: true if the directory exists, false otherwise.
 */
 
 // Example:

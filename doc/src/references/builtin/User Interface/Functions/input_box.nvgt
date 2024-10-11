@@ -1,10 +1,10 @@
 /**
 	Displays a dialog to the user consisting of an input field, an OK button and a cancel button.
-	string input_box(string title, string text, string default_text = "", uint64 flags = 0);
+	string input_box(const string&in title, const string&in text, const string&in default_text = "", uint64 flags = 0);
 	## Arguments:
-		* string title: the title of the input box.
-		* string text: the text to display above the text field.
-		* string default_text = "": the contents to populate the text box with by default.
+		* const string&in title: the title of the input box.
+		* const string&in text: the text to display above the text field.
+		* const string&in default_text = "": the contents to populate the text box with by default.
 		* uint64 flags = 0: a combination of flags, see message_box_flags for more information.
 	## Returns:
 		string: the text that the user typed.
