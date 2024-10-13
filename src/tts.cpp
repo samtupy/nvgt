@@ -29,26 +29,45 @@
 	#include <SDL3/SDL.h>
 #endif
 
-char* minitrim(char* data, unsigned long* bufsize, int bitrate, int channels) {
-	char* ptr = data;
-	if (!ptr || !bufsize || *bufsize % 2 != 0 || *bufsize < 1) return ptr;
-	short a = 3072;
-	while (bitrate == 16 && (ptr - data) < *bufsize) {
-		if (channels == 2) {
-			short l = (((short) * ptr) << 8) | *(ptr + 1);
-			short r = (((short) * (ptr + 2)) << 8) | *(ptr + 3);
-			if (l > -a && l < a && r > -a && r < a)
-				ptr += 4;
-			else break;
-		} else if (channels == 1) {
-			short s = (((short) * ptr) << 8) | *(ptr + 1);
-			if (s > -a && s < a)
-				ptr += 2;
-			else break;
+static char* minitrim(char* data, unsigned long* size, int bytesPerSample, int channels, int threshold = 20) {
+	int samplesPerFrame = channels * bytesPerSample;
+	int numSamples = *size / samplesPerFrame;
+	int startIndex = 0;
+	int endIndex = numSamples - 1;
+
+	for (int i = 0; i < numSamples; i++) {
+		int maxAbsValue = 0;
+		for (int j = 0; j < channels; j++) {
+			int absValue = abs(static_cast<int>(data[i * samplesPerFrame + j]));
+			if (absValue > maxAbsValue) {
+				maxAbsValue = absValue;
+			}
+		}
+		if (maxAbsValue >= threshold) {
+			startIndex = i;
+			break;
 		}
 	}
-	*bufsize -= (ptr - data);
-	return ptr;
+
+	for (int i = numSamples - 1; i >= 0; i--) {
+		int maxAbsValue = 0;
+		for (int j = 0; j < channels; j++) {
+			int absValue = abs(static_cast<int>(data[i * samplesPerFrame + j]));
+			if (absValue > maxAbsValue) {
+				maxAbsValue = absValue;
+			}
+		}
+		if (maxAbsValue >= threshold) {
+			endIndex = i;
+			break;
+		}
+	}
+
+	int trimmedSize = (endIndex - startIndex + 1) * samplesPerFrame;
+	char* trimmedData = new char[trimmedSize];
+	memcpy(trimmedData, data + startIndex * samplesPerFrame, trimmedSize);
+	*size = trimmedSize;
+	return trimmedData;
 }
 
 tts_voice::tts_voice(const std::string& builtin_voice_name) {
