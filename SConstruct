@@ -37,12 +37,12 @@ if ARGUMENTS.get("debug", "0") == "1":
 	cdb = env.CompilationDatabase()
 	Alias('cdb', cdb)
 if env["PLATFORM"] == "win32":
-	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/O2", "/bigobj", "/permissive-"])
+	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/Ob3", "/Oi", "/Os", "/Oy", "/bigobj", "/permissive-"])
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
 	env.Append(LIBS = ["UniversalSpeechStatic", "enet", "angelscript64", "SDL3"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
 else:
-	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-O2", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result"], LIBS = ["m"])
+	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-Oz", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result"], LIBS = ["m"])
 if env["PLATFORM"] == "darwin":
 	# homebrew paths and other libraries/flags for MacOS
 	env.Append(CCFLAGS = ["-mmacosx-version-min=14.0", "-arch", "arm64", "-arch", "x86_64"], LINKFLAGS = ["-arch", "arm64", "-arch", "x86_64"])
@@ -54,6 +54,7 @@ elif env["PLATFORM"] == "posix":
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
 	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL3.a", "crypto", "ssl"])
 env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
+env.Append(CPPDEFINES = ["SQLITE_DQS=0", "SQLITE_DEFAULT_MEMSTATUS=0", "SQLITE_DEFAULT_WAL_SYNCHRONOUS=1", "SQLITE_LIKE_DOESNT_MATCH_BLOBS", "SQLITE_MAX_EXPR_DEPTH=0", "SQLITE_OMIT_DECLTYPE", "SQLITE_OMIT_DEPRECATED", "SQLITE_USE_ALLOCA", "SQLITE_OMIT_AUTOINIT", "SQLITE_STRICT_SUBTYPE=1", "SQLITE_ALLOW_URI_AUTHORITY", "SQLITE_ENABLE_API_ARMOR", "SQLITE_ENABLE_BYTECODE_VTAB", "SQLITE_ENABLE_COLUMN_METADATA", "SQLITE_ENABLE_DBPAGE_VTAB", "SQLITE_ENABLE_DBSTAT_VTAB", "SQLITE_ENABLE_EXPLAIN_COMMENTS", "SQLITE_ENABLE_FTS3", "SQLITE_ENABLE_FTS3_PARENTHESIS", "SQLITE_ENABLE_FTS4", "SQLITE_ENABLE_FTS5", "SQLITE_ENABLE_GEOPOLY", "SQLITE_ENABLE_HIDDEN_COLUMNS", "SQLITE_ENABLE_MATH_FUNCTIONS", "SQLITE_ENABLE_JSON1", "SQLITE_ENABLE_LOCKING_STYLE", "SQLITE_ENABLE_MEMORY_MANAGEMENT", "SQLITE_ENABLE_MEMSYS5", "SQLITE_ENABLE_NORMALIZE", "SQLITE_ENABLE_NULL_TRIM", "SQLITE_ENABLE_OFFSET_SQL_FUNC", "SQLITE_ENABLE_PREUPDATE_HOOK", "SQLITE_ENABLE_RBU", "SQLITE_ENABLE_RTREE", "SQLITE_ENABLE_SESSION", "SQLITE_ENABLE_SNAPSHOT", "SQLITE_ENABLE_SORTER_REFERENCES", "SQLITE_ENABLE_STMTVTAB", "SQLITE_ENABLE_STAT4", "SQLITE_ENABLE_UPDATE_DELETE_LIMIT", "SQLITE_ENABLE_UNLOCK_NOTIFY", "SQLITE_SOUNDEX", "SQLITE3MC_USE_MINIZ=1", "SQLITE_ENABLE_COMPRESS=1", "SQLITE_ENABLE_SQLAR=1", "SQLITE_ENABLE_ZIPFILE=1", "SQLITE_ENABLE_CARRAY=1", "SQLITE_ENABLE_CSV=1", "SQLITE_ENABLE_SERIES=1", "SQLITE_MAX_LENGTH=2147483647"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
 # plugins

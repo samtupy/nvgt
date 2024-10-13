@@ -25,13 +25,13 @@
 #include <scriptarray.h>
 #include "nvgt.h"
 
-class pack : public Poco::RefCountedObject {
+class pack2 : public Poco::RefCountedObject {
 private:
-sqlite3* db;
-std::unordered_map<std::uint64_t, sqlite3_blob*> pack_streams;
+	sqlite3* db;
+	std::unordered_map<std::uint64_t, sqlite3_blob*> pack_streams;
 public:
-pack();
-	bool open(const std::string& filename, int mode);
+	pack2();
+	bool open(const std::string& filename, int mode, const std::string& key);
 	bool rekey(const std::string& key);
 	bool close();
 	bool add_file(const std::string& disk_filename, const std::string& pack_filename, bool allow_replace = false);
@@ -45,7 +45,7 @@ pack();
 	std::uint64_t get_file_size(const std::string& pack_filename);
 	unsigned int read_file(const std::string& pack_filename, unsigned int offset, unsigned char* buffer, unsigned int size);
 	std::string read_file_string(const std::string& pack_filename, unsigned int offset, unsigned int size);
-	unsigned int size();
+	std::uint64_t size();
 	bool is_active() {
 		return db;
 	};
