@@ -129,7 +129,11 @@ static int encrypt_page(void* cipher, int page, unsigned char* data, int len, in
 	nonce[21] = (n2 >> (8 * 5)) & 0xff;
 	nonce[22] = (n2 >> (8 * 6)) & 0xff;
 	nonce[23] = (n2 >> (8 * 7)) & 0xff;
-	crypto_aead_lock(data, (uint8_t*)data[actual_size + nonce.size()], c->key.data(), nonce.data(), nullptr, 0, (uint8_t*)data, actual_size);
+	if (page == 1) {
+		crypto_aead_lock(data + 24, (uint8_t*)data[actual_size + nonce.size()], c->key.data(), nonce.data(), nullptr, 0, (uint8_t*)data+24, actual_size - 24);
+		std::copy(c->salt.begin(), c->salt.end(), data);
+	} else
+		crypto_aead_lock(data, (uint8_t*)data[actual_size + nonce.size()], c->key.data(), nonce.data(), nullptr, 0, (uint8_t*)data, actual_size);
 	for (auto i = actual_size; i < actual_size + nonce.size(); ++i) {
 		data[i] = nonce[i];
 	}
@@ -152,9 +156,17 @@ static int decrypt_page(void* cipher, int page, unsigned char* data, int len, in
 	for (auto i = 0; i < 16; ++i) {
 		mac[i] = data[actual_size + 24 + i];
 	}
-	if (crypto_aead_unlock(data, mac.data(), c->key.data(), nonce.data(), nullptr, 0, data, actual_size) == -1) {
-		return SQLITE_IOERR_CORRUPTFS;
-	}
+	if (page == 1) {
+		if (crypto_aead_unlock(data + 24, mac.data(), c->key.data(), nonce.data(), nullptr, 0, data + 24, actual_size - 24) == -1) {
+			return SQLITE_IOERR_CORRUPTFS;
+		}
+		for (auto i = 0; i < 16; ++i)
+			c->salt[i] = data[i];
+	} else
+		if (crypto_aead_unlock(data, mac.data(), c->key.data(), nonce.data(), nullptr, 0, data, actual_size) == -1) {
+			return SQLITE_IOERR_CORRUPTFS;
+		}
+
 	return SQLITE_OK;
 }
 
@@ -231,28 +243,8 @@ bool pack2::add_file(const string& disk_filename, const string& pack_filename, b
 		}
 	}
 	sqlite3_finalize(stmt);
-	int64_t rowid = 0;
-	if (const auto rc = sqlite3_prepare_v3(db, "select rowid from pack_files where file_name = ?", -1, 0, &stmt, nullptr); rc != SQLITE_OK) {
-		throw runtime_error(Poco::format("Internal error: %s", sqlite3_errmsg(db)));
-	}
-	if (const auto rc = sqlite3_bind_text64(stmt, 1, pack_filename.data(), pack_filename.size(), SQLITE_STATIC, SQLITE_UTF8); rc != SQLITE_OK) {
-		sqlite3_finalize(stmt);
-		throw runtime_error(Poco::format("Internal error: %s", sqlite3_errmsg(db)));
-	}
-	while (true) {
-		const auto rc = sqlite3_step(stmt);
-		if (rc == SQLITE_BUSY) continue;
-		else if (rc == SQLITE_ROW) {
-			rowid = sqlite3_column_int64(stmt, 0);
-			break;
-		} else {
-			sqlite3_finalize(stmt);
-			throw runtime_error(Poco::format("Internal error: %s", sqlite3_errmsg(db)));
-		}
-	}
-	sqlite3_finalize(stmt);
 	sqlite3_blob* blob;
-	if (const auto rc = sqlite3_blob_open(db, "main", "pack_files", "data", rowid, 1, &blob); rc != SQLITE_OK) {
+	if (const auto rc = sqlite3_blob_open(db, "main", "pack_files", "data", sqlite3_last_insert_rowid(db), 1, &blob); rc != SQLITE_OK) {
 		throw runtime_error(Poco::format("Internal error: %s", sqlite3_errmsg(db)));
 	}
 	ifstream stream(filesystem::absolute(disk_filename), ios::in | ios::binary);
