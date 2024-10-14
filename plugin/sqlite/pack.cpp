@@ -24,7 +24,9 @@
 #include <algorithm>
 #include <filesystem>
 #include <mutex>
+/*#define NVGT_PLUGIN_INCLUDE
 #include "../../src/nvgt_plugin.h"
+*/
 
 using namespace std;
 
