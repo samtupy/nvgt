@@ -11,6 +11,7 @@
 */
 
 #include "nvgt_sqlite.h"
+#include "pack.h"
 // Before this became a plugin it used to support obfuscation of angelscript function signatures, replace the below macro to reenable that.
 #define _O(s) s
 static asIScriptEngine* g_ScriptEngine = NULL;
@@ -25,11 +26,7 @@ std::string stdstr(const char* val, size_t s = 0) {
 static bool sqlite_started = false;
 void init_sqlite() {
 	if (sqlite_started) return;
-	sqlite3_initialize();
-	sqlite3_auto_extension((void(*)(void))sqlite3_compress_init);
 	sqlite3_auto_extension((void(*)(void))sqlite3_eval_init);
-	sqlite3_auto_extension((void(*)(void))sqlite3_shathree_init);
-	sqlite3_auto_extension((void(*)(void))sqlite3_uuid_init);
 	sqlite_started = true;
 }
 
@@ -272,7 +269,11 @@ void RegisterSqlite3(asIScriptEngine* engine) {
 
 plugin_main(nvgt_plugin_shared* shared) {
 	prepare_plugin(shared);
+	if (const auto rc = sqlite3_initialize(); rc != SQLITE_OK) {
+		return false;
+	}
 	g_ScriptEngine = shared->script_engine;
 	RegisterSqlite3(shared->script_engine);
+	RegisterScriptPack(shared->script_engine);
 	return true;
 }

@@ -13,24 +13,18 @@
 #pragma once
 
 #include <angelscript.h>
-#include <sqlite3.h>
-#include <monocypher.h>
-#include <monocypher-ed25519.h>
-#include <array>
-#include <limits>
+#include "sqlite3.h"
 #include <cstdint>
-#include <filesystem>
 #include <unordered_map>
 #include <Poco/RefCountedObject.h>
 #include <scriptarray.h>
-#include "nvgt.h"
 
-class pack2 : public Poco::RefCountedObject {
+class pack : public Poco::RefCountedObject {
 private:
 	sqlite3* db;
 	std::unordered_map<std::uint64_t, sqlite3_blob*> pack_streams;
 public:
-	pack2();
+	pack();
 	bool open(const std::string& filename, int mode, const std::string& key);
 	bool rekey(const std::string& key);
 	bool close();
@@ -51,4 +45,4 @@ public:
 	};
 };
 
-void RegisterScriptPack2(asIScriptEngine* engine);
+void RegisterScriptPack(asIScriptEngine* engine);

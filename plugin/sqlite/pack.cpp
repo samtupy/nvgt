@@ -11,10 +11,10 @@
 */
 
 
-#include "pack2.h"
-#include <sqlite3.h>
-#include <monocypher.h>
-#include <monocypher-ed25519.h>
+#include "pack.h"
+#include "sqlite3.h"
+#include "monocypher.h"
+#include "monocypher-ed25519.h"
 #include <array>
 #include <limits>
 #include <cstdint>
@@ -22,10 +22,14 @@
 #include <Poco/Format.h>
 #include <fstream>
 #include <angelscript.h>
-#include <rng_get_bytes.h>
+#include "rng_get_bytes.h"
 #include <algorithm>
+#include <filesystem>
+#include <mutex>
 
 using namespace std;
+
+static once_flag SQLITE3MC_INITIALIZER;
 
 #ifdef SQLITE3MC_H_
 struct xchacha20_cipher {
@@ -172,12 +176,36 @@ static int decrypt_page(void* cipher, int page, unsigned char* data, int len, in
 }
 #endif
 
-pack2::pack2() {
+pack::pack() {
 	db = nullptr;
 	pack_streams.clear();
+	call_once(SQLITE3MC_INITIALIZER, []() {
+		#ifdef SQLITE3MC_H_
+		char XCHACHA20_CIPHER_NAME[] = "xchacha20";
+		const CipherDescriptor XChaCha20Descriptor = {
+			XCHACHA20_CIPHER_NAME,
+			alloc_cipher,
+			free_cipher,
+			clone_cipher,
+			cipher_get_legacy,
+			get_page_size,
+			get_reserved_size,
+			get_salt,
+			generate_key,
+			encrypt_page,
+			decrypt_page
+		};
+		const CipherParams XChaCha20Params[] = {
+			{nullptr, 0, 0, 0, 0},
+		};
+		if (const auto rc = sqlite3mc_register_cipher(&XChaCha20Descriptor, XChaCha20Params, true); rc != SQLITE_OK) {
+			throw runtime_error(Poco::format("Internal error: %s", sqlite3_errstr(rc)));
+		}
+		#endif
+	});
 }
 
-bool pack2::open(const string& filename, int mode, const string& key) {
+bool pack::open(const string& filename, int mode, const string& key) {
 	if (const auto rc = sqlite3_open_v2(filename.data(), &db, mode | SQLITE_OPEN_EXRESCODE, nullptr); rc != SQLITE_OK) {
 		return false;
 	}
@@ -198,7 +226,7 @@ bool pack2::open(const string& filename, int mode, const string& key) {
 }
 
 #ifdef SQLITE3MC_H_
-bool pack2::rekey(const string& key) {
+bool pack::rekey(const string& key) {
 	if (const auto rc = sqlite3_rekey_v2(db, "main", key.data(), key.size()); rc != SQLITE_OK) {
 		return false;
 	}
@@ -206,14 +234,14 @@ bool pack2::rekey(const string& key) {
 }
 #endif
 
-bool pack2::close() {
+bool pack::close() {
 	if (const auto rc = sqlite3_close(db); rc != SQLITE_OK) {
 		return false;
 	}
 	return true;
 }
 
-bool pack2::add_file(const string& disk_filename, const string& pack_filename, bool allow_replace) {
+bool pack::add_file(const string& disk_filename, const string& pack_filename, bool allow_replace) {
 	// This is a three-step process
 	// We could read the entire file into memory, but this is horribly inefficient and the file could be larger than RAM
 	// Thus, we first check if the file exists. If it already does and allow_replace is false, we abort; otherwise: we first perform a database insert, find the rowid, then open the blob for writing and incrementally store the blob bit by bit
@@ -272,7 +300,7 @@ bool pack2::add_file(const string& disk_filename, const string& pack_filename, b
 	return true;
 }
 
-bool pack2::add_memory(const string& pack_filename, unsigned char* data, unsigned int size, bool allow_replace) {
+bool pack::add_memory(const string& pack_filename, unsigned char* data, unsigned int size, bool allow_replace) {
 	if (size > SQLITE_MAX_LENGTH) {
 		return false;
 	}
@@ -305,7 +333,7 @@ bool pack2::add_memory(const string& pack_filename, unsigned char* data, unsigne
 	return true;
 }
 
-bool pack2::add_memory(const string& pack_filename, const string& data, bool allow_replace) {
+bool pack::add_memory(const string& pack_filename, const string& data, bool allow_replace) {
 	if (data.size() > SQLITE_MAX_LENGTH || data.empty()) {
 		return false;
 	}
@@ -338,7 +366,7 @@ bool pack2::add_memory(const string& pack_filename, const string& data, bool all
 	return true;
 }
 
-bool pack2::delete_file(const string& pack_filename) {
+bool pack::delete_file(const string& pack_filename) {
 	if (!file_exists(pack_filename)) {
 		return false;
 	}
@@ -363,7 +391,7 @@ bool pack2::delete_file(const string& pack_filename) {
 	return true;
 }
 
-bool pack2::file_exists(const string& pack_filename) {
+bool pack::file_exists(const string& pack_filename) {
 	sqlite3_stmt* stmt;
 	if (const auto rc = sqlite3_prepare_v3(db, "select file_name from pack_files where file_name = ?", -1, 0, &stmt, nullptr); rc != SQLITE_OK) {
 		throw runtime_error(Poco::format("Internal error: %s", sqlite3_errmsg(db)));
@@ -388,7 +416,7 @@ bool pack2::file_exists(const string& pack_filename) {
 	return false;
 }
 
-string pack2::get_file_name(const int64_t idx) {
+string pack::get_file_name(const int64_t idx) {
 	sqlite3_stmt* stmt;
 	if (const auto rc = sqlite3_prepare_v3(db, "select file_name from pack_files where rowid = ?", -1, 0, &stmt, nullptr); rc != SQLITE_OK) {
 		throw runtime_error(Poco::format("Internal error: %s", sqlite3_errmsg(db)));
@@ -418,7 +446,7 @@ string pack2::get_file_name(const int64_t idx) {
 	return "";
 }
 
-void pack2::list_files(std::vector<std::string>& files) {
+void pack::list_files(std::vector<std::string>& files) {
 	sqlite3_stmt* stmt;
 	if (const auto rc = sqlite3_prepare_v3(db, "select file_name from pack_files", -1, 0, &stmt, nullptr); rc != SQLITE_OK) {
 		throw runtime_error(Poco::format("Internal error: %s", sqlite3_errmsg(db)));
@@ -442,7 +470,7 @@ void pack2::list_files(std::vector<std::string>& files) {
 	sqlite3_finalize(stmt);
 }
 
-CScriptArray* pack2::list_files() {
+CScriptArray* pack::list_files() {
 	asIScriptContext* ctx = asGetActiveContext();
 	asIScriptEngine* engine = ctx->GetEngine();
 	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
@@ -488,7 +516,7 @@ CScriptArray* pack2::list_files() {
 	return array;
 }
 
-uint64_t pack2::get_file_size(const string& pack_filename) {
+uint64_t pack::get_file_size(const string& pack_filename) {
 	sqlite3_stmt* stmt;
 	if (const auto rc = sqlite3_prepare_v3(db, "select data from pack_files where file_name = ?", -1, 0, &stmt, nullptr); rc != SQLITE_OK) {
 		throw runtime_error(Poco::format("Internal error: %s", sqlite3_errmsg(db)));
@@ -514,7 +542,7 @@ uint64_t pack2::get_file_size(const string& pack_filename) {
 	return 0;
 }
 
-unsigned int pack2::read_file(const string& pack_filename, unsigned int offset, unsigned char* buffer, unsigned int size) {
+unsigned int pack::read_file(const string& pack_filename, unsigned int offset, unsigned char* buffer, unsigned int size) {
 	sqlite3_stmt* stmt;
 	int64_t rowid = 0;
 	if (const auto rc = sqlite3_prepare_v3(db, "select rowid from pack_files where file_name = ?", -1, 0, &stmt, nullptr); rc != SQLITE_OK) {
@@ -552,7 +580,7 @@ unsigned int pack2::read_file(const string& pack_filename, unsigned int offset, 
 	return size;
 }
 
-string pack2::read_file_string(const string& pack_filename, unsigned int offset, unsigned int size) {
+string pack::read_file_string(const string& pack_filename, unsigned int offset, unsigned int size) {
 	sqlite3_stmt* stmt;
 	int64_t rowid = 0;
 	if (const auto rc = sqlite3_prepare_v3(db, "select rowid from pack_files where file_name = ?", -1, 0, &stmt, nullptr); rc != SQLITE_OK) {
@@ -592,7 +620,7 @@ string pack2::read_file_string(const string& pack_filename, unsigned int offset,
 	return res;
 }
 
-uint64_t pack2::size() {
+uint64_t pack::size() {
 	// For now, we only get the size of the files in the pack_files table.
 	// We ignore all other tables
 	// To do: switch this to possibly using DBSTAT virtual table?
@@ -615,67 +643,41 @@ uint64_t pack2::size() {
 	return size;
 }
 
-pack2* ScriptPack_Factory() {
-	return new pack2();
+pack* ScriptPack_Factory() {
+	return new pack();
 }
 
-void RegisterScriptPack2(asIScriptEngine* engine) {
-	if (const auto rc = sqlite3_initialize(); rc != SQLITE_OK) {
-		throw runtime_error(Poco::format("Internal error: %s", sqlite3_errstr(rc)));
-	}
-	#ifdef SQLITE3MC_H_
-	char XCHACHA20_CIPHER_NAME[] = "xchacha20";
-	const CipherDescriptor XChaCha20Descriptor = {
-		XCHACHA20_CIPHER_NAME,
-		alloc_cipher,
-		free_cipher,
-		clone_cipher,
-		cipher_get_legacy,
-		get_page_size,
-		get_reserved_size,
-		get_salt,
-		generate_key,
-		encrypt_page,
-		decrypt_page
-	};
-	const CipherParams XChaCha20Params[] = {
-		{nullptr, 0, 0, 0, 0},
-	};
-	if (const auto rc = sqlite3mc_register_cipher(&XChaCha20Descriptor, XChaCha20Params, true); rc != SQLITE_OK) {
-		throw runtime_error(Poco::format("Internal error: %s", sqlite3_errstr(rc)));
-	}
-	#endif
-	engine->SetDefaultNamespace("experimental");
+void RegisterScriptPack(asIScriptEngine* engine) {
+	// What do we do about this enum?
 	engine->RegisterEnum("pack_open_mode");
-	engine->RegisterEnumValue("pack_open_mode", "PACK_OPEN_MODE_READ_ONLY", SQLITE_OPEN_READONLY);
-	engine->RegisterEnumValue("pack_open_mode", "PACK_OPEN_MODE_READ_WRITE", SQLITE_OPEN_READWRITE);
-	engine->RegisterEnumValue("pack_open_mode", "PACK_OPEN_MODE_CREATE", SQLITE_OPEN_CREATE);
-	engine->RegisterEnumValue("pack_open_mode", "PACK_OPEN_MODE_URI", SQLITE_OPEN_URI);
-	engine->RegisterEnumValue("pack_open_mode", "PACK_OPEN_MODE_MEMORY", SQLITE_OPEN_MEMORY);
-	engine->RegisterEnumValue("pack_open_mode", "PACK_OPEN_MODE_NO_MUTEX", SQLITE_OPEN_NOMUTEX);
-	engine->RegisterEnumValue("pack_open_mode", "PACK_OPEN_MODE_FULL_MUTEX", SQLITE_OPEN_FULLMUTEX);
-	engine->RegisterEnumValue("pack_open_mode", "PACK_OPEN_MODE_SHARED_CACHE", SQLITE_OPEN_SHAREDCACHE);
-	engine->RegisterEnumValue("pack_open_mode", "PACK_OPEN_MODE_PRIVATE_CACHE", SQLITE_OPEN_PRIVATECACHE);
-	engine->RegisterEnumValue("pack_open_mode", "PACK_OPEN_MODE_NO_FOLLOW", SQLITE_OPEN_NOFOLLOW);
-	engine->RegisterObjectType("pack", 0, asOBJ_REF);
-	engine->RegisterObjectBehaviour("pack", asBEHAVE_FACTORY, "pack @p()", asFUNCTION(ScriptPack_Factory), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("pack", asBEHAVE_ADDREF, "void f()", asMETHOD(pack2, duplicate), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("pack", asBEHAVE_RELEASE, "void f()", asMETHOD(pack2, release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack", "bool open(const string &in filename, int mode = PACK_OPEN_MODE_READ_ONLY, string& key = \"\")", asMETHOD(pack2, open), asCALL_THISCALL);
+	engine->RegisterEnumValue("pack_open_mode", "SQLITE_PACK_OPEN_MODE_READ_ONLY", SQLITE_OPEN_READONLY);
+	engine->RegisterEnumValue("pack_open_mode", "SQLITE_PACK_OPEN_MODE_READ_WRITE", SQLITE_OPEN_READWRITE);
+	engine->RegisterEnumValue("pack_open_mode", "SQLITE_PACK_OPEN_MODE_CREATE", SQLITE_OPEN_CREATE);
+	engine->RegisterEnumValue("pack_open_mode", "SQLITE_PACK_OPEN_MODE_URI", SQLITE_OPEN_URI);
+	engine->RegisterEnumValue("pack_open_mode", "SQLITE_PACK_OPEN_MODE_MEMORY", SQLITE_OPEN_MEMORY);
+	engine->RegisterEnumValue("pack_open_mode", "SQLITE_PACK_OPEN_MODE_NO_MUTEX", SQLITE_OPEN_NOMUTEX);
+	engine->RegisterEnumValue("pack_open_mode", "SQLITE_PACK_OPEN_MODE_FULL_MUTEX", SQLITE_OPEN_FULLMUTEX);
+	engine->RegisterEnumValue("pack_open_mode", "SQLITE_PACK_OPEN_MODE_SHARED_CACHE", SQLITE_OPEN_SHAREDCACHE);
+	engine->RegisterEnumValue("pack_open_mode", "SQLITE_PACK_OPEN_MODE_PRIVATE_CACHE", SQLITE_OPEN_PRIVATECACHE);
+	engine->RegisterEnumValue("pack_open_mode", "SQLITE_PACK_OPEN_MODE_NO_FOLLOW", SQLITE_OPEN_NOFOLLOW);
+	engine->RegisterObjectType("sqlite_pack", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("sqlite_pack", asBEHAVE_FACTORY, "sqlite_pack @p()", asFUNCTION(ScriptPack_Factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("sqlite_pack", asBEHAVE_ADDREF, "void f()", asMETHOD(pack, duplicate), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("sqlite_pack", asBEHAVE_RELEASE, "void f()", asMETHOD(pack, release), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "bool open(const string &in filename, int mode = PACK_OPEN_MODE_READ_ONLY, string& key = \"\")", asMETHOD(pack, open), asCALL_THISCALL);
 	#ifdef SQLITE3MC_H_
-	engine->RegisterObjectMethod("pack", "bool rekey(const string& key)", asMETHOD(pack2, rekey), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "bool rekey(const string& key)", asMETHOD(pack, rekey), asCALL_THISCALL);
 	#endif
-	engine->RegisterObjectMethod("pack", "bool close()", asMETHOD(pack2, close), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack", "bool add_file(const string &in disc_filename, const string& in pack_filename, bool allow_replace = false)", asMETHOD(pack2, add_file), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack", "bool add_memory(const string &in pack_filename, const string& in data, bool allow_replace = false)", asMETHODPR(pack2, add_memory, (const string&, const string&, bool), bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack", "bool delete_file(const string &in pack_filename)", asMETHOD(pack2, delete_file), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack", "bool file_exists(const string &in pack_filename) const", asMETHOD(pack2, file_exists), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack", "string get_file_name(int64 index) const", asMETHODPR(pack2, get_file_name, (int64_t), string), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack", "string[]@ list_files() const", asMETHODPR(pack2, list_files, (), CScriptArray*), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack", "uint get_file_size(const string &in pack_filename) const", asMETHOD(pack2, get_file_size), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack", "string read_file(const string &in pack_filename, uint offset_in_file, uint read_byte_count) const", asMETHOD(pack2, read_file_string), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack", "bool get_active() const property", asMETHOD(pack2, is_active), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack", "uint get_size() const property", asMETHOD(pack2, size), asCALL_THISCALL);
-	engine->SetDefaultNamespace("");
+	engine->RegisterObjectMethod("sqlite_pack", "bool close()", asMETHOD(pack, close), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "bool add_file(const string &in disc_filename, const string& in pack_filename, bool allow_replace = false)", asMETHOD(pack, add_file), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "bool add_memory(const string &in pack_filename, const string& in data, bool allow_replace = false)", asMETHODPR(pack, add_memory, (const string&, const string&, bool), bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "bool delete_file(const string &in pack_filename)", asMETHOD(pack, delete_file), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "bool file_exists(const string &in pack_filename) const", asMETHOD(pack, file_exists), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "string get_file_name(int64 index) const", asMETHODPR(pack, get_file_name, (int64_t), string), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "string[]@ list_files() const", asMETHODPR(pack, list_files, (), CScriptArray*), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "uint get_file_size(const string &in pack_filename) const", asMETHOD(pack, get_file_size), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "string read_file(const string &in pack_filename, uint offset_in_file, uint read_byte_count) const", asMETHOD(pack, read_file_string), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "bool get_active() const property", asMETHOD(pack, is_active), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "uint get_size() const property", asMETHOD(pack, size), asCALL_THISCALL);
 }
 

@@ -1,10 +1,12 @@
 Import("env")
 
 scriptarray = env.SharedObject("scriptarray", "#ASAddon/plugin/scriptarray.cpp")
-sqlite_addons = env.SharedObject(Glob("*.c"), CPPDEFINES = ["SQLITE_CORE"])
+sqlite_addons = env.SharedObject(["dbdump.c", "eval.c", "sqlite3.c"], CPPDEFINES = ["SQLITE_CORE"])
+sources = ["monocypher.c", "monocypher-ed25519.c", "nvgt_sqlite.cpp", "pack.cpp", "rng_get_bytes.c"]
+defines = ["SQLITE_ENABLE_CARRAY=1", "SQLITE_ENABLE_CSV=1", "SQLITE_ENABLE_EXTFUNC=1", "SQLITE_ENABLE_FILEIO=1", "SQLITE_ENABLE_REGEXP=1", "SQLITE_ENABLE_SERIES=1", "SQLITE_ENABLE_SHA3=1", "SQLITE_ENABLE_UUID=1", "SQLITE_MAX_ATTACHED=125", "SQLITE_SECURE_DELETE=1", "SQLITE_USE_URI=1", "SQLITE_ENABLE_COMPRESS=1", "SQLITE_ENABLE_SQLAR=1", "SQLITE_ENABLE_ZIPFILE=1", "SQLITE3MC_USE_MINIZ=1", "SQLITE_DQS=0", "SQLITE_DEFAULT_MEMSTATUS=0", "SQLITE_DEFAULT_WAL_SYNCHRONOUS=1", "SQLITE_LIKE_DOESNT_MATCH_BLOBS", "SQLITE_MAX_EXPR_DEPTH=0", "SQLITE_OMIT_DECLTYPE", "SQLITE_OMIT_DEPRECATED", "SQLITE_USE_ALLOCA", "SQLITE_OMIT_AUTOINIT", "SQLITE_STRICT_SUBTYPE=1", "SQLITE_ALLOW_URI_AUTHORITY", "SQLITE_ENABLE_API_ARMOR", "SQLITE_ENABLE_BYTECODE_VTAB", "SQLITE_ENABLE_COLUMN_METADATA", "SQLITE_ENABLE_DBPAGE_VTAB", "SQLITE_ENABLE_DBSTAT_VTAB", "SQLITE_ENABLE_EXPLAIN_COMMENTS", "SQLITE_ENABLE_FTS3", "SQLITE_ENABLE_FTS3_PARENTHESIS", "SQLITE_ENABLE_FTS4", "SQLITE_ENABLE_FTS5", "SQLITE_ENABLE_GEOPOLY", "SQLITE_ENABLE_HIDDEN_COLUMNS", "SQLITE_ENABLE_MATH_FUNCTIONS", "SQLITE_ENABLE_JSON1", "SQLITE_ENABLE_LOCKING_STYLE", "SQLITE_ENABLE_MEMORY_MANAGEMENT", "SQLITE_ENABLE_MEMSYS5", "SQLITE_ENABLE_NORMALIZE", "SQLITE_ENABLE_NULL_TRIM", "SQLITE_ENABLE_PREUPDATE_HOOK", "SQLITE_ENABLE_RBU", "SQLITE_ENABLE_RTREE", "SQLITE_ENABLE_SESSION", "SQLITE_ENABLE_SNAPSHOT", "SQLITE_ENABLE_SORTER_REFERENCES", "SQLITE_ENABLE_STMTVTAB", "SQLITE_ENABLE_STAT4", "SQLITE_ENABLE_UPDATE_DELETE_LIMIT", "SQLITE_ENABLE_UNLOCK_NOTIFY", "SQLITE_SOUNDEX", "SQLITE_DISABLE_PAGECACHE_OVERFLOW_STATS", "SQLITE_MAX_LENGTH=2147483647"]
 if ARGUMENTS.get("no_shared_plugins", "0") == "0":
-	env.SharedLibrary("#release/lib/nvgt_sqlite", ["nvgt_sqlite.cpp", "zlib_uncompr/uncompr.c", scriptarray, sqlite_addons], LIBS = ["PocoFoundationMT", "PocoDataSQLiteMT"] if env["PLATFORM"] == "win32" else ["PocoFoundation", "PocoDataSQLite"])
-static = env.Object("nvgt_sqlite_static", "nvgt_sqlite.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "nvgt_sqlite")])
-static = env.StaticLibrary("#build/lib/nvgt_sqlite", [static, sqlite_addons])
+	env.SharedLibrary("#release/lib/nvgt_sqlite", [sources, scriptarray, sqlite_addons], LIBS = ["PocoFoundationMT", "PocoDataSQLiteMT"] if env["PLATFORM"] == "win32" else ["PocoFoundation", "PocoDataSQLite"], CPPDEFINES=defines)
+static = env.Object("nvgt_sqlite_static", "nvgt_sqlite.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "nvgt_sqlite"), defines])
+static = env.StaticLibrary("#build/lib/nvgt_sqlite", [static, sources, sqlite_addons])
 static = [static, "PocoDataSQLiteMT" if env["PLATFORM"] == "win32" else "PocoDataSQLite"]
 Return("static")

@@ -1,4 +1,50 @@
 /*
+** Name:        sqlite3mc.h
+** Purpose:     Header file for SQLite3 Multiple Ciphers support
+** Author:      Ulrich Telle
+** Created:     2020-03-01
+** Copyright:   (c) 2019-2023 Ulrich Telle
+** License:     MIT
+*/
+
+#ifndef SQLITE3MC_H_
+#define SQLITE3MC_H_
+
+/*
+** Define SQLite3 Multiple Ciphers version information
+*/
+/* #include "sqlite3mc_version.h" */
+/*** Begin of #include "sqlite3mc_version.h" ***/
+/*
+** Name:        sqlite3mc_version.h
+** Purpose:     SQLite3 Multiple Ciphers version numbers
+** Author:      Ulrich Telle
+** Created:     2020-08-05
+** Copyright:   (c) 2020-2024 Ulrich Telle
+** License:     MIT
+*/
+
+/// \file sqlite3mc_version.h Version information for the SQLite3 Multiple Ciphers library
+
+#ifndef SQLITE3MC_VERSION_H_
+#define SQLITE3MC_VERSION_H_
+
+#define SQLITE3MC_VERSION_MAJOR      1
+#define SQLITE3MC_VERSION_MINOR      8
+#define SQLITE3MC_VERSION_RELEASE    7
+#define SQLITE3MC_VERSION_SUBRELEASE 0
+#define SQLITE3MC_VERSION_STRING     "SQLite3 Multiple Ciphers 1.8.7"
+
+#endif /* SQLITE3MC_VERSION_H_ */
+/*** End of #include "sqlite3mc_version.h" ***/
+
+
+/*
+** Define SQLite3 API
+*/
+/* #include "sqlite3.h" */
+/*** Begin of #include "sqlite3.h" ***/
+/*
 ** 2001-09-15
 **
 ** The author disclaims copyright to this source code.  In place of
@@ -146,9 +192,9 @@ extern "C" {
 ** [sqlite3_libversion_number()], [sqlite3_sourceid()],
 ** [sqlite_version()] and [sqlite_source_id()].
 */
-#define SQLITE_VERSION        "3.45.2"
-#define SQLITE_VERSION_NUMBER 3045002
-#define SQLITE_SOURCE_ID      "2024-03-12 11:06:23 d8cd6d49b46a395b13955387d05e9e1a2a47e54fb99f3c9b59835bbefad6af77"
+#define SQLITE_VERSION        "3.46.1"
+#define SQLITE_VERSION_NUMBER 3046001
+#define SQLITE_SOURCE_ID      "2024-08-13 09:16:08 c9c2ab54ba1f5f46360f1b4f35d849cd3f080e6fc2b6c60e91b16c63f69a1e33"
 
 /*
 ** CAPI3REF: Run-Time Library Version Numbers
@@ -764,11 +810,11 @@ struct sqlite3_file {
 ** </ul>
 ** xLock() upgrades the database file lock.  In other words, xLock() moves the
 ** database file lock in the direction NONE toward EXCLUSIVE. The argument to
-** xLock() is always on of SHARED, RESERVED, PENDING, or EXCLUSIVE, never
+** xLock() is always one of SHARED, RESERVED, PENDING, or EXCLUSIVE, never
 ** SQLITE_LOCK_NONE.  If the database file lock is already at or above the
 ** requested lock, then the call to xLock() is a no-op.
 ** xUnlock() downgrades the database file lock to either SHARED or NONE.
-*  If the lock is already at or below the requested lock state, then the call
+** If the lock is already at or below the requested lock state, then the call
 ** to xUnlock() is a no-op.
 ** The xCheckReservedLock() method checks whether any database connection,
 ** either in this process or in some other process, is holding a RESERVED,
@@ -2143,6 +2189,22 @@ struct sqlite3_mem_methods {
 ** configuration setting is never used, then the default maximum is determined
 ** by the [SQLITE_MEMDB_DEFAULT_MAXSIZE] compile-time option.  If that
 ** compile-time option is not set, then the default maximum is 1073741824.
+**
+** [[SQLITE_CONFIG_ROWID_IN_VIEW]]
+** <dt>SQLITE_CONFIG_ROWID_IN_VIEW
+** <dd>The SQLITE_CONFIG_ROWID_IN_VIEW option enables or disables the ability
+** for VIEWs to have a ROWID.  The capability can only be enabled if SQLite is
+** compiled with -DSQLITE_ALLOW_ROWID_IN_VIEW, in which case the capability
+** defaults to on.  This configuration option queries the current setting or
+** changes the setting to off or on.  The argument is a pointer to an integer.
+** If that integer initially holds a value of 1, then the ability for VIEWs to
+** have ROWIDs is activated.  If the integer initially holds zero, then the
+** ability is deactivated.  Any other initial value for the integer leaves the
+** setting unchanged.  After changes, if any, the integer is written with
+** a 1 or 0, if the ability for VIEWs to have ROWIDs is on or off.  If SQLite
+** is compiled without -DSQLITE_ALLOW_ROWID_IN_VIEW (which is the usual and
+** recommended case) then the integer is always filled with zero, regardless
+** if its initial value.
 ** </dl>
 */
 #define SQLITE_CONFIG_SINGLETHREAD         1  /* nil */
@@ -2174,6 +2236,7 @@ struct sqlite3_mem_methods {
 #define SQLITE_CONFIG_SMALL_MALLOC        27  /* boolean */
 #define SQLITE_CONFIG_SORTERREF_SIZE      28  /* int nByte */
 #define SQLITE_CONFIG_MEMDB_MAXSIZE       29  /* sqlite3_int64 */
+#define SQLITE_CONFIG_ROWID_IN_VIEW       30  /* int* */
 
 /*
 ** CAPI3REF: Database Connection Configuration Options
@@ -3288,8 +3351,8 @@ SQLITE_API int sqlite3_set_authorizer(
 #define SQLITE_RECURSIVE            33   /* NULL            NULL            */
 
 /*
-** CAPI3REF: Tracing And Profiling Functions
-** METHOD: sqlite3
+** CAPI3REF: Deprecated Tracing And Profiling Functions
+** DEPRECATED
 **
 ** These routines are deprecated. Use the [sqlite3_trace_v2()] interface
 ** instead of the routines described here.
@@ -6870,6 +6933,12 @@ SQLITE_API int sqlite3_autovacuum_pages(
 ** The exceptions defined in this paragraph might change in a future
 ** release of SQLite.
 **
+** Whether the update hook is invoked before or after the
+** corresponding change is currently unspecified and may differ
+** depending on the type of change. Do not rely on the order of the
+** hook call with regards to the final result of the operation which
+** triggers the hook.
+**
 ** The update hook implementation must not do anything that will modify
 ** the database connection that invoked the update hook.  Any actions
 ** to modify the database connection must be deferred until after the
@@ -8340,7 +8409,7 @@ SQLITE_API int sqlite3_test_control(int op, ...);
 ** The sqlite3_keyword_count() interface returns the number of distinct
 ** keywords understood by SQLite.
 **
-** The sqlite3_keyword_name(N,Z,L) interface finds the N-th keyword and
+** The sqlite3_keyword_name(N,Z,L) interface finds the 0-based N-th keyword and
 ** makes *Z point to that keyword expressed as UTF8 and writes the number
 ** of bytes in the keyword into *L.  The string that *Z points to is not
 ** zero-terminated.  The sqlite3_keyword_name(N,Z,L) routine returns
@@ -9919,23 +9988,44 @@ SQLITE_API const char *sqlite3_vtab_collation(sqlite3_index_info*,int);
 ** <li value="2"><p>
 ** ^(If the sqlite3_vtab_distinct() interface returns 2, that means
 ** that the query planner does not need the rows returned in any particular
-** order, as long as rows with the same values in all "aOrderBy" columns
-** are adjacent.)^  ^(Furthermore, only a single row for each particular
-** combination of values in the columns identified by the "aOrderBy" field
-** needs to be returned.)^  ^It is always ok for two or more rows with the same
-** values in all "aOrderBy" columns to be returned, as long as all such rows
-** are adjacent.  ^The virtual table may, if it chooses, omit extra rows
-** that have the same value for all columns identified by "aOrderBy".
-** ^However omitting the extra rows is optional.
+** order, as long as rows with the same values in all columns identified
+** by "aOrderBy" are adjacent.)^  ^(Furthermore, when two or more rows
+** contain the same values for all columns identified by "colUsed", all but
+** one such row may optionally be omitted from the result.)^
+** The virtual table is not required to omit rows that are duplicates
+** over the "colUsed" columns, but if the virtual table can do that without
+** too much extra effort, it could potentially help the query to run faster.
 ** This mode is used for a DISTINCT query.
 ** <li value="3"><p>
-** ^(If the sqlite3_vtab_distinct() interface returns 3, that means
-** that the query planner needs only distinct rows but it does need the
-** rows to be sorted.)^ ^The virtual table implementation is free to omit
-** rows that are identical in all aOrderBy columns, if it wants to, but
-** it is not required to omit any rows.  This mode is used for queries
+** ^(If the sqlite3_vtab_distinct() interface returns 3, that means the
+** virtual table must return rows in the order defined by "aOrderBy" as
+** if the sqlite3_vtab_distinct() interface had returned 0.  However if
+** two or more rows in the result have the same values for all columns
+** identified by "colUsed", then all but one such row may optionally be
+** omitted.)^  Like when the return value is 2, the virtual table
+** is not required to omit rows that are duplicates over the "colUsed"
+** columns, but if the virtual table can do that without
+** too much extra effort, it could potentially help the query to run faster.
+** This mode is used for queries
 ** that have both DISTINCT and ORDER BY clauses.
 ** </ol>
+**
+** <p>The following table summarizes the conditions under which the
+** virtual table is allowed to set the "orderByConsumed" flag based on
+** the value returned by sqlite3_vtab_distinct().  This table is a
+** restatement of the previous four paragraphs:
+**
+** <table border=1 cellspacing=0 cellpadding=10 width="90%">
+** <tr>
+** <td valign="top">sqlite3_vtab_distinct() return value
+** <td valign="top">Rows are returned in aOrderBy order
+** <td valign="top">Rows with the same value in all aOrderBy columns are adjacent
+** <td valign="top">Duplicates over all colUsed columns may be omitted
+** <tr><td>0<td>yes<td>yes<td>no
+** <tr><td>1<td>no<td>yes<td>no
+** <tr><td>2<td>no<td>yes<td>yes
+** <tr><td>3<td>yes<td>yes<td>yes
+** </table>
 **
 ** ^For the purposes of comparing virtual table output values to see if the
 ** values are same value for sorting purposes, two NULL values are considered
@@ -11982,6 +12072,30 @@ SQLITE_API int sqlite3changegroup_schema(sqlite3_changegroup*, sqlite3*, const c
 SQLITE_API int sqlite3changegroup_add(sqlite3_changegroup*, int nData, void *pData);
 
 /*
+** CAPI3REF: Add A Single Change To A Changegroup
+** METHOD: sqlite3_changegroup
+**
+** This function adds the single change currently indicated by the iterator
+** passed as the second argument to the changegroup object. The rules for
+** adding the change are just as described for [sqlite3changegroup_add()].
+**
+** If the change is successfully added to the changegroup, SQLITE_OK is
+** returned. Otherwise, an SQLite error code is returned.
+**
+** The iterator must point to a valid entry when this function is called.
+** If it does not, SQLITE_ERROR is returned and no change is added to the
+** changegroup. Additionally, the iterator must not have been opened with
+** the SQLITE_CHANGESETAPPLY_INVERT flag. In this case SQLITE_ERROR is also
+** returned.
+*/
+SQLITE_API int sqlite3changegroup_add_change(
+  sqlite3_changegroup*,
+  sqlite3_changeset_iter*
+);
+
+
+
+/*
 ** CAPI3REF: Obtain A Composite Changeset From A Changegroup
 ** METHOD: sqlite3_changegroup
 **
@@ -12785,8 +12899,8 @@ struct Fts5PhraseIter {
 ** EXTENSION API FUNCTIONS
 **
 ** xUserData(pFts):
-**   Return a copy of the context pointer the extension function was
-**   registered with.
+**   Return a copy of the pUserData pointer passed to the xCreateFunction()
+**   API when the extension function was registered.
 **
 ** xColumnTotalSize(pFts, iCol, pnToken):
 **   If parameter iCol is less than zero, set output variable *pnToken
@@ -13355,3 +13469,327 @@ struct fts5_api {
 #endif /* _FTS5_H */
 
 /******** End of fts5.h *********/
+/*** End of #include "sqlite3.h" ***/
+
+
+#ifdef SQLITE_USER_AUTHENTICATION
+/* #include "sqlite3userauth.h" */
+/*** Begin of #include "sqlite3userauth.h" ***/
+/*
+** 2014-09-08
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** This file contains the application interface definitions for the
+** user-authentication extension feature.
+**
+** To compile with the user-authentication feature, append this file to
+** end of an SQLite amalgamation header file ("sqlite3.h"), then add
+** the SQLITE_USER_AUTHENTICATION compile-time option.  See the
+** user-auth.txt file in the same source directory as this file for
+** additional information.
+*/
+#ifdef SQLITE_USER_AUTHENTICATION
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/*
+** If a database contains the SQLITE_USER table, then the
+** sqlite3_user_authenticate() interface must be invoked with an
+** appropriate username and password prior to enable read and write
+** access to the database.
+**
+** Return SQLITE_OK on success or SQLITE_ERROR if the username/password
+** combination is incorrect or unknown.
+**
+** If the SQLITE_USER table is not present in the database file, then
+** this interface is a harmless no-op returnning SQLITE_OK.
+*/
+SQLITE_API int sqlite3_user_authenticate(
+  sqlite3 *db,           /* The database connection */
+  const char *zUsername, /* Username */
+  const char *aPW,       /* Password or credentials */
+  int nPW                /* Number of bytes in aPW[] */
+);
+
+/*
+** The sqlite3_user_add() interface can be used (by an admin user only)
+** to create a new user.  When called on a no-authentication-required
+** database, this routine converts the database into an authentication-
+** required database, automatically makes the added user an
+** administrator, and logs in the current connection as that user.
+** The sqlite3_user_add() interface only works for the "main" database, not
+** for any ATTACH-ed databases.  Any call to sqlite3_user_add() by a
+** non-admin user results in an error.
+*/
+SQLITE_API int sqlite3_user_add(
+  sqlite3 *db,           /* Database connection */
+  const char *zUsername, /* Username to be added */
+  const char *aPW,       /* Password or credentials */
+  int nPW,               /* Number of bytes in aPW[] */
+  int isAdmin            /* True to give new user admin privilege */
+);
+
+/*
+** The sqlite3_user_change() interface can be used to change a users
+** login credentials or admin privilege.  Any user can change their own
+** login credentials.  Only an admin user can change another users login
+** credentials or admin privilege setting.  No user may change their own
+** admin privilege setting.
+*/
+SQLITE_API int sqlite3_user_change(
+  sqlite3 *db,           /* Database connection */
+  const char *zUsername, /* Username to change */
+  const char *aPW,       /* New password or credentials */
+  int nPW,               /* Number of bytes in aPW[] */
+  int isAdmin            /* Modified admin privilege for the user */
+);
+
+/*
+** The sqlite3_user_delete() interface can be used (by an admin user only)
+** to delete a user.  The currently logged-in user cannot be deleted,
+** which guarantees that there is always an admin user and hence that
+** the database cannot be converted into a no-authentication-required
+** database.
+*/
+SQLITE_API int sqlite3_user_delete(
+  sqlite3 *db,           /* Database connection */
+  const char *zUsername  /* Username to remove */
+);
+
+#ifdef __cplusplus
+}  /* end of the 'extern "C"' block */
+#endif
+
+#endif /* SQLITE_USER_AUTHENTICATION */
+/*** End of #include "sqlite3userauth.h" ***/
+
+#endif
+
+/*
+** Symbols for ciphers
+*/
+#define CODEC_TYPE_UNKNOWN     0
+#define CODEC_TYPE_AES128      1
+#define CODEC_TYPE_AES256      2
+#define CODEC_TYPE_CHACHA20    3
+#define CODEC_TYPE_SQLCIPHER   4
+#define CODEC_TYPE_RC4         5
+#define CODEC_TYPE_ASCON128    6
+#define CODEC_TYPE_MAX_BUILTIN 6
+
+/*
+** Definition of API functions
+*/
+
+/*
+** Define Windows specific SQLite API functions (not defined in sqlite3.h)
+*/
+#if SQLITE_OS_WIN == 1
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+SQLITE_API int sqlite3_win32_set_directory(unsigned long type, void* zValue);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/*
+** Specify the key for an encrypted database.
+** This routine should be called right after sqlite3_open().
+**
+** Arguments:
+**   db       - Database to be encrypted
+**   zDbName  - Name of the database (e.g. "main")
+**   pKey     - Passphrase
+**   nKey     - Length of passphrase
+*/
+SQLITE_API int sqlite3_key(sqlite3* db, const void* pKey, int nKey);
+SQLITE_API int sqlite3_key_v2(sqlite3* db, const char* zDbName, const void* pKey, int nKey);
+
+/*
+** Change the key on an open database.
+** If the current database is not encrypted, this routine will encrypt
+** it.  If pNew==0 or nNew==0, the database is decrypted.
+**
+** Arguments:
+**   db       - Database to be encrypted
+**   zDbName  - Name of the database (e.g. "main")
+**   pKey     - Passphrase
+**   nKey     - Length of passphrase
+*/
+SQLITE_API int sqlite3_rekey(sqlite3* db, const void* pKey, int nKey);
+SQLITE_API int sqlite3_rekey_v2(sqlite3* db, const char* zDbName, const void* pKey, int nKey);
+
+/*
+** Specify the activation key for a SEE database.
+** Unless activated, none of the SEE routines will work.
+**
+** Arguments:
+**   zPassPhrase  - Activation phrase
+**
+** Note: Provided only for API compatibility with SEE.
+** Encryption support of SQLite3 Multi Cipher is always enabled.
+*/
+SQLITE_API void sqlite3_activate_see(const char* zPassPhrase);
+
+/*
+** Define functions for the configuration of the wxSQLite3 encryption extension
+*/
+SQLITE_API int sqlite3mc_cipher_count();
+SQLITE_API int sqlite3mc_cipher_index(const char* cipherName);
+SQLITE_API const char* sqlite3mc_cipher_name(int cipherIndex);
+SQLITE_API int sqlite3mc_config(sqlite3* db, const char* paramName, int newValue);
+SQLITE_API int sqlite3mc_config_cipher(sqlite3* db, const char* cipherName, const char* paramName, int newValue);
+SQLITE_API unsigned char* sqlite3mc_codec_data(sqlite3* db, const char* zDbName, const char* paramName);
+SQLITE_API const char* sqlite3mc_version();
+
+#ifdef SQLITE3MC_WXSQLITE3_COMPATIBLE
+SQLITE_API int wxsqlite3_config(sqlite3* db, const char* paramName, int newValue);
+SQLITE_API int wxsqlite3_config_cipher(sqlite3* db, const char* cipherName, const char* paramName, int newValue);
+SQLITE_API unsigned char* wxsqlite3_codec_data(sqlite3* db, const char* zDbName, const char* paramName);
+#endif
+
+/*
+** Structures and functions to dynamically register a cipher
+*/
+
+/*
+** Structure for a single cipher configuration parameter
+**
+** Components:
+**   m_name      - name of parameter (1st char = alpha, rest = alphanumeric or underscore, max 63 characters)
+**   m_value     - current/transient parameter value
+**   m_default   - default parameter value
+**   m_minValue  - minimum valid parameter value
+**   m_maxValue  - maximum valid parameter value
+*/
+typedef struct _CipherParams
+{
+  char* m_name;
+  int   m_value;
+  int   m_default;
+  int   m_minValue;
+  int   m_maxValue;
+} CipherParams;
+
+/*
+** Structure for a cipher API
+**
+** Components:
+**   m_name            - name of cipher (1st char = alpha, rest = alphanumeric or underscore, max 63 characters)
+**   m_allocateCipher  - Function pointer for function AllocateCipher
+**   m_freeCipher      - Function pointer for function FreeCipher
+**   m_cloneCipher     - Function pointer for function CloneCipher
+**   m_getLegacy       - Function pointer for function GetLegacy
+**   m_getPageSize     - Function pointer for function GetPageSize
+**   m_getReserved     - Function pointer for function GetReserved
+**   m_getSalt         - Function pointer for function GetSalt
+**   m_generateKey     - Function pointer for function GenerateKey
+**   m_encryptPage     - Function pointer for function EncryptPage
+**   m_decryptPage     - Function pointer for function DecryptPage
+*/
+
+typedef struct BtShared BtSharedMC;
+
+typedef void* (*AllocateCipher_t)(sqlite3* db);
+typedef void  (*FreeCipher_t)(void* cipher);
+typedef void  (*CloneCipher_t)(void* cipherTo, void* cipherFrom);
+typedef int   (*GetLegacy_t)(void* cipher);
+typedef int   (*GetPageSize_t)(void* cipher);
+typedef int   (*GetReserved_t)(void* cipher);
+typedef unsigned char* (*GetSalt_t)(void* cipher);
+typedef void  (*GenerateKey_t)(void* cipher, BtSharedMC* pBt, char* userPassword, int passwordLength, int rekey, unsigned char* cipherSalt);
+typedef int   (*EncryptPage_t)(void* cipher, int page, unsigned char* data, int len, int reserved);
+typedef int   (*DecryptPage_t)(void* cipher, int page, unsigned char* data, int len, int reserved, int hmacCheck);
+
+typedef struct _CipherDescriptor
+{
+  char* m_name;
+  AllocateCipher_t m_allocateCipher;
+  FreeCipher_t     m_freeCipher;
+  CloneCipher_t    m_cloneCipher;
+  GetLegacy_t      m_getLegacy;
+  GetPageSize_t    m_getPageSize;
+  GetReserved_t    m_getReserved;
+  GetSalt_t        m_getSalt;
+  GenerateKey_t    m_generateKey;
+  EncryptPage_t    m_encryptPage;
+  DecryptPage_t    m_decryptPage;
+} CipherDescriptor;
+
+/*
+** Register a cipher
+**
+** Arguments:
+**   desc         - Cipher descriptor structure
+**   params       - Cipher configuration parameter table
+**   makeDefault  - flag whether to make the cipher the default cipher
+**
+** Returns:
+**   SQLITE_OK     - the cipher could be registered successfully
+**   SQLITE_ERROR  - the cipher could not be registered
+*/
+SQLITE_API int sqlite3mc_register_cipher(const CipherDescriptor* desc, const CipherParams* params, int makeDefault);
+
+#ifdef __cplusplus
+}
+#endif
+
+/*
+** Define public SQLite3 Multiple Ciphers VFS interface
+*/
+/* #include "sqlite3mc_vfs.h" */
+/*** Begin of #include "sqlite3mc_vfs.h" ***/
+/*
+** Name:        sqlite3mc_vfs.h
+** Purpose:     Header file for VFS of SQLite3 Multiple Ciphers support
+** Author:      Ulrich Telle
+** Created:     2020-03-01
+** Copyright:   (c) 2020-2023 Ulrich Telle
+** License:     MIT
+*/
+
+#ifndef SQLITE3MC_VFS_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifndef SQLITE_PRIVATE
+#define SQLITE_PRIVATE
+#endif
+
+SQLITE_PRIVATE int sqlite3mcCheckVfs(const char* zVfs);
+
+SQLITE_API int sqlite3mc_vfs_create(const char* zVfsReal, int makeDefault);
+SQLITE_API void sqlite3mc_vfs_destroy(const char* zName);
+SQLITE_API void sqlite3mc_vfs_shutdown();
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* SQLITE3MC_VFS_H_ */
+/*** End of #include "sqlite3mc_vfs.h" ***/
+
+
+#endif
