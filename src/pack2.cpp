@@ -27,6 +27,7 @@
 
 using namespace std;
 
+#ifdef SQLITE3MC_H_
 struct xchacha20_cipher {
 	array<uint8_t, 32> key;
 	array<uint8_t, 16> salt;
@@ -169,6 +170,7 @@ static int decrypt_page(void* cipher, int page, unsigned char* data, int len, in
 
 	return SQLITE_OK;
 }
+#endif
 
 pack2::pack2() {
 	db = nullptr;
@@ -179,12 +181,14 @@ bool pack2::open(const string& filename, int mode, const string& key) {
 	if (const auto rc = sqlite3_open_v2(filename.data(), &db, mode | SQLITE_OPEN_EXRESCODE, nullptr); rc != SQLITE_OK) {
 		return false;
 	}
+	#ifdef SQLITE3MC_H_
 	if (!key.empty()) {
 		if (const auto rc = sqlite3_key_v2(db, "main", key.data(), key.size()); rc != SQLITE_OK) {
 			throw runtime_error(Poco::format("Internal error: %s", sqlite3_errmsg(db)));
 		}
 	}
-	if (const auto rc = sqlite3_exec(db, "create table if not exists pack_files(file_name primary key not null unique, data);", nullptr, nullptr, nullptr); rc != SQLITE_OK) {
+	#endif
+	if (const auto rc = sqlite3_exec(db, "create table if not exists pack_files(file_name primary key not null unique, data); create unique index if not exists pack_files_index on pack_files(file_name);", nullptr, nullptr, nullptr); rc != SQLITE_OK) {
 		throw runtime_error(Poco::format("Internal error: %s", sqlite3_errmsg(db)));
 	}
 	if (const auto rc = sqlite3_db_config(db, SQLITE_DBCONFIG_DEFENSIVE, 1); rc != SQLITE_OK) {
@@ -193,12 +197,14 @@ bool pack2::open(const string& filename, int mode, const string& key) {
 	return true;
 }
 
+#ifdef SQLITE3MC_H_
 bool pack2::rekey(const string& key) {
 	if (const auto rc = sqlite3_rekey_v2(db, "main", key.data(), key.size()); rc != SQLITE_OK) {
 		return false;
 	}
 	return true;
 }
+#endif
 
 bool pack2::close() {
 	if (const auto rc = sqlite3_close(db); rc != SQLITE_OK) {
@@ -617,6 +623,7 @@ void RegisterScriptPack2(asIScriptEngine* engine) {
 	if (const auto rc = sqlite3_initialize(); rc != SQLITE_OK) {
 		throw runtime_error(Poco::format("Internal error: %s", sqlite3_errstr(rc)));
 	}
+	#ifdef SQLITE3MC_H_
 	char XCHACHA20_CIPHER_NAME[] = "xchacha20";
 	const CipherDescriptor XChaCha20Descriptor = {
 		XCHACHA20_CIPHER_NAME,
@@ -637,6 +644,7 @@ void RegisterScriptPack2(asIScriptEngine* engine) {
 	if (const auto rc = sqlite3mc_register_cipher(&XChaCha20Descriptor, XChaCha20Params, true); rc != SQLITE_OK) {
 		throw runtime_error(Poco::format("Internal error: %s", sqlite3_errstr(rc)));
 	}
+	#endif
 	engine->SetDefaultNamespace("experimental");
 	engine->RegisterEnum("pack_open_mode");
 	engine->RegisterEnumValue("pack_open_mode", "PACK_OPEN_MODE_READ_ONLY", SQLITE_OPEN_READONLY);
@@ -654,6 +662,9 @@ void RegisterScriptPack2(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("pack", asBEHAVE_ADDREF, "void f()", asMETHOD(pack2, duplicate), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("pack", asBEHAVE_RELEASE, "void f()", asMETHOD(pack2, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack", "bool open(const string &in filename, int mode = PACK_OPEN_MODE_READ_ONLY, string& key = \"\")", asMETHOD(pack2, open), asCALL_THISCALL);
+	#ifdef SQLITE3MC_H_
+	engine->RegisterObjectMethod("pack", "bool rekey(const string& key)", asMETHOD(pack2, rekey), asCALL_THISCALL);
+	#endif
 	engine->RegisterObjectMethod("pack", "bool close()", asMETHOD(pack2, close), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack", "bool add_file(const string &in disc_filename, const string& in pack_filename, bool allow_replace = false)", asMETHOD(pack2, add_file), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack", "bool add_memory(const string &in pack_filename, const string& in data, bool allow_replace = false)", asMETHODPR(pack2, add_memory, (const string&, const string&, bool), bool), asCALL_THISCALL);
