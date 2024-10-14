@@ -10,7 +10,6 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-
 #include "pack.h"
 #include "sqlite3.h"
 #include "monocypher.h"
@@ -21,11 +20,11 @@
 #include <stdexcept>
 #include <Poco/Format.h>
 #include <fstream>
-#include <angelscript.h>
 #include "rng_get_bytes.h"
 #include <algorithm>
 #include <filesystem>
 #include <mutex>
+#include "../../src/nvgt_plugin.h"
 
 using namespace std;
 

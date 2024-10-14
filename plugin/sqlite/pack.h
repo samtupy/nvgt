@@ -12,12 +12,13 @@
 
 #pragma once
 
-#include <angelscript.h>
 #include "sqlite3.h"
 #include <cstdint>
 #include <unordered_map>
 #include <Poco/RefCountedObject.h>
 #include <scriptarray.h>
+
+class asIScriptEngine;
 
 class pack : public Poco::RefCountedObject {
 private:
