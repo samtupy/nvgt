@@ -92,10 +92,11 @@ protected:
 			config().setString("application.gui", "");
 			#ifdef NVGT_STUB
 				ChDir(resources_dir);
-			#else
-				g_IncludeDirs.push_back(Path(resources_dir).pushDirectory("include").toString());
 			#endif
 		}
+		#ifndef NVGT_STUB
+			if (File(resources_dir).exists()) g_IncludeDirs.push_back(Path(resources_dir).pushDirectory("include").toString());
+		#endif
 		#elif defined(__ANDROID__)
 		config().setString("application.gui", "");
 		#endif
@@ -192,7 +193,7 @@ protected:
 			mode = option == 1? NVGT_RUN : NVGT_COMPILE;
 			try {
 				// Try to change to the directory containing the selected script.
-				ChDir(Poco::Path(script).parent().toString().c_str());
+				ChDir(Poco::Path(script).parent().toString());
 			} catch(...) {} // If it fails, so be it.
 			return script;
 		} else if (option == 4 || option == 5) {
@@ -226,6 +227,9 @@ protected:
 			message("error, no input files.\nType " + commandName() + " --help for usage instructions\n", commandName());
 			return Application::EXIT_USAGE;
 		}
+		#ifdef __APPLE__ // When run from an app bundle
+		if (!scriptfile.empty() && Path::current() == "/") ChDir(Path(scriptfile).makeParent().toString());
+		#endif
 		#ifndef __ANDROID__ // for now the following code would be highly unstable on android due to it's content URIs.
 		try {
 			// Parse the provided script path to insure it is valid and check if it is a file.

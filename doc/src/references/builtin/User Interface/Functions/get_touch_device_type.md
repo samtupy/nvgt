@@ -5,4 +5,3 @@ Determine the type of a touch device given it's ID.
 
 ## Returns:
 touch_device_type: The type of the given device, or TOUCH_DEVICE_TYPE_INVALID if a bad ID is given.
-

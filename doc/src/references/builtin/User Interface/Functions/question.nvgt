@@ -1,9 +1,9 @@
 /**
 	Display a yes/no dialog box to the user.
-	int question(string title, string text, bool can_cancel = false, uint flags = 0);
+	int question(const string&in title, const string&in text, bool can_cancel = false, uint flags = 0);
 	## Arguments:
-		* string title: the title of the dialog.
-		* string text: the text of the dialog.
+		* const string&in title: the title of the dialog.
+		* const string&in text: the text of the dialog.
 		* bool can_cancel = false: determines if a cancel button is present alongside the other buttons.
 		* uint flags = 0: a combination of flags (see message_box_flags for more information).
 	## Returns:

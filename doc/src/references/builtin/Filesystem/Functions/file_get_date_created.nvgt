@@ -1,8 +1,8 @@
 /**
 	Get a datetime object representing the creation date of a particular file.
-	datetime file_get_date_created(string filename);
+	datetime file_get_date_created(const string&in filename);
 	## Arguments:
-		* string filename; the name of the file to check.
+		* const string&in filename; the name of the file to check.
 	## Returns:
 		datetime: an initialized datetime object, with all its fields set to the creation date of the file.
 	## Remarks:

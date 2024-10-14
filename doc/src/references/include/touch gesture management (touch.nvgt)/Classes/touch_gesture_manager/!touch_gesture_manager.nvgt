@@ -10,10 +10,10 @@
 // Example:
 #include"touch.nvgt"
 #include"speech.nvgt"
-touch_jesture_manager touch;
+touch_gesture_manager touch;
 void main() {
 	show_window("touch screen test");
-	//attach multiple keys to a single jesture.
+	//attach multiple keys to a single gesture.
 	int[] t = {KEY_TAB, KEY_LSHIFT};
 	touch_keyboard_interface testsim(touch, {{"swipe_left1f", KEY_LEFT}, {"swipe_right1f", KEY_RIGHT}, {"swipe_up1f", KEY_UP}, {"swipe_down1f", KEY_DOWN}, {"double_tap1f", KEY_RETURN}, {"tripple_tap1f", t}, {"swipe_left2f", KEY_ESCAPE}, {"swipe_right2f", KEY_Q}, {"double_tap2f", KEY_SPACE}});
 	touch.add_touch_interface(testsim);

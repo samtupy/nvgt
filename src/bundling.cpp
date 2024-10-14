@@ -155,7 +155,7 @@ public:
 		stubpath = format("%snvgt_%s%s.bin", stubpath.toString(), platform, (stub != "" ? string("_") + stub : ""));
 		outpath = config.getString("build.output_basename", Path(input_file).setExtension("").toString());
 		alter_output_path(outpath);
-		string precommand = config.getString("build.precommand", "");
+		string precommand = config.getString("build.precommand_" + g_platform, config.getString("build.precommand", ""));
 		if (!precommand.empty()) {
 			set_status("executing prebuild command...");
 			if (!user_command(precommand)) throw Exception("prebuild command failed");
@@ -183,7 +183,7 @@ public:
 		fs.close();
 		finalize_product(outpath);
 		output_file = outpath.toString();
-		string postcommand = config.getString("build.postcommand", "");
+		string postcommand = config.getString("build.postcommand_" + g_platform, config.getString("build.postcommand", ""));
 		if (!postcommand.empty()) {
 			set_status("executing postbuild command...");
 			if (!user_command(postcommand)) throw Exception("postbuild command failed");
@@ -219,7 +219,7 @@ protected:
 		for (const game_asset& g : g_game_assets) {
 			Path p = Path(g.bundled_path).makeAbsolute(g.flags & GAME_ASSET_DOCUMENT? document_path : resource_path);
 			if (!File(p.parent()).exists()) File(p.parent()).createDirectories();
-			File(g.filesystem_path).copyTo(p.toString());
+			File(Path(g.filesystem_path).makeAbsolute(Path(get_input_file()).makeParent()).toString()).copyTo(p.toString());
 		}
 	}
 	void copy_shared_libraries(const Path& libpath) {
@@ -232,7 +232,7 @@ protected:
 		StringTokenizer excludes(config.getString("build.shared_library_excludes", "plist TrueAudioNext GPUUtilities systemd_notify sqlite git2 curl"), " "); // Todo: Make this a whitelist once plugins have a way to communicate about extra libraries they load.
 		string source = get_nvgt_lib_directory(g_platform);
 		set<string> libs;
-		Glob::glob("*", source, libs, Glob::GLOB_DOT_SPECIAL | Glob::GLOB_FOLLOW_SYMLINKS | Glob::GLOB_CASELESS);
+		Glob::glob(Path(source).append("*").toString(), libs, Glob::GLOB_DOT_SPECIAL | Glob::GLOB_FOLLOW_SYMLINKS | Glob::GLOB_CASELESS);
 		for (const string& library : libs) {
 			// First check if we wish to exclude this library.
 			bool excluded = false;
@@ -377,7 +377,7 @@ protected:
 		plist_mem_free(plist_xml);
 		plist_free(plist);
 		// Bundle assets and copy shared libraries.
-		bundle_assets(Path(workplace.path()).append("Contents/Resources"), bundle_mode == 3? Path(workplace.path()).makeParent() : Path(workplace.path()).append("Contents/Resources"));
+		bundle_assets(Path(workplace.path()).append("Contents/Resources"), bundle_mode == 2? Path(workplace.path()).makeParent() : Path(workplace.path()).append("Contents/Resources"));
 		copy_shared_libraries(Path(workplace.path()).append("Contents/Frameworks"));
 		if (bundle_mode > 1) {
 			// On the mac, we can execute the hdiutil command to create a .dmg file. Otherwise, we must create a .zip instead, as it can portably store unix file attributes.
@@ -386,7 +386,7 @@ protected:
 				string sout, serr;
 				File dmg_out = Path(final_output_path).makeFile().setExtension("dmg").toString();
 				if (dmg_out.exists()) dmg_out.remove(true);
-				if (!system_command("hdiutil", {"create", "-srcfolder", bundle_mode < 3? workplace.path() : Path(workplace.path()).makeParent().toString(), "-volname", Path(workplace.path()).makeFile().getBaseName(), dmg_out.path()}, sout, serr)) throw Exception(format("Unable to execute hdiutil for .dmg generation: %s", serr));
+				if (!system_command("hdiutil", {"create", "-srcfolder", bundle_mode != 2? workplace.path() : Path(workplace.path()).makeParent().toString(), "-volname", Path(workplace.path()).makeFile().getBaseName(), dmg_out.path()}, sout, serr)) throw Exception(format("Unable to execute hdiutil for .dmg generation: %s", serr));
 				output_path = dmg_out.path();
 			#else
 				File zip_out = Path(final_output_path).makeFile().setExtension("app.zip").toString();

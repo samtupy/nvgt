@@ -2,7 +2,7 @@
 	Returns the text currently on the user's clipboard.
 	string clipboard_get_text();
 	## Returns:
-		The text on the user's clipboard, as UTF_8.
+		string: The text on the user's clipboard, as UTF_8.
 */
 
 // Example:

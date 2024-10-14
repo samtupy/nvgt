@@ -1,10 +1,10 @@
 /**
 	Creates a directory if it doesn't already exist.
-	bool directory_create(string directory);
+	bool directory_create(const string&in directory);
 	## Arguments:
-		* string directory: path to the directory to create (can be nested, relative or absolute).
+		* const string&in directory: path to the directory to create (can be nested, relative or absolute).
 	## Returns:
-		true if the directory was successfully created or already exists, false otherwise.
+		bool: true if the directory was successfully created or already exists, false otherwise.
 */
 
 // Example:

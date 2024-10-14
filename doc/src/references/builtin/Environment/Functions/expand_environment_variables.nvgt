@@ -1,10 +1,10 @@
 /**
 	Expand environment variables.
-	string expand_environment_variables(string variables);
+	string expand_environment_variables(const string&in variables);
 	## Arguments:
-		* string variables: A string containing the variable(s) you wish to expand.
+		* const string&in variables: A string containing the variable(s) you wish to expand.
 	## Returns:
-		The expanded environment variable(s) if successful or an empty string if not.
+		string: the expanded environment variable(s) if successful or an empty string if not.
 */
 
 // Example:
