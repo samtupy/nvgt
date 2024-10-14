@@ -11,7 +11,7 @@
 */
 
 #include <obfuscate.h>
-#include "angelscript.h" // get_array_type
+#include "nvgt_angelscript.h" // get_array_type
 #include "network.h"
 
 bool g_enet_initialized = false;

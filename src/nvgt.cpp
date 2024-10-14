@@ -35,7 +35,7 @@
 #include "filesystem.h"
 #include "scriptarray.h"
 #define NVGT_LOAD_STATIC_PLUGINS
-#include "angelscript.h" // nvgt's angelscript implementation
+#include "nvgt_angelscript.h" // nvgt's angelscript implementation
 #include "bundling.h"
 #include "input.h"
 #include "misc_functions.h" // ChDir
