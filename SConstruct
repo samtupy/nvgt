@@ -20,6 +20,17 @@ Help("""
 	Note that custom switches or targets may be added by any plugin SConscript and may not be documented here.
 """)
 
+def is_compiler_flag_available(flag: str, cxx: bool = False)->bool:
+	env = Environment()
+	if cxx:
+		env["CXXFLAGS"].append(flag)
+	else:
+		env["CCFLAGS"].append(flag)
+	conf = Configure(env)
+	res = conf.CheckCC() if not cxx else conf.CheckCXX()
+	conf.Finish()
+	return res
+
 # setup
 env = Environment()
 # Prevent scons from wiping out the environment for certain tools, e.g. scan-build
@@ -37,12 +48,28 @@ if ARGUMENTS.get("debug", "0") == "1":
 	cdb = env.CompilationDatabase()
 	Alias('cdb', cdb)
 if env["PLATFORM"] == "win32":
-	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/Ob3", "/Oi", "/Os", "/Oy", "/bigobj", "/permissive-"])
+	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/bigobj", "/permissive-"])
+	if ARGUMENTS.get("debug", "0") == "1":
+		env["CCFLAGS"].append("/Od")
+	else:
+		env["CCFLAGS"].append("/O2")
+	if is_compiler_flag_available("/arch:AVX"):
+		env["CCFLAGS"].append("/arch:AVX")
+	elif is_compiler_flag_available("/arch:armv9.0"):
+		env["CCFLAGS"].append("/arch:armv9.0")
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
 	env.Append(LIBS = ["UniversalSpeechStatic", "enet", "angelscript64", "SDL3"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
 else:
-	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-Oz", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result"], LIBS = ["m"])
+	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result"], LIBS = ["m"])
+	if ARGUMENTS.get("debug", "0") == 1:
+		env["CXXFLAGS"].extend(["-O0", "-g"])
+	else:
+		env["CXXFLAGS"].append("-O3")
+	if is_compiler_flag_available("-maes", True):
+		env["CXXFLAGS"].append("-maes")
+	if is_compiler_flag_available("-maes"):
+		env["CCFLAGS"].append("-maes")
 if env["PLATFORM"] == "darwin":
 	# homebrew paths and other libraries/flags for MacOS
 	env.Append(CCFLAGS = ["-mmacosx-version-min=14.0", "-arch", "arm64", "-arch", "x86_64"], LINKFLAGS = ["-arch", "arm64", "-arch", "x86_64"])

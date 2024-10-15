@@ -10,6 +10,8 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#define NVGT_PLUGIN_INCLUDE
+#include "../../src/nvgt_plugin.h"
 #include "pack.h"
 #include "sqlite3.h"
 #include "monocypher.h"
@@ -24,9 +26,6 @@
 #include <algorithm>
 #include <filesystem>
 #include <mutex>
-/*#define NVGT_PLUGIN_INCLUDE
-#include "../../src/nvgt_plugin.h"
-*/
 
 using namespace std;
 
@@ -140,8 +139,8 @@ static int encrypt_page(void* cipher, int page, unsigned char* data, int len, in
 		std::copy(c->salt.begin(), c->salt.end(), data);
 	} else
 		crypto_aead_lock(data, (uint8_t*)data[actual_size + nonce.size()], c->key.data(), nonce.data(), nullptr, 0, (uint8_t*)data, actual_size);
-	for (auto i = actual_size; i < actual_size + nonce.size(); ++i) {
-		data[i] = nonce[i];
+	for (auto i = 0; i < nonce.size(); ++i) {
+		data[actual_size + i] = nonce[i];
 	}
 	c->counter++;
 	return SQLITE_OK;

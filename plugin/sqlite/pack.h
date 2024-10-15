@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <Poco/RefCountedObject.h>
 #include <scriptarray.h>
+#include <vector>
 
 class asIScriptEngine;
 
