@@ -19,7 +19,7 @@
 #include <Poco/Glob.h>
 #include <Poco/Timestamp.h>
 #include <Poco/UnicodeConverter.h>
-#include "angelscript.h" // nvgt's Angelscript implementation needed for get_array_type
+#include "nvgt_angelscript.h" // nvgt's Angelscript implementation needed for get_array_type
 
 using namespace std;
 using namespace Poco;

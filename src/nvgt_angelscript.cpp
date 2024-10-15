@@ -34,7 +34,7 @@
 #include <Poco/zlib.h>
 #include <Poco/Util/Application.h>
 #include <SDL3/SDL.h>
-#include "angelscript.h"
+#include "nvgt_angelscript.h"
 #include "bullet3.h"
 #include "bundling.h"
 #include "compression.h"
