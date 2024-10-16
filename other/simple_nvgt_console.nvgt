@@ -22,7 +22,7 @@ class simple_nvgt_console{
 			wait(5); //always wait or your programs die
 			f.monitor();
 			if(f.is_pressed(btn)){
-				console_environment.add_section("imports", "import void log(const string&in text, const bool&in silent=false) from \"nvgt_game\";");
+				console_environment.add_section("imports", "import void log(const string&in text, bool silent = false) from \"nvgt_game\";");
 				console_environment.add_section("<console>", "void console(){"+f.get_text(txt)+"}");
 				string[] errors;
 				if(console_environment.build(errors)<0){
@@ -41,7 +41,7 @@ class simple_nvgt_console{
 		}
 	}
 	
-	void log(const string&in text, const bool&in silent=false){
+	void log(const string&in text, bool silent = false){
 		if(!silent)
 		screen_reader_speak(text, false);
 		f.add_list_item(loglist, text);
@@ -58,6 +58,6 @@ void main(){
 }
 
 //As far as I know, we can't bind class methods to other modules, so we'll have to do this instead
-void log(const string&in text, const bool&in interrupt=false){
-	c.log(text, interrupt);
+void log(const string&in text, bool silent = false){
+	c.log(text, silent);
 }
