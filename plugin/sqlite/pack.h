@@ -21,14 +21,16 @@
 #include <Poco/BufferedBidirectionalStreamBuf.h>
 #include <string_view>
 #include <iostream>
+#include <ios>
 
-class asIScriptEngine;
+class blob_stream;
 
 class pack : public Poco::RefCountedObject {
 private:
 	sqlite3* db;
 public:
 	pack();
+	~pack();
 	bool open(const std::string& filename, int mode, const std::string& key);
 	bool rekey(const std::string& key);
 	bool close();
@@ -47,6 +49,38 @@ public:
 	bool is_active() {
 		return db;
 	}
+	blob_stream open_file(const std::string& file_name, const bool rw);
+};
+
+class blob_stream_buf: public Poco::BufferedBidirectionalStreamBuf {
+	using pos_type = std::basic_streambuf<char, std::char_traits<char>>::pos_type;
+public:
+	blob_stream_buf();
+	~blob_stream_buf();
+	void open(sqlite3* s, const std::string_view& db, const std::string_view& table, const std::string_view& column, const sqlite3_int64 row, const bool read_write);
+protected:
+	pos_type seekoff( off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out ) override;
+	pos_type seekpos(pos_type pos, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out ) override;
+private:
+	pos_type read_pos, write_pos;
+	int readFromDevice(char_type* buffer, std::streamsize length) override;
+	int writeToDevice(const char_type* buffer, std::streamsize length) override;
+	sqlite3_blob* blob;
+};
+
+class blob_ios: public virtual std::ios {
+public:
+	blob_ios();
+	void open(sqlite3* s, const std::string_view& db, const std::string_view& table, const std::string_view& column, const sqlite3_int64 row, const bool read_write);
+	blob_stream_buf* rdbuf();
+protected:
+	blob_stream_buf _buf;
+};
+
+class blob_stream: public blob_ios, public std::iostream {
+public:
+	blob_stream();
+	blob_stream(sqlite3* s, const std::string_view& db, const std::string_view& table, const std::string_view& column, const sqlite3_int64 row, const bool read_write);
 };
 
 void RegisterScriptPack(asIScriptEngine* engine);

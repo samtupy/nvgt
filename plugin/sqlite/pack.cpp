@@ -22,6 +22,7 @@
 #include <filesystem>
 #include <mutex>
 #include "xchacha_cipher.h"
+#include <Poco/StreamUtil.h>
 
 using namespace std;
 
@@ -58,6 +59,12 @@ bool pack::open(const string& filename, int mode, const string& key) {
 		throw runtime_error(Poco::format("Internal error: culd not set defensive mode: %s", string(sqlite3_errmsg(db))));
 	}
 	return true;
+}
+
+pack::~pack() {
+	if (db)
+		sqlite3_close(db);
+		db = nullptr;
 }
 
 #ifdef SQLITE3MC_H_
@@ -575,6 +582,151 @@ uint64_t pack::size() {
 	}
 	sqlite3_finalize(stmt);
 	return size;
+}
+
+blob_stream pack::open_file(const std::string& file_name, const bool rw) {
+	sqlite3_stmt* stmt;
+	int64_t rowid = 0;
+	if (const auto rc = sqlite3_prepare_v3(db, "select rowid from pack_files where file_name = ?", -1, 0, &stmt, nullptr); rc != SQLITE_OK) {
+		throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
+	}
+	if (const auto rc = sqlite3_bind_text64(stmt, 1, file_name.data(), file_name.size(), SQLITE_STATIC, SQLITE_UTF8); rc != SQLITE_OK) {
+		sqlite3_finalize(stmt);
+		throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
+	}
+	while (true) {
+		const auto rc = sqlite3_step(stmt);
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(stmt);
+				continue;
+			}
+		else if (rc == SQLITE_ROW) {
+			rowid = sqlite3_column_int64(stmt, 0);
+			break;
+		} else {
+			sqlite3_finalize(stmt);
+			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
+		}
+	}
+	sqlite3_finalize(stmt);
+	return blob_stream(db, "main", "pack_files", "data", rowid, rw);
+}
+
+blob_stream_buf::blob_stream_buf(): Poco::BufferedBidirectionalStreamBuf(4096, ios::in) {
+}
+
+blob_stream_buf::~blob_stream_buf() {
+	if (blob)
+		sqlite3_blob_close(blob);
+		blob = nullptr;
+}
+
+void blob_stream_buf::open(sqlite3* s, const std::string_view& db, const std::string_view& table, const std::string_view& column, const sqlite3_int64 row, const bool read_write) {
+	if (read_write)
+		setMode(ios::in | ios::out);
+	if (const auto rc = sqlite3_blob_open(s, db.data(), table.data(), column.data(), row, static_cast<int>(read_write), &blob); rc != SQLITE_OK)
+		throw runtime_error(Poco::format("%s", string(sqlite3_errmsg(s))));
+}
+
+blob_stream_buf::pos_type blob_stream_buf::seekoff(blob_stream_buf::off_type off, ios_base::seekdir dir, ios_base::openmode which) {
+	if (off < 0) return -1;
+	if (!(getMode() & which))
+		return -1;
+	if (which & ios::in)
+		switch (dir) {
+			case ios::beg:
+				read_pos = off;
+			break;
+			case ios::end:
+				read_pos -= off;
+			break;
+			case ios::cur:
+				read_pos += off;
+			break;
+		}
+	if (which & ios::out)
+		switch (dir) {
+			case ios::beg:
+				write_pos = off;
+			break;
+			case ios::end:
+				write_pos -= off;
+			break;
+			case ios::cur:
+				write_pos += off;
+			break;
+		}
+	if (read_pos >= sqlite3_blob_bytes(blob) || write_pos >= sqlite3_blob_bytes(blob))
+		return -1;
+	if (which & (ios::in | ios::out))
+		return read_pos;
+	else if (which & ios::in)
+		return read_pos;
+	else if (which & ios::out)
+		return write_pos;
+	else
+		return -1;
+}
+
+blob_stream_buf::pos_type blob_stream_buf::seekpos(blob_stream_buf::pos_type pos, ios_base::openmode which) {
+	if (pos < 0) return -1;
+	if (!(which & getMode()))
+		return -1;
+	if ((which & ios::in))
+		if (pos >= sqlite3_blob_bytes(blob))
+			return -1;
+		read_pos = pos;
+	if ((which & ios::out))
+		if (pos >= sqlite3_blob_bytes(blob))
+			return -1;
+		write_pos = pos;
+	if ((which & ios::in) || (which & (ios::in | ios::out)))
+		return read_pos;
+	else
+		return write_pos;
+}
+
+int blob_stream_buf::readFromDevice(char_type* buffer, std::streamsize length) {
+	if (read_pos >= sqlite3_blob_bytes(blob) || read_pos < 0)
+		return char_traits::eof();
+	const auto len = length % sqlite3_blob_bytes(blob);
+	if (const auto rc = sqlite3_blob_read(blob, buffer, len, read_pos); rc != SQLITE_OK)
+		throw runtime_error(sqlite3_errstr(rc));
+	read_pos += len;
+	return len;
+}
+
+int blob_stream_buf::writeToDevice(const char_type* buffer, std::streamsize length) {
+	if (write_pos >= sqlite3_blob_bytes(blob))
+		return char_traits::eof();
+	const auto len = length % sqlite3_blob_bytes(blob);
+	if (const auto rc = sqlite3_blob_write(blob, buffer, len, write_pos); rc != SQLITE_OK)
+		throw runtime_error(sqlite3_errstr(rc));
+	write_pos += len;
+	return len;
+}
+
+blob_ios::blob_ios() {
+	poco_ios_init(&_buf);
+}
+
+void blob_ios::open(sqlite3* s, const std::string_view& db, const std::string_view& table, const std::string_view& column, const sqlite3_int64 row, const bool read_write) {
+	_buf.open(s, db, table, column, row, read_write);
+}
+
+blob_stream_buf* blob_ios::rdbuf() {
+	return &_buf;
+}
+
+blob_stream::blob_stream(): blob_ios::blob_ios(), std::iostream::basic_iostream(&_buf) { }
+
+blob_stream::blob_stream(sqlite3* s, const std::string_view& db, const std::string_view& table, const std::string_view& column, const sqlite3_int64 row, const bool read_write): blob_ios::blob_ios(), std::iostream::basic_iostream(&_buf) {
+	open(s, db, table, column, row, read_write);
 }
 
 pack* ScriptPack_Factory() {
