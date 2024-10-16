@@ -36,7 +36,7 @@ inline void decode_state(void* st, int* x, int* y, int* z) {
 	*z = (s >> NODE_BIT_SIZE * 2 & mc) - 10000;
 }
 
-pathfinder::pathfinder(int size, bool cache) {
+pathfinder::pathfinder(int size, bool cache) : gc_flag(false) {
 	pf = new micropather::MicroPather(this, size, 10, cache);
 	callback = NULL;
 	callback_data = NULL;
@@ -49,17 +49,42 @@ pathfinder::pathfinder(int size, bool cache) {
 	solving = false;
 	total_cost = 0;
 	automatic_reset = false;
+	asIScriptContext* ctx = asGetActiveContext();
+	if (ctx) ctx->GetEngine()->NotifyGarbageCollectorOfNewObject(this, ctx->GetEngine()->GetTypeInfoByName("pathfinder"));
 }
-void pathfinder::AddRef() {
-	asAtomicInc(RefCount);
+int pathfinder::AddRef() {
+	gc_flag = false;
+	return asAtomicInc(RefCount);
 }
-void pathfinder::Release() {
-	if (asAtomicDec(RefCount) < 1) {
-		if (callback) callback->Release();
+int pathfinder::Release() {
+	gc_flag = false;
+	if (asAtomicDec(RefCount) == 0) {
+		release_all_handles(nullptr);
 		reset();
 		delete pf;
 		delete this;
+		return 0;
 	}
+	return RefCount;
+}
+int pathfinder::get_ref_count() {
+	return RefCount;
+}
+void pathfinder::enum_references(asIScriptEngine* engine) {
+	if (callback) engine->GCEnumCallback(callback);
+	if (callback_data) engine->GCEnumCallback(callback_data);
+}
+void pathfinder::release_all_handles(asIScriptEngine* engine) {
+	if (callback) callback->Release();
+	if (callback_data) callback_data->Release();
+	callback = nullptr;
+	callback_data = nullptr;
+}
+void pathfinder::set_gc_flag() {
+	gc_flag = true;
+}
+bool pathfinder::get_gc_flag() {
+	return gc_flag;
 }
 void pathfinder::set_callback_function(asIScriptFunction* func) {
 	if (callback) callback->Release();
@@ -134,6 +159,7 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	if (search_range > 0 && allow_diagonals && sqrtf(powf(end_x - start_x, 2) + powf(end_y - start_y, 2) + powf(end_z - start_z, 2)) > search_range || search_range > 0 && !allow_diagonals && (fabs(end_x - start_x) + fabs(end_y - start_y) + fabs(end_z - start_z)) > search_range) return array;
 	if (automatic_reset) reset();
 	callback_data = data;
+	data->AddRef();
 	if (get_difficulty(start_x, start_y, start_z) > 9 || get_difficulty(end_x, end_y, end_z) > 9) return array;
 	void* start = encode_state(start_x, start_y, start_z, desperation_factor);
 	this->start_x = start_x;
@@ -144,6 +170,7 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	solving = true;
 	int result = pf->Solve(start, end, &path, &total_cost);
 	solving = false;
+	data->Release();
 	callback_data = NULL;
 	if (abort || must_reset || result != micropather::MicroPather::SOLVED) {
 		abort = false;
@@ -210,10 +237,15 @@ pathfinder* new_pathfinder(int size, bool cache) {
 	return new pathfinder(size, cache);
 }
 void RegisterScriptPathfinder(asIScriptEngine* engine) {
-	engine->RegisterObjectType("pathfinder", 0, asOBJ_REF);
+	engine->RegisterObjectType("pathfinder", 0, asOBJ_REF | asOBJ_GC);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_FACTORY, "pathfinder @p(int = 1024, bool = true)", asFUNCTION(new_pathfinder), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_ADDREF, "void f()", asMETHOD(pathfinder, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_RELEASE, "void f()", asMETHOD(pathfinder, Release), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_GETREFCOUNT, "int f()", asMETHOD(pathfinder, get_ref_count), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_SETGCFLAG, "void f()", asMETHOD(pathfinder,set_gc_flag), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_GETGCFLAG, "bool f()", asMETHOD(pathfinder, get_gc_flag), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_ENUMREFS, "void f(int&in)", asMETHOD(pathfinder, enum_references), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_RELEASEREFS, "void f(int&in)", asMETHOD(pathfinder, release_all_handles), asCALL_THISCALL);
 	engine->RegisterObjectProperty("pathfinder", "const bool solving", asOFFSET(pathfinder, solving));
 	engine->RegisterObjectProperty("pathfinder", "const float total_cost", asOFFSET(pathfinder, total_cost));
 	engine->RegisterObjectProperty("pathfinder", "int desperation_factor", asOFFSET(pathfinder, desperation_factor));

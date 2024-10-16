@@ -34,7 +34,7 @@
 #include <SDL3/SDL.h>
 #include <tinyexpr.h>
 #include <dbgtools.h>
-#include "angelscript.h"
+#include "nvgt_angelscript.h"
 #include "nvgt.h"
 #include "UI.h" // wait
 #include "bl_number_to_words.h"

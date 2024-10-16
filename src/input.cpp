@@ -21,7 +21,7 @@
 #include <obfuscate.h>
 #include <sstream>
 #include <string>
-#include "angelscript.h"
+#include "nvgt_angelscript.h"
 #include "input.h"
 #include "misc_functions.h"
 #include "nvgt.h"

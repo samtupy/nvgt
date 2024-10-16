@@ -34,7 +34,7 @@
 #include <Poco/zlib.h>
 #include <Poco/Util/Application.h>
 #include <SDL3/SDL.h>
-#include "angelscript.h"
+#include "nvgt_angelscript.h"
 #include "bullet3.h"
 #include "bundling.h"
 #include "compression.h"
@@ -583,6 +583,11 @@ public:
 	bool fail, isUI, quiet;
 	CompileExecutableTask(asIScriptEngine* engine, const string& script_file) : stage(0), fail(false), isUI(Util::Application::instance().config().has("application.gui")), quiet(Util::Application::instance().config().has("application.quiet") || Util::Application::instance().config().has("application.QUIET")), engine(engine), script_file(script_file), output(nvgt_init_compilation(script_file, false)) {}
 	void compile() {
+		output->set_status("compiling...");
+		if (CompileScript(g_ScriptEngine, script_file.c_str()) < 0) {
+			fail = true;
+			return;
+		}
 		output->prepare();
 		if (!output) {
 			engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, "failed to initialize compilation output context");

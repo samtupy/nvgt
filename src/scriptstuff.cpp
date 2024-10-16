@@ -46,7 +46,7 @@ void garbage_collect(bool full = true) {
 	if (!full && g_GCMode < 3)
 		g_ScriptEngine->GarbageCollect(asGC_ONE_STEP | asGC_DETECT_GARBAGE);
 	else if (full && g_GCMode < 3)
-		g_ScriptEngine->GarbageCollect(asGC_FULL_CYCLE | asGC_DESTROY_GARBAGE);
+		g_ScriptEngine->GarbageCollect(asGC_FULL_CYCLE);
 	else if (full && g_GCMode == 3)
 		g_GCAutoFullTime = 0;
 }
