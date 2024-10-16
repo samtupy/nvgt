@@ -1,4 +1,4 @@
-/* pack2.cpp - pack API version 2 implementation
+/* pack.cpp - pack API version 2 implementation
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -29,7 +29,6 @@ static once_flag SQLITE3MC_INITIALIZER;
 
 pack::pack() {
 	db = nullptr;
-	pack_streams.clear();
 	call_once(SQLITE3MC_INITIALIZER, []() {
 		sqlite3_initialize();
 		#ifdef SQLITE3MC_H_
@@ -105,7 +104,15 @@ bool pack::add_file(const string& disk_filename, const string& pack_filename, bo
 	}
 	while (true) {
 		const auto rc = sqlite3_step(stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(stmt);
+				continue;
+			}
 		else if (rc == SQLITE_DONE) break;
 		else {
 			sqlite3_finalize(stmt);
@@ -154,7 +161,15 @@ bool pack::add_memory(const string& pack_filename, unsigned char* data, unsigned
 	}
 	while (true) {
 		const auto rc = sqlite3_step(stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(stmt);
+				continue;
+			}
 		else if (rc == SQLITE_DONE) break;
 		else {
 			sqlite3_finalize(stmt);
@@ -187,7 +202,14 @@ bool pack::add_memory(const string& pack_filename, const string& data, bool allo
 	}
 	while (true) {
 		const auto rc = sqlite3_step(stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				continue;
+			}
 		else if (rc == SQLITE_DONE) break;
 		else {
 			sqlite3_finalize(stmt);
@@ -212,7 +234,15 @@ bool pack::delete_file(const string& pack_filename) {
 	}
 	while (true) {
 		const auto rc = sqlite3_step(stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(stmt);
+				continue;
+			}
 		else if (rc == SQLITE_DONE) break;
 		else {
 			sqlite3_finalize(stmt);
@@ -234,7 +264,15 @@ bool pack::file_exists(const string& pack_filename) {
 	}
 	while (true) {
 		const auto rc = sqlite3_step(stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(stmt);
+				continue;
+			}
 		else if (rc == SQLITE_DONE) break;
 		else if (rc == SQLITE_ROW) {
 			sqlite3_finalize(stmt);
@@ -259,7 +297,15 @@ string pack::get_file_name(const int64_t idx) {
 	}
 	while (true) {
 		const auto rc = sqlite3_step(stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(stmt);
+				continue;
+			}
 		else if (rc == SQLITE_DONE) break;
 		else if (rc == SQLITE_ROW) {
 			std::string name;
@@ -285,7 +331,15 @@ void pack::list_files(std::vector<std::string>& files) {
 	}
 	while (true) {
 		const auto rc = sqlite3_step(stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(stmt);
+				continue;
+			}
 		else if (rc == SQLITE_DONE) break;
 		else if (rc == SQLITE_ROW) {
 			std::string name;
@@ -313,7 +367,15 @@ CScriptArray* pack::list_files() {
 	}
 	while (true) {
 		const auto rc = sqlite3_step(count_stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(count_stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(count_stmt);
+				continue;
+			}
 		else if (rc == SQLITE_DONE) return nullptr;
 		else if (rc == SQLITE_ROW) {
 			array->Reserve(sqlite3_column_int64(count_stmt, 0));
@@ -330,7 +392,15 @@ CScriptArray* pack::list_files() {
 	}
 	while (true) {
 		const auto rc = sqlite3_step(names_stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(names_stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(names_stmt);
+				continue;
+			}
 		else if (rc == SQLITE_DONE) break;
 		else if (rc == SQLITE_ROW) {
 			std::string name;
@@ -359,7 +429,15 @@ uint64_t pack::get_file_size(const string& pack_filename) {
 	}
 	while (true) {
 		const auto rc = sqlite3_step(stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(stmt);
+				continue;
+			}
 		else if (rc == SQLITE_DONE) break;
 		else if (rc == SQLITE_ROW) {
 			auto size = sqlite3_column_bytes(stmt, 0);
@@ -386,7 +464,15 @@ unsigned int pack::read_file(const string& pack_filename, unsigned int offset, u
 	}
 	while (true) {
 		const auto rc = sqlite3_step(stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(stmt);
+				continue;
+			}
 		else if (rc == SQLITE_ROW) {
 			rowid = sqlite3_column_int64(stmt, 0);
 			break;
@@ -424,7 +510,15 @@ string pack::read_file_string(const string& pack_filename, unsigned int offset, 
 	}
 	while (true) {
 		const auto rc = sqlite3_step(stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(stmt);
+				continue;
+			}
 		else if (rc == SQLITE_ROW) {
 			rowid = sqlite3_column_int64(stmt, 0);
 			break;
@@ -463,7 +557,15 @@ uint64_t pack::size() {
 	}
 	while (true) {
 		const auto rc = sqlite3_step(stmt);
-		if (rc == SQLITE_BUSY) continue;
+		if (rc == SQLITE_BUSY)
+			if (sqlite3_get_autocommit(db)) {
+				sqlite3_reset(stmt);
+				continue;
+			} else {
+				sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
+				sqlite3_reset(stmt);
+				continue;
+			}
 		else if (rc == SQLITE_DONE) break;
 		else if (rc == SQLITE_ROW) size += sqlite3_column_bytes(stmt, 0);
 		else {

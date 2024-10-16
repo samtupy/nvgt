@@ -1,4 +1,4 @@
-/* pack2.h - pack API version 2 implementation header
+/* pack.h - pack API version 2 implementation header
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -18,13 +18,15 @@
 #include <Poco/RefCountedObject.h>
 #include <scriptarray.h>
 #include <vector>
+#include <Poco/BufferedBidirectionalStreamBuf.h>
+#include <string_view>
+#include <iostream>
 
 class asIScriptEngine;
 
 class pack : public Poco::RefCountedObject {
 private:
 	sqlite3* db;
-	std::unordered_map<std::uint64_t, sqlite3_blob*> pack_streams;
 public:
 	pack();
 	bool open(const std::string& filename, int mode, const std::string& key);
@@ -44,7 +46,7 @@ public:
 	std::uint64_t size();
 	bool is_active() {
 		return db;
-	};
+	}
 };
 
 void RegisterScriptPack(asIScriptEngine* engine);
