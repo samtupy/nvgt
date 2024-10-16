@@ -75,6 +75,10 @@ else:
 		env["CXXFLAGS"].append("-maes")
 	if is_compiler_flag_available("-maes"):
 		env["CCFLAGS"].append("-maes")
+	if is_compiler_flag_available("-mavx", True):
+		env["CXXFLAGS"].append("-mavx")
+	if is_compiler_flag_available("-mavx"):
+		env["CCFLAGS"].append("-mavx")
 if env["PLATFORM"] == "darwin":
 	# homebrew paths and other libraries/flags for MacOS
 	env.Append(CCFLAGS = ["-mmacosx-version-min=14.0", "-arch", "arm64", "-arch", "x86_64"], LINKFLAGS = ["-arch", "arm64", "-arch", "x86_64"])

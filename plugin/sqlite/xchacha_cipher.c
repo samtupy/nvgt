@@ -126,7 +126,7 @@ static int encrypt_page(void* cipher, int page, unsigned char* data, int len, in
 		memcpy(c->salt, data, 16);
 	} else
 		crypto_aead_lock(data, (uint8_t*)data[actual_size + 24], c->key, nonce, NULL, 0, (uint8_t*)data, actual_size);
-	for (auto i = 0; i < 24; ++i) {
+	for (int i = 0; i < 24; ++i) {
 		data[actual_size + i] = nonce[i];
 	}
 	c->counter++;
@@ -141,19 +141,19 @@ static int decrypt_page(void* cipher, int page, unsigned char* data, int len, in
 	const int actual_size = len - reserved;
 	uint8_t nonce[24];
 	memset(nonce, 0, 24);
-	for (auto i = 0; i < 24; ++i) {
+	for (int i = 0; i < 24; ++i) {
 		nonce[i] = data[actual_size + i];
 	}
 	uint8_t mac[16];
 	memset(mac, 0, 16);
-	for (auto i = 0; i < 16; ++i) {
+	for (int i = 0; i < 16; ++i) {
 		mac[i] = data[actual_size + 24 + i];
 	}
 	if (page == 1) {
 		if (crypto_aead_unlock(data + 24, mac, c->key, nonce, NULL, 0, data + 24, actual_size - 24) == -1) {
 			return SQLITE_IOERR_CORRUPTFS;
 		}
-		for (auto i = 0; i < 16; ++i)
+		for (int i = 0; i < 16; ++i)
 			c->salt[i] = data[i];
 	} else
 		if (crypto_aead_unlock(data, mac, c->key, nonce, NULL, 0, data, actual_size) == -1) {
