@@ -65,7 +65,7 @@ if env["PLATFORM"] == "win32":
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
 else:
 	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result"], LIBS = ["m"])
-	if ARGUMENTS.get("debug", "0") == 1:
+	if ARGUMENTS.get("debug", "0") == "1":
 		env["CXXFLAGS"].extend(["-O0", "-g"])
 		env["CCFLAGS"].extend(["-O0", "-g"])
 	else:

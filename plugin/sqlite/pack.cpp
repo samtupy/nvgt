@@ -37,6 +37,7 @@ pack::pack() {
 			throw runtime_error(Poco::format("Internal error: can't register cipher: %s", string(sqlite3_errstr(rc))));
 		}
 		#endif
+		CScriptArray::SetMemoryFunctions(std::malloc, std::free);
 	});
 }
 
@@ -54,7 +55,7 @@ bool pack::open(const string& filename, int mode, const string& key) {
 	if (const auto rc = sqlite3_exec(db, "create table if not exists pack_files(file_name primary key not null unique, data); create unique index if not exists pack_files_index on pack_files(file_name);", nullptr, nullptr, nullptr); rc != SQLITE_OK) {
 		throw runtime_error(Poco::format("Internal error: could not create table or index: %s", string(sqlite3_errmsg(db))));
 	}
-	if (const auto rc = sqlite3_db_config(db, SQLITE_DBCONFIG_DEFENSIVE, 1); rc != SQLITE_OK) {
+	if (const auto rc = sqlite3_db_config(db, SQLITE_DBCONFIG_DEFENSIVE, 1, NULL); rc != SQLITE_OK) {
 		throw runtime_error(Poco::format("Internal error: culd not set defensive mode: %s", string(sqlite3_errmsg(db))));
 	}
 	return true;
@@ -126,10 +127,6 @@ bool pack::add_file(const string& disk_filename, const string& pack_filename, bo
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
 		offset += stream.gcount();
-	}
-	if (const auto rc = sqlite3_blob_write(blob, buffer, stream.gcount(), offset); rc != SQLITE_OK) {
-		sqlite3_blob_close(blob);
-		throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 	}
 	sqlite3_blob_close(blob);
 	return true;

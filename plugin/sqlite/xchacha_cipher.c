@@ -21,7 +21,6 @@
 
 struct xchacha20_cipher {
 	uint8_t key[32];
-	uint8_t salt[16];
 	uint64_t counter;
 };
 
@@ -44,7 +43,6 @@ static void clone_cipher(void* cipherTo, void* cipherFrom) {
 	struct xchacha20_cipher* c1 = (struct xchacha20_cipher*)cipherFrom;
 	struct xchacha20_cipher* c2 = (struct xchacha20_cipher*)cipherTo;
 	memcpy(c2->key, c1->key, 32);
-	memcpy(c2->salt, c1->salt, 16);
 	c2->counter = c1->counter;
 }
 
@@ -61,34 +59,12 @@ static int get_reserved_size(void *cipher) {
 }
 
 static unsigned char* get_salt(void* cipher) {
-	if (!cipher) return NULL;
-	struct xchacha20_cipher* c = (struct xchacha20_cipher*)cipher;
-	return c->salt;
+	return NULL;
 }
 
 static void generate_key(void* cipher, BtSharedMC* PBt, char* userPassword, int passwordLength, int rekey, unsigned char* salt) {
 	struct xchacha20_cipher* c = (struct xchacha20_cipher*)cipher;
-	if (rekey) {
-		while (rng_get_bytes(c->salt, 16) != 16);
-	} else if (salt != NULL) {
-		memcpy(c->salt, salt, 16);
-	}
-	crypto_argon2_config config;
-	config.algorithm = CRYPTO_ARGON2_I;
-	config.nb_blocks = 7168;
-	config.nb_passes = 5;
-	config.nb_lanes = 1;
-	crypto_argon2_inputs inputs;
-	inputs.pass = (uint8_t*)userPassword;
-	inputs.pass_size = passwordLength;
-	inputs.salt = c->salt;
-	inputs.salt_size = 16;
-	crypto_argon2_extras extras = {0};
-	uint8_t key[32];
-	uint8_t* work_area = sqlite3_malloc(config.nb_blocks*1024);
-	crypto_argon2(key, 32, work_area, config, inputs, extras);
-	sqlite3_free(work_area);
-	crypto_sha512_hkdf(c->key, 32, key, 32, c->salt, 16, NULL, 0);
+	crypto_sha512_hkdf(c->key, 32, userPassword, passwordLength, NULL, 0, NULL, 0);
 }
 
 static int encrypt_page(void* cipher, int page, unsigned char* data, int len, int reserved) {
@@ -121,11 +97,7 @@ static int encrypt_page(void* cipher, int page, unsigned char* data, int len, in
 	nonce[21] = (n2 >> (8 * 5)) & 0xff;
 	nonce[22] = (n2 >> (8 * 6)) & 0xff;
 	nonce[23] = (n2 >> (8 * 7)) & 0xff;
-	if (page == 1) {
-		crypto_aead_lock(data + 24, (uint8_t*)data[actual_size + 24], c->key, nonce, NULL, 0, (uint8_t*)data+24, actual_size - 24);
-		memcpy(c->salt, data, 16);
-	} else
-		crypto_aead_lock(data, (uint8_t*)data[actual_size + 24], c->key, nonce, NULL, 0, (uint8_t*)data, actual_size);
+	crypto_aead_lock(data, &data[actual_size + 24], c->key, nonce, NULL, 0, data, actual_size);
 	for (int i = 0; i < 24; ++i) {
 		data[actual_size + i] = nonce[i];
 	}
@@ -149,17 +121,9 @@ static int decrypt_page(void* cipher, int page, unsigned char* data, int len, in
 	for (int i = 0; i < 16; ++i) {
 		mac[i] = data[actual_size + 24 + i];
 	}
-	if (page == 1) {
-		if (crypto_aead_unlock(data + 24, mac, c->key, nonce, NULL, 0, data + 24, actual_size - 24) == -1) {
-			return SQLITE_IOERR_CORRUPTFS;
-		}
-		for (int i = 0; i < 16; ++i)
-			c->salt[i] = data[i];
-	} else
-		if (crypto_aead_unlock(data, mac, c->key, nonce, NULL, 0, data, actual_size) == -1) {
-			return SQLITE_IOERR_CORRUPTFS;
-		}
-
+	if (crypto_aead_unlock(data, mac, c->key, nonce, NULL, 0, data, actual_size) == -1) {
+		return SQLITE_IOERR_CORRUPTFS;
+	}
 	return SQLITE_OK;
 }
 
