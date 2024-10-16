@@ -2,7 +2,6 @@
 // Copyright (C) 2022-2024 Sam Tupy
 // License: zlib (see license.md in the root of the NVGT distribution)
 
-#pragma platform mac
 #pragma stub c
 
 void test_thread(dictionary@ d = null) {
