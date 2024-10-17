@@ -23,6 +23,7 @@
 #include <mutex>
 #include "xchacha_cipher.h"
 #include <Poco/StreamUtil.h>
+#include <algorithm>
 
 using namespace std;
 
@@ -52,6 +53,9 @@ bool pack::open(const string& filename, int mode, const string& key) {
 		}
 	}
 	#endif
+	if (const auto rc = sqlite3_exec(db, "pragma journal_mode=wal;", nullptr, nullptr, nullptr); rc != SQLITE_OK) {
+		throw runtime_error(Poco::format("Internal error: could not set journaling mode: %s", string(sqlite3_errmsg(db))));
+	}
 	if (const auto rc = sqlite3_exec(db, "create table if not exists pack_files(file_name primary key not null unique, data); create unique index if not exists pack_files_index on pack_files(file_name);", nullptr, nullptr, nullptr); rc != SQLITE_OK) {
 		throw runtime_error(Poco::format("Internal error: could not create table or index: %s", string(sqlite3_errmsg(db))));
 	}
@@ -62,9 +66,10 @@ bool pack::open(const string& filename, int mode, const string& key) {
 }
 
 pack::~pack() {
-	if (db)
+	if (db) {
 		sqlite3_close(db);
 		db = nullptr;
+	}
 }
 
 #ifdef SQLITE3MC_H_
@@ -122,6 +127,7 @@ bool pack::add_file(const string& disk_filename, const string& pack_filename, bo
 			}
 		else if (rc == SQLITE_DONE) break;
 		else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -144,6 +150,29 @@ bool pack::add_file(const string& disk_filename, const string& pack_filename, bo
 	}
 	sqlite3_blob_close(blob);
 	return true;
+}
+
+bool pack::add_directory(const string& dir, bool allow_replace) {
+	if (!filesystem::exists(dir) || !filesystem::is_directory(dir)) return false;
+	if (const auto rc = sqlite3_exec(db, "begin immediate transaction;", nullptr, nullptr, nullptr); rc != SQLITE_OK) {
+		throw runtime_error(Poco::format("Could not begin transaction: %s", string(sqlite3_errmsg(db))));
+	}
+	// To do: make the following process a lot more robust
+	for (const auto& f: filesystem::recursive_directory_iterator(dir)) {
+		// Skip certain types of files where reading from them would be nonsensical
+		if (!f.is_regular_file()) continue;
+		auto p = f.path().string();
+		ranges::replace(p, '\\', '/');
+		if (!add_file(f.path().string(), p, allow_replace)) {
+			if (!sqlite3_get_autocommit(db))
+				sqlite3_exec(db, "rollback;", nullptr, nullptr, nullptr);
+			return false;
+		}
+	}
+	if (const auto rc = sqlite3_exec(db, "commit;", nullptr, nullptr, nullptr); rc != SQLITE_OK) {
+		throw runtime_error(Poco::format("Could not commit transaction: %s", string(sqlite3_errmsg(db))));
+	}
+return true;
 }
 
 bool pack::add_memory(const string& pack_filename, unsigned char* data, unsigned int size, bool allow_replace) {
@@ -179,6 +208,7 @@ bool pack::add_memory(const string& pack_filename, unsigned char* data, unsigned
 			}
 		else if (rc == SQLITE_DONE) break;
 		else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -219,6 +249,7 @@ bool pack::add_memory(const string& pack_filename, const string& data, bool allo
 			}
 		else if (rc == SQLITE_DONE) break;
 		else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -252,6 +283,7 @@ bool pack::delete_file(const string& pack_filename) {
 			}
 		else if (rc == SQLITE_DONE) break;
 		else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -285,6 +317,7 @@ bool pack::file_exists(const string& pack_filename) {
 			sqlite3_finalize(stmt);
 			return true;
 		} else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -323,6 +356,7 @@ string pack::get_file_name(const int64_t idx) {
 			sqlite3_finalize(stmt);
 			return name;
 		} else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -356,6 +390,7 @@ void pack::list_files(std::vector<std::string>& files) {
 			}
 			files.emplace_back(name);
 		} else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(stmt);
 			throw std::runtime_error(Poco::format("Cannot list files: %s", sqlite3_errmsg(db)));
 		}
@@ -388,6 +423,7 @@ CScriptArray* pack::list_files() {
 			array->Reserve(sqlite3_column_int64(count_stmt, 0));
 			break;
 		} else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(count_stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -417,6 +453,7 @@ CScriptArray* pack::list_files() {
 			}
 			array->InsertLast(&name);
 		} else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(names_stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -451,6 +488,7 @@ uint64_t pack::get_file_size(const string& pack_filename) {
 			sqlite3_finalize(stmt);
 			return size;
 		} else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -484,6 +522,7 @@ unsigned int pack::read_file(const string& pack_filename, unsigned int offset, u
 			rowid = sqlite3_column_int64(stmt, 0);
 			break;
 		} else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -530,6 +569,7 @@ string pack::read_file_string(const string& pack_filename, unsigned int offset, 
 			rowid = sqlite3_column_int64(stmt, 0);
 			break;
 		} else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -576,6 +616,7 @@ uint64_t pack::size() {
 		else if (rc == SQLITE_DONE) break;
 		else if (rc == SQLITE_ROW) size += sqlite3_column_bytes(stmt, 0);
 		else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -585,6 +626,7 @@ uint64_t pack::size() {
 }
 
 blob_stream pack::open_file(const std::string& file_name, const bool rw) {
+	if (!file_exists(file_name)) throw ios_base::failure(Poco::format("File %s does not exist", file_name));
 	sqlite3_stmt* stmt;
 	int64_t rowid = 0;
 	if (const auto rc = sqlite3_prepare_v3(db, "select rowid from pack_files where file_name = ?", -1, 0, &stmt, nullptr); rc != SQLITE_OK) {
@@ -609,6 +651,7 @@ blob_stream pack::open_file(const std::string& file_name, const bool rw) {
 			rowid = sqlite3_column_int64(stmt, 0);
 			break;
 		} else {
+			if (!sqlite3_get_autocommit(db)) sqlite3_exec(db, "rollback", nullptr, nullptr, nullptr);
 			sqlite3_finalize(stmt);
 			throw runtime_error(Poco::format("Internal error: %s", string(sqlite3_errmsg(db))));
 		}
@@ -755,6 +798,7 @@ void RegisterScriptPack(asIScriptEngine* engine) {
 	#endif
 	engine->RegisterObjectMethod("sqlite_pack", "bool close()", asMETHOD(pack, close), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sqlite_pack", "bool add_file(const string &in disc_filename, const string& in pack_filename, bool allow_replace = false)", asMETHOD(pack, add_file), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sqlite_pack", "bool add_directory(const string &in dir, const bool allow_replace = false)", asMETHOD(pack, add_directory), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sqlite_pack", "bool add_memory(const string &in pack_filename, const string& in data, bool allow_replace = false)", asMETHODPR(pack, add_memory, (const string&, const string&, bool), bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sqlite_pack", "bool delete_file(const string &in pack_filename)", asMETHOD(pack, delete_file), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sqlite_pack", "bool file_exists(const string &in pack_filename) const", asMETHOD(pack, file_exists), asCALL_THISCALL);

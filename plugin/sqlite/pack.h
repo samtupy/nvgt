@@ -35,6 +35,7 @@ public:
 	bool rekey(const std::string& key);
 	bool close();
 	bool add_file(const std::string& disk_filename, const std::string& pack_filename, bool allow_replace = false);
+	bool add_directory(const std::string& dir, bool allow_replace = false);
 	bool add_memory(const std::string& pack_filename, unsigned char* data, unsigned int size, bool allow_replace = false);
 	bool add_memory(const std::string& pack_filename, const std::string& data, bool allow_replace = false);
 	bool delete_file(const std::string& pack_filename);
