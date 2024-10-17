@@ -27,6 +27,7 @@ static bool sqlite_started = false;
 void init_sqlite() {
 	if (sqlite_started) return;
 	sqlite3_auto_extension((void(*)(void))sqlite3_eval_init);
+	sqlite3_auto_extension((void(*)(void))sqlite3_spellfix_init);
 	sqlite_started = true;
 }
 
