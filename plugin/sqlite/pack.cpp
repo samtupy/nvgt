@@ -694,7 +694,7 @@ blob_stream_buf::pos_type blob_stream_buf::seekpos(blob_stream_buf::pos_type pos
 int blob_stream_buf::readFromDevice(char_type* buffer, std::streamsize length) {
 	if (read_pos >= sqlite3_blob_bytes(blob) || read_pos < 0)
 		return char_traits::eof();
-	const auto len = length % sqlite3_blob_bytes(blob);
+	const auto len = (read_pos + length) % sqlite3_blob_bytes(blob);
 	if (const auto rc = sqlite3_blob_read(blob, buffer, len, read_pos); rc != SQLITE_OK)
 		throw runtime_error(sqlite3_errstr(rc));
 	read_pos += len;
@@ -704,7 +704,7 @@ int blob_stream_buf::readFromDevice(char_type* buffer, std::streamsize length) {
 int blob_stream_buf::writeToDevice(const char_type* buffer, std::streamsize length) {
 	if (write_pos >= sqlite3_blob_bytes(blob))
 		return char_traits::eof();
-	const auto len = length % sqlite3_blob_bytes(blob);
+	const auto len = (write_pos + length) % sqlite3_blob_bytes(blob);
 	if (const auto rc = sqlite3_blob_write(blob, buffer, len, write_pos); rc != SQLITE_OK)
 		throw runtime_error(sqlite3_errstr(rc));
 	write_pos += len;
