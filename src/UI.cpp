@@ -186,6 +186,8 @@ bool urlopen(const std::string& url) {
 void next_keyboard_layout() {
 	#ifdef _WIN32
 	ActivateKeyboardLayout((HKL)HKL_NEXT, 0);
+	#elif defined(__APPLE__)
+	nextMacInputSource();
 	#endif
 }
 std::string input_box(const std::string& title, const std::string& text, const std::string& default_value) {
@@ -330,6 +332,7 @@ void refresh_window() {
 		post_events.clear();
 	}
 }
+
 void wait(int ms) {
 	if (!g_WindowHandle || g_WindowThreadId != thread_current_thread_id()) {
 		Poco::Thread::sleep(ms);
@@ -346,6 +349,7 @@ void wait(int ms) {
 	}
 	refresh_window();
 }
+
 
 
 // The following function contributed to NVGT by silak

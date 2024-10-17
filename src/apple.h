@@ -20,6 +20,7 @@ bool voice_over_speak(const std::string& message, bool interrupt = true);
 void voice_over_window_created();
 void voice_over_speech_shutdown();
 std::string apple_input_box(const std::string& title, const std::string& message, const std::string& default_value = "", bool secure = false, bool readonly = false);
+void nextMacInputSource();
 
 // Definition for AVTTSVoice class created by Gruia Chiscop on 6/6/24.
 class AVTTSVoice {
@@ -31,6 +32,7 @@ public:
 	void deinit();
 	bool speak(const std::string& text, bool interrupt);
 	bool speakWait(const std::string& text, bool interrupt);
+	bool speakToFile(const std::string& fileName, const std::string& text);
 	bool stopSpeech();
 	bool pauseSpeech();
 	CScriptArray* getAllVoices() const;
