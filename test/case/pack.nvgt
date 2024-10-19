@@ -1,13 +1,11 @@
-#include "file_contents.nvgt"
-
 void test_pack() {
-	put_file_contents("tmp/pack.dat", "test overwrite: lets start with bogus data");
+	file_put_contents("tmp/pack.dat", "test overwrite: lets start with bogus data");
 	dictionary cases;
 	pack p;
 	assert(p.open("tmp/pack.dat", PACK_OPEN_MODE_CREATE));
 	string[]@ case_list = find_files("case/*.nvgt");
 	for (uint i = 0; i < case_list.length(); i++) {
-		string case_data = get_file_contents("case/" + case_list[i]);
+		string case_data = file_get_contents("case/" + case_list[i]);
 		if (case_data.empty()) {
 			case_list.remove_at(i);
 			i--;
