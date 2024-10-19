@@ -1,0 +1,20 @@
+/**
+	Determines the best location to store user data for your game, creating the directory for you if necessary.
+	string get_preferences_path(string company_name, string product_name);
+	## Arguments:
+		* string company_name: The name of your organization, can be blank.
+		* string product_name: The name of your game or application.
+	## Remarks:
+		This is the recommended way to determine where your game should store application data. While other properties exist such as DIRECTORY_APPDATA which can be used to compose your own path if you desire, this function is generally more robust and platform agnostic than trying to prepare your own storage path using directory constants. This also frees you from needing to check for the existance of the directory before writing to it.
+		The company name and product name should never change for an application once you start using them, lest players lose access to their previous save data due to the directory changing names. The company name can be blank if you wish to only create one level of new directories in the users appdata, though this is generally not recommended to avoid clutter.
+		Both the company and product name are expected to contain only spaces and alphanumeric characters if you wish to be as platform agnostic as possible.
+		You should not assume that DIRECTORY_APPDATA + "/" + company_name + "/" + product_name will be the same as the directory returned by this function, or even that both the company and product names will be used all the time. On android, for example, this function always just returns the app's internal storage path.
+		This function is also registered as the alias DIRECTORY_PREFERENCES, for those who prefer the old style of directory constants naming.
+*/
+
+// Example:
+void main() {
+	string path = get_preferences_path("", "documentation example");
+	alert("test", "data will be stored at " + path);
+	directory_delete(path); // In this example we don't actually want this directory to save.
+}

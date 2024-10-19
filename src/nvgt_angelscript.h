@@ -13,17 +13,15 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <angelscript.h>
 #include <scriptarray.h>
-#include "contextmgr.h"
 
 extern std::string g_compiled_basename;
 extern CScriptArray* g_command_line_args;
 extern std::string g_CommandLine;
-extern std::vector<asIScriptContext*> g_ctxPool;
 extern std::vector<std::string> g_IncludeDirs;
 extern std::vector<std::string> g_IncludeScripts;
-extern CContextMgr* g_ctxMgr;
 
 void ShowAngelscriptMessages();
 int ConfigureEngine(asIScriptEngine* engine);
@@ -38,10 +36,4 @@ int ExecuteScript(asIScriptEngine* engine, const std::string& scriptFile);
 	int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size);
 	int LoadCompiledExecutable(asIScriptEngine* engine);
 #endif
-void MessageCallback(const asSMessageInfo* msg, void* param);
-asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* param);
-void ReturnContextCallback(asIScriptEngine* engine, asIScriptContext* ctx, void* param);
-void ExceptionHandlerCallback(asIScriptContext* ctx, void* obj);
-asUINT GetTimeCallback();
-asITypeInfo* get_array_type(const std::string& decl);
-void RegisterUnsorted(asIScriptEngine* engine);
+asITypeInfo* get_array_type(const std::string& decl);void RegisterUnsorted(asIScriptEngine* engine);
