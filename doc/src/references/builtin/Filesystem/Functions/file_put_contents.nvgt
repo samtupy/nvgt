@@ -11,7 +11,7 @@
 
 // Example:
 void main() {
-	if (!put_file_contents("example.txt", "This is an example"))
+	if (!file_put_contents("example.txt", "This is an example"))
 		alert("Example", "Failed to write the file.");
 	else
 		alert("Example", "Successfully wrote the example file.");
