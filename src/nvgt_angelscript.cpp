@@ -927,13 +927,14 @@ std::string Vector3ToString(void* obj, int expandMembers, CDebugger* dbg) {
 }
 #ifdef _WIN32
 BOOL WINAPI debugger_ctrlc(DWORD event) {
-	if (event != CTRL_C_EVENT || !g_dbg || g_dbg->IsTakingCommands()) return FALSE;
+	if ((event != CTRL_C_EVENT && event != CTRL_BREAK_EVENT) || !g_dbg || g_dbg->IsTakingCommands()) return FALSE;
 	g_ASDebugBreak = true;
 	return TRUE;
 }
 #endif
 void InitializeDebugger(asIScriptEngine* engine) {
 	#ifdef _WIN32
+	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
 	SetConsoleCtrlHandler(debugger_ctrlc, TRUE);;
 	#endif
 	g_dbg = new CDebugger();
