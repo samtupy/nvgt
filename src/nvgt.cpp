@@ -234,7 +234,7 @@ protected:
 		#if defined(__APPLE__) || defined(__ANDROID__)
 			scriptfile = event_requested_file(); // Files opened from external apps on MacOS, IOS, and Android do not use command line arguments.
 		#endif
-		if (scriptfile.empty() && mode == NVGT_RUN) scriptfile = args.size() > 0? args[0] : config().hasOption("application.gui")? UILauncher() : "";
+		if (scriptfile.empty() && (mode == NVGT_RUN || mode == NVGT_COMPILE)) scriptfile = args.size() > 0? args[0] : config().hasOption("application.gui")? UILauncher() : "";
 		if (mode == NVGT_EXIT) return Application::EXIT_OK;
 		else if (mode == NVGT_HELP) {
 			displayHelp();

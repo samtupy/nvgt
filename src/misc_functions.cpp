@@ -343,4 +343,12 @@ void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("void memory_free(uint64 ptr)"), asFUNCTION(free), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float parse_float(const string &in number)", asFUNCTION(parse_float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double parse_double(const string &in number)", asFUNCTION(parse_double), asCALL_CDECL);
+	engine->RegisterEnum("system_power_state");
+	engine->RegisterEnumValue("system_power_state", "POWER_STATE_ERROR", SDL_POWERSTATE_ERROR);
+	engine->RegisterEnumValue("system_power_state", "POWER_STATE_UNKNOWN", SDL_POWERSTATE_UNKNOWN);
+	engine->RegisterEnumValue("system_power_state", "POWER_STATE_ON_BATTERY", SDL_POWERSTATE_ON_BATTERY);
+	engine->RegisterEnumValue("system_power_state", "POWER_STATE_NO_BATTERY", SDL_POWERSTATE_NO_BATTERY);
+	engine->RegisterEnumValue("system_power_state", "POWER_STATE_CHARGING", SDL_POWERSTATE_CHARGING);
+	engine->RegisterEnumValue("system_power_state", "POWER_STATE_CHARGED", SDL_POWERSTATE_CHARGED);
+	engine->RegisterGlobalFunction("system_power_state system_power_info(int&out seconds = void, int&out percent = void)", asFUNCTION(SDL_GetPowerInfo), asCALL_CDECL);
 }

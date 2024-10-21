@@ -28,6 +28,7 @@ class menu {
 	string background_callback_data;
 	bool wrap = false; // If the user moves beyond an edge of the menu, set this to true to jump them to the other edge, or false to play an edge sound and repeat the last item.
 	uint wrap_delay = 10; // How much time should the menu block when wrapping.
+	bool repeat_boundary_items = false; // Menu items will not speak when the user repeatedly hits the edge of a non-wrapping menu if this is set to false.
 	bool focus_first_item = false; // If this is false, the user will be required to press an arrow key to focus either the first or last item of the menu after the intro function has been called. Otherwise they will be focused on the first item.
 	bool automatic_intro = true; // If this is true, the intro function will be automatically called the first time the monitor method is invoqued, then the variable will be set to false. It can be set to true again at any time to cause the intro sequence to repeat, or the intro function can be called manually.
 	pack@ pack_file; // Optionally set this to a pack containing sounds.
@@ -151,6 +152,7 @@ class menu {
 	}
 	private int on_form_list_event(audio_form@ f, int c, control_event_type event, dictionary@ args) {
 		if (event != event_list_cursor) return 0;
+		f.set_list_properties(f_list, false, repeat_boundary_items);
 		if (args.exists("boundary")) {
 			if (!wrap) {
 				play(edge_sound);
@@ -159,7 +161,7 @@ class menu {
 			play(wrap_sound);
 			stop_speech();
 			wait(wrap_delay);
-			f.set_list_position(0, int(args["key"]) == KEY_DOWN? 0 : f.get_list_count(0) -1, true);
+			f.set_list_position(f_list, int(args["key"]) == KEY_DOWN? 0 : f.get_list_count(0) -1, true);
 			return 1;
 		}
 		play(click_sound);

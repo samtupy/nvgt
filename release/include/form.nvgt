@@ -995,7 +995,7 @@ class audio_form {
 		set_cancel(control_index, cancel, overwrite);
 		return true;
 	}
-	bool set_list_propertyes(int control_index, bool multiselect=false, bool repeat_boundary_items=false) {
+	bool set_list_properties(int control_index, bool multiselect=false, bool repeat_boundary_items=false) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;

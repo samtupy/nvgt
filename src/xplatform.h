@@ -18,6 +18,8 @@
 #include <TargetConditionals.h>
 #endif
 
+class asIScriptEngine;
+
 bool running_on_mobile();
 #ifndef NVGT_STUB
 void determine_compile_platform();
@@ -33,3 +35,5 @@ std::string event_requested_file();
 #ifdef __ANDROID__
 std::string android_get_main_shared_object();
 #endif
+
+void RegisterXplatform(asIScriptEngine* engine);

@@ -1,4 +1,3 @@
-#include "bgt_compat.nvgt"
 file f;
 pack pfile;
 bool encrypt;
@@ -7,160 +6,125 @@ string encryption_key;
 string filename;
 string foldername;
 string[] fol;
-bool cont=true;
-bool silent=false;
-void main()
-{
-if (COMMAND_LINE=="/s")
-silent=true;
-if (file_exists("pack.pk"))
-{
-int a=0;
-if (silent==false)
-a=question("File was found.","Would you like to use the existing saved data?");
-else
-a=1;
-if (a==1)
-cont=false;
+bool cont = true;
+bool silent = false;
+
+void main() {
+	if (COMMAND_LINE == "/s") silent = true;
+	if (file_exists("pack.pk")) {
+		int a = 0;
+		if (!silent)
+			a = question("File was found.", "Would you like to use the existing saved data?");
+		else
+			a = 1;
+		if (a == 1) cont = false;
+	}
+	if (!cont) {
+		f.open("pack.pk", "rb");
+		string a = f.read();
+		f.close();
+		string[]@ b = a.split("{:}", true);
+		filename = b[0];
+		foldername = b[1];
+		int aencrypt = parse_int(b[2]);
+		if (aencrypt == 1)
+			encrypt = true;
+		else
+			encrypt = false;
+		if (encrypt)
+			encryption_key = b[3];
+	} else {
+		filename = input_box("pack creator", "enter the name of the pack you wish to create");
+		if (filename.empty()) exit();
+		foldername = input_box("pack creator", "enter the path that the files you wish to pack are contained.");
+		if (foldername.empty()) exit();
+		int answer = question("pack creator", "would you like these files to be encrypted");
+		if (answer == 1) {
+			encrypt = true;
+			encryption_key = input_box("file encrypter", "enter the encryption key you wish to use.");
+			if (encryption_key.empty()) exit();
+		} else encrypt = false;
+		string a = "";
+		f.open("pack.pk", "wb");
+		a = filename + "{:}" + foldername + "{:}";
+		if (!encrypt) a += "0";
+		else a += "1{:}" + encryption_key;
+		f.write(a);
+		f.close();
+	}
+	if (!silent)
+		show_window("creating pack file...");
+	if (!pfile.open(filename, PACK_OPEN_MODE_CREATE)) {
+		alert("error", "failed to create pack!");
+		exit();
+	}
+	if (!directory_exists(foldername)) {
+		if (!silent)
+			alert("error", "folder does not exist!");
+		exit();
+	}
+	find_stuff(foldername);
+	if (!silent)
+		alert("pack creator", "there are " + fol.length() + " files in the pack. Hit OK to start packing!");
+	for (uint i = 0; i < fol.length(); i++) {
+		if (!silent)
+			show_window("packing file " + i + " of " + fol.length());
+		wait(0);
+		pfile.add_file(fol[i], fol[i].replace(foldername + "/", "", true));
+		if (i % 50 == 0)
+			wait(1);
+	}
+	if (!silent)
+		alert("success!", "Files were added successfully!");
+	pfile.close();
+	exit();
 }
-if (cont==false)
-{
-f.open("pack.pk","rb");
-string a=f.read();
-f.close();
-string[] b=string_split(a,"{:}",true);
-filename=b[0];
-foldername=b[1];
-int aencrypt=string_to_number(b[2]);
-if (aencrypt==1)
-encrypt=true;
-else
-encrypt=false;
-if (encrypt==true)
-encryption_key=b[3];
+
+void find_stuff(const string&in path) {
+	string[] items;
+	string[]@ folders = find_directories(path + "\\*");
+	items = folders;
+	string[]@ files = find_files(path + "\\*.*");
+	for (uint i = 0; i < files.length(); i++)
+		fol.insert_last(path + "/" + files[i]);
+	if (items.length() > 0) {
+		for (uint i = 0; i < items.length(); i++)
+			find_stuff(path + "/" + items[i]);
+	}
 }
-else if (cont==true)
-{
-filename=input_box("pack creator", "enter the name of the pack you wish to create");
-if (filename=="")
-{
-exit();
+
+bool string_file_encrypt(const string&in input_file, const string&in output_file, const string&in key) {
+	bool success;
+	file f;
+	success = f.open(input_file, "rb");
+	if (!success) return false;
+	string text = f.read();
+	text = string_aes_encrypt(text, key);
+	if (text.empty()) return false;
+	success = f.open(output_file, "wb");
+	if (!success) return false;
+	f.write(text);
+	success = f.close();
+	return success;
 }
-foldername=input_box("pack creator", "enter the path that the files you wish to pack are contained.");
-if (foldername=="")
-{
-exit();
+
+string script_get_path() {
+	string scriptpath;
+	if (!SCRIPT_COMPILED)
+		scriptpath = SCRIPT_CURRENT_FILE;
+	else
+		scriptpath = SCRIPT_EXECUTABLE;
+	return scriptpath;
 }
-int answer=question("pack creator", "would you like these files to be encrypted");
-if (answer==1)
-{
-encrypt=true;
-encryption_key=input_box("file encrypter", "enter the encryption key you wish to use.");
-if (encryption_key=="")
-{
-exit();
-}
-}
-else
-{
-encrypt=false;
-}
-string a="";
-f.open("pack.pk","wb");
-a=filename+"{:}"+foldername+"{:}";
-if (encrypt==false)
-a+="0";
-else
-a+="1{:}"+encryption_key;
-f.write(a);
-f.close();
-}
-if (silent==false)
-show_game_window("creating pack file...");
-if(!pfile.open(filename, PACK_OPEN_MODE_CREATE))
-{
-alert("error", "failed to create pack!");
-exit();
-}
-if (!directory_exists(foldername))
-{
-if (silent==false)
-alert("error", "folder does not exist!");
-exit();
-}
-find_stuff(foldername);
-if (silent==false)
-alert("pack creator", "there are "+fol.length()+" files in the pack. Hit OK to start packing!");
-for (uint i=0; i<fol.length(); i++)
-{
-if (silent==false)
-show_game_window("packing file "+i+" of "+fol.length());
-wait(0);
-pfile.add_file(fol[i], string_replace(fol[i],foldername+"/","",true));
-if(i%50==0)
-wait(1);
-}
-if (silent==false)
-alert("success!", "Files were added successfully!");
-pfile.close();
-exit();
-}
-void find_stuff(string path)
-{
-string[] items;
-string[] folders=find_directories(path+"\\*");
-items=folders;
-string[] files=find_files(path+"\\*.*");
-for(uint i=0; i<files.length(); i++)
-{
-fol.insert_last(path+"/"+files[i]);
-}
-if (items.length()>0)
-{
-for(uint i=0; i<items.length(); i++)
-{
-find_stuff(path+"/"+items[i]);
-}
-}
-}
-bool string_file_encrypt(string input_file, string output_file, string key)
-{
-bool success;
-file f;
-success=f.open(input_file, "rb");
-if(!success) return false;
-string text=f.read();
-text=string_encrypt(text, key);
-if(text=="") return false;
-success=f.open(output_file, "wb");
-if(!success) return false;
-f.write(text);
-success=f.close();
-return success;
-}
-string script_get_path()
-{
-string scriptpath;
-if(SCRIPT_COMPILED==false)
-{
-scriptpath=SCRIPT_CURRENT_FILE;
-}
-else
-{
-scriptpath=SCRIPT_EXECUTABLE;
-}
-return scriptpath;
-}
-string script_get_folder()
-{
-string path=script_get_path();
-string[] spl=string_split(path, "\\", true);
-spl.resize(spl.length()-1);
-string folder;
-for(uint i=0; i<spl.length(); i++)
-{
-folder+=spl[i];
-if(i<spl.length()-1) folder+="\\";
-}
-return folder;
+
+string script_get_folder() {
+	string path = script_get_path();
+	string[]@ spl = path.split("\\", true);
+	spl.resize(spl.length() - 1);
+	string folder;
+	for (uint i = 0; i < spl.length(); i++) {
+		folder += spl[i];
+		if (i < spl.length() - 1) folder += "\\";
+	}
+	return folder;
 }

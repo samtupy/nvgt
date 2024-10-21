@@ -119,6 +119,7 @@ std::string g_stub = "";
 std::string g_platform = "auto";
 bool g_make_console = false;
 std::unordered_map<std::string, asITypeInfo*> g_TypeInfoCache;
+std::unordered_map<std::string, std::string> g_included_filenames; // maps included filenames to their paths, so that the same file from multiple locations can't get included twice.
 Timestamp g_script_build_time;
 
 class NVGTBytecodeStream : public asIBinaryStream {
@@ -299,20 +300,34 @@ void nvgt_line_callback(asIScriptContext* ctx, void* obj) {
 	profiler_callback(ctx, obj);
 }
 #ifndef NVGT_STUB
+int add_script_include(const Path& path, CScriptBuilder* builder) {
+	// Mostly a wrapper around builder->AddSectionFromFile, but also caches where the include came from so that it will be loaded from the same place again in the future.
+	std::string fn = path.getFileName();
+	if (!g_included_filenames.contains(fn)) g_included_filenames[fn] = path.toString();
+	return builder->AddSectionFromFile(path.toString().c_str());
+}
 int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilder* builder, void* param) {
+	// First, because it is the most platform agnostic method of accessing a file, we'll try loading the include manually with file_get_contents.
+	string include_text = file_get_contents(filename);
+	if (!include_text.empty()) return builder->AddSectionFromMemory(filename, include_text.c_str());
 	File include_file;
 	try {
 		Path include(Path::expand(filename));
 		include.makeAbsolute();
 		include_file = include;
-		if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str());
+		if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str()); // Don't cache locations for scripts that are directly included.
+		if (g_included_filenames.contains(include.getFileName())) {
+			include = g_included_filenames[include.getFileName()];
+			include_file = include;
+			if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str());
+		}
 		include = Path(sectionname).parent().append(filename);
 		include_file = include;
-		if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str());
+		if (include_file.exists() && include_file.isFile()) return add_script_include(include.toString(), builder);
 		for (int i = 0; i < g_IncludeDirs.size(); i++) {
 			include = Path(g_IncludeDirs[i]).append(filename);
 			include_file = include;
-			if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str());
+			if (include_file.exists() && include_file.isFile()) return add_script_include(include.toString(), builder);
 		}
 	} catch (Exception& e) {} // Might be wildcards.
 	try {
@@ -324,7 +339,7 @@ int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilde
 		}
 		for (const std::string& i : includes) {
 			include_file = i;
-			if (include_file.exists() && include_file.isFile()) builder->AddSectionFromFile(i.c_str());
+			if (include_file.exists() && include_file.isFile()) add_script_include(i, builder);
 		}
 		if (includes.size() > 0) return 1; // So that the below failure message won't execute.
 	} catch (Exception& e) {
@@ -476,6 +491,9 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	g_ctxMgr->SetGetTimeCallback(GetTimeCallback);
 	engine->BeginConfigGroup("unsorted");
 	RegisterUnsorted(engine);
+	engine->EndConfigGroup();
+	engine->BeginConfigGroup("xplatform");
+	RegisterXplatform(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	g_ctxMgr->RegisterThreadSupport(engine);
@@ -909,13 +927,14 @@ std::string Vector3ToString(void* obj, int expandMembers, CDebugger* dbg) {
 }
 #ifdef _WIN32
 BOOL WINAPI debugger_ctrlc(DWORD event) {
-	if (event != CTRL_C_EVENT || !g_dbg || g_dbg->IsTakingCommands()) return FALSE;
+	if ((event != CTRL_C_EVENT && event != CTRL_BREAK_EVENT) || !g_dbg || g_dbg->IsTakingCommands()) return FALSE;
 	g_ASDebugBreak = true;
 	return TRUE;
 }
 #endif
 void InitializeDebugger(asIScriptEngine* engine) {
 	#ifdef _WIN32
+	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
 	SetConsoleCtrlHandler(debugger_ctrlc, TRUE);;
 	#endif
 	g_dbg = new CDebugger();

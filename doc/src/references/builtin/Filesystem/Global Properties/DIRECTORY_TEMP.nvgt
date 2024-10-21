@@ -1,0 +1,16 @@
+/**
+	Property that returns the system's temporary directory, a place where short-term data can be stored.
+	const string DIRECTORY_TEMP;
+	## remarks:
+		A slash character is already appended to the directory returned by this property.
+		This function may return different values depending on the operating system the application is being run on.
+			* On Windows, usually C:\Users\%username%\appdata\local\temp/.
+			* on macOS and Linux systems, usually /tmp/.
+			* on Android, the app's cache path.
+		In any case the directory returned should be writable, though you should expect things you store there to be deleted by external factors at any time.
+*/
+
+// example:
+void main() {
+	alert("example", "a temporary file for the game could be stored at " + DIRECTORY_TEMP + "filename.txt");
+}
