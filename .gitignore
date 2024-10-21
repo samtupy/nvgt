@@ -28,6 +28,7 @@ libs
 obj
 release/lib/3rd_party_licenses.html
 release/lib_*
+release/nvgt
 
 # private user space and dependencies
 user/**
