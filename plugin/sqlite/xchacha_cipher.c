@@ -62,7 +62,7 @@ static unsigned char* get_salt(void* cipher) {
 	return NULL;
 }
 
-static void generate_key(void* cipher, BtSharedMC* PBt, char* userPassword, int passwordLength, int rekey, unsigned char* salt) {
+static void generate_key(void* cipher, char* userPassword, int passwordLength, int rekey, unsigned char* salt) {
 	struct xchacha20_cipher* c = (struct xchacha20_cipher*)cipher;
 	crypto_sha512_hkdf(c->key, 32, userPassword, passwordLength, NULL, 0, NULL, 0);
 }
