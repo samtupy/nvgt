@@ -1,4 +1,5 @@
-/* file_contents.nvgt - set or retrieve a file's contents in a single function call
+/* legacy_file_contents.nvgt - set or retrieve a file's contents in a single function call
+ * these functions now exist in core as file_get_contents and file_put_contents which should be used instead, this now exists for backwards compatibility or example code.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy

@@ -6,7 +6,7 @@ void main() {
 	string r = packet("fixstring", 1, 2, 3, 6168, 32.3, "last_fixstring");
 	alert("test", r.length());
 	file f;
-	f.open("packet.dat", "wb");
+	f.open("../tmp/packet.dat", "wb");
 	f.write(r);
 	f.close();
 	string r1;

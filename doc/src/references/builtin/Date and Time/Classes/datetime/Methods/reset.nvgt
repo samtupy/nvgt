@@ -1,0 +1,15 @@
+/**
+	Resets this datetime object to the current date and time.
+	void reset();
+	## Remarks:
+		The expression d.reset() is equivalent to the expression d = datetime(); this is only a convenience function.
+*/
+
+// Example:
+void main() {
+	datetime d;
+	d.set(2024, 3, 9, 1, 24, 49);
+	alert("The datetime object is currently set to", d.year + "/" + d.month + "/" + d.day + ", " + d.hour + ":" + d.minute + ":" + d.second);
+	d.reset();
+	alert("The datetime object is now set to", d.year + "/" + d.month + "/" + d.day + ", " + d.hour + ":" + d.minute + ":" + d.second);
+}

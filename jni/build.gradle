@@ -21,7 +21,6 @@ android {
 	namespace "com.samtupy.nvgt"
 	compileSdkVersion 34
 	aaptOptions {
-		noCompress 'nvgt'
 		cruncherEnabled = false  
 	}
 	flavorDimensions "version"

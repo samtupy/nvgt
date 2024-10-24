@@ -80,6 +80,7 @@ class pathfinder : public micropather::Graph {
 	CScriptAny* callback_data;
 	bool abort;
 	bool must_reset;
+	bool gc_flag;
 public:
 	bool solving;
 	int desperation_factor;
@@ -89,8 +90,13 @@ public:
 	float total_cost;
 	int start_x, start_y, start_z;
 	pathfinder(int size = 1024, bool cache = true);
-	void AddRef();
-	void Release();
+	int AddRef();
+	int Release();
+	void enum_references(asIScriptEngine* engine);
+	void release_all_handles(asIScriptEngine* engine);
+	int get_ref_count();
+	void set_gc_flag();
+	bool get_gc_flag();
 	void set_callback_function(asIScriptFunction* func);
 	float get_difficulty(void* state);
 	float get_difficulty(int x, int y, int z);

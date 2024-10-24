@@ -1,0 +1,22 @@
+/**
+	Search for an item in an array.
+	1. int find(const T&in value);
+	2. 	int find(uint start_at, const T&in value);
+	## Arguments:
+		* uint start_at: An optional index to begin searching from.
+		* const T&in value: The value to search for.
+	## Returns:
+		int: The index of the located item, or -1 if not found.
+	## Remarks:
+		Be ware that this method will start getting slower the larger your array is, this is because this find method must search through every item in the array until it finds an item that equals what you are looking for.
+		Be sure to never write code like `string value = array[array.find("testing")];` or anything else where you call array.find() directly within the array's indexing operator. This is because array.find() could return -1, meaning that an index out of bounds exception will be thrown if you use the value returned by this function without verifying it first.
+*/
+
+// Example:
+void main() {
+	string text = "this is a sentence made up of many words, sort of?";
+	string[]@ elements = text.split(" ,?.", false);
+	int word = elements.find("sort");
+	if (word < 0) alert("Oh no not found", "Someone should probably report this if they ever see it while running an unmodified version of this example...");
+	else alert("found", "The word sort is at index " + word);
+}

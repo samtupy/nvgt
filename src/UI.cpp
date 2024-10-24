@@ -97,11 +97,10 @@ void message(const std::string& text, const std::string& header) { // Usually us
 	std::string tmp = header;
 	tmp += ": ";
 	tmp += text;
-	printf("%s\n", tmp.c_str());
 	if (Poco::Util::Application::instance().config().hasOption("application.gui")) {
 		alert(header, text);
 		return;
-	}
+	} else printf("%s\n", tmp.c_str());
 }
 std::string ClipboardGetText() {
 	InputInit();
@@ -182,7 +181,7 @@ std::string simple_folder_select_dialog(const std::string& default_location) {
 	return simple_file_dialog("", default_location, DIALOG_TYPE_FOLDER);
 }
 bool urlopen(const std::string& url) {
-	return !SDL_OpenURL(url.c_str());
+	return SDL_OpenURL(url.c_str());
 }
 void next_keyboard_layout() {
 	#ifdef _WIN32
@@ -392,11 +391,7 @@ uint64_t idle_ticks() {
 
 bool is_console_available() {
 	#if defined (_WIN32)
-		#ifdef NVGT_WIN_APP
-		return GetConsoleWindow() != nullptr;
-		#else
-		return true;
-		#endif
+		return Poco::Util::Application::instance().config().hasOption("application.gui")? GetConsoleWindow() != nullptr : true;
 	#else
 		return isatty(fileno(stdin)) || isatty(fileno(stdout)) || isatty(fileno(stderr));
 	#endif

@@ -655,10 +655,8 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("void c_debug_break()"), asFUNCTIONPR(Debugger::enter, (), void), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void c_debug_break(const string&in)"), asFUNCTIONPR(Debugger::enter, (const std::string&), void), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_HOME() property"), asFUNCTION(Path::home), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_APPDATA() property"), asFUNCTION(Path::configHome), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_COMMON_APPDATA() property"), asFUNCTION(Path::config), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_LOCAL_APPDATA() property"), asFUNCTION(Path::dataHome), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_TEMP() property"), asFUNCTION(Path::temp), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool environment_variable_exists(const string&in)"), asFUNCTION(Environment::has), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string expand_environment_variables(const string& in)"), asFUNCTION(Path::expand), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string read_environment_variable(const string&in, const string&in = \"\")"), asFUNCTIONPR(Environment::get, (const std::string&, const std::string&), std::string), asCALL_CDECL);
