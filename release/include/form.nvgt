@@ -1959,8 +1959,8 @@ class audio_form {
 			return -1;
 		}
 		return c_form[control_index].slider_minimum_value;
-}
-double get_slider_maximum_value(int control_index) {
+	}
+	double get_slider_maximum_value(int control_index) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
