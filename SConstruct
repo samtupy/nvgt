@@ -20,6 +20,17 @@ Help("""
 	Note that custom switches or targets may be added by any plugin SConscript and may not be documented here.
 """)
 
+def is_compiler_flag_available(flag: str, cxx: bool = False)->bool:
+	env = Environment()
+	if cxx:
+		env["CXXFLAGS"].append(flag)
+	else:
+		env["CCFLAGS"].append(flag)
+	conf = Configure(env)
+	res = conf.CheckCC() if not cxx else conf.CheckCXX()
+	conf.Finish()
+	return res
+
 # setup
 env = Environment()
 # Prevent scons from wiping out the environment for certain tools, e.g. scan-build
@@ -37,12 +48,37 @@ if ARGUMENTS.get("debug", "0") == "1":
 	cdb = env.CompilationDatabase()
 	Alias('cdb', cdb)
 if env["PLATFORM"] == "win32":
-	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/O2", "/bigobj", "/permissive-"])
+	env.Append(CXXFLAGS = ["/EHsc", "/J", "/MT", "/std:c++20", "/GF", "/Zc:inline", "/bigobj", "/permissive-"])
+	if ARGUMENTS.get("debug", "0") == "1":
+		env["CCFLAGS"].extend(["/Od", "/Zi", "/FS"])
+		env["CXXFLAGS"].extend(["/Od", "/Zi", "/FS"])
+	else:
+		env["CCFLAGS"].append("/O2")
+	if is_compiler_flag_available("/arch:AVX"):
+		env["CCFLAGS"].append("/arch:AVX")
+	elif is_compiler_flag_available("/arch:armv9.0"):
+		env["CCFLAGS"].append("/arch:armv9.0")
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
+	if ARGUMENTS.get("debug", "0") == "1":
+		env["LINKFLAGS"].append("/debug:full")
 	env.Append(LIBS = ["UniversalSpeechStatic", "enet", "angelscript64", "SDL3"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
 else:
-	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-O2", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result"], LIBS = ["m"])
+	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result"], LIBS = ["m"])
+	if ARGUMENTS.get("debug", "0") == "1":
+		env["CXXFLAGS"].extend(["-O0", "-g"])
+		env["CCFLAGS"].extend(["-O0", "-g"])
+	else:
+		env["CXXFLAGS"].append("-O3")
+		env["CCFLAGS"].append("-O3")
+	if is_compiler_flag_available("-maes", True):
+		env["CXXFLAGS"].append("-maes")
+	if is_compiler_flag_available("-maes"):
+		env["CCFLAGS"].append("-maes")
+	if is_compiler_flag_available("-mavx", True):
+		env["CXXFLAGS"].append("-mavx")
+	if is_compiler_flag_available("-mavx"):
+		env["CCFLAGS"].append("-mavx")
 if env["PLATFORM"] == "darwin":
 	# homebrew paths and other libraries/flags for MacOS
 	env.Append(CCFLAGS = ["-mmacosx-version-min=14.0", "-arch", "arm64", "-arch", "x86_64"], LINKFLAGS = ["-arch", "arm64", "-arch", "x86_64"])
@@ -53,7 +89,8 @@ elif env["PLATFORM"] == "posix":
 	env.Append(CPPPATH = ["/usr/local/include"], LIBPATH = ["/usr/local/lib"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
 	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL3.a", "crypto", "ssl"])
-env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
+env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE", "_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES=1", "_CRT_NONSTDC_NO_WARNINGS", "_CRT_DECLARE_NONSTDC_NAMES"])
+env.Append(CDEFINES=["_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES=1", "_CRT_NONSTDC_NO_WARNINGS", "_CRT_DECLARE_NONSTDC_NAMES"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
 # plugins
