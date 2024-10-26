@@ -38,12 +38,14 @@ void main() {
 		if (filename.empty()) exit();
 		foldername = input_box("pack creator", "enter the path that the files you wish to pack are contained.");
 		if (foldername.empty()) exit();
+		/* to be added:
 		int answer = question("pack creator", "would you like these files to be encrypted");
 		if (answer == 1) {
 			encrypt = true;
 			encryption_key = input_box("file encrypter", "enter the encryption key you wish to use.");
 			if (encryption_key.empty()) exit();
 		} else encrypt = false;
+		*/
 		string a = "";
 		f.open("pack.pk", "wb");
 		a = filename + "{:}" + foldername + "{:}";
