@@ -54,6 +54,10 @@ LOCAL_MODULE    := libenet
 LOCAL_SRC_FILES := $(LIBPATH)/libenet.a
 include $(PREBUILT_STATIC_LIBRARY)
 
+LOCAL_MODULE    := libreactphysics3d
+LOCAL_SRC_FILES := $(LIBPATH)/libreactphysics3d.a
+include $(PREBUILT_STATIC_LIBRARY)
+
 LOCAL_MODULE    := libssl
 LOCAL_SRC_FILES := $(LIBPATH)/libssl.a
 include $(PREBUILT_STATIC_LIBRARY)
@@ -96,7 +100,7 @@ LOCAL_C_INCLUDES_COMMON := $(LOCAL_PATH)/../droidev/include $(LOCAL_PATH)/../ASA
 LOCAL_CXXFLAGS_COMMON := -DPOCO_STATIC -DNVGT_BUILDING -DAS_USE_STLNAMES=1 -std=c++20 -fms-extensions -ffunction-sections -O2 -fpermissive -O2 -Wno-narrowing -Wno-int-to-pointer-cast -Wno-delete-incomplete -Wno-unused-result -Wno-deprecated-array-compare -Wno-implicit-const-int-float-conversion
 LOCAL_LDFLAGS_COMMON = -Wl,--no-fatal-warnings -Wl,--no-undefined -Wl,--gc-sections
 LOCAL_SHARED_LIBRARIES_COMMON := SDL3 bass bassmix bass_fx phonon
-LOCAL_STATIC_LIBRARIES_COMMON := libPocoFoundation libPocoCrypto libPocoDataSQLite libPocoJSON libPocoNet libPocoNetSSL libPocoUtil libPocoXML libPocoZip libangelscript libcrypto libenet libssl
+LOCAL_STATIC_LIBRARIES_COMMON := libPocoFoundation libPocoCrypto libPocoDataSQLite libPocoJSON libPocoNet libPocoNetSSL libPocoUtil libPocoXML libPocoZip libangelscript libcrypto libenet libreactphysics3d libssl
 LOCAL_LDLIBS_COMMON := -lGLESv1_CM -lGLESv2 -lOpenSLES -llog -landroid
 LOCAL_CPP_FEATURES_COMMON := rtti exceptions
 

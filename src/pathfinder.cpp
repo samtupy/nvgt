@@ -1,4 +1,4 @@
-/* pathfinder.cpp - pathfinder implementation
+/* pathfinder.cpp - pathfinder implementation code
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -10,6 +10,9 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include <cstring>
+#include <algorithm>
+#include <reactphysics3d/reactphysics3d.h>
 #include "pathfinder.h"
 
 static asITypeInfo* VectorArrayType = NULL;
@@ -179,11 +182,11 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 		return array;
 	}
 	array->Reserve(path.size());
-	Vector3 v;
+	reactphysics3d::Vector3 v;
 	int x, y, z;
 	for (int i = 0; i < path.size(); i++) {
 		decode_state(path[i], &x, &y, &z);
-		v.setValue(x, y, z);
+		v.setAllValues(x, y, z);
 		array->InsertLast(&v);
 	}
 	return array;

@@ -35,7 +35,6 @@
 #include <Poco/Util/Application.h>
 #include <SDL3/SDL.h>
 #include "nvgt_angelscript.h"
-#include "bullet3.h"
 #include "bundling.h"
 #include "compression.h"
 #include "crypto.h"
@@ -57,6 +56,7 @@
 #include "pathfinder.h"
 #include "pocostuff.h"
 #include "random.h"
+#include "reactphysics.h"
 #include "scriptstuff.h"
 #include "serialize.h"
 #include "sound.h"
@@ -397,8 +397,9 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	RegisterExceptionRoutines(engine);
 	engine->RegisterGlobalProperty("const string last_exception_call_stack", &g_last_exception_callstack);
 	engine->EndConfigGroup();
-	engine->BeginConfigGroup("bullet3");
-	RegisterScriptBullet3(engine);
+	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
+	engine->BeginConfigGroup("physics");
+	RegisterReactphysics(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
 	engine->BeginConfigGroup("compression");
@@ -920,10 +921,8 @@ std::string DateTimeToString(void *obj, int expandMembers, CDebugger *dbg) {
 	return s.str(); 
 }
 std::string Vector3ToString(void* obj, int expandMembers, CDebugger* dbg) {
-	Vector3* v = reinterpret_cast<Vector3*>(obj);
-	std::stringstream s;
-	s << "{" << v->x << ", " << v->y << ", " << v->z << "}";
-	return s.str();
+	reactphysics3d::Vector3* v = reinterpret_cast<reactphysics3d::Vector3*>(obj);
+	return v->to_string();
 }
 #ifdef _WIN32
 BOOL WINAPI debugger_ctrlc(DWORD event) {

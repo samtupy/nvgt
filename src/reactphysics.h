@@ -1,4 +1,4 @@
-/* bullet3.h - bulletphysics integration header
+/* reactphysics.h - reactphysics3d wrapper header
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -10,10 +10,6 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-#pragma once
+class asIScriptEngine;
 
-#include <angelscript.h>
-#include <bullet/Bullet3Common/b3Vector3.h>
-typedef b3Vector3 Vector3;
-
-void RegisterScriptBullet3(asIScriptEngine* engine);
+void RegisterReactphysics(asIScriptEngine* engine);
