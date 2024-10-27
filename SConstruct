@@ -59,8 +59,8 @@ env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 # plugins
 plugin_env = env.Clone()
 static_plugins = []
-for s in Glob("plugin/*/_SConscript") + Glob("plugin/*/SConscript"):
-	plugname = str(s).split(os.path.sep)[1]
+for s in Glob("plugin/*/_SConscript") + Glob("plugin/*/SConscript") + Glob("extra/plugin/integrated/*/_SConscript") + Glob("extra/plugin/integrated/*/SConscript"):
+	plugname = str(s).split(os.path.sep)[-2]
 	if ARGUMENTS.get(f"no_{plugname}_plugin", "0") == "1": continue
 	plug = SConscript(s, variant_dir = f"build/obj_plugin/{plugname}", duplicate = 0, exports = {"env": plugin_env, "nvgt_env": env})
 	if plug: static_plugins.append(plug)
