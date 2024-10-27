@@ -20,20 +20,14 @@
 #include <limits>
 #include "scriptstuff.h"
 
-static asIScriptContext* fcallback_ctx = NULL;
+using reactphysics3d::Vector3;
 
-// At least some versions of bullet3 apparently don't have an init constructor for vectors that takes coordinate arguments.
-// Update: It turns out that clang with c++20 is more strict about using braces to construct a structure of values, I learned that after doing the following which now should be undone when possible.
-inline Vector3 VECTOR3(float x, float y, float z) {
-	Vector3 v;
-	v.setValue(x, y, z);
-	return v;
-}
+static asIScriptContext* fcallback_ctx = NULL;
 
 Vector3 rotate(const Vector3& p, const Vector3& o, double theta, bool maintain_z = true) {
 	int angle = (180.0 / M_PI) * theta;
 	Vector3 r;
-	Vector3 cs = VECTOR3(angle != 90 && angle != 270 ? cos(theta) : 0, angle != 180 ? sin(theta) : 0, 0);
+	Vector3 cs = Vector3(angle != 90 && angle != 270 ? cos(theta) : 0, angle != 180 ? sin(theta) : 0, 0);
 	r.x = (cs.x * (p.x - o.x)) - (cs.y * (p.y - o.y)) + o.x;
 	r.y = (cs.y * (p.x - o.x)) + (cs.x * (p.y - o.y)) + o.y;
 	if (maintain_z)
@@ -43,12 +37,12 @@ Vector3 rotate(const Vector3& p, const Vector3& o, double theta, bool maintain_z
 Vector3 get_center(Vector3 _min, Vector3 _max) {
 	if (_min == _max || _max.x - _min.x < 2 && _max.y - _min.y < 2 && _max.z - _min.z < 2)
 		return _min;
-	return VECTOR3(_min.x + (_max.x - _min.x) / 2.0, _min.y + (_max.y - _min.y) / 2.0, _min.z + (_max.z - _min.z) / 2.0);
+	return Vector3(_min.x + (_max.x - _min.x) / 2.0, _min.y + (_max.y - _min.y) / 2.0, _min.z + (_max.z - _min.z) / 2.0);
 }
 Vector3 get_center(double minx, double maxx, double miny, double maxy, double minz, double maxz) {
 	if (minx == maxx && miny == maxy && minz == maxz || maxx - minx < 2 && maxy - miny < 2 && maxz - minz < 2)
-		return VECTOR3(minx, miny, minz);
-	return VECTOR3(minx + (maxx - minx) / 2.0, miny + (maxy - miny) / 2.0, minz + (maxz - minz) / 2.0);
+		return Vector3(minx, miny, minz);
+	return Vector3(minx + (maxx - minx) / 2.0, miny + (maxy - miny) / 2.0, minz + (maxz - minz) / 2.0);
 }
 
 // following function in a round about way from https://stackoverflow.com/questions/10962379/how-to-check-intersection-between-2-rotated-rectangles
@@ -82,10 +76,10 @@ bool polygons_intersect(const std::vector<Vector3>& a, const std::vector<Vector3
 bool boxes_intersect(float minx1, float maxx1, float miny1, float maxy1, float r1, float minx2, float maxx2, float miny2, float maxy2, float r2) {
 	Vector3 c1 = get_center(minx1, maxx1 + 1, miny1, maxy1 + 1, 0, 0);
 	Vector3 c2 = get_center(minx2, maxx2, miny2, maxy2, 0, 0);
-	Vector3 min1 = VECTOR3(minx1, miny1, 0);
-	Vector3 min2 = VECTOR3(minx2, miny2, 0);
-	std::vector<Vector3> p1 = {min1 + rotate(VECTOR3(-c1.x, -c1.y, 0), VECTOR3(0, 0, 0), r1), min1 + rotate(VECTOR3(-c1.x, c1.y, 0), VECTOR3(0, 0, 0), r1), min1 + rotate(VECTOR3(c1.x, c1.y, 0), VECTOR3(0, 0, 0), r1), min1 + rotate(VECTOR3(c1.x, -c1.y, 0), VECTOR3(0, 0, 0), r1)};
-	std::vector<Vector3> p2 = {min2 + rotate(VECTOR3(-c2.x, -c2.y, 0), VECTOR3(0, 0, 0), r2), min2 + rotate(VECTOR3(-c2.x, c2.y, 0), VECTOR3(0, 0, 0), r2), min2 + rotate(VECTOR3(c2.x, c2.y, 0), VECTOR3(0, 0, 0), r2), min2 + rotate(VECTOR3(c2.x, -c2.y, 0), VECTOR3(0, 0, 0), r2)};
+	Vector3 min1 = Vector3(minx1, miny1, 0);
+	Vector3 min2 = Vector3(minx2, miny2, 0);
+	std::vector<Vector3> p1 = {min1 + rotate(Vector3(-c1.x, -c1.y, 0), Vector3(0, 0, 0), r1), min1 + rotate(Vector3(-c1.x, c1.y, 0), Vector3(0, 0, 0), r1), min1 + rotate(Vector3(c1.x, c1.y, 0), Vector3(0, 0, 0), r1), min1 + rotate(Vector3(c1.x, -c1.y, 0), Vector3(0, 0, 0), r1)};
+	std::vector<Vector3> p2 = {min2 + rotate(Vector3(-c2.x, -c2.y, 0), Vector3(0, 0, 0), r2), min2 + rotate(Vector3(-c2.x, c2.y, 0), Vector3(0, 0, 0), r2), min2 + rotate(Vector3(c2.x, c2.y, 0), Vector3(0, 0, 0), r2), min2 + rotate(Vector3(c2.x, -c2.y, 0), Vector3(0, 0, 0), r2)};
 	return polygons_intersect(p1, p2);
 }
 
@@ -154,11 +148,11 @@ void map_area::unframe() {
 void map_area::reframe() {
 	if (!parent || framed) return;
 	if (!framesize) framesize = get_frame_size(maxx - minx, maxy - miny, maxz - minz);
-	Vector3 MIN = VECTOR3(minx, miny, minz);
-	Vector3 MAX = VECTOR3(maxx, maxy, maxz);
+	Vector3 MIN = Vector3(minx, miny, minz);
+	Vector3 MAX = Vector3(maxx, maxy, maxz);
 	if (rotation > 0) {
 		Vector3 d = MAX - MIN;
-		std::vector<Vector3> points = {rotate(MIN, center, rotation), rotate(VECTOR3(MIN.x + d.x, MIN.y, 0), center, rotation), rotate(VECTOR3(MIN.x, MIN.y + d.y, 0), center, rotation), rotate(VECTOR3(MIN.x + d.x, MIN.y + d.y, 0), center, rotation)};
+		std::vector<Vector3> points = {rotate(MIN, center, rotation), rotate(Vector3(MIN.x + d.x, MIN.y, 0), center, rotation), rotate(Vector3(MIN.x, MIN.y + d.y, 0), center, rotation), rotate(Vector3(MIN.x + d.x, MIN.y + d.y, 0), center, rotation)};
 		for (int i = 0; i < points.size(); i++) {
 			if (points[i].x < MIN.x) MIN.x = points[i].x - 1;
 			else if (points[i].x > MAX.x) MAX.x = points[i].x + 1;
@@ -208,12 +202,12 @@ bool map_area::is_in_area(float x, float y, float z, float d, asIScriptFunction*
 		if (longest < 1) longest = 1;
 		return x >= center.x - d - longest && x <= center.x + d + longest && y >= center.y - d - longest && y <= center.y + d + longest && is_unfiltered(filter_callback);
 	}
-	Vector3 border = VECTOR3(1, 1, 1);
+	Vector3 border = Vector3(1, 1, 1);
 	if (rotation > 0) {
-		Vector3 r = rotate(VECTOR3(x, y, z), center, rotation);
+		Vector3 r = rotate(Vector3(x, y, z), center, rotation);
 		x = r.x;
 		y = r.y;
-		//border=rotate(border, VECTOR3(0, 0, 0), rotation);
+		//border=rotate(border, Vector3(0, 0, 0), rotation);
 	}
 	if (x < minx - d + (border.x < 0 ? border.x : 0) || x >= maxx + d + (border.x > 0 ? border.x : 0)) return false;
 	if (y < miny - d + (border.y < 0 ? border.y : 0) || y >= maxy + d + (border.y > 0 ? border.y : 0)) return false;
@@ -225,7 +219,7 @@ bool map_area::is_in_area_range(float minx, float maxx, float miny, float maxy, 
 	if (!flag_filter) return false;
 	if (minx == maxx && miny == maxy && minz == maxz) return is_in_area(minx, miny, minz, d, filter_callback);
 	else if (this->minx == this->maxx && this->miny == this->maxy && this->minz == this->maxz) {
-		Vector3 R = VECTOR3(this->minx, this->maxy, this->minz);
+		Vector3 R = Vector3(this->minx, this->maxy, this->minz);
 		if (r > 0)
 			R = rotate(R, get_center(minx, maxx, miny, maxy, minz, maxz), r);
 		return R.x >= minx - d && R.x < maxx + d + 1.0 && R.y >= miny - d && R.y < maxy + d + 1.0 && R.z >= minz - d && R.z < maxz + d + 1.0 && is_unfiltered(filter_callback);

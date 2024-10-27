@@ -1,4 +1,4 @@
-/* bgt_compat.nvgt - bgt compatibility layher
+/* bgt_compat.nvgt - bgt compatibility layer
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -356,3 +356,8 @@ const uint KEY_LBRACKET = KEY_LEFTBRACKET;
 const uint KEY_RBRACKET = KEY_RIGHTBRACKET;
 const uint KEY_NUMPADENTER = KEY_NUMPAD_ENTER;
 const uint KEY_DASH = KEY_MINUS;
+
+typedef int long;
+typedef uint ulong;
+typedef int16 short;
+typedef uint16 ushort;

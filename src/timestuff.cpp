@@ -308,6 +308,8 @@ template <class T, typename O> int timestuff_opCmp(T* self, O other) {
 	else if (*self > other) return 1;
 	else return 0;
 }
+// Assigns one of the datetime types to a new version of itself E. the current date and time.
+template <class T> void timestuff_reset(T* obj) { (*obj) = T(); }
 
 void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
@@ -326,7 +328,7 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("uint64 nanoticks()"), asFUNCTION(SDL_GetTicksNS), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64 get_SYSTEM_PERFORMANCE_COUNTER() property"), asFUNCTION(SDL_GetPerformanceCounter), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64 get_SYSTEM_PERFORMANCE_FREQUENCY() property"), asFUNCTION(SDL_GetPerformanceFrequency), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("void nanosleep(uint64 ns)"), asFUNCTION(SDL_GetTicksNS), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void nanosleep(uint64 ns)"), asFUNCTION(SDL_DelayNS), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction(_O("uint64 get_TIME_SYSTEM_RUNNING_MILLISECONDS() property"), asFUNCTION(system_running_milliseconds), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_TIMEZONE_BASE_OFFSET() property", asFUNCTION(Poco::Timezone::utcOffset), asCALL_CDECL);
@@ -483,6 +485,7 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("datetime", "datetime& opSubAssign(const timespan&in)", asMETHODPR(DateTime, operator-=, (const Timespan&), DateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "void make_UTC(int timezone_offset)", asMETHOD(DateTime, makeUTC), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "void make_local(int timezone_offset)", asMETHOD(DateTime, makeLocal), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "void reset()", asFUNCTION(timestuff_reset<DateTime>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterGlobalFunction("bool datetime_is_leap_year(int year)", asFUNCTION(DateTime::isLeapYear), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int datetime_days_of_month(int year, int month)", asFUNCTION(DateTime::daysOfMonth), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool datetime_is_valid(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION(DateTime::isValid), asCALL_CDECL);
@@ -522,6 +525,7 @@ void RegisterScriptTimestuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("calendar", "timespan opSub(const calendar&in) const", asMETHODPR(LocalDateTime, operator-, (const LocalDateTime&) const, Timespan), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "calendar& opAddAssign(const timespan&in)", asMETHODPR(LocalDateTime, operator+=, (const Timespan&), LocalDateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "calendar& opSubAssign(const timespan&in)", asMETHODPR(LocalDateTime, operator-=, (const Timespan&), LocalDateTime&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calendar", "void reset()", asFUNCTION(timestuff_reset<LocalDateTime>), asCALL_CDECL_OBJFIRST);
 
 	engine->RegisterObjectMethod("timestamp", "string format(const string&in fmt, int tzd = 0xffff)", asFUNCTIONPR(DateTimeFormatter::format, (const Timestamp&, const std::string&, int), std::string), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datetime", "string format(const string&in fmt, int tzd = 0xffff)", asFUNCTIONPR(DateTimeFormatter::format, (const DateTime&, const std::string&, int), std::string), asCALL_CDECL_OBJFIRST);

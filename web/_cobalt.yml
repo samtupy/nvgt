@@ -13,8 +13,9 @@ site:
    - ["Documentation", "/docs"]
    - [Blog, "/blog"]
    - [Downloads, "/downloads"]
-   - [Community on discord, "https://discord.gg/pJjRBXDxzw"]
    - [Source code on Github, "https://github.com/samtupy/nvgt"]
+   - [Community on discord, "https://discord.gg/pJjRBXDxzw"]
+   - [Community Forum, "https://forum.nvgt.gg"]
 
 posts:
  title: The NVGT blog

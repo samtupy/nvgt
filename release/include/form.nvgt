@@ -995,7 +995,7 @@ class audio_form {
 		set_cancel(control_index, cancel, overwrite);
 		return true;
 	}
-	bool set_list_propertyes(int control_index, bool multiselect=false, bool repeat_boundary_items=false) {
+	bool set_list_properties(int control_index, bool multiselect=false, bool repeat_boundary_items=false) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
@@ -1944,6 +1944,38 @@ class audio_form {
 		}
 		return c_form[control_index].slider_value;
 	}
+	double get_slider_minimum_value(int control_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return -1;
+		}
+		if (c_form[control_index].type != ct_slider) {
+			form_error = form_error_invalid_control;
+			return -1;
+		}
+		return c_form[control_index].slider_minimum_value;
+	}
+	double get_slider_maximum_value(int control_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return -1;
+		}
+		if (c_form[control_index].type != ct_slider) {
+			form_error = form_error_invalid_control;
+			return -1;
+		}
+		return c_form[control_index].slider_maximum_value;
+}
 	string get_slider_text_value(int control_index, double value) {
 		form_error = 0;
 		if (!active) {

@@ -1,0 +1,12 @@
+/**
+	This property is true if the application is running on a Google Chromebook.
+	const bool system_is_chromebook;
+*/
+
+// example:
+void main() {
+	if(system_is_chromebook)
+		alert("example", "This application is running on a chromebook!");
+	else
+		alert("example", "This application is not running on a chromebook.");
+}

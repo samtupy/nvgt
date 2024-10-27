@@ -1,0 +1,23 @@
+/**
+	Reads the entire content of a file and returns it as a string.
+	string file_get_contents(string filename)
+	## Arguments:
+		* string filename: the name of the file to read.
+	## Returns:
+		The contents of the file on success, an empty string on failure.
+	## Remarks:
+		This is a convenience function, though it is currently the only way to read an Android asset. If you wish to access a file with more control, see the file datastream class.
+		Be careful to avoid reading files that are too large with this function, as the entire file will be in memory in order to return it as a continguous string.
+*/
+
+// Example:
+void main() {
+	string filename = input_box("Filename", "Enter the name of a file to read.", "");
+	string contents = file_get_contents(filename);
+	if (contents == "")
+		alert("Example", "Either the file was not found, or it contained no text.");
+	else {
+		clipboard_set_text(contents);
+		alert("Example", "The contents of the file is now on your clipboard.");
+	}
+}

@@ -1,4 +1,4 @@
-/* file_contents.nvgt - set or retrieve a file's contents in a single function call
+/* reactphysics.h - reactphysics3d wrapper header
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -10,26 +10,6 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-string get_file_contents(const string& in filename) {
-	if (!file_exists(filename)) return "";
-	file f;
-	f.open(filename, "rb");
-	string text = "";
-	if (f.size > 0)
-		text = f.read();
-	f.close();
-	return text;
-}
-bool put_file_contents(const string& in filename, const string& in content, bool a = false) {
-	bool s;
-	file f;
-	if (!a)
-		s = f.open(filename, "wb");
-	else
-		s = f.open(filename, "ab");
-	if (!s)
-		return false;
-	if (content != "") s = f.write(content) == content.length();
-	f.close();
-	return s;
-}
+class asIScriptEngine;
+
+void RegisterReactphysics(asIScriptEngine* engine);

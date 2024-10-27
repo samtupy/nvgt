@@ -18,4 +18,5 @@ bool FileCopy(const std::string& source, const std::string& target, bool overwri
 bool FileMove(const std::string& source, const std::string& target);
 bool FileExists(const std::string& path);
 asINT64 FileGetSize(const std::string& path);
+std::string file_get_contents(const std::string& filename);
 void RegisterScriptFileSystemFunctions(asIScriptEngine* engine);

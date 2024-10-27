@@ -35,7 +35,8 @@
 #include "filesystem.h"
 #include "scriptarray.h"
 #define NVGT_LOAD_STATIC_PLUGINS
-#include "angelscript.h" // nvgt's angelscript implementation
+#include "nvgt_angelscript.h" // nvgt's angelscript implementation
+#include "bundling.h"
 #include "input.h"
 #include "misc_functions.h" // ChDir
 #include "nvgt.h"
@@ -128,8 +129,12 @@ protected:
 		options.addOption(Option("QUIET", "Q", "do not output anything (work in progress), error status must be determined by process exit code (intended for automation)").binding("application.QUIET").group("quiet"));
 		options.addOption(Option("debug", "d", "run with the Angelscript debugger").binding("application.as_debug"));
 		options.addOption(Option("warnings", "w", "select how script warnings should be handled (0 ignore (default), 1 print, 2 treat as error)", false, "level", true).binding("scripting.compiler_warnings").validator(new IntValidator(0, 2)));
+		options.addOption(Option("asset", "a", "bundle an asset when compiling similar to the #pragma asset directive", false, "path", true).repeatable(true));
+		options.addOption(Option("asset-document", "A", "bundle a document asset when compiling similar to the #pragma document directive", false, "path", true).repeatable(true));
 		options.addOption(Option("include", "i", "include an aditional script similar to the #include directive", false, "script", true).repeatable(true));
 		options.addOption(Option("include-directory", "I", "add an aditional directory to the search path for included scripts", false, "directory", true).repeatable(true));
+		options.addOption(Option("set", "s", "set a configuration property", false, "name=value", true).repeatable(true));
+		options.addOption(Option("settings", "S", "set additional configuration properties from a file", false, "path", true).repeatable(true));
 		options.addOption(Option("version", "V", "print version information and exit"));
 		options.addOption(Option("help", "h", "display available command line options"));
 	}
@@ -146,7 +151,24 @@ protected:
 			g_debug = name == "compile-debug";
 		} else if (name == "include-directory") g_IncludeDirs.push_back(value);
 		else if (name == "include") g_IncludeScripts.push_back(value);
+		else if (name == "asset") add_game_asset_to_bundle(value);
+		else if (name == "asset-document") add_game_asset_to_bundle(value, GAME_ASSET_DOCUMENT);
+		else if (name == "set") defineSetting(value);
+		else if (name == "settings") loadConfiguration(value);
 		else if (name == "platform") g_platform = value;
+	}
+	void defineSetting(const std::string& def) {
+		// Originally from Poco SampleApp.
+		std::string name;
+		std::string value;
+		std::string::size_type pos = def.find('=');
+		if (pos != std::string::npos)
+		{
+			name.assign(def, 0, pos);
+			value.assign(def, pos + 1, def.length() - pos);
+		}
+		else name = def;
+		config().setString(name, value);
 	}
 	void displayHelp() {
 		HelpFormatter hf(options());
@@ -212,8 +234,7 @@ protected:
 		#if defined(__APPLE__) || defined(__ANDROID__)
 			scriptfile = event_requested_file(); // Files opened from external apps on MacOS, IOS, and Android do not use command line arguments.
 		#endif
-		if (scriptfile.empty() && args.size() > 0) scriptfile = args[0];
-		if (scriptfile.empty() && config().hasOption("application.gui")) scriptfile = UILauncher();
+		if (scriptfile.empty() && (mode == NVGT_RUN || mode == NVGT_COMPILE)) scriptfile = args.size() > 0? args[0] : config().hasOption("application.gui")? UILauncher() : "";
 		if (mode == NVGT_EXIT) return Application::EXIT_OK;
 		else if (mode == NVGT_HELP) {
 			displayHelp();
@@ -254,18 +275,20 @@ protected:
 		setupCommandLineProperty(args, 1);
 		g_command_line_args->InsertAt(0, (void*)&scriptfile);
 		ConfigureEngineOptions(g_ScriptEngine);
-		if (CompileScript(g_ScriptEngine, scriptfile.c_str()) < 0) {
-			ShowAngelscriptMessages();
-			return Application::EXIT_DATAERR;
-		}
-		if (config().hasOption("application.as_debug")) {
-			if (config().hasOption("application.gui")) {
-				message("please use the command line version of nvgt if you wish to invoque the debugger", "error");
-				return Application::EXIT_CONFIG;
+		if (mode == NVGT_RUN) {
+			if (CompileScript(g_ScriptEngine, scriptfile.c_str()) < 0) {
+				ShowAngelscriptMessages();
+				return Application::EXIT_DATAERR;
 			}
-			#if !defined(NVGT_STUB) && !defined(NVGT_WIN_APP)
-			else InitializeDebugger(g_ScriptEngine);
-			#endif
+			if (config().hasOption("application.as_debug")) {
+				if (config().hasOption("application.gui")) {
+					message("please use the command line version of nvgt if you wish to invoque the debugger", "error");
+					return Application::EXIT_CONFIG;
+				}
+				#if !defined(NVGT_STUB) && !defined(NVGT_WIN_APP)
+				else InitializeDebugger(g_ScriptEngine);
+				#endif
+			}
 		}
 		int retcode = Application::EXIT_OK;
 		if (mode == NVGT_RUN && (retcode = ExecuteScript(g_ScriptEngine, scriptfile.c_str())) < 0 || mode == NVGT_COMPILE && CompileExecutable(g_ScriptEngine, scriptfile)) {
