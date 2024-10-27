@@ -17,6 +17,7 @@
 	#define ANGELSCRIPT_DLL_MANUAL_IMPORT
 #endif
 #include <angelscript.h>
+#include <iostream>
 
 // Subsystem flags, used for controling access to certain functions during development.
 enum NVGT_SUBSYSTEM {
@@ -58,6 +59,8 @@ typedef int t_asThreadCleanup();
 typedef void* t_asAllocMem(size_t);
 typedef void t_asFreeMem(void*);
 typedef void AS_CALL(void*);
+typedef void* t_nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
+typedef std::ios* t_nvgt_datastream_get_ios(void* stream);
 
 typedef struct {
 	t_asGetLibraryVersion* f_asGetLibraryVersion;
@@ -72,6 +75,8 @@ typedef struct {
 	t_asThreadCleanup* f_asThreadCleanup;
 	t_asAllocMem* f_asAllocMem;
 	t_asFreeMem* f_asFreeMem;
+	t_nvgt_datastream_create* f_nvgt_datastream_create;
+	t_nvgt_datastream_get_ios* f_nvgt_datastream_get_ios;
 	asIScriptEngine* script_engine;
 	void* user;
 } nvgt_plugin_shared;
@@ -95,6 +100,8 @@ typedef bool nvgt_plugin_entry(nvgt_plugin_shared*);
 		t_asThreadCleanup* asThreadCleanup = NULL;
 		t_asAllocMem* asAllocMem = NULL;
 		t_asFreeMem* asFreeMem = NULL;
+		t_nvgt_datastream_create* nvgt_datastream_create = NULL;
+		t_nvgt_datastream_get_ios* nvgt_datastream_get_ios = NULL;
 	#else // If an angelscript addon includes nvgt_plugin.h, set NVGT_PLUGIN_INCLUDE to prevent these symbols from being defined multiple times.
 		extern t_asGetLibraryVersion* asGetLibraryVersion;
 		extern t_asGetLibraryOptions* asGetLibraryOptions;
@@ -108,6 +115,8 @@ typedef bool nvgt_plugin_entry(nvgt_plugin_shared*);
 		extern t_asThreadCleanup* asThreadCleanup;
 		extern t_asAllocMem* asAllocMem;
 		extern t_asFreeMem* asFreeMem;
+		extern t_nvgt_datastream_create* nvgt_datastream_create;
+		extern t_nvgt_datastream_get_ios* nvgt_datastream_get_ios;
 	#endif
 #endif
 // Macro to ease the definition of a plugin's entry point. If this plugin is compiled as a static library then the entry point is called nvgt_plugin_%plugname% where as a dll just calls it nvgt_plugin and externs it.
@@ -142,11 +151,17 @@ inline void prepare_plugin(nvgt_plugin_shared* shared) {
 	asThreadCleanup = shared->f_asThreadCleanup;
 	asAllocMem = shared->f_asAllocMem;
 	asFreeMem = shared->f_asFreeMem;
+	nvgt_datastream_create = shared->f_nvgt_datastream_create;
+	nvgt_datastream_get_ios = shared->f_nvgt_datastream_get_ios;
 	#endif
 }
 #else
+#include <ios>
 #include <string>
 #include <stdio.h>
+void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
+std::ios* nvgt_datastream_get_ios(void* stream);
+
 // This function prepares an nvgt_plugin_shared structure for passing to a plugins entry point. Sane input expected, no error checking.
 inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* engine, void* user = NULL) {
 	shared->f_asGetLibraryVersion = asGetLibraryVersion;
@@ -161,6 +176,8 @@ inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* e
 	shared->f_asThreadCleanup = asThreadCleanup;
 	shared->f_asAllocMem = asAllocMem;
 	shared->f_asFreeMem = asFreeMem;
+	shared->f_nvgt_datastream_create = nvgt_datastream_create;
+	shared->f_nvgt_datastream_get_ios = nvgt_datastream_get_ios;
 	shared->script_engine = engine;
 	shared->user = user;
 }
