@@ -1,0 +1,100 @@
+/**
+	Sets a sub form to use on the current form.
+	bool audio_form::set_subform(int control_index, audio_form@ f);
+	## Arguments:
+		* int control_index: the control index of the sub form created with `audio_form::create_subform` method.
+		* audio_form@ f: an object pointing to an already created form.
+	## Returns:
+		bool: true if the operation was successful, false otherwise. To get error information, look at `audio_form::get_last_error();`.
+*/
+
+// Example:
+#include "form.nvgt"
+
+// some imaginary global application variables.
+bool logostart = true, menuwrap = false, firespace = false, radar = true;
+
+// First, lets make a class which stores a category name and the form that the category is linked to.
+class settings_category {
+	string name;
+	audio_form@ f;
+	settings_category(string n, audio_form@ f) {
+		this.name = n;
+		@this.f = @f;
+	}
+}
+
+void settings_dialog() {
+	// Define some categories and settings on each category like this:
+	audio_form fc_general;
+	fc_general.create_window();
+	int f_logostart = fc_general.create_checkbox("Play &logo on startup", logostart);
+	int f_menuwrap = fc_general.create_checkbox("Wrap &menus", menuwrap);
+	audio_form fc_gameplay;
+	fc_gameplay.create_window();
+	int f_firespace = fc_gameplay.create_checkbox("Use space instead of control to &fire", firespace);
+	int f_radar = fc_gameplay.create_checkbox("Enable the &radar", firespace);
+	// Add as many categories as you want this way.
+	audio_form f; // The overarching main form.
+	f.create_window("Settings", false, true);
+	int f_category_list = f.create_tab_panel("&Category"); // The user will select categories from here. Note: you can also use create_list.
+	int f_category_display = f.create_subform("General settings", @fc_general); // Now by default, the main form embeds the general category form right there.
+	int f_ok = f.create_button("&Save settings", true);
+	int f_cancel = f.create_button("Cancel", false, true);
+	// Now lets create a structured list of categories that can be browsed based on the class above.
+	settings_category@[] categories = {
+		settings_category("General", @fc_general),
+		settings_category("Gameplay", @fc_gameplay)
+	};
+	// And then add the list of categories to the form's list.
+	for (uint i = 0; i < categories.length(); i++) {
+		f.add_list_item(f_category_list, categories[i].name);
+	}
+	// Focus the form's list position on the general category, then set the form's initial focused control to the category list.
+	f.set_list_position(f_category_list, 0);
+	f.focus(0);
+	settings_category@ last_category = @categories[0]; // A handle to the currently selected category so we can detect changes to the selection.
+	// Finally this is the loop that does the rest of the magic.
+	while (!f.is_pressed(f_cancel)) {
+		wait(5);
+		f.monitor();
+		int pos = f.get_list_position(f_category_list);
+		settings_category@ selected_category = null;
+		if (pos > -1 and pos < categories.length())
+			@selected_category = @categories[pos];
+		if (@last_category != @selected_category) {
+			last_category.f.subform_control_index = -1; // Later improvements to audio form will make this line be handled internally.
+			last_category.f.focus_silently(0); // Make sure that if the category is reselected, it is focused on the first control.
+			@last_category = @selected_category;
+			f.set_subform(f_category_display, @selected_category.f);
+			f.set_caption(f_category_display, selected_category.name + " settings");
+		}
+		// The following is a special feature I came up with in stw which makes it so that if you are in the category list, keyboard shortcuts from the entire form will work regardless of category.
+		if (f.get_current_focus() == f_category_list and key_down(KEY_LALT) or key_down(KEY_RALT)) {
+			for (uint i = 0; i < categories.length(); i++) {
+				if (categories[i].f.check_shortcuts(true)) {
+					f.set_list_position(f_category_list, i);
+					@last_category = @categories[i];
+					f.set_subform(f_category_display, @last_category.f);
+					f.set_caption(f_category_display, last_category.name + " settings");
+					f.focus(f_category_display);
+					break;
+				}
+			}
+		}
+		// Now we can finally check for the save button.
+		if (f.is_pressed(f_ok)) {
+			logostart = fc_general.is_checked(f_logostart);
+			menuwrap = fc_general.is_checked(f_menuwrap);
+			firespace = fc_gameplay.is_checked(f_firespace);
+			radar = fc_gameplay.is_checked(f_radar);
+			return;
+		}
+	}
+}
+
+// Lets make this thing run so we can see it work.
+void main() {
+	show_window("test");
+	settings_dialog();
+}
