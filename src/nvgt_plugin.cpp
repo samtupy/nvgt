@@ -17,9 +17,14 @@
 #include <Poco/BinaryWriter.h>
 #include <Poco/Format.h>
 #include <SDL3/SDL.h>
+#include "datastreams.h"
 #include "nvgt.h"
 #include "nvgt_plugin.h"
 #include "UI.h"
+
+// Helper functions that are shared with plugins.
+void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder) { return new datastream(stream, encoding, byteorder); }
+std::ios* nvgt_datastream_get_ios(void* stream) { return reinterpret_cast<datastream*>(stream)->get_iostr; }
 
 std::unordered_map<std::string, void*> loaded_plugins; // Contains handles to sdl objects.
 std::unordered_map<std::string, nvgt_plugin_entry*>* static_plugins = NULL; // Contains pointers to static plugin entry points. This doesn't contain entry points for plugins loaded from a dll, rather those that have been linked statically into the executable produced by a custom build of nvgt. This is a pointer because the map is initialized the first time register_static_plugin is called so that we are not trusting in global initialization order.
