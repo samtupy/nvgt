@@ -120,10 +120,10 @@ BOOL init_sound(unsigned int dev) {
 	if (BASS_Init(dev, 44100, 0, NULL, NULL))
 		sound_initialized = TRUE;
 	if (sound_initialized) {
-		if (!BASS_PluginLoad("lib\\bassflac.dll", 0))
-			BASS_PluginLoad("bassflac.dll", 0);
-		if (!BASS_PluginLoad("lib\\bassopus.dll", 0))
-			BASS_PluginLoad("bassopus.dll", 0);
+		if (!BASS_PluginLoad("lib\\bassflac", 0))
+			BASS_PluginLoad("bassflac", 0);
+		if (!BASS_PluginLoad("lib\\bassopus", 0))
+			BASS_PluginLoad("bassopus", 0);
 		BASS_GetVersion();
 		BASS_FX_GetVersion();
 		output = new mixer(NULL);

@@ -19,6 +19,7 @@
 #include <Poco/URIStreamOpener.h>
 #include <Poco/Net/AcceptCertificateHandler.h>
 #include <Poco/Net/Context.h>
+#include <Poco/Net/DNS.h>
 #include <Poco/Net/FTPClientSession.h>
 #include <Poco/Net/HTTPClientSession.h>
 #include <Poco/Net/HTTPCredentials.h>
@@ -495,6 +496,9 @@ void RegisterWebSocket(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("web_socket", "void set_max_payload_size(int size) property", asMETHOD(WebSocket, setMaxPayloadSize), asCALL_THISCALL);
 	engine->RegisterObjectMethod("web_socket", "int get_max_payload_size() const property", asMETHOD(WebSocket, getMaxPayloadSize), asCALL_THISCALL);
 }
+void RegisterDNS(asIScriptEngine* engine) {
+	engine->RegisterGlobalFunction("spec::ip_address dns_resolve_single(const string&in address)", asFUNCTION(DNS::resolveOne), asCALL_CDECL);
+}
 
 // NVGT's highest level HTTP. The following code will likely be rewritten once after we write the http class, which will be the middle-level http support. For now this is being rushed to fix an issue regarding the removal of curl and the url_get/post methods in bgt_compat.nvgt. The original code was sourced from Poco's HTTPSUriStreamOpener.
 string url_request(const string& method, const string& url, const string& data, HTTPResponse* resp) {
@@ -586,11 +590,11 @@ void RegisterInternet(asIScriptEngine* engine) {
 	engine->RegisterEnum("ftp_file_type");
 	engine->RegisterEnumValue("ftp_file_type", "FTP_FILE_TYPE_TEXT", FTPClientSession::TYPE_TEXT);
 	engine->RegisterEnumValue("ftp_file_type", "FTP_FILE_TYPE_BINARY", FTPClientSession::TYPE_BINARY);
-	engine->RegisterGlobalFunction(_O("string url_encode(const string&in url, const string&in reserved = \"\")"), asFUNCTION(url_encode), asCALL_CDECL);
 	engine->RegisterEnum("socket_type");
 	engine->RegisterEnumValue("socket_type", "SOCKET_TYPE_STREAM", Socket::Type::SOCKET_TYPE_STREAM);
 	engine->RegisterEnumValue("socket_type", "SOCKET_TYPE_DATAGRAM", Socket::Type::SOCKET_TYPE_DATAGRAM);
 	engine->RegisterEnumValue("socket_type", "SOCKET_TYPE_RAW", Socket::Type::SOCKET_TYPE_RAW);
+	engine->RegisterGlobalFunction(_O("string url_encode(const string&in url, const string&in reserved = \"\")"), asFUNCTION(url_encode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string url_decode(const string&in url, bool plus_as_space = true)"), asFUNCTION(url_decode), asCALL_CDECL);
 	RegisterNameValueCollection<NameValueCollection>(engine, "name_value_collection");
 	RegisterMessageHeader<MessageHeader, NameValueCollection>(engine, "internet_message_header", "name_value_collection");
@@ -606,6 +610,7 @@ void RegisterInternet(asIScriptEngine* engine) {
 	RegisterSocket<Socket>(engine, "socket");
 	RegisterStreamSocket<StreamSocket>(engine, "stream_socket");
 	RegisterWebSocket(engine);
+	RegisterDNS(engine);
 	engine->RegisterGlobalFunction("string url_request(const string&in method, const string&in url, const string&in data = \"\", http_response&out response = void)", asFUNCTION(url_request), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string url_get(const string&in url, http_response&out response = void)", asFUNCTION(url_get), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string url_post(const string&in url, const string&in data, http_response&out response = void)", asFUNCTION(url_post), asCALL_CDECL);

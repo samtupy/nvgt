@@ -533,13 +533,9 @@ void ConfigureEngineOptions(asIScriptEngine* engine) {
 	engine->SetEngineProperty(asEP_ALTER_SYNTAX_NAMED_ARGS, config.getInt("scripting.alter_syntax_named_args", 2));
 }
 int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
-	#ifndef __ANDROID__
-		Path global_include(Path(Path::self()).parent().append("include"));
-	#else
-		// Attempting to read default includes from assets directory of app, haven't succeeded yet.
-		Path global_include(Path(android_get_main_shared_object()).parent().parent().parent().append("assets"));
-	#endif
+	Path global_include(Path(Path::self()).parent().append("include"));
 	g_IncludeDirs.push_back(global_include.toString());
+	g_included_filenames[Path(scriptFile).getFileName()] = scriptFile;
 	if (!g_debug) engine->SetEngineProperty(asEP_BUILD_WITHOUT_LINE_CUES, true);
 	if (g_platform == "auto") determine_compile_platform(); // Insure that platform defines work whether compiling or executing a script.
 	CScriptBuilder builder;
