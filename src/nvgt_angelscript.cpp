@@ -367,6 +367,7 @@ asUINT GetTimeCallback() {
 	return ticks();
 }
 
+// Registrations in the following function are usually done in alphabetical order, with some exceptions involving one subsystem depending on another. For example the internet subsystem registers functions that take timespans, meaning that timestuff gets registered before internet.
 int ConfigureEngine(asIScriptEngine* engine) {
 	engine->SetMessageCallback(asFUNCTION(MessageCallback), 0, asCALL_CDECL);
 	engine->SetTranslateAppExceptionCallback(asFUNCTION(TranslateException), 0, asCALL_CDECL);
@@ -418,9 +419,6 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_INPUT);
 	engine->BeginConfigGroup("input");
 	RegisterInput(engine);
-	engine->EndConfigGroup();
-	engine->BeginConfigGroup("internet");
-	RegisterInternet(engine);
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("library");
 	RegisterScriptLibrary(engine);
@@ -477,6 +475,9 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->BeginConfigGroup("time");
 	RegisterScriptTimestuff(engine);
 	engine->EndConfigGroup();
+	engine->BeginConfigGroup("internet");
+	RegisterInternet(engine);
+	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_FS);
 	engine->BeginConfigGroup("filesystem");
 	RegisterScriptFileSystemFunctions(engine);
@@ -532,13 +533,9 @@ void ConfigureEngineOptions(asIScriptEngine* engine) {
 	engine->SetEngineProperty(asEP_ALTER_SYNTAX_NAMED_ARGS, config.getInt("scripting.alter_syntax_named_args", 2));
 }
 int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
-	#ifndef __ANDROID__
-		Path global_include(Path(Path::self()).parent().append("include"));
-	#else
-		// Attempting to read default includes from assets directory of app, haven't succeeded yet.
-		Path global_include(Path(android_get_main_shared_object()).parent().parent().parent().append("assets"));
-	#endif
+	Path global_include(Path(Path::self()).parent().append("include"));
 	g_IncludeDirs.push_back(global_include.toString());
+	g_included_filenames[Path(scriptFile).getFileName()] = scriptFile;
 	if (!g_debug) engine->SetEngineProperty(asEP_BUILD_WITHOUT_LINE_CUES, true);
 	if (g_platform == "auto") determine_compile_platform(); // Insure that platform defines work whether compiling or executing a script.
 	CScriptBuilder builder;

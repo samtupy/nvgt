@@ -16,7 +16,7 @@
 class menu {
 	funcdef void menu_callback(menu@, string);
 	audio_form form; // Only access if really needed.
-	// All properties from this point can be freely set while using this class.
+	// All properties from this point can be freely set while using this class. If a variable is marked as private and begins with an underscore, it only means that public getters and setters with the same name minus the prefixed underscore exist later in the class.
 	string intro_text; // Spoken when the void intro() function is called.
 	string click_sound; // Played when the user changes positions in the menu.
 	string select_sound; // Played when the user chooses an option in the menu.
@@ -28,32 +28,40 @@ class menu {
 	string background_callback_data;
 	bool wrap = false; // If the user moves beyond an edge of the menu, set this to true to jump them to the other edge, or false to play an edge sound and repeat the last item.
 	uint wrap_delay = 10; // How much time should the menu block when wrapping.
-	bool repeat_boundary_items = false; // Menu items will not speak when the user repeatedly hits the edge of a non-wrapping menu if this is set to false.
 	bool focus_first_item = false; // If this is false, the user will be required to press an arrow key to focus either the first or last item of the menu after the intro function has been called. Otherwise they will be focused on the first item.
 	bool automatic_intro = true; // If this is true, the intro function will be automatically called the first time the monitor method is invoqued, then the variable will be set to false. It can be set to true again at any time to cause the intro sequence to repeat, or the intro function can be called manually.
+	private bool _repeat_boundary_items = false; // Menu items will not speak when the user repeatedly hits the edge of a non-wrapping menu if this is set to false.
+	private bool _allow_escape = true; // If set to false, the user must click on an option manually and will not be able to use escape to exit the menu.
+	private bool _allow_go_to_index = true; // If set to false, the user can no longer press ctrl+g to select a menu item by number.
+	private bool _allow_search = true; // If set to false, the user can no longer press ctrl+f to search for an item in the menu by text.
 	pack@ pack_file; // Optionally set this to a pack containing sounds.
 	menu() {
 		reset();
 	}
 	// The following function resets the menu to it's default state. If reset_settings is true, the sounds which have been set and other such options are cleared.
 	void reset(bool reset_settings = false) {
-		form.reset();
-		form.create_window();
-		f_list = form.create_list("Menu", repeat_boundary_items : true);
-		form.set_event_callback(f_list, on_control_event_callback(on_form_list_event));
-		f_ok = form.create_button("OK", true);
-		form.set_state(f_ok, true, false);
-		f_cancel = form.create_button("Cancel", false, true);
-		form.set_state(f_cancel, true, false);
-		form.focus_silently(f_list);
 		if (reset_settings) {
 			intro_text = click_sound = select_sound = edge_sound = wrap_sound = open_sound = close_sound = "";
 			wrap = false;
 			automatic_intro = true;
 			wrap_delay = 10;
 			focus_first_item = false;
+			allow_escape = true;
+			_repeat_boundary_items = false;
+			_allow_escape = true;
+			_allow_go_to_index = true;
+			_allow_search = true;
 			@pack_file = null;
 		}
+		form.reset();
+		form.create_window();
+		f_list = form.create_list("Menu", repeat_boundary_items : true);
+		form.set_event_callback(f_list, on_control_event_callback(on_form_list_event));
+		f_ok = form.create_button("OK", true);
+		form.set_state(f_ok, true, false);
+		f_cancel = form.create_button("Cancel", false, allow_escape);
+		form.set_state(f_cancel, true, false);
+		form.focus_silently(f_list);
 	}
 	// Item IDs are entirely optional.
 	int add_item(const string&in text, const string&in id = "", int position = -1) {
@@ -130,6 +138,34 @@ class menu {
 	string get_selected_item_id() const property {
 		return last_selected_id;
 	}
+	bool get_repeat_boundary_items() const property {
+		return _repeat_boundary_items;
+	}
+	void set_repeat_boundary_items(bool enabled) property {
+		_repeat_boundary_items = enabled;
+		form.set_list_properties(f_list, false, enabled);
+	}
+	bool get_allow_escape() const property {
+		return _allow_escape;
+	}
+	void set_allow_escape(bool enabled) property {
+		_allow_escape = enabled;
+		form.set_button_attributes(f_cancel, false, enabled);
+	}
+	bool get_allow_go_to_index() const property {
+		return _allow_go_to_index;
+	}
+	void set_allow_go_to_index(bool enabled) property {
+		_allow_go_to_index = enabled;
+		form.set_enable_go_to_index(f_list, enabled);
+	}
+	bool get_allow_search() const property {
+		return _allow_search;
+	}
+	void set_allow_search(bool enabled) property {
+		_allow_search = enabled;
+		form.set_enable_search(f_list, enabled);
+	}
 	// Anything beyond this point is only used internally by this class.
 	private int f_list, f_ok, f_cancel; // form controls
 	private int last_selected_index;
@@ -152,7 +188,6 @@ class menu {
 	}
 	private int on_form_list_event(audio_form@ f, int c, control_event_type event, dictionary@ args) {
 		if (event != event_list_cursor) return 0;
-		f.set_list_properties(f_list, false, repeat_boundary_items);
 		if (args.exists("boundary")) {
 			if (!wrap) {
 				play(edge_sound);
