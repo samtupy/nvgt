@@ -1,0 +1,13 @@
+void main() {
+	vector v(10, 20, 30);
+	vector v2 = v + v;
+	alert("test", v2);
+	ray r(v, v2 * 5);
+	alert(r.point1, r.point2);
+	aabb box(vector(0, 0, 0), vector(10, 10, 10));
+	alert(EPSILON, box.extent);
+	float[]@ matrix = IDENTITY_TRANSFORM.get_opengl_matrix();
+	transform tr;
+	tr.set_from_opengl_matrix(matrix);
+	alert(tr == IDENTITY_TRANSFORM, string(matrix));
+}

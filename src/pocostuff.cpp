@@ -282,7 +282,7 @@ poco_shared<Dynamic::Var>* poco_var_dec(poco_shared<Dynamic::Var>* var) {
 }
 int poco_var_cmp(poco_shared<Dynamic::Var>* var, const poco_shared<Dynamic::Var>& other) {
 	if ((*var->ptr) < *(other.ptr)) return -1;
-	else if ((*var->ptr) > *(other.ptr)) return -1;
+	else if ((*var->ptr) > *(other.ptr)) return 1;
 	else return 0;
 }
 template<typename T> T poco_var_sub_assign(poco_shared<Dynamic::Var>* var, const T& val) {
@@ -305,6 +305,14 @@ template<typename T> T poco_var_div_assign(poco_shared<Dynamic::Var>* var, const
 }
 template<typename T> T poco_var_div(poco_shared<Dynamic::Var>* var, const T& val) {
 	return var->ptr->template operator/<T>(val).template convert<T>();
+}
+template<typename T> T poco_var_mod_assign(poco_shared<Dynamic::Var>* var, const T& val) {
+	T tmp = var->ptr->template convert<T>() % val;
+	var->ptr->template operator=<T>(tmp);
+	return tmp;
+}
+template<typename T> T poco_var_mod(poco_shared<Dynamic::Var>* var, const T& val) {
+	return var->ptr->template convert<T>() % val;
 }
 // Special opAssign, opAdd and opAddAssign operator overloads for string, so one can do "str"+var etc.
 std::string poco_var_add_string(std::string* var, const poco_shared<Dynamic::Var>& val) {
@@ -547,6 +555,10 @@ template<typename T, bool is_string = false> void RegisterPocoVarType(asIScriptE
 		engine->RegisterObjectMethod("var", format("%s opMul(const %s&in) const", type, type).c_str(), asFUNCTION(poco_var_mul<T>), asCALL_CDECL_OBJFIRST);
 		engine->RegisterObjectMethod("var", format("%s opDivAssign(const %s&in)", type, type).c_str(), asFUNCTION(poco_var_div_assign<T>), asCALL_CDECL_OBJFIRST);
 		engine->RegisterObjectMethod("var", format("%s opDiv(const %s&in) const", type, type).c_str(), asFUNCTION(poco_var_div<T>), asCALL_CDECL_OBJFIRST);
+		if constexpr(std::is_integral<T>::value) {
+			engine->RegisterObjectMethod("var", format("%s opModAssign(const %s&in)", type, type).c_str(), asFUNCTION(poco_var_mod_assign<T>), asCALL_CDECL_OBJFIRST);
+			engine->RegisterObjectMethod("var", format("%s opMod(const %s&in) const", type, type).c_str(), asFUNCTION(poco_var_mod<T>), asCALL_CDECL_OBJFIRST);
+		}
 	}
 	engine->RegisterObjectMethod("var", format("%s opImplConv() const", type).c_str(), asFUNCTION(poco_var_extract<T>), asCALL_CDECL_OBJFIRST);
 }
