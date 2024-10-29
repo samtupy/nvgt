@@ -367,6 +367,7 @@ asUINT GetTimeCallback() {
 	return ticks();
 }
 
+// Registrations in the following function are usually done in alphabetical order, with some exceptions involving one subsystem depending on another. For example the internet subsystem registers functions that take timespans, meaning that timestuff gets registered before internet.
 int ConfigureEngine(asIScriptEngine* engine) {
 	engine->SetMessageCallback(asFUNCTION(MessageCallback), 0, asCALL_CDECL);
 	engine->SetTranslateAppExceptionCallback(asFUNCTION(TranslateException), 0, asCALL_CDECL);
@@ -418,9 +419,6 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_INPUT);
 	engine->BeginConfigGroup("input");
 	RegisterInput(engine);
-	engine->EndConfigGroup();
-	engine->BeginConfigGroup("internet");
-	RegisterInternet(engine);
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("library");
 	RegisterScriptLibrary(engine);
@@ -476,6 +474,9 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("time");
 	RegisterScriptTimestuff(engine);
+	engine->EndConfigGroup();
+	engine->BeginConfigGroup("internet");
+	RegisterInternet(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_FS);
 	engine->BeginConfigGroup("filesystem");
