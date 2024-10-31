@@ -146,6 +146,7 @@ class ini {
 					if (is_escape)
 						is_escape = false;
 				}
+				identifier.trim_whitespace_right_this();
 				// So at this point string identifier contains the name of the new section, so add the previous one and start this one.
 				this.sections.insert_last(tmp_section);
 				if (tmp_section.name != "") {
@@ -179,6 +180,7 @@ class ini {
 				if (is_escape)
 					is_escape = false;
 			}
+			identifier.trim_whitespace_this();
 			// If an identifier was found, it's pretty safe to finally add the key to the section!
 			if (found_identifier)
 				tmp_section.set_string(identifier, value, true);
