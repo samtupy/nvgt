@@ -153,6 +153,7 @@ int websocket_send_frame(WebSocket& sock, const string& data, int flags) { retur
 string websocket_receive_frame(WebSocket& sock, int& flags) {
 	Buffer<char> buf(0);
 	int recv_len = sock.receiveFrame(buf, flags);
+	if (recv_len == 0) return "";
 	return string(buf.begin(), buf.end());
 }
 
@@ -594,6 +595,10 @@ void RegisterInternet(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("socket_type", "SOCKET_TYPE_STREAM", Socket::Type::SOCKET_TYPE_STREAM);
 	engine->RegisterEnumValue("socket_type", "SOCKET_TYPE_DATAGRAM", Socket::Type::SOCKET_TYPE_DATAGRAM);
 	engine->RegisterEnumValue("socket_type", "SOCKET_TYPE_RAW", Socket::Type::SOCKET_TYPE_RAW);
+	engine->RegisterEnum("socket_select_mode");
+	engine->RegisterEnumValue("socket_select_mode", "SOCKET_SELECT_READ", Socket::SELECT_READ);
+	engine->RegisterEnumValue("socket_select_mode", "SOCKET_SELECT_WRITE", Socket::SELECT_WRITE);
+	engine->RegisterEnumValue("socket_select_mode", "SOCKET_SELECT_ERROR", Socket::SELECT_ERROR);
 	engine->RegisterGlobalFunction(_O("string url_encode(const string&in url, const string&in reserved = \"\")"), asFUNCTION(url_encode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string url_decode(const string&in url, bool plus_as_space = true)"), asFUNCTION(url_decode), asCALL_CDECL);
 	RegisterNameValueCollection<NameValueCollection>(engine, "name_value_collection");
