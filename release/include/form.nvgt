@@ -1616,6 +1616,22 @@ class audio_form {
 		}
 		return c_form[control_index].text;
 	}
+	int get_text_cursor(int control_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return -1;
+		}
+		if (c_form[control_index].type != ct_input) {
+			form_error = form_error_invalid_control;
+			return -1;
+		}
+		return c_form[control_index].cursor;
+	}
 	bool set_text(int control_index, string new_text) {
 		form_error = 0;
 		if (!active) {
