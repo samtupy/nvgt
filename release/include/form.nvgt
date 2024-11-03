@@ -2565,6 +2565,7 @@ class control {
 		this.use_only_disallowed_chars = false;
 		this.char_disallowed_description = "";
 		this.enable_go_to_index = true;
+		this.enable_search = true;
 	}
 	void focus(bool interrupt_previous_speech, bool separate_attributes, bool silent = false) {
 		if (silent == true) {
