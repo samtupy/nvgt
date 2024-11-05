@@ -1,8 +1,8 @@
 /**
 	Encodes a string as base64.
-	string string_base64_encode(string the_data, string_base64_options options = STRING_BASE64_DEFAULT);
+	string string_base64_encode(const string&in the_data, string_base64_options options = STRING_BASE64_DEFAULT);
 	## Arguments:
-		* string the_data: The data that is to be encoded.
+		* const string&in the_data: The data that is to be encoded.
 		* string_base64_options options = STRING_BASE64_DEFAULT: A bitwise of options that control the behavior of the encoding (see remarks).
 	## Returns:
 		String: The encoded string on success or an empty string on failure.

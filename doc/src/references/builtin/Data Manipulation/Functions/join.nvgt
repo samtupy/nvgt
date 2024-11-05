@@ -1,9 +1,9 @@
 /**
 	turn an array into a string, with each element being separated by the given delimiter.
-	string join(string[] elements, string delimiter);
+	string join(const string[]@ elements, const string&in delimiter);
 	## Arguments:
-		* string[] elements: the array to join.
-		* string delimiter: the delimiter used to separate each element in the array (can be empty).
+		* const string[]@ elements: a handle to the array to join.
+		* const string&in delimiter: the delimiter used to separate each element in the array (can be empty).
 	## Returns:
 		string: the given array as a string.
 	## Remarks:

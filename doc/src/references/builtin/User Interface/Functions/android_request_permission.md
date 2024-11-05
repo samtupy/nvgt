@@ -1,5 +1,4 @@
 # android_request_permission
-
 Request a permission from the Android operating system either synchronously or asynchronously.
 
 `bool android_request_permission(string permission, android_permission_request_callback@ callback = null, string callback_data = "");`

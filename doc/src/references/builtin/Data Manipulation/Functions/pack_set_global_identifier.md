@@ -1,10 +1,10 @@
 # pack_set_global_identifier
 Set the global identifier of all your packs (e.g. the first 8-bytes that determine if you have a valid pack or not).
 
-`bool pack_set_global_identifier(string ident);`
+`bool pack_set_global_identifier(const string&in ident);`
 
 ## Arguments:
-* string ident: the new identifier (see remarks).
+* const string&in ident: the new identifier (see remarks).
 
 ## Returns:
 bool: true if the identifier was properly set, false otherwise.
