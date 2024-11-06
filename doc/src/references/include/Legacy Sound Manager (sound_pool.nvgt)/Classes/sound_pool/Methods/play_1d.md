@@ -1,5 +1,5 @@
 # play_1d
-Play a sound using 1dimension and return a slot.
+Play a sound in 1 dimension and return a slot.
 
 `int sound_pool::play_1d(string filename, pack@ packfile, float listener_x, float sound_x, bool looping, bool persistent = false);`
 

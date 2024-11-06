@@ -1,5 +1,5 @@
 # update_listener_3d
-Updates the listener coordinate in 3dimension.
+Updates the listener coordinate in 3 dimensions.
 
 1. `void sound_pool::update_listener_3d(float listener_x, float listener_y, float listener_z, double rotation = 0.0, bool refresh_y_is_elevation = true);`
 2. `void sound_pool::update_listener_3d(vector listener, double rotation = 0.0, bool refresh_y_is_elevation = true);`

@@ -1,5 +1,5 @@
 # play_2d
-Play a sound using 2dimension and return a slot.
+Play a sound in 2 dimensions and return a slot.
 
 1. `int sound_pool::play_2d(string filename, pack@ packfile, float listener_x, float listener_y, float sound_x, float sound_y, bool looping, bool persistent = false);`
 2. `int sound_pool::play_2d(string filename, pack@ packfile, float listener_x, float listener_y, float sound_x, float sound_y, double rotation, bool looping, bool persistent = false);`

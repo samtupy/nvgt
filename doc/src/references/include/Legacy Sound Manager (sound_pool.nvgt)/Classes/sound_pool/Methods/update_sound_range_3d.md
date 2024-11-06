@@ -1,5 +1,5 @@
 # update_sound_range_3d
-Updates the sound range in 3dimension.
+Updates the sound range in 3 dimensions.
 
 `bool sound_pool::update_sound_range_3d(int slot, int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range, bool update_sound = true);`
 

@@ -1,5 +1,5 @@
 # update_sound_3d
-Updates the sound coordinate in 3dimension.
+Updates the sound coordinate in 3 dimensions.
 
 1. `bool sound_pool::update_sound_3d(int slot, int x, int y, int z);`
 2. `bool sound_pool::update_sound_3d(int slot, vector coordinate);`

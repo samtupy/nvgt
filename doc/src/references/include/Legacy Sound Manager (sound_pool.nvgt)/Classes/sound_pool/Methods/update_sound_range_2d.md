@@ -1,5 +1,5 @@
 # update_sound_range_2d
-Updates the sound range in 2dimension.
+Updates the sound range in 2 dimensions.
 
 `bool sound_pool::update_sound_range_2d(int slot, int left_range, int right_range, int backward_range, int forward_range);`
 

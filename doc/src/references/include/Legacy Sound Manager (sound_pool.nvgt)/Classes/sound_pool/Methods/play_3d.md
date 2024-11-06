@@ -1,5 +1,5 @@
 # play_3d
-Play a sound using 3dimension and return a slot.
+Play a sound in 3 dimensions and return a slot.
 
 1. `int sound_pool::play_3d(string filename, pack@ packfile, float listener_x, float listener_y, float listener_z, float sound_x, float sound_y, float sound_z, double rotation, bool looping, bool persistent = false);`
 2. `int sound_pool::play_3d(string filename, pack@ packfile, vector listener, vector sound_coordinate, double rotation, bool looping, bool persistent = false);`
