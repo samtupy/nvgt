@@ -129,7 +129,10 @@ class touch_gesture_manager {
 	}
 	bool is_available() {
 		uint64[]@ dev = get_touch_devices();
-		return dev.length() < 1 ? false : true;
+		return dev.length() > 0;
+	}
+	bool get_available() property {
+		return is_available();
 	}
 	bool add_touch_interface(touch_interface@i) {
 		if (@i == null) return false;
