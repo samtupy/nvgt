@@ -29,45 +29,35 @@
 	#include <SDL3/SDL.h>
 #endif
 
-static char* minitrim(char* data, unsigned long* size, int bytesPerSample, int channels, int threshold = 20) {
-	int samplesPerFrame = channels * bytesPerSample;
+static char* minitrim(char* data, unsigned long* size, int bitrate, int channels, int begin_threshold = 512, int end_threshold = 128) {
+	int samplesPerFrame = channels * (bitrate / 8);
 	int numSamples = *size / samplesPerFrame;
 	int startIndex = 0;
 	int endIndex = numSamples - 1;
-
 	for (int i = 0; i < numSamples; i++) {
 		int maxAbsValue = 0;
 		for (int j = 0; j < channels; j++) {
-			int absValue = abs(static_cast<int>(data[i * samplesPerFrame + j]));
-			if (absValue > maxAbsValue) {
-				maxAbsValue = absValue;
-			}
+			int absValue = abs(bitrate == 16? reinterpret_cast<short*>(data)[i * channels + j] : data[i * channels + j]);
+			if (absValue > maxAbsValue) maxAbsValue = absValue;
 		}
-		if (maxAbsValue >= threshold) {
+		if (maxAbsValue >= begin_threshold) {
 			startIndex = i;
 			break;
 		}
 	}
-
 	for (int i = numSamples - 1; i >= 0; i--) {
 		int maxAbsValue = 0;
 		for (int j = 0; j < channels; j++) {
-			int absValue = abs(static_cast<int>(data[i * samplesPerFrame + j]));
-			if (absValue > maxAbsValue) {
-				maxAbsValue = absValue;
-			}
+			int absValue = abs(bitrate == 16? reinterpret_cast<short*>(data)[i * channels + j] : data[i * channels + j]);
+			if (absValue > maxAbsValue) maxAbsValue = absValue;
 		}
-		if (maxAbsValue >= threshold) {
+		if (maxAbsValue >= end_threshold) {
 			endIndex = i;
 			break;
 		}
 	}
-
-	int trimmedSize = (endIndex - startIndex + 1) * samplesPerFrame;
-	char* trimmedData = new char[trimmedSize];
-	memcpy(trimmedData, data + startIndex * samplesPerFrame, trimmedSize);
-	*size = trimmedSize;
-	return trimmedData;
+	*size = (endIndex - startIndex + 1) * samplesPerFrame;
+	return data + startIndex * samplesPerFrame;
 }
 
 tts_voice::tts_voice(const std::string& builtin_voice_name) {
