@@ -1,8 +1,8 @@
 /**
 	Remove a value from the JSON object given a key.
-	void json_object::remove(string key);
+	void json_object::remove(const string&in key);
 	## Arguments:
-		* string key: the key of the value to remove.
+		* const string&in key: the key of the value to remove.
 */
 
 // Example:

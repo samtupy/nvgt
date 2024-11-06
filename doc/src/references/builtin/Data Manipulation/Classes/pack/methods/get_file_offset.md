@@ -1,10 +1,10 @@
 # get_file_offset
 Get the offset of a file in your pack.
 
-`uint pack::get_file_offset(string filename);`
+`uint pack::get_file_offset(const string&in filename);`
 
 ## Arguments:
-* string filename: the name of the file to get the offset of.
+* const string&in filename: the name of the file to get the offset of.
 
 ## Returns:
 uint: the offset of the file (in bytes).

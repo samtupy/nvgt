@@ -1,8 +1,8 @@
 /**
 	Speaks a string (forcefully interrupting) through the currently active text-to-speech voice.
-	bool tts_voice::speak_interrupt(string  text);
+	bool tts_voice::speak_interrupt(const string&in text);
 	## Arguments:
-		* string text: the text to speak.
+		* const string&in text: the text to speak.
 	## Returns:
 		bool: true if the speech was generated successfully, false otherwise.
 */

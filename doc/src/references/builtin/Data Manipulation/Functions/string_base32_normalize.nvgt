@@ -1,8 +1,8 @@
 /**
 	Normalize a string to conform to the base32 spec.
-	string string_base32_normalize(string the_data);
+	string string_base32_normalize(const string&in the_data);
 	## Arguments:
-		* string the_data: the string to normalize.
+		* const string&in the_data: the string to normalize.
 	## Returns:
 		string: the normalized string.
 	## Remarks:

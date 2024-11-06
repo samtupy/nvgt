@@ -1,8 +1,8 @@
 /**
 	Get a value out of a JSON object using a query.
-	var@ json_object::opCall(string query);
+	var@ json_object::opCall(const string&in query);
 	## Arguments:
-		* string query: the JSON query (see the remarks section for details).
+		* const string&in query: the JSON query (see the remarks section for details).
 	## Returns:
 		var@: a handle to the object, null if not found.
 	## Remarks:

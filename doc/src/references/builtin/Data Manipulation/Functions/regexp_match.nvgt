@@ -1,9 +1,9 @@
 /**
 	Test if the text matches the specified regular expression.
-	bool regexp_match(string text, string pattern);
+	bool regexp_match(const string&in text, const string&in pattern);
 	## Arguments:
-		* string text: the text to compare against the regular expression.
-		* string pattern: the regular expression to match.
+		* const string&in text: the text to compare against the regular expression.
+		* const string&in pattern: the regular expression to match.
 	## Returns:
 		bool: true if the text matches the given regular expression, false otherwise.
 	## Remarks:

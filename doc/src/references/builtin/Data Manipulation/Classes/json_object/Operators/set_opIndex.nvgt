@@ -1,8 +1,8 @@
 /**
 	Set a value in the JSON object with a particular key.
-	void json_object::set_opIndex(string key, var@ value) property;
+	void json_object::set_opIndex(const string&in key, var@ value) property;
 	## Arguments:
-		* string key: the key of the object.
+		* const string&in key: the key of the object.
 		* var@ value: the value to set.
 */
 
