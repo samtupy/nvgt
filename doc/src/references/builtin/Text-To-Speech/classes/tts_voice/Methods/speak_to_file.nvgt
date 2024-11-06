@@ -1,9 +1,9 @@
 /**
 	Outputs a string of text through the currently active TTS voice to a wave file.
-	bool tts_voice::speak_to_file(string filename, string text);
+	bool tts_voice::speak_to_file(const string&in filename, const string&in text);
 	## Arguments:
-		* string filename: the filename to write to.
-		* string text: the text to synthesize.
+		* const string&in filename: the filename to write to.
+		* const string&in text: the text to synthesize.
 	## Returns:
 		bool: true if synthesis was successful and the file was written, false otherwise.
 */

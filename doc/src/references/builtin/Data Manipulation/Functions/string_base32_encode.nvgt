@@ -1,8 +1,8 @@
 /**
 	Encodes a string as base32.
-	string string_base32_encode(string the_data);
+	string string_base32_encode(const string&in the_data);
 	## Arguments:
-		* string the_data: The data that is to be encoded.
+		* const string&in the_data: The data that is to be encoded.
 	## Returns:
 		String: The encoded string on success or an empty string on failure.
 	## Remarks:

@@ -59,8 +59,8 @@ env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 # plugins
 plugin_env = env.Clone()
 static_plugins = []
-for s in Glob("plugin/*/_SConscript") + Glob("plugin/*/SConscript"):
-	plugname = str(s).split(os.path.sep)[1]
+for s in Glob("plugin/*/_SConscript") + Glob("plugin/*/SConscript") + Glob("extra/plugin/integrated/*/_SConscript") + Glob("extra/plugin/integrated/*/SConscript"):
+	plugname = str(s).split(os.path.sep)[-2]
 	if ARGUMENTS.get(f"no_{plugname}_plugin", "0") == "1": continue
 	plug = SConscript(s, variant_dir = f"build/obj_plugin/{plugname}", duplicate = 0, exports = {"env": plugin_env, "nvgt_env": env})
 	if plug: static_plugins.append(plug)
@@ -73,7 +73,7 @@ if "version.cpp" in sources: sources.remove("version.cpp")
 env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
 version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.
 VariantDir("build/obj_src", "src", duplicate = 0)
-env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoNetSSLWinMT", "PocoUtilMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoZip", "PocoFoundation"], "phonon", "bass", "bass_fx", "bassmix"])
+env.Append(LIBS = [["PocoFoundationMT", "PocoJSONMT", "PocoNetMT", "PocoNetSSLWinMT", "PocoUtilMT", "PocoZipMT"] if env["PLATFORM"] == "win32" else ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoZip", "PocoFoundation"], "phonon", "bass", "bass_fx", "bassmix", "reactphysics3d"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(LINKFLAGS = ["/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll"])

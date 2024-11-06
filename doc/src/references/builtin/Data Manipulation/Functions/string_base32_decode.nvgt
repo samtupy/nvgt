@@ -1,8 +1,8 @@
 /**
 	Decodes a string from base32.
-	string string_base32_decode(string the_data);
+	string string_base32_decode(const string&in the_data);
 	## Arguments:
-		* string the_data: The data that is to be decoded.
+		* const string&in the_data: The data that is to be decoded.
 	## Returns:
 		String: The decoded string on success or an empty string on failure.
 	## Remarks:

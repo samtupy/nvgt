@@ -9,7 +9,7 @@ void main() {
 	show_window("touch screen test");
 	speak("please wait", true);
 	wait(1000);
-	touch_jesture_manager touch;
+	touch_gesture_manager touch;
 	if (!touch.is_available()) {
 		alert("error", "This system does not support touch screen devices");
 		if (question("No touch", "There was no touch input on your system, which is what this program's use-case is for. Would you like to continue execution anyway?") != 1) exit();

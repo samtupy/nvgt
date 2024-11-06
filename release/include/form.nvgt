@@ -1163,6 +1163,23 @@ class audio_form {
 		c_form[control_index].enable_go_to_index = enabled;
 		return true;
 	}
+	bool set_enable_search(int control_index, bool enabled) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_index].enable_search = enabled;
+		return true;
+	}
 	bool set_disallowed_chars(int control_index, string chars, bool use_only_disallowed_chars = false, string char_disallowed_description = "") {
 		form_error = 0;
 		if (!active) {
@@ -1599,6 +1616,22 @@ class audio_form {
 		}
 		return c_form[control_index].text;
 	}
+	int get_text_cursor(int control_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return -1;
+		}
+		if (c_form[control_index].type != ct_input) {
+			form_error = form_error_invalid_control;
+			return -1;
+		}
+		return c_form[control_index].cursor;
+	}
 	bool set_text(int control_index, string new_text) {
 		form_error = 0;
 		if (!active) {
@@ -1944,6 +1977,38 @@ class audio_form {
 		}
 		return c_form[control_index].slider_value;
 	}
+	double get_slider_minimum_value(int control_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return -1;
+		}
+		if (c_form[control_index].type != ct_slider) {
+			form_error = form_error_invalid_control;
+			return -1;
+		}
+		return c_form[control_index].slider_minimum_value;
+	}
+	double get_slider_maximum_value(int control_index) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return -1;
+		}
+		if (c_form[control_index].type != ct_slider) {
+			form_error = form_error_invalid_control;
+			return -1;
+		}
+		return c_form[control_index].slider_maximum_value;
+	}
 	string get_slider_text_value(int control_index, double value) {
 		form_error = 0;
 		if (!active) {
@@ -2178,7 +2243,7 @@ class audio_form {
 			if (keyboard_modifiers & KEYMOD_CTRL != 0 and key_pressed(KEY_G) and c_form[tab_index].enable_go_to_index)
 				go_to_index(this, tab_index);
 		}
-		if ((c_form[tab_index].type == ct_input && c_form[tab_index].multiline && c_form[tab_index].text != "") or c_form[tab_index].type == ct_list) {
+		if (c_form[tab_index].enable_search && ((c_form[tab_index].type == ct_input && c_form[tab_index].multiline && c_form[tab_index].text != "") or c_form[tab_index].type == ct_list)) {
 			if (keyboard_modifiers & KEYMOD_CTRL != 0 and key_pressed(KEY_F))
 				search_for(this, tab_index);
 			else if (key_repeating(KEY_F3)) {
@@ -2448,6 +2513,7 @@ class control {
 	bool use_only_disallowed_chars;
 	string char_disallowed_description;
 	bool enable_go_to_index; //This is mostly used on go to index field where it prevents the key from pressing again.
+	bool enable_search;
 	control() {
 		progress_time.restart();
 		progress_time.pause();
@@ -2499,6 +2565,7 @@ class control {
 		this.use_only_disallowed_chars = false;
 		this.char_disallowed_description = "";
 		this.enable_go_to_index = true;
+		this.enable_search = true;
 	}
 	void focus(bool interrupt_previous_speech, bool separate_attributes, bool silent = false) {
 		if (silent == true) {

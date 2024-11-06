@@ -229,6 +229,27 @@ template<typename T> datastream& datastream::write(T value) {
 	binary ? (*w) << value : (*_ostr) << value;
 	return *this;
 }
+std::string datastream::read_until(const std::string& text, bool require_full) {
+	if (!_istr || text.empty()) return "";
+	std::string final_output;
+	while (_istr->good()) {
+		std::string result;
+		std::getline(*_istr, result, text[0]);
+		if (_istr->good()) result += text[0];
+		if (!require_full || text.size() == 1) return result;
+		final_output += result;
+		int search_cursor = 0;
+		while (_istr->good() && search_cursor > -1 && ++search_cursor < text.length()) {
+			char c = _istr->get();
+			final_output += c;
+			if (c == text[search_cursor]) continue;
+			else search_cursor = -1; // break out of both this and parent loop
+		}
+		if (search_cursor < 0 || !_istr->good()) continue; // try getline again
+		else break; // string located
+	}
+	return final_output;
+}
 
 // This can be used for any datastream that wants to allow a default constructor E. stream is in closed state.
 datastream* datastream_empty_factory() {
@@ -294,6 +315,7 @@ template <class T, datastream_factory_type factory> void RegisterDatastreamType(
 	engine->RegisterObjectMethod(classname.c_str(), "int64 get_wpos() const property", asMETHOD(datastream, get_pos), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read(uint = 0)", asMETHODPR(datastream, read, (unsigned int), std::string), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read_line()", asMETHOD(datastream, read_line), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "string read_until(const string&in text, bool require_full)", asMETHOD(datastream, read_until), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "uint write(const string&in)", asMETHODPR(datastream, write, (const std::string&), unsigned int), asCALL_THISCALL);
 	RegisterDatastreamReadwrite<char>(engine, classname, "int8");
 	RegisterDatastreamReadwrite<unsigned char>(engine, classname, "uint8");

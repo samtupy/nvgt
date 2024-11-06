@@ -73,6 +73,7 @@ public:
 	template<typename T> datastream& read(T& value);
 	template <typename T> T read();
 	template<typename T> datastream& write(T value);
+	std::string read_until(const std::string& text, bool full);
 	inline bool good() {
 		return _istr ? _istr->good() : _ostr ? _ostr->good() : false;
 	}

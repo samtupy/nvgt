@@ -19,6 +19,7 @@
 #include <Poco/URIStreamOpener.h>
 #include <Poco/Net/AcceptCertificateHandler.h>
 #include <Poco/Net/Context.h>
+#include <Poco/Net/DNS.h>
 #include <Poco/Net/FTPClientSession.h>
 #include <Poco/Net/HTTPClientSession.h>
 #include <Poco/Net/HTTPCredentials.h>
@@ -28,6 +29,7 @@
 #include <Poco/Net/HTTPSClientSession.h>
 #include <Poco/Net/MessageHeader.h>
 #include <Poco/Net/SSLManager.h>
+#include <Poco/Net/WebSocket.h>
 #include <scriptarray.h>
 #include <scriptdictionary.h>
 #include "datastreams.h"
@@ -51,9 +53,20 @@ string url_decode(const string& url, bool plus_as_space) {
 	return result;
 }
 
-template <class T> void generic_construct(T* mem) { new (mem) T(); }
+template <class T, typename... A> void generic_construct(T* mem, A... args) { new (mem) T(args...); }
 template <class T> void generic_copy_construct(T* mem, const T& other) { new (mem) T(other); }
 template <class T> void generic_destruct(T* mem) { mem->~T(); }
+template <class T> int opCmp(const T& first, const T& second) {
+	if (first < second) return -1;
+	else if (first > second) return 1;
+	else return 0;
+}
+template <class T> int opCmpNoGT(const T& first, const T& second) {
+	// Some classes have operator< and operator==, but not operator>.
+	if (first < second) return -1;
+	else if (first == second) return 0;
+	else return 1;
+}
 
 // We will need to wrap any functions that handle std iostreams.
 template <class T> bool message_header_write(MessageHeader* h, datastream* ds) {
@@ -121,6 +134,29 @@ template <class T> const string& name_value_collection_value_at(T* nvc, unsigned
 	if (index >= nvc->size()) throw RangeException(format("index %u into name_value_collection out of bounds (contains %z elements)", index, nvc->size()));
 	return (nvc->begin() + index)->second;
 }
+
+// In NVGT we tend to overuse std::string, make sure sockets can handle this datatype. We should try to register versions of SendBytes and ReceiveBytes that works with a lower level datatype when possible especially because of the unnecessary memory usage incurred with std::string in this case.
+template <class T> int socket_send_bytes(T& sock, const string& data, int flags) { return sock.sendBytes(data.data(), data.size(), flags); }
+template <class T> string socket_receive_bytes(T& sock, int length, int flags) {
+	if (!length) return 0;
+	string result(length, 0); // ooouuuch this initialization to null chars hurts and is a waste, find a way to fix it!
+	int recv_len = sock.receiveBytes(result.data(), length, flags);
+	result.resize(recv_len);
+	return result;
+}
+template <class T> string socket_receive_bytes_buf(T& sock, int flags, const Timespan& timeout) {
+	Buffer<char> buf(0);
+	sock.receiveBytes(buf, flags);
+	return string(buf.begin(), buf.end());
+}
+int websocket_send_frame(WebSocket& sock, const string& data, int flags) { return sock.sendFrame(data.data(), data.size(), flags); }
+string websocket_receive_frame(WebSocket& sock, int& flags) {
+	Buffer<char> buf(0);
+	int recv_len = sock.receiveFrame(buf, flags);
+	if (recv_len == 0) return "";
+	return string(buf.begin(), buf.end());
+}
+
 
 template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, const string& type) {
 	angelscript_refcounted_register<T>(engine, type.c_str());
@@ -267,6 +303,203 @@ template <class T> void RegisterFTPClientSession(asIScriptEngine* engine, const 
 	engine->RegisterObjectMethod(type.c_str(), "bool get_is_secure() const property", asMETHOD(T, isSecure), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_welcome_message() const property", asMETHOD(T, welcomeMessage), asCALL_THISCALL);
 }
+void RegisterIPAddress(asIScriptEngine* engine) {
+	// Also registers SocketAddress as an aside.
+	engine->SetDefaultNamespace("spec");
+	engine->RegisterEnum("ip_address_family");
+	engine->RegisterEnumValue("ip_address_family", "IP_FAMILY_UNKNOWN", AddressFamily::UNKNOWN);
+	#ifdef POCO_HAS_UNIX_SOCKET
+	engine->RegisterEnumValue("ip_address_family", "IP_FAMILY_unix_local", AddressFamily::UNIX_LOCAL);
+	#else
+	engine->RegisterEnumValue("ip_address_family", "IP_FAMILY_unix_local", AddressFamily::UNKNOWN);
+	#endif
+	engine->RegisterEnumValue("ip_address_family", "IP_FAMILY_IPV4", AddressFamily::IPv4);
+	engine->RegisterEnumValue("ip_address_family", "IP_FAMILY_IPV6", AddressFamily::IPv6);
+	engine->RegisterObjectType("ip_address", sizeof(IPAddress), asOBJ_VALUE | asGetTypeTraits<IPAddress>());
+	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(generic_construct<IPAddress>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f(ip_address_family)", asFUNCTION((generic_construct<IPAddress, AddressFamily::Family>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f(const string&in addr)", asFUNCTION((generic_construct<IPAddress, const string&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f(const string&in addr, ip_address_family)", asFUNCTION((generic_construct<IPAddress, const string&, AddressFamily::Family>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f(const ip_address&in)", asFUNCTION(generic_copy_construct<IPAddress>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(generic_destruct<IPAddress>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("ip_address", "ip_address& opAssign(const ip_address&in addr)", asMETHODPR(IPAddress, operator=, (const IPAddress&), IPAddress&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_v4() const property", asMETHOD(IPAddress, isV4), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_v6() const property", asMETHOD(IPAddress, isV6), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "ip_address_family get_family() const property", asMETHOD(IPAddress, family), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "uint get_scope() const property", asMETHOD(IPAddress, scope), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "string opImplConv() const", asMETHOD(IPAddress, toString), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_wildcard() const property", asMETHOD(IPAddress, isWildcard), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_broadcast() const property", asMETHOD(IPAddress, isBroadcast), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_loopback() const property", asMETHOD(IPAddress, isLoopback), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_multicast() const property", asMETHOD(IPAddress, isMulticast), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_unicast() const property", asMETHOD(IPAddress, isUnicast), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_link_local() const property", asMETHOD(IPAddress, isLinkLocal), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_site_local() const property", asMETHOD(IPAddress, isSiteLocal), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_IPV4_compatible() const property", asMETHOD(IPAddress, isIPv4Compatible), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_IPV4_mapped() const property", asMETHOD(IPAddress, isIPv4Mapped), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_well_known_multicast() const property", asMETHOD(IPAddress, isWellKnownMC), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_node_local_multicast() const property", asMETHOD(IPAddress, isNodeLocalMC), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_link_local_multicast() const property", asMETHOD(IPAddress, isLinkLocalMC), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_site_local_multicast() const property", asMETHOD(IPAddress, isSiteLocalMC), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_org_local_multicast() const property", asMETHOD(IPAddress, isOrgLocalMC), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool get_is_global_multicast() const property", asMETHOD(IPAddress, isGlobalMC), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "bool opEquals(const ip_address&in addr) const", asMETHOD(IPAddress, operator==), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "int opCmp(const ip_address&in)", asFUNCTION(opCmp<IPAddress>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("ip_address", "ip_address opAnd(const ip_address&in addr) const", asMETHOD(IPAddress, operator&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "ip_address opOr(const ip_address&in addr) const", asMETHOD(IPAddress, operator|), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "ip_address opXor(const ip_address&in addr) const", asMETHOD(IPAddress, operator^), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "ip_address opCom() const", asMETHOD(IPAddress, operator~), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "uint get_prefix_length() const property", asMETHOD(IPAddress, prefixLength), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "void mask(const ip_address&in mask)", asMETHODPR(IPAddress, mask, (const IPAddress&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("ip_address", "void mask(const ip_address&in mask, const ip_address&in set)", asMETHODPR(IPAddress, mask, (const IPAddress&, const IPAddress&), void), asCALL_THISCALL);
+	engine->RegisterGlobalFunction("bool parse_ip_address(const string&in addr_in, ip_address&out addr_out)", asFUNCTION(IPAddress::tryParse), asCALL_CDECL);
+	engine->RegisterGlobalFunction("ip_address wildcard_ip_address(spec::ip_address_family)", asFUNCTION(IPAddress::wildcard), asCALL_CDECL);
+	engine->RegisterGlobalFunction("ip_address broadcast_ip_address()", asFUNCTION(IPAddress::broadcast), asCALL_CDECL);
+	engine->SetDefaultNamespace("");
+	engine->RegisterObjectType("socket_address", sizeof(SocketAddress), asOBJ_VALUE | asGetTypeTraits<SocketAddress>());
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(generic_construct<SocketAddress>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family) explicit", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(uint16 port) explicit", asFUNCTION((generic_construct<SocketAddress, UInt16>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(const spec::ip_address&in addr, uint16 port)", asFUNCTION((generic_construct<SocketAddress, const IPAddress&, UInt16>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(const string&in host_and_port)", asFUNCTION((generic_construct<SocketAddress, const string&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(const string&in host, uint16 port)", asFUNCTION((generic_construct<SocketAddress, const string&, UInt16>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family, uint16 port)", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family, UInt16>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family, const string&in addr)", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family, const string&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family, const string&in host, uint16 port)", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family, const string&, UInt16>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family, const string&in host, const string&in port)", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family, const string&, const string&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(const socket_address&in)", asFUNCTION(generic_copy_construct<SocketAddress>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(generic_destruct<SocketAddress>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("socket_address", "socket_address& opAssign(const socket_address&in addr)", asMETHODPR(SocketAddress, operator=, (const SocketAddress&), SocketAddress&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("socket_address", "spec::ip_address get_host() const property", asMETHOD(SocketAddress, host), asCALL_THISCALL);
+	engine->RegisterObjectMethod("socket_address", "uint16 get_port() const property", asMETHOD(SocketAddress, port), asCALL_THISCALL);
+	engine->RegisterObjectMethod("socket_address", "string opImplConv() const", asMETHOD(SocketAddress, toString), asCALL_THISCALL);
+	engine->RegisterObjectMethod("socket_address", "spec::ip_address_family get_family() const property", asMETHOD(SocketAddress, family), asCALL_THISCALL);
+	engine->RegisterObjectMethod("socket_address", "int opCmp(const socket_address&in)", asFUNCTION(opCmpNoGT<SocketAddress>), asCALL_CDECL_OBJFIRST);
+}
+template <class T> void RegisterSocket(asIScriptEngine* engine, const std::string& type) {
+	angelscript_refcounted_register<T>(engine, type.c_str());
+	if constexpr(!std::is_same_v<T, WebSocket>) engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f()", type).c_str(), asFUNCTION(angelscript_refcounted_factory<T>), asCALL_CDECL);
+	if (type != "socket") 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const socket&in sock)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const Socket&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const %s&in sock)", type, type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const T&>)), asCALL_CDECL);
+	if (type != "socket") 	engine->RegisterObjectMethod(type.c_str(), format("%s& opAssign(const socket&in sock)", type).c_str(), asMETHODPR(T, operator=, (const Socket&), T&), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), format("%s& opAssign(const %s&in socket)", type, type).c_str(), asMETHODPR(T, operator=, (const T&), T&), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), format("int opCmp(const %s&in)", type).c_str(), asFUNCTION(opCmp<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), format("socket_type get_type() const property", type).c_str(), asMETHOD(T, type), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_is_null() const property", asMETHOD(T, isNull), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_is_stream() const property", asMETHOD(T, isStream), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_is_datagram() const property", asMETHOD(T, isDatagram), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_is_raw() const property", asMETHOD(T, isRaw), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void close()", asMETHOD(T, close), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool poll(const timespan& timeout, int mode) const", asMETHOD(T, poll), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int get_available() const property", asMETHOD(T, available), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int get_error() const property", asMETHOD(T, getError), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_send_buffer_size(int size) property", asMETHOD(T, setSendBufferSize), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int get_send_buffer_size() const property", asMETHOD(T, getSendBufferSize), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_receive_buffer_size(int size) property", asMETHOD(T, setReceiveBufferSize), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int get_receive_buffer_size() const property", asMETHOD(T, getReceiveBufferSize), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_send_timeout(const timespan&in timeout) property", asMETHOD(T, setSendTimeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "timespan get_send_timeout() const property", asMETHOD(T, getSendTimeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_receive_timeout(const timespan&in timeout) property", asMETHOD(T, setReceiveTimeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "timespan get_receive_timeout() const property", asMETHOD(T, getReceiveTimeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_option(int level, int option, int value)", asMETHODPR(T, setOption, (int, int, int), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_option(int level, int option, uint value)", asMETHODPR(T, setOption, (int, int, unsigned), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_option(int level, int option, uint8 value)", asMETHODPR(T, setOption, (int, int, unsigned char), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_option(int level, int option, const timespan&in value)", asMETHODPR(T, setOption, (int, int, const Timespan&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_option(int level, int option, const spec::ip_address&in value)", asMETHODPR(T, setOption, (int, int, const IPAddress&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void get_option(int level, int option, int&out value) const", asMETHODPR(T, getOption, (int, int, int&) const, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void get_option(int level, int option, uint&out value) const", asMETHODPR(T, getOption, (int, int, unsigned&) const, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void get_option(int level, int option, uint8&out value) const", asMETHODPR(T, getOption, (int, int, unsigned char&) const, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void get_option(int level, int option, timespan&out value) const", asMETHODPR(T, getOption, (int, int, Timespan&) const, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void get_option(int level, int option, spec::ip_address&out value)", asMETHODPR(T, getOption, (int, int, IPAddress&) const, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_linger(bool on, int seconds)", asMETHOD(T, setLinger), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void get_linger(bool&out on, int&out seconds)", asMETHOD(T, getLinger), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_no_delay(bool flag) property", asMETHOD(T, setNoDelay), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_no_delay() const property", asMETHOD(T, getNoDelay), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_keep_alive(bool flag) property", asMETHOD(T, setKeepAlive), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_keep_alive() const property", asMETHOD(T, getKeepAlive), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_reuse_address(bool flag) property", asMETHOD(T, setReuseAddress), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_reuse_address() const property", asMETHOD(T, getReuseAddress), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_reuse_port(bool flag) property", asMETHOD(T, setReusePort), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_reuse_port() const property", asMETHOD(T, getReusePort), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_oob_inline(bool flag) property", asMETHOD(T, setOOBInline), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_oob_inline() const property", asMETHOD(T, getOOBInline), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_blocking(bool flag) property", asMETHOD(T, setBlocking), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_blocking() const property", asMETHOD(T, getBlocking), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "socket_address get_address() const property", asMETHOD(T, address), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "socket_address get_peer_address() const property", asMETHOD(T, peerAddress), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_secure() const property", asMETHOD(T, secure), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void init(int af)", asMETHOD(T, init), asCALL_THISCALL);
+}
+template <class T> void RegisterStreamSocket(asIScriptEngine* engine, const std::string& type) {
+	RegisterSocket<T>(engine, type);
+	if constexpr(!std::is_same_v<T, WebSocket>) {
+		engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const socket_address&in address)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const SocketAddress&>)), asCALL_CDECL);
+		engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const spec::ip_address_family)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, SocketAddress::Family>)), asCALL_CDECL);
+		engine->RegisterObjectMethod(type.c_str(), "void connect(const socket_address&in address)", asMETHODPR(T, connect, (const SocketAddress&), void), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type.c_str(), "void connect(const socket_address&in address, const timespan&in timeout)", asMETHODPR(T, connect, (const SocketAddress&, const Timespan&), void), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type.c_str(), "void connect_nonblocking(const socket_address&in address)", asMETHOD(T, connectNB), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type.c_str(), "bool bind(const socket_address&in address, bool reuse_address = false, bool IPv6_only = false)", asMETHOD(T, bind), asCALL_THISCALL);
+	}
+	engine->RegisterObjectMethod(type.c_str(), "void shutdown_receive()", asMETHOD(T, shutdownReceive), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void shutdown_send()", asMETHOD(T, shutdownSend), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void shutdown()", asMETHOD(T, shutdown), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int send_bytes(const string&in data, int flags = 0)", asFUNCTION(socket_send_bytes<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "string receive_bytes(int length, int flags = 0)", asFUNCTION(socket_receive_bytes<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "string receive_bytes(int flags = 0, const timespan& timeout = 100000)", asFUNCTION(socket_receive_bytes_buf<T>), asCALL_CDECL_OBJFIRST);
+}
+void RegisterWebSocket(asIScriptEngine* engine) {
+	engine->RegisterEnum("web_socket_mode");
+	engine->RegisterEnumValue("web_socket_mode", "WS_SERVER", WebSocket::WS_SERVER);
+	engine->RegisterEnumValue("web_socket_mode", "WS_CLIENT", WebSocket::WS_CLIENT);
+	engine->RegisterEnum("web_socket_frame_flags");
+	engine->RegisterEnumValue("web_socket_frame_flags", "WS_FRAME_FLAG_FIN", WebSocket::FRAME_FLAG_FIN);
+	engine->RegisterEnum("web_socket_frame_opcodes");
+	engine->RegisterEnumValue("web_socket_frame_opcodes", "WS_FRAME_OP_CONT", WebSocket::FRAME_OP_CONT);
+	engine->RegisterEnumValue("web_socket_frame_opcodes", "WS_FRAME_OP_TEXT", WebSocket::FRAME_OP_TEXT);
+	engine->RegisterEnumValue("web_socket_frame_opcodes", "WS_FRAME_OP_BINARY", WebSocket::FRAME_OP_BINARY);
+	engine->RegisterEnumValue("web_socket_frame_opcodes", "WS_FRAME_OP_CLOSE", WebSocket::FRAME_OP_CLOSE);
+	engine->RegisterEnumValue("web_socket_frame_opcodes", "WS_FRAME_OP_PING", WebSocket::FRAME_OP_PING);
+	engine->RegisterEnumValue("web_socket_frame_opcodes", "WS_FRAME_OP_PONG", WebSocket::FRAME_OP_PONG);
+	engine->RegisterEnumValue("web_socket_frame_opcodes", "WS_FRAME_OP_BITMASK", WebSocket::FRAME_OP_BITMASK);
+	engine->RegisterEnumValue("web_socket_frame_opcodes", "WS_FRAME_OP_SETRAW", WebSocket::FRAME_OP_SETRAW);
+	engine->RegisterEnum("web_socket_send_flags");
+	engine->RegisterEnumValue("web_socket_send_flags", "WS_FRAME_TEXT", WebSocket::FRAME_TEXT);
+	engine->RegisterEnumValue("web_socket_send_flags", "WS_FRAME_BINARY", WebSocket::FRAME_BINARY);
+	engine->RegisterEnum("web_socket_status_codes");
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_NORMAL_CLOSE", WebSocket::WS_NORMAL_CLOSE);
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_ENDPOINT_GOING_AWAY", WebSocket::WS_ENDPOINT_GOING_AWAY);
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_PROTOCOL_ERROR", WebSocket::WS_PROTOCOL_ERROR);
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_PAYLOAD_NOT_ACCEPTABLE", WebSocket::WS_PAYLOAD_NOT_ACCEPTABLE);
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_RESERVED", WebSocket::WS_RESERVED);
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_RESERVED_NO_STATUS_CODE", WebSocket::WS_RESERVED_NO_STATUS_CODE);
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_RESERVED_ABNORMAL_CLOSE", WebSocket::WS_RESERVED_ABNORMAL_CLOSE);
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_MALFORMED_PAYLOAD", WebSocket::WS_MALFORMED_PAYLOAD);
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_POLICY_VIOLATION", WebSocket::WS_POLICY_VIOLATION);
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_PAYLOAD_TOO_BIG", WebSocket::WS_PAYLOAD_TOO_BIG);
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_EXTENSION_REQUIRED", WebSocket::WS_EXTENSION_REQUIRED);
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_UNEXPECTED_CONDITION", WebSocket::WS_UNEXPECTED_CONDITION);
+	engine->RegisterEnumValue("web_socket_status_codes", "WS_RESERVED_TLS_FAILURE", WebSocket::WS_RESERVED_TLS_FAILURE);
+	engine->RegisterEnum("web_socket_error_codes");
+	engine->RegisterEnumValue("web_socket_error_codes", "WS_ERR_NO_HANDSHAKE", WebSocket::WS_ERR_NO_HANDSHAKE);
+	engine->RegisterEnumValue("web_socket_error_codes", "WS_ERR_HANDSHAKE_NO_VERSION", WebSocket::WS_ERR_HANDSHAKE_NO_VERSION);
+	engine->RegisterEnumValue("web_socket_error_codes", "WS_ERR_HANDSHAKE_UNSUPPORTED_VERSION", WebSocket::WS_ERR_HANDSHAKE_UNSUPPORTED_VERSION);
+	engine->RegisterEnumValue("web_socket_error_codes", "WS_ERR_HANDSHAKE_NO_KEY", WebSocket::WS_ERR_HANDSHAKE_NO_KEY);
+	engine->RegisterEnumValue("web_socket_error_codes", "WS_ERR_HANDSHAKE_ACCEPT", WebSocket::WS_ERR_HANDSHAKE_ACCEPT);
+	engine->RegisterEnumValue("web_socket_error_codes", "WS_ERR_UNAUTHORIZED", WebSocket::WS_ERR_UNAUTHORIZED);
+	engine->RegisterEnumValue("web_socket_error_codes", "WS_ERR_PAYLOAD_TOO_BIG", WebSocket::WS_ERR_PAYLOAD_TOO_BIG);
+	engine->RegisterEnumValue("web_socket_error_codes", "WS_ERR_INCOMPLETE_FRAME", WebSocket::WS_ERR_INCOMPLETE_FRAME);
+	RegisterStreamSocket<WebSocket>(engine, "web_socket");
+	engine->RegisterObjectBehaviour("web_socket", asBEHAVE_FACTORY, "web_socket@ s(http_client& cs, http_request& request, http_response& response)", asFUNCTION((angelscript_refcounted_factory<WebSocket, HTTPClientSession&, HTTPRequest&, HTTPResponse&>)), asCALL_CDECL);
+	engine->RegisterObjectMethod("web_socket", "void shutdown(uint16 status_code, const string&in status_message = \"\")", asMETHODPR(WebSocket, shutdown, (UInt16, const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("web_socket", "int send_frame(const string&in data, int flags = WS_FRAME_TEXT)", asFUNCTION(websocket_send_frame), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("web_socket", "string receive_frame(int&out flags)", asFUNCTION(websocket_receive_frame), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("web_socket", "web_socket_mode get_mode() const property", asMETHOD(WebSocket, mode), asCALL_THISCALL);
+	engine->RegisterObjectMethod("web_socket", "void set_max_payload_size(int size) property", asMETHOD(WebSocket, setMaxPayloadSize), asCALL_THISCALL);
+	engine->RegisterObjectMethod("web_socket", "int get_max_payload_size() const property", asMETHOD(WebSocket, getMaxPayloadSize), asCALL_THISCALL);
+}
+void RegisterDNS(asIScriptEngine* engine) {
+	engine->RegisterGlobalFunction("spec::ip_address dns_resolve_single(const string&in address)", asFUNCTION(DNS::resolveOne), asCALL_CDECL);
+}
 
 // NVGT's highest level HTTP. The following code will likely be rewritten once after we write the http class, which will be the middle-level http support. For now this is being rushed to fix an issue regarding the removal of curl and the url_get/post methods in bgt_compat.nvgt. The original code was sourced from Poco's HTTPSUriStreamOpener.
 string url_request(const string& method, const string& url, const string& data, HTTPResponse* resp) {
@@ -358,6 +591,14 @@ void RegisterInternet(asIScriptEngine* engine) {
 	engine->RegisterEnum("ftp_file_type");
 	engine->RegisterEnumValue("ftp_file_type", "FTP_FILE_TYPE_TEXT", FTPClientSession::TYPE_TEXT);
 	engine->RegisterEnumValue("ftp_file_type", "FTP_FILE_TYPE_BINARY", FTPClientSession::TYPE_BINARY);
+	engine->RegisterEnum("socket_type");
+	engine->RegisterEnumValue("socket_type", "SOCKET_TYPE_STREAM", Socket::Type::SOCKET_TYPE_STREAM);
+	engine->RegisterEnumValue("socket_type", "SOCKET_TYPE_DATAGRAM", Socket::Type::SOCKET_TYPE_DATAGRAM);
+	engine->RegisterEnumValue("socket_type", "SOCKET_TYPE_RAW", Socket::Type::SOCKET_TYPE_RAW);
+	engine->RegisterEnum("socket_select_mode");
+	engine->RegisterEnumValue("socket_select_mode", "SOCKET_SELECT_READ", Socket::SELECT_READ);
+	engine->RegisterEnumValue("socket_select_mode", "SOCKET_SELECT_WRITE", Socket::SELECT_WRITE);
+	engine->RegisterEnumValue("socket_select_mode", "SOCKET_SELECT_ERROR", Socket::SELECT_ERROR);
 	engine->RegisterGlobalFunction(_O("string url_encode(const string&in url, const string&in reserved = \"\")"), asFUNCTION(url_encode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string url_decode(const string&in url, bool plus_as_space = true)"), asFUNCTION(url_decode), asCALL_CDECL);
 	RegisterNameValueCollection<NameValueCollection>(engine, "name_value_collection");
@@ -369,7 +610,12 @@ void RegisterInternet(asIScriptEngine* engine) {
 	RegisterHTTPClientSession<HTTPSClientSession>(engine, "https_client");
 	engine->RegisterObjectMethod("http_client", "https_client@ opCast()", asFUNCTION((angelscript_refcounted_refcast<HTTPClientSession, HTTPSClientSession>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("https_client", "http_client@ opImplCast()", asFUNCTION((angelscript_refcounted_refcast<HTTPSClientSession, HTTPClientSession>)), asCALL_CDECL_OBJFIRST);
+	RegisterIPAddress(engine);
 	RegisterFTPClientSession<FTPClientSession>(engine, "ftp_client");
+	RegisterSocket<Socket>(engine, "socket");
+	RegisterStreamSocket<StreamSocket>(engine, "stream_socket");
+	RegisterWebSocket(engine);
+	RegisterDNS(engine);
 	engine->RegisterGlobalFunction("string url_request(const string&in method, const string&in url, const string&in data = \"\", http_response&out response = void)", asFUNCTION(url_request), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string url_get(const string&in url, http_response&out response = void)", asFUNCTION(url_get), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string url_post(const string&in url, const string&in data, http_response&out response = void)", asFUNCTION(url_post), asCALL_CDECL);

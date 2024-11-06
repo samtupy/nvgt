@@ -35,20 +35,20 @@ function setup_angelscript {
 	mkdir -p build
 	cd build
 	cmake .. -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
-	cmake --build .
+	cmake --build . -j$(nsysctl -n hw.ncpu)
 	sudo cmake --install .
 	cd ../../../../../..
 	echo Angelscript installed.
 }
 
-function setup_bullet {
-	echo Installing bullet3...
-	git clone --depth 1 https://github.com/bulletphysics/bullet3||true
-	cd bullet3
+function setup_reactphysics {
+	echo Installing reactphysics3d...
+	git clone --depth 1 https://github.com/DanielChappuis/reactphysics3d||true
+	cd reactphysics3d
 	mkdir build_cmake
 	cd build_cmake
-	cmake -S.. -B. -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=MinSizeRel -DBUILD_UNIT_TESTS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_ENET=OFF -DBUILD_CLSOCKET=OFF -DBUILD_EGL=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_BULLET2_DEMOS=OFF -DBUILD_EXTRAS=OFF -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
-	cmake --build .
+	cmake -S.. -B. -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+	cmake --build . --config MinSizeRel -j$(nsysctl -n hw.ncpu)
 	sudo cmake --install .
 	cd ../..
 }
@@ -72,7 +72,7 @@ function setup_libgit2 {
 	mkdir -p build
 	cd build
 	cmake .. -DBUILD_TESTS=OFF -DUSE_ICONV=OFF -DBUILD_CLI=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
-	cmake --build .
+	cmake --build . -j$(nsysctl -n hw.ncpu)
 	sudo cmake --install .
 	cd ../..
 	rm v1.8.1.tar.gz
@@ -84,7 +84,7 @@ function setup_libplist {
 	tar -xf libplist-2.6.0.tar.bz2
 	cd libplist-2.6.0
 	./configure --without-cython CC="clang -arch x86_64 -arch arm64" CXX="clang++ -arch x86_64 -arch arm64" CPP="clang -E" CXXCPP="clang++ -E"
-	make
+	make -j$(nsysctl -n hw.ncpu)
 	sudo make install
 	cd ..
 	rm libplist-2.6.0.tar.bz2
@@ -98,7 +98,7 @@ function setup_poco {
 	mkdir -p cmake_build
 	cd cmake_build
 	cmake .. -DENABLE_TESTS=OFF -DENABLE_SAMPLES=OFF -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DENABLE_PAGECOMPILER=OFF -DENABLE_PAGECOMPILER_FILE2PAGE=OFF -DENABLE_ACTIVERECORD=OFF -DENABLE_ACTIVERECORD_COMPILER=OFF -DENABLE_MONGODB=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_CXX_FLAGS=-DPOCO_UTIL_NO_XMLCONFIGURATION
-	cmake --build .
+	cmake --build . -j$(nsysctl -n hw.ncpu)
 	sudo cmake --install .
 	cd ../..
 	rm poco-1.13.3-all.tar.gz
@@ -111,7 +111,7 @@ function setup_sdl {
 	cd SDL/build
 	git checkout 4e09e58f62e95a66125dae9ddd3e302603819ffd
 	cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST_LIBRARY=OFF -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" ..
-	cmake --build . --config MinSizeRel
+	cmake --build . --config MinSizeRel -j$(nsysctl -n hw.ncpu)
 	sudo make install
 	cd ../..
 	echo SDL installed.
@@ -150,7 +150,7 @@ function main {
 	setup_homebrew
 	setup_openssl
 	setup_angelscript
-	setup_bullet
+	setup_reactphysics
 	setup_enet
 	setup_libgit2
 	setup_poco
