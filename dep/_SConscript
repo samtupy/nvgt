@@ -5,7 +5,7 @@
 
 Import("env")
 
-sources = ["aes.c", "cmp.c", "micropather.cpp", "rng_get_bytes.c", "singleheader.cpp", "sonic.c", "tinyexpr.c", "uncompr.c"]
+sources = ["aes.c", "cmp.c", "enet_compress.c", "micropather.cpp", "rng_get_bytes.c", "singleheader.cpp", "sonic.c", "tinyexpr.c", "uncompr.c"]
 if env["PLATFORM"] == "win32":
 	sources += ["blastspeak.c", "InputBox.cpp", "vs_version.cpp"]
 env.StaticLibrary("#build/lib/deps", sources, CPPDEFINES = ["_LIB"])

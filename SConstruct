@@ -39,7 +39,7 @@ if ARGUMENTS.get("debug", "0") == "1":
 if env["PLATFORM"] == "win32":
 	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/O2", "/bigobj", "/permissive-"])
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
-	env.Append(LIBS = ["UniversalSpeechStatic", "enet", "angelscript64", "SDL3"])
+	env.Append(LIBS = ["UniversalSpeechStatic", "angelscript64", "SDL3"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
 else:
 	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-O2", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result"], LIBS = ["m"])
@@ -47,7 +47,7 @@ if env["PLATFORM"] == "darwin":
 	# homebrew paths and other libraries/flags for MacOS
 	env.Append(CCFLAGS = ["-mmacosx-version-min=14.0", "-arch", "arm64", "-arch", "x86_64"], LINKFLAGS = ["-arch", "arm64", "-arch", "x86_64"])
 	# The following, to say the least, is absolutely not ideal. In some cases we have both static and dynamic libraries on the system and must explicitly choose the static one. The normal :libname.a trick doesn't seem to work on clang, we're just informed that libs couldn't be found. If anybody knows a better way to force static library linkage on MacOS particularly without the absolute paths, please let me know!
-	env.Append(LIBS = [File("/usr/local/lib/libangelscript.a"), File("/usr/local/lib/libenet.a"), File("/usr/local/lib/libSDL3.a"), File("/usr/local/lib/libcrypto.a"), File("/usr/local/lib/libssl.a"), "iconv"])
+	env.Append(LIBS = [File("/usr/local/lib/libangelscript.a"), File("/usr/local/lib/libSDL3.a"), File("/usr/local/lib/libcrypto.a"), File("/usr/local/lib/libssl.a"), "iconv"])
 elif env["PLATFORM"] == "posix":
 	# enable the gold linker to silence seemingly pointless warnings about symbols in the bass libraries, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
 	env.Append(CPPPATH = ["/usr/local/include"], LIBPATH = ["/usr/local/lib"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
