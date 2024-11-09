@@ -154,6 +154,10 @@ void tts_voice::Release() {
 	}
 }
 bool tts_voice::speak(const std::string& text, bool interrupt) {
+	if (text.empty()) {
+		if (audioout) BASS_ChannelStop(audioout);
+		return true;
+	}
 	unsigned long bufsize;
 	char* data = NULL;
 	if (voice_index == builtin_index) {
@@ -231,7 +235,6 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 	#ifdef _WIN32
 	else {
 		if (!inst && !refresh()) return FALSE;
-		DWORD bufsize;
 		data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
 		if (!audioout || (inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels)) {
 			samprate = inst->sample_rate;

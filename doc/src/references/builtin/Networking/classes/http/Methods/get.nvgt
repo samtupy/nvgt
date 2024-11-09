@@ -1,0 +1,24 @@
+/**
+	Initiate a get request.
+	bool get(spec::uri url, name_value_collection@ headers = null, http_credentials@ creds = null);
+	## Arguments:
+		* spec::uri url: A valid URI which must have a scheme of either http or https.
+		* name_value_collection@ headers = null: Pairs of extra http headers to pass on to the server.
+		* http_credentials@ creds = null: Optional credentials to authenticate the request with.
+	## Returns:
+		bool: True if the request was initiated, or false if there was an error.
+	## Remarks:
+		Once this method is called and returns true, you will usually want to wait until either http.complete returns true or http.running returns false before thoroughly handling the request. However http.progress, http.status_code, http.response_headers and http.response_body are accessible throughout the request's lifecycle to stream the data or get more detailed information.
+*/
+
+// Example:
+void main() {
+	// Fetch the latest version of NVGT.
+	http h;
+	if (!h.get("http://nvgt.gg/downloads/latest_version")) {
+		alert("oops", "request failed"); // This class will contain more detailed error management facilities in the near future.
+		return;
+	}
+	h.wait(); // You can also use the h.running or h.complete properties in a loop to execute code in the background while the request progresses.
+	alert("nvgt latest version", h.response_body);
+}

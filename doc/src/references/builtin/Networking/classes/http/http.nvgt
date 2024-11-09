@@ -1,0 +1,37 @@
+/**
+	Facilitate HTTP requests from a simple, asynchronous interface.
+	http();
+	## Remarks:
+		This is one of the easiest ways to perform an http request in NVGT without blocking the rest of your code.
+		Simply create an http object, call either it's get, head or post methods, then begin accessing properties on the object such  as progress, status_code or response_body to query and access details of the request.
+*/
+
+// Example:
+#include "size.nvgt"
+#include "speech.nvgt"
+void main() {
+	// This script downloads the latest NVGT windows installer and saves it in the current working directory.
+	http h;
+	h.get("https://nvgt.zip/windows");
+	file f;
+	string filename = "";
+	show_window("downloading...");
+	while (!h.complete) {
+		wait(5);
+		if (key_pressed(KEY_ESCAPE)) {
+			f.close();
+			file_delete(filename);
+			return; // Destruction of the http object will cancel any requests in progress.
+		}
+		if (!f.active and h.status_code == 200) { // The file is available.
+			string[]@ path = h.url.get_path_segments();
+			filename = path.length() > 0? path[-1] : "http.txt";
+			f.open(filename, "wb");
+		}
+		if (f.active) f.write(h.response_body);
+		if (key_pressed(KEY_SPACE)) speak(round(h.progress * 100, 2) + "%");
+	}
+	int keep = question(filename, size_to_string(f.size) + " downloaded, keep file?");
+	f.close();
+	if (keep != 1) file_delete(filename);
+}
