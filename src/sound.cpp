@@ -1516,7 +1516,6 @@ BOOL mixer::add_mixer(mixer* m) {
 	if (ret) {
 		m->parent_mixer = this;
 		mixers.insert(m);
-		AddRef();
 	}
 	return ret;
 }
@@ -1526,7 +1525,6 @@ BOOL mixer::remove_mixer(mixer* m, BOOL internal) {
 		return FALSE;
 	mixers.erase(i);
 	BASS_Mixer_ChannelRemove(m->channel);
-	Release();
 	if (internal)
 		return TRUE;
 	m->parent_mixer = NULL;

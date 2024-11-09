@@ -26,7 +26,7 @@ template <class T, typename... A> void rp_construct(void* mem, A... args) { new 
 template <class T> void rp_copy_construct(void* mem, const T& obj) { new(mem) T(obj); }
 template <class T> void rp_destruct(T* obj) { obj->~T(); }
 
-// Some functions require manual wrapping, especially anything dealing with arrays.
+// Some functions require manual wrapping, especially anything dealing with arrays or force inline.
 CScriptArray* transform_get_opengl_matrix(const Transform& t) {
 	CScriptArray* array = CScriptArray::Create(get_array_type("array<float>"), 16);
 	t.getOpenGLMatrix(reinterpret_cast<float*>(array->GetBuffer()));
@@ -51,6 +51,8 @@ template <class T> void RegisterCollisionShape() {
 }
 
 void RegisterReactphysics(asIScriptEngine* engine) {
+	engine->RegisterGlobalFunction("int clamp(int value, int min, int max)", asFUNCTIONPR(clamp, (int, int, int), int), asCALL_CDECL);
+	engine->RegisterGlobalFunction("float clamp(float value, float min, float max)", asFUNCTIONPR(clamp, (decimal, decimal, decimal), decimal), asCALL_CDECL);
 	engine->RegisterEnum("physics_shape_type");
 	engine->RegisterEnumValue("physics_shape_type", "SHAPE_TYPE_SPHERE", int(CollisionShapeType::SPHERE));
 	engine->RegisterEnumValue("physics_shape_type", "SHAPE_TYPE_CAPSULE", int(CollisionShapeType::CAPSULE));
