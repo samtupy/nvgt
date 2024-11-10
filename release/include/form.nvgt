@@ -48,6 +48,12 @@ added event callback
 */
 
 //constants
+enum clipboard_flags
+	{
+	clipboard_flag_copy = 1 << 0,
+	clipboard_flag_cut = 1 << 1,
+	clipboard_flag_paste = 1 << 2
+}
 enum control_types {
 	ct_button = 0,
 	ct_input,
@@ -270,6 +276,8 @@ class audio_form {
 		c_form[control_counter].caption = caption.replace("&", "", true);
 		c_form[control_counter].visible = true;
 		c_form[control_counter].enabled = true;
+		c_form[control_counter].enable_delete = true;
+		set_clipboard_flags(control_counter, true, true, true);
 		c_form[control_counter].speech_output = speech_output;
 		if ((maximum_length > 0) && (default_text.length() > maximum_length)) {
 			default_text = default_text.substr(0, maximum_length);
@@ -1144,6 +1152,40 @@ class audio_form {
 		}
 		c_form[control_index].enabled = enabled;
 		c_form[control_index].visible = visible;
+		return true;
+	}
+	bool set_enable_delete(int control_index, bool enabled) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_index].enable_delete = enabled;
+		return true;
+	}
+	bool set_delete_disabled_message(int control_index, string message) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_index].delete_disabled_message = message;
 		return true;
 	}
 	bool set_enable_go_to_index(int control_index, bool enabled) {
@@ -2123,6 +2165,23 @@ class audio_form {
 		c_form[control_index].echo_flag = keyboard_echo;
 		return true;
 	}
+	bool set_clipboard_flags(int control_index, bool copy, bool cut, bool paste) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_index].clipboard_flags = ((copy ? clipboard_flag_copy : 0) | (cut ? clipboard_flag_cut : 0) | (paste ? clipboard_flag_paste : 0));
+		return true;
+	}
 	bool set_keyboard_echo(int control_index, int keyboard_echo) {
 		form_error = 0;
 		if (!active) {
@@ -2512,14 +2571,18 @@ class control {
 	string[] disallowed_chars;
 	bool use_only_disallowed_chars;
 	string char_disallowed_description;
+	bool enable_delete;
+	string delete_disabled_message;
 	bool enable_go_to_index; //This is mostly used on go to index field where it prevents the key from pressing again.
 	bool enable_search;
+	uint8 clipboard_flags;
 	control() {
 		progress_time.restart();
 		progress_time.pause();
 		multinav_timer.restart();
 		multinav_timer.pause();
 		caption = "";
+		custom_type = "";
 		text = "";
 		password_mask = "";
 		type = -1;
@@ -2657,19 +2720,27 @@ class control {
 					else
 						add(char);
 				}
-				if (((key_down(KEY_LCTRL)) || (key_down(KEY_RCTRL))) && (key_repeating(KEY_X)) && password_mask == "")
+				if ((clipboard_flags & clipboard_flag_cut > 0) && (keyboard_modifiers & KEYMOD_CTRL > 0) && (key_repeating(KEY_X)) && password_mask == "")
 					cut_highlighted();
-				if (((key_down(KEY_LCTRL)) || (key_down(KEY_RCTRL))) && (key_repeating(KEY_V)) || key_pressed(KEY_PASTE))
+				if ((clipboard_flags & clipboard_flag_paste > 0) && (keyboard_modifiers & KEYMOD_CTRL > 0) && (key_repeating(KEY_V)) || key_pressed(KEY_PASTE))
 					paste_text();
 				if (key_repeating(KEY_BACK)) {
-					if ((key_down(KEY_LCTRL) || key_down(KEY_RCTRL)) && (sel_start < 0 || sel_end < 0 || sel_start > sel_end)) {
+					if (false == enable_delete) {
+						speak(delete_disabled_message);
+						return;
+					}
+					if ((keyboard_modifiers & KEYMOD_CTRL > 0) && (sel_start < 0 || sel_end < 0 || sel_start > sel_end)) {
 						delete_word_left();
 						return;
 					}
 					delete_highlighted();
 				}
 				if (key_repeating(KEY_DELETE)) {
-					if ((key_down(KEY_LCTRL) || key_down(KEY_RCTRL)) && (sel_start < 0 || sel_end < 0 || sel_start > sel_end)) {
+					if (false == enable_delete) {
+						speak(delete_disabled_message);
+						return;
+					}
+					if ((keyboard_modifiers & KEYMOD_CTRL > 0) && (sel_start < 0 || sel_end < 0 || sel_start > sel_end)) {
 						delete_word_right();
 						return;
 					}
@@ -2680,7 +2751,7 @@ class control {
 			}
 			if (((key_down(KEY_LCTRL)) || (key_down(KEY_RCTRL))) && key_up(KEY_LSHIFT) && key_up(KEY_RSHIFT) && (key_repeating(KEY_A)))
 				highlight_all();
-			if (((key_down(KEY_LCTRL)) || (key_down(KEY_RCTRL))) && (key_repeating(KEY_C)) && (password_mask == ""))
+			if ((clipboard_flags & clipboard_flag_copy > 0) && (keyboard_modifiers & KEYMOD_CTRL > 0) && (key_repeating(KEY_C)) && (password_mask == ""))
 				copy_highlighted();
 			if (key_repeating(KEY_LEFT)) {
 				if ((key_down(KEY_LCTRL)) || (key_down(KEY_RCTRL))) {
