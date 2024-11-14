@@ -9,7 +9,7 @@ our goal is to make the transition as seamless as possible from BGT to NVGT, but
 
 * Always `#include "bgt_compat.nvgt"` as this includes a lot of aliases to other functions. Using built-in functions may improve performance so this is more or less a stop-gap to get you up and running quickly; however if you wish for your code to just run, bgt_compat will certainly be of use.
 * Although a wrapper function is included in the `bgt_compat` header, it's important to note that the `set_sound_storage()` function has been replaced with the `sound_default_pack` global property.
-* When refering to an array's length, pass length as a method call and not as a property. ,For example, you would use `array.length();` rather than `a.length;`.
+* When refering to an array's length, pass length as a method call and not as a property. For example, you would use `array.length();` rather than `array.length;`.
 * The `sound::stream()` method does exist in NVGT, but it's simply an alias to `sound::load()`. For this reason it is recommended that you change all your `stream()` calls to `load()` instead. The load function performs an  efficient combination of streaming and preloading by default.
 * Take care to check any method calls using the tts_voice object as a few methods such as set_voice have changed from their BGT counterparts.
 * When splitting a string, matching against \r\n is advised as BGT handles this differently. This will result in not having spurious line breaks at the ends of split text.
