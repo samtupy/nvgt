@@ -10,11 +10,16 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include <atomic>
 #include <string>
 #include <obfuscate.h>
 #include <Poco/Format.h>
 #include <Poco/NullStream.h>
+#include <Poco/RefCountedObject.h>
+#include <Poco/Runnable.h>
 #include <Poco/StreamCopier.h>
+#include <Poco/SynchronizedObject.h>
+#include <Poco/Thread.h>
 #include <Poco/URI.h>
 #include <Poco/URIStreamOpener.h>
 #include <Poco/Net/AcceptCertificateHandler.h>
@@ -35,6 +40,7 @@
 #include "datastreams.h"
 #include "internet.h"
 #include "nvgt.h"
+#include "nvgt_angelscript.h"
 #include "pocostuff.h" // angelscript_refcounted
 #include "version.h"
 
@@ -134,6 +140,10 @@ template <class T> const string& name_value_collection_value_at(T* nvc, unsigned
 	if (index >= nvc->size()) throw RangeException(format("index %u into name_value_collection out of bounds (contains %z elements)", index, nvc->size()));
 	return (nvc->begin() + index)->second;
 }
+
+// Wrappers for vector->scriptarray conversion.
+CScriptArray* host_entry_get_aliases(const HostEntry& e) { return vector_to_scriptarray<string>(e.aliases(), "string"); }
+CScriptArray* host_entry_get_addresses(const HostEntry& e) { return vector_to_scriptarray<IPAddress>(e.addresses(), "spec::ip_address"); }
 
 // In NVGT we tend to overuse std::string, make sure sockets can handle this datatype. We should try to register versions of SendBytes and ReceiveBytes that works with a lower level datatype when possible especially because of the unnecessary memory usage incurred with std::string in this case.
 template <class T> int socket_send_bytes(T& sock, const string& data, int flags) { return sock.sendBytes(data.data(), data.size(), flags); }
@@ -253,6 +263,12 @@ template <class T> void RegisterHTTPSession(asIScriptEngine* engine, const strin
 	engine->RegisterObjectMethod(type.c_str(), "bool get_keep_alive() const property", asMETHOD(T, getKeepAlive), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_connected() const property", asMETHOD(T, connected), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void abort()", asMETHOD(T, abort), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_keep_alive_timeout(const timespan&in timeout) property", asMETHOD(T, setKeepAliveTimeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "timespan get_keep_alive_timeout() const property", asMETHOD(T, getKeepAliveTimeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_send_timeout(const timespan&in timeout) property", asMETHOD(T, setSendTimeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "timespan get_send_timeout() const property", asMETHOD(T, getSendTimeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_receive_timeout(const timespan&in timeout) property", asMETHOD(T, setReceiveTimeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "timespan get_receive_timeout() const property", asMETHOD(T, getReceiveTimeout), asCALL_THISCALL);
 }
 template <class T> void RegisterHTTPClientSession(asIScriptEngine* engine, const string& type) {
 	RegisterHTTPSession<T>(engine, type);
@@ -302,6 +318,36 @@ template <class T> void RegisterFTPClientSession(asIScriptEngine* engine, const 
 	engine->RegisterObjectMethod(type.c_str(), "bool get_is_logged_in() const property", asMETHOD(T, isLoggedIn), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_is_secure() const property", asMETHOD(T, isSecure), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_welcome_message() const property", asMETHOD(T, welcomeMessage), asCALL_THISCALL);
+}
+void RegisterHTTPCredentials(asIScriptEngine* engine) {
+	angelscript_refcounted_register<HTTPCredentials>(engine, "http_credentials");
+	engine->RegisterObjectBehaviour("http_credentials", asBEHAVE_FACTORY, "http_credentials@ f()", asFUNCTION((angelscript_refcounted_factory<HTTPCredentials>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("http_credentials", asBEHAVE_FACTORY, "http_credentials@ f(const string&in username, const string&in password)", asFUNCTION((angelscript_refcounted_factory<HTTPCredentials, const string&, const string&>)), asCALL_CDECL);
+	engine->RegisterObjectMethod("http_credentials", "void from_user_info(const string&in user_info)", asMETHOD(HTTPCredentials, fromUserInfo), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "void from_uri(const spec::uri&in uri)", asMETHOD(HTTPCredentials, fromURI), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "void clear()", asMETHOD(HTTPCredentials, clear), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "void set_username(const string&in username) property", asMETHOD(HTTPCredentials, setUsername), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "string get_username() const property", asMETHOD(HTTPCredentials, getUsername), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "void set_password(const string&in password) property", asMETHOD(HTTPCredentials, setPassword), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "string get_password() const property", asMETHOD(HTTPCredentials, getPassword), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "void set_host(const string&in host) property", asMETHOD(HTTPCredentials, setHost), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "string get_host() const property", asMETHOD(HTTPCredentials, getHost), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "bool get_empty() const property", asMETHOD(HTTPCredentials, empty), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "void authenticate(http_request& request, const http_response&in response)", asMETHOD(HTTPCredentials, authenticate), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "void update_auth_info(http_request& request)", asMETHOD(HTTPCredentials, updateAuthInfo), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "void proxy_authenticate(http_request& request, const http_response&in response)", asMETHOD(HTTPCredentials, proxyAuthenticate), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "void update_proxy_auth_info(http_request& request)", asMETHOD(HTTPCredentials, updateProxyAuthInfo), asCALL_THISCALL);
+	engine->RegisterGlobalFunction("bool http_credentials_is_basic(const string&in header)", asFUNCTION(HTTPCredentials::isBasicCredentials), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool http_credentials_is_digest(const string&in header)", asFUNCTION(HTTPCredentials::isDigestCredentials), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool http_credentials_is_ntlm(const string&in header)", asFUNCTION(HTTPCredentials::isNTLMCredentials), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool http_credentials_is_basic(const http_request&in request)", asFUNCTION(HTTPCredentials::hasBasicCredentials), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool http_credentials_is_digest(const http_request&in request)", asFUNCTION(HTTPCredentials::hasDigestCredentials), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool http_credentials_is_ntlm(const http_request&in request)", asFUNCTION(HTTPCredentials::hasNTLMCredentials), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool http_credentials_is_proxy_basic(const http_request&in request)", asFUNCTION(HTTPCredentials::hasProxyBasicCredentials), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool http_credentials_is_proxy_digest(const http_request&in request)", asFUNCTION(HTTPCredentials::hasProxyDigestCredentials), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool http_credentials_is_proxy_ntlm(const http_request&in request)", asFUNCTION(HTTPCredentials::hasProxyNTLMCredentials), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool http_credentials_extract(const string&in user_info, string&out username, string&out password)", asFUNCTIONPR(HTTPCredentials::extractCredentials, (const string&, string&, string&), void), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool http_credentials_extract(const spec::uri&in uri, string&out username, string&out password)", asFUNCTIONPR(HTTPCredentials::extractCredentials, (const URI&, string&, string&), void), asCALL_CDECL);
 }
 void RegisterIPAddress(asIScriptEngine* engine) {
 	// Also registers SocketAddress as an aside.
@@ -490,6 +536,7 @@ void RegisterWebSocket(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("web_socket_error_codes", "WS_ERR_INCOMPLETE_FRAME", WebSocket::WS_ERR_INCOMPLETE_FRAME);
 	RegisterStreamSocket<WebSocket>(engine, "web_socket");
 	engine->RegisterObjectBehaviour("web_socket", asBEHAVE_FACTORY, "web_socket@ s(http_client& cs, http_request& request, http_response& response)", asFUNCTION((angelscript_refcounted_factory<WebSocket, HTTPClientSession&, HTTPRequest&, HTTPResponse&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("web_socket", asBEHAVE_FACTORY, "web_socket@ s(http_client& cs, http_request& request, http_response& response, http_credentials& credentials)", asFUNCTION((angelscript_refcounted_factory<WebSocket, HTTPClientSession&, HTTPRequest&, HTTPResponse&, HTTPCredentials&>)), asCALL_CDECL);
 	engine->RegisterObjectMethod("web_socket", "void shutdown(uint16 status_code, const string&in status_message = \"\")", asMETHODPR(WebSocket, shutdown, (UInt16, const string&), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("web_socket", "int send_frame(const string&in data, int flags = WS_FRAME_TEXT)", asFUNCTION(websocket_send_frame), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("web_socket", "string receive_frame(int&out flags)", asFUNCTION(websocket_receive_frame), asCALL_CDECL_OBJFIRST);
@@ -498,67 +545,220 @@ void RegisterWebSocket(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("web_socket", "int get_max_payload_size() const property", asMETHOD(WebSocket, getMaxPayloadSize), asCALL_THISCALL);
 }
 void RegisterDNS(asIScriptEngine* engine) {
+	engine->RegisterObjectType("dns_host_entry", sizeof(HostEntry), asOBJ_VALUE | asGetTypeTraits<HostEntry>());
+	engine->RegisterObjectBehaviour("dns_host_entry", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(generic_construct<HostEntry>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("dns_host_entry", asBEHAVE_CONSTRUCT, "void f(const dns_host_entry&in)", asFUNCTION(generic_copy_construct<HostEntry>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("dns_host_entry", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(generic_destruct<HostEntry>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("dns_host_entry", "dns_host_entry& opAssign(const dns_host_entry&in e)", asMETHOD(HostEntry, operator=), asCALL_THISCALL);
+	engine->RegisterObjectMethod("dns_host_entry", "const string& get_name() const property", asMETHOD(HostEntry, name), asCALL_THISCALL);
+	engine->RegisterObjectMethod("dns_host_entry", "string[]@ get_aliases() const", asFUNCTION(host_entry_get_aliases), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("dns_host_entry", "spec::ip_address[]@ get_addresses() const", asFUNCTION(host_entry_get_addresses), asCALL_CDECL_OBJFIRST);
+	engine->RegisterGlobalFunction("dns_host_entry dns_resolve(const string&in address)", asFUNCTION(DNS::resolve), asCALL_CDECL);
 	engine->RegisterGlobalFunction("spec::ip_address dns_resolve_single(const string&in address)", asFUNCTION(DNS::resolveOne), asCALL_CDECL);
+	engine->RegisterGlobalFunction("dns_host_entry system_dns_host_entry()", asFUNCTION(DNS::thisHost), asCALL_CDECL);
 }
 
-// NVGT's highest level HTTP. The following code will likely be rewritten once after we write the http class, which will be the middle-level http support. For now this is being rushed to fix an issue regarding the removal of curl and the url_get/post methods in bgt_compat.nvgt. The original code was sourced from Poco's HTTPSUriStreamOpener.
-string url_request(const string& method, const string& url, const string& data, HTTPResponse* resp) {
-	URI u(url);
-	if (u.getScheme() != "http" && u.getScheme() != "https") return "";
-	string user, password;
-	bool authorize = false;
-	bool delete_response = resp == nullptr; // In this case we create our own response object and must delete it when finished.
-	HTTPClientSession* http = NULL;
-	if (!resp) resp = new HTTPResponse;
-	int tries = 10;
-	while (tries) {
-		tries--;
-		try {
-			string path = u.getPathAndQuery();
-			if (path.empty()) path = "/";
-			HTTPRequest req(method, path, HTTPMessage::HTTP_1_1);
-			req.setContentLength(data.length());
-			req.setContentType("application/x-www-form-urlencoded");
-			if (!http) http = u.getScheme() == "http"? new HTTPClientSession(u.getHost(), u.getPort()) : new HTTPSClientSession(u.getHost(), u.getPort());
-			if (authorize) {
-				HTTPCredentials::extractCredentials(u, user, password);
-				HTTPCredentials cred(user, password);
-				cred.authenticate(req, *resp);
-			}
-			req.set("User-Agent"s, "nvgt "s + NVGT_VERSION);
-			std::ostream& ostr = http->sendRequest(req);
-			ostr << data;
-			std::istream& istr = http->receiveResponse(*resp);
-			bool moved = (resp->getStatus() == HTTPResponse::HTTP_MOVED_PERMANENTLY || resp->getStatus() == HTTPResponse::HTTP_FOUND || resp->getStatus() == HTTPResponse::HTTP_SEE_OTHER || resp->getStatus() == HTTPResponse::HTTP_TEMPORARY_REDIRECT);
-			if (moved) {
-				u.resolve(resp->get("Location"));
-				if (!user.empty()) {
-					u.setUserInfo(format("%s:%s", user, password));
-					authorize = false;
-				}
-				delete http;
-				http = nullptr;
-				continue; // Try again with the new URI
-			} else if (resp->getStatus() == HTTPResponse::HTTP_UNAUTHORIZED && !authorize) {
-				authorize = true;
-				NullOutputStream null;
-				StreamCopier::copyStream(istr, null);
-				continue;
-			} else {
-				string result;
-				StreamCopier::copyToString(istr, result);
-				delete http;
-				if (delete_response) delete resp;
-				return result;
-			}
-		} catch(Exception& e) {
-			if (delete_response) delete resp;
-			return "";
+// NVGT's mid-level HTTP. This wraps the various Poco HTTP classes into a convenient asynchronous interface.
+class http : public RefCountedObject, Runnable, public SynchronizedObject {
+	HTTPClientSession* _session;
+	HTTPRequest _request;
+	HTTPResponse _response;
+	HTTPCredentials _creds;
+	string _request_body, _response_body, _user_agent;
+	Thread worker;
+	URI _url;
+	streamsize _bytes_downloaded;
+	atomic<int> _max_retries, _retry_delay;
+public:
+	http() : _session(nullptr), _bytes_downloaded(0), _max_retries(10), _retry_delay(0) { set_user_agent(); }
+	bool request(const string& method, const URI& url, const NameValueCollection* headers, const string& body, const HTTPCredentials* creds = nullptr) {
+		if (worker.isRunning()) return false;
+		if (url.getScheme() != "http" && url.getScheme() != "https") return false;
+		ScopedLock lock(*this);
+		reset();
+		_request.setMethod(method);
+		_request.setContentLength(body.length());
+		_url = url;
+		if (creds) {
+			_creds.setHost(creds->getHost());
+			_creds.setUsername(creds->getUsername());
+			_creds.setPassword(creds->getPassword());
 		}
+		if (!url.getUserInfo().empty()) _creds.fromURI(url);
+		_request_body = body;
+		if (headers) {
+			for (const auto& header : *headers) _request.add(header.first, header.second);
+		}
+		worker.start(*this);
+		return true;
 	}
-	if (http) delete http;
-	if (delete_response) delete resp;
-	return "";
+	~http() { reset(); }
+	void reset() {
+		if (worker.isRunning()) {
+			notify();
+			worker.join();
+		}
+		_request_body = _response_body = "";
+		_creds.clear();
+		_request = HTTPRequest(HTTPMessage::HTTP_1_1);
+		_request.setContentLength(0);
+		_request.set("User-Agent", "nvgt " + NVGT_VERSION);
+		_response.clear();
+		_max_retries = 10;
+		_bytes_downloaded = _retry_delay = 0;
+		tryWait(0); // Try making sure the event is not signaled.
+	}
+	bool get(const URI& url, const NameValueCollection* headers, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_GET, url, headers, "", creds); }
+	bool head(const URI& url, const NameValueCollection* headers, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_HEAD, url, headers, "", creds); }
+	bool post(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_POST, url, headers, body, creds); }
+	void run() {
+		bool authorize = false;
+		int tries = _max_retries;
+		while (tries && !tryWait(_retry_delay)) {
+			tries--;
+			try {
+				string path = _url.getPathAndQuery();
+				if (path.empty()) path = "/";
+				lock();
+				HTTPRequest req(_request);
+				req.setHost(_url.getHost());
+				req.setURI(path);
+				unlock();
+				if (req.getContentType() == HTTPMessage::UNKNOWN_CONTENT_TYPE) req.setContentType("application/x-www-form-urlencoded");
+				lock();
+				HTTPResponse tmp_response = _response;
+				if (!_session) _session = _url.getScheme() == "http"? new HTTPClientSession(_url.getHost(), _url.getPort()) : new HTTPSClientSession(_url.getHost(), _url.getPort());
+				if (authorize) _creds.authenticate(req, tmp_response);
+				std::ostream& ostr = _session->sendRequest(req);
+				unlock();;
+				if (tryWait(0)) break;
+				ostr << _request_body;
+				std::istream& istr = _session->receiveResponse(tmp_response);
+				lock();
+				_response = tmp_response;
+				bool moved = (_response.getStatus() == HTTPResponse::HTTP_MOVED_PERMANENTLY || _response.getStatus() == HTTPResponse::HTTP_FOUND || _response.getStatus() == HTTPResponse::HTTP_SEE_OTHER || _response.getStatus() == HTTPResponse::HTTP_TEMPORARY_REDIRECT);
+				if (moved) {
+					_url.resolve(_response.get("Location"));
+					authorize = false;
+					delete _session;
+					_session = nullptr;
+					unlock();
+					continue;
+				} else if (_response.getStatus() == HTTPResponse::HTTP_UNAUTHORIZED && !authorize) {
+					unlock();
+					authorize = true;
+					NullOutputStream null;
+					StreamCopier::copyStream(istr, null);
+					continue;
+				}
+				unlock();
+				string buffer(512, '\0');
+				while (istr.good() && !tryWait(0)) {
+					istr.read(buffer.data(), 512);
+					streamsize count = istr.gcount();
+					ScopedLock lock(*this);
+					_response_body.append(buffer.begin(), buffer.begin() + count);
+					_bytes_downloaded += count;
+				}
+				break;
+			} catch(Exception& e) {
+				if (_session) delete _session;
+				_session = nullptr;
+				unlock();
+				return;
+			}
+		}
+		if (_session) {
+			_session->reset();
+			delete _session;
+		}
+		_session = nullptr;
+		return;
+	}
+	HTTPResponse* get_response_headers() {
+		ScopedLock lock(*this);
+		return angelscript_refcounted_factory<HTTPResponse, const HTTPResponse&>(_response);
+	}
+	string operator[](const string& key) {
+		ScopedLock lock(*this);
+		return _response[key];
+	}
+	string get_response_body() {
+		ScopedLock lock(*this);
+		string r = _response_body;
+		_response_body.clear();
+		return r;
+	}
+	int get_status_code() {
+		ScopedLock lock(*this);
+		if (_response.empty()) return 0;
+		return _response.getStatus();
+	}
+	float get_progress() {
+		ScopedLock lock(*this);
+		if (_response.empty()) return 0;
+		else if (!_response.hasContentLength()) return -1;
+		return float(_bytes_downloaded) / _response.getContentLength();
+	}
+	URI get_url() {
+		ScopedLock lock(*this);
+		return _url;
+	}
+	string get_user_agent() const { return _user_agent; }
+	void set_user_agent(const string& agent = "") {
+		if (agent.empty()) _user_agent = "nvgt " + NVGT_VERSION;
+		else _user_agent = agent;
+	}
+	int get_max_retries() const { return _max_retries; }
+	void set_max_retries(int retries) { _max_retries = retries; }
+	int get_retry_delay() const { return _retry_delay; }
+	void set_retry_delay(int delay = 0) { _retry_delay = delay; }
+	void wait() {
+		if (!worker.isRunning()) return;
+		return worker.join();
+	}
+	bool is_complete() {
+		return !worker.isRunning() || worker.tryJoin(0);
+	}
+	bool is_running() const {
+		return worker.isRunning();
+	}
+};
+http* http_factory() { return new http(); }
+void RegisterHTTP(asIScriptEngine* engine) {
+	engine->RegisterObjectType("http", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("http", asBEHAVE_FACTORY, "http@ f()", asFUNCTION(http_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("http", asBEHAVE_ADDREF, "void f()", asMETHODPR(http, duplicate, () const, void), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("http", asBEHAVE_RELEASE, "void f()", asMETHODPR(http, release, () const, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool get(const spec::uri&in url, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, get), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool head(const spec::uri&in url, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, head), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool post(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, post), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "http_response@ get_response_headers() property", asMETHOD(http, get_response_headers), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "string get_response_body() property", asMETHOD(http, get_response_body), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "string request()", asMETHOD(http, get_response_body), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "string opIndex(const string&in key)", asMETHOD(http, operator[]), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "spec::uri get_url() property", asMETHOD(http, get_url), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "float get_progress() property", asMETHOD(http, get_progress), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "int get_status_code() property", asMETHOD(http, get_status_code), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "string get_user_agent() const property", asMETHOD(http, get_user_agent), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_user_agent(const string&in agent = \"\") property", asMETHOD(http, set_user_agent), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "int get_max_retries() const property", asMETHOD(http, get_max_retries), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_max_retries(int retries) property", asMETHOD(http, set_max_retries), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "int get_retry_delay() const property", asMETHOD(http, get_retry_delay), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_retry_delay(int delay = 0) property", asMETHOD(http, set_retry_delay), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool get_complete() property", asMETHOD(http, is_complete), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool get_running() property", asMETHOD(http, is_running), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void wait()", asMETHOD(http, wait), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void reset()", asMETHOD(http, reset), asCALL_THISCALL);
+}
+
+// NVGT's highest level HTTP.
+string url_request(const string& method, const string& url, const string& data, HTTPResponse* resp) {
+	http h;
+	if (!h.request(method, URI(url), nullptr, data)) return "";
+	h.wait();
+	if (resp) *resp = *h.get_response_headers();
+	return h.get_response_body();
 }
 string url_get(const string& url, HTTPResponse* resp) { return url_request(HTTPRequest::HTTP_GET, url, "", resp); }
 string url_post(const string& url, const string& data, HTTPResponse* resp) { return url_request(HTTPRequest::HTTP_POST, url, data, resp); }
@@ -610,12 +810,14 @@ void RegisterInternet(asIScriptEngine* engine) {
 	RegisterHTTPClientSession<HTTPSClientSession>(engine, "https_client");
 	engine->RegisterObjectMethod("http_client", "https_client@ opCast()", asFUNCTION((angelscript_refcounted_refcast<HTTPClientSession, HTTPSClientSession>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("https_client", "http_client@ opImplCast()", asFUNCTION((angelscript_refcounted_refcast<HTTPSClientSession, HTTPClientSession>)), asCALL_CDECL_OBJFIRST);
+	RegisterHTTPCredentials(engine);
 	RegisterIPAddress(engine);
 	RegisterFTPClientSession<FTPClientSession>(engine, "ftp_client");
 	RegisterSocket<Socket>(engine, "socket");
 	RegisterStreamSocket<StreamSocket>(engine, "stream_socket");
 	RegisterWebSocket(engine);
 	RegisterDNS(engine);
+	RegisterHTTP(engine);
 	engine->RegisterGlobalFunction("string url_request(const string&in method, const string&in url, const string&in data = \"\", http_response&out response = void)", asFUNCTION(url_request), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string url_get(const string&in url, http_response&out response = void)", asFUNCTION(url_get), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string url_post(const string&in url, const string&in data, http_response&out response = void)", asFUNCTION(url_post), asCALL_CDECL);

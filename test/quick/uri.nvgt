@@ -1,0 +1,14 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	spec::uri u = "wss://user:testing@samtupy.com:774/this/is/a/test/of/this?uri=class&IDK=whether#itWillWork";
+	alert("test", u);
+	alert("test", string(u.get_path_segments()));
+	alert("test", string(u.get_query_parameters()));
+	u.host = "testing.net";
+	u.add_query_parameter("haha", "lol");
+	alert(u.scheme, u.host + ", " + u.path_etc);
+	alert("test", u.user_info);
+}

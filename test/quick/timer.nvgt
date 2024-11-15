@@ -4,7 +4,7 @@
 
 void main() {
 	timer t_millis, t_dec;
-	timer t_secs(0, SECONDS);
+	timer t_secs(-5, SECONDS);
 	timer t_micros(0, 1);
 	show_window("test");
 	t_dec.accuracy = SECONDS / 10;

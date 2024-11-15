@@ -1,0 +1,17 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	http_request req(HTTP_GET, "/ip.php");
+	http_response resp;
+	https_client http("samtupy.com");
+	req["User-Agent"] = "nvgt-test-script";
+	http.send_request(req);
+	datastream@ ds = http.receive_response(resp);
+	alert(resp.content_length, ds.read());
+	datastream output;
+	req.write(output);
+	resp.write(output);
+	clipboard_set_text(output.str());
+}

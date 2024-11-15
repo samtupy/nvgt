@@ -10,9 +10,13 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#define ENET_IMPLEMENTATION
 #include <obfuscate.h>
 #include "nvgt_angelscript.h" // get_array_type
 #include "network.h"
+
+// declared in dep/enet_compress.c:
+extern "C" int enet_host_compress_with_range_coder (ENetHost * host);
 
 bool g_enet_initialized = false;
 network_event g_enet_none_event; // The none event is static and never changes, why reallocate it every time network::request() doesn't come up with an event?

@@ -131,11 +131,23 @@ shared double get_3d_distance(double x1, double y1, double z1, double x2, double
 	double z = get_1d_distance(z1, z2);
 	return sqrt(pow(x, 2.0) + pow(y, 2.0) + pow(z, 2.0));
 }
+shared double get_3d_distance(vector c1, vector c2) {
+	return get_3d_distance(c1.x, c1.y, c1.z, c2.x, c2.y, c2.z);
+}
+shared double get_clamped_3d_distance(vector current, vector min, vector max) {
+	double dx = (current.x < min.x) ? (min.x - current.x) : (current.x > max.x) ? (current.x - max.x) : 0;
+	double dy = (current.y < min.y) ? (min.y - current.y) : (current.y > max.y) ? (current.y - max.y) : 0;
+	double dz = (current.z < min.z) ? (min.z - current.z) : (current.z > max.z) ? (current.z - max.z) : 0;
+	return sqrt(dx * dx + dy * dy + dz * dz);
+}
 shared double get_3d_distance_circle(double x1, double y1, double z1, double x2, double y2, double z2) {
 	double x = get_1d_distance(x1, x2);
 	double y = get_1d_distance(y1, y2);
 	double z = get_1d_distance(z1, z2);
 	return x + y + z;
+}
+shared double get_3d_distance_circle(vector c1, vector c2) {
+	return get_3d_distance(c1.x, c1.y, c1.z, c2.x, c2.y, c2.z);
 }
 shared double calculate_x_y_angle(double x1, double y1, double x2, double y2, double deg, bool at_least_1_tile = true, bool floor_deg = true) {
 	if (at_least_1_tile and get_2d_distance(x1, y1, x2, y2) < 1) return 0;
@@ -148,6 +160,32 @@ shared double calculate_x_y_angle(double x1, double y1, double x2, double y2, do
 	fdeg -= deg;
 	while (fdeg < 0)
 		fdeg += 360;
+	if (floor_deg)
+		fdeg = floor(fdeg);
+	return fdeg;
+}
+shared double calculate_clamped_x_y_angle(vector current, vector min, vector max, double deg, bool at_least_1_tile = true, bool floor_deg = true) {
+	// Clamp current.x to be within the range [min.x, max.x]
+	double clamped_x = (current.x < min.x) ? min.x : (current.x > max.x) ? max.x : current.x;
+	// Clamp current.y to be within the range [min.y, max.y]
+	double clamped_y = (current.y < min.y) ? min.y : (current.y > max.y) ? max.y : current.y;
+	// Calculate 2D distance between the current point and the clamped point
+	if (at_least_1_tile && get_2d_distance(current.x, current.y, clamped_x, clamped_y) < 1)
+		return 0;
+	// Calculate x and y differences between current and clamped point
+	double x = clamped_x - current.x;
+	double y = clamped_y - current.y;
+	// Check if there’s any distance to compute an angle
+	if (x == 0 && y == 0)
+		return 0;
+	// Calculate the angle in radians, convert to degrees, and adjust by `deg`
+	double rad = atan2(x, y);
+	double fdeg = rad * (180.0 / pi);
+	fdeg -= deg;
+	// Normalize the angle to be within 0 to 360 degrees
+	while (fdeg < 0)
+		fdeg += 360;
+	// Apply flooring if specified
 	if (floor_deg)
 		fdeg = floor(fdeg);
 	return fdeg;

@@ -1,8 +1,8 @@
 /**
 	Get a value out of the JSON object with literal syntax, for example `json["key"]`.
-	var@ json_object::get_opIndex(string key) property;
+	var@ json_object::get_opIndex(const string&in key) property;
 	## Arguments:
-		* string key: the key of the object to get.
+		* const string&in key: the key of the object to get.
 	## Returns:
 		var@: a handle to the object, or null if not found.
 */

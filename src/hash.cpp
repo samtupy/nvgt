@@ -12,7 +12,7 @@
 
 #include <string>
 #include <angelscript.h>
-#include <enet/enet.h>
+#include <enet.h>
 #include <obfuscate.h>
 #include <Poco/HMACEngine.h>
 #include <Poco/MD5Engine.h>

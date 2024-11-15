@@ -1,8 +1,8 @@
 /**
 	Return the ascii value for the given character.
-	uint8 character_to_ascii(string character);
+	uint8 character_to_ascii(const string&in character);
 	## Arguments:
-		* string character: the character to convert.
+		* const string&in character: the character to convert.
 	## Returns:
 		uint8: the ascii value for the given character.
 	## Remarks:

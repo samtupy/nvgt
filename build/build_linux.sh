@@ -23,18 +23,6 @@ function setup_reactphysics {
 	cd ../..
 }
 
-function setup_enet {
-	echo Installing enet...
-	git clone --depth 1 https://github.com/lsalzman/enet||true
-	cd enet
-	autoreconf -vfi
-	./configure
-	make -j$(nproc)
-	sudo make install
-	cd ..
-	echo Enet installed.
-}
-
 function setup_libgit2 {
 	echo Installing libgit2...
 	curl -s -O -L https://github.com/libgit2/libgit2/archive/refs/tags/v1.8.1.tar.gz
@@ -138,7 +126,6 @@ function main {
 	
 	setup_angelscript
 	setup_reactphysics
-	setup_enet
 	setup_libgit2
 	setup_libplist
 	setup_poco

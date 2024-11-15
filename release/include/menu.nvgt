@@ -62,6 +62,12 @@ class menu {
 		f_cancel = form.create_button("Cancel", false, allow_escape);
 		form.set_state(f_cancel, true, false);
 		form.focus_silently(f_list);
+		//If the settings haven't been reset, restore the settings to the form, as it has been recreated.
+		if(!reset_settings) {
+			set_allow_escape(get_allow_escape());
+			set_allow_search(get_allow_search());
+			set_allow_go_to_index(get_allow_go_to_index());
+		}
 	}
 	// Item IDs are entirely optional.
 	int add_item(const string&in text, const string&in id = "", int position = -1) {

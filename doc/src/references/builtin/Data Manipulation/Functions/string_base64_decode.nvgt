@@ -1,8 +1,8 @@
 /**
 	Decodes a string which has previously been encoded in base64.
-	string string_base64_decode(string the_data, string_base64_options options = STRING_BASE64_PADLESS);
+	string string_base64_decode(const string&in the_data, string_base64_options options = STRING_BASE64_PADLESS);
 	## Arguments:
-		* string the_data: The data that is to be decoded.
+		* const string&in the_data: The data that is to be decoded.
 		* string_base64_options options = STRING_BASE64_PADLESS: A bitwise of options that control the behavior of the decoding (see remarks).
 	## Returns:
 		String: The decoded string on success or an empty string on failure.

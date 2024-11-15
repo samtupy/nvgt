@@ -1,8 +1,8 @@
 /**
 	Print a message to the C debugger.
-	void c_debug_message(string message);
+	void c_debug_message(const string&in message);
 	## Arguments:
-		* Message: The message to print to the C debugger's console.
+		* const string&in message: The message to print to the C debugger's console.
 */
 
 // Example:

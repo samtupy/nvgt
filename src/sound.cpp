@@ -2045,6 +2045,7 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("mixer", "bool set_fx(const string &in, int = -1)", asMETHOD(mixer, set_fx), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool set_position(float, float, float, float, float, float, float, float, float)", asMETHOD(mixer, set_position), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool set_mixer(mixer@ = null)", asMETHOD(mixer, set_mixer), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "void set_hrtf(bool = true)", asMETHOD(mixer, set_hrtf), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool get_sliding() const property", asMETHOD(mixer, is_sliding), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool get_pan_sliding() const property", asMETHOD(mixer, is_pan_sliding), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool get_pitch_sliding() const property", asMETHOD(mixer, is_pitch_sliding), asCALL_THISCALL);
