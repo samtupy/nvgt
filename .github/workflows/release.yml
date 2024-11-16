@@ -12,6 +12,7 @@ jobs:
     - name: build
       run: |
         python3 -m venv venv
+        chmod +x venv/bin/activate
         ./venv/bin/activate
         echo $PATH
         pip3 install scons
@@ -30,6 +31,7 @@ jobs:
     - name: build
       run: |
         python3 -m venv venv
+        chmod +x venv/bin/activate
         ./venv/bin/activate
         echo $PATH
         pip3 install scons
@@ -170,6 +172,7 @@ jobs:
         tar -xzf windows_release.tar.gz -C windows_release
         tar -xzf linux_release.tar.gz -C release
         python3 -m venv venv
+        chmod +x venv/bin/activate
         ./venv/bin/activate
         echo $PATH
         cd doc
