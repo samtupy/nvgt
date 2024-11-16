@@ -1,5 +1,7 @@
 name: release
 on:
+  # [Temp] run on push for quicker testing
+  push:
   workflow_dispatch:
 
 jobs:
@@ -9,7 +11,10 @@ jobs:
     - uses: actions/checkout@v4
     - name: build
       run: |
-        brew install scons
+        python3 -m vemv vemv
+        ./venv/bin/activate
+        echo $PATH
+        pip3 install scons
         cp build/build_macos.sh .
         sudo chmod +x build_macos.sh
         ./build_macos.sh ci
@@ -24,6 +29,10 @@ jobs:
     - uses: actions/checkout@v4
     - name: build
       run: |
+        python3 -m vemv vemv
+        ./venv/bin/activate
+        echo $PATH
+        pip3 install scons
         sudo chmod +x build/build_linux.sh
         ./build/build_linux.sh ci
         cd release
@@ -69,6 +78,8 @@ jobs:
     - uses: actions/checkout@v4
     - name: build
       run: |
+        python -m venv venv
+        venv\bin\activate
         pip3 install scons
         choco install -y upx
         curl -s -O https://nvgt.gg/windev.zip
@@ -158,8 +169,11 @@ jobs:
         mkdir windows_release
         tar -xzf windows_release.tar.gz -C windows_release
         tar -xzf linux_release.tar.gz -C release
+        python3 -m vemv vemv
+        ./venv/bin/activate
+        echo $PATH
         cd doc
-        pip3 install --user -r requirements.txt
+        pip3 install -r requirements.txt
         cd OSL
         python3 make_osl_document.py
         cd ..
