@@ -13,7 +13,7 @@ jobs:
       run: |
         python3 -m venv venv
         chmod +x venv/bin/activate
-        ./venv/bin/activate
+        source ./venv/bin/activate
         echo $PATH
         pip3 install scons
         cp build/build_macos.sh .
@@ -32,7 +32,7 @@ jobs:
       run: |
         python3 -m venv venv
         chmod +x venv/bin/activate
-        ./venv/bin/activate
+        source ./venv/bin/activate
         echo $PATH
         pip3 install scons
         sudo chmod +x build/build_linux.sh
@@ -173,7 +173,7 @@ jobs:
         tar -xzf linux_release.tar.gz -C release
         python3 -m venv venv
         chmod +x venv/bin/activate
-        ./venv/bin/activate
+        source ./venv/bin/activate
         echo $PATH
         cd doc
         pip3 install -r requirements.txt
