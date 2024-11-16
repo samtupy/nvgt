@@ -81,7 +81,7 @@ jobs:
     - name: build
       run: |
         python -m venv venv
-        call venv/bin/activate
+        venv/scripts/activate
         pip3 install scons
         choco install -y upx
         curl -s -O https://nvgt.gg/windev.zip
