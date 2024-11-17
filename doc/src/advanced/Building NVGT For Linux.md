@@ -5,7 +5,9 @@ There is a [script to build NVGT on Linux](https://raw.githubusercontent.com/sam
 
 Internally, this script is used within our GitHub Actions to make builds of NVGT. It is also used within our local testing environments.
 
-Note that this script will currently only run on systems where apt is installed, and does not support any other package managers.
+### Notes
+* This script will currently only run on systems where `apt` and `pip` are installed, and does not support any other package managers.
+* Where required, the below examples create a [virtual environment](https://docs.python.org/3/library/venv.html) and activates it before running the script.
 
 This script can be ran in two modes:
 * Adding `ci` as an argument causes the dependencies to be downloaded in the current working directory inside a `deps` folder (useful if you already are working from within NVGT).
@@ -14,6 +16,8 @@ This script can be ran in two modes:
 ### Example of Running the script with the `ci` argument
 It is assumed you are in a freshly-cloned NVGT, so that your working directory ends with `nvgt`.
 ```
+python3 -m venv venv --upgrade-deps
+source venv/bin/activate
 chmod +x build/build_linux.sh
 ./build/build_linux.sh ci
 ```

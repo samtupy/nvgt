@@ -1,7 +1,5 @@
 name: release
 on:
-  # [Temp] run on push for quicker testing
-  push:
   workflow_dispatch:
 
 jobs:
