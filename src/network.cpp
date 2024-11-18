@@ -62,16 +62,17 @@ void network::destroy(bool flush) {
 	reset_totals();
 }
 
-bool network::setup_client(unsigned char max_channels, unsigned short max_peers) {
+bool network::setup_client(unsigned char max_channels, unsigned short max_peers, bool opt_out_of_encryption) {
 	if (host) return false;
 	host = enet_host_create(NULL, max_peers, max_channels, 0, 0);
 	if (!host) return false;
 	is_client = true;
 	channel_count = max_channels;
+	no_encryption = opt_out_of_encryption;
 	return true;
 }
 
-bool network::setup_server(unsigned short port, unsigned char max_channels, unsigned short max_peers) {
+bool network::setup_server(unsigned short port, unsigned char max_channels, unsigned short max_peers, bool opt_out_of_encryption) {
 	if (host) return false;
 	ENetAddress address;
 	address.host = ENET_HOST_ANY;
@@ -79,10 +80,11 @@ bool network::setup_server(unsigned short port, unsigned char max_channels, unsi
 	host = enet_host_create(&address, max_peers, max_channels, 0, 0);
 	if (!host) return false;
 	channel_count = max_channels;
+	no_encryption = opt_out_of_encryption;
 	return true;
 }
 
-bool network::setup_local_server(unsigned short port, unsigned char max_channels, unsigned short max_peers) {
+bool network::setup_local_server(unsigned short port, unsigned char max_channels, unsigned short max_peers, bool opt_out_of_encryption) {
 	if (host) return false;
 	ENetAddress address;
 	enet_address_set_host(&address, "127.0.0.1");
@@ -90,6 +92,7 @@ bool network::setup_local_server(unsigned short port, unsigned char max_channels
 	host = enet_host_create(&address, max_peers, max_channels, 0, 0);
 	if (!host) return false;
 	channel_count = max_channels;
+	no_encryption = opt_out_of_encryption;
 	return true;
 }
 
@@ -281,9 +284,9 @@ void RegisterScriptNetwork(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("network"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(network, addRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("network"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(network, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("void destroy(bool flush = true)"), asMETHOD(network, destroy), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool setup_client(uint8 max_channels, uint16 max_peers)"), asMETHOD(network, setup_client), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool setup_server(uint16 port, uint8 max_channels, uint16 max_peers)"), asMETHOD(network, setup_server), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool setup_local_server(uint16 port, uint8 max_channels, uint16 max_peers)"), asMETHOD(network, setup_local_server), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool setup_client(uint8 max_channels, uint16 max_peers, bool opt_out_of_encryption = false)"), asMETHOD(network, setup_client), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool setup_server(uint16 port, uint8 max_channels, uint16 max_peers, bool opt_out_of_encryption = false)"), asMETHOD(network, setup_server), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool setup_local_server(uint16 port, uint8 max_channels, uint16 max_peers, bool opt_out_of_encryption = false)"), asMETHOD(network, setup_local_server), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint64 connect(const string& in host, uint16 port)"), asMETHOD(network, connect), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("const network_event@ request(uint timeout = 0)"), asMETHOD(network, request), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("string get_peer_address(uint64 peer_id) const"), asMETHOD(network, get_peer_address), asCALL_THISCALL);

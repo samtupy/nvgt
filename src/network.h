@@ -24,6 +24,7 @@
 #include <string>
 #include <angelscript.h>
 #include <scriptarray.h>
+#include "noise.h"
 
 extern bool g_enet_initialized;
 class network_event;
@@ -33,6 +34,9 @@ class network {
 	std::unordered_map<asQWORD, ENetPeer*> peers;
 	asQWORD next_peer;
 	unsigned char channel_count;
+	noise::HandshakeState hs_state;
+	noise::CipherState cs_send, cs_recv;
+	bool no_encryption = false;
 	ENetPeer* get_peer(asQWORD peer_id);
 	// Enet's total_sent/received counters are 32 bit integers that can overflow, work around that
 	asQWORD total_sent_data, total_sent_packets, total_received_data, total_received_packets;
@@ -52,9 +56,9 @@ public:
 	void addRef();
 	void release();
 	void destroy(bool flush = true);
-	bool setup_client(unsigned char max_channels, unsigned short max_peers);
-	bool setup_server(unsigned short port, unsigned char max_channels, unsigned short max_peers);
-	bool setup_local_server(unsigned short port, unsigned char max_channels, unsigned short max_peers);
+	bool setup_client(unsigned char max_channels, unsigned short max_peers, bool opt_out_of_encryption);
+	bool setup_server(unsigned short port, unsigned char max_channels, unsigned short max_peers, bool opt_out_of_encryption);
+	bool setup_local_server(unsigned short port, unsigned char max_channels, unsigned short max_peers, bool opt_out_of_encryption);
 	asQWORD connect(const std::string& hostname, unsigned short port);
 	const network_event* request(uint32_t timeout = 0);
 	std::string get_peer_address(asQWORD peer_id);
