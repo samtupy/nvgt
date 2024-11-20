@@ -12,7 +12,6 @@ jobs:
         python3 -m venv venv --upgrade-deps
         chmod +x venv/bin/activate
         source ./venv/bin/activate
-        echo $PATH
         pip3 install scons
         cp build/build_macos.sh .
         sudo chmod +x build_macos.sh
@@ -31,7 +30,6 @@ jobs:
         python3 -m venv venv --upgrade-deps
         chmod +x venv/bin/activate
         source ./venv/bin/activate
-        echo $PATH
         pip3 install scons
         sudo chmod +x build/build_linux.sh
         ./build/build_linux.sh ci
@@ -172,7 +170,6 @@ jobs:
         python3 -m venv venv --upgrade-deps
         chmod +x venv/bin/activate
         source ./venv/bin/activate
-        echo $PATH
         cd doc
         pip3 install -r requirements.txt
         cd OSL
