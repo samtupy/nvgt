@@ -11,8 +11,361 @@
 #include <version>
 #include <algorithm>
 #include <cstdint>
+#include <memory>
 
 BEGIN_AS_NAMESPACE
+
+struct floating_point_characteristics;
+
+static std::unique_ptr<floating_point_characteristics> fp_characteristics = nullptr;
+
+struct floating_point_characteristics {
+	struct {
+		int ibeta;
+		int it;
+		int machep;
+		float eps;
+		int negep;
+		float epsneg;
+		int iexp;
+		int minexp;
+		float xmin;
+		int maxexp;
+		float xmax;
+		int irnd;
+		int ngrd;
+	} flt;
+	struct {
+		int ibeta;
+		int it;
+		int machep;
+		double eps;
+		int negep;
+		double epsneg;
+		int iexp;
+		int minexp;
+		double xmin;
+		int maxexp;
+		double xmax;
+		int irnd;
+		int ngrd;
+	} dbl;
+};
+
+void compute_fp_characteristics() {
+	if (fp_characteristics) return;
+	fp_characteristics = std::make_unique<floating_point_characteristics>();
+	{ // float
+		int i, itemp, iz, j, k, mx, nxres;
+		float a, b, beta, betah, betain, t, temp, temp1, tempa, zero, one, two, y, z;
+		one = 1.0f;
+		two = one + one;
+		zero = one - one;
+		a = one;
+		do {
+			a += a;
+			temp = a + one;
+			temp1 = temp - a;
+		} while (temp1 - one == zero);
+		b = one;
+		do {
+			b += b;
+			temp = a + b;
+			itemp = static_cast<int>(temp - a);
+		} while (itemp == 0);
+		fp_characteristics->flt.ibeta = itemp;
+		beta = fp_characteristics->flt.ibeta;
+		fp_characteristics->flt.it = 0;
+		b = one;
+		do {
+			fp_characteristics->flt.it++;
+			b *= beta;
+			temp = b + one;
+			temp1 = temp - b;
+		} while (temp1 - one == zero);
+		fp_characteristics->flt.irnd = 0;
+		betah = beta / two;
+		temp = a + betah;
+		if (temp - a != zero) {
+			fp_characteristics->flt.irnd = 1;
+		}
+		tempa = a + beta;
+		temp = tempa + betah;
+		if (fp_characteristics->flt.irnd == 0 && temp - tempa != zero) {
+			fp_characteristics->flt.irnd = 2;
+		}
+		fp_characteristics->flt.negep = fp_characteristics->flt.it + 3;
+		betain = one / beta;
+		a = one;
+		for (i = 1; i <= fp_characteristics->flt.negep; i++) {
+			a *= betain;
+		}
+		b = a;
+		while (true) {
+			temp = one - a;
+			if (temp - one != zero) {
+				break;
+			}
+			a *= beta;
+			fp_characteristics->flt.negep--;
+		}
+		fp_characteristics->flt.negep = -fp_characteristics->flt.negep;
+		fp_characteristics->flt.epsneg = a;
+		fp_characteristics->flt.machep = -fp_characteristics->flt.it - 3;
+		a = b;
+		while (true) {
+			temp = one + a;
+			if (temp - one != zero) {
+				break;
+			}
+			a *= beta;
+			fp_characteristics->flt.machep++;
+		}
+		fp_characteristics->flt.eps = a;
+		fp_characteristics->flt.ngrd = 0;
+		temp = one + fp_characteristics->flt.eps;
+		if (fp_characteristics->flt.irnd == 0 && temp * one - one != zero) {
+			fp_characteristics->flt.ngrd = 1;
+		}
+		i = 0;
+		k = 1;
+		z = betain;
+		t = one + fp_characteristics->flt.eps;
+		nxres = 0;
+		while (true) {
+			y = z;
+			z = y * y;
+			a = z * one;
+			temp = z * t;
+			if (a + a == zero || std::abs(z) >= y) {
+				break;
+			}
+			temp1 = temp * betain;
+			if (temp1 * beta == z) {
+				break;
+			}
+			i++;
+			k += k;
+		}
+		if (fp_characteristics->flt.ibeta != 10) {
+			fp_characteristics->flt.iexp = i + 1;
+			mx = k + k;
+		} else {
+			fp_characteristics->flt.iexp = 2;
+			iz = fp_characteristics->flt.ibeta;
+			while (k >= iz) {
+				iz *= fp_characteristics->flt.ibeta;
+				fp_characteristics->flt.iexp++;
+			}
+			mx = iz + iz - 1;
+		}
+		while (true) {
+			fp_characteristics->flt.xmin = y;
+			y = y * betain;
+			a = y * one;
+			temp = y * t;
+			if (a + a != zero && std::abs(y) < fp_characteristics->flt.xmin) {
+				k++;
+				temp1 = temp * betain;
+				if (temp1 * beta == y && temp != y) {
+					nxres = 3;
+					fp_characteristics->flt.xmin = y;
+					break;
+				}
+			} else {
+				break;
+			}
+		}
+		fp_characteristics->flt.minexp = -k;
+		if (mx <= k + k - 3 && fp_characteristics->flt.ibeta != 10) {
+			mx = mx + mx;
+			fp_characteristics->flt.iexp++;
+		}
+		fp_characteristics->flt.maxexp = mx + fp_characteristics->flt.minexp;
+		fp_characteristics->flt.irnd = fp_characteristics->flt.irnd + nxres;
+		if (fp_characteristics->flt.irnd >= 2) {
+			fp_characteristics->flt.maxexp = fp_characteristics->flt.maxexp - 2;
+		}
+		i = fp_characteristics->flt.maxexp + fp_characteristics->flt.minexp;
+		if (fp_characteristics->flt.ibeta == 2 && i == 0) {
+			fp_characteristics->flt.maxexp = fp_characteristics->flt.maxexp - 1;
+		}
+		if (i > 20) {
+			fp_characteristics->flt.maxexp = fp_characteristics->flt.maxexp - 1;
+		}
+		if (a != y) {
+			fp_characteristics->flt.maxexp = fp_characteristics->flt.maxexp - 2;
+		}
+		fp_characteristics->flt.xmax = one - fp_characteristics->flt.epsneg;
+		if (fp_characteristics->flt.xmax * one != fp_characteristics->flt.xmax) {
+			fp_characteristics->flt.xmax = one - beta * fp_characteristics->flt.epsneg;
+		}
+		fp_characteristics->flt.xmax /= fp_characteristics->flt.xmin * beta * beta * beta;
+		i = fp_characteristics->flt.maxexp + fp_characteristics->flt.minexp + 3;
+		for (j = 1; j <= i; j++) {
+			if (fp_characteristics->flt.ibeta == 2) {
+				fp_characteristics->flt.xmax += fp_characteristics->flt.xmax;
+			} else {
+				fp_characteristics->flt.xmax *= beta;
+			}
+		}
+	}
+	{ // double
+		int i, itemp, iz, j, k, mx, nxres;
+		double a, b, beta, betah, betain, t, temp, temp1, tempa, zero, one, two, y, z;
+		one = 1.0f;
+		two = one + one;
+		zero = one - one;
+		a = one;
+		do {
+			a += a;
+			temp = a + one;
+			temp1 = temp - a;
+		} while (temp1 - one == zero);
+		b = one;
+		do {
+			b += b;
+			temp = a + b;
+			itemp = static_cast<int>(temp - a);
+		} while (itemp == 0);
+		fp_characteristics->dbl.ibeta = itemp;
+		beta = fp_characteristics->dbl.ibeta;
+		fp_characteristics->dbl.it = 0;
+		b = one;
+		do {
+			fp_characteristics->dbl.it++;
+			b *= beta;
+			temp = b + one;
+			temp1 = temp - b;
+		} while (temp1 - one == zero);
+		fp_characteristics->dbl.irnd = 0;
+		betah = beta / two;
+		temp = a + betah;
+		if (temp - a != zero) {
+			fp_characteristics->dbl.irnd = 1;
+		}
+		tempa = a + beta;
+		temp = tempa + betah;
+		if (fp_characteristics->dbl.irnd == 0 && temp - tempa != zero) {
+			fp_characteristics->dbl.irnd = 2;
+		}
+		fp_characteristics->dbl.negep = fp_characteristics->dbl.it + 3;
+		betain = one / beta;
+		a = one;
+		for (i = 1; i <= fp_characteristics->dbl.negep; i++) {
+			a *= betain;
+		}
+		b = a;
+		while (true) {
+			temp = one - a;
+			if (temp - one != zero) {
+				break;
+			}
+			a *= beta;
+			fp_characteristics->dbl.negep--;
+		}
+		fp_characteristics->dbl.negep = -fp_characteristics->dbl.negep;
+		fp_characteristics->dbl.epsneg = a;
+		fp_characteristics->dbl.machep = -fp_characteristics->dbl.it - 3;
+		a = b;
+		while (true) {
+			temp = one + a;
+			if (temp - one != zero) {
+				break;
+			}
+			a *= beta;
+			fp_characteristics->dbl.machep++;
+		}
+		fp_characteristics->dbl.eps = a;
+		fp_characteristics->dbl.ngrd = 0;
+		temp = one + fp_characteristics->dbl.eps;
+		if (fp_characteristics->dbl.irnd == 0 && temp * one - one != zero) {
+			fp_characteristics->dbl.ngrd = 1;
+		}
+		i = 0;
+		k = 1;
+		z = betain;
+		t = one + fp_characteristics->dbl.eps;
+		nxres = 0;
+		while (true) {
+			y = z;
+			z = y * y;
+			a = z * one;
+			temp = z * t;
+			if (a + a == zero || std::abs(z) >= y) {
+				break;
+			}
+			temp1 = temp * betain;
+			if (temp1 * beta == z) {
+				break;
+			}
+			i++;
+			k += k;
+		}
+		if (fp_characteristics->dbl.ibeta != 10) {
+			fp_characteristics->dbl.iexp = i + 1;
+			mx = k + k;
+		} else {
+			fp_characteristics->dbl.iexp = 2;
+			iz = fp_characteristics->dbl.ibeta;
+			while (k >= iz) {
+				iz *= fp_characteristics->dbl.ibeta;
+				fp_characteristics->dbl.iexp++;
+			}
+			mx = iz + iz - 1;
+		}
+		while (true) {
+			fp_characteristics->dbl.xmin = y;
+			y = y * betain;
+			a = y * one;
+			temp = y * t;
+			if (a + a != zero && std::abs(y) < fp_characteristics->dbl.xmin) {
+				k++;
+				temp1 = temp * betain;
+				if (temp1 * beta == y && temp != y) {
+					nxres = 3;
+					fp_characteristics->dbl.xmin = y;
+					break;
+				}
+			} else {
+				break;
+			}
+		}
+		fp_characteristics->dbl.minexp = -k;
+		if (mx <= k + k - 3 && fp_characteristics->dbl.ibeta != 10) {
+			mx = mx + mx;
+			fp_characteristics->dbl.iexp++;
+		}
+		fp_characteristics->dbl.maxexp = mx + fp_characteristics->dbl.minexp;
+		fp_characteristics->dbl.irnd = fp_characteristics->dbl.irnd + nxres;
+		if (fp_characteristics->dbl.irnd >= 2) {
+			fp_characteristics->dbl.maxexp = fp_characteristics->dbl.maxexp - 2;
+		}
+		i = fp_characteristics->dbl.maxexp + fp_characteristics->dbl.minexp;
+		if (fp_characteristics->dbl.ibeta == 2 && i == 0) {
+			fp_characteristics->dbl.maxexp = fp_characteristics->dbl.maxexp - 1;
+		}
+		if (i > 20) {
+			fp_characteristics->dbl.maxexp = fp_characteristics->dbl.maxexp - 1;
+		}
+		if (a != y) {
+			fp_characteristics->dbl.maxexp = fp_characteristics->dbl.maxexp - 2;
+		}
+		fp_characteristics->dbl.xmax = one - fp_characteristics->dbl.epsneg;
+		if (fp_characteristics->dbl.xmax * one != fp_characteristics->dbl.xmax) {
+			fp_characteristics->dbl.xmax = one - beta * fp_characteristics->dbl.epsneg;
+		}
+		fp_characteristics->dbl.xmax /= fp_characteristics->dbl.xmin * beta * beta * beta;
+		i = fp_characteristics->dbl.maxexp + fp_characteristics->dbl.minexp + 3;
+		for (j = 1; j <= i; j++) {
+			if (fp_characteristics->dbl.ibeta == 2) {
+				fp_characteristics->dbl.xmax += fp_characteristics->dbl.xmax;
+			} else {
+				fp_characteristics->dbl.xmax *= beta;
+			}
+		}
+	}
+}
 
 // As AngelScript doesn't allow bitwise manipulation of float types we'll provide a couple of
 // functions for converting float values to IEEE 754 formatted values etc. This also allow us to 
@@ -317,11 +670,38 @@ void RegisterScriptMath_Native(asIScriptEngine *engine)
 	r = engine->RegisterEnumValue("floating_point_classification", "FP_ZERO", FP_ZERO); assert(r >= 0);
 	r = engine->RegisterEnumValue("floating_point_classification", "FP_INFINITE", FP_INFINITE); assert(r >= 0);
 	r = engine->RegisterEnumValue("floating_point_classification", "FP_NAN", FP_NAN); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int FLOAT_RADIX", &fp_characteristics->flt.ibeta); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int FLOAT_MANTISSA_DIGITS", &fp_characteristics->flt.it); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int FLOAT_EPSILON_EXPONENT", &fp_characteristics->flt.machep); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const float FLOAT_EPSILON", &fp_characteristics->flt.eps); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int FLOAT_NEG_EPSILON_EXPONENT", &fp_characteristics->flt.negep); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const float FLOAT_NEG_EPSILON", &fp_characteristics->flt.epsneg); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int FLOAT_EXPONENT_BITS", &fp_characteristics->flt.iexp); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int FLOAT_MIN_EXPONENT", &fp_characteristics->flt.minexp); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const float FLOAT_MIN_NORMALIZED", &fp_characteristics->flt.xmin); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int FLOAT_MAX_EXPONENT", &fp_characteristics->flt.maxexp); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const float FLOAT_MAX", &fp_characteristics->flt.xmax); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int FLOAT_ROUNDING_MODE", &fp_characteristics->flt.irnd); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int FLOAT_GUARD_DIGITS", &fp_characteristics->flt.ngrd); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int DOUBLE_RADIX", &fp_characteristics->dbl.ibeta); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int DOUBLE_MANTISSA_DIGITS", &fp_characteristics->dbl.it); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int DOUBLE_EPSILON_EXPONENT", &fp_characteristics->dbl.machep); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const double DOUBLE_EPSILON", &fp_characteristics->dbl.eps); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int DOUBLE_NEG_EPSILON_EXPONENT", &fp_characteristics->dbl.negep); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const double DOUBLE_NEG_EPSILON", &fp_characteristics->dbl.epsneg); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int DOUBLE_EXPONENT_BITS", &fp_characteristics->dbl.iexp); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int DOUBLE_MIN_EXPONENT", &fp_characteristics->dbl.minexp); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const double DOUBLE_MIN_NORMALIZED", &fp_characteristics->dbl.xmin); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int DOUBLE_MAX_EXPONENT", &fp_characteristics->dbl.maxexp); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const double DOUBLE_MAX", &fp_characteristics->dbl.xmax); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int DOUBLE_ROUNDING_MODE", &fp_characteristics->dbl.irnd); assert(r >= 0);
+	r = engine->RegisterGlobalProperty("const int DOUBLE_GUARD_DIGITS", &fp_characteristics->dbl.ngrd); assert(r >= 0);
 }
 
 
 void RegisterScriptMath(asIScriptEngine *engine)
 {
+	compute_fp_characteristics();
 	RegisterScriptMath_Native(engine);
 }
 
