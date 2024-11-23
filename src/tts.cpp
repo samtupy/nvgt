@@ -29,26 +29,35 @@
 	#include <SDL3/SDL.h>
 #endif
 
-char* minitrim(char* data, unsigned long* bufsize, int bitrate, int channels) {
-	char* ptr = data;
-	if (!ptr || !bufsize || *bufsize % 2 != 0 || *bufsize < 1) return ptr;
-	short a = 3072;
-	while (bitrate == 16 && (ptr - data) < *bufsize) {
-		if (channels == 2) {
-			short l = (((short) * ptr) << 8) | *(ptr + 1);
-			short r = (((short) * (ptr + 2)) << 8) | *(ptr + 3);
-			if (l > -a && l < a && r > -a && r < a)
-				ptr += 4;
-			else break;
-		} else if (channels == 1) {
-			short s = (((short) * ptr) << 8) | *(ptr + 1);
-			if (s > -a && s < a)
-				ptr += 2;
-			else break;
+static char* minitrim(char* data, unsigned long* size, int bitrate, int channels, int begin_threshold = 512, int end_threshold = 128) {
+	int samplesPerFrame = channels * (bitrate / 8);
+	int numSamples = *size / samplesPerFrame;
+	int startIndex = 0;
+	int endIndex = numSamples - 1;
+	for (int i = 0; i < numSamples; i++) {
+		int maxAbsValue = 0;
+		for (int j = 0; j < channels; j++) {
+			int absValue = abs(bitrate == 16? reinterpret_cast<short*>(data)[i * channels + j] : data[i * channels + j]);
+			if (absValue > maxAbsValue) maxAbsValue = absValue;
+		}
+		if (maxAbsValue >= begin_threshold) {
+			startIndex = i;
+			break;
 		}
 	}
-	*bufsize -= (ptr - data);
-	return ptr;
+	for (int i = numSamples - 1; i >= 0; i--) {
+		int maxAbsValue = 0;
+		for (int j = 0; j < channels; j++) {
+			int absValue = abs(bitrate == 16? reinterpret_cast<short*>(data)[i * channels + j] : data[i * channels + j]);
+			if (absValue > maxAbsValue) maxAbsValue = absValue;
+		}
+		if (maxAbsValue >= end_threshold) {
+			endIndex = i;
+			break;
+		}
+	}
+	*size = (endIndex - startIndex + 1) * samplesPerFrame;
+	return data + startIndex * samplesPerFrame;
 }
 
 tts_voice::tts_voice(const std::string& builtin_voice_name) {
@@ -145,6 +154,10 @@ void tts_voice::Release() {
 	}
 }
 bool tts_voice::speak(const std::string& text, bool interrupt) {
+	if (text.empty()) {
+		if (audioout) BASS_ChannelStop(audioout);
+		return true;
+	}
 	unsigned long bufsize;
 	char* data = NULL;
 	if (voice_index == builtin_index) {
@@ -222,7 +235,6 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 	#ifdef _WIN32
 	else {
 		if (!inst && !refresh()) return FALSE;
-		DWORD bufsize;
 		data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
 		if (!audioout || (inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels)) {
 			samprate = inst->sample_rate;

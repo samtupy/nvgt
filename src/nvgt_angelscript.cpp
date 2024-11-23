@@ -457,6 +457,9 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->BeginConfigGroup("serialization");
 	RegisterSerializationFunctions(engine);
 	engine->EndConfigGroup();
+	engine->BeginConfigGroup("xplatform");
+	RegisterXplatform(engine);
+	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_SOUND);
 	engine->BeginConfigGroup("sound");
 	RegisterScriptSound(engine);
@@ -493,9 +496,6 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	g_ctxMgr->SetGetTimeCallback(GetTimeCallback);
 	engine->BeginConfigGroup("unsorted");
 	RegisterUnsorted(engine);
-	engine->EndConfigGroup();
-	engine->BeginConfigGroup("xplatform");
-	RegisterXplatform(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	g_ctxMgr->RegisterThreadSupport(engine);

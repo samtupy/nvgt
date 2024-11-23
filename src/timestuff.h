@@ -84,6 +84,7 @@ public:
 	timer(int64_t initial_value, uint64_t initial_accuracy, bool secure);
 	int64_t get_elapsed() const;
 	bool has_elapsed(int64_t value) const;
+	bool tick(int64_t value);
 	void force(int64_t value);
 	void adjust(int64_t value);
 	void restart();

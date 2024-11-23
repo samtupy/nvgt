@@ -16,6 +16,7 @@
 #include <vector>
 #include <angelscript.h>
 #include <scriptarray.h>
+#include <Poco/Format.h>
 
 extern std::string g_compiled_basename;
 extern CScriptArray* g_command_line_args;
@@ -36,4 +37,13 @@ int ExecuteScript(asIScriptEngine* engine, const std::string& scriptFile);
 	int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size);
 	int LoadCompiledExecutable(asIScriptEngine* engine);
 #endif
-asITypeInfo* get_array_type(const std::string& decl);void RegisterUnsorted(asIScriptEngine* engine);
+asITypeInfo* get_array_type(const std::string& decl);
+template <class T> inline CScriptArray* vector_to_scriptarray(const std::vector<T>& input, const std::string& array_type) {
+	asITypeInfo* t = get_array_type(Poco::format("array<%s>", array_type));
+	if (!t) return nullptr;
+	CScriptArray* array = CScriptArray::Create(t, input.size());
+	for (int i = 0; i < input.size(); i++) ((T*)array->At(i))->operator=(input[i]);
+	return array;
+}
+
+void RegisterUnsorted(asIScriptEngine* engine);

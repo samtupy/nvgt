@@ -53,18 +53,6 @@ function setup_reactphysics {
 	cd ../..
 }
 
-function setup_enet {
-	echo Installing enet...
-	git clone --depth 1 https://github.com/lsalzman/enet||true
-	cd enet
-	autoreconf -vfi
-	./configure CC="clang -arch x86_64 -arch arm64" CXX="clang++ -arch x86_64 -arch arm64" CPP="clang -E" CXXCPP="clang++ -E"
-	make -j$(nsysctl -n hw.ncpu)
-	sudo make install
-	cd ..
-	echo Enet installed.
-}
-
 function setup_libgit2 {
 	curl -s -O -L https://github.com/libgit2/libgit2/archive/refs/tags/v1.8.1.tar.gz
 	tar -xzf v1.8.1.tar.gz
@@ -151,7 +139,6 @@ function main {
 	setup_openssl
 	setup_angelscript
 	setup_reactphysics
-	setup_enet
 	setup_libgit2
 	setup_poco
 	setup_sdl

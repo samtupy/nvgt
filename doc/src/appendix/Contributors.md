@@ -12,5 +12,5 @@ This file contains the names of anyone who has helped contribute to the NVGT eng
 * [Gruia Chiscop](https://github.com/GruiaChiscop): AVSpeech implementation.
 * [Hamza Ahmad](https://github.com/literary-programmer): Contributed virtual_dialogs.nvgt include, Improvements to form.nvgt.
 * [Abdullah Tepeli](https://github.com/colonel-official): Delete-by-word support for the audio_form include.
-* Beta testers including but not limited to Patrick Wilson, Quin G, Steven D, Lucas Brown, Liam Erven, DJWolfy, Lukáš Hosnedl, Heaven Games, Pragma and Day Garwood, without the valuable feedback and suggestions provided by these people NVGT would have never gotten this far.
+* Beta testers including but not limited to Patrick Wilson, Quin G, Steven D, Lucas Brown, Liam Erven, DJWolfy, Lukáš Hosnedl, Jonathan859, Remi, Pragma and Day Garwood, without the valuable feedback and suggestions provided by these people NVGT would have never gotten this far.
 * Last but not least, nothing is worth maintaining or developing without users, and so thank you to everyone who uses this engine and gives it their feedback, time and attention!
