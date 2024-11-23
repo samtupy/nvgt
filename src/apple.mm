@@ -29,6 +29,7 @@ public:
 	AVSpeechSynthesizer* synth;
 	AVSpeechSynthesisVoice* currentVoice;
 	AVSpeechUtterance* utterance;
+	AVAudioFile* file;
 	Impl() {
 		currentVoice = [AVSpeechSynthesisVoice voiceWithLanguage:@"en-US"]; //choosing english as a default language
 		utterance = [[AVSpeechUtterance alloc] initWithString:@""];
@@ -36,6 +37,7 @@ public:
 		volume = utterance.volume;
 		pitch = utterance.pitchMultiplier;
 		synth = [[AVSpeechSynthesizer alloc] init];
+		file = nil;
 	}
 	Impl(const std::string& language) {
 		NSString *nslanguage = [NSString stringWithUTF8String:language.c_str()];
@@ -68,6 +70,44 @@ public:
 			wait(5);
 		return result; //If it executes, it means that the result is true and the utterance could speak
 	}
+	bool speakToFile(const std::string& filename, const std::string& text) {
+		NSString *nstext = [NSString stringWithUTF8String:text.c_str()];
+		AVSpeechUtterance *utterance = [[AVSpeechUtterance alloc] initWithString:nstext];
+		utterance.rate = rate;
+		utterance.volume = volume;
+		utterance.pitchMultiplier = pitch;
+		utterance.voice = currentVoice;
+		this->utterance = utterance;
+		NSURL* nsFileNameURl = [NSURL fileURLWithPath:[NSString stringWithUTF8String:filename.c_str()]];
+		__block Boolean success = YES;
+		[synth writeUtterance:utterance toBufferCallback:^(AVAudioBuffer* _Nonnull buffer) {
+            AVAudioPCMBuffer* pcmBuffer = (AVAudioPCMBuffer*)buffer;
+            if(!pcmBuffer) {
+				success= NO;
+                return;;
+            }
+            if(pcmBuffer.frameLength != 0) {
+                if(file==nil) {
+					NSError *error = nil;
+                    file = [[AVAudioFile alloc] initForWriting:nsFileNameURl settings:pcmBuffer.format.settings error:&error];
+					if(error) {
+						success = NO;
+						return;;
+					}
+                }
+				NSError* writeError  = nil;
+                [file writeFromBuffer:pcmBuffer error:&writeError];
+				if(writeError) {
+					success = NO;
+					return;
+				}
+            }
+        }];
+		[file close];
+		file = nil;
+		return success;
+	}
+
 	bool stopSpeech() {
 		if (synth.isSpeaking) return [synth stopSpeakingAtBoundary:AVSpeechBoundaryImmediate];
 		return false;
@@ -140,6 +180,7 @@ public:
 	//this method returns the index of the voice, using its name. If more than a voice has the same name, like alex from eSpeak and Alex from Apple, the first voice index will be returned.
 	int getVoiceIndex(const std::string& name) {
 		NSArray<AVSpeechSynthesisVoice *> *voices = [AVSpeechSynthesisVoice speechVoices];
+NSString *nsname = [NSString stringWithUTF8String:name.c_str()];
 		AVSpeechSynthesisVoice *voice = getVoiceObject([NSString stringWithUTF8String:name.c_str()]);
 		if (voice) {
 			NSUInteger result = [voices indexOfObject:voice];
@@ -188,6 +229,7 @@ bool AVTTSVoice::speak(const std::string& text, bool interrupt) {
 bool AVTTSVoice::speakWait(const std::string& text, bool interrupt) {
 	return impl->speakWait(text, interrupt);
 }
+bool AVTTSVoice::speakToFile(const std::string& filename, const std::string& text) { return impl->speakToFile(filename, text); }
 
 bool AVTTSVoice::pauseSpeech() {
 	return impl->pauseSpeech();

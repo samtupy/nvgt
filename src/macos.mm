@@ -11,6 +11,7 @@
 */
 
 #import <AppKit/AppKit.h>
+#import <Carbon/Carbon.h>
 #include <string>
 #include <Poco/Event.h>
 #include <Poco/Mutex.h>
@@ -92,4 +93,28 @@ std::string apple_input_box(const std::string& title, const std::string& message
 	if (result == NSAlertFirstButtonReturn) return [[input stringValue] UTF8String];
 	else if (result == NSAlertSecondButtonReturn) return "\xff"; // nvgt value for cancel for the moment.
 	return "\xff"; // Either an error or we can't determine what was pressed. Should we throw an exception or something?
+}
+
+void nextMacInputSource() {
+	CFArrayRef inputSources = TISCreateInputSourceList(NULL, false);
+	TISInputSourceRef currentInput = TISCopyCurrentKeyboardInputSource();
+	NSInteger count = CFArrayGetCount(inputSources);
+	NSInteger currentIndex = -1;
+	for(int i=0; i<count; i++) {
+		TISInputSourceRef k = (TISInputSourceRef)CFArrayGetValueAtIndex(inputSources, i);
+		if(CFEqual(k, currentInput)) {
+			currentIndex = i;
+			break;	
+		}
+	}
+	if(currentIndex==-1) {
+	CFRelease(currentInput);
+	CFRelease(inputSources);
+	return;
+	}
+	NSInteger nextIndex = (currentIndex+1)%count;
+	TISInputSourceRef nextInput = (TISInputSourceRef)CFArrayGetValueAtIndex(inputSources, nextIndex);
+	TISSelectInputSource(nextInput);
+	CFRelease(currentInput);
+	CFRelease(inputSources);
 }
