@@ -1,9 +1,9 @@
 /**
 	Decrypts a string using the AES 256 bit CBC algorithm.
-	string string_aes_decrypt(string the_data, string the_key)
+	string string_aes_decrypt(const string&in the_data, const string&in the_key)
 	## Arguments:
-		* string the_data: The data to be decrypted.
-		* string the_key: The key to decrypt the data with.
+		* const string&in the_data: The data to be decrypted.
+		* const string&in the_key: The key to decrypt the data with.
 	## Returns:
 		string: decrypted text on success or an empty string on failure.
 	## Remarks:
