@@ -118,6 +118,9 @@ function setup_nvgt {
 function main {
 	sudo apt update -y
 	set -e
+	python3 -m venv venv --upgrade-deps
+	chmod +x venv/bin/activate
+	source ./venv/bin/activate
 	mkdir -p deps
 	cd deps
 	
