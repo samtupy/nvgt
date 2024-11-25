@@ -1970,6 +1970,27 @@ class audio_form {
 		}
 		return true;
 	}
+	bool set_input_read_only(int control_index, bool read_only) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return false;
+		}
+		if (c_form[control_index].type != ct_input) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_index].read_only = read_only;
+		return true;
+	}
 	bool set_slider(int control_index, double value, double min = -1, double max = -1) {
 		form_error = 0;
 		if (!active) {
@@ -2725,7 +2746,7 @@ class control {
 				if ((clipboard_flags & clipboard_flag_paste > 0) && (keyboard_modifiers & KEYMOD_CTRL > 0) && (key_repeating(KEY_V)) || key_pressed(KEY_PASTE))
 					paste_text();
 				if (key_repeating(KEY_BACK)) {
-					if (false == enable_delete) {
+					if (!enable_delete) {
 						speak(delete_disabled_message);
 						return;
 					}
@@ -2736,7 +2757,7 @@ class control {
 					delete_highlighted();
 				}
 				if (key_repeating(KEY_DELETE)) {
-					if (false == enable_delete) {
+					if (!enable_delete) {
 						speak(delete_disabled_message);
 						return;
 					}
