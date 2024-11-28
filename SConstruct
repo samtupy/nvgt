@@ -9,7 +9,7 @@ Help("""
 	Available custom build switches for NVGT:
 		copylibs=0 or 1 (default 1): Copy shared libraries to release/lib after building?
 		debug=0 or 1 (default 0): Include debug symbols in the resulting binaries?
-		no_upx=0 or 1 (defaulot 1): Disable UPX stubs?
+		no_upx=0 or 1 (default 1): Disable UPX stubs?
 		no_plugins=0 or 1 (default 0): Disable the plugin system entirely?
 		no_shared_plugins=0 or 1 (default 0): Only compile plugins statically?
 		no_stubs=0 or 1 (default 0): Disable compilation of all stubs?
