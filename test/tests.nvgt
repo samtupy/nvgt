@@ -87,8 +87,11 @@ void test(const string&in testcase) {
 	}
 	string[] errors;
 	if (verbose) outp("Testing %0... ".format(testcase));
+	// Give test cases the freedom to safely manipulate the current working directory.
+	string current_dir = cwdir();
 	timer test_clock(0, 1);
 	func({}, errors);
+	chdir(current_dir);
 	if (errors.length() < 1) {
 		if (verbose) outln("OK (" + (test_clock.elapsed / double(MILLISECONDS)) + "ms)");
 		tests_passed++;

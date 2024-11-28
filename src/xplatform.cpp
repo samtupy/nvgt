@@ -181,6 +181,7 @@ std::string get_directory_temp() {
 }
 #endif
 void RegisterXplatform(asIScriptEngine* engine) {
+	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction("string set_linux_thread_priority(int64 thread_id, int priority)", asFUNCTION(SDL_SetLinuxThreadPriority), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string set_linux_thread_priority_and_policy(int64 thread_id, int priority, int policy)", asFUNCTION(SDL_SetLinuxThreadPriorityAndPolicy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_ANDROID_SDK_VERSION() property", asFUNCTION(SDL_GetAndroidSDKVersion), asCALL_CDECL);
@@ -190,8 +191,13 @@ void RegisterXplatform(asIScriptEngine* engine) {
 	engine->RegisterFuncdef("void android_permission_request_callback(string permission, bool granted, string user_data)");
 	engine->RegisterGlobalFunction("bool android_request_permission(const string&in permission, android_permission_request_callback@ callback = null, const string&in callback_data = \"\")", asFUNCTION(request_android_permission), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool android_show_toast(const string&in message, int duration, int gravity = -1, int x_offset = 0, int y_offset = 0)", asFUNCTION(show_android_toast), asCALL_CDECL);
+	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
+	engine->RegisterGlobalFunction("int get_ANDROID_SDK_VERSION() property", asFUNCTION(SDL_GetAndroidSDKVersion), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool get_system_is_chromebook() property", asFUNCTION(SDL_IsChromebook), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool get_system_is_DeX_mode() property", asFUNCTION(SDL_IsDeXMode), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool get_system_is_tablet() property", asFUNCTION(SDL_IsTablet), asCALL_CDECL);
 	//engine->RegisterGlobalFunction("bool get_system_is_tv() property", asFUNCTION(SDL_IsTV), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_APPDATA() property"), asFUNCTION(get_directory_appdata), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_TEMP() property"), asFUNCTION(get_directory_temp), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool get_system_is_mobile() property", asFUNCTION(running_on_mobile), asCALL_CDECL);
 }

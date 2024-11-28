@@ -47,6 +47,7 @@
 #include "sound.h"
 #include <scriptarray.h>
 #include "timestuff.h" //ticks() sound preloading
+#include "xplatform.h" // running_on_mobile
 #include <system_error>
 #include <fast_float.h>
 #include <Poco/StringTokenizer.h>
@@ -2007,23 +2008,23 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_RELEASE, "void f()", asMETHOD(sound, Release), asCALL_THISCALL);
 	engine->RegisterObjectProperty("sound", "const string loaded_filename", asOFFSET(sound, loaded_filename));
 	engine->RegisterObjectMethod("sound", "bool close()", asMETHOD(sound, close), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool load(const string &in, pack@ = sound_default_pack, bool = true)", asMETHOD(sound, load), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load(const string &in filename, pack@ pack_file = sound_default_pack, bool allow_preloads = !system_is_mobile)", asMETHOD(sound, load), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool load(sound_close_callback@, sound_length_callback@, sound_read_callback@, sound_seek_callback@, const string &in, const string&in = \"\")", asMETHOD(sound, load_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool load(string&, uint, const string&in = \"\", bool = false)", asMETHOD(sound, load_memstream), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool load_url(const string &in)", asMETHOD(sound, load_url), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool stream(const string &in, pack@ = sound_default_pack)", asMETHOD(sound, stream), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool push_memory(const string &in, bool = false, int = 0, int = 0)", asMETHOD(sound, push_string), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool set_position(float, float, float, float, float, float, float, float, float)", asMETHOD(sound, set_position), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool set_mixer(mixer@ = null)", asMETHOD(sound, set_mixer), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "void set_hrtf(bool = true)", asMETHOD(sound, set_hrtf), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "void set_length(float = 0.0)", asMETHOD(sound, set_length), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool set_fx(const string &in, int = -1)", asMETHOD(sound, set_fx), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool play(bool = true)", asMETHOD(sound, play), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load(string& data, uint size, const string&in preload_filename = \"\", bool legacy_encrypt = false)", asMETHOD(sound, load_memstream), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load_url(const string &in url)", asMETHOD(sound, load_url), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool stream(const string &in filename, pack@ containing_pack = sound_default_pack)", asMETHOD(sound, stream), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool push_memory(const string &in data, bool end_stream = false, int pcm_rate = 0, int pcm_channels = 0)", asMETHOD(sound, push_string), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool set_position(float listener_x, float listener_y, float listener_z, float sound_x, float sound_y, float sound_z, float rotation = 0.0, float pan_step = 1.0, float volume_step = 1.0)", asMETHOD(sound, set_position), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool set_mixer(mixer@ mixer = null)", asMETHOD(sound, set_mixer), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_hrtf(bool enable = true)", asMETHOD(sound, set_hrtf), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_length(float length = 0.0)", asMETHOD(sound, set_length), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool set_fx(const string &in fx, int index = -1)", asMETHOD(sound, set_fx), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool play(bool reset_loop_state = true)", asMETHOD(sound, play), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool play_wait()", asMETHOD(sound, play_wait), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool play_looped()", asMETHOD(sound, play_looped), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool pause()", asMETHOD(sound, pause), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool stop()", asMETHOD(sound, stop), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool seek(float)", asMETHOD(sound, seek), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool seek(float position)", asMETHOD(sound, seek), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool get_active() const property", asMETHOD(sound, is_active), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool get_playing() const property", asMETHOD(sound, is_playing), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool get_paused() const property", asMETHOD(sound, is_paused), asCALL_THISCALL);

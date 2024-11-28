@@ -1,8 +1,8 @@
 /**
 	Formats a string with placeholders.
-	string string::format(const ?& in = null...);
+	string string::format(const ?&in = null...);
 	## Arguments:
-		* const ?& in = null: Any stringable value. You can pass up to 16 parameters.
+		* const ?&in = null: Any stringable value. You can pass up to 16 parameters.
 	## Returns:
 		Returns the formatted string.
 	## Remarks:

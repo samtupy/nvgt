@@ -1,8 +1,8 @@
 /**
 	Splits a string into an array at a given delimiter.
-	string[]@ string::split(string delimiter);
+	string[]@ string::split(const string&in delimiter);
 	## Arguments:
-		* string delimiter: the delimiter to split at.
+		* const string&in delimiter: the delimiter to split at.
 	## Returns:
 		string[]@: a handle to an array containing each part of the split string.
 */
