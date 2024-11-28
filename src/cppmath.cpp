@@ -26,14 +26,10 @@
 #include <memory>
 #include <limits>
 #include "cppmath.h"
-#ifdef __cpp_lib_int_pow2
-using std::bit_width;
-#else
 template< class T >
 constexpr int bit_width( T x ) noexcept {
 	return std::numeric_limits<T>::digits - std::countl_zero(x);
 }
-#endif
 
 struct floating_point_characteristics;
 
