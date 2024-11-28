@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <limits>
 #include "cppmath.h"
 #ifdef __APPLE__
 #include <tr1/cmath>
@@ -70,6 +71,14 @@ using std::riemann_zeta;
 using std::sph_bessel;
 using std::sph_neumann;
 using std::sph_legendre;
+#endif
+#ifdef __cpp_lib_int_pow2
+using std::bit_width;
+#else
+template< class T >
+constexpr int bit_width( T x ) noexcept {
+	return std::numeric_limits<T>::digits - std::countl_zero(x);
+}
 #endif
 
 struct floating_point_characteristics;
@@ -679,7 +688,7 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("bool is_power_of_2(const uint8 v)", asFUNCTIONPR(std::has_single_bit<uint8>, (uint8), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint8 bit_ceil(const uint8 x)", asFUNCTIONPR(std::bit_ceil<uint8>, (uint8), uint8), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint8 bit_floor(const uint8 x)", asFUNCTIONPR(std::bit_floor<uint8>, (uint8), uint8), asCALL_CDECL);
-	engine->RegisterGlobalFunction("int bit_width(const uint8 x)", asFUNCTIONPR(std::bit_width<uint8>, (uint8), int), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int bit_width(const uint8 x)", asFUNCTIONPR(bit_width<uint8>, (uint8), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint8 rotl(uint8 x, int s)", asFUNCTIONPR(std::rotl<uint8>, (uint8, int), uint8), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint8 rotr(uint8 x, int s)", asFUNCTIONPR(std::rotr<uint8>, (uint8, int), uint8), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_leading_zeroes(uint8 x)", asFUNCTIONPR(std::countl_zero<uint8>, (uint8), int), asCALL_CDECL);
@@ -690,7 +699,7 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("bool is_power_of_2(const uint16 v)", asFUNCTIONPR(std::has_single_bit<uint16>, (uint16), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint16 bit_ceil(const uint16 x)", asFUNCTIONPR(std::bit_ceil<uint16>, (uint16), uint16), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint16 bit_floor(const uint16 x)", asFUNCTIONPR(std::bit_floor<uint16>, (uint16), uint16), asCALL_CDECL);
-	engine->RegisterGlobalFunction("int bit_width(const uint16 x)", asFUNCTIONPR(std::bit_width<uint16>, (uint16), int), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int bit_width(const uint16 x)", asFUNCTIONPR(bit_width<uint16>, (uint16), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint16 rotl(uint16 x, int s)", asFUNCTIONPR(std::rotl<uint16>, (uint16, int), uint16), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint16 rotr(uint16 x, int s)", asFUNCTIONPR(std::rotr<uint16>, (uint16, int), uint16), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_leading_zeroes(uint16 x)", asFUNCTIONPR(std::countl_zero<uint16>, (uint16), int), asCALL_CDECL);
@@ -701,7 +710,7 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("bool is_power_of_2(const uint32 v)", asFUNCTIONPR(std::has_single_bit<uint32>, (uint32), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint32 bit_ceil(const uint32 x)", asFUNCTIONPR(std::bit_ceil<uint32>, (uint32), uint32), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint32 bit_floor(const uint32 x)", asFUNCTIONPR(std::bit_floor<uint32>, (uint32), uint32), asCALL_CDECL);
-	engine->RegisterGlobalFunction("int bit_width(const uint32 x)", asFUNCTIONPR(std::bit_width<uint32>, (uint32), int), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int bit_width(const uint32 x)", asFUNCTIONPR(bit_width<uint32>, (uint32), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint32 rotl(uint32 x, int s)", asFUNCTIONPR(std::rotl<uint32>, (uint32, int), uint32), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint32 rotr(uint32 x, int s)", asFUNCTIONPR(std::rotr<uint32>, (uint32, int), uint32), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_leading_zeroes(uint32 x)", asFUNCTIONPR(std::countl_zero<uint32>, (uint32), int), asCALL_CDECL);
@@ -712,7 +721,7 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("bool is_power_of_2(const uint64 v)", asFUNCTIONPR(std::has_single_bit<uint64>, (uint64), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 bit_ceil(const uint64 x)", asFUNCTIONPR(std::bit_ceil<uint64>, (uint64), uint64), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 bit_floor(const uint64 x)", asFUNCTIONPR(std::bit_floor<uint64>, (uint64), uint64), asCALL_CDECL);
-	engine->RegisterGlobalFunction("int bit_width(const uint64 x)", asFUNCTIONPR(std::bit_width<uint64>, (uint64), int), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int bit_width(const uint64 x)", asFUNCTIONPR(bit_width<uint64>, (uint64), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 rotl(uint64 x, int s)", asFUNCTIONPR(std::rotl<uint64>, (uint64, int), uint64), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 rotr(uint64 x, int s)", asFUNCTIONPR(std::rotr<uint64>, (uint64, int), uint64), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_leading_zeroes(uint64 x)", asFUNCTIONPR(std::countl_zero<uint64>, (uint64), int), asCALL_CDECL);
