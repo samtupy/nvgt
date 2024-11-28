@@ -7,7 +7,7 @@ Internally, this script is used within our GitHub Actions to make builds of NVGT
 
 ### Notes
 * This script will currently only run on systems where `apt` and `pip` are installed, and does not support any other package managers.
-* Where required, the below examples create and activate a [virtual environment](https://docs.python.org/3/library/venv.html) before running the script. Furthermore, they additionally check for dependency updates.
+* This script will create and activate a [virtual environment](https://docs.python.org/3/library/venv.html).
 
 This script can be ran in two modes:
 * Adding `ci` as an argument causes the dependencies to be downloaded in the current working directory inside a `deps` folder (useful if you already are working from within NVGT's source directory).
@@ -16,8 +16,6 @@ This script can be ran in two modes:
 ### Example of Running the script with the `ci` argument
 It is assumed you are in a freshly-cloned NVGT, so that your working directory ends with `nvgt`.
 ```
-python3 -m venv venv --upgrade-deps
-source venv/bin/activate
 chmod +x build/build_linux.sh
 ./build/build_linux.sh ci
 ```
@@ -27,8 +25,6 @@ It will then attempt to download all required packages and build NVGT. This will
 ### Example of Running the script without the `ci` argument
 Insure you are in a working directory where you are okay with the script making a few folders; in particular `deps` and `nvgt`. This is where all of the downloading, building, etc. will occur. The below example assumes that build_linux.sh is in the same directory, but it does not assume NVGT is already downloaded.
 ```
-python3 -m venv venv --upgrade-deps
-source venv/bin/activate
 chmod +x build_linux.sh
 ./build_linux.sh
 ```
