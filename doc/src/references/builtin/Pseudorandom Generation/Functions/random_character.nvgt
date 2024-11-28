@@ -1,9 +1,9 @@
 /**
 	Generates a random ascii character.
-	string random_character(string min_ascii, string max_ascii);
+	string random_character(const string&in min_ascii, const string&in max_ascii);
 	## Arguments:
-		* string min_ascii: the minimum possible ascii character to be generated.
-		* string max_ascii: the maximum possible ascii character.
+		* const string&in min_ascii: the minimum possible ascii character to be generated.
+		* const string&in max_ascii: the maximum possible ascii character.
 	## Returns:
 		string: a random ascii character in the given range.
 	## Remarks:

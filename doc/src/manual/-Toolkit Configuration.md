@@ -125,8 +125,10 @@ This section contains options that are directly related to the compiling/bundlin
 * output_basename = string default set from input filename: the output file or directory name of the final compiled package without an extension
 * precommand = string: a custom system command that will be executed before the build begins if no platform specific command is set
 * `precommand_<platform>` = string: allows the execution of custom prebuild commands on a per-platform basis
+* `precommand_<platform>_<debug or release>` = string: allows the execution of custom prebuild commands on a per-platform basis  with the condition of only exicuting on debug or release builds
 * postcommand = string: a custom system command that will be executed after the build completes but before the success message
 * `postcommand_<platform>` = string: allows the execution of custom postbuild commands on a per-platform basis
+* `postcommand_<platform>_<debug or release>` = string: allows the execution of custom postbuild commands on a per-platform basis with the condition of only exicuting on debug or release builds
 * product_identifier=string default com.NVGTUser.InputBasenameSlug: the reverse domain bundle identifier for your application (highly recommended to customize for mobile platforms, see compiling for distribution tutorial)
 * product_identifier_domain = string defaults to com.NVGTUser: everything accept the final chunk of a reverse domain identifier (used only if build.product_identifier is default)
 * product_name=string defaults to input file basename: human friendly display name of your application
