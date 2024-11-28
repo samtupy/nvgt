@@ -11,6 +11,11 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#ifdef __STDCPP_MATH_SPEC_FUNCS__
+#if __STDCPP_MATH_SPEC_FUNCS__ >= 201003L
+#define __STDCPP_WANT_MATH_SPEC_FUNCS__ 1
+#endif
+#endif
 #include <assert.h>
 #include <math.h>
 #include <float.h>
