@@ -12,31 +12,24 @@
 
 //Possible token modes.
 enum token_gen_flag {
-	token_gen_flag_all = 0,
-	token_gen_flag_characters,
-	token_gen_flag_numbers,
-	token_gen_flag_symbols,
-	token_gen_flag_numbers_symbols,
-	token_gen_flag_characters_symbols
+	TOKEN_CHARACTERS = 1 << 0,
+	TOKEN_NUMBERS = 1 << 1,
+	TOKEN_SYMBOLS = 1 << 2
 }
 
-string generate_token(int token_length, int mode = token_gen_flag_all) {
-	string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-	string numbers = "1234567890";
-	string symbols = "`~!@#$%^&*()_+=-[]{}/.,;:|?><";
-	string token_sims = chars + numbers + symbols;
-	if (mode == token_gen_flag_characters) token_sims = chars;
-	else if (mode == token_gen_flag_numbers) token_sims = numbers;
-	else if (mode == token_gen_flag_symbols) token_sims = symbols;
-	else if (mode == token_gen_flag_numbers_symbols) token_sims = numbers + symbols;
-	else if (mode == token_gen_flag_characters_symbols) token_sims = chars + symbols;
-	return generate_custom_token(token_length, token_sims);
+string generate_token(int token_length, int mode = TOKEN_CHARACTERS | TOKEN_NUMBERS) {
+	string chars;
+	if (mode & TOKEN_CHARACTERS != 0) chars += "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	if (mode & TOKEN_NUMBERS != 0) chars += "1234567890";
+	if (mode & TOKEN_SYMBOLS != 0) chars += "`~!@#$%^&*()_+=-[]{}/.,;:|?><";
+	return generate_custom_token(token_length, chars);
 }
 
-string generate_custom_token(int token_length, string characters) {
+string generate_custom_token(int token_length, const string&in characters) {
 	if (characters.empty() || token_length <= 0) return "";
 	string final_token;
+	final_token.resize(token_length);
 	for (uint i = 0; i < token_length; i++)
-		final_token += characters[random(0, characters.length() - 1)];
+		final_token[i] = characters[random(0, characters.length() - 1)];
 	return final_token;
 }
