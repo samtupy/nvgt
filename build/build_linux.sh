@@ -1,4 +1,4 @@
-F#!/bin/bash
+#!/bin/bash
 
 function setup_angelscript {
 	echo Installing Angelscript...
