@@ -1,9 +1,9 @@
 # token_gen_flag
-This enum holds various constants that can be passed to the mode parameter in order to change how tokens are generated in the `generate_token` function.
+This enum holds various constants that can be passed to the mode parameter of the generate_token function in order to control what characters appear in results.
 
-* token_gen_flag_all: Uses all characters, numbers and symbols, see below.
-* token_gen_flag_characters: Uses only characters, a-zA-Z
-* token_gen_flag_numbers: Uses only numbers, 0-9
-* token_gen_flag_symbols: Uses only symbols, \`\~\!\@\#\$\%\^\&\*\(\)\_\+\=\-\[\]\{\}\/\.\,\;\:\|\?\>\<
-* token_gen_flag_numbers_symbols: Uses numbers and symbols.
-* token_gen_flag_characters_symbols: Uses characters and symbols.
+* TOKEN_CHARACTERS = 1: Allows for characters, a-zA-Z
+* TOKEN_NUMBERS = 2: Allows for numbers, 0-9
+* TOKEN_SYMBOLS = 4: Uses only symbols, \`\~\!\@\#\$\%\^\&\*\(\)\_\+\=\-\[\]\{\}\/\.\,\;\:\|\?\>\<
+
+## Remarks:
+These are flags that should be combined together using the bitwise OR operator. To generate a token containing characters and symbols, for example, you would pass `TOKEN_CHARACTERS | TOKEN_NUMBERS | TOKEN_SYMBOLS` to the mode argument of generate_token. The default flags are TOKEN_CHARACTERS | TOKEN_NUMBERS.

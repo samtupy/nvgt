@@ -20,6 +20,7 @@
 */
 
 #include"ini.nvgt"
+
 class settings_helper {
 	string company_name, product;
 	private bool can_encrypt_data = false;
@@ -88,6 +89,8 @@ class settings_helper {
 		return false;
 	}
 }
+funcdef settings_helper@ settings_helper_factory(settings@ parent);
+
 class ini_settings_helper: settings_helper {
 	ini@config;
 	ini_settings_helper(settings@parent) {
@@ -155,6 +158,8 @@ class ini_settings_helper: settings_helper {
 		return true;
 	}
 }
+settings_helper@ ini_settings_factory(settings@ parent) { return ini_settings_helper(parent); }
+
 class json_settings_helper: settings_helper {
 	json_object@config;
 	json_settings_helper(settings@parent) {
@@ -220,6 +225,8 @@ class json_settings_helper: settings_helper {
 		return true;
 	}
 }
+settings_helper@ json_settings_factory(settings@ parent) { return json_settings_helper(parent); }
+
 class nvgt_settings_helper: settings_helper {
 	dictionary@config;
 	nvgt_settings_helper(settings@parent) {
@@ -293,6 +300,10 @@ class nvgt_settings_helper: settings_helper {
 		return true;
 	}
 }
+settings_helper@ nvgt_settings_factory(settings@ parent) { return nvgt_settings_helper(parent); }
+
+dictionary available_settings_formats = {{"ini", @ini_settings_factory}, {"json", @json_settings_factory}, {"nvgt", @nvgt_settings_factory}};
+
 class settings {
 	string company_name, product;
 	bool local_path = false;
@@ -361,18 +372,13 @@ class settings {
 		this.company_name = company;
 		this.product = product;
 		this.local_path = local_path;
-		settings_helper@temp = find_settings_helper(format, this);
+		settings_helper_factory@ factory = cast<settings_helper_factory@>(available_settings_formats[format]);
+		settings_helper@ temp = @factory != null? factory(this) : null;
 		if (@temp == null) return false;
 		bool success = temp.setup(company, product, local_path);
 		if (success) @this.data_helper = temp;
 		return success;
 	}
-}
-settings_helper@find_settings_helper(string&in format, settings@parent) {
-	if (format == "json") return json_settings_helper(parent);
-	else if (format == "ini") return ini_settings_helper(parent);
-	else if (format == "nvgt") return nvgt_settings_helper(parent);
-	return null;
 }
 bool ensure_data_path(string&in filename) {
 	//make sure that all directories within the given path exist.

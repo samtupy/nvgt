@@ -64,6 +64,9 @@ std::string random_get_state() {
 int random(int min, int max) {
 	return rnd_pcg_range(&rng, min, max);
 }
+float random_float() {
+	return rnd_pcg_nextf(&rng);
+}
 bool random_bool(int percent) {
 	if (percent < 1) return false;
 	if (percent >= 100) return true;
@@ -109,6 +112,7 @@ void RegisterScriptRandom(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("uint random_seed()"), asFUNCTION(random_seed), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64 random_seed64()"), asFUNCTION(random_seed64), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int random(int, int)"), WRAP_FN_PR(random, (int, int), int), asCALL_GENERIC);
+	engine->RegisterGlobalFunction(_O("float random_float()"), asFUNCTION(random_float), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool random_bool(int = 50)"), asFUNCTION(random_bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string random_character(const string& in, const string& in)"), asFUNCTION(random_character), asCALL_CDECL);
 	engine->RegisterObjectMethod(_O("array<T>"), _O("const T& random() const"), asFUNCTION(random_choice), asCALL_CDECL_OBJFIRST);
