@@ -26,52 +26,6 @@
 #include <memory>
 #include <limits>
 #include "cppmath.h"
-#ifdef __APPLE__
-#include <tr1/cmath>
-using std::tr1::assoc_laguerre;
-using std::tr1::assoc_legendre;
-using std::tr1::beta;
-using std::tr1::comp_ellint_1;
-using std::tr1::comp_ellint_2;
-using std::tr1::comp_ellint_3;
-using std::tr1::cyl_bessel_i;
-using std::tr1::cyl_bessel_j;
-using std::tr1::cyl_bessel_k;
-using std::tr1::cyl_neumann;
-using std::tr1::ellint_1;
-using std::tr1::ellint_2;
-using std::tr1::ellint_3;
-using std::tr1::expint;
-using std::tr1::hermite;
-using std::tr1::legendre;
-using std::tr1::laguerre;
-using std::tr1::riemann_zeta;
-using std::tr1::sph_bessel;
-using std::tr1::sph_neumann;
-using std::tr1::sph_legendre;
-#else
-using std::assoc_laguerre;
-using std::assoc_legendre;
-using std::beta;
-using std::comp_ellint_1;
-using std::comp_ellint_2;
-using std::comp_ellint_3;
-using std::cyl_bessel_i;
-using std::cyl_bessel_j;
-using std::cyl_bessel_k;
-using std::cyl_neumann;
-using std::ellint_1;
-using std::ellint_2;
-using std::ellint_3;
-using std::expint;
-using std::hermite;
-using std::legendre;
-using std::laguerre;
-using std::riemann_zeta;
-using std::sph_bessel;
-using std::sph_neumann;
-using std::sph_legendre;
-#endif
 #ifdef __cpp_lib_int_pow2
 using std::bit_width;
 #else
@@ -578,27 +532,6 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("bool is_less_equal(float x, float y)", asFUNCTIONPR(std::islessequal, (float, float), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_less_greater(float x, float y)", asFUNCTIONPR(std::islessgreater, (float, float), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_unordered(float x, float y)", asFUNCTIONPR(std::isunordered, (float, float), bool), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float assoc_laguerre(uint n, uint m, float x)", asFUNCTIONPR(assoc_laguerre, (unsigned int, unsigned int, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float assoc_legendre(uint n, uint m, float x)", asFUNCTIONPR(assoc_legendre, (unsigned int, unsigned int, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float calculate_beta(float x, float y)", asFUNCTIONPR(beta, (float, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float comp_ellint_1(float k)", asFUNCTIONPR(comp_ellint_1, (float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float comp_ellint_2(float k)", asFUNCTIONPR(comp_ellint_2, (float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float comp_ellint_3(float k, float nu)", asFUNCTIONPR(comp_ellint_3, (float, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float cyl_bessel_i(float nu, float x)", asFUNCTIONPR(cyl_bessel_i, (float, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float cyl_bessel_j(float nu, float x)", asFUNCTIONPR(cyl_bessel_j, (float, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float cyl_bessel_k(float nu, float x)", asFUNCTIONPR(cyl_bessel_k, (float, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float cyl_neumann(float nu, float x)", asFUNCTIONPR(cyl_neumann, (float, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float ellint_1(float k, float phi)", asFUNCTIONPR(ellint_1, (float, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float ellint_2(float k, float phi)", asFUNCTIONPR(ellint_2, (float, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float ellint_3(float k, float nu, float phi)", asFUNCTIONPR(ellint_3, (float, float, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float expint(float num)", asFUNCTIONPR(expint, (float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float hermite(uint n, float x)", asFUNCTIONPR(hermite, (unsigned int, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float legendre(uint n, float x)", asFUNCTIONPR(legendre, (unsigned int, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float laguerre(uint n, float x)", asFUNCTIONPR(laguerre, (unsigned int, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float riemann_zeta(float num)", asFUNCTIONPR(riemann_zeta, (float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float sph_bessel(uint n, float x)", asFUNCTIONPR(sph_bessel, (unsigned int, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float sph_legendre(uint l, uint m, float theta)", asFUNCTIONPR(sph_legendre, (unsigned int, unsigned int, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float sph_neumann(uint n, float x)", asFUNCTIONPR(sph_neumann, (unsigned int, float), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double abs(double v)", asFUNCTIONPR(std::abs, (double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double fmod(double a, double b)", asFUNCTIONPR(std::fmod, (double, double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double remainder(double a, double b)", asFUNCTIONPR(std::remainder, (double, double), double), asCALL_CDECL);
@@ -664,27 +597,6 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("bool is_less_equal(double x, double y)", asFUNCTIONPR(std::islessequal, (double, double), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_less_greater(double x, double y)", asFUNCTIONPR(std::islessgreater, (double, double), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_unordered(double x, double y)", asFUNCTIONPR(std::isunordered, (double, double), bool), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double assoc_laguerre(uint n, uint m, double x)", asFUNCTIONPR(assoc_laguerre, (unsigned int, unsigned int, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double assoc_legendre(uint n, uint m, double x)", asFUNCTIONPR(assoc_legendre, (unsigned int, unsigned int, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double calculate_beta(double x, double y)", asFUNCTIONPR(beta, (double, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double comp_ellint_1(double k)", asFUNCTIONPR(comp_ellint_1, (double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double comp_ellint_2(double k)", asFUNCTIONPR(comp_ellint_2, (double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double comp_ellint_3(double k, double nu)", asFUNCTIONPR(comp_ellint_3, (double, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double cyl_bessel_i(double nu, double x)", asFUNCTIONPR(cyl_bessel_i, (double, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double cyl_bessel_j(double nu, double x)", asFUNCTIONPR(cyl_bessel_j, (double, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double cyl_bessel_k(double nu, double x)", asFUNCTIONPR(cyl_bessel_k, (double, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double cyl_neumann(double nu, double x)", asFUNCTIONPR(cyl_neumann, (double, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double ellint_1(double k, double phi)", asFUNCTIONPR(ellint_1, (double, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double ellint_2(double k, double phi)", asFUNCTIONPR(ellint_2, (double, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double ellint_3(double k, double nu, double phi)", asFUNCTIONPR(ellint_3, (double, double, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double expint(double num)", asFUNCTIONPR(expint, (double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double hermite(uint n, double x)", asFUNCTIONPR(hermite, (unsigned int, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double legendre(uint n, double x)", asFUNCTIONPR(legendre, (unsigned int, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double laguerre(uint n, double x)", asFUNCTIONPR(laguerre, (unsigned int, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double riemann_zeta(double num)", asFUNCTIONPR(riemann_zeta, (double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double sph_bessel(uint n, double x)", asFUNCTIONPR(sph_bessel, (unsigned int, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double sph_legendre(uint l, uint m, double theta)", asFUNCTIONPR(sph_legendre, (unsigned int, unsigned int, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double sph_neumann(uint n, double x)", asFUNCTIONPR(sph_neumann, (unsigned int, double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_power_of_2(const uint8 v)", asFUNCTIONPR(std::has_single_bit<uint8>, (uint8), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint8 bit_ceil(const uint8 x)", asFUNCTIONPR(std::bit_ceil<uint8>, (uint8), uint8), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint8 bit_floor(const uint8 x)", asFUNCTIONPR(std::bit_floor<uint8>, (uint8), uint8), asCALL_CDECL);
