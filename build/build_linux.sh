@@ -108,7 +108,6 @@ function setup_nvgt {
 	cd ..
 	rm lindev.tar.gz
 	if ! which scons &> /dev/null; then
-		export PIP_BREAK_SYSTEM_PACKAGES=1
 		pip3 install scons
 	fi
 	scons -s no_upx=0
@@ -135,6 +134,7 @@ function main {
 	setup_sdl
 	setup_nvgt
 	echo Success!
+	deactivate
 	exit 0
 }
 
