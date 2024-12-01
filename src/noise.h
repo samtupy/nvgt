@@ -1,4 +1,7 @@
 #pragma once
+#ifdef IN // For some reason this is needed, need to figure out what's defining this macro
+#undef IN
+#endif
 #include <algorithm>
 #include <array>
 #include <concepts>
