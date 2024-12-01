@@ -585,9 +585,11 @@ void HandshakeState::initialize(const HandshakeStateConfiguration &config) {
   } else {
     repk.fill(0);
   }
-  if (config.psks.empty()) {
+  if (!config.psks.empty()) {
     psk_mode = true;
     std::ranges::copy(config.psks, psks.begin());
+  } else {
+    psk_mode = false;
   }
   using enum PatternToken;
   using enum HandshakePattern;

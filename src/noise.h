@@ -1,5 +1,4 @@
 #pragma once
-#undef IN
 #include <algorithm>
 #include <array>
 #include <concepts>
@@ -155,7 +154,7 @@ private:
   std::array<std::uint8_t, 32> esk;
   std::array<std::uint8_t, 32> rspk;
   std::array<std::uint8_t, 32> repk;
-  bool initiator = false, my_turn = false, completed = false, psk_mode = false;
+  bool initiator, my_turn, completed, psk_mode;
   std::deque<std::vector<PatternToken>> message_patterns;
   std::vector<PatternToken> initiator_pre_message_pattern,
       responder_pre_message_pattern;
