@@ -30,7 +30,8 @@
 #endif
 
 namespace noise {
-inline std::string handshake_pattern_to_string(const HandshakePattern &p) {
+[[nodiscard]] inline std::string
+handshake_pattern_to_string(const HandshakePattern &p) {
   using enum HandshakePattern;
   switch (p) {
   case IK:
@@ -109,6 +110,48 @@ inline std::string handshake_pattern_to_string(const HandshakePattern &p) {
     return "IX1";
   case I1X1:
     return "I1X1";
+  case Npsk0:
+    return "Npsk0";
+  case Kpsk0:
+    return "Kpsk0";
+  case Xpsk1:
+    return "Xpsk1";
+  case NNpsk0:
+    return "NNpsk0";
+  case NNpsk2:
+    return "NNpsk2";
+  case NKpsk0:
+    return "NKpsk0";
+  case NKpsk2:
+    return "NKpsk2";
+  case NXpsk2:
+    return "NXpsk2";
+  case XNpsk3:
+    return "XNpsk3";
+  case XKpsk3:
+    return "XKpsk3";
+  case XXpsk3:
+    return "XXpsk3";
+  case KNpsk0:
+    return "KNpsk0";
+  case KNpsk2:
+    return "KNpsk2";
+  case KKpsk0:
+    return "KKpsk0";
+  case KKpsk2:
+    return "KKpsk2";
+  case KXpsk2:
+    return "KXpsk2";
+  case INpsk1:
+    return "INpsk1";
+  case INpsk2:
+    return "INpsk2";
+  case IKpsk1:
+    return "IKpsk1";
+  case IKpsk2:
+    return "IKpsk2";
+  case IXpsk2:
+    return "IXpsk2";
   default:
 #ifdef __cpp_lib_unreachable
     std::unreachable();
@@ -118,16 +161,16 @@ inline std::string handshake_pattern_to_string(const HandshakePattern &p) {
   }
 }
 
-std::tuple<std::array<std::uint8_t, 32>, std::array<std::uint8_t, 32>>
-generate_keypair() {
-  std::array<std::uint8_t, 32> privkey, pubkey;
-  while (rng_get_bytes(privkey.data(), 32) != 32)
+KeyPair generate_keypair() {
+  KeyPair kp;
+  while (rng_get_bytes(kp.sk.data(), 32) != 32)
     ;
-  crypto_x25519_public_key(pubkey.data(), privkey.data());
-  return {privkey, pubkey};
+  crypto_x25519_public_key(kp.pk.data(), kp.sk.data());
+  return kp;
 }
 
-template <STLContainer T> T dh(const T &privkey, const T &pubkey) {
+template <STLContainer T>
+[[nodiscard]] T dh(const T &privkey, const T &pubkey) {
   T secret;
   crypto_x25519(secret.data(), privkey.data(), pubkey.data());
   return secret;
@@ -241,7 +284,8 @@ void decrypt(std::array<std::uint8_t, 32> &k, std::uint64_t n,
   in_out.resize(text_size);
 }
 
-template <STLContainer T1, STLContainer... T2> T1 hash(const T2 &...input) {
+template <STLContainer T1, STLContainer... T2>
+[[nodiscard]] T1 hash(const T2 &...input) {
   T1 hash;
   crypto_blake2b_ctx ctx;
   crypto_blake2b_init(&ctx, hash.size());
@@ -250,8 +294,9 @@ template <STLContainer T1, STLContainer... T2> T1 hash(const T2 &...input) {
   return hash;
 }
 
-std::array<std::uint8_t, 64> hmac_hash(std::array<std::uint8_t, 64> &key,
-                                       const std::vector<std::uint8_t> &input) {
+[[nodiscard]] std::array<std::uint8_t, 64>
+hmac_hash(std::array<std::uint8_t, 64> &key,
+          const std::vector<std::uint8_t> &input) {
   std::array<std::uint8_t, 64> hmac;
   std::array<std::uint8_t, 128> temp_key;
   for (auto i = 0; i < 64; ++i) {
@@ -277,7 +322,7 @@ std::array<std::uint8_t, 64> hmac_hash(std::array<std::uint8_t, 64> &key,
   return hmac;
 }
 
-std::array<std::uint8_t, 64>
+[[nodiscard]] std::array<std::uint8_t, 64>
 hmac_hash(std::array<std::uint8_t, 64> &key,
           const std::array<std::uint8_t, 32> &input) {
   std::array<std::uint8_t, 64> hmac;
@@ -380,6 +425,16 @@ void CipherState::decrypt_with_ad(std::vector<std::uint8_t> &ciphertext) {
   decrypt_with_ad(null_ad, ciphertext);
 }
 
+void CipherState::rekey() {
+  std::vector<std::uint8_t> payload;
+  payload.resize(32);
+  std::ranges::fill(payload, 0);
+  encrypt(k, std::numeric_limits<std::uint64_t>::max() - 1, std::nullopt,
+          payload);
+  std::ranges::copy_n(payload.begin(), 32, k.begin());
+  crypto_wipe(payload.data(), payload.size());
+}
+
 SymmetricState::~SymmetricState() {
   crypto_wipe(ck.data(), ck.size());
   crypto_wipe(h.data(), h.size());
@@ -416,6 +471,26 @@ template <STLContainer T> void SymmetricState::mix_key(T &input_key_material) {
 
 template <STLContainer T> void SymmetricState::mix_hash(const T &data) {
   h = hash<std::array<std::uint8_t, 64>>(h, data);
+}
+
+template <STLContainer T>
+void SymmetricState::mix_key_and_hash(T &input_key_material) {
+  std::array<std::uint8_t, 64> temp_ck, temp_h, temp_k;
+  std::array<std::uint8_t, 32> truncated_temp_k;
+  temp_ck.fill(0);
+  temp_h.fill(0);
+  temp_k.fill(0);
+  truncated_temp_k.fill(0);
+  hkdf(ck, input_key_material, temp_ck, temp_h, temp_k);
+  std::ranges::move(temp_ck, ck.begin());
+  mix_hash(temp_h);
+  std::ranges::copy_n(temp_k.begin(), 32, truncated_temp_k.begin());
+  cs.initialize_key(truncated_temp_k);
+  crypto_wipe(temp_ck.data(), temp_ck.size());
+  crypto_wipe(temp_k.data(), temp_k.size());
+  crypto_wipe(temp_h.data(), temp_h.size());
+  crypto_wipe(truncated_temp_k.data(), truncated_temp_k.size());
+  crypto_wipe(input_key_material.data(), input_key_material.size());
 }
 
 std::array<std::uint8_t, 64> SymmetricState::get_handshake_hash() const {
@@ -469,20 +544,10 @@ HandshakeState::~HandshakeState() {
   crypto_wipe(esk.data(), esk.size());
 }
 
-void HandshakeState::initialize(
-    const HandshakePattern &handshake_pattern, const bool &i,
-    const std::vector<std::uint8_t> prologue,
-    std::optional<
-        std::tuple<std::array<std::uint8_t, 32>, std::array<std::uint8_t, 32>>>
-        s,
-    std::optional<
-        std::tuple<std::array<std::uint8_t, 32>, std::array<std::uint8_t, 32>>>
-        e,
-    std::optional<std::array<std::uint8_t, 32>> rs,
-    std::optional<std::array<std::uint8_t, 32>> re) {
+void HandshakeState::initialize(const HandshakeStateConfiguration &config) {
   const auto protocol_name_str =
       std::format("Noise_{}_25519_ChaChaPoly_BLAKE2b",
-                  handshake_pattern_to_string(handshake_pattern));
+                  handshake_pattern_to_string(config.pattern));
   if (protocol_name_str.size() > 255) {
     throw std::length_error("Protocol name too long");
   }
@@ -492,37 +557,41 @@ void HandshakeState::initialize(
       protocol_name_str.begin(), protocol_name_str.end(), protocol_name.begin(),
       [](const auto &chr) { return static_cast<std::uint8_t>(chr); });
   ss.initialize_symmetric(protocol_name);
-  ss.mix_hash(prologue);
-  initiator = i;
-  if (s) {
-    const auto &[sk, pk] = *s;
-    ssk = sk;
-    spk = pk;
+  ss.mix_hash(config.prologue);
+  initiator = config.initiator;
+  if (config.s) {
+    const auto &kp = *config.s;
+    ssk = kp.sk;
+    spk = kp.pk;
   } else {
     ssk.fill(0);
     spk.fill(0);
   }
-  if (e) {
-    const auto &[sk, pk] = *e;
-    esk = sk;
-    epk = pk;
+  if (config.e) {
+    const auto &kp = *config.s;
+    esk = kp.sk;
+    epk = kp.pk;
   } else {
     esk.fill(0);
     epk.fill(0);
   }
-  if (rs) {
-    rspk = *rs;
+  if (config.rs) {
+    rspk = *config.rs;
   } else {
     rspk.fill(0);
   }
-  if (re) {
-    repk = *re;
+  if (config.re) {
+    repk = *config.re;
   } else {
     repk.fill(0);
   }
+  if (config.psks.empty()) {
+    psk_mode = true;
+    std::ranges::copy(config.psks, psks.begin());
+  }
   using enum PatternToken;
   using enum HandshakePattern;
-  switch (handshake_pattern) {
+  switch (config.pattern) {
   case IK: {
     message_patterns = {{E, Es, S, Ss}, {E, Ee, Se}};
     responder_pre_message_pattern = {S};
@@ -665,6 +734,85 @@ void HandshakeState::initialize(
   case I1X1:
     message_patterns = {{E, S}, {E, Ee, S}, {Se, Es}};
     break;
+  case Npsk0: {
+    responder_pre_message_pattern = {S};
+    message_patterns = {{Psk, E, Es}};
+  } break;
+  case Kpsk0: {
+    initiator_pre_message_pattern = {S};
+    responder_pre_message_pattern = {S};
+    message_patterns = {{Psk, E, Es, Ss}};
+  } break;
+  case Xpsk1: {
+    responder_pre_message_pattern = {S};
+    message_patterns = {{E, Es, S, Ss, Psk}};
+  } break;
+  case NNpsk0: {
+    message_patterns = {{Psk, E}, {E, Ee}};
+  } break;
+  case NNpsk2: {
+    message_patterns = {{E}, {E, Ee, Psk}};
+  } break;
+  case NKpsk0: {
+    responder_pre_message_pattern = {S};
+    message_patterns = {{Psk, E, Es}, {E, Ee}};
+  } break;
+  case NKpsk2: {
+    responder_pre_message_pattern = {S};
+    message_patterns = {{E, Es}, {E, Ee, Psk}};
+  } break;
+  case NXpsk2: {
+    message_patterns = {{E}, {E, Ee, S, Es, Psk}};
+  } break;
+  case XNpsk3: {
+    message_patterns = {{E}, {E, Ee}, {S, Se, Psk}};
+  } break;
+  case XKpsk3: {
+    responder_pre_message_pattern = {S};
+    message_patterns = {{E, Es}, {E, Ee}, {S, Se, Psk}};
+  } break;
+  case XXpsk3: {
+    message_patterns = {{E}, {E, Ee, S, Es}, {S, Se, Psk}};
+  } break;
+  case KNpsk0: {
+    initiator_pre_message_pattern = {S};
+    message_patterns = {{Psk, E}, {E, Ee, Se}};
+  } break;
+  case KNpsk2: {
+    initiator_pre_message_pattern = {S};
+    message_patterns = {{E}, {E, Ee, Se, Psk}};
+  } break;
+  case KKpsk0: {
+    initiator_pre_message_pattern = {S};
+    responder_pre_message_pattern = {S};
+    message_patterns = {{Psk, E, Es, Ss}, {E, Ee, Se}};
+  } break;
+  case KKpsk2: {
+    initiator_pre_message_pattern = {S};
+    responder_pre_message_pattern = {S};
+    message_patterns = {{E, Es, Ss}, {E, Ee, Se, Psk}};
+  } break;
+  case KXpsk2: {
+    initiator_pre_message_pattern = {S};
+    message_patterns = {{E}, {E, Ee, Se, S, Es, Psk}};
+  } break;
+  case INpsk1: {
+    message_patterns = {{E, S, Psk}, {E, Ee, Se}};
+  } break;
+  case INpsk2: {
+    message_patterns = {{E, S}, {E, Ee, Se, Psk}};
+  } break;
+  case IKpsk1: {
+    responder_pre_message_pattern = {S};
+    message_patterns = {{E, Es, S, Ss, Psk}, {E, Ee, Se}};
+  } break;
+  case IKpsk2: {
+    responder_pre_message_pattern = {S};
+    message_patterns = {{E, Es, S, Ss}, {E, Ee, Se, Psk}};
+  } break;
+  case IXpsk2: {
+    message_patterns = {{E, S}, {E, Ee, Se, S, Es, Psk}};
+  } break;
   default:
     throw std::out_of_range("Selected pattern is NOT implemented!");
   }
@@ -672,10 +820,10 @@ void HandshakeState::initialize(
       !responder_pre_message_pattern.empty()) {
     if (initiator) {
       for (const auto &token : initiator_pre_message_pattern) {
-        if (token == E && !e)
+        if (token == E && !config.e)
           throw std::logic_error(
               "An ephemeral key pair was expected but was not specified!");
-        if (token == S && !s)
+        if (token == S && !config.s)
           throw std::logic_error(
               "A static key pair was expected but was not specified!");
         if (token == S)
@@ -684,10 +832,10 @@ void HandshakeState::initialize(
           ss.mix_hash(epk);
       }
       for (const auto &token : initiator_pre_message_pattern) {
-        if (token == E && !re)
+        if (token == E && !config.re)
           throw std::logic_error("A remote ephemeral key pair was expected but "
                                  "was not specified!");
-        if (token == S && !rs)
+        if (token == S && !config.rs)
           throw std::logic_error("A remote ephemeral static key pair was "
                                  "expected but was not specified!");
         if (token == S)
@@ -697,10 +845,10 @@ void HandshakeState::initialize(
       }
     } else {
       for (const auto &token : initiator_pre_message_pattern) {
-        if (token == E && !re)
+        if (token == E && !config.re)
           throw std::logic_error("A remote ephemeral key pair was expected but "
                                  "was not specified!");
-        if (token == S && !rs)
+        if (token == S && !config.rs)
           throw std::logic_error("A remote ephemeral static key pair was "
                                  "expected but was not specified!");
         if (token == S)
@@ -709,10 +857,10 @@ void HandshakeState::initialize(
           ss.mix_hash(repk);
       }
       for (const auto &token : initiator_pre_message_pattern) {
-        if (token == E && !e)
+        if (token == E && !config.e)
           throw std::logic_error(
               "An ephemeral key pair was expected but was not specified!");
-        if (token == S && !s)
+        if (token == S && !config.s)
           throw std::logic_error(
               "A static key pair was expected but was not specified!");
         if (token == S)
@@ -758,6 +906,8 @@ void HandshakeState::write_message(std::vector<std::uint8_t> &payload,
         crypto_wipe(pk.data(), pk.size());
         std::ranges::copy(epk, std::back_inserter(message_buffer));
         ss.mix_hash(epk);
+        if (psk_mode)
+          ss.mix_key(epk);
       } break;
       case S: {
         std::vector<std::uint8_t> encrypted_pk;
@@ -795,6 +945,13 @@ void HandshakeState::write_message(std::vector<std::uint8_t> &payload,
         auto dhres = dh(ssk, rspk);
         ss.mix_key(dhres);
         crypto_wipe(dhres.data(), dhres.size());
+      } break;
+      case Psk: {
+        if (psks.empty())
+          throw std::logic_error(
+              "No PSKs were set, but a PSK is required for this pattern!");
+        ss.mix_key_and_hash(psks.front());
+        psks.erase(psks.begin());
       } break;
       }
     }
@@ -839,6 +996,8 @@ void HandshakeState::read_message(std::vector<std::uint8_t> &message,
         std::copy_n(std::make_move_iterator(message.begin()), 32, repk.begin());
         message.erase(message.begin(), message.begin() + 32);
         ss.mix_hash(repk);
+        if (psk_mode)
+          ss.mix_key(repk);
       } break;
       case S: {
         std::vector<std::uint8_t> temp;
@@ -886,6 +1045,13 @@ void HandshakeState::read_message(std::vector<std::uint8_t> &message,
         auto dhres = dh(ssk, rspk);
         ss.mix_key(dhres);
         crypto_wipe(dhres.data(), dhres.size());
+      } break;
+      case Psk: {
+        if (psks.empty())
+          throw std::logic_error(
+              "No PSKs were set, but a PSK is required for this pattern!");
+        ss.mix_key_and_hash(psks.front());
+        psks.erase(psks.begin());
       } break;
       }
     }

@@ -25,7 +25,7 @@ concept STLContainer = requires(T container) {
   { container.size() } -> std::same_as<std::size_t>;
 };
 
-enum class PatternToken : std::uint8_t { E, S, Ee, Es, Se, Ss };
+enum class PatternToken : std::uint8_t { E, S, Ee, Es, Se, Ss, Psk };
 
 enum class HandshakePattern : std::uint8_t {
   IK,
@@ -66,10 +66,44 @@ enum class HandshakePattern : std::uint8_t {
   I1X,
   IX1,
   I1X1,
+  Npsk0,
+  Kpsk0,
+  Xpsk1,
+  NNpsk0,
+  NNpsk2,
+  NKpsk0,
+  NKpsk2,
+  NXpsk2,
+  XNpsk3,
+  XKpsk3,
+  XXpsk3,
+  KNpsk0,
+  KNpsk2,
+  KKpsk0,
+  KKpsk2,
+  KXpsk2,
+  INpsk1,
+  INpsk2,
+  IKpsk1,
+  IKpsk2,
+  IXpsk2,
 };
 
-std::tuple<std::array<std::uint8_t, 32>, std::array<std::uint8_t, 32>>
-generate_keypair();
+struct KeyPair {
+  std::array<std::uint8_t, 32> sk;
+  std::array<std::uint8_t, 32> pk;
+};
+
+KeyPair generate_keypair();
+
+struct HandshakeStateConfiguration {
+  HandshakePattern pattern;
+  bool initiator;
+  std::vector<std::uint8_t> prologue;
+  std::optional<KeyPair> s, e;
+  std::optional<std::array<std::uint8_t, 32>> rs, re;
+  std::vector<std::vector<std::uint8_t>> psks;
+};
 
 class CipherState {
 private:
@@ -80,12 +114,13 @@ public:
   CipherState() = default;
   ~CipherState();
   void initialize_key(const std::array<std::uint8_t, 32> &key);
-  bool has_key() const;
+  [[nodiscard]] bool has_key() const;
   void set_nonce(const std::uint64_t &nonce);
   template <STLContainer T> void encrypt_with_ad(T &ad, T &plaintext);
   void encrypt_with_ad(std::vector<std::uint8_t> &plaintext);
   template <STLContainer T> void decrypt_with_ad(T &ad, T &ciphertext);
   void decrypt_with_ad(std::vector<std::uint8_t> &ciphertext);
+  void rekey();
 };
 
 class SymmetricState {
@@ -100,11 +135,12 @@ public:
   void initialize_symmetric(const std::vector<std::uint8_t> &protocol_name);
   template <STLContainer T> void mix_key(T &input_key_material);
   template <STLContainer T> void mix_hash(const T &data);
-  std::array<std::uint8_t, 64> get_handshake_hash() const;
+  template <STLContainer T> void mix_key_and_hash(T &input_key_material);
+  [[nodiscard]] std::array<std::uint8_t, 64> get_handshake_hash() const;
   template <STLContainer T> void encrypt_and_hash(T &plaintext);
   template <STLContainer T> void decrypt_and_hash(T &ciphertext);
-  std::tuple<CipherState, CipherState> split();
-  bool cs_has_key() const;
+  [[nodiscard]] std::tuple<CipherState, CipherState> split();
+  [[nodiscard]] bool cs_has_key() const;
 };
 
 class HandshakeState {
@@ -119,38 +155,29 @@ private:
   std::array<std::uint8_t, 32> esk;
   std::array<std::uint8_t, 32> rspk;
   std::array<std::uint8_t, 32> repk;
-  bool initiator, my_turn, completed;
+  bool initiator = false, my_turn = false, completed = false, psk_mode = false;
   std::deque<std::vector<PatternToken>> message_patterns;
   std::vector<PatternToken> initiator_pre_message_pattern,
       responder_pre_message_pattern;
+  std::vector<std::vector<std::uint8_t>> psks;
 
 public:
   HandshakeState() = default;
   ~HandshakeState();
-  void
-  initialize(const HandshakePattern &handshake_pattern, const bool &initiator,
-             const std::vector<std::uint8_t> prologue = {},
-             std::optional<std::tuple<std::array<std::uint8_t, 32>,
-                                      std::array<std::uint8_t, 32>>>
-                 s = std::nullopt,
-             std::optional<std::tuple<std::array<std::uint8_t, 32>,
-                                      std::array<std::uint8_t, 32>>>
-                 e = std::nullopt,
-             std::optional<std::array<std::uint8_t, 32>> rs = std::nullopt,
-             std::optional<std::array<std::uint8_t, 32>> re = std::nullopt);
+  void initialize(const HandshakeStateConfiguration &config);
   void write_message(std::vector<std::uint8_t> &payload,
                      std::vector<std::uint8_t> &message_buffer);
   void write_message(std::vector<std::uint8_t> &message_buffer);
   void read_message(std::vector<std::uint8_t> &message,
                     std::vector<std::uint8_t> &payload_buffer);
-  std::array<std::uint8_t, 64> get_handshake_hash();
-  std::array<std::uint8_t, 32> get_local_static_public_key();
-  std::array<std::uint8_t, 32> get_local_ephemeral_public_key();
-  std::array<std::uint8_t, 32> get_remote_ephemeral_public_key();
-  std::array<std::uint8_t, 32> get_remote_static_public_key();
-  bool is_initiator();
-  bool is_handshake_finished();
-  bool is_my_turn();
-  std::tuple<CipherState, CipherState> finalize();
+  [[nodiscard]] std::array<std::uint8_t, 64> get_handshake_hash();
+  [[nodiscard]] std::array<std::uint8_t, 32> get_local_static_public_key();
+  [[nodiscard]] std::array<std::uint8_t, 32> get_local_ephemeral_public_key();
+  [[nodiscard]] std::array<std::uint8_t, 32> get_remote_ephemeral_public_key();
+  [[nodiscard]] std::array<std::uint8_t, 32> get_remote_static_public_key();
+  [[nodiscard]] bool is_initiator();
+  [[nodiscard]] bool is_handshake_finished();
+  [[nodiscard]] bool is_my_turn();
+  [[nodiscard]] std::tuple<CipherState, CipherState> finalize();
 };
 } // namespace noise
