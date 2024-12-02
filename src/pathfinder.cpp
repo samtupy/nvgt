@@ -14,7 +14,8 @@
 #include <algorithm>
 #include <reactphysics3d/reactphysics3d.h>
 #include "pathfinder.h"
-
+#include <cmath>
+using namespace std;
 static asITypeInfo* VectorArrayType = NULL;
 #define NODE_BIT_SIZE 19
 inline void* encode_state(int64_t x, int64_t y, int64_t z, int64_t d) {
@@ -159,10 +160,11 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	total_cost = 0;
 	if (!callback)
 		return array;
-	if (search_range > 0 && allow_diagonals && sqrtf(powf(end_x - start_x, 2) + powf(end_y - start_y, 2) + powf(end_z - start_z, 2)) > search_range || search_range > 0 && !allow_diagonals && (fabs(end_x - start_x) + fabs(end_y - start_y) + fabs(end_z - start_z)) > search_range) return array;
+	if (search_range > 0 && allow_diagonals && hypot(end_x - start_x, end_y - start_y, end_z - start_z) > search_range || search_range > 0 && !allow_diagonals && (abs(end_x - start_x) + abs(end_y - start_y) + abs(end_z - start_z)) > search_range) return array;
 	if (automatic_reset) reset();
 	callback_data = data;
-	data->AddRef();
+	if (data)
+		data->AddRef();
 	if (get_difficulty(start_x, start_y, start_z) > 9 || get_difficulty(end_x, end_y, end_z) > 9) return array;
 	void* start = encode_state(start_x, start_y, start_z, desperation_factor);
 	this->start_x = start_x;
@@ -173,7 +175,8 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	solving = true;
 	int result = pf->Solve(start, end, &path, &total_cost);
 	solving = false;
-	data->Release();
+	if (data)
+		data->Release();
 	callback_data = NULL;
 	if (abort || must_reset || result != micropather::MicroPather::SOLVED) {
 		abort = false;
@@ -201,9 +204,9 @@ float pathfinder::LeastCostEstimate(void* nodeStart, void* nodeEnd) {
 	float d = get_difficulty(end_x, end_y, end_z);
 	if (d > 9) return FLT_MAX;
 	if (allow_diagonals)
-		return sqrtf(x * x + y * y + z * z);
+		return hypot(x, y, z);
 	else
-		return (fabs(x) + fabs(y) + fabs(z));
+		return (abs(x) + abs(y) + abs(z));
 }
 void pathfinder::AdjacentCost(void* node, micropather::MPVector<micropather::StateCost>* neighbors) {
 	int x, y, z;
