@@ -184,9 +184,6 @@ void RegisterXplatform(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction("string set_linux_thread_priority(int64 thread_id, int priority)", asFUNCTION(SDL_SetLinuxThreadPriority), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string set_linux_thread_priority_and_policy(int64 thread_id, int priority, int policy)", asFUNCTION(SDL_SetLinuxThreadPriorityAndPolicy), asCALL_CDECL);
-	engine->RegisterGlobalFunction("int get_ANDROID_SDK_VERSION() property", asFUNCTION(SDL_GetAndroidSDKVersion), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool get_system_is_chromebook() property", asFUNCTION(SDL_IsChromebook), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool get_system_is_DeX_mode() property", asFUNCTION(SDL_IsDeXMode), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void android_send_back_button()", asFUNCTION(SDL_SendAndroidBackButton), asCALL_CDECL);
 	engine->RegisterFuncdef("void android_permission_request_callback(string permission, bool granted, string user_data)");
 	engine->RegisterGlobalFunction("bool android_request_permission(const string&in permission, android_permission_request_callback@ callback = null, const string&in callback_data = \"\")", asFUNCTION(request_android_permission), asCALL_CDECL);
