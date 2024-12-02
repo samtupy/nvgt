@@ -1,4 +1,4 @@
-F#!/bin/bash
+#!/bin/bash
 
 function setup_angelscript {
 	echo Installing Angelscript...
@@ -108,8 +108,7 @@ function setup_nvgt {
 	cd ..
 	rm lindev.tar.gz
 	if ! which scons &> /dev/null; then
-		export PIP_BREAK_SYSTEM_PACKAGES=1
-		pip3 install --user scons
+		pip3 install scons
 	fi
 	scons -s no_upx=0
 	echo NVGT built.
@@ -118,11 +117,14 @@ function setup_nvgt {
 function main {
 	sudo apt update -y
 	set -e
+	python3 -m venv venv --upgrade-deps
+	chmod +x venv/bin/activate
+	source ./venv/bin/activate
 	mkdir -p deps
 	cd deps
 	
 	# Insure required packages are installed for building.
-	sudo apt install build-essential gcc g++ make cmake autoconf libtool python3 python3-pip libsystemd-dev libspeechd-dev -y
+	sudo apt install build-essential gcc g++ make cmake autoconf libtool python3 python3-pip libssl-dev libsystemd-dev libspeechd-dev -y
 	
 	setup_angelscript
 	setup_reactphysics
@@ -132,6 +134,7 @@ function main {
 	setup_sdl
 	setup_nvgt
 	echo Success!
+	deactivate
 	exit 0
 }
 

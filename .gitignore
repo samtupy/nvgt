@@ -39,6 +39,7 @@ lindev
 macosdev
 windev
 deps
+venv
 
 # website builds
 web/public_html
