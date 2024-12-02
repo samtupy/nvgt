@@ -162,7 +162,8 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	if (search_range > 0 && allow_diagonals && sqrtf(powf(end_x - start_x, 2) + powf(end_y - start_y, 2) + powf(end_z - start_z, 2)) > search_range || search_range > 0 && !allow_diagonals && (fabs(end_x - start_x) + fabs(end_y - start_y) + fabs(end_z - start_z)) > search_range) return array;
 	if (automatic_reset) reset();
 	callback_data = data;
-	data->AddRef();
+	if (data)
+		data->AddRef();
 	if (get_difficulty(start_x, start_y, start_z) > 9 || get_difficulty(end_x, end_y, end_z) > 9) return array;
 	void* start = encode_state(start_x, start_y, start_z, desperation_factor);
 	this->start_x = start_x;
@@ -173,7 +174,8 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	solving = true;
 	int result = pf->Solve(start, end, &path, &total_cost);
 	solving = false;
-	data->Release();
+	if (data)
+		data->Release();
 	callback_data = NULL;
 	if (abort || must_reset || result != micropather::MicroPather::SOLVED) {
 		abort = false;
