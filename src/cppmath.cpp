@@ -16,7 +16,6 @@
 #include <float.h>
 #include <string.h>
 #include <cmath>
-#include <numbers>
 #include <numeric>
 #include <version>
 #include <bit>
@@ -391,19 +390,19 @@ float fpFromIEEE(asUINT raw)
 {
 	// TODO: Identify CPU family to provide proper conversion
 	//        if the CPU doesn't natively use IEEE style floats
-	return std::bit_cast<float>(raw);
+	return *(reinterpret_cast<float*>(&raw));
 }
 asUINT fpToIEEE(float fp)
 {
-	return std::bit_cast<asUINT>(fp);
+	return *(reinterpret_cast<asUINT*>(&fp));
 }
 double fpFromIEEE(asQWORD raw)
 {
-	return std::bit_cast<double>(raw);
+	return *(reinterpret_cast<double*>(&raw));
 }
 asQWORD fpToIEEE(double fp)
 {
-	return std::bit_cast<asQWORD>(fp);
+	return *(reinterpret_cast<asQWORD*>(&fp));
 }
 
 // closeTo() is used to determine if the binary representation of two numbers are 
@@ -593,45 +592,45 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("bool is_less_equal(double x, double y)", asFUNCTIONPR(std::islessequal, (double, double), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_less_greater(double x, double y)", asFUNCTIONPR(std::islessgreater, (double, double), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_unordered(double x, double y)", asFUNCTIONPR(std::isunordered, (double, double), bool), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool is_power_of_2(const uint8 v)", asFUNCTIONPR(std::has_single_bit<uint8>, (uint8), bool), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint8 bit_ceil(const uint8 x)", asFUNCTIONPR(std::bit_ceil<uint8>, (uint8), uint8), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint8 bit_floor(const uint8 x)", asFUNCTIONPR(std::bit_floor<uint8>, (uint8), uint8), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("bool is_power_of_2(const uint8 v)", asFUNCTIONPR(std::has_single_bit<uint8>, (uint8), bool), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint8 bit_ceil(const uint8 x)", asFUNCTIONPR(std::bit_ceil<uint8>, (uint8), uint8), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint8 bit_floor(const uint8 x)", asFUNCTIONPR(std::bit_floor<uint8>, (uint8), uint8), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int bit_width(const uint8 x)", asFUNCTIONPR(bit_width<uint8>, (uint8), int), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint8 rotl(uint8 x, int s)", asFUNCTIONPR(std::rotl<uint8>, (uint8, int), uint8), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint8 rotr(uint8 x, int s)", asFUNCTIONPR(std::rotr<uint8>, (uint8, int), uint8), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint8 rotl(uint8 x, int s)", asFUNCTIONPR(std::rotl<uint8>, (uint8, int), uint8), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint8 rotr(uint8 x, int s)", asFUNCTIONPR(std::rotr<uint8>, (uint8, int), uint8), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_leading_zeroes(uint8 x)", asFUNCTIONPR(std::countl_zero<uint8>, (uint8), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_trailing_zeroes(uint8 x)", asFUNCTIONPR(std::countr_zero<uint8>, (uint8), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_leading_ones(uint8 x)", asFUNCTIONPR(std::countl_one<uint8>, (uint8), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_trailing_ones(uint8 x)", asFUNCTIONPR(std::countr_one<uint8>, (uint8), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int popcount(uint8 x)", asFUNCTIONPR(std::popcount<uint8>, (uint8), int), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool is_power_of_2(const uint16 v)", asFUNCTIONPR(std::has_single_bit<uint16>, (uint16), bool), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint16 bit_ceil(const uint16 x)", asFUNCTIONPR(std::bit_ceil<uint16>, (uint16), uint16), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint16 bit_floor(const uint16 x)", asFUNCTIONPR(std::bit_floor<uint16>, (uint16), uint16), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("bool is_power_of_2(const uint16 v)", asFUNCTIONPR(std::has_single_bit<uint16>, (uint16), bool), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint16 bit_ceil(const uint16 x)", asFUNCTIONPR(std::bit_ceil<uint16>, (uint16), uint16), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint16 bit_floor(const uint16 x)", asFUNCTIONPR(std::bit_floor<uint16>, (uint16), uint16), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int bit_width(const uint16 x)", asFUNCTIONPR(bit_width<uint16>, (uint16), int), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint16 rotl(uint16 x, int s)", asFUNCTIONPR(std::rotl<uint16>, (uint16, int), uint16), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint16 rotr(uint16 x, int s)", asFUNCTIONPR(std::rotr<uint16>, (uint16, int), uint16), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint16 rotl(uint16 x, int s)", asFUNCTIONPR(std::rotl<uint16>, (uint16, int), uint16), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint16 rotr(uint16 x, int s)", asFUNCTIONPR(std::rotr<uint16>, (uint16, int), uint16), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_leading_zeroes(uint16 x)", asFUNCTIONPR(std::countl_zero<uint16>, (uint16), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_trailing_zeroes(uint16 x)", asFUNCTIONPR(std::countr_zero<uint16>, (uint16), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_leading_ones(uint16 x)", asFUNCTIONPR(std::countl_one<uint16>, (uint16), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_trailing_ones(uint16 x)", asFUNCTIONPR(std::countr_one<uint16>, (uint16), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int popcount(uint16 x)", asFUNCTIONPR(std::popcount<uint16>, (uint16), int), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool is_power_of_2(const uint32 v)", asFUNCTIONPR(std::has_single_bit<uint32>, (uint32), bool), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint32 bit_ceil(const uint32 x)", asFUNCTIONPR(std::bit_ceil<uint32>, (uint32), uint32), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint32 bit_floor(const uint32 x)", asFUNCTIONPR(std::bit_floor<uint32>, (uint32), uint32), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("bool is_power_of_2(const uint32 v)", asFUNCTIONPR(std::has_single_bit<uint32>, (uint32), bool), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint32 bit_ceil(const uint32 x)", asFUNCTIONPR(std::bit_ceil<uint32>, (uint32), uint32), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint32 bit_floor(const uint32 x)", asFUNCTIONPR(std::bit_floor<uint32>, (uint32), uint32), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int bit_width(const uint32 x)", asFUNCTIONPR(bit_width<uint32>, (uint32), int), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint32 rotl(uint32 x, int s)", asFUNCTIONPR(std::rotl<uint32>, (uint32, int), uint32), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint32 rotr(uint32 x, int s)", asFUNCTIONPR(std::rotr<uint32>, (uint32, int), uint32), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint32 rotl(uint32 x, int s)", asFUNCTIONPR(std::rotl<uint32>, (uint32, int), uint32), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint32 rotr(uint32 x, int s)", asFUNCTIONPR(std::rotr<uint32>, (uint32, int), uint32), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_leading_zeroes(uint32 x)", asFUNCTIONPR(std::countl_zero<uint32>, (uint32), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_trailing_zeroes(uint32 x)", asFUNCTIONPR(std::countr_zero<uint32>, (uint32), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_leading_ones(uint32 x)", asFUNCTIONPR(std::countl_one<uint32>, (uint32), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_trailing_ones(uint32 x)", asFUNCTIONPR(std::countr_one<uint32>, (uint32), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int popcount(uint32 x)", asFUNCTIONPR(std::popcount<uint32>, (uint32), int), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool is_power_of_2(const uint64 v)", asFUNCTIONPR(std::has_single_bit<uint64>, (uint64), bool), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint64 bit_ceil(const uint64 x)", asFUNCTIONPR(std::bit_ceil<uint64>, (uint64), uint64), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint64 bit_floor(const uint64 x)", asFUNCTIONPR(std::bit_floor<uint64>, (uint64), uint64), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("bool is_power_of_2(const uint64 v)", asFUNCTIONPR(std::has_single_bit<uint64>, (uint64), bool), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint64 bit_ceil(const uint64 x)", asFUNCTIONPR(std::bit_ceil<uint64>, (uint64), uint64), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint64 bit_floor(const uint64 x)", asFUNCTIONPR(std::bit_floor<uint64>, (uint64), uint64), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int bit_width(const uint64 x)", asFUNCTIONPR(bit_width<uint64>, (uint64), int), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint64 rotl(uint64 x, int s)", asFUNCTIONPR(std::rotl<uint64>, (uint64, int), uint64), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint64 rotr(uint64 x, int s)", asFUNCTIONPR(std::rotr<uint64>, (uint64, int), uint64), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint64 rotl(uint64 x, int s)", asFUNCTIONPR(std::rotl<uint64>, (uint64, int), uint64), asCALL_CDECL);
+	//engine->RegisterGlobalFunction("uint64 rotr(uint64 x, int s)", asFUNCTIONPR(std::rotr<uint64>, (uint64, int), uint64), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_leading_zeroes(uint64 x)", asFUNCTIONPR(std::countl_zero<uint64>, (uint64), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_trailing_zeroes(uint64 x)", asFUNCTIONPR(std::countr_zero<uint64>, (uint64), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int count_leading_ones(uint64 x)", asFUNCTIONPR(std::countl_one<uint64>, (uint64), int), asCALL_CDECL);
