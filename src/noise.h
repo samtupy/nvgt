@@ -1,6 +1,11 @@
 #pragma once
-#ifdef IN // For some reason this is needed, need to figure out what's defining this macro
+// For some reason this is needed, need to figure out what's defining these
+// macro
+#ifdef IN
 #undef IN
+#endif
+#ifdef IK
+#undef IK
 #endif
 #include <algorithm>
 #include <array>
@@ -11,7 +16,6 @@
 #include <iterator>
 #include <limits>
 #include <optional>
-#include <ranges>
 #include <span>
 #include <stack>
 #include <stdexcept>

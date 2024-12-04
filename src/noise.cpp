@@ -2,21 +2,23 @@
 #include "monocypher-ed25519.h"
 #include "monocypher.h"
 #include "rng_get_bytes.h"
+#include <Poco/Format.h>
 #include <algorithm>
 #include <array>
 #include <deque>
 #include <exception>
-#include <format>
 #include <iterator>
 #include <limits>
 #include <optional>
-#include <ranges>
 #include <span>
 #include <stack>
 #include <stdexcept>
 #include <tuple>
 #include <vector>
 #include <version>
+#ifdef IN
+#undef IN
+#endif
 #ifdef __cpp_lib_unreachable
 #include <utility>
 #else
@@ -388,7 +390,8 @@ void CipherState::initialize_key(const std::array<std::uint8_t, 32> &key) {
 }
 
 bool CipherState::has_key() const {
-  return !std::ranges::all_of(k, [](const auto &el) { return el == 0; });
+  return !std::all_of(k.begin(), k.end(),
+                      [](const auto &el) { return el == 0; });
 }
 
 void CipherState::set_nonce(const std::uint64_t &nonce) { n = nonce; }
@@ -428,10 +431,10 @@ void CipherState::decrypt_with_ad(std::vector<std::uint8_t> &ciphertext) {
 void CipherState::rekey() {
   std::vector<std::uint8_t> payload;
   payload.resize(32);
-  std::ranges::fill(payload, 0);
+  std::fill(payload.begin(), payload.end(), 0);
   encrypt(k, std::numeric_limits<std::uint64_t>::max() - 1, std::nullopt,
           payload);
-  std::ranges::copy_n(payload.begin(), 32, k.begin());
+  std::copy_n(payload.begin(), 32, k.begin());
   crypto_wipe(payload.data(), payload.size());
 }
 
@@ -443,7 +446,7 @@ SymmetricState::~SymmetricState() {
 void SymmetricState::initialize_symmetric(
     const std::vector<std::uint8_t> &protocol_name) {
   if (protocol_name.size() <= 64) {
-    std::ranges::copy_n(protocol_name.begin(), protocol_name.size(), h.begin());
+    std::copy_n(protocol_name.begin(), protocol_name.size(), h.begin());
     for (auto i = protocol_name.size(); i < h.size(); ++i) {
       h[i] = 0;
     }
@@ -462,7 +465,7 @@ template <STLContainer T> void SymmetricState::mix_key(T &input_key_material) {
   std::array<std::uint8_t, 64> temp_k;
   hkdf(ck, input_key_material, ck, temp_k);
   std::array<std::uint8_t, 32> truncated_k;
-  std::ranges::copy_n(temp_k.begin(), 32, truncated_k.begin());
+  std::copy_n(temp_k.begin(), 32, truncated_k.begin());
   crypto_wipe(temp_k.data(), temp_k.size());
   cs.initialize_key(truncated_k);
   crypto_wipe(truncated_k.data(), truncated_k.size());
@@ -482,9 +485,9 @@ void SymmetricState::mix_key_and_hash(T &input_key_material) {
   temp_k.fill(0);
   truncated_temp_k.fill(0);
   hkdf(ck, input_key_material, temp_ck, temp_h, temp_k);
-  std::ranges::move(temp_ck, ck.begin());
+  std::move(temp_ck.begin(), temp_ck.end(), ck.begin());
   mix_hash(temp_h);
-  std::ranges::copy_n(temp_k.begin(), 32, truncated_temp_k.begin());
+  std::copy_n(temp_k.begin(), 32, truncated_temp_k.begin());
   cs.initialize_key(truncated_temp_k);
   crypto_wipe(temp_ck.data(), temp_ck.size());
   crypto_wipe(temp_k.data(), temp_k.size());
@@ -521,8 +524,8 @@ std::tuple<CipherState, CipherState> SymmetricState::split() {
   std::vector<std::uint8_t> zerolen;
   hkdf(ck, zerolen, temp_k1, temp_k2);
   std::array<std::uint8_t, 32> actual_k1, actual_k2;
-  std::ranges::copy_n(temp_k1.begin(), 32, actual_k1.begin());
-  std::ranges::copy_n(temp_k2.begin(), 32, actual_k2.begin());
+  std::copy_n(temp_k1.begin(), 32, actual_k1.begin());
+  std::copy_n(temp_k2.begin(), 32, actual_k2.begin());
   crypto_wipe(temp_k1.data(), temp_k1.size());
   crypto_wipe(temp_k2.data(), temp_k2.size());
   CipherState c1, c2;
@@ -546,8 +549,8 @@ HandshakeState::~HandshakeState() {
 
 void HandshakeState::initialize(const HandshakeStateConfiguration &config) {
   const auto protocol_name_str =
-      std::format("Noise_{}_25519_ChaChaPoly_BLAKE2b",
-                  handshake_pattern_to_string(config.pattern));
+      Poco::format("Noise_%s_25519_ChaChaPoly_BLAKE2b",
+                   handshake_pattern_to_string(config.pattern));
   if (protocol_name_str.size() > 255) {
     throw std::length_error("Protocol name too long");
   }
@@ -587,7 +590,7 @@ void HandshakeState::initialize(const HandshakeStateConfiguration &config) {
   }
   if (!config.psks.empty()) {
     psk_mode = true;
-    std::ranges::copy(config.psks, psks.begin());
+    std::copy(config.psks.begin(), config.psks.end(), psks.begin());
   } else {
     psk_mode = false;
   }
@@ -894,28 +897,29 @@ void HandshakeState::write_message(std::vector<std::uint8_t> &payload,
       using enum PatternToken;
       switch (token) {
       case E: {
-        if (!(std::ranges::all_of(esk,
-                                  [](const auto byte) { return byte == 0; }) &&
-              std::ranges::all_of(epk,
-                                  [](const auto byte) { return byte == 0; }))) {
+        if (!(std::all_of(esk.begin(), esk.end(),
+                          [](const auto byte) { return byte == 0; }) &&
+              std::all_of(epk.begin(), epk.end(),
+                          [](const auto byte) { return byte == 0; }))) {
           throw std::logic_error(
               "Asked to generate a new key pair but one already exists!");
         }
         auto [sk, pk] = generate_keypair();
-        std::ranges::move(sk, esk.begin());
-        std::ranges::move(pk, epk.begin());
+        std::move(sk.begin(), sk.end(), esk.begin());
+        std::move(pk.begin(), pk.end(), epk.begin());
         crypto_wipe(sk.data(), sk.size());
         crypto_wipe(pk.data(), pk.size());
-        std::ranges::copy(epk, std::back_inserter(message_buffer));
+        std::copy(epk.begin(), epk.end(), std::back_inserter(message_buffer));
         ss.mix_hash(epk);
         if (psk_mode)
           ss.mix_key(epk);
       } break;
       case S: {
         std::vector<std::uint8_t> encrypted_pk;
-        std::ranges::copy(spk, std::back_inserter(encrypted_pk));
+        std::copy(spk.begin(), spk.end(), std::back_inserter(encrypted_pk));
         ss.encrypt_and_hash(encrypted_pk);
-        std::ranges::move(encrypted_pk, std::back_inserter(message_buffer));
+        std::move(encrypted_pk.begin(), encrypted_pk.end(),
+                  std::back_inserter(message_buffer));
         crypto_wipe(encrypted_pk.data(), encrypted_pk.size());
       } break;
       case Ee: {
@@ -960,7 +964,7 @@ void HandshakeState::write_message(std::vector<std::uint8_t> &payload,
     message_patterns.pop_front();
   }
   ss.encrypt_and_hash(payload);
-  std::ranges::move(payload, std::back_inserter(message_buffer));
+  std::move(payload.begin(), payload.end(), std::back_inserter(message_buffer));
   if (message_patterns.empty()) {
     completed = true;
   } else {
@@ -991,8 +995,8 @@ void HandshakeState::read_message(std::vector<std::uint8_t> &message,
       using enum PatternToken;
       switch (token) {
       case E: {
-        if (std::ranges::all_of(repk,
-                                [](const auto byte) { return byte != 0; })) {
+        if (std::all_of(repk.begin(), repk.end(),
+                        [](const auto byte) { return byte != 0; })) {
           throw std::logic_error("Wanted to store RE but RE already stored!");
         }
         std::copy_n(std::make_move_iterator(message.begin()), 32, repk.begin());
@@ -1015,7 +1019,7 @@ void HandshakeState::read_message(std::vector<std::uint8_t> &message,
           message.erase(message.begin(), message.begin() + 32);
         }
         ss.decrypt_and_hash(temp);
-        std::ranges::move(temp, rspk.begin());
+        std::move(temp.begin(), temp.end(), rspk.begin());
         crypto_wipe(temp.data(), temp.size());
       } break;
       case Ee: {
@@ -1060,7 +1064,7 @@ void HandshakeState::read_message(std::vector<std::uint8_t> &message,
     message_patterns.pop_front();
   }
   ss.decrypt_and_hash(message);
-  std::ranges::move(message, std::back_inserter(payload_buffer));
+  std::move(message.begin(), message.end(), std::back_inserter(payload_buffer));
   if (message_patterns.empty()) {
     completed = true;
   } else {
