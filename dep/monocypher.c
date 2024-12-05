@@ -232,7 +232,7 @@ u64 crypto_chacha20_djb(u8 *cipher_text, const u8 *plain_text,
 	size_t nb_blocks = text_size >> 6;
 	FOR (i, 0, nb_blocks) {
 		chacha20_rounds(pool, input);
-		if (plain_text != NULL) {
+		if (plain_text != 0) {
 			FOR (j, 0, 16) {
 				u32 p = pool[j] + input[j];
 				store32_le(cipher_text, p ^ load32_le(plain_text));
@@ -255,7 +255,7 @@ u64 crypto_chacha20_djb(u8 *cipher_text, const u8 *plain_text,
 
 	// Last (incomplete) block
 	if (text_size > 0) {
-		if (plain_text == NULL) {
+		if (plain_text == 0) {
 			plain_text = zero;
 		}
 		chacha20_rounds(pool, input);
@@ -863,7 +863,7 @@ void crypto_argon2(u8 *hash, u32 hash_size, void *work_area,
 					u32 next_slice   = ((slice + 1) % 4) * segment_size;
 					u32 window_start = pass == 0 ? 0     : next_slice;
 					u32 nb_segments  = pass == 0 ? slice : 3;
-					u32 lane         =
+					u64 lane         =
 						pass == 0 && slice == 0
 						? segment
 						: (index_seed >> 32) % config.nb_lanes;
@@ -877,8 +877,8 @@ void crypto_argon2(u8 *hash, u32 hash_size, void *work_area,
 					u64  x         = (j1 * j1)         >> 32;
 					u64  y         = (window_size * x) >> 32;
 					u64  z         = (window_size - 1) - y;
-					u32  ref       = (window_start + z) % lane_size;
-					u32  index     = lane * lane_size + ref;
+					u64  ref       = (window_start + z) % lane_size;
+					u32  index     = lane * lane_size + (u32)ref;
 					blk *reference = blocks + index;
 
 					// Shuffle the previous & reference block
