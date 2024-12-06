@@ -1,9 +1,9 @@
 /**
 	Encrypts a string using the AES 256 bit CBC algorithm.
-	string string_aes_encrypt(string the_data, string the_key)
+	string string_aes_encrypt(const string&in the_data, const string&in the_key)
 	## Arguments:
-		* string the_data: The data to be encrypted.
-		* string the_key: The key to encrypt the data with.
+		* const string&in the_data: The data to be encrypted.
+		* const string&in the_key: The key to encrypt the data with.
 	## Returns:
 		string: Encrypted ciphertext on success or an empty string on failure.
 	## Remarks:

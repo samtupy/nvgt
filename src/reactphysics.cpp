@@ -46,8 +46,17 @@ AABB aabb_from_triangle(CScriptArray* points) {
 }
 
 // registration templates
-template <class T> void RegisterCollisionShape() {
-	
+template <class T> void RegisterCollisionShape(asIScriptEngine* engine, const string& type) {
+	engine->RegisterObjectMethod(type.c_str(), "physics_shape_name get_name() const property", asMETHOD(T, getName), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "physics_shape_type get_type() const property", asMETHOD(T, getType), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_is_convex() const property", asMETHOD(T, isConvex), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_is_polyhedron() const property", asMETHOD(T, isPolyhedron), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "aabb get_local_bounds() const", asMETHOD(T, getLocalBounds), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int get_id() const property", asMETHOD(T, getId), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_local_inertia_tensor(float mass) const", asMETHOD(T, getLocalInertiaTensor), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "float get_volume() const property", asMETHOD(T, getVolume), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "aabb compute_transformed_aabb(const transform&in transform) const", asMETHOD(T, computeTransformedAABB), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "string opImplConv() const", asMETHOD(T, to_string), asCALL_THISCALL);
 }
 
 void RegisterReactphysics(asIScriptEngine* engine) {
@@ -58,6 +67,14 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("physics_shape_type", "SHAPE_TYPE_CAPSULE", int(CollisionShapeType::CAPSULE));
 	engine->RegisterEnumValue("physics_shape_type", "SHAPE_TYPE_CONVEX_POLYHEDRON", int(CollisionShapeType::CONVEX_POLYHEDRON));
 	engine->RegisterEnumValue("physics_shape_type", "SHAPE_TYPE_CONCAVE", int(CollisionShapeType::CONCAVE_SHAPE));
+	engine->RegisterEnum("physics_shape_name");
+	engine->RegisterEnumValue("physics_shape_name", "SHAPE_TRIANGLE", int(CollisionShapeName::TRIANGLE));
+	engine->RegisterEnumValue("physics_shape_name", "SHAPE_SPHERE", int(CollisionShapeName::SPHERE));
+	engine->RegisterEnumValue("physics_shape_name", "SHAPE_CAPSULE", int(CollisionShapeName::CAPSULE));
+	engine->RegisterEnumValue("physics_shape_name", "SHAPE_BOX", int(CollisionShapeName::BOX));
+	engine->RegisterEnumValue("physics_shape_name", "SHAPE_CONVEX_MESH", int(CollisionShapeName::CONVEX_MESH));
+	engine->RegisterEnumValue("physics_shape_name", "SHAPE_TRIANGLE_MESH", int(CollisionShapeName::TRIANGLE_MESH));
+	engine->RegisterEnumValue("physics_shape_name", "SHAPE_HEIGHTFIELD", int(CollisionShapeName::HEIGHTFIELD));
 	engine->RegisterGlobalProperty("const float EPSILON", (void*)&MACHINE_EPSILON);
 	engine->RegisterObjectType("vector", sizeof(Vector3), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Vector3>() | asOBJ_APP_CLASS_ALLFLOATS);
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<Vector3>), asCALL_CDECL_OBJFIRST);

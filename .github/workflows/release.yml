@@ -9,7 +9,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: build
       run: |
-        brew install scons
+        pip3 install scons
         cp build/build_macos.sh .
         sudo chmod +x build_macos.sh
         ./build_macos.sh ci
@@ -24,6 +24,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: build
       run: |
+        pip3 install scons
         sudo chmod +x build/build_linux.sh
         ./build/build_linux.sh ci
         cd release
@@ -158,8 +159,11 @@ jobs:
         mkdir windows_release
         tar -xzf windows_release.tar.gz -C windows_release
         tar -xzf linux_release.tar.gz -C release
+        python3 -m venv venv --upgrade-deps
+        chmod +x venv/bin/activate
+        source ./venv/bin/activate
         cd doc
-        pip3 install --user -r requirements.txt
+        pip3 install -r requirements.txt
         cd OSL
         python3 make_osl_document.py
         cd ..

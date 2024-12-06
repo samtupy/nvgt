@@ -50,6 +50,10 @@ LOCAL_MODULE    := libcrypto
 LOCAL_SRC_FILES := $(LIBPATH)/libcrypto.a
 include $(PREBUILT_STATIC_LIBRARY)
 
+LOCAL_MODULE    := libenet6
+LOCAL_SRC_FILES := $(LIBPATH)/libenet6.a
+include $(PREBUILT_STATIC_LIBRARY)
+
 LOCAL_MODULE    := libreactphysics3d
 LOCAL_SRC_FILES := $(LIBPATH)/libreactphysics3d.a
 include $(PREBUILT_STATIC_LIBRARY)
@@ -101,7 +105,7 @@ else
     LOCAL_LDFLAGS_COMMON = -Wl,--no-fatal-warnings -Wl,--no-undefined -Wl,--gc-sections
 endif
 LOCAL_SHARED_LIBRARIES_COMMON := SDL3 bass bassmix bass_fx phonon
-LOCAL_STATIC_LIBRARIES_COMMON := libPocoFoundation libPocoCrypto libPocoDataSQLite libPocoJSON libPocoNet libPocoNetSSL libPocoUtil libPocoXML libPocoZip libangelscript libcrypto libreactphysics3d libssl
+LOCAL_STATIC_LIBRARIES_COMMON := libPocoFoundation libPocoCrypto libPocoDataSQLite libPocoJSON libPocoNet libPocoNetSSL libPocoUtil libPocoXML libPocoZip libangelscript libcrypto libenet6 libreactphysics3d libssl
 LOCAL_LDLIBS_COMMON := -lGLESv1_CM -lGLESv2 -lOpenSLES -llog -landroid
 LOCAL_CPP_FEATURES_COMMON := rtti exceptions
 

@@ -133,6 +133,9 @@ function setup_nvgt {
 
 function main {
 	set -e
+	python3 -m venv venv --upgrade-deps
+	chmod +x venv/bin/activate
+	source ./venv/bin/activate
 	mkdir -p deps
 	cd deps
 	setup_homebrew
