@@ -1,5 +1,5 @@
 # load_string
-This function loads ini data stored as a string, doing it this way insures that ini data can come from any source, such as an encrypted string if need be.
+This function loads INI data stored as a string, doing it this way insures that ini data can come from any source, such as an encrypted string if need be.
 
 `bool ini::load_string(string data, string filename = "*");`
 
