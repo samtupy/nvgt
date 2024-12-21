@@ -94,7 +94,7 @@ $(shell python "${LOCAL_PATH}/../build/version_sconscript.py")
 LOCAL_SRC_FILES_COMMON := \
     $(subst $(LOCAL_PATH)/,, \
     $(wildcard $(LOCAL_PATH)/../ASAddon/src/*.cpp)\
-    ../dep/aes.c ../dep/cmp.c ../dep/enet_compress.c ../dep/micropather.cpp ../dep/rng_get_bytes.c ../dep/singleheader.cpp ../dep/sonic.c ../dep/tinyexpr.c ../dep/uncompr.c ../dep/monocypher.c ../dep/monocypher-ed25519.c\
+    ../dep/aes.c ../dep/cmp.c ../dep/micropather.cpp ../dep/rng_get_bytes.c ../dep/singleheader.cpp ../dep/sonic.c ../dep/tinyexpr.c ../dep/uncompr.c ../dep/monocypher.c ../dep/monocypher-ed25519.c\
     $(wildcard $(LOCAL_PATH)/../src/*.cpp))
 LOCAL_C_INCLUDES_COMMON := $(LOCAL_PATH)/../droidev/include $(LOCAL_PATH)/../ASAddon/include $(LOCAL_PATH)/../dep
 ifeq ($(NDK_DEBUG), 1)
