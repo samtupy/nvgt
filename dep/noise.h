@@ -172,12 +172,12 @@ public:
   HandshakeState(const HandshakeStateConfiguration &config);
   ~HandshakeState();
   void initialize(const HandshakeStateConfiguration &config);
-  void write_message(std::vector<std::uint8_t> &payload,
-                     std::vector<std::uint8_t> &message_buffer);
-  void write_message(std::vector<std::uint8_t> &message_buffer);
-  void read_message(std::vector<std::uint8_t> &message,
-                    std::vector<std::uint8_t> &payload_buffer);
-  void read_message(std::vector<std::uint8_t> &message_buffer);
+  template <STLContainer T> void write_message(T&payload,
+                     T& message_buffer);
+  template<STLContainer T> void write_message(T& message_buffer);
+  template<STLContainer T> void read_message(T &message,
+                    T &payload_buffer);
+  template <STLContainer T> void read_message(T&message_buffer);
   [[nodiscard]] std::array<std::uint8_t, 64> get_handshake_hash();
   [[nodiscard]] std::array<std::uint8_t, 32> get_local_static_public_key();
   [[nodiscard]] std::array<std::uint8_t, 32> get_local_ephemeral_public_key();

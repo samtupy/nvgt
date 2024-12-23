@@ -176,7 +176,7 @@ const network_event* network::request(uint32_t timeout) {
 		e->peer_id = peer_id;
 	} else if (event.type == ENET_EVENT_TYPE_RECEIVE) {
 		peer_data* pd = reinterpret_cast<peer_data*>(event.peer->data);
-if (pd->handshake && pd->handshake.is_my_turn()) {
+if (pd->handshake && pd->handshake->is_my_turn()) {
 			
 		}
 				e->peer_id = pd->id;

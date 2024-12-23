@@ -883,8 +883,8 @@ void HandshakeState::initialize(const HandshakeStateConfiguration &config) {
   completed = false;
 }
 
-void HandshakeState::write_message(std::vector<std::uint8_t> &payload,
-                                   std::vector<std::uint8_t> &message_buffer) {
+template <STLContainer T> void HandshakeState::write_message(T &payload,
+                                   T &message_buffer) {
   if (completed) {
     throw std::runtime_error("Handshake has already been completed!");
   }
@@ -976,13 +976,13 @@ void HandshakeState::write_message(std::vector<std::uint8_t> &payload,
   }
 }
 
-void HandshakeState::write_message(std::vector<std::uint8_t> &message_buffer) {
+template <STLContainer T> void HandshakeState::write_message(T &message_buffer) {
   std::vector<std::uint8_t> null_payload;
   write_message(null_payload, message_buffer);
 }
 
-void HandshakeState::read_message(std::vector<std::uint8_t> &message,
-                                  std::vector<std::uint8_t> &payload_buffer) {
+template <STLContainer T> void HandshakeState::read_message(T &message,
+                                  T &payload_buffer) {
   if (completed) {
     throw std::runtime_error("Handshake has already been completed!");
   }
@@ -1076,7 +1076,7 @@ void HandshakeState::read_message(std::vector<std::uint8_t> &message,
   }
 }
 
-void HandshakeState::read_message(std::vector<std::uint8_t> &message_buffer) {
+template<STLContainer T> void HandshakeState::read_message(T &message_buffer) {
   std::vector<std::uint8_t> null_payload;
   read_message(null_payload, message_buffer);
 }
