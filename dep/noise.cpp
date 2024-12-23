@@ -538,6 +538,10 @@ std::tuple<CipherState, CipherState> SymmetricState::split() {
 
 bool SymmetricState::cs_has_key() const { return cs.has_key(); }
 
+HandshakeState::HandshakeState(const HandshakeStateConfiguration &config) {
+  initialize(config);
+}
+
 HandshakeState::~HandshakeState() {
   crypto_wipe(spk.data(), spk.size());
   crypto_wipe(ssk.data(), ssk.size());
@@ -1070,6 +1074,11 @@ void HandshakeState::read_message(std::vector<std::uint8_t> &message,
   } else {
     my_turn = true;
   }
+}
+
+void HandshakeState::read_message(std::vector<std::uint8_t> &message_buffer) {
+  std::vector<std::uint8_t> null_payload;
+  read_message(null_payload, message_buffer);
 }
 
 std::array<std::uint8_t, 64> HandshakeState::get_handshake_hash() {

@@ -20,11 +20,14 @@
 	#include <cstring>
 #endif
 #include <map>
+#include <memory>
 #include <unordered_map>
 #include <string>
 #include <angelscript.h>
 #include <scriptarray.h>
-#include "noise.h"
+
+namespace noise { struct HandshakeStateConfiguration; }
+struct peer_data;
 
 extern bool g_enet_initialized;
 class network_event;
@@ -34,9 +37,7 @@ class network {
 	std::unordered_map<asQWORD, ENetPeer*> peers;
 	asQWORD next_peer;
 	unsigned char channel_count;
-	noise::HandshakeState hs_state;
-	noise::CipherState cs_send, cs_recv;
-	bool no_encryption = false;
+	std::unique_ptr<noise::HandshakeStateConfiguration>  encryption_state;
 	ENetPeer* get_peer(asQWORD peer_id);
 	// Enet's total_sent/received counters are 32 bit integers that can overflow, work around that
 	asQWORD total_sent_data, total_sent_packets, total_received_data, total_received_packets;
@@ -50,6 +51,7 @@ class network {
 	void reset_totals() {
 		total_sent_data = total_sent_packets = total_received_data = total_received_packets = 0;
 	}
+	peer_data* new_peer_data(asQWORD id);
 public:
 	bool is_client;
 	bool IPv6enabled;
@@ -58,9 +60,11 @@ public:
 	void addRef();
 	void release();
 	void destroy(bool flush = true);
-	bool setup_client(unsigned char max_channels, unsigned short max_peers, bool opt_out_of_encryption);
-	bool setup_server(unsigned short port, unsigned char max_channels, unsigned short max_peers, bool opt_out_of_encryption);
-	bool setup_local_server(unsigned short port, unsigned char max_channels, unsigned short max_peers, bool opt_out_of_encryption);
+	bool set_encryption(bool enabled, const std::string& password = "");
+	bool get_encryption() { return encryption_state != nullptr; }
+	bool setup_client(unsigned char max_channels, unsigned short max_peers);
+	bool setup_server(unsigned short port, unsigned char max_channels, unsigned short max_peers);
+	bool setup_local_server(unsigned short port, unsigned char max_channels, unsigned short max_peers);
 	asQWORD connect(const std::string& hostname, unsigned short port);
 	const network_event* request(uint32_t timeout = 0);
 	std::string get_peer_address(asQWORD peer_id);
