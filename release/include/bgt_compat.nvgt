@@ -91,7 +91,7 @@ bool show_game_window(const string& in title) {
 }
 
 bool hide_game_window() {
-	hide_window();
+	return hide_window();
 }
 
 bool is_game_window_active() {
