@@ -416,7 +416,7 @@ class ini {
 	}
 
 	// Fetch a string given a section and key. All getters will use this format, and if one returns a default value (blank string, an int that equals 0, a boolean that equals false etc), and if you want to know whether the key actually existed, use the error checking system.
-	string get_string(const string& in section, const string& in key, string default_value = "") {
+	string get_string(const string& in section, const string& in key, const string&in default_value = "") {
 		ini_section@ tmp = this.get_section_verified(section, key, true, "get string");
 		if (@tmp != null)
 			return tmp.get_string(key);
@@ -581,7 +581,7 @@ class ini_section {
 	}
 
 	// Add a raw string value to the section. If the key already exists, overwrite it in it's current place. This is the base function that is used to set all other datatypes, since they all end up as strings. The raw argument controls whether the string should be escaped before adding or whether this is raw data. It is mostly used internally and it is safe to keep it at false (the default) unless there is not a suitable datatype in this class for your situation and you're trying to write your own or something. Regardless only change the raw argument if you know what your doing.
-	void set_string(const string& in key_name, string value, bool raw = false) {
+	void set_string(const string& in key_name, const string&in value, bool raw = false) {
 		if (!this.keys.exists(key_name))
 			this.key_names.insert_last(key_name);
 		if (!raw)
@@ -635,21 +635,21 @@ bool INI_IS_VALID_IDENT_CHAR(const string& in char) {
 }
 
 // Escape backslash, cama, colon and semicolon
-string INI_ESCAPE_STRING(string value) {
-	value.replace_this("\\", "\\\\", true);
-	value.replace_this(",", "\\,", true);
-	value.replace_this(":", "\\:", true);
-	value.replace_this(";", "\\;", true);
-	return value;
+string INI_ESCAPE_STRING(const string&in value) {
+	string result = value.replace("\\", "\\\\", true);
+	result.replace_this(",", "\\,", true);
+	result.replace_this(":", "\\:", true);
+	result.replace_this(";", "\\;", true);
+	return result;
 }
 
 // Unescape backslash, cama, colon and semicolon
-string INI_UNESCAPE_STRING(string value) {
-	value.replace_this("\\\\", "\\", true);
-	value.replace_this("\\,", ",", true);
-	value.replace_this("\\:", ":", true);
-	value.replace_this("\\;", ";", true);
-	return value;
+string INI_UNESCAPE_STRING(const string&in value) {
+	string result = value.replace("\\\\", "\\", true);
+	result.replace_this("\\,", ",", true);
+	result.replace_this("\\:", ":", true);
+	result.replace_this("\\;", ";", true);
+	return result;
 }
 
 // Verify an identifier to make sure keys and section names with invalid characters aren't permitted. A blank string returned means that the identifier is OK, anything else is error text.

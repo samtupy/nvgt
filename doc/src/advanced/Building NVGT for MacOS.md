@@ -5,9 +5,12 @@ There is a [script to build NVGT on macOS](https://raw.githubusercontent.com/sam
 
 Internally, this script is used within our GitHub Actions to make builds of NVGT. It is also used within our local testing environments.
 
+### Notes
+* This script will create and activate a [virtual environment](https://docs.python.org/3/library/venv.html).
+
 This script can be ran in two modes:
-* Adding `ci` as an argument causes the dependencies to be downloaded in the current working directory inside a `deps` folder (useful if you already are working from within NVGT).
-* If `ci` is not present, the script will assume NVGT is not downloaded and will clone NVGT before attempting to build it.
+* Adding `ci` as an argument causes the dependencies to be downloaded in the current working directory inside a `deps` folder (useful if you already are working from within NVGT's source directory).
+* If `ci` is not present, the script will assume NVGT is not downloaded and will clone NVGT into the current directory before attempting to build it.
 
 ### Example of Running the script with the `ci` argument
 It is assumed you are in a freshly-cloned NVGT, so that your working directory ends with `nvgt`.
@@ -28,7 +31,7 @@ chmod +x build_macos.sh
 
 
 ## Building NVGT manually
-Below are some older notes for building NVGT for macOS.
+If you wish to build manually, some rather old instructions are below. At this time, it would probably be much more beneficial to read the `build_macos.sh` script or [readme.md](https://github.com/samtupy/nvgt) for much more updated commands; the below commands are here for reference and aren't updated often.
 
 Assuming xcode and homebrew are installed:
 

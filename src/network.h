@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include <enet.h>
+#include <enet6/enet.h>
 #ifdef _WIN32
 	#define WIN32_LEAN_AND_MEAN
 	#include <windows.h>
@@ -48,6 +48,8 @@ class network {
 	}
 public:
 	bool is_client;
+	bool IPv6enabled;
+	bool receive_timeout_event;
 	network();
 	void addRef();
 	void release();

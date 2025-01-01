@@ -1083,7 +1083,7 @@ BOOL sound::postload(const string& filename) {
 		iplBinauralEffectCreate(phonon_context, &phonon_audio_settings, &effect_settings, &hrtf_effect);
 	}
 	if (!parent_mixer)
-		parent_mixer = output;
+		parent_mixer = g_default_mixer? g_default_mixer : output;
 	if (!output_mixer) {
 		output_mixer = new mixer(parent_mixer, !env);
 		if (listener_x != x || listener_y != y || listener_z != z || env)
@@ -1091,8 +1091,6 @@ BOOL sound::postload(const string& filename) {
 	} else if (!pos_effect && (listener_x != x || listener_y != y || listener_z != z || env))
 		pos_effect = BASS_ChannelSetDSP(output_mixer->channel, positioning_dsp, this, 0);
 	store_channel = register_hstream(channel);
-	if (g_default_mixer != NULL)
-		set_mixer(g_default_mixer);
 	output_mixer->add_sound(*this, TRUE);
 	script_loading = FALSE;
 	return TRUE;

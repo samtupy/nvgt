@@ -1,8 +1,8 @@
 /**
 	Determines if a string ends with another string.
-	bool string::ends_with(string str);
+	bool string::ends_with(const string&in str);
 	## Arguments:
-		* string str: the string to look for.
+		* const string&in str: the string to look for.
 	## Returns:
 		bool: true if the string ends with the specified search, false if not.
 */

@@ -9,7 +9,7 @@ Help("""
 	Available custom build switches for NVGT:
 		copylibs=0 or 1 (default 1): Copy shared libraries to release/lib after building?
 		debug=0 or 1 (default 0): Include debug symbols in the resulting binaries?
-		no_upx=0 or 1 (defaulot 1): Disable UPX stubs?
+		no_upx=0 or 1 (default 1): Disable UPX stubs?
 		no_plugins=0 or 1 (default 0): Disable the plugin system entirely?
 		no_shared_plugins=0 or 1 (default 0): Only compile plugins statically?
 		no_stubs=0 or 1 (default 0): Disable compilation of all stubs?
@@ -42,7 +42,7 @@ if env["PLATFORM"] == "win32":
 	env.Append(LIBS = ["UniversalSpeechStatic", "angelscript64", "SDL3"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
 else:
-	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-O2", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result"], LIBS = ["m"])
+	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-O0" if ARGUMENTS.get("debug", 0) == "1" else "-O3", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result", "-g" if ARGUMENTS.get("debug", 0) == "1" else ""], LIBS = ["m"])
 if env["PLATFORM"] == "darwin":
 	# homebrew paths and other libraries/flags for MacOS
 	env.Append(CCFLAGS = ["-mmacosx-version-min=14.0", "-arch", "arm64", "-arch", "x86_64"], LINKFLAGS = ["-arch", "arm64", "-arch", "x86_64"])
@@ -52,7 +52,7 @@ elif env["PLATFORM"] == "posix":
 	# enable the gold linker to silence seemingly pointless warnings about symbols in the bass libraries, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
 	env.Append(CPPPATH = ["/usr/local/include"], LIBPATH = ["/usr/local/lib"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
-	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL3.a", "crypto", "ssl"])
+	env.Append(LIBS = [":libangelscript.a", ":libenet6.a", ":libSDL3.a", "crypto", "ssl"])
 env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
@@ -73,7 +73,7 @@ if "version.cpp" in sources: sources.remove("version.cpp")
 env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
 version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.
 VariantDir("build/obj_src", "src", duplicate = 0)
-env.Append(LIBS = [["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoZip", "PocoFoundation"] if env["PLATFORM"] != "win32" else [], "phonon", "bass", "bass_fx", "bassmix", "reactphysics3d"])
+env.Append(LIBS = [["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoZip", "PocoFoundation"] if env["PLATFORM"] != "win32" else [], "phonon", "bass", "bass_fx", "bassmix", "enet6", "reactphysics3d"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(LINKFLAGS = ["/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll"])

@@ -115,7 +115,7 @@ std::string android_get_main_shared_object() {
 // Usually this involves defining no-op versions of functions that are only available on certain platforms, though can sometimes include wrappers as well to get around char* and other things that we can't directly register.
 #ifndef SDL_PLATFORM_LINUX
 bool SDL_SetLinuxThreadPriority(Sint64 threadID, int priority) { return false; }
-bool SDL_SetLinuxThreadPriorityAndPolicy(Sint64 threadID, int priority, int schedPolocy) { return false; }
+bool SDL_SetLinuxThreadPriorityAndPolicy(Sint64 threadID, int priority, int schedPolicy) { return false; }
 #endif
 #ifndef SDL_PLATFORM_ANDROID
 int SDL_GetAndroidSDKVersion() { return -1; }

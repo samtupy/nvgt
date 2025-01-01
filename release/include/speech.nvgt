@@ -18,8 +18,12 @@ bool use_sr = true;
 string voicename = "SR";
 audio_form@ tts_config_form = null;
 bool tts_default_interrupt = true;
-bool speak(string text, bool interrupt = tts_default_interrupt, bool translate_text = true, bool braille = true) {
+funcdef string text_processing_callback(const string&in text);
+text_processing_callback@ tts_default_text_processing_callback = null;
+bool speak(string text, bool interrupt = tts_default_interrupt, text_processing_callback@ processing_callback = tts_default_text_processing_callback, bool braille = true) {
 	speechbuff = text;
+	if (@processing_callback != null) text = processing_callback(text);
+	if (braille) screen_reader_braille(text);
 	if (text.length() > 10000) {
 		string tmp = text;
 		while (tmp.length() > 0) {
@@ -55,7 +59,7 @@ void stop_speech() {
 	tts.stop();
 }
 
-string tts_dump_config(tts_voice@ v, bool save_screen_reader_setting = ffalse) {
+string tts_dump_config(tts_voice@ v, bool save_screen_reader_setting = false) {
 	string o;
 	if (v.voice < 0) return "default";
 	else o = v.get_voice_name(v.voice) + "||";

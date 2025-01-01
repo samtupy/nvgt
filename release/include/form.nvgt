@@ -13,41 +13,46 @@
 
 #include "speech.nvgt"
 
-/*
-modified by Sam Tupy:
-audioform_input_disable_ralt
-added search text functionality
-control+arrows now moves by more than just space
-added get_line_number, get_line_column, and set_line functions
-added the ct_form control type
-added the ct_keyboard_area control type
-changed some text field cosmetics
-added multiline_enter as an optional arg to create_input_box to make shift or control+enter insert a new line while enter still activates the default control
-adds focus_silently and focus_interrupt functions
-adds set_default_controls function
-list items can now have ID strings apart from the item names (add_list_item extra param, get_list_item_id, edit_list_item_id)
-shortcut announcement now respects the separate_attributes parameter
-fixed absolutely critical multiline bug that somehow made it into BGT's release
-pasting text now moves cursor to end of pasted text
-added set_keyboard_echo function
-added set_default_keyboard_echo function
-finished keyboard echo modes
-added complete keyboard repeating
-added multi-letter-navigation in lists with a function called set_list_multinavigation that lets you enable or disable it for both letters and numbers
-fixed and changed anouncement of checkboxes
-deleting text now calls input_box_speak with ignore_echo_flag set to true
-delete_speech_text now empty by default and no space is added to text string if this is true (if you press backspace or delete you know your deleting)
-fixed selections speaking the contents of password fields
-pasting in text fields now just says text pasted instead of anouncing what you have pasted, both to decrease annoyance and to make password fields secure
-create_list now has a repeat_boundary_items argument, which if true causes pressing up or down arrows on list boundaries to repeat the first or last item depending
-set_list_position now has speak_new_item argument (false by default)
-edit_list_item had taken code from add_list_item thus not allowing item editing if the list was full and also allowing a runtime error if attempting to edit an item 1 greater than the list length, these bugs have been fixed
-added the ct_slider control type, create_slider, get_slider, set_slider, get_slider_text_value, set_slider_text_value, clear_slider_text_values
-added prespeech callback
-added event callback
+/* modified by Sam Tupy:
+	audioform_input_disable_ralt
+	added search text functionality
+	control+arrows now moves by more than just space
+	added get_line_number, get_line_column, and set_line functions
+	added the ct_form control type
+	added the ct_keyboard_area control type
+	changed some text field cosmetics
+	added multiline_enter as an optional arg to create_input_box to make shift or control+enter insert a new line while enter still activates the default control
+	adds focus_silently and focus_interrupt functions
+	adds set_default_controls function
+	list items can now have ID strings apart from the item names (add_list_item extra param, get_list_item_id, edit_list_item_id)
+	shortcut announcement now respects the separate_attributes parameter
+	fixed absolutely critical multiline bug that somehow made it into BGT's release
+	pasting text now moves cursor to end of pasted text
+	added set_keyboard_echo function
+	added set_default_keyboard_echo function
+	finished keyboard echo modes
+	added complete keyboard repeating
+	added multi-letter-navigation in lists with a function called set_list_multinavigation that lets you enable or disable it for both letters and numbers
+	fixed and changed anouncement of checkboxes
+	deleting text now calls input_box_speak with ignore_echo_flag set to true
+	delete_speech_text now empty by default and no space is added to text string if this is true (if you press backspace or delete you know your deleting)
+	fixed selections speaking the contents of password fields
+	pasting in text fields now just says text pasted instead of anouncing what you have pasted, both to decrease annoyance and to make password fields secure
+	create_list now has a repeat_boundary_items argument, which if true causes pressing up or down arrows on list boundaries to repeat the first or last item depending
+	set_list_position now has speak_new_item argument (false by default)
+	edit_list_item had taken code from add_list_item thus not allowing item editing if the list was full and also allowing a runtime error if attempting to edit an item 1 greater than the list length, these bugs have been fixed
+	added the ct_slider control type, create_slider, get_slider, set_slider, get_slider_text_value, set_slider_text_value, clear_slider_text_values
+	added prespeech callback
+	added event callback
 */
 
 //constants
+enum clipboard_flags
+	{
+	clipboard_flag_copy = 1 << 0,
+	clipboard_flag_cut = 1 << 1,
+	clipboard_flag_paste = 1 << 2
+}
 enum control_types {
 	ct_button = 0,
 	ct_input,
@@ -103,18 +108,22 @@ enum control_event_type {
 string audioform_word_separators = "_ .,!\\\"/[{()}]=\n";
 //prespeech callback, if set the given function will be called right before the form speaks.
 funcdef void prespeech_callback(audio_form@ f);
+// Background callback, this method is fired at the top of the monitor function and can return false to abort the forms monitor logic during that iteration. It can be useful when creating UI extension libraries that need to insert logic into any form in an application without modifying every loop that invoques form.monitor in the target application.
+funcdef bool form_background_callback(audio_form@ f);
 //control event callback
 funcdef int on_control_event_callback(audio_form@ f, int c, control_event_type event, dictionary@ args);
 
 //can make this a member of the audio form class as soon as even one person suggests seriously wanting to change on a form by form basis I guess
 bool audioform_input_disable_ralt = true;
 int audioform_keyboard_echo = textflag_characters;
+form_background_callback@ audioform_default_background_callback = null;
 //main window class
 class audio_form {
 	bool active;
 	bool speak_control_attributes_separately;
 	int subform_control_index = -1;
 	on_control_event_callback@ event_callback = null;
+	form_background_callback@ background_callback = @audioform_default_background_callback;
 	utility_form@ utility_form = null;
 	dictionary utility_form_data;
 	//constructor
@@ -270,6 +279,8 @@ class audio_form {
 		c_form[control_counter].caption = caption.replace("&", "", true);
 		c_form[control_counter].visible = true;
 		c_form[control_counter].enabled = true;
+		c_form[control_counter].enable_delete = true;
+		set_clipboard_flags(control_counter, true, true, true);
 		c_form[control_counter].speech_output = speech_output;
 		if ((maximum_length > 0) && (default_text.length() > maximum_length)) {
 			default_text = default_text.substr(0, maximum_length);
@@ -586,7 +597,7 @@ class audio_form {
 		return true;
 	}
 	int monitor() {
-		if (total_keys_down() < 1) return 0;
+		if (@background_callback != null and background_callback(this) and total_keys_down() < 1) return 0;
 		if (@utility_form != null) {
 			utility_form.monitor();
 			return 0;
@@ -1144,6 +1155,40 @@ class audio_form {
 		}
 		c_form[control_index].enabled = enabled;
 		c_form[control_index].visible = visible;
+		return true;
+	}
+	bool set_enable_delete(int control_index, bool enabled) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_index].enable_delete = enabled;
+		return true;
+	}
+	bool set_delete_disabled_message(int control_index, string message) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_index].delete_disabled_message = message;
 		return true;
 	}
 	bool set_enable_go_to_index(int control_index, bool enabled) {
@@ -1928,6 +1973,27 @@ class audio_form {
 		}
 		return true;
 	}
+	bool set_input_read_only(int control_index, bool read_only) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return false;
+		}
+		if (c_form[control_index].type != ct_input) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_index].read_only = read_only;
+		return true;
+	}
 	bool set_slider(int control_index, double value, double min = -1, double max = -1) {
 		form_error = 0;
 		if (!active) {
@@ -2121,6 +2187,23 @@ class audio_form {
 		c_form[control_index].percentage_speech_text = percentage;
 		c_form[control_index].delete_speech_text = deletion;
 		c_form[control_index].echo_flag = keyboard_echo;
+		return true;
+	}
+	bool set_clipboard_flags(int control_index, bool copy, bool cut, bool paste) {
+		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return false;
+		}
+		if ((control_index < 0) || (control_index > c_form.length() - 1)) {
+			form_error = form_error_invalid_index;
+			return false;
+		}
+		if (!c_form[control_index].active) {
+			form_error = form_error_invalid_control;
+			return false;
+		}
+		c_form[control_index].clipboard_flags = ((copy ? clipboard_flag_copy : 0) | (cut ? clipboard_flag_cut : 0) | (paste ? clipboard_flag_paste : 0));
 		return true;
 	}
 	bool set_keyboard_echo(int control_index, int keyboard_echo) {
@@ -2512,14 +2595,18 @@ class control {
 	string[] disallowed_chars;
 	bool use_only_disallowed_chars;
 	string char_disallowed_description;
+	bool enable_delete;
+	string delete_disabled_message;
 	bool enable_go_to_index; //This is mostly used on go to index field where it prevents the key from pressing again.
 	bool enable_search;
+	uint8 clipboard_flags;
 	control() {
 		progress_time.restart();
 		progress_time.pause();
 		multinav_timer.restart();
 		multinav_timer.pause();
 		caption = "";
+		custom_type = "";
 		text = "";
 		password_mask = "";
 		type = -1;
@@ -2657,19 +2744,27 @@ class control {
 					else
 						add(char);
 				}
-				if (((key_down(KEY_LCTRL)) || (key_down(KEY_RCTRL))) && (key_repeating(KEY_X)) && password_mask == "")
+				if ((clipboard_flags & clipboard_flag_cut > 0) && (keyboard_modifiers & KEYMOD_CTRL > 0) && (key_repeating(KEY_X)) && password_mask == "")
 					cut_highlighted();
-				if (((key_down(KEY_LCTRL)) || (key_down(KEY_RCTRL))) && (key_repeating(KEY_V)) || key_pressed(KEY_PASTE))
+				if ((clipboard_flags & clipboard_flag_paste > 0) && (keyboard_modifiers & KEYMOD_CTRL > 0) && (key_repeating(KEY_V)) || key_pressed(KEY_PASTE))
 					paste_text();
 				if (key_repeating(KEY_BACK)) {
-					if ((key_down(KEY_LCTRL) || key_down(KEY_RCTRL)) && (sel_start < 0 || sel_end < 0 || sel_start > sel_end)) {
+					if (!enable_delete) {
+						speak(delete_disabled_message);
+						return;
+					}
+					if ((keyboard_modifiers & KEYMOD_CTRL > 0) && (sel_start < 0 || sel_end < 0 || sel_start > sel_end)) {
 						delete_word_left();
 						return;
 					}
 					delete_highlighted();
 				}
 				if (key_repeating(KEY_DELETE)) {
-					if ((key_down(KEY_LCTRL) || key_down(KEY_RCTRL)) && (sel_start < 0 || sel_end < 0 || sel_start > sel_end)) {
+					if (!enable_delete) {
+						speak(delete_disabled_message);
+						return;
+					}
+					if ((keyboard_modifiers & KEYMOD_CTRL > 0) && (sel_start < 0 || sel_end < 0 || sel_start > sel_end)) {
 						delete_word_right();
 						return;
 					}
@@ -2680,7 +2775,7 @@ class control {
 			}
 			if (((key_down(KEY_LCTRL)) || (key_down(KEY_RCTRL))) && key_up(KEY_LSHIFT) && key_up(KEY_RSHIFT) && (key_repeating(KEY_A)))
 				highlight_all();
-			if (((key_down(KEY_LCTRL)) || (key_down(KEY_RCTRL))) && (key_repeating(KEY_C)) && (password_mask == ""))
+			if ((clipboard_flags & clipboard_flag_copy > 0) && (keyboard_modifiers & KEYMOD_CTRL > 0) && (key_repeating(KEY_C)) && (password_mask == ""))
 				copy_highlighted();
 			if (key_repeating(KEY_LEFT)) {
 				if ((key_down(KEY_LCTRL)) || (key_down(KEY_RCTRL))) {
@@ -3121,7 +3216,7 @@ class control {
 		sel_end = -1;
 		if (!multiline) {
 			cursor = text.length();
-			speak(read_line(0), true, false);
+			speak(read_line(0), true, null);
 			return;
 		}
 		int line_start = current_line_start_position();
@@ -3135,10 +3230,10 @@ class control {
 			if (text[counter] != "\n")
 				continue;
 			cursor = counter + 1;
-			speak(read_line(cursor), true, false);
+			speak(read_line(cursor), true, null);
 			return;
 		}
-		speak(read_line(line_start), true, false);
+		speak(read_line(line_start), true, null);
 		cursor = text.length();
 	}
 	void previous_line() {
@@ -3150,14 +3245,14 @@ class control {
 			if (text == "")
 				speak("Blank");
 			else
-				speak(read_line(0), true, false);
+				speak(read_line(0), true, null);
 			return;
 		}
 		cursor = line_start - 1;
 		cursor = current_line_start_position();
 		if (cursor < 0)
 			cursor = 0;
-		speak(read_line(cursor), true, false);
+		speak(read_line(cursor), true, null);
 	}
 	void highlight_all() {
 		if (text == "") {
@@ -3175,7 +3270,7 @@ class control {
 		if (selection.length() >= 1024 || password_mask != "")
 			speak(selection.length() + " characters " + highlight_selection_speech_text);
 		else
-			speak(selection + " " + highlight_selection_speech_text, true, false);
+			speak(selection + " " + highlight_selection_speech_text, true, null);
 	}
 	void add(string character, bool silent = false) {
 		if(type != ct_input)
@@ -3672,19 +3767,19 @@ class control {
 				if (sel_end == -1)
 					sel_end = cursor - 1;
 				if (speak_selection_status) speak_selected(text.substr(sel_start, cursor - sel_start));
-				else speak(text.substr(sel_start, cursor - sel_start), true, false);
+				else speak(text.substr(sel_start, cursor - sel_start), true, null);
 				cursor = sel_start;
 				return;
 			} else if (cursor == sel_end || cursor - 1 == sel_end) {
 				sel_end = pos - 1;
-				if (speak_selection_status) speak(text.substr(pos, cursor - 1 - pos) + " " + highlight_unselection_speech_text, true, false);
-				else speak(text.substr(pos, cursor - 1 - pos), true, false);
+				if (speak_selection_status) speak(text.substr(pos, cursor - 1 - pos) + " " + highlight_unselection_speech_text, true, null);
+				else speak(text.substr(pos, cursor - 1 - pos), true, null);
 				cursor = pos;
 				return;
 			}
 		}
 		if (cursor <= 0) {
-			speak(read_word_from_position(0), true, false);
+			speak(read_word_from_position(0), true, null);
 			return;
 		}
 		int cur_word = current_line_start_position(true);
@@ -3695,7 +3790,7 @@ class control {
 			cursor = tmp_cursor;
 		}
 		cursor = cur_word;
-		speak(read_word_from_position(cur_word), true, false);
+		speak(read_word_from_position(cur_word), true, null);
 	}
 	void move_word_right(bool highlighting = false, bool speak_selection_status = true) {
 		if (text == "" || cursor < 0 || cursor >= text.length()) {
@@ -3722,12 +3817,12 @@ class control {
 					sel_start = cursor;
 				sel_end = new_word - 1;
 				if (speak_selection_status) speak_selected(text.substr(cursor, new_word - cursor));
-				else speak(text.substr(cursor, new_word - cursor), true, false);
+				else speak(text.substr(cursor, new_word - cursor), true, null);
 				cursor = new_word;
 				return;
 			} else if (cursor == sel_start || cursor - 1 == sel_start) {
-				if (speak_selection_status) speak(text.substr(sel_start, new_word - sel_start) + " " + highlight_unselection_speech_text, true, false);
-				else speak(text.substr(sel_start, new_word - sel_start), true, false);
+				if (speak_selection_status) speak(text.substr(sel_start, new_word - sel_start) + " " + highlight_unselection_speech_text, true, null);
+				else speak(text.substr(sel_start, new_word - sel_start), true, null);
 				sel_start = new_word;
 				cursor = new_word;
 				return;
@@ -3735,7 +3830,7 @@ class control {
 		}
 		cursor = new_word;
 		if (cursor < text.length())
-			speak(read_word_from_position(cursor), true, false);
+			speak(read_word_from_position(cursor), true, null);
 		else
 			speak("Blank");
 	}
@@ -3747,7 +3842,7 @@ class control {
 			speak("Blank", true);
 			return;
 		}
-		speak(read_line(0), true, false);
+		speak(read_line(0), true, null);
 	}
 	void field_end() {
 		sel_start = -1;
@@ -3758,7 +3853,7 @@ class control {
 		}
 		cursor = text.length();
 		int line_start = current_line_start_position();
-		speak(read_line(line_start), true, false);
+		speak(read_line(line_start), true, null);
 	}
 	string read_word_from_position(int position) {
 		if (text == "")
@@ -3821,7 +3916,7 @@ class control {
 			cursor = sel_start;
 		} else if (cursor == sel_end || cursor - 1 == sel_end) {
 			sel_end = line_start;
-			speak(text.substr(sel_end, cursor - sel_end) + " " + highlight_unselection_speech_text, true, false);
+			speak(text.substr(sel_end, cursor - sel_end) + " " + highlight_unselection_speech_text, true, null);
 			cursor = sel_end;
 		}
 		if (sel_end < sel_start) {
@@ -3859,7 +3954,7 @@ class control {
 			speak_selected(text.substr(old_cursor, sel_end - old_cursor));
 		} else if (cursor == sel_start || cursor - 1 == sel_start) {
 			sel_start = line_end;
-			speak(text.substr(cursor, line_end - cursor) + " " + highlight_unselection_speech_text, true, false);
+			speak(text.substr(cursor, line_end - cursor) + " " + highlight_unselection_speech_text, true, null);
 			cursor = line_end;
 		}
 		if (sel_end < sel_start) {
