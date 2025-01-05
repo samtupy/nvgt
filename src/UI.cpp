@@ -267,6 +267,8 @@ bool ShowNVGTWindow(const std::string& window_title) {
 	SDL_ShowWindow(g_WindowHandle);
 	SDL_RaiseWindow(g_WindowHandle);
 	voice_over_window_created();
+	#elif defined(__ANDROID__)
+	g_OSWindowHandle = (NSWindow*)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, NULL);
 	#endif
 	g_WindowThreadId = thread_current_thread_id();
 	return true;
@@ -297,6 +299,10 @@ bool WindowIsFocused() {
 bool WindowIsHidden() {
 	if (!g_WindowHandle) return false;
 	return (SDL_GetWindowFlags(g_WindowHandle) & SDL_WINDOW_HIDDEN) != 0;
+}
+bool set_window_fullscreen(bool fullscreen) {
+	if (!g_WindowHandle) return false;
+return SDL_SetWindowFullscreen(g_WindowHandle, fullscreen);
 }
 std::string get_window_text() {
 	if (!g_WindowHandle) return "";
@@ -436,6 +442,7 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool focus_window()", asFUNCTION(FocusNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_window_active()", asFUNCTION(WindowIsFocused), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_window_hidden()", asFUNCTION(WindowIsHidden), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool set_window_fullscreen(bool fullscreen)", asFUNCTION(set_window_fullscreen), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_window_text()", asFUNCTION(get_window_text), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 get_window_os_handle()", asFUNCTION(get_window_os_handle), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void refresh_window()", asFUNCTION(refresh_window), asCALL_CDECL);
