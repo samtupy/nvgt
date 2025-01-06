@@ -1,0 +1,19 @@
+/**
+	Displays a dialog from which a user may select a folder.
+	string select_folder_dialog(string default_location = "")
+	## Arguments:
+		* string default_location = "": The absolute initial directory to select from (empty for OS default).
+	## Returns:
+		string: The path to a folder or an empty string on failure/cancelation.
+	## Remarks:
+		Be aware that on some platforms, the user might be able to select a directory that does not yet exist.
+		This function is blocking, though we plan to add a version of the API in the future that uses a callback function or an event you can wait on if you wish to use this dialog asynchronously.
+		You should only call this function on your application's main thread, which is what happens by default unless you use any of NVGT's threading facilities.
+*/
+
+// Example:
+void main() {
+	string location = select_folder_dialog();
+	if (location.empty()) return;
+	alert("example", "you selected " + location);
+}

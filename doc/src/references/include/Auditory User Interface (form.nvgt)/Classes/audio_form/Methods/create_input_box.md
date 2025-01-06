@@ -6,7 +6,7 @@ Creates an input box control on the audio form.
 ## Arguments:
 * string caption: the label of the input box (e.g. what will be read when you tab over it?).
 * string default_text = "": the text to populate the input box with by default (if any).
-*( string password_mask = "": a string to mask typed characters with, (e.g. "star"). Mainly useful if you want your field to be password protected. Leave blank for no password protection.
+* string password_mask = "": a string to mask typed characters with, (e.g. "star"). Mainly useful if you want your field to be password protected. Leave blank for no password protection.
 * int maximum_length = 0: the maximum number of characters that can be typed in this field, 0 for unlimited.
 * bool read_only = false: should this text field be read-only?
 * bool multiline = false: should this text field have multiple lines?

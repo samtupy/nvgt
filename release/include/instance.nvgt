@@ -14,7 +14,7 @@
 class instance {
 	private bool already_locked = false;
 	instance(const string&in app_id = "") {
-		mtx_name = crc32("G_INSTANCE_" + app_id);
+		mtx_name = crc32(NVGT_VERSION_COMMIT_HASH + app_id);
 		@mtx = named_mutex(mtx_name);
 		try {
 			already_locked = mtx.try_lock(); // If this is the first time the mutex was created by name, try_lock will return true.

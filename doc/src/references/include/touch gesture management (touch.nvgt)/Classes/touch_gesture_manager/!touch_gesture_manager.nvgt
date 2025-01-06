@@ -1,0 +1,41 @@
+/**
+	Detects and then converts raw touch screen finger data into gesture events which can be detected by your application or even converted to keyboard input.
+	touch_gesture_manager();
+	## Remarks:
+		This is the highest level interface NVGT offers to accessing touch screens. It looks at what fingers are touching the screen and where, and by monitoring that data over time, derives gestures such as swipes and taps from that data before passing them along to whatever interface you register to receive them.
+		An interface is included by default (see the touch_keyboard_interface class), which convertes these events into simulated keyboard input for you so that adding touch support to your game becomes as simple as mapping gesture names to keycode lists.
+		The basic usage of this class is to create an instatnce of it somewhere, before attaching any number of touch_interface instances to the manager and finally calling manager.monitor() within the loops of your programs to receive gesture events.
+*/
+
+// Example:
+#include"touch.nvgt"
+#include"speech.nvgt"
+touch_gesture_manager touch;
+void main() {
+	show_window("touch screen test");
+	//attach multiple keys to a single gesture.
+	int[] t = {KEY_TAB, KEY_LSHIFT};
+	touch_keyboard_interface testsim(touch, {{"swipe_left1f", KEY_LEFT}, {"swipe_right1f", KEY_RIGHT}, {"swipe_up1f", KEY_UP}, {"swipe_down1f", KEY_DOWN}, {"double_tap1f", KEY_RETURN}, {"tripple_tap1f", t}, {"swipe_left2f", KEY_ESCAPE}, {"swipe_right2f", KEY_Q}, {"double_tap2f", KEY_SPACE}});
+	touch.add_touch_interface(testsim);
+	dictionary@d = {{"double_tap1f", KEY_X}, {"double_tap2f", KEY_Z}};
+	// Demonstrate registering an interface for only a portion of the screen.
+	touch.add_touch_interface(touch_keyboard_interface(touch, d, 0.5, 1.0, 0.5, 1.0));
+	while (!key_pressed(KEY_ESCAPE) and !key_pressed(KEY_AC_BACK)) {
+		wait(5);
+		touch.monitor();
+		if (key_pressed(KEY_LEFT)) speak("left");
+		if (key_pressed(KEY_RIGHT)) speak("right");
+		if (key_pressed(KEY_DOWN)) speak("down");
+		if (key_pressed(KEY_UP)) speak("up");
+		if (key_pressed(KEY_TAB)) {
+			speak("tripple tap");
+			if (key_down(KEY_LSHIFT) or key_down(KEY_RSHIFT)) speak("you are holding down shift", false);
+		}
+		if (key_pressed(KEY_SPACE)) speak("double tap 2 fingers");
+		if (key_pressed(KEY_ESCAPE)) exit();
+		if (key_pressed(KEY_Q)) speak("swipe right 2 fingers");
+		if (key_pressed(KEY_RETURN)) speak("you just double tapped the screen!", false);
+		if (key_pressed(KEY_X)) speak("You just double tapped another part of the screen!");
+		if (key_pressed(KEY_Z)) speak("You just double tapped with 2 fingers on another part of the screen!");
+	}
+}

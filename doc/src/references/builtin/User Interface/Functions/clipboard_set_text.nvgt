@@ -1,8 +1,8 @@
 /**
 	Sets the text on the user's clipboard.
-	bool clipboard_set_text(string text);
+	bool clipboard_set_text(const string&in text);
 	## Arguments:
-		* string text: the text to copy, assumed to be UTF_8.
+		* const string&in text: the text to copy, assumed to be UTF_8.
 	## Returns:
 		Bool: true on success, false on failure.
 	## Remarks:

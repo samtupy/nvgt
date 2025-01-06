@@ -14,7 +14,7 @@
 #include <obfuscate.h>
 #include <scriptarray.h>
 #include <scriptdictionary.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "library.h"
 #include "nvgt.h" // g_ScriptEngine, NVGT_SUBSYSTEM_DLLCALL
 #include "serialize.h" // g_StringTypeid.
@@ -87,7 +87,7 @@ void library::call(asIScriptGeneric* gen) {
 		}
 		engine->EndConfigGroup();
 		func = engine->GetFunctionById(id);
-		void* addr = SDL_LoadFunction(shared_object, func->GetName());
+		void* addr = (void*)SDL_LoadFunction(shared_object, func->GetName());
 		if (!addr) {
 			engine->RemoveConfigGroup("parse_decl");
 			ACtx->SetException("can't find function");
@@ -178,9 +178,9 @@ void RegisterScriptLibrary(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("library"), asBEHAVE_FACTORY, _O("library @l()"), asFUNCTION(new_script_library), asCALL_CDECL);
 	engine->RegisterObjectBehaviour(_O("library"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(library, add_ref), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("library"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(library, release), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("library"), _O("bool load(const string&in)"), asMETHOD(library, load), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("library"), _O("bool load(const string&in filename)"), asMETHOD(library, load), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("bool unload()"), asMETHOD(library, load), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("bool get_active() const property"), asMETHOD(library, is_active), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("library"), _O("dictionary@ call(const string&in, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null)"), asFUNCTION(library_call_generic), asCALL_GENERIC);
-	engine->RegisterGlobalFunction("string string_create_from_pointer(uint64, uint64)", asFUNCTION(string_create_from_pointer), asCALL_CDECL);
+	engine->RegisterObjectMethod(_O("library"), _O("dictionary@ call(const string&in signature, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null)"), asFUNCTION(library_call_generic), asCALL_GENERIC);
+	engine->RegisterGlobalFunction("string string_create_from_pointer(uint64 ptr, uint64 length)", asFUNCTION(string_create_from_pointer), asCALL_CDECL);
 }

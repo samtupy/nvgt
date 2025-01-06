@@ -141,18 +141,14 @@ This is a complete list of possible keycodes in NVGT, as well as a short descrip
 * KEY_MUTE: the Mute key.
 * KEY_VOLUMEUP: the Volume Up key.
 * KEY_VOLUMEDOWN: the Volume Down key.
-* KEY_AUDIONEXT: the Audio Next key.
-* KEY_AUDIOPREV: the Audio Previous key.
-* KEY_AUDIOSTOP: the Audio Stop key.
-* KEY_AUDIOPLAY: the Audio Play key.
-* KEY_AUDIOMUTE: the Audio Mute key.
-* KEY_MEDIASELECT: the Media Select key.
+* KEY_MEDIA_NEXT_TRACK: the next track key.
+* KEY_MEDIA_PREVIOUS_TRACK: the previous track key.
+* KEY_MEDIA_STOP: the stop media key.
+* KEY_MEDIA_PLAY: the play media key.
+* KEY_MUTE: the mute key.
+* KEY_MEDIA_SELECT: the media select key.
 
 ## Browser and Application keys
-* KEY_WWW: the WWW key.
-* KEY_MAIL: the Mail key.
-* KEY_CALCULATOR: the Calculator key.
-* KEY_COMPUTER: the Computer key.
 * KEY_AC_SEARCH: the AC Search key.
 * KEY_AC_HOME: the AC Home key.
 * KEY_AC_BACK: the AC Back key.
@@ -162,18 +158,10 @@ This is a complete list of possible keycodes in NVGT, as well as a short descrip
 * KEY_AC_BOOKMARKS: the AC Bookmarks key.
 
 ## Additional keys
-* KEY_BRIGHTNESSDOWN: the Brightness Down key.
-* KEY_BRIGHTNESSUP: the Brightness Up key.
-* KEY_DISPLAYSWITCH: the Display Switch key.
-* KEY_KBDILLUMTOGGLE: the Keyboard Illumination Toggle key.
-* KEY_KBDILLUMDOWN: the Keyboard Illumination Down key.
-* KEY_KBDILLUMUP: the Keyboard Illumination Up key.
-* KEY_EJECT: the Eject key.
-* KEY_SLEEP: the Sleep key.
-* KEY_APP1: the Application 1 key.
-* KEY_APP2: the Application 2 key.
-* KEY_AUDIOREWIND: the Audio Rewind key.
-* KEY_AUDIOFASTFORWARD: the Audio Fast Forward key.
+* KEY_MEDIA_EJECT: the eject key.
+* KEY_SLEEP: the sleep key.
+* KEY_MEDIA_REWIND: the media rewind key.
+* KEY_MEDIA_FAST_FORWARD: the media fast forward key.
 * KEY_SOFTLEFT: the Soft Left key.
 * KEY_SOFTRIGHT: the Soft Right key.
 * KEY_CALL: the Call key.

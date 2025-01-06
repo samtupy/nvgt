@@ -17,32 +17,47 @@
 #endif
 #include <obfuscate.h>
 #ifdef __APPLE__
-#include "apple.h"
+	#include "apple.h"
 #endif
 #include "riffheader.h"
 #include "tts.h"
 #include "UI.h"
+#ifdef __ANDROID__
+	#include <jni.h>
+	#include <Poco/Exception.h>
+	#include <Poco/Format.h>
+	#include <SDL3/SDL.h>
+#endif
 
-char* minitrim(char* data, unsigned long* bufsize, int bitrate, int channels) {
-	char* ptr = data;
-	if (!ptr || !bufsize || *bufsize % 2 != 0 || *bufsize < 1) return ptr;
-	short a = 3072;
-	while (bitrate == 16 && (ptr - data) < *bufsize) {
-		if (channels == 2) {
-			short l = (((short) * ptr) << 8) | *(ptr + 1);
-			short r = (((short) * (ptr + 2)) << 8) | *(ptr + 3);
-			if (l > -a && l < a && r > -a && r < a)
-				ptr += 4;
-			else break;
-		} else if (channels == 1) {
-			short s = (((short) * ptr) << 8) | *(ptr + 1);
-			if (s > -a && s < a)
-				ptr += 2;
-			else break;
+static char* minitrim(char* data, unsigned long* size, int bitrate, int channels, int begin_threshold = 512, int end_threshold = 128) {
+	int samplesPerFrame = channels * (bitrate / 8);
+	int numSamples = *size / samplesPerFrame;
+	int startIndex = 0;
+	int endIndex = numSamples - 1;
+	for (int i = 0; i < numSamples; i++) {
+		int maxAbsValue = 0;
+		for (int j = 0; j < channels; j++) {
+			int absValue = abs(bitrate == 16? reinterpret_cast<short*>(data)[i * channels + j] : data[i * channels + j]);
+			if (absValue > maxAbsValue) maxAbsValue = absValue;
+		}
+		if (maxAbsValue >= begin_threshold) {
+			startIndex = i;
+			break;
 		}
 	}
-	*bufsize -= (ptr - data);
-	return ptr;
+	for (int i = numSamples - 1; i >= 0; i--) {
+		int maxAbsValue = 0;
+		for (int j = 0; j < channels; j++) {
+			int absValue = abs(bitrate == 16? reinterpret_cast<short*>(data)[i * channels + j] : data[i * channels + j]);
+			if (absValue > maxAbsValue) maxAbsValue = absValue;
+		}
+		if (maxAbsValue >= end_threshold) {
+			endIndex = i;
+			break;
+		}
+	}
+	*size = (endIndex - startIndex + 1) * samplesPerFrame;
+	return data + startIndex * samplesPerFrame;
 }
 
 tts_voice::tts_voice(const std::string& builtin_voice_name) {
@@ -75,6 +90,34 @@ void tts_voice::setup() {
 	#elif defined(__APPLE__)
 	inst = new AVTTSVoice();
 	voice_index = inst->getVoiceIndex(inst->getCurrentVoice());
+	#elif defined (__ANDROID__)
+	env = (JNIEnv*)SDL_GetAndroidJNIEnv();
+	if (!env) throw Poco::Exception("cannot retrieve JNI environment");
+	TTSClass = env->FindClass("com/samtupy/nvgt/TTS");
+	if (!TTSClass) throw Poco::Exception("Cannot find NVGT TTS class!");
+	constructor = env->GetMethodID(TTSClass, "<init>", "()V");
+	if (!constructor) throw Poco::Exception("Cannot find NVGT TTS constructor!");
+	TTSObj = env->NewObject(TTSClass, constructor);
+	if (!TTSObj) throw Poco::Exception("Can't instantiate TTS object!");
+	midIsActive = env->GetMethodID(TTSClass, "isActive", "()Z");
+	midIsSpeaking = env->GetMethodID(TTSClass, "isSpeaking", "()Z");
+	midSpeak = env->GetMethodID(TTSClass, "speak", "(Ljava/lang/String;Z)Z");
+	midSilence = env->GetMethodID(TTSClass, "silence", "()Z");
+	midGetVoice = env->GetMethodID(TTSClass, "getVoice", "()Ljava/lang/String;");
+	midSetRate = env->GetMethodID(TTSClass, "setRate", "(F)Z");
+	midSetPitch = env->GetMethodID(TTSClass, "setPitch", "(F)Z");
+	midSetPan = env->GetMethodID(TTSClass, "setPan", "(F)V");
+	midSetVolume = env->GetMethodID(TTSClass, "setVolume", "(F)V");
+	midGetVoices = env->GetMethodID(TTSClass, "getVoices", "()Ljava/util/List;");
+	midSetVoice = env->GetMethodID(TTSClass, "setVoice", "(Ljava/lang/String;)Z");
+	midGetMaxSpeechInputLength = env->GetMethodID(TTSClass, "getMaxSpeechInputLength", "()I");
+	midGetRate = env->GetMethodID(TTSClass, "getRate", "()F");
+	midGetPitch = env->GetMethodID(TTSClass, "getPitch", "()F");
+	midGetPan = env->GetMethodID(TTSClass, "getPan", "()F");
+	midGetVolume = env->GetMethodID(TTSClass, "getVolume", "()F");
+	if (!midIsActive || !midIsSpeaking || !midSpeak || !midSilence || !midGetVoice || !midSetRate || !midSetPitch || !midSetPan || !midSetVolume || !midGetVoices || !midSetVoice || !midGetMaxSpeechInputLength || !midGetPitch || !midGetPan || !midGetRate || !midGetVolume) throw Poco::Exception("One or more methods on the TTS class could not be retrieved from JNI!");
+	if (!env->CallBooleanMethod(TTSObj, midIsActive)) throw Poco::Exception("TTS engine could not be initialized!");
+	voice_index = 1;
 	#else
 	voice_index = builtin_index;
 	#endif
@@ -93,6 +136,9 @@ void tts_voice::destroy() {
 	if (!inst) return;
 	delete inst;
 	inst = nullptr;
+	#elif defined(__ANDROID__)
+	env->DeleteLocalRef(TTSObj);
+	TTSObj = nullptr;
 	#endif
 	destroyed = true;
 	voice_index = -1;
@@ -108,6 +154,10 @@ void tts_voice::Release() {
 	}
 }
 bool tts_voice::speak(const std::string& text, bool interrupt) {
+	if (text.empty()) {
+		if (audioout) BASS_ChannelStop(audioout);
+		return true;
+	}
 	unsigned long bufsize;
 	char* data = NULL;
 	if (voice_index == builtin_index) {
@@ -135,8 +185,14 @@ bool tts_voice::speak(const std::string& text, bool interrupt) {
 		}
 	}
 	#elif defined(__APPLE__)
-	else {
+	else
 		return inst->speak(text, interrupt);
+	#elif defined (__ANDROID__)
+	else {
+		jstring jtext = env->NewStringUTF(text.c_str());
+		bool r = env->CallBooleanMethod(TTSObj, midSpeak, jtext, interrupt ? JNI_TRUE : JNI_FALSE);
+		env->DeleteLocalRef(jtext);
+		return r;
 	}
 	#endif
 	if (voice_index == builtin_index && !text.empty()) {
@@ -179,7 +235,6 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 	#ifdef _WIN32
 	else {
 		if (!inst && !refresh()) return FALSE;
-		DWORD bufsize;
 		data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
 		if (!audioout || (inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels)) {
 			samprate = inst->sample_rate;
@@ -194,6 +249,9 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 	else {
 		return false; // not implemented yet.
 	}
+	#elif defined(__ANDROID__)
+	else
+		return false;
 	#endif
 	char* ptr = minitrim(data, &bufsize, bitrate, channels);
 	FILE* f = fopen(filename.c_str(), "wb");
@@ -235,7 +293,7 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 			audioout = 0;
 		}
 	}
-	#elif defined(__APPLE__)
+	#elif defined(__APPLE__) || defined(__ANDROID__)
 	else {
 		return ""; // Not implemented yet.
 	}
@@ -249,10 +307,11 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 	return output;
 }
 bool tts_voice::speak_wait(const std::string& text, bool interrupt) {
-	if (!speak(text, interrupt))
-		return false;
+	if (!speak(text, interrupt)) return false;
 	#ifdef __APPLE__
 	while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || inst->isSpeaking())
+	#elif defined(__ANDROID__)
+	while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || get_speaking())
 	#else
 	while (BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING)
 	#endif
@@ -260,7 +319,11 @@ bool tts_voice::speak_wait(const std::string& text, bool interrupt) {
 	return true;
 }
 bool tts_voice::stop() {
+	#ifndef __ANDROID__
 	return speak("", true);
+	#else
+	return env->CallBooleanMethod(TTSObj, midSilence);
+	#endif
 }
 int tts_voice::get_rate() {
 	if (voice_index == builtin_index) return builtin_rate;
@@ -272,6 +335,8 @@ int tts_voice::get_rate() {
 	return result;
 	#elif defined(__APPLE__)
 	return inst->getRate() * 7;
+	#elif defined (__ANDROID__)
+	return static_cast<int>((env->CallFloatMethod(TTSObj, midGetRate) - 1) * 10.0);
 	#endif
 	return 0;
 }
@@ -281,6 +346,8 @@ int tts_voice::get_pitch() {
 	// not implemented yet
 	#elif defined(__APPLE__)
 	return inst->getPitch();
+	#elif defined (__ANDROID__)
+	return static_cast<int>((env->CallFloatMethod(TTSObj, midGetPitch) - 1) * 10.0);
 	#endif
 	return 0;
 }
@@ -294,6 +361,8 @@ int tts_voice::get_volume() {
 	return result;
 	#elif defined(__APPLE__)
 	return inst->getRate();
+	#elif defined(__ANDROID__)
+	return static_cast<int>(env->CallFloatMethod(TTSObj, midGetVolume) - 100.0);
 	#endif
 	return 0;
 }
@@ -304,6 +373,8 @@ void tts_voice::set_rate(int rate) {
 	blastspeak_set_voice_rate(inst, rate);
 	#elif defined(__APPLE__)
 	inst->setRate(rate / 7.0);
+	#elif defined(__ANDROID__)
+	env->CallBooleanMethod(TTSObj, midSetRate, (static_cast<float>(rate) / 10.0) + 1.0);
 	#endif
 }
 void tts_voice::set_pitch(int pitch) {
@@ -312,6 +383,8 @@ void tts_voice::set_pitch(int pitch) {
 	// not implemented
 	#elif defined(__APPLE__)
 	inst->setPitch(pitch);
+	#elif defined(__ANDROID__)
+	env->CallBooleanMethod(TTSObj, midSetPitch, (static_cast<float>(pitch) / 10.0) + 1.0);
 	#endif
 	return;
 }
@@ -322,6 +395,8 @@ void tts_voice::set_volume(int volume) {
 	blastspeak_set_voice_volume(inst, volume);
 	#elif defined(__APPLE__)
 	inst->setVolume(volume);
+	#elif defined(__ANDROID__)
+	env->CallBooleanMethod(TTSObj, midSetVolume, static_cast<float>(volume) + 100.0);
 	#endif
 }
 bool tts_voice::set_voice(int voice) {
@@ -347,6 +422,9 @@ bool tts_voice::get_speaking() {
 	#ifdef __APPLE__
 	if (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING) return true;
 	return inst->isSpeaking();
+	#elif defined(__ANDROID__)
+	if (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING) return true;
+	return env->CallBooleanMethod(TTSObj, midIsSpeaking) == JNI_TRUE;
 	#else
 	if (!audioout) return false;
 	return BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING;
@@ -381,6 +459,8 @@ int tts_voice::get_voice_count() {
 	return inst ? inst->voice_count + (builtin_index + 1) : builtin_index + 1;
 	#elif defined(__APPLE__)
 	return inst->getVoicesCount() + (builtin_index + 1);
+	#elif defined(__ANDROID__)
+	return 1;
 	#endif
 	return builtin_index + 1;
 }
@@ -396,6 +476,9 @@ std::string tts_voice::get_voice_name(int index) {
 		return std::string(result);
 	#elif defined(__APPLE__)
 	return inst->getVoiceName(index);
+	#elif defined(__ANDROID__)
+	jboolean isCopy;
+	return env->GetStringUTFChars((jstring)env->CallObjectMethod(TTSObj, midGetVoice), &isCopy);
 	#endif
 	return "";
 }
@@ -412,27 +495,27 @@ tts_voice* Script_tts_voice_Factory(const std::string& builtin_voice_name) {
 }
 void RegisterTTSVoice(asIScriptEngine* engine) {
 	engine->RegisterObjectType("tts_voice", 0, asOBJ_REF);
-	engine->RegisterObjectBehaviour("tts_voice", asBEHAVE_FACTORY, _O("tts_voice @t(const string&in = \"builtin fallback voice\")"), asFUNCTION(Script_tts_voice_Factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("tts_voice", asBEHAVE_FACTORY, _O("tts_voice @t(const string&in fallback_voice_name = \"builtin fallback voice\")"), asFUNCTION(Script_tts_voice_Factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("tts_voice", asBEHAVE_ADDREF, "void f()", asMETHOD(tts_voice, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("tts_voice", asBEHAVE_RELEASE, "void f()", asMETHOD(tts_voice, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "bool speak(const string &in, bool = false)", asMETHOD(tts_voice, speak), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "bool speak_interrupt(const string &in)", asMETHOD(tts_voice, speak_interrupt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "bool speak_to_file(const string& in, const string &in)", asMETHOD(tts_voice, speak_to_file), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "bool speak_wait(const string &in, bool = false)", asMETHOD(tts_voice, speak_wait), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "string speak_to_memory(const string &in)", asMETHOD(tts_voice, speak_to_memory), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "bool speak_interrupt_wait(const string &in)", asMETHOD(tts_voice, speak_interrupt_wait), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "bool speak(const string &in text, bool interrupt = false)", asMETHOD(tts_voice, speak), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "bool speak_interrupt(const string &in text)", asMETHOD(tts_voice, speak_interrupt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "bool speak_to_file(const string& in filename, const string &in text)", asMETHOD(tts_voice, speak_to_file), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "bool speak_wait(const string &in text, bool interrupt = false)", asMETHOD(tts_voice, speak_wait), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "string speak_to_memory(const string &in text)", asMETHOD(tts_voice, speak_to_memory), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "bool speak_interrupt_wait(const string &in text)", asMETHOD(tts_voice, speak_interrupt_wait), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool refresh()", asMETHOD(tts_voice, refresh), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool stop()", asMETHOD(tts_voice, stop), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "array<string>@ list_voices() const", asMETHOD(tts_voice, list_voices), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "bool set_voice(int)", asMETHOD(tts_voice, set_voice), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "bool set_voice(int index)", asMETHOD(tts_voice, set_voice), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "int get_rate() const property", asMETHOD(tts_voice, get_rate), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "void set_rate(int) property", asMETHOD(tts_voice, set_rate), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "void set_rate(int rate) property", asMETHOD(tts_voice, set_rate), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "int get_pitch() const property", asMETHOD(tts_voice, get_pitch), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "void set_pitch(int) property", asMETHOD(tts_voice, set_pitch), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "void set_pitch(int pitch) property", asMETHOD(tts_voice, set_pitch), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "int get_volume() const property", asMETHOD(tts_voice, get_volume), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "void set_volume(int) property", asMETHOD(tts_voice, set_volume), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "void set_volume(int volume) property", asMETHOD(tts_voice, set_volume), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "int get_voice_count() const property", asMETHOD(tts_voice, get_voice_count), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "string get_voice_name(int) const", asMETHOD(tts_voice, get_voice_name), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "string get_voice_name(int index) const", asMETHOD(tts_voice, get_voice_name), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool get_speaking() const property", asMETHOD(tts_voice, get_speaking), asCALL_THISCALL);
 	engine->RegisterObjectProperty("tts_voice", "const int voice", asOFFSET(tts_voice, voice_index));
 }

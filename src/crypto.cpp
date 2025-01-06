@@ -1,5 +1,5 @@
 /* crypto.cpp - AES encryption and decryption functions code
- * Warning, the author of this code is not an expert on encryption. While the functions here will protect your data, they have by no means been battletested by a cryptography expert and/or they may not follow standards perfectly. Please feel free to report any vulterabilities.
+ * Warning, the author of this code is not an expert on encryption. While the functions here will protect your data, they have by no means been battletested by a cryptography expert and/or they may not follow standards perfectly. Please feel free to report any vulnerabilities.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -93,7 +93,7 @@ std::string random_bytes(asUINT len) {
 }
 
 void RegisterScriptCrypto(asIScriptEngine* engine) {
-	engine->RegisterGlobalFunction(_O("string string_aes_encrypt(const string&in, string)"), asFUNCTION(string_aes_encrypt), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_aes_decrypt(const string&in, string)"), asFUNCTION(string_aes_decrypt), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string random_bytes(uint)"), asFUNCTION(random_bytes), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_aes_encrypt(const string&in plaintext, string key)"), asFUNCTION(string_aes_encrypt), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_aes_decrypt(const string&in ciphertext, string)"), asFUNCTION(string_aes_decrypt), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string random_bytes(uint count)"), asFUNCTION(random_bytes), asCALL_CDECL);
 }

@@ -9,7 +9,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: build
       run: |
-        brew install scons
+        pip3 install scons
         cp build/build_macos.sh .
         sudo chmod +x build_macos.sh
         ./build_macos.sh ci
@@ -24,12 +24,45 @@ jobs:
     - uses: actions/checkout@v4
     - name: build
       run: |
+        pip3 install scons
         sudo chmod +x build/build_linux.sh
         ./build/build_linux.sh ci
         cd release
         tar -czf ../linux_release.tar.gz *
         cd ..
         curl -u "${{secrets.CIFTP}}" -s -T linux_release.tar.gz ftp://nvgt.gg
+
+  android_build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        cache: 'gradle'
+    - uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25c
+        link-to-sdk: true
+        add-to-path: true
+    - name: set_version
+      run: |
+        python3 build/ci_set_version.py
+    - name: build
+      run: |
+        curl -s -O https://nvgt.gg/droidev.zip
+        mkdir -p droidev
+        cd droidev
+        unzip -q ../droidev.zip
+        cd ../jni
+        echo "${{secrets.ANDROID_RUNNER_KEYSTORE}}" > android_enc.keystore
+        cat android_enc.keystore | base64 -d > android.keystore
+        ./gradlew assembleRunnerRelease AssembleStubRelease --no-daemon -Pandroid.injected.signing.store.file=android.keystore -Pandroid.injected.signing.store.password=${{secrets.ANDROID_RUNNER_KEYSTORE_PW}} -Pandroid.injected.signing.key.alias=app -Pandroid.injected.signing.key.password="${{secrets.ANDROID_RUNNER_KEYSTORE_PW}}"
+        mv build/outputs/apk/runner/release/nvgt-runner-release.apk ../nvgt_$nvgt_version.apk
+        cd ..
+        curl -u "${{secrets.CIFTP}}" -s -T nvgt_$nvgt_version.apk ftp://nvgt.gg
+        curl -u "${{secrets.CIFTP}}" -s -T release/stub/nvgt_android.bin ftp://nvgt.gg
 
   windows_build:
     runs-on: windows-latest
@@ -49,7 +82,7 @@ jobs:
 
   windows_package:
     runs-on: windows-latest
-    needs: ["linux_build", "mac_build", "windows_build"]
+    needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
     - name: package
@@ -69,15 +102,18 @@ jobs:
         cd ..
         python3 docgen.py
         cd ..
+        cp -r linux_release/lib release/lib_linux
         cp linux_release/stub/* release/stub
+        cp -r mac_release/lib release/lib_mac
         cp mac_release/stub/* release/stub
+        curl -s -o release/stub/nvgt_android.bin -u "${{secrets.CIFTP}}" ftp://nvgt.gg/nvgt_android.bin
         cd install
-        makensis nvgt.nsi
+        iscc nvgt.iss
         python3 upload_windows_installer.py ${{secrets.CIFTP}}
 
   mac_package:
     runs-on: macos-latest
-    needs: ["linux_build", "mac_build", "windows_build"]
+    needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
     - name: package
@@ -97,14 +133,17 @@ jobs:
         cd ..
         python3 docgen.py
         cd ..
+        cp -r linux_release/lib release/lib_linux
         cp linux_release/stub/* release/stub
+        cp -r windows_release/lib release/lib_windows
         cp windows_release/stub/* release/stub
+        curl -s -o release/stub/nvgt_android.bin -u "${{secrets.CIFTP}}" ftp://nvgt.gg/nvgt_android.bin
         cd install
         python3 make_dmg.py ../release ${{secrets.CIFTP}}
 
   linux_package:
     runs-on: ubuntu-latest
-    needs: ["linux_build", "mac_build", "windows_build"]
+    needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
     - name: set_version
@@ -120,15 +159,21 @@ jobs:
         mkdir windows_release
         tar -xzf windows_release.tar.gz -C windows_release
         tar -xzf linux_release.tar.gz -C release
+        python3 -m venv venv --upgrade-deps
+        chmod +x venv/bin/activate
+        source ./venv/bin/activate
         cd doc
-        pip3 install --user -r requirements.txt
+        pip3 install -r requirements.txt
         cd OSL
         python3 make_osl_document.py
         cd ..
         python3 docgen.py
         cd ..
+        cp -r mac_release/lib release/lib_mac
         cp mac_release/stub/* release/stub
+        cp -r windows_release/lib release/lib_windows
         cp windows_release/stub/* release/stub
+        curl -s -o release/stub/nvgt_android.bin -u "${{secrets.CIFTP}}" ftp://nvgt.gg/nvgt_android.bin
         cd release
         tar -czf "../nvgt_$nvgt_version.tar.gz" *
         cd ..
@@ -137,6 +182,7 @@ jobs:
   final_package:
     runs-on: ubuntu-latest
     needs: ["windows_package", "mac_package", "linux_package"]
+    if: github.ref_name == 'main'
     steps:
     - uses: actions/checkout@v4
     - name: set_version

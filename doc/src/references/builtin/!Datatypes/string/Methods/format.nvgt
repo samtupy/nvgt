@@ -1,18 +1,18 @@
 /**
 	Formats a string with placeholders.
-	string string::format(const ?& in = null...);
-	## Arguments
-		* const ?& in = null: Any stringable value. You can pass up to 16 parameters.
-	## Returns
+	string string::format(const ?&in = null...);
+	## Arguments:
+		* const ?&in = null: Any stringable value. You can pass up to 16 parameters.
+	## Returns:
 		Returns the formatted string.
-	## Remarks
+	## Remarks:
 		This method is useful in situations when:
 		1. You want to have multiple formats for messages, such as short and long messages.
 		2. You don't want to use concatenation.
 		3. You want to use a placeholder more than once in a string.
 */
 
-// Example
+// Example:
 void main() {
 	string[] greetings = {"Hello %0! How are you?", "Hola %0! ¿Cómo estás?"};
 	string[] messages = {"You have %0 health", "%0 health"};

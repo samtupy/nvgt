@@ -2,16 +2,25 @@
 // Copyright (C) 2022-2024 Sam Tupy
 // License: zlib (see license.md in the root of the NVGT distribution)
 
+#include "speech.nvgt"
+
 void main() {
-	http_request req(HTTP_GET, "/ip.php");
-	http_response resp;
-	https_client http("samtupy.com");
-	req["User-Agent"] = "nvgt-test-script";
-	http.send_request(req);
-	datastream@ ds = http.receive_response(resp);
-	alert(resp.content_length, ds.read());
-	datastream output;
-	req.write(output);
-	resp.write(output);
-	clipboard_set_text(output.str());
+	http h;
+	h.get("https://nvgt.zip/windows");
+	file f;
+	string filename = "";
+	show_window("downloading...");
+	while (!h.complete) {
+		wait(5);
+		if (!f.active and h.status_code == 200) { // The file is available.
+			string[]@ path = h.url.get_path_segments();
+			filename = path.length() > 0? path[-1] : "http.txt";
+			f.open(filename, "wb");
+		}
+		if (f.active) f.write(h.response_body);
+		if (key_pressed(KEY_SPACE)) speak(round(h.progress * 100, 2) + "%");
+	}
+	int keep = question(filename, f.size+"b downloaded, keep file?");
+	f.close();
+	if (keep != 1) file_delete(filename);
 }

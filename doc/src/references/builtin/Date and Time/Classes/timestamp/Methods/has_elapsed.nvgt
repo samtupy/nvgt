@@ -1,0 +1,18 @@
+/**
+	determine whether the given number of microseconds has elapsed since the time point stored in this timestamp.
+	bool has_elapsed(int64 microseconds);
+	## Arguments:
+		* int64 microseconds: the number of microseconds to check elapsed status of
+	## Returns:
+		bool: Whether the given number of milliseconds has elapsed
+	## Remarks:
+		This method serves as a shorthand version of executing `bool has_elapsed = timestamp() - this >= microseconds;`
+*/
+
+// Example:
+void main() {
+	timestamp ts;
+	alert("test", "will you keep the alert box opened for 10 seconds?");
+	if (ts.has_elapsed(10 * SECONDS)) alert("good job", "You kept the alert box opened for 10 seconds!");
+	else alert("oh no", "looks like a bit of character development in regards to the trait of patience is in order...");
+}

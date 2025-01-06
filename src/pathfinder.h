@@ -1,4 +1,4 @@
-/*
+/* pathfinder.h - pathfinder implementation header
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -14,17 +14,11 @@
 
 #include <unordered_map>
 #include <string>
-#include <cstring>
-#include <algorithm>
 #include <vector>
-#ifdef _Win32
-	#include <windows.h>
-#endif
 #include <angelscript.h>
 #include <micropather.h>
 #include "scriptarray.h"
 #include "scriptany.h"
-#include "bullet3.h"
 #include "nvgt.h"
 
 class hashpoint {
@@ -80,6 +74,7 @@ class pathfinder : public micropather::Graph {
 	CScriptAny* callback_data;
 	bool abort;
 	bool must_reset;
+	bool gc_flag;
 public:
 	bool solving;
 	int desperation_factor;
@@ -89,41 +84,17 @@ public:
 	float total_cost;
 	int start_x, start_y, start_z;
 	pathfinder(int size = 1024, bool cache = true);
-	void AddRef();
-	void Release();
+	int AddRef();
+	int Release();
+	void enum_references(asIScriptEngine* engine);
+	void release_all_handles(asIScriptEngine* engine);
+	int get_ref_count();
+	void set_gc_flag();
+	bool get_gc_flag();
 	void set_callback_function(asIScriptFunction* func);
 	float get_difficulty(void* state);
 	float get_difficulty(int x, int y, int z);
 	void cancel();
-	void reset();
-	CScriptArray* find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny* data);
-	virtual float LeastCostEstimate(void* nodeStart, void* nodeEnd);
-	virtual void AdjacentCost(void* node, micropather::MPVector<micropather::StateCost>* neighbors);
-	virtual void PrintStateInfo(void* state) {
-		return;
-	}
-};
-typedef std::unordered_map<hashpoint, int, hashpoint_hash, hashpoint_equals> hashpoint_int_map;
-class staged_pathfinder : public micropather::Graph {
-	hashpoint_int_map difficulty_cache;
-	micropather::MicroPather* pf;
-	int RefCount;
-	asIScriptFunction* callback;
-	CScriptAny* callback_data;
-	int minx, miny, minz;
-	int maxx, maxy, maxz;
-public:
-	bool solving;
-	int desperation_factor;
-	bool allow_diagonals;
-	float total_cost;
-	int start_x, start_y, start_z;
-	staged_pathfinder(int size = 1024);
-	void AddRef();
-	void Release();
-	void set_callback_function(asIScriptFunction* func);
-	int get_difficulty(void* state);
-	int get_difficulty(int x, int y, int z);
 	void reset();
 	CScriptArray* find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny* data);
 	virtual float LeastCostEstimate(void* nodeStart, void* nodeEnd);

@@ -1,0 +1,12 @@
+/**
+	This property is true if the application is running on any device that identifies itself as a tablet.
+	const bool system_is_tablet;
+*/
+
+// example:
+void main() {
+	if(system_is_tablet)
+		alert("example", "This application is running on a tablet!");
+	else
+		alert("example", "This application is not running on a tablet.");
+}

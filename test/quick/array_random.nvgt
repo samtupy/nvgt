@@ -1,0 +1,9 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	random_gamerand rnd(74);
+	string[] strings = {"hi", "this is a test", "another test", "I never know what to type when doing random strings like this", "uh this is another string I guess?", "bye now"};
+	alert(strings.random(), strings.random(rnd));
+}

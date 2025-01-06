@@ -1,6 +1,6 @@
 /* tests.nvgt - main test runner application
  * In our case, it's actually better to write our tests directly in Angelscript, as any specific parts of the c++ code will be tested by loading and executing this Angelscript code which can test engine features in the same way as end-users will be employing them.
- * To add a test, create a .nvgt script in the case folder with a function that returns void, takes no arguments and is named after the basename of the test script, for example void foo() for foo.nvgt. A test should throw an exception if it fails, if the function returns successfully the test is considered to have passed.
+ * To add a test, create a .nvgt script in the case folder with a function that returns void, takes no arguments and is named after the basename of the test script prepended with the word "test_", for example void test_foo() for foo.nvgt. A test should throw an exception if it fails, if the function returns successfully the test is considered to have passed.
  * If a test case relies on any static files, those should go in the data folder.
  * If a test case produces any temporary data to work with, it should go in the tmp folder so as to be ignored by git.
  *
@@ -18,19 +18,27 @@
 #include "case/*.nvgt"
 
 dictionary disabled_tests;
-bool verbose = false, nonfatal = false;
+bool verbose = false, nonfatal = false, console_available = is_console_available();
 script_module@ nvgt_game = script_get_module("nvgt_game");
 int tests_total, tests_skipped, tests_failed, tests_passed;
+string ui_buffer;
 
 void help() {
-	println("NVGT tests program available options:");
-	println("-v (verbose), print status information.");
-	println("-n (nonfatal), Warn on failed test and continue rather than exiting.");
-	println("-d (disable), do not run a given test (-dbase64).");
-	println("-h (help), Print this message and exit.");
-	exit();
+	outln("NVGT tests program available options:");
+	outln("-v (verbose), print status information.");
+	outln("-n (nonfatal), Warn on failed test and continue rather than exiting.");
+	outln("-d (disable), do not run a given test (-dbase64).");
+	outln("-h (help), Print this message and exit.");
+	abort();
 }
 void main() {
+	if (SCRIPT_COMPILED) {
+		outln("the test runner application must currently be executed from source", "error");
+		abort(64);
+	}
+	// Correct current working directory if needed.
+	if (!directory_exists("case")) chdir(spec::path(SCRIPT_CURRENT_FILE).make_parent());
+	if (!directory_exists("case")) outln("no test cases found", "error");
 	timer timetracker;
 	// Very oversimplified command line parsing.
 	for (uint i = 1; i < ARGS.length(); i++) {
@@ -39,8 +47,8 @@ void main() {
 		else if (ARGS[i] == "-n") nonfatal = true;
 		else if (ARGS[i].starts_with("-d")) disabled_tests.set(ARGS[i].substr(2), true);
 		else {
-			println("unknown command line option " + ARGS[i]);
-			exit(64);
+			outln("unknown command line option " + ARGS[i]);
+			abort(64);
 		}
 	}
 	if (!directory_exists("tmp")) directory_create("tmp");
@@ -49,15 +57,16 @@ void main() {
 	for (uint i = 0; i < files.length(); i++)
 		test(spec::path(files[i]).basename);
 	if (tests_failed == 0)
-		println("%0 of %1 tests passed successfully in %2ms!".format(tests_passed, tests_total, timetracker.elapsed));
+		outln("%0 of %1 tests passed successfully in %2ms!".format(tests_passed, tests_total, timetracker.elapsed), "success");
 	else
-		println("%0 of %1 tests have passed successfully, with %2 failures. Total time %3ms.".format(tests_passed, tests_total, tests_failed, timetracker.elapsed));
-	if (tests_skipped > 0) println("%0 tests skipped.".format(tests_skipped));
+		outln("%0 of %1 tests have passed successfully, with %2 failures. Total time %3ms.".format(tests_passed, tests_total, tests_failed, timetracker.elapsed), "partial success");
+	if (tests_skipped > 0) outln("%0 tests skipped.".format(tests_skipped));
+	display_ui_buffer();
 }
 void test(const string&in testcase) {
 	tests_total++;
 	if (disabled_tests.exists(testcase)) {
-		if (verbose) println("Skipping %0 (commandline)".format(testcase));
+		if (verbose) outln("Skipping %0 (commandline)".format(testcase));
 		tests_skipped++;
 		return;
 	}
@@ -65,32 +74,56 @@ void test(const string&in testcase) {
 	any@ v_skip = nvgt_game.get_global(nvgt_game.get_global_index_by_decl("bool test_%0_skip".format(testcase)));
 	bool b_skip = false;
 	if (@v_skip != null and v_skip.retrieve(b_skip) and b_skip) {
-		if (verbose) println("Skipping %0 (script)".format(testcase));
+		if (verbose) outln("Skipping %0 (script)".format(testcase));
 		tests_skipped++;
 		return;
 	}
 	script_function@ func = nvgt_game.get_function_by_decl("void test_%0()".format(testcase));
 	if (@func == null) {
-		println("Error, test case %0 is badly formatted, can't find void test_%0()".format(testcase));
+		outln("Error, test case %0 is badly formatted, can't find void test_%0()".format(testcase));
 		tests_failed++;
 		if (nonfatal) return;
-		else exit(64);
+		else abort(64);
 	}
 	string[] errors;
-	if (verbose) print("Testing %0... ".format(testcase));
+	if (verbose) outp("Testing %0... ".format(testcase));
+	// Give test cases the freedom to safely manipulate the current working directory.
+	string current_dir = cwdir();
+	timer test_clock(0, 1);
 	func({}, errors);
+	chdir(current_dir);
 	if (errors.length() < 1) {
-		if (verbose) println("OK");
+		if (verbose) outln("OK (" + (test_clock.elapsed / double(MILLISECONDS)) + "ms)");
 		tests_passed++;
 		return;
 	}
 	tests_failed++;
-	if (verbose) println("FAILED!");
-	else println("TEST %0 FAILED!".format(testcase));
+	if (verbose) outln("FAILED!");
+	else outln("TEST %0 FAILED!".format(testcase));
 	if (!nonfatal) { // Only print full callstacks if we exit on test fail rather than warn where we just print the exception and last frame instead.
-		for (uint i = 1; i < errors.length(); i++) println(errors[i]); // We start at offset 1 in order to move the exception itself to the bottom of the output to avoid waiding through the call stack when unwanted.
+		for (uint i = 1; i < errors.length(); i++) outln(errors[i]); // We start at offset 1 in order to move the exception itself to the bottom of the output to avoid waiding through the call stack when unwanted.
 	}
-	println(errors[0]);
+	outln(errors[0]);
 	if (nonfatal) return;
-	else exit(1);
+	else abort(1);
+}
+
+// utility functions:
+void outln(const string&in msg, const string&in popup_title = "") {
+	if (console_available) println(msg);
+	else if(!popup_title.empty()) alert(popup_title, msg);
+	else ui_buffer += msg + "\r\n";
+}
+void outp(const string& partial_line) {
+	if (console_available) print(partial_line);
+	else ui_buffer += partial_line;
+}
+void abort(int retcode = 0) {
+	display_ui_buffer();
+	exit(retcode);
+}
+void display_ui_buffer() {
+	if (ui_buffer.empty()) return;
+	info_box("status", "test runner messages", ui_buffer);
+	ui_buffer.resize(0);
 }

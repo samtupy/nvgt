@@ -1,0 +1,15 @@
+#include"menu.nvgt"
+void main() {
+	show_window("menu test");
+	menu test;
+	test.intro_text = "select a programming language";
+	string[] lst = {"python", "php", "javescript"};
+	test.add_items(lst);
+	while (true) {
+		wait(5);
+		if (!test.monitor()) {
+			alert("selection", lst[test.focused_item]);
+			break;
+		}
+	}
+}

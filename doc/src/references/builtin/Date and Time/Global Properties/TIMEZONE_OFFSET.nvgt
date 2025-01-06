@@ -1,0 +1,11 @@
+/**
+	Determine the system's current timezone offset from UTC in seconds.
+	const int TIMEZONE_OFFSET;
+	## Remarks:
+		This is also the sum of TIMEZONE_BASE_OFFSET + TIMEZONE_DST_OFFSET, provided for convenience.
+*/
+
+// Example:
+void main() {
+	alert(TIMEZONE_NAME, "offset from UTC: " + timespan(TIMEZONE_OFFSET, 0).format());
+}

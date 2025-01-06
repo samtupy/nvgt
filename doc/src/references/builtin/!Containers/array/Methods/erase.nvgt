@@ -3,6 +3,8 @@
 	void array::erase(uint index);
 	## Arguments:
 		* uint index: the index of the item to delete.
+	## Remarks:
+		Passing an index that is less than 0 or greater or equal to the array's absolute length will result in an index out of bounds exception being thrown.
 */
 
 // Example:

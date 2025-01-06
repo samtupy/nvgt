@@ -12,8 +12,8 @@
 
 #include <string>
 #include <angelscript.h>
-#include <enet/enet.h>
 #include <obfuscate.h>
+#include <Poco/Checksum.h>
 #include <Poco/HMACEngine.h>
 #include <Poco/MD5Engine.h>
 #include <Poco/SHA1Engine.h>
@@ -113,19 +113,25 @@ uint32_t hotp(const std::string& key, uint64_t counter, uint32_t digitCount) {
 
 unsigned int crc32(const std::string& data) {
 	if (data == "") return 0;
-	ENetBuffer b;
-	b.data = (void*)&data[0];
-	b.dataLength = data.size();
-	return enet_crc32(&b, 1);
+	Poco::Checksum c;
+	c.update(data);
+	return c.checksum();
+}
+unsigned int adler32(const std::string& data) {
+	if (data == "") return 0;
+	Poco::Checksum c(Poco::Checksum::TYPE_ADLER32);
+	c.update(data);
+	return c.checksum();
 }
 
 void RegisterScriptHash(asIScriptEngine* engine) {
-	engine->RegisterGlobalFunction(_O("string string_hash_md5(const string& in, bool = false)"), asFUNCTION(md5), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_hash_sha1(const string& in, bool = false)"), asFUNCTION(sha1), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_hash_sha224(const string& in, bool = false)"), asFUNCTION(sha224), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_hash_sha256(const string& in, bool = false)"), asFUNCTION(sha256), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_hash_sha384(const string& in, bool = false)"), asFUNCTION(sha384), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_hash_sha512(const string& in, bool = false)"), asFUNCTION(sha512), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("uint crc32(const string& in)"), asFUNCTION(crc32), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("uint HOTP(const string& in, uint64, uint = 6)"), asFUNCTION(hotp), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_hash_md5(const string& in data, bool binary = false)"), asFUNCTION(md5), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_hash_sha1(const string& in data, bool binary = false)"), asFUNCTION(sha1), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_hash_sha224(const string& in data, bool binary = false)"), asFUNCTION(sha224), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_hash_sha256(const string& in data, bool binary = false)"), asFUNCTION(sha256), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_hash_sha384(const string& in data, bool binary = false)"), asFUNCTION(sha384), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_hash_sha512(const string& in data, bool binary = false)"), asFUNCTION(sha512), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint crc32(const string& in data)"), asFUNCTION(crc32), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint adler32(const string& in data)"), asFUNCTION(adler32), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint HOTP(const string& in key, uint64 counter, uint digits = 6)"), asFUNCTION(hotp), asCALL_CDECL);
 }

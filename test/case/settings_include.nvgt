@@ -1,0 +1,39 @@
+#include "settings.nvgt"
+#include "token_gen.nvgt"
+
+// We run this test multiple times, once per format.
+void evaluate_format(string format, settings@ s = null) {
+	if (@s == null) @s = settings(); // Allow already existing objects to test whether a settings object can close one format and open another.
+	assert(s.setup("NVGTTesting", "testing_framework", true, format));
+	uint key_count = 10;
+	string[] strings(key_count);
+	double[] numbers(key_count);
+	for (uint i = 0; i < key_count; i++) {
+		strings[i] = generate_token(i * 10);
+		assert(s.write_string("s" + i, strings[i]));
+		assert(s.read_string("s" + i) == strings[i]);
+		numbers[i] = random(i * 2, i * 10) + random_float();
+		assert(s.write_number("n" + i, numbers[i]));
+		assert(s.read_number("n" + i) == numbers[i]);
+	}
+	assert(s.close());
+	assert(s.setup("NVGTTesting", "testing_framework", true, format));
+	for (uint i = 0; i < key_count; i++) {
+		assert(s.read_string("s" + i) == strings[i]);
+		assert(s.read_number("n" + i) == numbers[i]);
+	}
+	assert(s.remove_product());
+}
+
+void test_settings_include() {
+	directory_delete("NVGTTesting"); // Start from scratch.
+	settings s;
+	assert(s.setup("NVGTTesting", "testing_framework", true));
+	assert(!s.has_other_products());
+	evaluate_format("ini");
+	evaluate_format("ini", s);
+	evaluate_format("json");
+	evaluate_format("json", s);
+	evaluate_format("nvgt");
+	evaluate_format("nvgt", s);
+}

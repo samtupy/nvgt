@@ -1,0 +1,8 @@
+void test_float_to_bytes() {
+	random_pcg r;
+	for (uint i = 0; i < 50; i++) {
+		float f = r.nextf();
+		string b = float_to_bytes(f);
+		assert(bytes_to_float(b) == f);
+	}
+}

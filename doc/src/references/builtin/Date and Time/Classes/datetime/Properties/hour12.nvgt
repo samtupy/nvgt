@@ -7,5 +7,5 @@
 void main() {
 	datetime d;
 	d.set(d.year, d.month, d.day, 13, 47, 19);
-	alert("In 12 hour time, the current hour of the datetime object is", d.hour12);
+	alert("In 12 hour time, the set hour of the datetime object is", d.hour12);
 }

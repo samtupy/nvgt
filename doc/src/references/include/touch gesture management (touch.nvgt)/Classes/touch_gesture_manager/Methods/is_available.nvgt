@@ -1,0 +1,15 @@
+/**
+	Determine whether any touch devices are available to receive events from.
+	bool is_available();
+	## Returns:
+		bool: true if at least one touch device is available on the system, false otherwise.
+	## Remarks:
+		It is worth noting that due to circumstances outside our control, sometimes touch devices don't appear in the list until after you have touched them at least once. Therefor you should not use this method at program startup to determine with finality that no touch device is available, but could instead use it during program lifetime to monitor for whether touch support appears or disappears.
+*/
+
+// Example:
+touch_gesture_manager touch;
+void main() {
+	wait(1000); // Give the user some time to touch the screen to make sure it appears.
+	if (!touch.is_available()) alert("warning", "This system does not appear to support touch screen devices");
+}

@@ -1,9 +1,9 @@
 /**
 	Write to an environment variable.
-	void write_environment_variable(string variable, string value);
+	void write_environment_variable(const string&in variable, const string&in value);
 	## Arguments:
-		* string variable: The environment variable you wish to write to.
-		* string value: The value you wish to write to this variable.
+		* const string&in variable: The environment variable you wish to write to.
+		* const string&in value: The value you wish to write to this variable.
 */
 
 // Example:

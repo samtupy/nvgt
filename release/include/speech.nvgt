@@ -18,8 +18,12 @@ bool use_sr = true;
 string voicename = "SR";
 audio_form@ tts_config_form = null;
 bool tts_default_interrupt = true;
-bool speak(string text, bool interrupt = tts_default_interrupt, bool translate_text = true, bool braille = true) {
+funcdef string text_processing_callback(const string&in text);
+text_processing_callback@ tts_default_text_processing_callback = null;
+bool speak(string text, bool interrupt = tts_default_interrupt, text_processing_callback@ processing_callback = tts_default_text_processing_callback, bool braille = true) {
 	speechbuff = text;
+	if (@processing_callback != null) text = processing_callback(text);
+	if (braille) screen_reader_braille(text);
 	if (text.length() > 10000) {
 		string tmp = text;
 		while (tmp.length() > 0) {
@@ -55,12 +59,14 @@ void stop_speech() {
 	tts.stop();
 }
 
-string tts_dump_config(tts_voice@ v) {
+string tts_dump_config(tts_voice@ v, bool save_screen_reader_setting = false) {
 	string o;
 	if (v.voice < 0) return "default";
 	else o = v.get_voice_name(v.voice) + "||";
 	if (o == "||") o = "default||";
-	return o + v.rate + "||0||" + v.volume;
+	o += v.rate + "||0||" + v.volume;
+	if (save_screen_reader_setting) o += "||" + (use_sr? "1" : "0");
+	return o;
 }
 bool tts_load_config(string c, tts_voice@ v) {
 	string[] args = c.split("||");
@@ -73,6 +79,7 @@ bool tts_load_config(string c, tts_voice@ v) {
 	}
 	v.set_rate(parse_float(args[1]));
 	v.set_volume(parse_float(args[3]));
+	if (args.length() > 4) use_sr = args[4] == "1";
 	return true;
 }
 

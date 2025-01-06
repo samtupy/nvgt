@@ -1,0 +1,242 @@
+/* virtual_dialogs.nvgt - high level virtual alert box, question, input box, and other dialogs using audio form
+ *
+ * Include copyright (c) 2024 Hamza Ahmad (literary-programmer) <https://github.com/literary-programmer>, under the same license as:
+ * NVGT - NonVisual Gaming Toolkit
+ * Copyright (c) 2022-2024 Sam Tupy
+ * https://nvgt.gg
+ * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+ * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+ * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+*/
+
+#include "form.nvgt"
+
+class virtual_dialogs {
+	private audio_form form;
+	private bool was_window_active = false, was_window_created = false, was_window_hidden = false;
+	private string last_title = "";
+
+	private void create_dialog(const string title) {
+		this.form.create_window(title, this.create_window(title));
+	}
+
+	private bool destroy_window() {
+		this.was_window_active = is_window_active();
+		if (this.was_window_created) {
+			:: destroy_window();
+			this.was_window_created = false;
+			return true;
+		} else if (this.was_window_hidden) {
+			show_window(this.last_title);
+			hide_window();
+			this.was_window_hidden = false;
+			return true;
+		}
+
+		return false;
+	}
+
+	private bool create_window(const string title) {
+		if (get_window_os_handle() == 0) {
+			show_window(title);
+			this.was_window_created = true;
+			return true;
+		} else if (is_window_hidden()) {
+			this.last_title = get_window_text();
+			show_window(title);
+			this.was_window_hidden = true;
+			return true;
+		}
+
+		return false;
+	}
+
+	private void handle_arrow_keys() {
+		int focus, count, type;
+
+		focus = this.form.get_current_focus();
+		type = this.form.get_control_type(focus);
+		if (type == ct_input || type == ct_keyboard_area || type == ct_list || type == ct_slider)
+			return;
+
+		count = this.form.get_control_count();
+		if (count < 3)
+			return;
+
+		if (key_repeating(KEY_LEFT) || key_repeating(KEY_UP))
+			focus --;
+		else if (key_repeating(KEY_RIGHT) || key_repeating(KEY_DOWN))
+			focus ++;
+
+		if (focus == this.form.get_current_focus())
+			return;
+
+		if (focus < 1)
+			focus = count - 1;
+		else if (focus >= count)
+			focus = 1;
+
+		this.form.focus_interrupt(focus);
+	}
+
+	private void monitor() {
+		bool window_status;
+
+		wait(5);
+		this.handle_arrow_keys();
+		this.form.monitor();
+		window_status = is_window_active();
+		if (window_status == this.was_window_active)
+			return;
+
+		// if (window_status)
+		//	 this.form.focus(this.form.get_current_focus());
+
+		this.was_window_active = window_status;
+	}
+
+	bool info_box(const string title, const string label, const string text) {
+		int text_box, close_button, cancel_button;
+		bool result = false;
+
+		this.form.reset();
+		this.create_dialog(title);
+		text_box = this.form.create_input_box(label, text, read_only = true, multiline = true, multiline_enter = false);
+		close_button = this.form.create_button("Close", true);
+		cancel_button = this.form.create_button("Cancel", false, true);
+		this.form.set_state(cancel_button, true, false);
+		this.form.focus(text_box);
+		while (true) {
+			this.monitor();
+			if (this.form.is_pressed(close_button)) {
+				result = true;
+				break;
+			} else if (this.form.is_pressed(cancel_button))
+				break;
+
+		}
+
+		this.destroy_window();
+		return result;
+	}
+
+	string input_box(const string title, const string text, const string default_text = "", const int flags = 0) {
+		string result;
+		int text_box, ok_button, cancel_button;
+
+		this.form.reset();
+		this.create_dialog(title);
+		text_box = this.form.create_input_box(text, default_text);
+		ok_button = this.form.create_button("OK", true);
+		cancel_button = this.form.create_button("Cancel", cancel = true);
+		this.form.focus(text_box);
+		while (true) {
+			this.monitor();
+			if (this.form.is_pressed(ok_button)) {
+				result = this.form.get_text(text_box);
+				break;
+			} else if (this.form.is_pressed(cancel_button))
+				break;
+
+		}
+
+		this.destroy_window();
+		return result;
+	}
+
+	int message_box(const string title, const string caption, string[]@ buttons, int flags = 0) {
+		int control;
+		int[] controls;
+		bool primary, secondary;
+		string button;
+		bool pressed;
+
+		pressed = false;
+		this.form.reset();
+		this.create_dialog(title);
+		control = this.form.create_button("Cancel", false, true);
+		controls.insert_last(control);
+		for (uint i = 0, l = buttons.length(); i < l; i ++) {
+			button = buttons[i];
+			primary = (button.starts_with("`")) ? true : false;
+			secondary = (button.starts_with("~")) ? true : false;
+			if (button.starts_with("`") || button.starts_with("~"))
+				button = button.substr(1);
+
+			control = this.form.create_button(button, primary, secondary, true);
+			if (control != -1)
+				controls.insert_last(control);
+
+		}
+
+		speak(caption, false);
+		this.form.set_state(controls[0], true, false);
+		if (controls.length() > 1)
+			this.form.focus(controls[1]);
+
+		while (true) {
+			this.monitor();
+			for (uint j = 0, l = controls.length(); j < l; j ++) {
+				control = controls[j];
+				if (!this.form.is_pressed(control))
+					continue;
+
+				pressed = true;
+				break;
+			}
+
+			if (pressed)
+				break;
+
+		}
+
+		if (control == 0)
+			control = -1;
+
+		this.destroy_window();
+		return control;
+	}
+
+	int question(const string title, const string text, const bool can_cancel = false, const int flags = 0) {
+		string[] controls = {"Yes", "No"};
+		if (can_cancel)
+			controls.insert_last("Cancel");
+
+		return this.message_box(title, text, controls, flags);
+	}
+
+	int alert(const string title, const string text, const bool can_cancel = false, const int flags = 0) {
+		string[] controls = {"OK"};
+		if (can_cancel)
+			controls.insert_last("Cancel");
+
+		return this.message_box(title, text, controls, flags);
+	}
+}
+
+int virtual_alert(const string title, const string text, const bool can_cancel = false, const int flags = 0) {
+	virtual_dialogs vd;
+	return vd.alert(title, text, can_cancel, flags);
+}
+
+bool virtual_info_box(const string title, const string label, const string text) {
+	virtual_dialogs vd;
+	return vd.info_box(title, label, text);
+}
+
+string virtual_input_box(const string title, const string text, const string default_text = "", const int flags = 0) {
+	virtual_dialogs vd;
+	return vd.input_box(title, text, default_text, flags);
+}
+
+int virtual_message_box(const string title, const string caption, string[]@ buttons, const int flags = 0) {
+	virtual_dialogs vd;
+	return vd.message_box(title, caption, buttons, flags);
+}
+
+int virtual_question(const string title, const string text, const bool can_cancel = false, const int flags = 0) {
+	virtual_dialogs vd;
+	return vd.question(title, text, can_cancel, flags);
+}

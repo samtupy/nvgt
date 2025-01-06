@@ -1,0 +1,17 @@
+/**
+	Inserts an element into an array at a given position, moving other items aside to make room if necessary.
+	void array::insert_at(uint index, const T&in value);
+	## Arguments:
+		* uint index: the position to insert at.
+		* const T&in value: the element to be inserted.
+	## Remarks:
+		This method adds an element to the given position of an array. If you pass index 0, the item will be inserted at the beginning of the aray, and if you pass the array's absolute length, the item will be inserted at the end. Any values less than 0 or greater than the array's absolute length will result in an index out of bounds exception being thrown.
+*/
+
+// Example:
+void main() {
+	string[] names = {"HTML", "CSS"};
+	names.insert_at(0,"Java Script");
+	names.insert_at(2, "php");
+	alert("Languages", join(names, ", "));
+}

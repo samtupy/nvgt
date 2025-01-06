@@ -11,7 +11,7 @@
 */
 
 #include <obfuscate.h>
-#include "angelscript.h" // get_array_type
+#include "nvgt_angelscript.h" // get_array_type
 #include "network.h"
 
 bool g_enet_initialized = false;
@@ -31,7 +31,8 @@ network::network() {
 	host = NULL;
 	next_peer = 1;
 	channel_count = 0;
-	is_client = false;
+	is_client = receive_timeout_event = false;
+	IPv6enabled = true;
 	RefCount = 1;
 	reset_totals();
 }
@@ -47,7 +48,10 @@ void network::release() {
 
 void network::destroy(bool flush) {
 	if (host) {
-		if (flush) enet_host_flush(host);
+		if (flush) {
+			for (const auto& it : peers) enet_peer_disconnect(it.second, 0);
+			enet_host_flush(host);
+		}
 		enet_host_destroy(host);
 		host = NULL;
 	}
@@ -60,7 +64,7 @@ void network::destroy(bool flush) {
 
 bool network::setup_client(unsigned char max_channels, unsigned short max_peers) {
 	if (host) return false;
-	host = enet_host_create(NULL, max_peers, max_channels, 0, 0);
+	host = enet_host_create(IPv6enabled? ENET_ADDRESS_TYPE_ANY : ENET_ADDRESS_TYPE_IPV4, NULL, max_peers, max_channels, 0, 0);
 	if (!host) return false;
 	is_client = true;
 	channel_count = max_channels;
@@ -70,9 +74,9 @@ bool network::setup_client(unsigned char max_channels, unsigned short max_peers)
 bool network::setup_server(unsigned short port, unsigned char max_channels, unsigned short max_peers) {
 	if (host) return false;
 	ENetAddress address;
-	address.host = ENET_HOST_ANY;
+	enet_address_build_any(&address, IPv6enabled? ENET_ADDRESS_TYPE_IPV6 : ENET_ADDRESS_TYPE_IPV4);
 	address.port = port;
-	host = enet_host_create(&address, max_peers, max_channels, 0, 0);
+	host = enet_host_create(IPv6enabled? ENET_ADDRESS_TYPE_ANY : ENET_ADDRESS_TYPE_IPV4, &address, max_peers, max_channels, 0, 0);
 	if (!host) return false;
 	channel_count = max_channels;
 	return true;
@@ -81,9 +85,9 @@ bool network::setup_server(unsigned short port, unsigned char max_channels, unsi
 bool network::setup_local_server(unsigned short port, unsigned char max_channels, unsigned short max_peers) {
 	if (host) return false;
 	ENetAddress address;
-	enet_address_set_host(&address, "127.0.0.1");
+	enet_address_build_loopback(&address, IPv6enabled? ENET_ADDRESS_TYPE_IPV6 : ENET_ADDRESS_TYPE_IPV4);
 	address.port = port;
-	host = enet_host_create(&address, max_peers, max_channels, 0, 0);
+	host = enet_host_create(IPv6enabled? ENET_ADDRESS_TYPE_ANY : ENET_ADDRESS_TYPE_IPV4, &address, max_peers, max_channels, 0, 0);
 	if (!host) return false;
 	channel_count = max_channels;
 	return true;
@@ -92,7 +96,7 @@ bool network::setup_local_server(unsigned short port, unsigned char max_channels
 asQWORD network::connect(const std::string& hostname, unsigned short port) {
 	if (!host || !is_client) return 0;
 	ENetAddress addr;
-	if (enet_address_set_host(&addr, hostname.c_str()) < 0) return false;
+	if (enet_address_set_host(&addr, IPv6enabled? ENET_ADDRESS_TYPE_ANY : ENET_ADDRESS_TYPE_IPV4, hostname.c_str()) < 0) return false;
 	addr.port = port;
 	ENetPeer* svr = enet_host_connect(host, &addr, channel_count, 0);
 	if (!svr) return 0;
@@ -117,6 +121,7 @@ const network_event* network::request(uint32_t timeout) {
 	network_event* e = new network_event();
 	e->type = event.type;
 	e->channel = event.channelID;
+	if (!receive_timeout_event && e->type == ENET_EVENT_TYPE_DISCONNECT_TIMEOUT) e->type = ENET_EVENT_TYPE_DISCONNECT;
 	if (event.type == ENET_EVENT_TYPE_CONNECT) {
 		enet_peer_timeout(event.peer, 128, 10000, 35000);
 		if (!is_client) {
@@ -126,7 +131,7 @@ const network_event* network::request(uint32_t timeout) {
 			next_peer++;
 		} else
 			e->peer_id = (asQWORD)event.peer->data;
-	} else if (event.type == ENET_EVENT_TYPE_DISCONNECT) {
+	} else if (event.type == ENET_EVENT_TYPE_DISCONNECT || event.type == ENET_EVENT_TYPE_DISCONNECT_TIMEOUT) {
 		asQWORD peer_id = (asQWORD)event.peer->data;
 		event.peer->data = NULL;
 		if (peer_id > 0)
@@ -250,25 +255,26 @@ network_event& network_event::operator=(const network_event& e) {
 }
 
 
-int EVENT_NONE = ENET_EVENT_TYPE_NONE, EVENT_CONNECT = ENET_EVENT_TYPE_CONNECT, EVENT_DISCONNECT = ENET_EVENT_TYPE_DISCONNECT, EVENT_RECEIVE = ENET_EVENT_TYPE_RECEIVE;
-
 network* ScriptNetwork_Factory() {
 	return new network();
 }
 network_event* ScriptNetwork_event_Factory() {
 	return new network_event();
 }
+
 void RegisterScriptNetwork(asIScriptEngine* engine) {
-	engine->RegisterGlobalProperty(_O("const int event_none"), &EVENT_NONE);
-	engine->RegisterGlobalProperty(_O("const int event_connect"), &EVENT_CONNECT);
-	engine->RegisterGlobalProperty(_O("const int event_disconnect"), &EVENT_DISCONNECT);
-	engine->RegisterGlobalProperty(_O("const int event_receive"), &EVENT_RECEIVE);
+	engine->RegisterEnum("network_event_type");
+	engine->RegisterEnumValue("network_event_type", "event_none", ENET_EVENT_TYPE_NONE);
+	engine->RegisterEnumValue("network_event_type", "event_connect", ENET_EVENT_TYPE_CONNECT);
+	engine->RegisterEnumValue("network_event_type", "event_disconnect", ENET_EVENT_TYPE_DISCONNECT);
+	engine->RegisterEnumValue("network_event_type", "event_disconnect_timeout", ENET_EVENT_TYPE_DISCONNECT_TIMEOUT);
+	engine->RegisterEnumValue("network_event_type", "event_receive", ENET_EVENT_TYPE_RECEIVE);
 	engine->RegisterObjectType(_O("network_event"), 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(_O("network_event"), asBEHAVE_FACTORY, _O("network_event @e()"), asFUNCTION(ScriptNetwork_event_Factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour(_O("network_event"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(network_event, addRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("network_event"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(network_event, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network_event"), _O("network_event& opAssign(const network_event &in)"), asMETHOD(network_event, operator=), asCALL_THISCALL);
-	engine->RegisterObjectProperty(_O("network_event"), _O("const int type"), asOFFSET(network_event, type));
+	engine->RegisterObjectProperty(_O("network_event"), _O("const network_event_type type"), asOFFSET(network_event, type));
 	engine->RegisterObjectProperty(_O("network_event"), _O("const uint64 peer_id"), asOFFSET(network_event, peer_id));
 	engine->RegisterObjectProperty(_O("network_event"), _O("const uint channel"), asOFFSET(network_event, channel));
 	engine->RegisterObjectProperty(_O("network_event"), _O("const string message"), asOFFSET(network_event, message));
@@ -276,33 +282,35 @@ void RegisterScriptNetwork(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("network"), asBEHAVE_FACTORY, _O("network @n()"), asFUNCTION(ScriptNetwork_Factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour(_O("network"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(network, addRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("network"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(network, release), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("void destroy(bool = true)"), asMETHOD(network, destroy), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool setup_client(uint8, uint16)"), asMETHOD(network, setup_client), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool setup_server(uint16, uint8, uint16)"), asMETHOD(network, setup_server), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool setup_local_server(uint16, uint8, uint16)"), asMETHOD(network, setup_local_server), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("uint64 connect(const string& in, uint16)"), asMETHOD(network, connect), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("const network_event@ request(uint = 0)"), asMETHOD(network, request), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("string get_peer_address(uint64) const"), asMETHOD(network, get_peer_address), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("uint get_peer_average_round_trip_time(uint64) const"), asMETHOD(network, get_peer_average_round_trip_time), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool send(uint64, const string& in, uint8, bool = true)"), asMETHOD(network, send), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool send_reliable(uint64, const string& in, uint8)"), asMETHOD(network, send_reliable), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool send_unreliable(uint64, const string& in, uint8)"), asMETHOD(network, send_unreliable), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool send_peer(uint64, const string& in, uint8, bool = true)"), asMETHOD(network, send_peer), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool send_reliable_peer(uint64, const string& in, uint8)"), asMETHOD(network, send_reliable_peer), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool send_unreliable_peer(uint64, const string& in, uint8)"), asMETHOD(network, send_unreliable_peer), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool disconnect_peer_softly(uint64)"), asMETHOD(network, disconnect_peer_softly), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool disconnect_peer(uint64)"), asMETHOD(network, disconnect_peer), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("bool disconnect_peer_forcefully(uint64)"), asMETHOD(network, disconnect_peer_forcefully), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("void destroy(bool flush = true)"), asMETHOD(network, destroy), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool setup_client(uint8 max_channels, uint16 max_peers)"), asMETHOD(network, setup_client), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool setup_server(uint16 port, uint8 max_channels, uint16 max_peers)"), asMETHOD(network, setup_server), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool setup_local_server(uint16 port, uint8 max_channels, uint16 max_peers)"), asMETHOD(network, setup_local_server), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("uint64 connect(const string& in host, uint16 port)"), asMETHOD(network, connect), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("const network_event@ request(uint timeout = 0)"), asMETHOD(network, request), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("string get_peer_address(uint64 peer_id) const"), asMETHOD(network, get_peer_address), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("uint get_peer_average_round_trip_time(uint64 peer_id) const"), asMETHOD(network, get_peer_average_round_trip_time), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool send(uint64 peer_id, const string& in message, uint8 channel, bool reliable = true)"), asMETHOD(network, send), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool send_reliable(uint64 peer_id, const string& in message, uint8 channel)"), asMETHOD(network, send_reliable), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool send_unreliable(uint64 peer_id, const string& in message, uint8 channel)"), asMETHOD(network, send_unreliable), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool send_peer(uint64 peer_pointer, const string& in message, uint8 channel, bool reliable = true)"), asMETHOD(network, send_peer), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool send_reliable_peer(uint64 peer_pointer, const string& in message, uint8 channel)"), asMETHOD(network, send_reliable_peer), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool send_unreliable_peer(uint64 peer_pointer, const string& in message, uint8 channel)"), asMETHOD(network, send_unreliable_peer), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool disconnect_peer_softly(uint64 peer_id)"), asMETHOD(network, disconnect_peer_softly), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool disconnect_peer(uint64 peer_id)"), asMETHOD(network, disconnect_peer), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool disconnect_peer_forcefully(uint64 peer_id)"), asMETHOD(network, disconnect_peer_forcefully), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint64[]@ get_peer_list() const"), asMETHOD(network, list_peers), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint64 get_connected_peers() const property"), asMETHOD(network, get_connected_peers), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool get_packet_compression() const property"), asMETHOD(network, get_packet_compression), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("void set_packet_compression(bool) property"), asMETHOD(network, set_packet_compression), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("void set_packet_compression(bool compressed) property"), asMETHOD(network, set_packet_compression), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint get_duplicate_peers() const property"), asMETHOD(network, get_duplicate_peers), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("void set_duplicate_peers(uint) property"), asMETHOD(network, set_duplicate_peers), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("void set_duplicate_peers(uint max_duplicates) property"), asMETHOD(network, set_duplicate_peers), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint get_bytes_received() const property"), asMETHOD(network, get_bytes_received), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint get_bytes_sent() const property"), asMETHOD(network, get_bytes_sent), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint get_packets_received() const property"), asMETHOD(network, get_packets_received), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("uint get_packets_sent() const property"), asMETHOD(network, get_packets_sent), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network"), _O("void set_bandwidth_limits(uint, uint)"), asMETHOD(network, set_bandwidth_limits), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("void set_bandwidth_limits(uint max_incoming_bytes_per_second, uint max_outgoing_bytes_per_second)"), asMETHOD(network, set_bandwidth_limits), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool get_active() const property"), asMETHOD(network, active), asCALL_THISCALL);
+	engine->RegisterObjectProperty(_O("network"), _O("bool IPV6enabled"), asOFFSET(network, IPv6enabled));
+	engine->RegisterObjectProperty(_O("network"), _O("bool receive_timeout_event"), asOFFSET(network, receive_timeout_event));
 }

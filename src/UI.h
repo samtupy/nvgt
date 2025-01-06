@@ -24,16 +24,23 @@
 #endif
 #include <angelscript.h>
 #include <string>
-#include <SDL2/SDL.h>
+#include <vector>
+#include <SDL3/SDL.h>
 
 extern SDL_Window* g_WindowHandle;
 
+int message_box(const std::string& title, const std::string& text, const std::vector<std::string>& buttons, unsigned int mb_flags = 0);
 int alert(const std::string& title, const std::string& text, bool can_cancel = false, unsigned int flags = 0);
 int question(const std::string& title, const std::string& text, bool can_cancel = false, unsigned int flags = 0);
 void message(const std::string& text, const std::string& header);
 bool info_box(const std::string& title, const std::string& text, const std::string& value);
 bool ClipboardSetText(const std::string& text);
+std::string simple_file_open_dialog(const std::string& filters = "All files:*", const std::string& default_location = "");
+bool urlopen(const std::string& url);
 
-asINT64 ShowWindow(std::string& window_title);
+bool ShowNVGTWindow(const std::string& window_title);
+bool DestroyNVGTWindow();
+bool WindowIsFocused();
+void refresh_window();
 void wait(int ms);
 void RegisterUI(asIScriptEngine* engine);

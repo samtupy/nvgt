@@ -20,7 +20,7 @@
 	#include <intrin.h>
 	#include <iphlpapi.h>
 #endif
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 unsigned short hashMacAddress(PIP_ADAPTER_INFO info) {
 	unsigned short hash = 0;
@@ -210,13 +210,16 @@ unsigned short getVolumeHash() {
 #ifdef __APPLE__
 #include <mach-o/arch.h>
 unsigned short getCpuHash() {
-	unsigned short val = SDL_GetCPUCount() + SDL_GetCPUCacheLineSize();
+	unsigned short val = SDL_GetNumLogicalCPUCores() + SDL_GetCPUCacheLineSize();
 	return val;
 }
 
 #else // !__APPLE__
 
 static void getCpuid(unsigned int* eax, unsigned int* ebx, unsigned int* ecx, unsigned int* edx) {
+	#ifdef __ANDROID__
+		return;
+	#else
 	#ifdef __arm__
 	*eax = 0xFD;
 	*ebx = 0xC1;
@@ -229,6 +232,7 @@ static void getCpuid(unsigned int* eax, unsigned int* ebx, unsigned int* ecx, un
 	             "=b"(*ebx),
 	             "=c"(*ecx),
 	             "=d"(*edx) : "0"(*eax), "2"(*ecx));
+	#endif
 	#endif
 }
 
@@ -294,6 +298,6 @@ std::string generate_system_fingerprint(const std::string& identifier = "") {
 }
 
 void RegisterSystemFingerprintFunction(asIScriptEngine* engine) {
-	engine->RegisterGlobalFunction(_O("string generate_system_fingerprint(const string&in = "")"), asFUNCTION(generate_system_fingerprint), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string generate_system_fingerprint_legacy1(const string&in = "")"), asFUNCTION(generate_system_fingerprint_legacy1), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string generate_system_fingerprint(const string&in application_id = "")"), asFUNCTION(generate_system_fingerprint), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string generate_system_fingerprint_legacy1(const string&in application_id = "")"), asFUNCTION(generate_system_fingerprint_legacy1), asCALL_CDECL);
 }

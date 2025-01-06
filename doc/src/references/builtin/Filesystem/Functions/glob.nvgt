@@ -1,8 +1,8 @@
 /**
 	Return a list of files and directories on the filesystem given a path glob.
-	string[]@ glob(string path_pattern, glob_options options = GLOB_DEFAULT);
+	string[]@ glob(const string&in path_pattern, glob_options options = GLOB_DEFAULT);
 	## Arguments:
-		* string path_pattern: The pattern to match files and directories with (Unix shell like, see remarks).
+		* const string&in path_pattern: The pattern to match files and directories with (Unix shell like, see remarks).
 		* glob_options options: A bitwise of glob_options enum constants that influence the behavior of this function (see remarks).
 	## Returns:
 		string[]@: A list of all matching files and directories that match the given path pattern, an empty array on no matches or failure.

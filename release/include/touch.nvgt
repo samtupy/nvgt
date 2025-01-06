@@ -1,0 +1,379 @@
+/*touch.nvgt - high-level classes and interfaces for touch screen devices.
+ * This allows a user to detect gestures and convert them into keyboard input or other events, including multi-finger swipes and taps over configurable areas of the screen.
+ *
+ * NVGT - NonVisual Gaming Toolkit
+ * Copyright (c) 2022-2024 Sam Tupy
+ * https://nvgt.gg
+ * touch.nvgt - Copyright (C) 2024 Ivan Soto
+ * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+ * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+ * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+*/
+
+enum swipe_touch_directions {
+	swipe_touch_direction_left = 0, swipe_touch_direction_right, swipe_touch_direction_up, swipe_touch_direction_down
+}
+funcdef void tap_func(touch_screen_finger@finger);
+const float TOUCH_UNCOORDINATED = -10.0f;
+class touch_interface {
+	touch_gesture_manager@parent;
+	float minx, maxx, miny, maxy;
+	bool coordinated = false;
+	touch_interface(touch_gesture_manager@parent, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED) {
+		@this.parent = parent;
+		this.minx = minx;
+		this.maxx = maxx;
+		this.miny = miny;
+		this.maxy = maxy;
+		if (this.minx != TOUCH_UNCOORDINATED or this.maxx != TOUCH_UNCOORDINATED or this.miny != TOUCH_UNCOORDINATED or this.maxy != TOUCH_UNCOORDINATED) this.coordinated = true;
+	}
+	void on_double_tap(touch_screen_finger@finger) {
+	}
+	void on_tripple_tap(touch_screen_finger@finger) {
+	}
+
+	bool in_bounds(float x, float y) {
+		if (!this.coordinated) return true;
+		if ((x<this.minx or x>this.maxx) or (y<this.miny or y>this.maxy)) return false;
+		return true;
+	}
+	void on_swipe_left(touch_screen_finger@finger) {
+	}
+	void on_swipe_right(touch_screen_finger@finger) {
+	}
+	void on_swipe_up(touch_screen_finger@finger) {
+	}
+	void on_swipe_down(touch_screen_finger@finger) {
+	}
+	void on_released_finger(touch_screen_finger@finger) {
+	}
+}
+class touch_keyboard_interface: touch_interface {
+	dictionary keymap;
+	touch_keyboard_interface(touch_gesture_manager@parent, dictionary@map, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED) {
+		super(parent, minx, maxx, miny, maxy);
+		this.keymap = map;
+	}
+	bool attempt_key_simulate(string&in dir, bool swipe = true, int[] & out key_codes = void) {
+		uint size = this.parent.last_finger_size;
+		if (swipe) size = this.parent.finger_map.get_size();
+		int key;
+		string keyname = (swipe ? "swipe_" : "") + dir + size + "f";
+		if (this.keymap.get(keyname, key)) {
+			if (simulate_key_down(key)) {
+				key_codes.insert_last(key);
+				return true;
+			}
+		}
+		//check to see if it's an array of keys.
+		int[] keys;
+		if (this.keymap.get(keyname, keys)) {
+			if (simulate_keys_down(keys)) {
+				key_codes = keys;
+				return true;
+			}
+		}
+		return false;
+	}
+	void on_swipe_left(touch_screen_finger@finger) {
+		if (@finger == null) return;
+		int[] keycodes;
+		if (this.attempt_key_simulate("left", true, keycodes)) finger.last_keys_pressed = keycodes;
+	}
+	void on_swipe_right(touch_screen_finger@finger) {
+		if (@finger == null) return;
+		int[] keycodes;
+		if (this.attempt_key_simulate("right", true, keycodes)) finger.last_keys_pressed = keycodes;
+	}
+	void on_swipe_up(touch_screen_finger@finger) {
+		if (@finger == null) return;
+		int[] keycodes;
+		if (this.attempt_key_simulate("up", true, keycodes)) finger.last_keys_pressed = keycodes;
+	}
+	void on_swipe_down(touch_screen_finger@finger) {
+		if (@finger == null) return;
+		int[] keycodes;
+		if (this.attempt_key_simulate("down", true, keycodes)) finger.last_keys_pressed = keycodes;
+	}
+	void on_double_tap(touch_screen_finger@finger) {
+		if (@finger == null) return;
+		int[] keycodes;
+		if (this.attempt_key_simulate("double_tap", false, keycodes))
+			finger.last_keys_pressed = keycodes;
+	}
+	void on_tripple_tap(touch_screen_finger@finger) {
+		if (@finger == null) return;
+		int[] keycodes;
+		if (this.attempt_key_simulate("tripple_tap", false, keycodes)) finger.last_keys_pressed = keycodes;
+	}
+	void on_released_finger(touch_screen_finger@finger) {
+		if (@finger != null) {
+			if (finger.has_swiped and finger.last_keys_pressed.length() > 0) simulate_keys_up(finger.last_keys_pressed);
+		}
+	}
+}
+class touch_gesture_manager {
+	tap_func@last_tap_func;
+	bool no_touch = true;
+	timer input_timer, tap_timer;
+	double doubletap_threshold = 500;
+	int taps = 0;
+	dictionary finger_map;
+	uint last_finger_size = 0;
+	touch_interface@[] interfaces;
+	touch_screen_finger@last_tapped_finger;
+	timer updatetimer;
+	touch_gesture_manager() {
+	}
+	bool is_available() {
+		uint64[]@ dev = get_touch_devices();
+		return dev.length() > 0;
+	}
+	bool get_available() property {
+		return is_available();
+	}
+	bool add_touch_interface(touch_interface@i) {
+		if (@i == null) return false;
+		this.interfaces.insert_last(i);
+		return true;
+	}
+	bool set_touch_interfaces(touch_interface@[] interfaces, bool append = false) {
+		if(!append) {
+			this.interfaces = interfaces;
+			return true;
+		}
+			else {
+			if(interfaces.length()<=0) return false;
+			this.interfaces.insert_last(interfaces);
+		}
+		return true;
+	}
+	void clear_touch_interfaces() {
+		this.interfaces.resize(0);
+	}
+	touch_interface@get_touch_interface(float x, float y) {
+		uint len = this.interfaces.length();
+		if (len <= 0) return null;
+		touch_interface@global;
+		for (int i = len-1; i >= 0; i -= 1) {
+			if (!this.interfaces[i].coordinated and @global == null) @global = this.interfaces[i];
+			else if (this.interfaces[i].coordinated and this.interfaces[i].in_bounds(x, y)) return this.interfaces[i];
+		}
+		return global;
+	}
+	bool set_last_tap_func(tap_func@f, touch_screen_finger@finger) {
+		if (@f == null or @finger == null) return false;
+		@this.last_tap_func = f;
+		@this.last_tapped_finger = finger;
+		if (this.tap_timer.elapsed >= 50) this.last_finger_size = this.finger_map.get_size();
+		this.tap_timer.restart();
+		return true;
+	}
+	void monitor() {
+		touch_finger[]@ temp = query_touch_device();
+		if (this.finger_map.get_size() != temp.length()) this.update(temp);
+		else this.update_finger_positions(temp);
+		if (this.tap_timer.elapsed >= 250 and @this.last_tap_func != null and @this.last_tapped_finger != null) {
+			this.last_tap_func(this.last_tapped_finger);
+			@this.last_tapped_finger = null;
+			@this.last_tap_func = null;
+			this.tap_timer.restart();
+			this.last_finger_size = 0;
+		}
+	}
+	touch_screen_finger@[] get_touch_finger_list() {
+		touch_screen_finger@[] result;
+		string[]@ k = this.finger_map.get_keys();
+		if (k.length() <= 0) return result;
+		for (uint i = 0; i < k.length(); i += 1) {
+			touch_screen_finger@finger;
+			this.finger_map.get(k[i], @finger);
+			result.insert_last(finger);
+		}
+		return result;
+	}
+	void clear_finger_list() {
+		touch_screen_finger@[]fingers = this.get_touch_finger_list();
+		touch_finger[] rem;
+		for (int i = 0; i < fingers.length(); i += 1) rem.insert_last(fingers[i].internal_finger);
+		this.remove_fingers(rem);
+	}
+	void update(touch_finger[]@ current) {
+		uint finger_size = this.get_touch_finger_list().length();
+		this.no_touch = false;
+		if (current.length() > finger_size) {
+			// A finger was added
+			this.add_fingers(current);
+		} else if (current.length() < finger_size) {
+			// A finger was removed
+			this.remove_fingers(current);
+		}
+		if (current.length() <= 0 and finger_size > 0) {
+			this.no_touch = true;
+			this.clear_finger_list();
+		}
+	}
+	void add_fingers(touch_finger[]@ new_fingers) {
+		for (uint i = 0; i < new_fingers.length(); i++) {
+			touch_screen_finger temp(new_fingers[i]);
+			this.finger_map.set(new_fingers[i].id, @temp);
+			this.on_finger_added(new_fingers[i]);
+			if (this.input_timer.elapsed > 50) {
+				this.taps += 1;
+				this.input_timer.restart();
+			}
+		}
+	}
+	void check_taps(touch_screen_finger@finger) {
+		if (finger.has_swiped) return;
+		if (this.tap_timer.elapsed >= 300) this.taps = 1;
+		if (this.taps == 2)
+			this.set_last_tap_func(tap_func(this.on_double_tap), finger);
+		else if (this.taps == 3)
+			this.set_last_tap_func(tap_func(this.on_tripple_tap), finger);
+		this.tap_timer.restart();
+	}
+	void remove_fingers(touch_finger[]@ current) {
+		for (uint i = 0; i < current.length(); i++) {
+			touch_screen_finger@finger = this.lookup_finger(current[i].id);
+			if (@finger != null) {
+				this.check_taps(finger);
+				touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
+				if (@temp != null) temp.on_released_finger(finger);
+				this.finger_map.delete(finger.id);
+				this.on_finger_removed(finger.internal_finger);
+			}
+		}
+	}
+	bool check_swipe(touch_screen_finger@finger) {
+		int swipe = detect_swipe(finger.start_x, finger.start_y, finger.x, finger.y);
+		if (swipe > -1 and finger.active_time < 500 and !finger.has_swiped) {
+			finger.has_swiped = true;
+			if (swipe == swipe_touch_direction_right) this.on_swipe_right(finger);
+			else if (swipe == swipe_touch_direction_left) this.on_swipe_left(finger);
+			else if (swipe == swipe_touch_direction_up) this.on_swipe_up(finger);
+			else if (swipe == swipe_touch_direction_down) this.on_swipe_down(finger);
+			return true;
+		}
+		return false;
+	}
+	void update_finger_positions(touch_finger[]@ current) {
+		if (this.updatetimer.elapsed < 50) return;
+		this.updatetimer.restart();
+		touch_screen_finger@[] f = this.get_touch_finger_list();
+		bool swiped = false;
+		for (uint i = 0; i < current.length(); i++) {
+			for (uint j = 0; j < f.length(); j++) {
+				if (current[i].id == f[j].id) {
+					float old_x = f[j].x;
+					float old_y = f[j].y;
+					if (round(current[i].x, 1) != round(old_x, 1) or round(current[i].y, 1) != round(old_y, 1)) {
+						// Handle finger movement
+						f[j].internal_finger = current[i];
+						if (!swiped) swiped = this.check_swipe(f[j]);
+						this.on_finger_moved(current[i]);
+					}
+					break;
+				}
+			}
+		}
+	}
+	touch_screen_finger@ lookup_finger(uint id) {
+		if (!this.finger_map.exists(id))
+			return null;
+		touch_screen_finger@ tf;
+		this.finger_map.get(id, @tf);
+		return tf;
+	}
+	void on_finger_added(touch_finger finger) {
+	}
+	void on_finger_removed(touch_finger finger) {
+	}
+	void on_finger_moved(touch_finger finger) {
+	}
+	void on_swipe_left(touch_screen_finger@finger) {
+		touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
+		if (@temp != null) temp.on_swipe_left(finger);
+	}
+	void on_swipe_right(touch_screen_finger@finger) {
+		touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
+		if (@temp != null) temp.on_swipe_right(finger);
+	}
+	void on_swipe_up(touch_screen_finger@finger) {
+		touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
+		if (@temp != null) temp.on_swipe_up(finger);
+	}
+	void on_swipe_down(touch_screen_finger@finger) {
+		touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
+		if (@temp != null) temp.on_swipe_down(finger);
+	}
+	void on_double_tap(touch_screen_finger@finger) {
+		touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
+		if (@temp != null) temp.on_double_tap(finger);
+	}
+	void on_tripple_tap(touch_screen_finger@finger) {
+		touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
+		if (@temp != null) temp.on_tripple_tap(finger);
+	}
+}
+class touch_screen_finger {
+	touch_finger internal_finger;
+	timer main_timer;
+	float start_x, start_y;
+	int64 id;
+	int[] last_keys_pressed;
+	bool has_swiped = false;
+	touch_screen_finger(touch_finger internal) {
+		this.internal_finger = internal;
+		this.start_x = internal.x;
+		this.start_y = internal.y;
+		this.id = internal.id;
+	}
+	float get_x() property {
+		return this.internal_finger.x;
+	}
+	float get_y() property {
+		return this.internal_finger.y;
+	}
+	float get_pressure() property {
+		return this.internal_finger.pressure;
+	}
+	int64 get_active_time() const property {
+		return this.main_timer.elapsed;
+	}
+}
+int detect_swipe(float start_x, float start_y, float end_x, float end_y, float min_swipe_distance = 0.1f) {
+	float delta_x = end_x - start_x;
+	float delta_y = end_y - start_y;
+	if (fabs(delta_x) > fabs(delta_y)) {
+		if (delta_x > min_swipe_distance)
+			return swipe_touch_direction_right;
+		else if (delta_x < -min_swipe_distance)
+			return swipe_touch_direction_left;
+	} else {
+		if (delta_y > min_swipe_distance)
+			return swipe_touch_direction_down;
+		else if (delta_y < -min_swipe_distance)
+			return swipe_touch_direction_up;
+	}
+	return -1;
+}
+float fabs(float value) {
+	return float(abs(value));
+}
+bool simulate_keys_down(int[] keys) {
+	bool result = true;
+	for (int i = 0; i < keys.length(); i += 1) {
+		if (!simulate_key_down(keys[i])) result = false;
+	}
+	return result;
+}
+bool simulate_keys_up(int[] keys) {
+	bool result = true;
+	for (int i = 0; i < keys.length(); i += 1) {
+		if (!simulate_key_up(keys[i])) result = false;
+	}
+	return result;
+}

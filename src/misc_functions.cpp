@@ -31,10 +31,10 @@
 #include <sstream>
 #include <angelscript.h>
 #include <scriptarray.h>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <tinyexpr.h>
 #include <dbgtools.h>
-#include "angelscript.h"
+#include "nvgt_angelscript.h"
 #include "nvgt.h"
 #include "UI.h" // wait
 #include "bl_number_to_words.h"
@@ -276,11 +276,12 @@ int utf8next(const std::string& text, int offset = 0) {
 CScriptArray* get_preferred_locales() {
 	asITypeInfo* arrayType = get_array_type("array<string>");
 	CScriptArray* array = CScriptArray::Create(arrayType);
-	SDL_Locale* locales = SDL_GetPreferredLocales();
+	int count;
+	SDL_Locale** locales = SDL_GetPreferredLocales(&count);
 	if (!locales) return array;
-	for (int i = 0; locales[i].language; i++) {
-		std::string tmp = locales[i].language;
-		if (locales[i].country) tmp += std::string("-") + locales[i].country;
+	for (int i = 0; i < count; i++) {
+		std::string tmp = locales[i]->language;
+		if (locales[i]->country) tmp += std::string("-") + locales[i]->country;
 		array->Resize(array->GetSize() + 1);
 		((std::string*)(array->At(array->GetSize() - 1)))->assign(tmp);
 	}
@@ -289,62 +290,65 @@ CScriptArray* get_preferred_locales() {
 }
 
 float parse_float(const std::string& val) {
-float res = 0.0;
-const auto [valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
-if (valEc != std::errc()) {
-return 0.0;
+	float res = 0.0;
+	const auto [valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
+	if (valEc != std::errc()) return 0.0;
+	return res;
 }
-return res;
-}
-
 double parse_double(const std::string& val) {
-double res = 0.0;
-const auto [valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
-if (valEc != std::errc()) {
-return 0.0;
-}
-return res;
+	double res = 0.0;
+	const auto [valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
+	if (valEc != std::errc()) return 0.0;
+	return res;
 }
 
 void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
-	engine->RegisterGlobalFunction(_O("bool chdir(const string& in)"), asFUNCTION(ChDir), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool chdir(const string& in directory)"), asFUNCTION(ChDir), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
-	engine->RegisterGlobalFunction(_O("uint8 character_to_ascii(const string&in)"), asFUNCTION(character_to_ascii), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string ascii_to_character(uint8)"), asFUNCTION(ascii_to_character), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_base32_normalize(const string& in)"), asFUNCTION(base32_normalize), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint8 character_to_ascii(const string&in character)"), asFUNCTION(character_to_ascii), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string ascii_to_character(uint8 character_code)"), asFUNCTION(ascii_to_character), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_base32_normalize(const string& in base32encoded)"), asFUNCTION(base32_normalize), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
 	engine->RegisterGlobalFunction(_O("uint64 get_TIME_STAMP() property"), asFUNCTION(timestamp), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction(_O("string[]@ get_preferred_locales()"), asFUNCTION(get_preferred_locales), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_COMMAND_LINE() property"), asFUNCTION(get_command_line), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool run(const string& in, const string& in, bool, bool)"), asFUNCTION(run), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool run(const string& in filename, const string& in arguments, bool wait_for_completion, bool background)"), asFUNCTION(run), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool is_debugger_present()"), asFUNCTION(debugger_present), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int get_last_error()"), asFUNCTION(get_last_error), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
-	engine->RegisterGlobalFunction(_O("double round(double, int)"), asFUNCTION(Round), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("double tinyexpr(const string &in)"), asFUNCTION(tinyexpr), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("double round(double number, int place)"), asFUNCTION(Round), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("double tinyexpr(const string &in expression)"), asFUNCTION(tinyexpr), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
-	engine->RegisterGlobalFunction(_O("string number_to_words(int64, bool = true)"), asFUNCTION(number_to_words), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("uint string_distance(const string&in, const string&in, uint=1, uint=1, uint=1)"), asFUNCTION(string_distance), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string float_to_bytes(float)"), asFUNCTION(float_to_bytes), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("float bytes_to_float(const string&in)"), asFUNCTION(bytes_to_float), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string double_to_bytes(double)"), asFUNCTION(double_to_bytes), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("double bytes_to_double(const string&in)"), asFUNCTION(bytes_to_double), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool natural_number_sort(const string&in, const string&in)"), asFUNCTION(natural_number_sort), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("int utf8prev(const string&in, int)"), asFUNCTION(utf8prev), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("int utf8next(const string&in, int)"), asFUNCTION(utf8next), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("int utf8size(const string&in)"), asFUNCTION(utf8size), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string number_to_words(int64 number, bool include_and = true)"), asFUNCTION(number_to_words), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint string_distance(const string&in string1, const string&in string2, uint insert_cost = 1, uint delete_cost = 1, uint replace_cost = 1)"), asFUNCTION(string_distance), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string float_to_bytes(float number)"), asFUNCTION(float_to_bytes), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("float bytes_to_float(const string&in data)"), asFUNCTION(bytes_to_float), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string double_to_bytes(double number)"), asFUNCTION(double_to_bytes), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("double bytes_to_double(const string&in data)"), asFUNCTION(bytes_to_double), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool natural_number_sort(const string&in string1, const string&in string2)"), asFUNCTION(natural_number_sort), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int utf8prev(const string&in text, int cursor)"), asFUNCTION(utf8prev), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int utf8next(const string&in text, int cursor)"), asFUNCTION(utf8next), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int utf8size(const string&in character)"), asFUNCTION(utf8size), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->RegisterObjectType(_O("refstring"), 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(_O("refstring"), asBEHAVE_FACTORY, _O("refstring @s()"), asFUNCTION(new_refstring), asCALL_CDECL);
 	engine->RegisterObjectBehaviour(_O("refstring"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(refstring, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("refstring"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(refstring, Release), asCALL_THISCALL);
 	engine->RegisterObjectProperty(_O("refstring"), _O("string str"), asOFFSET(refstring, str));
-	engine->RegisterGlobalFunction(_O("uint64 memory_allocate(uint64)"), asFUNCTION(malloc), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("uint64 memory_allocate_units(uint64, uint64)"), asFUNCTION(calloc), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("uint64 memory_reallocate(uint64, uint64)"), asFUNCTION(realloc), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("void memory_free(uint64)"), asFUNCTION(free), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float parse_float(const string &in)", asFUNCTION(parse_float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double parse_double(const string &in)", asFUNCTION(parse_double), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 memory_allocate(uint64 size)"), asFUNCTION(malloc), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 memory_allocate_units(uint64 unit_size, uint64 unit_count)"), asFUNCTION(calloc), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 memory_reallocate(uint64 ptr, uint64 size)"), asFUNCTION(realloc), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void memory_free(uint64 ptr)"), asFUNCTION(free), asCALL_CDECL);
+	engine->RegisterGlobalFunction("float parse_float(const string &in number)", asFUNCTION(parse_float), asCALL_CDECL);
+	engine->RegisterGlobalFunction("double parse_double(const string &in number)", asFUNCTION(parse_double), asCALL_CDECL);
+	engine->RegisterEnum("system_power_state");
+	engine->RegisterEnumValue("system_power_state", "POWER_STATE_ERROR", SDL_POWERSTATE_ERROR);
+	engine->RegisterEnumValue("system_power_state", "POWER_STATE_UNKNOWN", SDL_POWERSTATE_UNKNOWN);
+	engine->RegisterEnumValue("system_power_state", "POWER_STATE_ON_BATTERY", SDL_POWERSTATE_ON_BATTERY);
+	engine->RegisterEnumValue("system_power_state", "POWER_STATE_NO_BATTERY", SDL_POWERSTATE_NO_BATTERY);
+	engine->RegisterEnumValue("system_power_state", "POWER_STATE_CHARGING", SDL_POWERSTATE_CHARGING);
+	engine->RegisterEnumValue("system_power_state", "POWER_STATE_CHARGED", SDL_POWERSTATE_CHARGED);
+	engine->RegisterGlobalFunction("system_power_state system_power_info(int&out seconds = void, int&out percent = void)", asFUNCTION(SDL_GetPowerInfo), asCALL_CDECL);
 }

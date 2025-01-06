@@ -46,7 +46,7 @@ void garbage_collect(bool full = true) {
 	if (!full && g_GCMode < 3)
 		g_ScriptEngine->GarbageCollect(asGC_ONE_STEP | asGC_DETECT_GARBAGE);
 	else if (full && g_GCMode < 3)
-		g_ScriptEngine->GarbageCollect(asGC_FULL_CYCLE | asGC_DESTROY_GARBAGE);
+		g_ScriptEngine->GarbageCollect(asGC_FULL_CYCLE);
 	else if (full && g_GCMode == 3)
 		g_GCAutoFullTime = 0;
 }
@@ -260,7 +260,6 @@ void script_assert(bool expr, const std::string& failtext = "") {
 	if (!expr) throw Poco::AssertionViolationException(failtext);
 }
 
-class script_function;
 void script_message_callback(const asSMessageInfo* msg, void* param) {
 	if (!param)
 		return;
@@ -276,178 +275,172 @@ void script_message_callback(const asSMessageInfo* msg, void* param) {
 	if (msg->type == asMSGTYPE_ERROR)
 		messages->InsertLast(&buffer_str);
 }
-void script_function_line_callback(asIScriptContext* ctx, script_function* func);
-class script_function {
-	int RefCount;
-public:
-	unsigned int max_statement_count, current_statement_count;
-	asIScriptFunction* func;
-	script_function(asIScriptFunction* f, int max_statements = 0) : func(f), RefCount(1), max_statement_count(max_statements), current_statement_count(0) {
-		if (f)
-			func->AddRef();
-	}
-	void AddRef() {
-		asAtomicInc(RefCount);
-	}
-	void Release() {
-		if (asAtomicDec(RefCount) < 1) {
-			if (func) func->Release();
-			delete this;
-		}
-	}
-	CScriptDictionary* call(CScriptDictionary* args, CScriptArray* errors = NULL) {
-		std::string failure_reason = "";
-		std::string callstack1 = "";
-		std::string callstack2 = "";
-		g_ScriptEngine->SetMessageCallback(asFUNCTION(script_message_callback), errors, asCALL_CDECL);
-		asIScriptContext* ACtx = asGetActiveContext();
-		bool new_context = ACtx == NULL || ACtx->PushState() < 0;
-		asIScriptContext* ctx = (new_context ? g_ScriptEngine->RequestContext() : ACtx);
-		if (!ctx) {
-			failure_reason = "ERROR: Failed to acquire context.";
-			goto failure;
-		}
-		if (ctx->Prepare(func) < 0) {
-			failure_reason = "ERROR: Failed to prepare context.";
-			goto failure;
-		}
-		int arg_index;
-		arg_index = 1;
-		while (args && args->GetSize() > 0) {
-			int arg_type_id;
-			DWORD arg_tmods;
-			CScriptDictionary::CIterator k = args->find(std::to_string(arg_index));
-			if (k == args->end()) break;
-			if (func->GetParam(arg_index - 1, &arg_type_id, &arg_tmods) < 0) {
-				/*
-				failure_reason="ERROR: Trying to pass too many arguments.";
-				goto failure;
-				*/
-				break;
-			}
-			void* arg_value = ctx->GetAddressOfArg(arg_index - 1);
-			if (!arg_value) {
-				failure_reason = "ERROR: Trying to pass too many arguments.";
-				goto failure;
-			}
-			if ((arg_type_id & asTYPEID_MASK_OBJECT)) {
-				const void* o = k.GetAddressOfValue();
-				if (arg_type_id & asTYPEID_OBJHANDLE)
-					ctx->SetArgObject(arg_index - 1, *(void**)o);
-				else
-					ctx->SetArgObject(arg_index - 1, (void*)o);
-			} else if (!k.GetValue(arg_value, arg_type_id)) {
-				if (arg_type_id & asTYPEID_INT32) {
-					asINT64 val;
-					k.GetValue(val);
-					ctx->SetArgDWord(arg_index - 1, val);
-				} else if (arg_type_id & asTYPEID_FLOAT) {
-					double val;
-					k.GetValue(val);
-					ctx->SetArgFloat(arg_index - 1, val);
-				} else if (arg_type_id & asTYPEID_BOOL) {
-					asINT64 val;
-					k.GetValue(val);
-					ctx->SetArgByte(arg_index - 1, val);
-				} else {
-					failure_reason = "ERROR: Type mismatch for parameter ";
-					failure_reason += std::to_string(arg_index);
-					goto failure;
-				}
-			}
-			arg_index += 1;
-		}
-		current_statement_count = 0;
-		ctx->SetLineCallback(asFUNCTION(script_function_line_callback), this, asCALL_CDECL);
-		int xr;
-		xr = ctx->Execute();
-		ctx->SetLineCallback(asFUNCTION(profiler_callback), NULL, asCALL_CDECL);
-		if (xr != asEXECUTION_FINISHED) {
-			if (xr == asEXECUTION_EXCEPTION) {
-				char msg[4096];
-				const char* section;
-				int col;
-				const char* decl = ctx->GetExceptionFunction()->GetDeclaration();
-				const char* exc = ctx->GetExceptionString();
-				int line = ctx->GetExceptionLineNumber(&col, &section);
-				snprintf(msg, 4096, "Exception: %s in %s %s at line %d, %d", exc, section, decl, line, col);
-				failure_reason = msg;
-			} else if (xr == asEXECUTION_SUSPENDED) {
-				char msg[128];
-				snprintf(msg, 128, "maximum statement count of %d exceeded", max_statement_count);
-				failure_reason = msg;
-			}
-			callstack1 = get_call_stack_ctx(ctx);
-			if (ctx != ACtx)
-				callstack2 = get_call_stack_ctx(ACtx);
-			goto failure;
-		}
-		if (args)
-			args->DeleteAll();
-		int ret_type_id;
-		ret_type_id = func->GetReturnTypeId();
-		if (ret_type_id != asTYPEID_VOID) {
-			void* ret = ctx->GetAddressOfReturnValue();
-			if (ret && !args)
-				args = CScriptDictionary::Create(g_ScriptEngine);
-			if (args && ret)
-				args->Set("0", ret, ret_type_id);
-		}
-		if (new_context) g_ScriptEngine->ReturnContext(ctx);
-		else ctx->PopState();
-		g_ScriptEngine->ClearMessageCallback();
-		if (errors)
-			errors->Release();
-		return args;
-	failure:
-		if (errors != NULL && failure_reason != "") {
-			errors->InsertLast(&failure_reason);
-			errors->InsertLast(&callstack1);
-			errors->InsertLast(&callstack2);
-		}
-		if (ctx) {
-			if (new_context) {
-				ctx->Unprepare();
-				g_ScriptEngine->ReturnContext(ctx);
-			} else ctx->PopState();
-		}
-		if (args) {
-			args->DeleteAll();
-			args->Release();
-			args = NULL;
-		}
-		g_ScriptEngine->ClearMessageCallback();
-		if (errors)
-			errors->Release();
-		return NULL;
-	}
-	int get_line() {
-		if (!func) return -1;
-		asIScriptContext* ctx = g_ScriptEngine->CreateContext();
-		if (!ctx) return -2;
-		if (ctx->Prepare(func) < 0) return -3;
-		int ret = ctx->GetLineNumber();
-		ctx->Release();
-		return ret;
-	}
-	std::string get_decl() {
-		if (!func) return "";
-		return std::string(func->GetDeclaration());
-	}
-	std::string get_name() {
-		if (!func) return "";
-		return std::string(func->GetName());
-	}
-	std::string get_script() {
-		if (!func) return "";
-		return std::string(func->GetScriptSectionName());
-	}
+struct script_function_call_data {
+	int max_statement_count;
+	int current_statement_count;
 };
-void script_function_line_callback(asIScriptContext* ctx, script_function* func) {
+void script_function_line_callback(asIScriptContext* ctx, script_function_call_data* data);
+CScriptDictionary* script_function_call(asIScriptFunction* func, CScriptDictionary* args, CScriptArray* errors = NULL, int max_statement_count = 0) {
+	std::string failure_reason = "";
+	std::string callstack1 = "";
+	std::string callstack2 = "";
+	g_ScriptEngine->SetMessageCallback(asFUNCTION(script_message_callback), errors, asCALL_CDECL);
+	script_function_call_data call_data {max_statement_count, 0};
+	asIScriptContext* ACtx = asGetActiveContext();
+	bool new_context = ACtx == NULL || ACtx->PushState() < 0;
+	asIScriptContext* ctx = (new_context ? g_ScriptEngine->RequestContext() : ACtx);
+	if (!ctx) {
+		failure_reason = "ERROR: Failed to acquire context.";
+		goto failure;
+	}
+	if (ctx->Prepare(func) < 0) {
+		failure_reason = "ERROR: Failed to prepare context.";
+		goto failure;
+	}
+	int arg_index;
+	arg_index = 1;
+	while (args && args->GetSize() > 0) {
+		int arg_type_id;
+		DWORD arg_tmods;
+		CScriptDictionary::CIterator k = args->find(std::to_string(arg_index));
+		if (k == args->end()) break;
+		if (func->GetParam(arg_index - 1, &arg_type_id, &arg_tmods) < 0) {
+			/*
+			failure_reason="ERROR: Trying to pass too many arguments.";
+			goto failure;
+			*/
+			break;
+		}
+		void* arg_value = ctx->GetAddressOfArg(arg_index - 1);
+		if (!arg_value) {
+			failure_reason = "ERROR: Trying to pass too many arguments.";
+			goto failure;
+		}
+		if ((arg_type_id & asTYPEID_MASK_OBJECT)) {
+			const void* o = k.GetAddressOfValue();
+			if (arg_type_id & asTYPEID_OBJHANDLE)
+				ctx->SetArgObject(arg_index - 1, *(void**)o);
+			else
+				ctx->SetArgObject(arg_index - 1, (void*)o);
+		} else if (!k.GetValue(arg_value, arg_type_id)) {
+			if (arg_type_id & asTYPEID_INT32) {
+				asINT64 val;
+				k.GetValue(val);
+				ctx->SetArgDWord(arg_index - 1, val);
+			} else if (arg_type_id & asTYPEID_FLOAT) {
+				double val;
+				k.GetValue(val);
+				ctx->SetArgFloat(arg_index - 1, val);
+			} else if (arg_type_id & asTYPEID_BOOL) {
+				asINT64 val;
+				k.GetValue(val);
+				ctx->SetArgByte(arg_index - 1, val);
+			} else {
+				failure_reason = "ERROR: Type mismatch for parameter ";
+				failure_reason += std::to_string(arg_index);
+				goto failure;
+			}
+		}
+		arg_index += 1;
+	}
+	call_data.current_statement_count = 0;
+	ctx->SetLineCallback(asFUNCTION(script_function_line_callback), &call_data, asCALL_CDECL);
+	int xr;
+	xr = ctx->Execute();
+	ctx->SetLineCallback(asFUNCTION(profiler_callback), NULL, asCALL_CDECL);
+	if (xr != asEXECUTION_FINISHED) {
+		if (xr == asEXECUTION_EXCEPTION) {
+			char msg[4096];
+			const char* section;
+			int col;
+			const char* decl = ctx->GetExceptionFunction()->GetDeclaration();
+			const char* exc = ctx->GetExceptionString();
+			int line = ctx->GetExceptionLineNumber(&col, &section);
+			snprintf(msg, 4096, "Exception: %s in %s %s at line %d, %d", exc, section, decl, line, col);
+			failure_reason = msg;
+		} else if (xr == asEXECUTION_SUSPENDED) {
+			char msg[128];
+			snprintf(msg, 128, "maximum statement count of %d exceeded", call_data.max_statement_count);
+			failure_reason = msg;
+		}
+		callstack1 = get_call_stack_ctx(ctx);
+		if (ctx != ACtx)
+			callstack2 = get_call_stack_ctx(ACtx);
+		goto failure;
+	}
+	if (args)
+		args->DeleteAll();
+	int ret_type_id;
+	ret_type_id = func->GetReturnTypeId();
+	if (ret_type_id != asTYPEID_VOID) {
+		void* ret = ctx->GetAddressOfReturnValue();
+		if (ret && !args)
+			args = CScriptDictionary::Create(g_ScriptEngine);
+		if (args && ret)
+			args->Set("0", ret, ret_type_id);
+	}
+	if (new_context) g_ScriptEngine->ReturnContext(ctx);
+	else ctx->PopState();
+	g_ScriptEngine->ClearMessageCallback();
+	if (errors)
+		errors->Release();
+	return args;
+failure:
+	if (errors != NULL && failure_reason != "") {
+		errors->InsertLast(&failure_reason);
+		errors->InsertLast(&callstack1);
+		errors->InsertLast(&callstack2);
+	}
+	if (ctx) {
+		if (new_context) {
+			ctx->Unprepare();
+			g_ScriptEngine->ReturnContext(ctx);
+		} else ctx->PopState();
+	}
+	if (args) {
+		args->DeleteAll();
+		args->Release();
+		args = NULL;
+	}
+	g_ScriptEngine->ClearMessageCallback();
+	if (errors)
+		errors->Release();
+	return NULL;
+}
+bool script_function_retrieve(asIScriptFunction* func, asIScriptFunction** out_func, int type_id) {
+	if (type_id & asTYPEID_OBJHANDLE) {
+		*out_func = func;
+		func->AddRef();
+		return true;
+	}
+	return false;
+}
+int script_function_get_line(asIScriptFunction* func) {
+	asIScriptContext* ctx = g_ScriptEngine->CreateContext();
+	if (!ctx) return -2;
+	if (ctx->Prepare(func) < 0) return -3;
+	int ret = ctx->GetLineNumber();
+	ctx->Release();
+	return ret;
+}
+std::string script_function_get_decl(asIScriptFunction* func, bool include_object_name = true, bool include_namespace = true, bool include_param_names = false) {
+	return std::string(func->GetDeclaration(include_object_name, include_namespace, include_param_names));
+}
+std::string script_function_get_decl_property(asIScriptFunction* func) { return script_function_get_decl(func); }
+std::string script_function_get_name(asIScriptFunction* func) {
+	return std::string(func->GetName());
+}
+std::string script_function_get_namespace(asIScriptFunction* func) {
+	return std::string(func->GetNamespace());
+}
+std::string script_function_get_script(asIScriptFunction* func) {
+	return std::string(func->GetScriptSectionName());
+}
+void script_function_line_callback(asIScriptContext* ctx, script_function_call_data* data) {
 	profiler_callback(ctx, NULL);
-	if (func->max_statement_count < 1) return;
-	func->current_statement_count += 1;
-	if (func->current_statement_count > func->max_statement_count)
+	if (data->max_statement_count < 1) return;
+	data->current_statement_count += 1;
+	if (data->current_statement_count > data->max_statement_count)
 		ctx->Suspend();
 	return;
 }
@@ -558,14 +551,14 @@ public:
 			return asNO_MODULE;
 		return mod->BindAllImportedFunctions();
 	}
-	int bind_imported_function(DWORD index, script_function* func) {
+	int bind_imported_function(DWORD index, asIScriptFunction* func) {
 		if (!mod)
 			return asNO_MODULE;
 		if (!func)
 			return asNO_FUNCTION;
-		return mod->BindImportedFunction(index, func->func);
+		return mod->BindImportedFunction(index, func);
 	}
-	script_function* compile_function(const std::string& section_name, const std::string& code, CScriptArray* errors, BOOL add_to_module = FALSE, DWORD line_offset = 0) {
+	asIScriptFunction* compile_function(const std::string& section_name, const std::string& code, CScriptArray* errors, BOOL add_to_module = FALSE, DWORD line_offset = 0) {
 		if (mod == NULL) {
 			if (errors) errors->Release();
 			return NULL;
@@ -579,7 +572,7 @@ public:
 			return NULL;
 		}
 		if (errors) errors->Release();
-		return new script_function(out_ptr, max_statement_count);
+		return out_ptr;
 	}
 	int compile_global(const std::string& section_name, const std::string& code, CScriptArray* errors, DWORD line_offset = 0) {
 		if (mod == NULL) {
@@ -612,23 +605,17 @@ public:
 		if (!mod) return 0;
 		return mod->SetAccessMask(mask);
 	}
-	script_function* get_function_by_index(int index) {
+	asIScriptFunction* get_function_by_index(int index) {
 		if (!mod) return NULL;
-		asIScriptFunction* func = mod->GetFunctionByIndex(index);
-		if (func == NULL) return NULL;
-		return new script_function(func, max_statement_count);
+		return mod->GetFunctionByIndex(index);
 	}
-	script_function* get_function_by_name(const std::string& name) {
+	asIScriptFunction* get_function_by_name(const std::string& name) {
 		if (!mod) return NULL;
-		asIScriptFunction* func = mod->GetFunctionByName(name.c_str());
-		if (func == NULL) return NULL;
-		return new script_function(func, max_statement_count);
+		return mod->GetFunctionByName(name.c_str());
 	}
-	script_function* get_function_by_decl(const std::string& name) {
+	asIScriptFunction* get_function_by_decl(const std::string& name) {
 		if (!mod) return NULL;
-		asIScriptFunction* func = mod->GetFunctionByDecl(name.c_str());
-		if (func == NULL) return NULL;
-		return new script_function(func, max_statement_count);
+		return mod->GetFunctionByDecl(name.c_str());
 	}
 	const std::string get_imported_function_decl(DWORD index) {
 		if (!mod)
@@ -708,15 +695,17 @@ script_module* script_get_module(const std::string& name, int mode) {
 void RegisterScripting(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_SCRIPTING);
 	engine->RegisterObjectType(_O("script_function"), 0, asOBJ_REF);
-	engine->RegisterObjectBehaviour(_O("script_function"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(script_function, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour(_O("script_function"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(script_function, Release), asCALL_THISCALL);
-	engine->RegisterObjectProperty(_O("script_function"), _O("uint max_statement_count"), asOFFSET(script_function, max_statement_count));
-	engine->RegisterObjectMethod(_O("script_function"), _O("dictionary@ call(dictionary@, string[]@=null)"), asMETHOD(script_function, call), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_function"), _O("dictionary@ opCall(dictionary@, string[]@=null)"), asMETHOD(script_function, call), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_function"), _O("string get_decl() property"), asMETHOD(script_function, get_decl), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_function"), _O("string get_name() property"), asMETHOD(script_function, get_name), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_function"), _O("string get_script() property"), asMETHOD(script_function, get_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_function"), _O("int get_line() property"), asMETHOD(script_function, get_line), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour(_O("script_function"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(asIScriptFunction, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour(_O("script_function"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(asIScriptFunction, Release), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_function"), _O("dictionary@ call(dictionary@ args, string[]@ errors = null, int max_statement_count = 0)"), asFUNCTION(script_function_call), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("dictionary@ opCall(dictionary@ args, string[]@ errors = null, int max_statement_count = 0)"), asFUNCTION(script_function_call), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("bool retrieve(?&out)"), asFUNCTION(script_function_retrieve), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("string get_decl(bool include_object_name, bool include_namespace = true, bool include_param_names = true)"), asFUNCTION(script_function_get_decl), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("string get_decl() property"), asFUNCTION(script_function_get_decl_property), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("string get_name() property"), asFUNCTION(script_function_get_name), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("string get_namespace() property"), asFUNCTION(script_function_get_namespace), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("string get_script() property"), asFUNCTION(script_function_get_script), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("int get_line() property"), asFUNCTION(script_function_get_line), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectType(_O("script_module"), 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(_O("script_module"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(script_module, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("script_module"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(script_module, Release), asCALL_THISCALL);
@@ -731,9 +720,9 @@ void RegisterScripting(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("script_module"), _O("int compile_global(const string&in, const string&in, uint=0)"), asMETHOD(script_module, compile_global), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@ compile_function(const string&in, const string&in, string[]@=null, bool=false, uint=0)"), asMETHOD(script_module, compile_function), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("void discard()"), asMETHOD(script_module, discard), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@ get_function_by_decl(const string&in)"), asMETHOD(script_module, get_function_by_decl), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@ get_function_by_index(uint)"), asMETHOD(script_module, get_function_by_index), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@ get_function_by_name(const string&in)"), asMETHOD(script_module, get_function_by_name), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@+ get_function_by_decl(const string&in)"), asMETHOD(script_module, get_function_by_decl), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@+ get_function_by_index(uint)"), asMETHOD(script_module, get_function_by_index), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@+ get_function_by_name(const string&in)"), asMETHOD(script_module, get_function_by_name), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("any@ get_global(uint)"), asMETHOD(script_module, get_global), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("const string get_global_decl(uint)"), asMETHOD(script_module, get_global_decl), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("int get_global_index_by_decl(const string&in)"), asMETHOD(script_module, get_global_index_by_decl), asCALL_THISCALL);

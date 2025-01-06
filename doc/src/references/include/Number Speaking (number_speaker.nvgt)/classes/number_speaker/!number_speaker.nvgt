@@ -1,0 +1,15 @@
+/**
+	The `number_speaker` object is used to facilitate natural and smooth number speech. It is best to use this class if you're developing a game with voice acting.
+	number_speaker();
+	## Remarks:
+		The `number_speaker` class searches for sound files that match the spoken components of a number as closely as possible, separating words with an underscore. For instance, if the number is 72, it'll first check for a file named seventy_two.wav. If this file is not available, it'll search for seventy.wav and two.wav and combine them.
+		This system allows you to record as many number sounds as desired to achieve flawless spoken output. Alternatively, you can record only essential numbers, such as zero.wav to nineteen.wav, twenty.wav to ninety.wav, and optionally hundred.wav, thousand.wav, and million.wav. You can also record a file named minus.wav to distinguish between positive and negative numbers, as well as and.ogg to have the word "and" spoken if the include_and parameter is enabled.
+*/
+
+// Example:
+#include "number_speaker.nvgt"
+void main() {
+	// Speak a number using speak_wait.
+	number_speaker test;
+	test.speak_wait(350);
+}

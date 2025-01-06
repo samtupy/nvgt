@@ -1,0 +1,24 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#include "form.nvgt"
+void main() {
+	audio_form f;
+	f.create_window("test");
+	int b = f.create_input_box("type text here", "or leave it alone", multiline: true, multiline_enter: false);
+	//Disallow characters field
+	int c = f.create_input_box("Text without spaces and quotes");
+	f.set_disallowed_chars(c, " \"", false, "Spaces and quotes are not allowed");
+	//Disallow characters field but only given characters can be typed.
+	int d = f.create_input_box("Type numbers only (0-9)");
+	f.set_disallowed_chars(d, "1234567890", true, "Only digits");
+	int ok = f.create_button("ok", true);
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		f.monitor();
+		if (f.is_pressed(ok))
+			speak(f.get_text(b), true);
+	}
+	exit();
+}

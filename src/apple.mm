@@ -16,34 +16,9 @@
 #include <vector>
 #include <string>
 #include <angelscript.h>
-#include <Poco/Clock.h>
-#include <Poco/Environment.h>
-#include <Poco/Thread.h>
 #include <scriptarray.h>
-#include <SDL2/SDL.h>
 #include "apple.h"
 #include "UI.h"
-
-// The following code allows nvgt's compiler to open files sent to it from finder. SDL handles the needed event for us, so we just need to snatch it from the event queue before our normal cross platform sdl event handling takes over after the nvgt script has begun executing.
-void InputInit(); // Forward declared from input.cpp
-std::string apple_requested_file() {
-	if (!Poco::Environment::has("MACOS_BUNDLED_APP")) return ""; // This will certainly not happen outside of the app bundle.
-	InputInit();
-	std::string result;
-	Poco::Clock timeout;
-	Uint8 old_dropfile_state = SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
-	while (!timeout.isElapsed(50000)) {
-		Poco::Thread::sleep(5);
-		SDL_Event e;
-		SDL_PumpEvents();
-		if (SDL_PeepEvents(&e, 1, SDL_GETEVENT, SDL_DROPFILE, SDL_DROPFILE) < 1) continue;
-		result = e.drop.file;
-		SDL_free(e.drop.file);
-		break;
-	}
-	SDL_EventState(SDL_DROPFILE, old_dropfile_state);
-	return result;
-}
 
 // AVTTSVoice class created by Gruia Chiscop on 6/6/24.
 class AVTTSVoice::Impl {

@@ -1,0 +1,107 @@
+buildscript {
+	repositories {
+		mavenCentral()
+		google()
+	}
+	dependencies {
+		classpath 'com.android.tools.build:gradle:8.1.1'
+	}
+}
+
+allprojects {
+	repositories {
+		mavenCentral()
+		google()
+	}
+}
+
+apply plugin: 'com.android.application'
+
+android {
+	namespace "com.samtupy.nvgt"
+	compileSdkVersion 34
+	aaptOptions {
+		cruncherEnabled = false  
+	}
+	flavorDimensions "version"
+	defaultConfig {
+		minSdkVersion 21
+		targetSdkVersion 34
+		versionCode 1
+		versionName "1.0"
+		externalNativeBuild {
+			ndkBuild {
+				arguments "APP_PLATFORM=android-21", "-j8"
+				abiFilters 'arm64-v8a' // 'armeabi-v7a', 
+			}
+		}
+	}
+	buildTypes {
+		release {
+			minifyEnabled false
+			crunchPngs false
+			proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+		}
+	}
+	productFlavors {
+		runner {
+			dimension "version"
+			applicationId "com.samtupy.nvgt.runner"
+			versionName file("../version").getText().trim()
+			externalNativeBuild {
+				ndkBuild {
+					arguments "BUILD_RUNNER=1", "BUILD_STUB=0"
+				}
+			}
+		}
+		stub {
+			dimension "version"
+			applicationId "com.samtupy.nvgt.stub"
+			externalNativeBuild {
+				ndkBuild {
+					arguments "BUILD_RUNNER=0", "BUILD_STUB=1"
+				}
+			}
+		}
+	}
+
+	sourceSets {
+		runner {
+			jniLibs.srcDirs = ['libs/runner']
+			assets.srcDirs = ['../release/include']
+		}
+		stub {
+			jniLibs.srcDirs = ['libs/stub']
+			assets.srcDirs = []
+		}
+	}
+	applicationVariants.all { variant ->
+		if (variant.productFlavors[0].name == "stub") {
+			variant.getAssembleProvider().configure() {
+				it.doLast { 
+					variant.outputs.each { output ->
+						File apk = output.outputFile
+						exec {
+							commandLine "python", "makestub.py", "${variant.name}", "${buildDir}"
+						}
+					}
+				}
+			}
+		} else {
+			variant.outputs.each { output ->
+				output.versionCodeOverride = (int) (new Date().getTime() / 60000.0)
+			}
+		}
+		tasks["merge${variant.name.capitalize()}Assets"].dependsOn("externalNativeBuild${variant.name.capitalize()}")
+	}
+	if (!project.hasProperty('EXCLUDE_NATIVE_LIBS')) {
+		externalNativeBuild {
+			ndkBuild {
+				path 'Android.mk'
+			}
+		}
+	}
+	lint {
+		abortOnError false
+	}
+}

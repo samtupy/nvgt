@@ -11,15 +11,18 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include <array>
 #include <string>
 #include <angelscript.h> // the actual Angelscript header
 #include <scriptarray.h>
 #include <Poco/Exception.h>
 #include <Poco/File.h>
 #include <Poco/Glob.h>
+#include <Poco/Path.h>
 #include <Poco/Timestamp.h>
 #include <Poco/UnicodeConverter.h>
-#include "angelscript.h" // nvgt's Angelscript implementation needed for get_array_type
+#include <SDL3/SDL.h>
+#include "nvgt_angelscript.h" // nvgt's Angelscript implementation needed for get_array_type
 
 using namespace std;
 using namespace Poco;
@@ -317,6 +320,30 @@ Timestamp FileGetModified(const string& path) {
 	return File(path).getLastModified();
 }
 
+std::string get_preferences_path(const std::string& org, const std::string& app) {
+	char* p = SDL_GetPrefPath(org.c_str(), app.c_str());
+	if (!p) return "";
+	std::string result = p;
+	SDL_free(p);
+	return result;
+}
+std::string file_get_contents(const std::string& filename) {
+	SDL_IOStream* stream = SDL_IOFromFile(filename.c_str(), "rb");
+	if (!stream) return ""; // sigh we really need to figure out a get_last_error situation or something here.
+	std::array<char, 4096> buffer;
+	std::string result;
+	Sint64 size;
+	while ((size = SDL_ReadIO(stream, buffer.data(), buffer.size())) > 0) result.append(buffer.begin(), buffer.begin() + size);
+	SDL_CloseIO(stream);
+	return result;
+}
+bool file_put_contents(const std::string& filename, const std::string& contents, bool append) {
+	SDL_IOStream* stream = SDL_IOFromFile(filename.c_str(), append? "ab" : "wb");
+	if (!stream) return false;
+	bool result = SDL_WriteIO(stream, contents.data(), contents.size()) == contents.size();
+	SDL_CloseIO(stream);
+	return result;
+}
 
 
 void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
@@ -325,19 +352,23 @@ void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("glob_options", "GLOB_IGNORE_HIDDEN", Glob::GLOB_DOT_SPECIAL);
 	engine->RegisterEnumValue("glob_options", "GLOB_FOLLOW_SYMLINKS", Glob::GLOB_FOLLOW_SYMLINKS);
 	engine->RegisterEnumValue("glob_options", "GLOB_CASELESS", Glob::GLOB_CASELESS);
-	engine->RegisterGlobalFunction("bool directory_exists(const string& in)", asFUNCTION(DirectoryExists), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool directory_create(const string& in)", asFUNCTION(DirectoryCreate), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool directory_delete(const string& in)", asFUNCTION(DirectoryDelete), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool file_exists(const string& in)", asFUNCTION(FileExists), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool file_delete(const string& in)", asFUNCTION(FileDelete), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool file_copy(const string& in, const string& in, bool)", asFUNCTION(FileCopy), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool file_hard_link(const string& in, const string&in)", asFUNCTION(FileHardLink), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool file_move(const string& in, const string& in)", asFUNCTION(FileMove), asCALL_CDECL);
-	engine->RegisterGlobalFunction("string[]@ find_directories(const string& in)", asFUNCTION(FindDirectories), asCALL_CDECL);
-	engine->RegisterGlobalFunction("string[]@ find_files(const string& in)", asFUNCTION(FindFiles), asCALL_CDECL);
-	engine->RegisterGlobalFunction("string[]@ glob(const string& in, glob_options = GLOB_DEFAULT)", asFUNCTION(script_glob), asCALL_CDECL);
-	engine->RegisterGlobalFunction("int64 file_get_size(const string& in)", asFUNCTION(FileGetSize), asCALL_CDECL);
-	engine->RegisterGlobalFunction("timestamp file_get_date_created(const string& in)", asFUNCTION(FileGetCreated), asCALL_CDECL);
-	engine->RegisterGlobalFunction("timestamp file_get_date_modified(const string& in)", asFUNCTION(FileGetModified), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool fnmatch(const string& in, const string& in)", asFUNCTION(FNMatch), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool directory_exists(const string& in path)", asFUNCTION(DirectoryExists), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool directory_create(const string& in path)", asFUNCTION(DirectoryCreate), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool directory_delete(const string& in path, bool recursive = true)", asFUNCTION(DirectoryDelete), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool file_exists(const string& in path)", asFUNCTION(FileExists), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool file_delete(const string& in path)", asFUNCTION(FileDelete), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool file_copy(const string& in source, const string& in destination, bool)", asFUNCTION(FileCopy), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool file_hard_link(const string& in source, const string&in destination)", asFUNCTION(FileHardLink), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool file_move(const string& in source, const string& in destination)", asFUNCTION(FileMove), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string[]@ find_directories(const string& in pattern)", asFUNCTION(FindDirectories), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string[]@ find_files(const string& in pattern)", asFUNCTION(FindFiles), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string[]@ glob(const string& in pattern, glob_options options = GLOB_DEFAULT)", asFUNCTION(script_glob), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int64 file_get_size(const string& in path)", asFUNCTION(FileGetSize), asCALL_CDECL);
+	engine->RegisterGlobalFunction("timestamp file_get_date_created(const string& in path)", asFUNCTION(FileGetCreated), asCALL_CDECL);
+	engine->RegisterGlobalFunction("timestamp file_get_date_modified(const string& in path)", asFUNCTION(FileGetModified), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool fnmatch(const string& in text, const string& in pattern)", asFUNCTION(FNMatch), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string get_preferences_path(const string&in company_name, const string&in application_name)", asFUNCTION(get_preferences_path), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string DIRECTORY_PREFERENCES(const string&in company_name, const string&in application_name)", asFUNCTION(get_preferences_path), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string file_get_contents(const string&in filename)", asFUNCTION(file_get_contents), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool file_put_contents(const string&in filename, const string&in contents, bool append = false)", asFUNCTION(file_put_contents), asCALL_CDECL);
 }
