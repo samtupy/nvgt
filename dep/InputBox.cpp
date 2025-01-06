@@ -3,6 +3,8 @@
 #define _UNICODE
 
 #include <windows.h>
+#include <RichEdit.h>
+#include <textserv.h>
 #include <tchar.h>
 #include "InputBox.h"
 
@@ -19,7 +21,6 @@
 #define CLASSNAME					_T("NVGTTextbox")
 #define PUSH_BUTTON					_T("Button")
 #define FONT_NAME					_T("Times")
-#define TEXTEDIT_CLASS				_T("edit")
 #define SetFontToControl(n)			SendMessage((n), WM_SETFONT, (WPARAM)m_hFont, 0);
 #define SOFT_BLUE RGB(206,214,240)
 void setTextAlignment(HWND hwnd, int textalignment);
@@ -27,6 +28,7 @@ void setTextAlignment(HWND hwnd, int textalignment);
 void ReportError(const char *CallingFunction);
 
 HFONT m_hFont=NULL;
+HMODULE m_hRicheditModule = NULL;
 HWND  m_hWndInputBox=NULL;
 HWND  m_hWndParent=NULL;
 HWND  m_hWndEdit=NULL;
@@ -35,6 +37,20 @@ HWND  m_hWndCancel=NULL;
 HWND  m_hWndPrompt=NULL;
 bool infobox=false;
 static HBRUSH hbrBkgnd=NULL;
+
+// This function makes richedit controls stop making a sound if you try to scroll past their borders, imported into NVGT from pipe2textbox. Thanks to https://stackoverflow.com/questions/55884687/how-to-eliminate-the-messagebeep-from-the-richedit-control
+void disable_richedit_beeps(HMODULE richedit_module, HWND richedit_control) {
+		IUnknown* unknown;
+		ITextServices* ts;
+		IID* ITextservicesId = (IID*)GetProcAddress(richedit_module, "IID_ITextServices");
+		if(!ITextservicesId) return;
+		if(!SendMessage(richedit_control, EM_GETOLEINTERFACE, 0, (LPARAM)&unknown)) return;
+		HRESULT hr = unknown->QueryInterface(*ITextservicesId, (void**)&ts);
+		unknown->Release();
+		if(hr) return;
+		ts->OnTxPropertyBitsChange(TXTBIT_ALLOWBEEP, 0);
+		ts->Release();
+}
 
 LRESULT CALLBACK InputBoxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -78,12 +94,13 @@ return NULL;
 // setting font
 SetFontToControl(m_hWndPrompt);
 // The TextEdit Control - For the text to be input
-m_hWndEdit = CreateWindowEx(WS_EX_STATICEDGE, TEXTEDIT_CLASS, _T(""), WS_VISIBLE | WS_CHILD | WS_TABSTOP | (infobox ? WS_VSCROLL | ES_WANTRETURN | ES_MULTILINE : 0), 5, TOP_EDGE + BUTTON_HEIGHT * 2+30, INPUTBOX_WIDTH - 30, TEXTEDIT_HEIGHT, hWnd, NULL, m_hInst, NULL);
+m_hWndEdit = CreateWindowEx(WS_EX_STATICEDGE, m_hRicheditModule? RICHEDIT_CLASS : L"edit", _T(""), WS_VISIBLE | WS_CHILD | WS_TABSTOP | (infobox ? WS_VSCROLL | ES_WANTRETURN | ES_MULTILINE : 0), 5, TOP_EDGE + BUTTON_HEIGHT * 2+30, INPUTBOX_WIDTH - 30, TEXTEDIT_HEIGHT, hWnd, NULL, m_hInst, NULL);
 if (m_hWndEdit == NULL)
 {
 REPORTERROR;
 return NULL;
 }
+if (m_hRicheditModule) disable_richedit_beeps(m_hRicheditModule, m_hWndEdit);
 SetFontToControl(m_hWndEdit);
 // The Confirm button
 if (!infobox)
@@ -146,6 +163,7 @@ hbrBkgnd=NULL;
 HWND InputBoxCreateWindow(const std::wstring& szCaption, const std::wstring& szPrompt, const std::wstring& szText, HWND hWnd)
 {
 InputBoxReset();
+if (!m_hRicheditModule) m_hRicheditModule = LoadLibrary(L"Riched20.dll");
 RECT r;
 if(!hWnd)
 hWnd = GetDesktopWindow();
@@ -208,7 +226,7 @@ while (GetMessage(&msg, NULL, 0, 0))
 {
 if (msg.message == WM_KEYDOWN)
 {
-if(infobox&&msg.wParam==VK_TAB)
+if(msg.wParam==VK_TAB)
 {
 HWND hWndFocused=GetFocus();
 BOOL prev=GetAsyncKeyState(VK_SHIFT);
