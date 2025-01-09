@@ -10,14 +10,18 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-#include <miniaudio.h>
-#include "bullet3.h" // Vector3
+#pragma once
 
+#include <miniaudio.h>
+#include <reactphysics3d/mathematics/Vector3.h>
+
+class CScriptArray;
 class asIScriptEngine;
 class audio_engine;
 class mixer;
 class sound;
 
+//extern audio_engine* g_audio_engine;
 bool init_sound();
 bool refresh_audio_devices();
 
@@ -44,7 +48,7 @@ class audio_node {
 		virtual unsigned long long get_time() = 0;
 		virtual bool set_time(unsigned long long local_time) = 0;
 };
-	class audio_engine {
+class audio_engine {
 	public:
 		enum engine_flags {
 			DURATIONS_IN_FRAMES = 1, // If set, all durations possible will expect a value in PCM frames rather than milliseconds.
@@ -54,8 +58,9 @@ class audio_node {
 		virtual void duplicate() = 0; // reference counting
 		virtual void release() = 0;
 		virtual audio_node* get_endpoint() = 0;
+		virtual ma_engine* get_ma_engine() = 0;
 		virtual bool read(void* buffer, unsigned long long frame_count, unsigned long long* frames_read) = 0;
-		virtual CScriptArray* read(unsigned long long64 frame_count) = 0;
+		virtual CScriptArray* read(unsigned long long frame_count) = 0;
 		virtual unsigned long long get_time() = 0;
 		virtual bool set_time(unsigned long long time) = 0; // depends on DURATIONS_IN_FRAMES flag.
 		virtual unsigned long long get_time_in_frames() = 0;
@@ -73,15 +78,15 @@ class audio_node {
 		virtual unsigned int get_listener_count() = 0;
 		virtual unsigned int find_closest_listener(float x, float y, float z) = 0;
 		virtual void set_listener_position(unsigned int index, float x, float y, float z) = 0;
-		virtual Vector3 get_listener_position(unsigned int index) = 0;
+		virtual reactphysics3d::Vector3 get_listener_position(unsigned int index) = 0;
 		virtual void set_listener_direction(unsigned int index, float x, float y, float z) = 0;
-		virtual Vector3 get_listener_direction(unsigned int index) = 0;
+		virtual reactphysics3d::Vector3 get_listener_direction(unsigned int index) = 0;
 		virtual void set_listener_velocity(unsigned int index, float x, float y, float z) = 0;
-		virtual Vector3 get_listener_velocity(unsigned int index) = 0;
+		virtual reactphysics3d::Vector3 get_listener_velocity(unsigned int index) = 0;
 		virtual void set_listener_cone(unsigned int index, float inner_radians, float outer_radians, float outer_gain) = 0;
 		virtual void get_listener_cone(unsigned int index, float* inner_radians, float* outer_radians, float* outer_gain) = 0;
 		virtual void set_listener_world_up(unsigned int index, float x, float y, float z) = 0;
-		virtual Vector3 get_listener_world_up(unsigned int index) = 0;
+		virtual reactphysics3d::Vector3 get_listener_world_up(unsigned int index) = 0;
 		virtual void set_listener_enabled(unsigned int index, bool enabled) = 0;
 		virtual bool get_listener_enabled(unsigned int index) = 0;
 		virtual bool play(const std::string& path, audio_node* node, unsigned int input_bus_index) = 0;
@@ -109,13 +114,13 @@ class mixer {
 		virtual void set_pinned_listener(unsigned int index) = 0;
 		virtual unsigned int get_pinned_listener() = 0;
 		virtual unsigned int get_listener() = 0;
-		virtual Vector3 get_direction_to_listener() = 0;
-		virtual void set_position(float x, float y, float z) = 0;
-		virtual Vector3 get_position() = 0;
+		virtual reactphysics3d::Vector3 get_direction_to_listener() = 0;
+		virtual void set_position_3d(float x, float y, float z) = 0;
+		virtual reactphysics3d::Vector3 get_position_3d() = 0;
 		virtual void set_direction(float x, float y, float z) = 0;
-		virtual Vector3 get_direction() = 0;
+		virtual reactphysics3d::Vector3 get_direction() = 0;
 		virtual void set_velocity(float x, float y, float z) = 0;
-		virtual Vector3 get_velocity() = 0;
+		virtual reactphysics3d::Vector3 get_velocity() = 0;
 		virtual void set_attenuation_model(ma_attenuation_model model) = 0;
 		virtual ma_attenuation_model get_attenuation_model() = 0;
 		virtual void set_positioning(ma_positioning positioning) = 0;
@@ -153,6 +158,13 @@ class mixer {
 };
 class sound : public mixer {
 	public:
+		virtual bool load(const std::string& filename) = 0;
+		virtual bool load_memory(const std::string& data) = 0;
+		virtual bool load_memory(void* buffer, unsigned int size) = 0;
+		virtual bool load_pcm(void* buffer, unsigned int size, ma_format format, int samplerate, int channels) = 0;
+		virtual bool close() = 0;
+		virtual bool get_active() = 0;
+		virtual bool get_paused() = 0;
 		virtual bool pause() = 0;
 		virtual bool pause_fade(unsigned long long length) = 0; // depends on the DURATIONS_IN_FRAMES engine flag.
 		virtual bool pause_fade_in_frames(unsigned long long frames) = 0;
@@ -177,5 +189,7 @@ class sound : public mixer {
 		virtual unsigned long long get_length_in_milliseconds() = 0;
 		virtual bool get_data_format(ma_format* format, unsigned int* channels, unsigned int* sample_rate) = 0;
 };
+
+// audio_engine* new_audio_engine();
 
 void RegisterSoundsystem(asIScriptEngine* engine);

@@ -37,7 +37,7 @@ class tts_voice {
 	jobject TTSObj;
 	#endif
 	bool destroyed;
-	HSTREAM audioout;
+	sound* audioout;
 	long samprate;
 	short bitrate;
 	short channels;

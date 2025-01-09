@@ -462,7 +462,7 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_SOUND);
 	engine->BeginConfigGroup("sound");
-	RegisterScriptSound(engine);
+	RegisterSoundsystem(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	engine->BeginConfigGroup("system_fingerprint");

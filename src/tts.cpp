@@ -13,12 +13,14 @@
 */
 
 #ifdef _WIN32
+	#define NOMINMAX
 	#include <blastspeak.h>
 #endif
 #include <obfuscate.h>
 #ifdef __APPLE__
 	#include "apple.h"
 #endif
+#define riffheader_impl
 #include "riffheader.h"
 #include "tts.h"
 #include "UI.h"
@@ -72,7 +74,7 @@ tts_voice::tts_voice(const std::string& builtin_voice_name) {
 	builtin_index = builtin_voice_name.size() > 0 ? 0 : -1;
 	this->builtin_voice_name = builtin_voice_name;
 	setup();
-	audioout = 0;
+	audioout = nullptr;
 }
 tts_voice::~tts_voice() {
 	//destroy();
@@ -124,8 +126,8 @@ void tts_voice::setup() {
 }
 void tts_voice::destroy() {
 	if (audioout) {
-		BASS_StreamFree(audioout);
-		audioout = 0;
+		audioout->release();
+		audioout = nullptr;
 	}
 	#ifdef _WIN32
 	if (destroyed || !inst) return;
@@ -155,7 +157,7 @@ void tts_voice::Release() {
 }
 bool tts_voice::speak(const std::string& text, bool interrupt) {
 	if (text.empty()) {
-		if (audioout) BASS_ChannelStop(audioout);
+		if (audioout) audioout->stop();
 		return true;
 	}
 	unsigned long bufsize;
@@ -165,9 +167,10 @@ bool tts_voice::speak(const std::string& text, bool interrupt) {
 			samprate = 48000;
 			bitrate = 16;
 			channels = 2;
-			if (audioout)
-				BASS_StreamFree(audioout);
-			audioout = 0;
+			if (audioout) {
+				audioout->release();
+				audioout = nullptr;
+			}
 		}
 	}
 	#ifdef _WIN32
@@ -179,9 +182,10 @@ bool tts_voice::speak(const std::string& text, bool interrupt) {
 			samprate = inst->sample_rate;
 			bitrate = inst->bits_per_sample;
 			channels = inst->channels;
-			if (audioout)
-				BASS_StreamFree(audioout);
-			audioout = 0;
+			if (audioout) {
+				audioout->release();
+				audioout = nullptr;
+			}
 		}
 	}
 	#elif defined(__APPLE__)
@@ -201,18 +205,16 @@ bool tts_voice::speak(const std::string& text, bool interrupt) {
 		bufsize = samples * 4;
 	}
 	if (interrupt) {
-		if (audioout) BASS_ChannelPlay(audioout, true);
+		if (audioout) audioout->close();
 		if (text.empty()) return true;
 	}
-	if (!data) return interrupt;
-	if (!audioout && !text.empty())
-		audioout = BASS_StreamCreate(samprate, channels, 0, STREAMPROC_PUSH, NULL);
+	if (!data || text.empty()) return interrupt;
+	// *FIXME* if (!audioout) audioout = g_audio_engine->new_sound();
 	char* ptr = minitrim(data, &bufsize, bitrate, channels);
-	int ret = BASS_StreamPutData(audioout, ptr, bufsize);
+	bool ret = audioout->load_pcm(ptr, bufsize, bitrate == 16? ma_format_s16 : ma_format_u8, samprate, channels);
 	if (voice_index == builtin_index) free(data);
-	if (ret < 0)
-		return false;
-	BASS_ChannelPlay(audioout, FALSE);
+	if (!ret) return false;
+	audioout->play();
 	return true;
 }
 bool tts_voice::speak_to_file(const std::string& filename, const std::string& text) {
@@ -224,9 +226,8 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 			samprate = 48000;
 			bitrate = 16;
 			channels = 2;
-			if (audioout)
-				BASS_StreamFree(audioout);
-			audioout = 0;
+			if (audioout) audioout->release();
+			audioout = nullptr;
 		}
 		int samples;
 		data = (char*)speech_gen(&samples, text.c_str(), NULL);
@@ -240,9 +241,8 @@ bool tts_voice::speak_to_file(const std::string& filename, const std::string& te
 			samprate = inst->sample_rate;
 			bitrate = inst->bits_per_sample;
 			channels = inst->channels;
-			if (audioout)
-				BASS_StreamFree(audioout);
-			audioout = 0;
+			if (audioout) audioout->release();
+			audioout = nullptr;
 		}
 	}
 	#elif defined(__APPLE__)
@@ -272,9 +272,8 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 			samprate = 48000;
 			bitrate = 16;
 			channels = 2;
-			if (audioout)
-				BASS_StreamFree(audioout);
-			audioout = 0;
+			if (audioout) audioout->release();
+			audioout = nullptr;
 		}
 		int samples;
 		data = (char*)speech_gen(&samples, text.c_str(), NULL);
@@ -288,9 +287,8 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 			samprate = inst->sample_rate;
 			bitrate = inst->bits_per_sample;
 			channels = inst->channels;
-			if (audioout)
-				BASS_StreamFree(audioout);
-			audioout = 0;
+			if (audioout) audioout->release();
+			audioout = nullptr;
 		}
 	}
 	#elif defined(__APPLE__) || defined(__ANDROID__)
@@ -309,11 +307,11 @@ std::string tts_voice::speak_to_memory(const std::string& text) {
 bool tts_voice::speak_wait(const std::string& text, bool interrupt) {
 	if (!speak(text, interrupt)) return false;
 	#ifdef __APPLE__
-	while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || inst->isSpeaking())
+	while (voice_index == builtin_index && audioout && audioout->get_playing() || inst->isSpeaking())
 	#elif defined(__ANDROID__)
-	while (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING || get_speaking())
+	while (voice_index == builtin_index && audioout && audioout->get_playing() || get_speaking())
 	#else
-	while (BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING)
+	while (audioout && audioout->get_playing())
 	#endif
 		wait(5);
 	return true;
@@ -420,14 +418,14 @@ bool tts_voice::set_voice(int voice) {
 }
 bool tts_voice::get_speaking() {
 	#ifdef __APPLE__
-	if (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING) return true;
+	if (voice_index == builtin_index && audioout && audioout->get_playing()) return true;
 	return inst->isSpeaking();
 	#elif defined(__ANDROID__)
-	if (voice_index == builtin_index && BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING) return true;
+	if (voice_index == builtin_index && audioout && audioout->get_playing()) return true;
 	return env->CallBooleanMethod(TTSObj, midIsSpeaking) == JNI_TRUE;
 	#else
 	if (!audioout) return false;
-	return BASS_ChannelIsActive(audioout) == BASS_ACTIVE_PLAYING;
+	return audioout->get_playing();
 	#endif
 }
 CScriptArray* tts_voice::list_voices() {

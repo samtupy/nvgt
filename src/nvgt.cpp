@@ -14,6 +14,7 @@
 #include <sstream>
 #define SDL_MAIN_HANDLED // We do actually use SDL_main, but see below near the bottom of the file.
 #ifdef _WIN32
+	#define NOMINMAX
 	#include <windows.h>
 	#include <locale.h>
 #else
