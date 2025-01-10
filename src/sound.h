@@ -110,7 +110,7 @@ class mixer {
 		virtual void set_pitch(float pitch) = 0;
 		virtual float get_pitch() = 0;
 		virtual void set_spatialization_enabled(bool enabled) = 0;
-		virtual void get_spatialization_enabled() = 0;
+		virtual bool get_spatialization_enabled() = 0;
 		virtual void set_pinned_listener(unsigned int index) = 0;
 		virtual unsigned int get_pinned_listener() = 0;
 		virtual unsigned int get_listener() = 0;
