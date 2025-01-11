@@ -77,13 +77,13 @@ CScriptArray* get_sound_output_devices() {
 reactphysics3d::Vector3 ma_vec3_to_rp_vec3(const ma_vec3f& v) { return reactphysics::Vector3(v.x, v.y, v.z); }
 
 // I learned the hard way that you can't instantiate a virtual class until none of it's members are abstract. Hack around that. When wrapper is complete, remove the following placeholder classes:
-class mixer_tmp {
+class audio_engine_tmp {
 public:
-	virtual void duplicate() = 0;
-	virtual void release() = 0;
-	virtual bool play() = 0;
+	virtual ma_engine* get_ma_engine() = 0;
+	virtual int get_device() = 0;
+	virtual bool set_device(int device) = 0;
 };
-class sound_tmp : public virtual mixer_tmp {
+class sound_tmp : public virtual mixer {
 public:
 	virtual bool load(const string& filename) = 0;
 	virtual bool seek(unsigned long long offset) = 0;
@@ -184,24 +184,271 @@ class audio_engine_impl : public audio_engine {
 		bool play(const string& filename, audio_node* node, unsigned int bus_index) { return false; } // Implement after audio_node
 		bool play(const string& filename, mixer* mixer) { return engine? (ma_engine_play_sound(&*engine, mixer? mixer->get_ma_sound() : nullptr)) == MA_SUCCESS : false; }
 };
-class mixer_impl : public virtual mixer_tmp {
+class mixer_impl : public virtual mixer {
 	// In miniaudio, a sound_group is really just a sound. A typical ma_sound_group_x function looks like float ma_sound_group_get_pan(const ma_sound_group* pGroup) { return ma_sound_get_pan(pGroup); }.
 	// Furthermore ma_sound_group is just a typedef for ma_sound. As such, for the sake of less code and better inheritance, we will directly call the ma_sound APIs in this class even though it deals with sound groups and not sounds.
 	protected:
-		ma_engine* engine;
+		audio_engine* engine;
 		unique_ptr<ma_sound> snd;
 		int refcount;
 	public:
 	mixer_impl() : snd(nullptr), refcount(1) {
 		init_sound();
-		engine = g_audio_engine->get_ma_engine();
+		engine = static_cast<audio_engine*>(g_audio_engine);
 	}
 	mixer_impl(ma_engine* engine) : engine(engine), snd(nullptr), refcount(1) {}
-	void duplicate() { asAtomicInc(refcount); }
-	void release() {
+	void duplicate() override { asAtomicInc(refcount); }
+	void release() override {
 		if (asAtomicDec(refcount) < 1) delete this;
 	}
-	bool play() { return snd? ma_sound_start(&*snd) : false; }
+	bool play() override { return snd? ma_sound_start(&*snd) : false; }
+	audio_engine* get_engine() override {
+		return engine;
+	}
+	bool stop() override { return snd ? ma_sound_stop(&*snd) : false; }
+	void set_volume(float volume) override {
+		if (snd) ma_sound_set_volume(&*snd, volume);
+	}
+	float get_volume() override { return snd ? ma_sound_get_volume(&*snd) : NAN; }
+	void set_pan(float pan) override {
+		if (snd) {
+			ma_sound_set_pan(&*snd, pan);
+		}
+	}
+	float get_pan() override {
+		return snd ? ma_sound_get_pan(&*snd) : NAN;
+	}
+	void set_pan_mode(ma_pan_mode mode) override {
+		if (snd) {
+			ma_sound_set_pan_mode(&*snd, mode);
+		}
+	}
+	ma_pan_mode get_pan_mode() override {
+		return snd ? ma_sound_get_pan_mode(&*snd) : ma_pan_mode_balance;
+	}
+	void set_pitch(float pitch) override {
+		if (snd) {
+			ma_sound_set_pitch(&*snd, pitch);
+		}
+	}
+	float get_pitch() override {
+		return snd ? ma_sound_get_pitch(&*snd) : NAN;
+	}
+	void set_spatialization_enabled(bool enabled) override {
+		if (snd) {
+			ma_sound_set_spatialization_enabled(&*snd, enabled);
+		}
+	}
+	bool get_spatialization_enabled() override {
+		return snd ? ma_sound_is_spatialization_enabled(&*snd) : false;
+	}
+	void set_pinned_listener(unsigned int index) override {
+		if (snd) {
+			ma_sound_set_pinned_listener_index(&*snd, index);
+		}
+	}
+	unsigned int get_pinned_listener() override {
+		return snd ? ma_sound_get_pinned_listener_index(&*snd) : 0;
+	}
+	unsigned int get_listener() override {
+		return snd ? ma_sound_get_listener_index(&*snd) : 0;
+	}
+	reactphysics3d::Vector3 get_direction_to_listener() override {
+		if (!snd) return reactphysics3d::Vector3();
+		const auto dir = ma_sound_get_direction_to_listener(&*snd);
+		reactphysics3d::Vector3 res;
+		res.setAllValues(dir.x, dir.y, dir.z);
+		return res;
+	}
+	void set_position_3d(float x, float y, float z) override {
+		if (!snd) return;
+		return ma_sound_set_position(&*snd, x, y, z);
+	}
+	reactphysics3d::Vector3 get_position_3d() override {
+		if (!snd) return reactphysics3d::Vector3();
+		const auto pos = ma_sound_get_position(&*snd);
+		reactphysics3d::Vector3 res;
+		res.setAllValues(pos.x, pos.y, pos.z);
+		return res;
+}
+	void set_direction(float x, float y, float z) override {
+		if (!snd) return;
+		return ma_sound_set_direction(&*snd, x, y, z);
+	}
+	reactphysics3d::Vector3 get_direction() override {
+		if (!snd) return reactphysics3d::Vector3();
+		const auto dir = ma_sound_get_direction(&*snd);
+		reactphysics3d::Vector3 res;
+		res.setAllValues(dir.x, dir.y, dir.z);
+		return res;
+}
+	void set_velocity(float x, float y, float z) override {
+		if (!snd) return;
+		return ma_sound_set_velocity(&*snd, x, y, z);
+	}
+	reactphysics3d::Vector3 get_velocity() override {
+		if (!snd) return reactphysics3d::Vector3();
+		const auto vel = ma_sound_get_velocity(&*snd);
+		reactphysics3d::Vector3 res;
+		res.setAllValues(vel.x, vel.y, vel.z);
+		return res;
+}
+	void set_attenuation_model(ma_attenuation_model model) override {
+		if (snd) {
+			ma_sound_set_attenuation_model(&*snd, model);
+		}
+	}
+	ma_attenuation_model get_attenuation_model() override {
+		return snd ? ma_sound_get_attenuation_model(&*snd) : ma_attenuation_model_none;
+	}
+	void set_positioning(ma_positioning positioning) override {
+		if (snd) {
+			ma_sound_set_positioning(&*snd, positioning);
+		}
+	}
+	ma_positioning get_positioning() override {
+		return snd ? ma_sound_get_positioning(&*snd) : ma_positioning_absolute;
+	}
+	void set_rolloff(float rolloff) override {
+		if (snd) {
+			ma_sound_set_rolloff(&*snd, rolloff);
+		}
+	}
+	float get_rolloff() override {
+		return snd ? ma_sound_get_rolloff(&*snd) : NAN;
+	}
+	void set_min_gain(float gain) override {
+		if (snd) {
+			ma_sound_set_min_gain(&*snd, gain);
+		}
+	}
+	float get_min_gain() override {
+		return snd ? ma_sound_get_min_gain(&*snd) : NAN;
+	}
+	void set_max_gain(float gain) override {
+		if (snd) {
+			ma_sound_set_max_gain(&*snd, gain);
+		}
+	}
+	float get_max_gain() override {
+		return snd ? ma_sound_get_max_gain(&*snd) : NAN;
+	}
+	void set_min_distance(float distance) override {
+		if (snd) {
+			ma_sound_set_min_distance(&*snd, distance);
+		}
+	}
+	float get_min_distance() override {
+		return snd ? ma_sound_get_min_distance(&*snd) : NAN;
+	}
+	void set_max_distance(float distance) override {
+		if (snd) {
+			ma_sound_set_max_distance(&*snd, distance);
+		}
+	}
+	float get_max_distance() override {
+		return snd ? ma_sound_get_max_distance(&*snd) : NAN;
+	}
+	void set_cone(float inner_radians, float outer_radians, float outer_gain) override {
+		if (snd) {
+			ma_sound_set_cone(&*snd, inner_radians, outer_radians, outer_gain);
+		}
+	}
+	void get_cone(float* inner_radians, float* outer_radians, float* outer_gain) override {
+		if (snd) {
+			ma_sound_get_cone(&*snd, inner_radians, outer_radians, outer_gain);
+		} else {
+			if (inner_radians) *inner_radians = NAN;
+			if (outer_radians) *outer_radians = NAN;
+			if (outer_gain)	*outer_gain	= NAN;
+		}
+	}
+	void set_doppler_factor(float factor) override {
+		if (snd) {
+			ma_sound_set_doppler_factor(&*snd, factor);
+		}
+	}
+	float get_doppler_factor() override {
+		return snd ? ma_sound_get_doppler_factor(&*snd) : NAN;
+	}
+	void set_directional_attenuation_factor(float factor) override {
+		if (snd) {
+			ma_sound_set_directional_attenuation_factor(&*snd, factor);
+		}
+	}
+	float get_directional_attenuation_factor() override {
+		return snd ? ma_sound_get_directional_attenuation_factor(&*snd) : NAN;
+	}
+	void set_fade(float start_volume, float end_volume, unsigned long long length) override {
+		if (snd) {
+			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES) {
+				ma_sound_set_fade_in_pcm_frames(&*snd, start_volume, end_volume, length);
+			} else {
+				ma_sound_set_fade_in_milliseconds(&*snd, start_volume, end_volume, length);
+			}
+		}
+	}
+	void set_fade_in_frames(float start_volume, float end_volume, unsigned long long frames) override {
+		if (snd) {
+			ma_sound_set_fade_in_pcm_frames(&*snd, start_volume, end_volume, frames);
+		}
+	}
+	void set_fade_in_milliseconds(float start_volume, float end_volume, unsigned long long milliseconds) override {
+		if (snd) {
+			ma_sound_set_fade_in_milliseconds(&*snd, start_volume, end_volume, milliseconds);
+		}
+	}
+	float get_current_fade_volume() override {
+		return snd ? ma_sound_get_current_fade_volume(&*snd) : NAN;
+	}
+	void set_start_time(unsigned long long absolute_time) override {
+		if (snd) {
+			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
+				ma_sound_set_start_time_in_pcm_frames(&*snd, absolute_time);
+			else
+				ma_sound_set_start_time_in_milliseconds(&*snd, absolute_time);
+		}
+	}
+	void set_start_time_in_frames(unsigned long long absolute_time) override {
+		if (snd) {
+			ma_sound_set_start_time_in_pcm_frames(&*snd, absolute_time);
+		}
+	}
+	void set_start_time_in_milliseconds(unsigned long long absolute_time) override {
+		if (snd) {
+			ma_sound_set_start_time_in_milliseconds(&*snd, absolute_time);
+		}
+	}
+	void set_stop_time(unsigned long long absolute_time) override {
+		if (snd) {
+			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
+				ma_sound_set_stop_time_in_pcm_frames(&*snd, absolute_time);
+			else
+				ma_sound_set_stop_time_in_milliseconds(&*snd, absolute_time);
+		}
+	}
+	void set_stop_time_in_frames(unsigned long long absolute_time) override {
+		if (snd) {
+			ma_sound_set_stop_time_in_pcm_frames(&*snd, absolute_time);
+		}
+	}
+	void set_stop_time_in_milliseconds(unsigned long long absolute_time) override {
+		if (snd) {
+			ma_sound_set_stop_time_in_milliseconds(&*snd, absolute_time);
+		}
+	}
+	unsigned long long get_time() override {
+	return snd ? ((engine->flags & audio_engine::DURATION_IN_FLAGS) ? ma_sound_get_time_in_pcm_frames(&*snd) : ma_sound_get_time_in_milliseconds(&*snd)) : 0;
+	}
+	unsigned long long get_time_in_frames() override {
+		return snd ? ma_sound_get_time_in_pcm_frames(&*snd) : 0;
+	}
+	unsigned long long get_time_in_milliseconds() override {
+		return snd ? ma_sound_get_time_in_milliseconds(&*snd) : 0ULL;
+	}
+	bool get_playing() override {
+		return snd ? ma_sound_is_playing(&*snd) : false;
+	}
 };
 class sound_impl : public mixer_impl, public sound_tmp {
 	public:
