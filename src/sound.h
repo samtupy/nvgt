@@ -57,6 +57,8 @@ class audio_engine {
 		};
 		virtual void duplicate() = 0; // reference counting
 		virtual void release() = 0;
+		virtual int get_device() = 0;
+		virtual bool set_device(int device) = 0;
 		virtual audio_node* get_endpoint() = 0;
 		virtual ma_engine* get_ma_engine() = 0;
 		virtual bool read(void* buffer, unsigned long long frame_count, unsigned long long* frames_read) = 0;
@@ -76,16 +78,21 @@ class audio_engine {
 		virtual bool set_gain(float db) = 0;
 		virtual float get_gain() = 0;
 		virtual unsigned int get_listener_count() = 0;
-		virtual unsigned int find_closest_listener(float x, float y, float z) = 0;
+		virtual int find_closest_listener(float x, float y, float z) = 0;
+		virtual int find_closest_listener(const reactphysics3d::Vector& listener);
 		virtual void set_listener_position(unsigned int index, float x, float y, float z) = 0;
+		virtual void set_listener_position(unsigned int index, const reactphysics3d::Vector& position) = 0;
 		virtual reactphysics3d::Vector3 get_listener_position(unsigned int index) = 0;
 		virtual void set_listener_direction(unsigned int index, float x, float y, float z) = 0;
+		virtual void set_listener_direction(unsigned int index, const reactphysics3d::Vector& direction) = 0;
 		virtual reactphysics3d::Vector3 get_listener_direction(unsigned int index) = 0;
 		virtual void set_listener_velocity(unsigned int index, float x, float y, float z) = 0;
+		virtual void set_listener_velocity(unsigned int index, const reactphysics3d::Vector& velocity) = 0;
 		virtual reactphysics3d::Vector3 get_listener_velocity(unsigned int index) = 0;
 		virtual void set_listener_cone(unsigned int index, float inner_radians, float outer_radians, float outer_gain) = 0;
 		virtual void get_listener_cone(unsigned int index, float* inner_radians, float* outer_radians, float* outer_gain) = 0;
 		virtual void set_listener_world_up(unsigned int index, float x, float y, float z) = 0;
+		virtual void set_listener_world_up(unsigned int index, const reactphysics3d::Vector3& world_up) = 0;
 		virtual reactphysics3d::Vector3 get_listener_world_up(unsigned int index) = 0;
 		virtual void set_listener_enabled(unsigned int index, bool enabled) = 0;
 		virtual bool get_listener_enabled(unsigned int index) = 0;
@@ -99,6 +106,7 @@ class mixer {
 		virtual void duplicate() = 0; // reference counting
 		virtual void release() = 0;
 		virtual audio_engine* get_engine() = 0;
+		virtual ma_sound* get_ma_sound() = 0;
 		virtual bool play() = 0;
 		virtual bool stop() = 0;
 		virtual void set_volume(float volume) = 0;
@@ -156,7 +164,7 @@ class mixer {
 		virtual unsigned long long get_time_in_milliseconds() = 0;
 		virtual bool get_playing() = 0;
 };
-class sound : public mixer {
+class sound : public virtual mixer {
 	public:
 		virtual bool load(const std::string& filename) = 0;
 		virtual bool load_memory(const std::string& data) = 0;

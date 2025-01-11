@@ -74,13 +74,9 @@ CScriptArray* get_sound_output_devices() {
 	return g_sound_script_output_devices;
 }
 
+reactphysics3d::Vector3 ma_vec3_to_rp_vec3(const ma_vec3f& v) { return reactphysics::Vector3(v.x, v.y, v.z); }
+
 // I learned the hard way that you can't instantiate a virtual class until none of it's members are abstract. Hack around that. When wrapper is complete, remove the following placeholder classes:
-class audio_engine_tmp {
-public:
-	virtual ma_engine* get_ma_engine() = 0;
-	virtual int get_device() = 0;
-	virtual bool set_device(int device) = 0;
-};
 class mixer_tmp {
 public:
 	virtual void duplicate() = 0;
@@ -94,10 +90,11 @@ public:
 };
 
 // Miniaudio objects must be allocated on the heap as nvgt's API introduces the concept of an uninitialized sound, which a stack based system would make more difficult to implement.
-class audio_engine_impl : public audio_engine_tmp {
+class audio_engine_impl : public audio_engine {
 		unique_ptr<ma_engine> engine;
 		audio_node* engine_endpoint; // Upon engine creation we'll call ma_engine_get_endpoint once so as to avoid creating more than one of our wrapper objects when our engine->get_endpoint() function is called.
 	public:
+		engine_flags flags;
 		audio_engine_impl() {
 			// default constructor initializes a miniaudio engine ourselves.
 			ma_engine_config cfg = ma_engine_config_init();
@@ -108,7 +105,9 @@ class audio_engine_impl : public audio_engine_tmp {
 			}
 		}
 		ma_engine* get_ma_engine() { return engine.get(); }
+		audio_node* get_endpoint() { return nullptr; } // Implement after audio_node
 		int get_device() {
+			if (!engine) return -1;
 			ma_device* dev = ma_engine_get_device(&*engine);
 			ma_device_info info;
 			if (!dev || ma_device_get_info(dev, ma_device_type_playback, &info) != MA_SUCCESS) return -1;
@@ -118,7 +117,7 @@ class audio_engine_impl : public audio_engine_tmp {
 			return -1; // couldn't determine device?
 		}
 		bool set_device(int device) {
-			if (device < 0 || device >= g_sound_output_devices.size()) return false;
+			if (!engine || device < 0 || device >= g_sound_output_devices.size()) return false;
 			ma_device* old_dev = ma_engine_get_device(&*engine);
 			if (!old_dev || memcmp(&old_dev->playback.id, &g_sound_output_devices[device].id, sizeof(ma_device_id)) == 0) return false;
 			ma_engine_stop(&*engine);
@@ -137,6 +136,53 @@ class audio_engine_impl : public audio_engine_tmp {
 			ma_device_init(&g_sound_context, &cfg, old_dev);
 			return (g_soundsystem_last_error = ma_engine_start(&*engine)) == MA_SUCCESS;
 		}
+		bool read(void* buffer, unsigned long long frame_count, unsigned long long* frames_read) { return engine? (g_soundsystem_last_error = ma_engine_read_pcm_frames()) == MA_SUCCESS : false; }
+		CScriptArray* read(unsigned long long frame_count) {
+			if (!engine) return nullptr;
+			CScriptArray* result = CScriptArray::Create(get_array_type("array<float>"), frame_count * ma_engine_get_channels(&*engine));
+			unsigned long long frames_read;
+			if (!read(result->GetBuffer(), frame_count, &frames_read)) {
+				result->Resize(0);
+				return result;
+			}
+			result->Resize(frames_read * ma_engine_get_channel(&*engine));
+			return result;
+		}
+		unsigned long long get_time() { return engine? (flags & DURATIONS_IN_FRAMES? ma_engine_get_time_in_pcm_frames(&*engine) : ma_engine_get_time_in_milliseconds(&*engine)) : 0; }
+		bool set_time(unsigned long long time) { return engine? (g_soundsystem_last_error = (flags & DURATIONS_IN_FRAMES? ma_engine_set_time_in_pcm_frames(&*engine, time) : ma_engine_set_time_in_milliseconds(&*engine, time))) == MA_SUCCESS : false; }
+		unsigned long long get_time_in_frames() { return engine? ma_engine_get_time_in_pcm_frames(&*engine) : 0; }
+		bool set_time_in_frames(unsigned long long time) { return engine ? (g_soundsystem_last_error = ma_engine_set_time_in_pcm_frames(&*engine, time)) == MA_SUCCESS : false; }
+		unsigned long long get_time_in_milliseconds() { return engine? ma_engine_get_time_in_milliseconds(&*engine) : 0; }
+		bool set_time_in_milliseconds(unsigned long long time) { return engine ? (g_soundsystem_last_error = ma_engine_set_time_in_milliseconds(&*engine, time)) == MA_SUCCESS : false; }
+		int get_channels() { return engine? ma_engine_get_channels(&*engine) : 0; }
+		int get_sample_rate() { return engine? ma_engine_get_sample_rate(&*engine) : 0; }
+		bool start() { return engine? (ma_engine_start(&*engine)) == MA_SUCCESS : false; }
+		bool stop() { return engine? (ma_engine_stop(&*engine)) == MA_SUCCESS : false; }
+		bool set_volume(float volume) { return engine? (g_soundsystem_last_error = ma_engine_set_volume(&*engine, volume)) == MA_SUCCESS : false; }
+		float get_volume() { return engine? ma_engine_get_volume(&*engine) : 0; }
+		bool set_gain(float db) { return engine? (g_soundsystem_last_error = ma_engine_set_volume(&*engine, gain)) == MA_SUCCESS : false; }
+		float get_gain() { return engine? ma_engine_get_gain(&*engine) : 0; }
+		unsigned int get_listener_count() { return engine? ma_engine_get_listener_count(&*engine) : 0; }
+		int find_closest_listener(float x, float y, float z) { return engine? ma_engine_find_closest_listener(&*engine, x, y, z); : -1; }
+		int find_closest_listener(const reactphysics3d::Vector& listener) { return engine? ma_engine_find_closest_listener(&*engine, listener.x, listener.y, listener.z); : -1; }
+		void set_listener_position(unsigned int index, float x, float y, float z) { if(engine) ma_engine_listener_set_position(&*engine, index, x, y, z); }
+		void set_listener_position(unsigned int index, const reactphysics3d::Vector& position) { if(engine) ma_engine_listener_set_position(&*engine, index, position.x, position.y, position.z); }
+		reactphysics3d::Vector3 get_listener_position(unsigned int index) { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_position(index)) : reactphysics::Vector3(); }
+		void set_listener_direction(unsigned int index, float x, float y, float z) { if(engine) ma_engine_listener_set_direction(&*engine, index, x, y, z); }
+		void set_listener_direction(unsigned int index, const reactphysics3d::Vector& direction) { if(engine) ma_engine_listener_set_direction(&*engine, index, direction.x, direction.y, direction.z); }
+		reactphysics3d::Vector3 get_listener_direction(unsigned int index) { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_direction(index)) : reactphysics::Vector3(); }
+		void set_listener_velocity(unsigned int index, float x, float y, float z) { if(engine) ma_engine_listener_set_velocity(&*engine, index, x, y, z); }
+		void set_listener_velocity(unsigned int index, const reactphysics3d::Vector& velocity) { if(engine) ma_engine_listener_set_velocity(&*engine, index, velocity.x, velocity.y, velocity.z); }
+		reactphysics3d::Vector3 get_listener_velocity(unsigned int index) { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_velocity(index)) : reactphysics::Vector3(); }
+		void set_listener_cone(unsigned int index, float inner_radians, float outer_radians, float outer_gain) { if(engine) ma_engine_listener_set_cone(&*engine, index, inner_radians, outer_radians, outer_gain); }
+		void get_listener_cone(unsigned int index, float* inner_radians, float* outer_radians, float* outer_gain) { if(engine) ma_engine_listener_get_cone(&*engine, index, inner_radians, outer_radians, outer_gain); }
+		void set_listener_world_up(unsigned int index, float x, float y, float z) { if(engine) ma_engine_listener_set_world_up(&*engine, index, x, y, z) }
+		void set_listener_world_up(unsigned int index, const reactphysics3d::Vector& world_up) { if(engine) ma_engine_listener_set_world_up(&*engine, index, world_up.x, world_up.y, world_up.z); }
+		reactphysics3d::Vector3 get_listener_world_up(unsigned int index) { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_world_up(index)) : reactphysics::Vector3(); }
+		void set_listener_enabled(unsigned int index, bool enabled) { if(engine) ma_engine_listener_set_enabled(&*engine, index, enabled); }
+		bool get_listener_enabled(unsigned int index) { return ma_engine_listener_get_enabled(&*engine, index); }
+		bool play(const string& filename, audio_node* node, unsigned int bus_index) { return false; } // Implement after audio_node
+		bool play(const string& filename, mixer* mixer) { return engine? (ma_engine_play_sound(&*engine, mixer? mixer->get_ma_sound() : nullptr)) == MA_SUCCESS : false; }
 };
 class mixer_impl : public virtual mixer_tmp {
 	// In miniaudio, a sound_group is really just a sound. A typical ma_sound_group_x function looks like float ma_sound_group_get_pan(const ma_sound_group* pGroup) { return ma_sound_get_pan(pGroup); }.
