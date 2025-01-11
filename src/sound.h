@@ -79,15 +79,15 @@ class audio_engine {
 		virtual float get_gain() = 0;
 		virtual unsigned int get_listener_count() = 0;
 		virtual int find_closest_listener(float x, float y, float z) = 0;
-		virtual int find_closest_listener(const reactphysics3d::Vector& listener);
+		virtual int find_closest_listener(const reactphysics3d::Vector3& position) = 0;
 		virtual void set_listener_position(unsigned int index, float x, float y, float z) = 0;
-		virtual void set_listener_position(unsigned int index, const reactphysics3d::Vector& position) = 0;
+		virtual void set_listener_position(unsigned int index, const reactphysics3d::Vector3& position) = 0;
 		virtual reactphysics3d::Vector3 get_listener_position(unsigned int index) = 0;
 		virtual void set_listener_direction(unsigned int index, float x, float y, float z) = 0;
-		virtual void set_listener_direction(unsigned int index, const reactphysics3d::Vector& direction) = 0;
+		virtual void set_listener_direction(unsigned int index, const reactphysics3d::Vector3& direction) = 0;
 		virtual reactphysics3d::Vector3 get_listener_direction(unsigned int index) = 0;
 		virtual void set_listener_velocity(unsigned int index, float x, float y, float z) = 0;
-		virtual void set_listener_velocity(unsigned int index, const reactphysics3d::Vector& velocity) = 0;
+		virtual void set_listener_velocity(unsigned int index, const reactphysics3d::Vector3& velocity) = 0;
 		virtual reactphysics3d::Vector3 get_listener_velocity(unsigned int index) = 0;
 		virtual void set_listener_cone(unsigned int index, float inner_radians, float outer_radians, float outer_gain) = 0;
 		virtual void get_listener_cone(unsigned int index, float* inner_radians, float* outer_radians, float* outer_gain) = 0;
@@ -99,7 +99,7 @@ class audio_engine {
 		virtual bool play(const std::string& path, audio_node* node, unsigned int input_bus_index) = 0;
 		virtual bool play(const std::string& path, mixer* mixer = nullptr) = 0;
 		virtual mixer* new_mixer() = 0;
-		virtual sound* new_sound() = 0;
+		//virtual sound* new_sound() = 0;
 };
 class mixer {
 	public:
@@ -186,13 +186,13 @@ class sound : public virtual mixer {
 		virtual void set_looping(bool looping) = 0;
 		virtual bool get_looping() = 0;
 		virtual bool get_at_end() = 0;
-		virtual bool seek(unsigned long long position) = 0; // DURATION_IN_FRAMES
+		virtual bool seek(unsigned long long position) = 0; // DURATIONS_IN_FRAMES
 		virtual bool seek_in_frames(unsigned long long position) = 0;
 		virtual bool seek_in_milliseconds(unsigned long long position) = 0;
-		virtual unsigned long long get_position() = 0; // DURATION_IN_FRAMES
+		virtual unsigned long long get_position() = 0; // DURATIONS_IN_FRAMES
 		virtual unsigned long long get_position_in_frames() = 0;
 		virtual unsigned long long get_position_in_milliseconds() = 0;
-		virtual unsigned long long get_length() = 0; // DURATION_IN_FRAMES
+		virtual unsigned long long get_length() = 0; // DURATIONS_IN_FRAMES
 		virtual unsigned long long get_length_in_frames() = 0;
 		virtual unsigned long long get_length_in_milliseconds() = 0;
 		virtual bool get_data_format(ma_format* format, unsigned int* channels, unsigned int* sample_rate) = 0;
