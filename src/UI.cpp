@@ -23,6 +23,8 @@
 #include <IOKit/IOCFBundle.h>
 #include <CoreFoundation/CoreFoundation.h>
 	#include "apple.h"
+#elif defined(__ANDROID__)
+	#include <android/native_window.h>
 #else
 // Following commented includes are for determining user idle time using x11 screensaver extension. Disabled for now until viability of linking with this library is established or until we fix the idle_ticks() function to use dlopen/dlsym and friends.
 //#include <X11/Xlib.h>
@@ -235,6 +237,8 @@ SDL_Window* g_WindowHandle = 0;
 #elif defined(__APPLE__)
 	#include "apple.h"
 	NSWindow* g_OSWindowHandle = NULL;
+#elif defined(__ANDROID__)
+	ANativeWindow* g_OSWindowHandle = nullptr;
 #else
 	void* g_OSWindowHandle = NULL;
 #endif
@@ -268,7 +272,7 @@ bool ShowNVGTWindow(const std::string& window_title) {
 	SDL_RaiseWindow(g_WindowHandle);
 	voice_over_window_created();
 	#elif defined(__ANDROID__)
-	g_OSWindowHandle = (NSWindow*)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, NULL);
+	g_OSWindowHandle = (ANativeWindow*)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, NULL);
 	#endif
 	g_WindowThreadId = thread_current_thread_id();
 	return true;
