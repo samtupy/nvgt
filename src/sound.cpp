@@ -48,7 +48,7 @@ bool init_sound() {
 // audio device enumeration, we'll just maintain a global list of available devices, vectors of ma_device_info structures for the c++ side and CScriptArrays of device names on the Angelscript side. It is important that the data in these arrays is index aligned.
 static vector<ma_device_info> g_sound_input_devices, g_sound_output_devices;
 static CScriptArray* g_sound_script_input_devices = nullptr, * g_sound_script_output_devices = nullptr;
-ma_bool32 ma_device_enum_callback(ma_context* ctx, ma_device_type type, const ma_device_info* info, void* /*user*/) {
+ma_bool32 ma_device_enum_callback(ma_context* /*ctx*/, ma_device_type type, const ma_device_info* info, void* /*user*/) {
 	string devname;
 	if (type == ma_device_type_playback) {
 		g_sound_output_devices.push_back(*info);
@@ -86,8 +86,8 @@ class audio_node_impl : public virtual audio_node {
 	audio_engine* engine;
 	int refcount;
 public:
-	audio_node_impl() : node(nullptr), refcount(1) {}
-	audio_node_impl(ma_node_base* node, audio_engine* engine) : node(node), engine(engine), refcount(1) {}
+	audio_node_impl() : audio_node(), node(nullptr), refcount(1) {}
+	audio_node_impl(ma_node_base* node, audio_engine* engine) : audio_node(), node(node), engine(engine), refcount(1) {}
 	void duplicate() { asAtomicInc(refcount); }
 	void release() {
 		if (asAtomicDec(refcount) < 1) delete this;
@@ -106,19 +106,19 @@ public:
 	bool set_state(ma_node_state state) { return node ? (g_soundsystem_last_error = ma_node_set_state(&*node, state)) == MA_SUCCESS : false; }
 	ma_node_state get_state() { return node ? ma_node_get_state(&*node) : ma_node_state_stopped; }
 	bool set_state_time(ma_node_state state, unsigned long long time) { return node ? (g_soundsystem_last_error = ma_node_set_state_time(&*node, state, time)) == MA_SUCCESS : false; }
-	unsigned long long get_state_time(ma_node_state state) { return node ? ma_node_get_state_time(&*node, state) : ma_node_state_stopped; }
+	unsigned long long get_state_time(ma_node_state state) { return node ? ma_node_get_state_time(&*node, state) : static_cast<unsigned long long>(ma_node_state_stopped); }
 	ma_node_state get_state_by_time(unsigned long long global_time) { return node ? ma_node_get_state_by_time(&*node, global_time) : ma_node_state_stopped; }
 	ma_node_state get_state_by_time_range(unsigned long long global_time_begin, unsigned long long global_time_end) { return node ? ma_node_get_state_by_time_range(&*node, global_time_begin, global_time_end) : ma_node_state_stopped; }
 	unsigned long long get_time() { return node ? ma_node_get_time(&*node) : 0; }
 	bool set_time(unsigned long long local_time) { return node ? (g_soundsystem_last_error = ma_node_set_time(&*node, local_time)) == MA_SUCCESS : false; }
 };
-class audio_engine_impl : public audio_engine {
+class audio_engine_impl final : public audio_engine {
 	unique_ptr<ma_engine> engine;
 	audio_node* engine_endpoint; // Upon engine creation we'll call ma_engine_get_endpoint once so as to avoid creating more than one of our wrapper objects when our engine->get_endpoint() function is called.
 	int refcount;
 public:
 	engine_flags flags;
-	audio_engine_impl() : engine(nullptr), engine_endpoint(nullptr), refcount(1) {
+	audio_engine_impl() : audio_engine(), engine(nullptr), engine_endpoint(nullptr), refcount(1) {
 		// default constructor initializes a miniaudio engine ourselves.
 		ma_engine_config cfg = ma_engine_config_init();
 		engine = make_unique<ma_engine>();
@@ -146,7 +146,7 @@ public:
 		ma_device* dev = ma_engine_get_device(&*engine);
 		ma_device_info info;
 		if (!dev || ma_device_get_info(dev, ma_device_type_playback, &info) != MA_SUCCESS) return -1;
-		for (int i = 0; i < g_sound_output_devices.size(); i++) {
+		for (std::size_t i = 0; i < g_sound_output_devices.size(); i++) {
 			if (memcmp(&g_sound_output_devices[i].id, &info.id, sizeof(ma_device_id)) == 0) return i;
 		}
 		return -1; // couldn't determine device?
@@ -227,17 +227,14 @@ class mixer_impl : public audio_node_impl, public virtual mixer {
 protected:
 	audio_engine_impl* engine;
 	unique_ptr<ma_sound> snd;
-	int refcount;
 public:
-	mixer_impl() : snd(nullptr), refcount(1) {
+	mixer_impl() : mixer(), audio_node_impl(), snd(nullptr) {
 		init_sound();
 		engine = static_cast<audio_engine_impl*>(g_audio_engine);
 	}
-	mixer_impl(audio_engine* engine) : engine(static_cast<audio_engine_impl*>(engine)), snd(nullptr), refcount(1) {}
-	void duplicate() override { asAtomicInc(refcount); }
-	void release() override {
-		if (asAtomicDec(refcount) < 1) delete this;
-	}
+	mixer_impl(audio_engine* engine) : mixer(), audio_node_impl(), engine(static_cast<audio_engine_impl*>(engine)), snd(nullptr) {}
+	inline void duplicate() override { audio_node_impl::duplicate(); }
+	inline void release() override { audio_node_impl::release(); }
 	bool play() override { return snd ? ma_sound_start(&*snd) : false; }
 	ma_sound* get_ma_sound() override { return &*snd; }
 	audio_engine* get_engine() override {
@@ -403,7 +400,7 @@ public:
 		return snd ? ma_sound_get_directional_attenuation_factor(&*snd) : NAN;
 	}
 	void set_fade(float start_volume, float end_volume, unsigned long long length) override {
-		if (snd)
+		if (!snd) return;
 			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
 				set_fade_in_frames(start_volume, end_volume, length);
 			else
@@ -421,7 +418,7 @@ public:
 		return snd ? ma_sound_get_current_fade_volume(&*snd) : NAN;
 	}
 	void set_start_time(unsigned long long absolute_time) override {
-		if (snd)
+		if (!snd) return;
 			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
 				set_start_time_in_frames(absolute_time);
 			else
@@ -436,7 +433,7 @@ public:
 			ma_sound_set_start_time_in_milliseconds(&*snd, absolute_time);
 	}
 	void set_stop_time(unsigned long long absolute_time) override {
-		if (snd)
+		if (!snd) return;
 			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
 				set_stop_time_in_frames(absolute_time);
 			else
@@ -463,18 +460,13 @@ public:
 		return snd ? ma_sound_is_playing(&*snd) : false;
 	}
 };
-class sound_impl : public mixer_impl, public sound {
+class sound_impl final : public mixer_impl, public sound {
 public:
-	sound_impl(audio_engine* e) {
-		engine = static_cast<audio_engine_impl*>(e);
+	sound_impl(audio_engine* e) : mixer_impl(static_cast<audio_engine_impl*>(e)), sound() {
 		snd = nullptr;
 	}
 	~sound_impl() {
 		close();
-		snd.reset();
-	}
-	void release() {
-		if (asAtomicDec(refcount) < 1) delete this;
 	}
 	bool load(const string& filename) override {
 		if (!snd) snd = make_unique<ma_sound>();
@@ -596,16 +588,15 @@ public:
 		return false;
 	}
 	unsigned long long get_position() override {
-		if (snd)
+		if (!snd) return 0;
 			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
 				return get_position_in_frames();
 			else
 				return get_position_in_milliseconds();
-		return 0;
 	}
 	unsigned long long get_position_in_frames() override {
 		if (snd) {
-			std::uint64_t pos = 0;
+			ma_uint64 pos = 0;
 			g_soundsystem_last_error = ma_sound_get_cursor_in_pcm_frames(&*snd, &pos);
 			return g_soundsystem_last_error == MA_SUCCESS ? pos : 0;
 		}
@@ -620,16 +611,15 @@ public:
 		return 0;
 	}
 	unsigned long long get_length() override {
-		if (snd)
+		if (!snd) return 0;
 			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
 				return get_length_in_frames();
 			else
 				return get_length_in_milliseconds();
-		return 0;
 	}
 	unsigned long long get_length_in_frames() override {
 		if (snd) {
-			std::uint64_t len;
+			ma_uint64 len;
 			g_soundsystem_last_error = ma_sound_get_length_in_pcm_frames(&*snd, &len);
 			return g_soundsystem_last_error == MA_SUCCESS ? len : 0;
 		}
@@ -662,38 +652,38 @@ bool set_sound_output_device(int device) { init_sound(); return g_audio_engine->
 void RegisterSoundsystem(asIScriptEngine* engine) {
 	engine->RegisterObjectType("sound", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("sound", asBEHAVE_ADDREF, "void f()", WRAP_MFN_PR(sound, duplicate, (), void), asCALL_GENERIC);
-	engine->RegisterObjectBehaviour("sound", asBEHAVE_RELEASE, "void f()", WRAP_MFN_PR(sound, release, (), void), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool load(const string&in filename)", WRAP_MFN(sound, load), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool load_memory(const string&in data)", WRAP_MFN_PR(sound, load_memory, (const string&), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool close()", WRAP_MFN(sound, close), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool get_active() property", WRAP_MFN(sound, get_active), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool get_paused() property", WRAP_MFN(sound, get_paused), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool pause()", WRAP_MFN(sound, pause), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool pause_fade(const uint64 length)", WRAP_MFN(sound, pause_fade), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool pause_fade_in_frames(const uint64 frames)", WRAP_MFN(sound, pause_fade_in_frames), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool pause_fade_in_milliseconds(const uint64 milliseconds)", WRAP_MFN(sound, pause_fade_in_milliseconds), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_timed_fade(const float start_volume, const float end_volume, const uint64 length, const uint64 absolute_time)", WRAP_MFN(sound, set_timed_fade), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_timed_fade_in_frames(const float start_volume, const float end_volume, const uint64 length, const uint64 absolute_time)", WRAP_MFN(sound, set_timed_fade_in_frames), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_timed_fade_in_milliseconds(const float start_volume, const float end_volume, const uint64 length, const uint64 absolute_time)", WRAP_MFN(sound, set_timed_fade_in_milliseconds), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade(const uint64 absolute_time, const uint64 fade_length)", WRAP_MFN(sound, set_stop_time_with_fade), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade_in_frames(const uint64 absolute_time, const uint64 fade_length)", WRAP_MFN(sound, set_stop_time_with_fade_in_frames), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade_in_milliseconds(const uint64 absolute_time, const uint64 fade_length)", WRAP_MFN(sound, set_stop_time_with_fade_in_milliseconds), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_looping(const bool looping) property", WRAP_MFN(sound, set_looping), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool get_looping() property", WRAP_MFN(sound, get_looping), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool get_at_end() property", WRAP_MFN(sound, get_at_end), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool seek(const uint64 position)", WRAP_MFN(sound, seek), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool seek_in_frames(const uint64 position)", WRAP_MFN(sound, seek_in_frames), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool seek_in_milliseconds(const uint64 position)", WRAP_MFN(sound, seek_in_milliseconds), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "uint64 get_position() property", WRAP_MFN(sound, get_position), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "uint64 get_position_in_frames() property", WRAP_MFN(sound, get_position_in_frames), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "uint64 get_position_in_ms", WRAP_MFN(sound, get_position_in_milliseconds), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "uint64 get_length() property", WRAP_MFN(sound, get_length), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "uint64 get_length_in_frames() property", WRAP_MFN(sound, get_length_in_frames), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "uint64 get_length_in_ms() property", WRAP_MFN(sound, get_length_in_milliseconds), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool get_data_format(audio_format@ out format, uint32@ out channels, uint32@ out sample_rate)", WRAP_MFN(sound, get_data_format), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool play()", WRAP_MFN(sound, play), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool stop()", WRAP_MFN(sound, stop), asCALL_GENERIC);
+	engine->RegisterObjectBehaviour("sound", asBEHAVE_ADDREF, "void f()", asMETHODPR(mixer, duplicate, (), void), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("sound", asBEHAVE_RELEASE, "void f()", asMETHODPR(mixer, release, (), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load(const string&in filename)", asMETHOD(sound, load), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load_memory(const string&in data)", asMETHODPR(sound, load_memory, (const string&), bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool close()", asMETHOD(sound, close), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool get_active() property", asMETHOD(sound, get_active), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool get_paused() property", asMETHOD(sound, get_paused), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool pause()", asMETHOD(sound, pause), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool pause_fade(const uint64 length)", asMETHOD(sound, pause_fade), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool pause_fade_in_frames(const uint64 frames)", asMETHOD(sound, pause_fade_in_frames), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool pause_fade_in_milliseconds(const uint64 milliseconds)", asMETHOD(sound, pause_fade_in_milliseconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_timed_fade(const float start_volume, const float end_volume, const uint64 length, const uint64 absolute_time)", asMETHOD(sound, set_timed_fade), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_timed_fade_in_frames(const float start_volume, const float end_volume, const uint64 length, const uint64 absolute_time)", asMETHOD(sound, set_timed_fade_in_frames), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_timed_fade_in_milliseconds(const float start_volume, const float end_volume, const uint64 length, const uint64 absolute_time)", asMETHOD(sound, set_timed_fade_in_milliseconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade(const uint64 absolute_time, const uint64 fade_length)", asMETHOD(sound, set_stop_time_with_fade), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade_in_frames(const uint64 absolute_time, const uint64 fade_length)", asMETHOD(sound, set_stop_time_with_fade_in_frames), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade_in_milliseconds(const uint64 absolute_time, const uint64 fade_length)", asMETHOD(sound, set_stop_time_with_fade_in_milliseconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_looping(const bool looping) property", asMETHOD(sound, set_looping), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool get_looping() property", asMETHOD(sound, get_looping), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool get_at_end() property", asMETHOD(sound, get_at_end), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool seek(const uint64 position)", asMETHOD(sound, seek), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool seek_in_frames(const uint64 position)", asMETHOD(sound, seek_in_frames), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool seek_in_milliseconds(const uint64 position)", asMETHOD(sound, seek_in_milliseconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "uint64 get_position() property", asMETHOD(sound, get_position), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "uint64 get_position_in_frames() property", asMETHOD(sound, get_position_in_frames), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "uint64 get_position_in_ms", asMETHOD(sound, get_position_in_milliseconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "uint64 get_length() property", asMETHOD(sound, get_length), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "uint64 get_length_in_frames() property", asMETHOD(sound, get_length_in_frames), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "uint64 get_length_in_ms() property", asMETHOD(sound, get_length_in_milliseconds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool get_data_format(audio_format@ out format, uint32@ out channels, uint32@ out sample_rate)", asMETHOD(sound, get_data_format), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool play()", asMETHOD(sound, play), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool stop()", asMETHOD(sound, stop), asCALL_THISCALL);
 	engine->RegisterGlobalFunction("const string[]@ get_sound_input_devices() property", asFUNCTION(get_sound_input_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("const string[]@ get_sound_output_devices() property", asFUNCTION(get_sound_output_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);

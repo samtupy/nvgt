@@ -29,6 +29,7 @@ class audio_node {
 public:
 	virtual void duplicate() = 0; // reference counting
 	virtual void release() = 0;
+	virtual ~audio_node() = default;
 	virtual ma_node_base* get_ma_node() = 0;
 	virtual audio_engine* get_engine() const = 0;
 	virtual unsigned int get_input_bus_count() = 0;
@@ -58,6 +59,7 @@ public:
 	};
 	virtual void duplicate() = 0; // reference counting
 	virtual void release() = 0;
+	virtual ~audio_engine() = default;
 	virtual int get_device() = 0;
 	virtual bool set_device(int device) = 0;
 	virtual audio_node* get_endpoint() = 0;

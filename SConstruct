@@ -16,6 +16,8 @@ Help("""
 		no_user=0 or 1 (default 0): Pretend that the user directory doesn't exist?
 		no_<plugname>_plugin=1: Disable a plugin by name.
 		stub_obfuscation=0 or 1 (default 0): Obfuscate some Angelscript function registration strings in the resulting stubs? Could make them bigger.
+		warnings (0 or 1, default 0): enable compiler warnings?
+		warnings_as_errors (0 or 1, default 0): treat compiler warnings as errors?
 	You can also run scons install (for now only on windows) to install the build into C:/nvgt. STILL WIP!
 	Note that custom switches or targets may be added by any plugin SConscript and may not be documented here.
 """)
@@ -37,12 +39,12 @@ if ARGUMENTS.get("debug", "0") == "1":
 	cdb = env.CompilationDatabase()
 	Alias('cdb', cdb)
 if env["PLATFORM"] == "win32":
-	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT" if not "windev_debug" in env else "/MTd", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/O2", "/bigobj", "/permissive-"])
+	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT" if not "windev_debug" in env else "/MTd", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/O2", "/bigobj", "/permissive-", "/W3" if ARGUMENTS.get("warnings", "0") == "1" else "", "/WX" if ARGUMENTS.get("warnings_as_errors", "0") == "1" else ""])
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
 	env.Append(LIBS = ["UniversalSpeechStatic", "angelscript64", "SDL3"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
 else:
-	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-O0" if ARGUMENTS.get("debug", 0) == "1" else "-O3", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result", "-g" if ARGUMENTS.get("debug", 0) == "1" else ""], LIBS = ["m"])
+	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-O0" if ARGUMENTS.get("debug", 0) == "1" else "-O3", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result", "-g" if ARGUMENTS.get("debug", 0) == "1" else "", "-Wall" if ARGUMENTS.get("warnings", "0") == "1" else "", "-Wextra" if ARGUMENTS.get("warnings", "0") == "1" else "", "-Werror" if ARGUMENTS.get("warnings_as_errors", "0") == "1" else ""], LIBS = ["m"])
 if env["PLATFORM"] == "darwin":
 	# homebrew paths and other libraries/flags for MacOS
 	env.Append(CCFLAGS = ["-mmacosx-version-min=14.0", "-arch", "arm64", "-arch", "x86_64"], LINKFLAGS = ["-arch", "arm64", "-arch", "x86_64"])
