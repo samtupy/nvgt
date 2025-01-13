@@ -81,13 +81,44 @@ CScriptArray* get_sound_output_devices() {
 reactphysics3d::Vector3 ma_vec3_to_rp_vec3(const ma_vec3f& v) { return reactphysics3d::Vector3(v.x, v.y, v.z); }
 
 // Miniaudio objects must be allocated on the heap as nvgt's API introduces the concept of an uninitialized sound, which a stack based system would make more difficult to implement.
+class audio_node_impl : public virtual audio_node {
+		unique_ptr<ma_node_base> node;
+		audio_engine* engine;
+		int refcount;
+	public:
+		audio_node_impl() : node(nullptr), refcount(1) {}
+		audio_node_impl(ma_node_base* node, audio_engine* engine) : node(node), engine(engine), refcount(1) {}
+		void duplicate() { asAtomicInc(refcount); }
+		void release() {
+			if (asAtomicDec(refcount) < 1) delete this;
+		}
+		audio_engine* get_engine() const { return engine; }
+		ma_node_base* get_ma_node() { return &*node; }
+		unsigned int get_input_bus_count() { return node? ma_node_get_input_bus_count(&*node) : 0; }
+		unsigned int get_output_bus_count() { return node? ma_node_get_output_bus_count(&*node) : 0; }
+		unsigned int get_input_channels(unsigned int bus) { return node? ma_node_get_input_channels(&*node, bus) : 0; }
+		unsigned int get_output_channels(unsigned int bus) { return node? ma_node_get_output_channels(&*node, bus) : 0; }
+		bool attach_output_bus(unsigned int output_bus, audio_node* destination, unsigned int destination_input_bus) { return node? (g_soundsystem_last_error = ma_node_attach_output_bus(&*node, output_bus, destination, destination_input_bus)) == MA_SUCCESS : false; }
+		bool detach_output_bus(unsigned int bus) { return node? (g_soundsystem_last_error = ma_node_detach_output_bus(&*node, bus)) == MA_SUCCESS : false; }
+		bool detach_all_output_buses() { return node? (g_soundsystem_last_error = ma_node_detach_all_output_buses(&*node)) == MA_SUCCESS : false; }
+		bool set_output_bus_volume(unsigned int bus, float volume) { return node? (g_soundsystem_last_error = ma_node_set_output_bus_volume(&*node, bus, volume)) == MA_SUCCESS : false; }
+		float get_output_bus_volume(unsigned int bus) { return node? ma_node_get_output_bus_volume(&*node, bus) : 0; }
+		bool set_state(ma_node_state state) { return node? (g_soundsystem_last_error = ma_node_set_state(&*node, state)) == MA_SUCCESS : false; }
+		ma_node_state get_state() { return node? ma_node_get_state(&*node) : ma_node_state_stopped; }
+		bool set_state_time(ma_node_state state, unsigned long long time) { return node? (g_soundsystem_last_error = ma_node_set_state_time(&*node, state, time)) == MA_SUCCESS : false; }
+		unsigned long long get_state_time(ma_node_state state) { return node? ma_node_get_state_time(&*node, state) : ma_node_state_stopped; }
+		ma_node_state get_state_by_time(unsigned long long global_time) { return node? ma_node_get_state_by_time(&*node, global_time) : ma_node_state_stopped; }
+		ma_node_state get_state_by_time_range(unsigned long long global_time_begin, unsigned long long global_time_end) { return node? ma_node_get_state_by_time_range(&*node, global_time_begin, global_time_end) : ma_node_state_stopped; }
+		unsigned long long get_time() { return node? ma_node_get_time(&*node) : 0; }
+		bool set_time(unsigned long long local_time) { return node? (g_soundsystem_last_error = ma_node_set_time(&*node, local_time)) == MA_SUCCESS : false; }
+};
 class audio_engine_impl : public audio_engine {
 		unique_ptr<ma_engine> engine;
 		audio_node* engine_endpoint; // Upon engine creation we'll call ma_engine_get_endpoint once so as to avoid creating more than one of our wrapper objects when our engine->get_endpoint() function is called.
 		int refcount;
 	public:
 		engine_flags flags;
-		audio_engine_impl() : refcount(1) {
+		audio_engine_impl() : engine(nullptr), engine_endpoint(nullptr), refcount(1) {
 			// default constructor initializes a miniaudio engine ourselves.
 			ma_engine_config cfg = ma_engine_config_init();
 			engine = make_unique<ma_engine>();
@@ -95,13 +126,21 @@ class audio_engine_impl : public audio_engine {
 				engine.reset();
 				return;
 			}
+			engine_endpoint = new audio_node_impl(reinterpret_cast<ma_node_base*>(ma_engine_get_endpoint(&*engine)), this);
+		}
+		~audio_engine_impl() {
+			if (engine_endpoint) engine_endpoint->release();
+			if (engine) {
+				ma_engine_uninit(&*engine);
+				engine = nullptr;
+			}
 		}
 		void duplicate() { asAtomicInc(refcount); }
 		void release() {
 			if (asAtomicDec(refcount) < 1) delete this;
 		}
 		ma_engine* get_ma_engine() { return engine.get(); }
-		audio_node* get_endpoint() { return nullptr; } // Implement after audio_node
+		audio_node* get_endpoint() { return engine_endpoint; } // Implement after audio_node
 		int get_device() {
 			if (!engine) return -1;
 			ma_device* dev = ma_engine_get_device(&*engine);
@@ -177,12 +216,12 @@ class audio_engine_impl : public audio_engine {
 		reactphysics3d::Vector3 get_listener_world_up(unsigned int index) { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_world_up(&*engine, index)) : reactphysics3d::Vector3(); }
 		void set_listener_enabled(unsigned int index, bool enabled) { if(engine) ma_engine_listener_set_enabled(&*engine, index, enabled); }
 		bool get_listener_enabled(unsigned int index) { return ma_engine_listener_is_enabled(&*engine, index); }
-		bool play(const string& filename, audio_node* node, unsigned int bus_index) { return false; } // Implement after audio_node
+		bool play(const string& filename, audio_node* node, unsigned int bus_index) { return engine? (g_soundsystem_last_error = ma_engine_play_sound_ex(&*engine, filename.c_str(), node? node->get_ma_node() : nullptr, bus_index)) == MA_SUCCESS : false; }
 		bool play(const string& filename, mixer* mixer) { return engine? (ma_engine_play_sound(&*engine, filename.c_str(), mixer? mixer->get_ma_sound() : nullptr)) == MA_SUCCESS : false; }
 		mixer* new_mixer() { return ::new_mixer(this); }
 		sound* new_sound() { return ::new_sound(this); }
 };
-class mixer_impl : public virtual mixer {
+class mixer_impl : public audio_node_impl, public virtual mixer {
 	// In miniaudio, a sound_group is really just a sound. A typical ma_sound_group_x function looks like float ma_sound_group_get_pan(const ma_sound_group* pGroup) { return ma_sound_get_pan(pGroup); }.
 	// Furthermore ma_sound_group is just a typedef for ma_sound. As such, for the sake of less code and better inheritance, we will directly call the ma_sound APIs in this class even though it deals with sound groups and not sounds.
 	protected:

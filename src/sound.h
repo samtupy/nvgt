@@ -29,6 +29,7 @@ class audio_node {
 	public:
 		virtual void duplicate() = 0; // reference counting
 		virtual void release() = 0;
+		virtual ma_node_base* get_ma_node() = 0;
 		virtual audio_engine* get_engine() const = 0;
 		virtual unsigned int get_input_bus_count() = 0;
 		virtual unsigned int get_output_bus_count() = 0;
@@ -36,7 +37,7 @@ class audio_node {
 		virtual unsigned int get_output_channels(unsigned int bus) = 0;
 		virtual bool attach_output_bus(unsigned int output_bus, audio_node* destination, unsigned int destination_input_bus) = 0;
 		virtual bool detach_output_bus(unsigned int bus) = 0;
-		virtual bool detach_all_output_busses() = 0;
+		virtual bool detach_all_output_buses() = 0;
 		virtual bool set_output_bus_volume(unsigned int bus, float volume) = 0;
 		virtual float get_output_bus_volume(unsigned int bus) = 0;
 		virtual bool set_state(ma_node_state state) = 0;
@@ -101,7 +102,7 @@ class audio_engine {
 		virtual mixer* new_mixer() = 0;
 		//virtual sound* new_sound() = 0;
 };
-class mixer {
+class mixer : public virtual audio_node {
 	public:
 		virtual void duplicate() = 0; // reference counting
 		virtual void release() = 0;
