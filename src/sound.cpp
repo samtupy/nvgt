@@ -20,31 +20,33 @@
 #include <scriptarray.h>
 #include "nvgt_angelscript.h" // get_array_type
 #include "sound.h"
+#include <atomic>
+#include <cstdint>
 
 using namespace std;
 
-class sound_tmp;
+class sound_impl;
 audio_engine* new_audio_engine();
 mixer* new_mixer(audio_engine* engine);
-sound_tmp* new_sound(audio_engine* engine);
+sound* new_sound(audio_engine* engine);
 
 // Globals, currently NVGT does not support instanciating multiple miniaudio contexts and NVGT provides a global sound engine.
 static ma_context g_sound_context;
 audio_engine* g_audio_engine = nullptr;
-static bool g_soundsystem_initialized = false;
-static ma_result g_soundsystem_last_error = MA_SUCCESS;
+static std::atomic_flag g_soundsystem_initialized;
+static std::atomic<ma_result> g_soundsystem_last_error = MA_SUCCESS;
 
 bool init_sound() {
-	if (g_soundsystem_initialized) return true;
+	if (g_soundsystem_initialized.test()) return true;
 	if ((g_soundsystem_last_error = ma_context_init(nullptr, 0, nullptr, &g_sound_context)) != MA_SUCCESS) return false;
-	g_soundsystem_initialized = true;
+	g_soundsystem_initialized.test_and_set();
 	refresh_audio_devices();
 	g_audio_engine = new_audio_engine();
 	return true;
 }
 
 // audio device enumeration, we'll just maintain a global list of available devices, vectors of ma_device_info structures for the c++ side and CScriptArrays of device names on the Angelscript side. It is important that the data in these arrays is index aligned.
-vector<ma_device_info> g_sound_input_devices, g_sound_output_devices;
+static vector<ma_device_info> g_sound_input_devices, g_sound_output_devices;
 static CScriptArray* g_sound_script_input_devices = nullptr, * g_sound_script_output_devices = nullptr;
 ma_bool32 ma_device_enum_callback(ma_context* ctx, ma_device_type type, const ma_device_info* info, void* /*user*/) {
 	string devname;
@@ -58,7 +60,7 @@ ma_bool32 ma_device_enum_callback(ma_context* ctx, ma_device_type type, const ma
 	return MA_TRUE;
 }
 bool refresh_audio_devices() {
-	if (!g_soundsystem_initialized && !init_sound()) return false;
+	if (!g_soundsystem_initialized.test() && !init_sound()) return false;
 	g_sound_output_devices.clear();
 	g_sound_input_devices.clear();
 	if (!g_sound_script_output_devices) g_sound_script_output_devices = CScriptArray::Create(get_array_type("array<string>"));
@@ -77,13 +79,6 @@ CScriptArray* get_sound_output_devices() {
 }
 
 reactphysics3d::Vector3 ma_vec3_to_rp_vec3(const ma_vec3f& v) { return reactphysics3d::Vector3(v.x, v.y, v.z); }
-
-// I learned the hard way that you can't instantiate a virtual class until none of it's members are abstract. Hack around that. When wrapper is complete, remove the following placeholder classes:
-class sound_tmp : public virtual mixer {
-public:
-	virtual bool load(const string& filename) = 0;
-	virtual bool seek(unsigned long long offset) = 0;
-};
 
 // Miniaudio objects must be allocated on the heap as nvgt's API introduces the concept of an uninitialized sound, which a stack based system would make more difficult to implement.
 class audio_engine_impl : public audio_engine {
@@ -185,7 +180,7 @@ class audio_engine_impl : public audio_engine {
 		bool play(const string& filename, audio_node* node, unsigned int bus_index) { return false; } // Implement after audio_node
 		bool play(const string& filename, mixer* mixer) { return engine? (ma_engine_play_sound(&*engine, filename.c_str(), mixer? mixer->get_ma_sound() : nullptr)) == MA_SUCCESS : false; }
 		mixer* new_mixer() { return ::new_mixer(this); }
-		//sound* new_sound() { return ::new_sound(this); }
+		sound* new_sound() { return ::new_sound(this); }
 };
 class mixer_impl : public virtual mixer {
 	// In miniaudio, a sound_group is really just a sound. A typical ma_sound_group_x function looks like float ma_sound_group_get_pan(const ma_sound_group* pGroup) { return ma_sound_get_pan(pGroup); }.
@@ -454,43 +449,210 @@ class mixer_impl : public virtual mixer {
 		return snd ? ma_sound_is_playing(&*snd) : false;
 	}
 };
-class sound_impl : public mixer_impl, public sound_tmp {
+class sound_impl : public mixer_impl, public sound {
 	public:
 		sound_impl(audio_engine* e) {
 			engine = static_cast<audio_engine_impl*>(e);
 			snd = nullptr;
 		}
 		~sound_impl() {
-			if (snd) ma_sound_uninit(&*snd);
+			close();
 			snd.reset();
 		}
 	void release() {
 		if (asAtomicDec(refcount) < 1) delete this;
 	}
-		bool load(const string& filename) {
+		bool load(const string& filename) override {
 			if (!snd) snd = make_unique<ma_sound>();
-			g_soundsystem_last_error = ma_sound_init_from_file(engine->get_ma_engine(), filename.c_str(), 0, nullptr, nullptr, snd.get());
+			g_soundsystem_last_error = ma_sound_init_from_file(engine->get_ma_engine(), filename.c_str(), 0, nullptr, nullptr, &*snd);
 			if (g_soundsystem_last_error != MA_SUCCESS) snd.reset();
 			return g_soundsystem_last_error == MA_SUCCESS;
 		}
-		bool seek(unsigned long long offset) { return snd? (g_soundsystem_last_error = ma_sound_seek_to_pcm_frame(&*snd, offset * ma_engine_get_sample_rate(engine->get_ma_engine()) / 1000)) == MA_SUCCESS : false; }
+		bool seek_in_milliseconds(unsigned long long offset) override { return snd? (g_soundsystem_last_error = ma_sound_seek_to_pcm_frame(&*snd, offset * ma_engine_get_sample_rate(engine->get_ma_engine()) / 1000)) == MA_SUCCESS : false; }
+		bool load_memory(const std::string& data) override {
+			if (!snd) snd = make_unique<ma_sound>();
+			auto config = ma_decoder_config_init(ma_format_f32, ma_engine_get_channels(engine->get_ma_engine()), ma_engine_get_sample_rate(engine->get_ma_engine()));
+			ma_decoder decoder;
+			g_soundsystem_last_error = ma_decoder_init_memory(data.c_str(), data.size(), &config, &decoder);
+			if (g_soundsystem_last_error != MA_SUCCESS) snd.reset();
+			g_soundsystem_last_error = ma_sound_init_from_data_source(engine->get_ma_engine(), &decoder, 0, nullptr, &*snd);
+			if (g_soundsystem_last_error != MA_SUCCESS) snd.reset();
+			return g_soundsystem_last_error == MA_SUCCESS;
+		}
+		bool load_memory(void* buffer, unsigned int size) override {
+			if (!snd) snd = make_unique<ma_sound>();
+			auto config = ma_decoder_config_init(ma_format_f32, ma_engine_get_channels(engine->get_ma_engine()), ma_engine_get_sample_rate(engine->get_ma_engine()));
+			ma_decoder decoder;
+			g_soundsystem_last_error = ma_decoder_init_memory(buffer, size, &config, &decoder);
+			if (g_soundsystem_last_error != MA_SUCCESS) snd.reset();
+			g_soundsystem_last_error = ma_sound_init_from_data_source(engine->get_ma_engine(), &decoder, 0, nullptr, &*snd);
+			if (g_soundsystem_last_error != MA_SUCCESS) snd.reset();
+			return g_soundsystem_last_error == MA_SUCCESS;
+		}
+	bool load_pcm(void* buffer, unsigned int size, ma_format format, int samplerate, int channels) override {
+			auto config = ma_audio_buffer_config_init(format, channels, (size / channels) * (32 / 8), buffer, nullptr);
+			ma_audio_buffer audio_buffer;
+			g_soundsystem_last_error = ma_audio_buffer_init(&config, &audio_buffer);
+			if (g_soundsystem_last_error != MA_SUCCESS) snd.reset();
+			g_soundsystem_last_error = ma_sound_init_from_data_source(engine->get_ma_engine(), &buffer, 0, nullptr, &*snd);
+			if (g_soundsystem_last_error != MA_SUCCESS) snd.reset();
+			return g_soundsystem_last_error == MA_SUCCESS;
+		}
+		bool close() override {
+			if (snd) {
+				ma_sound_uninit(&*snd);
+			snd.reset();
+			return true;
+		}
+			return false;
+		}
+		bool get_active() override {
+			return snd ? true : false;
+		}
+		bool get_paused() override {
+			return snd ? ma_sound_is_playing(&*snd) : false;
+		}
+		bool pause() override {
+			if (snd) {
+				g_soundsystem_last_error = ma_sound_stop(&*snd);
+				return g_soundsystem_last_error == MA_SUCCESS;
+			}
+			return false;
+		}
+		bool pause_fade(unsigned long long length) override {
+			return (engine->flags & audio_engine::DURATIONS_IN_FRAMES) ? pause_fade_in_frames(length) : pause_fade_in_milliseconds(length);
+		}
+		bool pause_fade_in_frames(unsigned long long frames) override {
+			if (snd) {
+				g_soundsystem_last_error = ma_sound_stop_with_fade_in_pcm_frames(&*snd, frames);
+				return g_soundsystem_last_error == MA_SUCCESS;
+			}
+			return false;
+		}
+		bool pause_fade_in_milliseconds(unsigned long long frames) override {
+			if (snd) {
+				g_soundsystem_last_error = ma_sound_stop_with_fade_in_milliseconds(&*snd, frames);
+				return g_soundsystem_last_error == MA_SUCCESS;
+			}
+			return false;
+		}
+		void set_timed_fade(float start_volume, float end_volume, unsigned long long length, unsigned long long absolute_time) override {
+			return (engine->flags & audio_engine::DURATIONS_IN_FRAMES) ? set_timed_fade_in_frames(start_volume, end_volume, length, absolute_time) : set_timed_fade_in_milliseconds(start_volume, end_volume, length, absolute_time);
+		}
+		void set_timed_fade_in_frames(float start_volume, float end_volume, unsigned long long frames, unsigned long long absolute_time_in_frames) override {
+			if (snd)
+				ma_sound_set_fade_start_in_pcm_frames(&*snd, start_volume, end_volume, frames, absolute_time_in_frames);
+		}
+		void set_timed_fade_in_milliseconds(float start_volume, float end_volume, unsigned long long frames, unsigned long long absolute_time_in_frames) override {
+			if (snd)
+				ma_sound_set_fade_start_in_milliseconds(&*snd, start_volume, end_volume, frames, absolute_time_in_frames);
+		}
+		void set_stop_time_with_fade(unsigned long long absolute_time, unsigned long long fade_length) override {
+			return (engine->flags & audio_engine::DURATIONS_IN_FRAMES) ? set_stop_time_with_fade_in_frames(absolute_time, fade_length) : set_stop_time_with_fade_in_milliseconds(absolute_time, fade_length);
+		}
+		void set_stop_time_with_fade_in_frames(unsigned long long absolute_time, unsigned long long fade_length) override {
+			if (snd)
+				ma_sound_set_stop_time_with_fade_in_pcm_frames(&*snd, absolute_time, fade_length);
+		}
+		void set_stop_time_with_fade_in_milliseconds(unsigned long long absolute_time, unsigned long long fade_length) override {
+			if (snd)
+				ma_sound_set_stop_time_with_fade_in_milliseconds(&*snd, absolute_time, fade_length);
+		}
+		void set_looping(bool looping) override {
+			if (snd)
+				ma_sound_set_looping(&*snd, looping);
+		}
+		bool get_looping() override {
+			return snd ? ma_sound_is_looping(&*snd) : false;
+		}
+		bool get_at_end() override {
+			return snd ? ma_sound_at_end(&*snd) : false;
+		}
+		bool seek(unsigned long long position) override {
+			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
+				return seek_in_frames(position);
+			else
+				return seek_in_milliseconds(position);
+		}
+		bool seek_in_frames(unsigned long long position) override {
+			if (snd) {
+				g_soundsystem_last_error = ma_sound_seek_to_pcm_frame(&*snd, position);
+				return g_soundsystem_last_error == MA_SUCCESS;
+			}
+			return false;
+		}
+		unsigned long long get_position() override {
+			if (snd)
+				if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
+					return get_position_in_frames();
+				else
+					return get_position_in_milliseconds();
+			return 0;
+		}
+		unsigned long long get_position_in_frames() override {
+			if (snd) {
+				std::uint64_t pos = 0;
+				g_soundsystem_last_error = ma_sound_get_cursor_in_pcm_frames(&*snd, &pos);
+				return g_soundsystem_last_error == MA_SUCCESS ? pos : 0;
+			}
+			return 0;
+		}
+		unsigned long long get_position_in_milliseconds() override {
+			if (snd) {
+				float pos = 0.0f;
+				g_soundsystem_last_error = ma_sound_get_cursor_in_seconds(&*snd, &pos);
+				return g_soundsystem_last_error == MA_SUCCESS ? pos * 1000.0f : 0;
+			}
+			return 0;
+		}
+		unsigned long long get_length() override {
+			if (snd)
+				if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
+					return get_length_in_frames();
+				else
+					return get_length_in_milliseconds();
+			return 0;
+		}
+		unsigned long long get_length_in_frames() override {
+			if (snd) {
+				std::uint64_t len;
+				g_soundsystem_last_error = ma_sound_get_length_in_pcm_frames(&*snd, &len);
+				return g_soundsystem_last_error == MA_SUCCESS ? len : 0;
+			}
+			return 0;
+		}
+		unsigned long long get_length_in_milliseconds() override {
+			if (snd) {
+				float len;
+				g_soundsystem_last_error = ma_sound_get_length_in_seconds(&*snd, &len);
+				return g_soundsystem_last_error == MA_SUCCESS ? len * 1000.0f : 0;
+			}
+			return 0;
+		}
+		bool get_data_format(ma_format* format, unsigned int* channels, unsigned int* sample_rate) override {
+			if (snd) {
+				g_soundsystem_last_error = ma_sound_get_data_format(&*snd, format, channels, sample_rate, nullptr, 0);
+				return g_soundsystem_last_error == MA_SUCCESS;
+			}
+			return false;
+		}
 };
 
 audio_engine* new_audio_engine() { return new audio_engine_impl(); }
 mixer* new_mixer(audio_engine* engine) { return new mixer_impl(engine); }
-sound_tmp* new_sound(audio_engine* engine) { return new sound_impl(engine); }
-sound_tmp* new_global_sound() { init_sound(); return new sound_impl(g_audio_engine); }
+sound* new_sound(audio_engine* engine) { return new sound_impl(engine); }
+sound* new_global_sound() { init_sound(); return new sound_impl(g_audio_engine); }
 int get_sound_output_device() { init_sound(); return g_audio_engine->get_device(); }
 bool set_sound_output_device(int device) { init_sound(); return g_audio_engine->set_device(device); }
 
 void RegisterSoundsystem(asIScriptEngine* engine) {
 	engine->RegisterObjectType("sound", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("sound", asBEHAVE_ADDREF, "void f()", WRAP_MFN_PR(sound_tmp, duplicate, (), void), asCALL_GENERIC);
-	engine->RegisterObjectBehaviour("sound", asBEHAVE_RELEASE, "void f()", WRAP_MFN_PR(sound_tmp, release, (), void), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool load(const string&in filename)", WRAP_MFN(sound_tmp, load), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool play()", WRAP_MFN_PR(sound_tmp, play, (), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool seek(uint64 offset)", WRAP_MFN_PR(sound_tmp, seek, (unsigned long long), bool), asCALL_GENERIC);
+	engine->RegisterObjectBehaviour("sound", asBEHAVE_ADDREF, "void f()", WRAP_MFN_PR(sound, duplicate, (), void), asCALL_GENERIC);
+	engine->RegisterObjectBehaviour("sound", asBEHAVE_RELEASE, "void f()", WRAP_MFN_PR(sound, release, (), void), asCALL_GENERIC);
+	engine->RegisterObjectMethod("sound", "bool load(const string&in filename)", WRAP_MFN(sound, load), asCALL_GENERIC);
+	engine->RegisterObjectMethod("sound", "bool play()", WRAP_MFN_PR(sound, play, (), bool), asCALL_GENERIC);
+	engine->RegisterObjectMethod("sound", "bool seek(uint64 offset)", WRAP_MFN_PR(sound, seek, (unsigned long long), bool), asCALL_GENERIC);
 	engine->RegisterGlobalFunction("const string[]@ get_sound_input_devices() property", asFUNCTION(get_sound_input_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("const string[]@ get_sound_output_devices() property", asFUNCTION(get_sound_output_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);
