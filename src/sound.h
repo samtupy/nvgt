@@ -100,7 +100,7 @@ class audio_engine {
 		virtual bool play(const std::string& path, audio_node* node, unsigned int input_bus_index) = 0;
 		virtual bool play(const std::string& path, mixer* mixer = nullptr) = 0;
 		virtual mixer* new_mixer() = 0;
-		//virtual sound* new_sound() = 0;
+		virtual sound* new_sound() = 0;
 };
 class mixer : public virtual audio_node {
 	public:

@@ -135,13 +135,13 @@ class audio_engine_impl : public audio_engine {
 				engine = nullptr;
 			}
 		}
-		void duplicate() { asAtomicInc(refcount); }
-		void release() {
+		void duplicate() override { asAtomicInc(refcount); }
+		void release() override {
 			if (asAtomicDec(refcount) < 1) delete this;
 		}
-		ma_engine* get_ma_engine() { return engine.get(); }
-		audio_node* get_endpoint() { return engine_endpoint; } // Implement after audio_node
-		int get_device() {
+		ma_engine* get_ma_engine() override { return engine.get(); }
+		audio_node* get_endpoint() override { return engine_endpoint; } // Implement after audio_node
+		int get_device() override {
 			if (!engine) return -1;
 			ma_device* dev = ma_engine_get_device(&*engine);
 			ma_device_info info;
@@ -151,7 +151,7 @@ class audio_engine_impl : public audio_engine {
 			}
 			return -1; // couldn't determine device?
 		}
-		bool set_device(int device) {
+		bool set_device(int device) override {
 			if (!engine || device < 0 || device >= g_sound_output_devices.size()) return false;
 			ma_device* old_dev = ma_engine_get_device(&*engine);
 			if (!old_dev || memcmp(&old_dev->playback.id, &g_sound_output_devices[device].id, sizeof(ma_device_id)) == 0) return false;
@@ -171,8 +171,8 @@ class audio_engine_impl : public audio_engine {
 			ma_device_init(&g_sound_context, &cfg, old_dev);
 			return (g_soundsystem_last_error = ma_engine_start(&*engine)) == MA_SUCCESS;
 		}
-		bool read(void* buffer, unsigned long long frame_count, unsigned long long* frames_read) { return engine? (g_soundsystem_last_error = ma_engine_read_pcm_frames(&*engine, buffer, frame_count, frames_read)) == MA_SUCCESS : false; }
-		CScriptArray* read(unsigned long long frame_count) {
+		bool read(void* buffer, unsigned long long frame_count, unsigned long long* frames_read) override { return engine? (g_soundsystem_last_error = ma_engine_read_pcm_frames(&*engine, buffer, frame_count, frames_read)) == MA_SUCCESS : false; }
+		CScriptArray* read(unsigned long long frame_count) override {
 			if (!engine) return nullptr;
 			CScriptArray* result = CScriptArray::Create(get_array_type("array<float>"), frame_count * ma_engine_get_channels(&*engine));
 			unsigned long long frames_read;
@@ -183,43 +183,43 @@ class audio_engine_impl : public audio_engine {
 			result->Resize(frames_read * ma_engine_get_channels(&*engine));
 			return result;
 		}
-		unsigned long long get_time() { return engine? (flags & DURATIONS_IN_FRAMES? ma_engine_get_time_in_pcm_frames(&*engine) : ma_engine_get_time_in_milliseconds(&*engine)) : 0; }
-		bool set_time(unsigned long long time) { return engine? (g_soundsystem_last_error = (flags & DURATIONS_IN_FRAMES? ma_engine_set_time_in_pcm_frames(&*engine, time) : ma_engine_set_time_in_milliseconds(&*engine, time))) == MA_SUCCESS : false; }
-		unsigned long long get_time_in_frames() { return engine? ma_engine_get_time_in_pcm_frames(&*engine) : 0; }
-		bool set_time_in_frames(unsigned long long time) { return engine ? (g_soundsystem_last_error = ma_engine_set_time_in_pcm_frames(&*engine, time)) == MA_SUCCESS : false; }
-		unsigned long long get_time_in_milliseconds() { return engine? ma_engine_get_time_in_milliseconds(&*engine) : 0; }
-		bool set_time_in_milliseconds(unsigned long long time) { return engine ? (g_soundsystem_last_error = ma_engine_set_time_in_milliseconds(&*engine, time)) == MA_SUCCESS : false; }
-		int get_channels() { return engine? ma_engine_get_channels(&*engine) : 0; }
-		int get_sample_rate() { return engine? ma_engine_get_sample_rate(&*engine) : 0; }
-		bool start() { return engine? (ma_engine_start(&*engine)) == MA_SUCCESS : false; }
-		bool stop() { return engine? (ma_engine_stop(&*engine)) == MA_SUCCESS : false; }
-		bool set_volume(float volume) { return engine? (g_soundsystem_last_error = ma_engine_set_volume(&*engine, volume)) == MA_SUCCESS : false; }
-		float get_volume() { return engine? ma_engine_get_volume(&*engine) : 0; }
-		bool set_gain(float db) { return engine? (g_soundsystem_last_error = ma_engine_set_gain_db(&*engine, db)) == MA_SUCCESS : false; }
-		float get_gain() { return engine? ma_engine_get_gain_db(&*engine) : 0; }
-		unsigned int get_listener_count() { return engine? ma_engine_get_listener_count(&*engine) : 0; }
-		int find_closest_listener(float x, float y, float z) { return engine? ma_engine_find_closest_listener(&*engine, x, y, z) : -1; }
+		unsigned long long get_time() override { return engine? (flags & DURATIONS_IN_FRAMES? get_time_in_frames() : get_time_in_milliseconds()) : 0; }
+		bool set_time(unsigned long long time) override { return engine? (flags & DURATIONS_IN_FRAMES) ? set_time_in_frames(time) : set_time_in_milliseconds(time) : false; }
+		unsigned long long get_time_in_frames() override { return engine? ma_engine_get_time_in_pcm_frames(&*engine) : 0; }
+		bool set_time_in_frames(unsigned long long time) override { return engine ? (g_soundsystem_last_error = ma_engine_set_time_in_pcm_frames(&*engine, time)) == MA_SUCCESS : false; }
+		unsigned long long get_time_in_milliseconds() override { return engine? ma_engine_get_time_in_milliseconds(&*engine) : 0; }
+		bool set_time_in_milliseconds(unsigned long long time) override { return engine ? (g_soundsystem_last_error = ma_engine_set_time_in_milliseconds(&*engine, time)) == MA_SUCCESS : false; }
+		int get_channels() override { return engine? ma_engine_get_channels(&*engine) : 0; }
+		int get_sample_rate() override { return engine? ma_engine_get_sample_rate(&*engine) : 0; }
+		bool start() override { return engine? (ma_engine_start(&*engine)) == MA_SUCCESS : false; }
+		bool stop() override { return engine? (ma_engine_stop(&*engine)) == MA_SUCCESS : false; }
+		bool set_volume(float volume) override { return engine? (g_soundsystem_last_error = ma_engine_set_volume(&*engine, volume)) == MA_SUCCESS : false; }
+		float get_volume() override { return engine? ma_engine_get_volume(&*engine) : 0; }
+		bool set_gain(float db) override { return engine? (g_soundsystem_last_error = ma_engine_set_gain_db(&*engine, db)) == MA_SUCCESS : false; }
+		float get_gain() override { return engine? ma_engine_get_gain_db(&*engine) : 0; }
+		unsigned int get_listener_count() override { return engine? ma_engine_get_listener_count(&*engine) : 0; }
+		int find_closest_listener(float x, float y, float z) override { return engine? ma_engine_find_closest_listener(&*engine, x, y, z) : -1; }
 		int find_closest_listener(const reactphysics3d::Vector3& position) override { return engine? ma_engine_find_closest_listener(&*engine, position.x, position.y, position.z) : -1; }
-		void set_listener_position(unsigned int index, float x, float y, float z) { if(engine) ma_engine_listener_set_position(&*engine, index, x, y, z); }
-		void set_listener_position(unsigned int index, const reactphysics3d::Vector3& position) { if(engine) ma_engine_listener_set_position(&*engine, index, position.x, position.y, position.z); }
-		reactphysics3d::Vector3 get_listener_position(unsigned int index) { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_position(&*engine, index)) : reactphysics3d::Vector3(); }
-		void set_listener_direction(unsigned int index, float x, float y, float z) { if(engine) ma_engine_listener_set_direction(&*engine, index, x, y, z); }
-		void set_listener_direction(unsigned int index, const reactphysics3d::Vector3& direction) { if(engine) ma_engine_listener_set_direction(&*engine, index, direction.x, direction.y, direction.z); }
-		reactphysics3d::Vector3 get_listener_direction(unsigned int index) { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_direction(&*engine, index)) : reactphysics3d::Vector3(); }
-		void set_listener_velocity(unsigned int index, float x, float y, float z) { if(engine) ma_engine_listener_set_velocity(&*engine, index, x, y, z); }
-		void set_listener_velocity(unsigned int index, const reactphysics3d::Vector3& velocity) { if(engine) ma_engine_listener_set_velocity(&*engine, index, velocity.x, velocity.y, velocity.z); }
-		reactphysics3d::Vector3 get_listener_velocity(unsigned int index) { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_velocity(&*engine, index)) : reactphysics3d::Vector3(); }
-		void set_listener_cone(unsigned int index, float inner_radians, float outer_radians, float outer_gain) { if(engine) ma_engine_listener_set_cone(&*engine, index, inner_radians, outer_radians, outer_gain); }
-		void get_listener_cone(unsigned int index, float* inner_radians, float* outer_radians, float* outer_gain) { if(engine) ma_engine_listener_get_cone(&*engine, index, inner_radians, outer_radians, outer_gain); }
-		void set_listener_world_up(unsigned int index, float x, float y, float z) { if(engine) ma_engine_listener_set_world_up(&*engine, index, x, y, z); }
-		void set_listener_world_up(unsigned int index, const reactphysics3d::Vector3& world_up) { if(engine) ma_engine_listener_set_world_up(&*engine, index, world_up.x, world_up.y, world_up.z); }
-		reactphysics3d::Vector3 get_listener_world_up(unsigned int index) { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_world_up(&*engine, index)) : reactphysics3d::Vector3(); }
-		void set_listener_enabled(unsigned int index, bool enabled) { if(engine) ma_engine_listener_set_enabled(&*engine, index, enabled); }
-		bool get_listener_enabled(unsigned int index) { return ma_engine_listener_is_enabled(&*engine, index); }
-		bool play(const string& filename, audio_node* node, unsigned int bus_index) { return engine? (g_soundsystem_last_error = ma_engine_play_sound_ex(&*engine, filename.c_str(), node? node->get_ma_node() : nullptr, bus_index)) == MA_SUCCESS : false; }
-		bool play(const string& filename, mixer* mixer) { return engine? (ma_engine_play_sound(&*engine, filename.c_str(), mixer? mixer->get_ma_sound() : nullptr)) == MA_SUCCESS : false; }
-		mixer* new_mixer() { return ::new_mixer(this); }
-		sound* new_sound() { return ::new_sound(this); }
+		void set_listener_position(unsigned int index, float x, float y, float z) override { if(engine) ma_engine_listener_set_position(&*engine, index, x, y, z); }
+		void set_listener_position(unsigned int index, const reactphysics3d::Vector3& position) override { if(engine) ma_engine_listener_set_position(&*engine, index, position.x, position.y, position.z); }
+		reactphysics3d::Vector3 get_listener_position(unsigned int index) override { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_position(&*engine, index)) : reactphysics3d::Vector3(); }
+		void set_listener_direction(unsigned int index, float x, float y, float z) override { if(engine) ma_engine_listener_set_direction(&*engine, index, x, y, z); }
+		void set_listener_direction(unsigned int index, const reactphysics3d::Vector3& direction) override { if(engine) ma_engine_listener_set_direction(&*engine, index, direction.x, direction.y, direction.z); }
+		reactphysics3d::Vector3 get_listener_direction(unsigned int index) override { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_direction(&*engine, index)) : reactphysics3d::Vector3(); }
+		void set_listener_velocity(unsigned int index, float x, float y, float z) override { if(engine) ma_engine_listener_set_velocity(&*engine, index, x, y, z); }
+		void set_listener_velocity(unsigned int index, const reactphysics3d::Vector3& velocity) override { if(engine) ma_engine_listener_set_velocity(&*engine, index, velocity.x, velocity.y, velocity.z); }
+		reactphysics3d::Vector3 get_listener_velocity(unsigned int index) override { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_velocity(&*engine, index)) : reactphysics3d::Vector3(); }
+		void set_listener_cone(unsigned int index, float inner_radians, float outer_radians, float outer_gain) override { if(engine) ma_engine_listener_set_cone(&*engine, index, inner_radians, outer_radians, outer_gain); }
+		void get_listener_cone(unsigned int index, float* inner_radians, float* outer_radians, float* outer_gain) override { if(engine) ma_engine_listener_get_cone(&*engine, index, inner_radians, outer_radians, outer_gain); }
+		void set_listener_world_up(unsigned int index, float x, float y, float z) override { if(engine) ma_engine_listener_set_world_up(&*engine, index, x, y, z); }
+		void set_listener_world_up(unsigned int index, const reactphysics3d::Vector3& world_up) override { if(engine) ma_engine_listener_set_world_up(&*engine, index, world_up.x, world_up.y, world_up.z); }
+		reactphysics3d::Vector3 get_listener_world_up(unsigned int index) override { return engine? ma_vec3_to_rp_vec3(ma_engine_listener_get_world_up(&*engine, index)) : reactphysics3d::Vector3(); }
+		void set_listener_enabled(unsigned int index, bool enabled) override { if(engine) ma_engine_listener_set_enabled(&*engine, index, enabled); }
+		bool get_listener_enabled(unsigned int index) override { return ma_engine_listener_is_enabled(&*engine, index); }
+		bool play(const string& filename, audio_node* node, unsigned int bus_index) override { return engine? (g_soundsystem_last_error = ma_engine_play_sound_ex(&*engine, filename.c_str(), node? node->get_ma_node() : nullptr, bus_index)) == MA_SUCCESS : false; }
+		bool play(const string& filename, mixer* mixer) override { return engine? (ma_engine_play_sound(&*engine, filename.c_str(), mixer? mixer->get_ma_sound() : nullptr)) == MA_SUCCESS : false; }
+		mixer* new_mixer() override { return ::new_mixer(this); }
+		sound* new_sound() override { return ::new_sound(this); }
 };
 class mixer_impl : public audio_node_impl, public virtual mixer {
 	// In miniaudio, a sound_group is really just a sound. A typical ma_sound_group_x function looks like float ma_sound_group_get_pan(const ma_sound_group* pGroup) { return ma_sound_get_pan(pGroup); }.
@@ -239,7 +239,7 @@ class mixer_impl : public audio_node_impl, public virtual mixer {
 		if (asAtomicDec(refcount) < 1) delete this;
 	}
 	bool play() override { return snd? ma_sound_start(&*snd) : false; }
-	ma_sound* get_ma_sound() { return &*snd; }
+	ma_sound* get_ma_sound() override { return &*snd; }
 	audio_engine* get_engine() override {
 		return engine;
 	}
@@ -249,41 +249,36 @@ class mixer_impl : public audio_node_impl, public virtual mixer {
 	}
 	float get_volume() override { return snd ? ma_sound_get_volume(&*snd) : NAN; }
 	void set_pan(float pan) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_pan(&*snd, pan);
-		}
 	}
 	float get_pan() override {
 		return snd ? ma_sound_get_pan(&*snd) : NAN;
 	}
 	void set_pan_mode(ma_pan_mode mode) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_pan_mode(&*snd, mode);
-		}
 	}
 	ma_pan_mode get_pan_mode() override {
 		return snd ? ma_sound_get_pan_mode(&*snd) : ma_pan_mode_balance;
 	}
 	void set_pitch(float pitch) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_pitch(&*snd, pitch);
-		}
 	}
 	float get_pitch() override {
 		return snd ? ma_sound_get_pitch(&*snd) : NAN;
 	}
 	void set_spatialization_enabled(bool enabled) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_spatialization_enabled(&*snd, enabled);
-		}
 	}
 	bool get_spatialization_enabled() override {
 		return snd ? ma_sound_is_spatialization_enabled(&*snd) : false;
 	}
 	void set_pinned_listener(unsigned int index) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_pinned_listener_index(&*snd, index);
-		}
 	}
 	unsigned int get_pinned_listener() override {
 		return snd ? ma_sound_get_pinned_listener_index(&*snd) : 0;
@@ -332,151 +327,131 @@ class mixer_impl : public audio_node_impl, public virtual mixer {
 		return res;
 	}
 	void set_attenuation_model(ma_attenuation_model model) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_attenuation_model(&*snd, model);
-		}
 	}
 	ma_attenuation_model get_attenuation_model() override {
 		return snd ? ma_sound_get_attenuation_model(&*snd) : ma_attenuation_model_none;
 	}
 	void set_positioning(ma_positioning positioning) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_positioning(&*snd, positioning);
-		}
 	}
 	ma_positioning get_positioning() override {
 		return snd ? ma_sound_get_positioning(&*snd) : ma_positioning_absolute;
 	}
 	void set_rolloff(float rolloff) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_rolloff(&*snd, rolloff);
-		}
 	}
 	float get_rolloff() override {
 		return snd ? ma_sound_get_rolloff(&*snd) : NAN;
 	}
 	void set_min_gain(float gain) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_min_gain(&*snd, gain);
-		}
 	}
 	float get_min_gain() override {
 		return snd ? ma_sound_get_min_gain(&*snd) : NAN;
 	}
 	void set_max_gain(float gain) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_max_gain(&*snd, gain);
-		}
 	}
 	float get_max_gain() override {
 		return snd ? ma_sound_get_max_gain(&*snd) : NAN;
 	}
 	void set_min_distance(float distance) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_min_distance(&*snd, distance);
-		}
 	}
 	float get_min_distance() override {
 		return snd ? ma_sound_get_min_distance(&*snd) : NAN;
 	}
 	void set_max_distance(float distance) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_max_distance(&*snd, distance);
-		}
 	}
 	float get_max_distance() override {
 		return snd ? ma_sound_get_max_distance(&*snd) : NAN;
 	}
 	void set_cone(float inner_radians, float outer_radians, float outer_gain) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_cone(&*snd, inner_radians, outer_radians, outer_gain);
-		}
 	}
 	void get_cone(float* inner_radians, float* outer_radians, float* outer_gain) override {
-		if (snd) {
+		if (snd)
 			ma_sound_get_cone(&*snd, inner_radians, outer_radians, outer_gain);
-		} else {
+		else {
 			if (inner_radians) *inner_radians = NAN;
 			if (outer_radians) *outer_radians = NAN;
 			if (outer_gain)	*outer_gain	= NAN;
 		}
 	}
 	void set_doppler_factor(float factor) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_doppler_factor(&*snd, factor);
-		}
 	}
 	float get_doppler_factor() override {
 		return snd ? ma_sound_get_doppler_factor(&*snd) : NAN;
 	}
 	void set_directional_attenuation_factor(float factor) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_directional_attenuation_factor(&*snd, factor);
-		}
 	}
 	float get_directional_attenuation_factor() override {
 		return snd ? ma_sound_get_directional_attenuation_factor(&*snd) : NAN;
 	}
 	void set_fade(float start_volume, float end_volume, unsigned long long length) override {
-		if (snd) {
-			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES) {
-				ma_sound_set_fade_in_pcm_frames(&*snd, start_volume, end_volume, length);
-			} else {
-				ma_sound_set_fade_in_milliseconds(&*snd, start_volume, end_volume, length);
-			}
-		}
+		if (snd)
+			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
+				set_fade_in_frames(start_volume, end_volume, length);
+			else
+				set_fade_in_milliseconds(start_volume, end_volume, length);
 	}
 	void set_fade_in_frames(float start_volume, float end_volume, unsigned long long frames) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_fade_in_pcm_frames(&*snd, start_volume, end_volume, frames);
-		}
 	}
 	void set_fade_in_milliseconds(float start_volume, float end_volume, unsigned long long milliseconds) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_fade_in_milliseconds(&*snd, start_volume, end_volume, milliseconds);
-		}
 	}
 	float get_current_fade_volume() override {
 		return snd ? ma_sound_get_current_fade_volume(&*snd) : NAN;
 	}
 	void set_start_time(unsigned long long absolute_time) override {
-		if (snd) {
+		if (snd)
 			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
-				ma_sound_set_start_time_in_pcm_frames(&*snd, absolute_time);
+				set_start_time_in_frames(absolute_time);
 			else
-				ma_sound_set_start_time_in_milliseconds(&*snd, absolute_time);
-		}
+				set_start_time_in_milliseconds(absolute_time);
 	}
 	void set_start_time_in_frames(unsigned long long absolute_time) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_start_time_in_pcm_frames(&*snd, absolute_time);
-		}
 	}
 	void set_start_time_in_milliseconds(unsigned long long absolute_time) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_start_time_in_milliseconds(&*snd, absolute_time);
-		}
 	}
 	void set_stop_time(unsigned long long absolute_time) override {
-		if (snd) {
+		if (snd)
 			if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
-				ma_sound_set_stop_time_in_pcm_frames(&*snd, absolute_time);
+				set_stop_time_in_frames(absolute_time);
 			else
-				ma_sound_set_stop_time_in_milliseconds(&*snd, absolute_time);
-		}
+				set_stop_time_in_milliseconds(absolute_time);
 	}
 	void set_stop_time_in_frames(unsigned long long absolute_time) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_stop_time_in_pcm_frames(&*snd, absolute_time);
-		}
 	}
 	void set_stop_time_in_milliseconds(unsigned long long absolute_time) override {
-		if (snd) {
+		if (snd)
 			ma_sound_set_stop_time_in_milliseconds(&*snd, absolute_time);
-		}
 	}
 	unsigned long long get_time() override {
-	return snd ? ((engine->flags & audio_engine::DURATIONS_IN_FRAMES) ? ma_sound_get_time_in_pcm_frames(&*snd) : ma_sound_get_time_in_milliseconds(&*snd)) : 0;
+	return snd ? ((engine->flags & audio_engine::DURATIONS_IN_FRAMES) ? get_time_in_frames() : get_time_in_milliseconds()) : 0;
 	}
 	unsigned long long get_time_in_frames() override {
 		return snd ? ma_sound_get_time_in_pcm_frames(&*snd) : 0;
@@ -690,8 +665,35 @@ void RegisterSoundsystem(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_ADDREF, "void f()", WRAP_MFN_PR(sound, duplicate, (), void), asCALL_GENERIC);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_RELEASE, "void f()", WRAP_MFN_PR(sound, release, (), void), asCALL_GENERIC);
 	engine->RegisterObjectMethod("sound", "bool load(const string&in filename)", WRAP_MFN(sound, load), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool play()", WRAP_MFN_PR(sound, play, (), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool seek(uint64 offset)", WRAP_MFN_PR(sound, seek, (unsigned long long), bool), asCALL_GENERIC);
+		engine->RegisterObjectMethod("sound", "bool load_memory(const string&in data)", WRAP_MFN_PR(sound, load_memory, (const string&), bool), asCALL_GENERIC);
+			engine->RegisterObjectMethod("sound", "bool close()", WRAP_MFN(sound, close), asCALL_GENERIC);
+				engine->RegisterObjectMethod("sound", "bool get_active() property", WRAP_MFN(sound, get_active), asCALL_GENERIC);
+					engine->RegisterObjectMethod("sound", "bool get_paused() property", WRAP_MFN(sound, get_paused), asCALL_GENERIC);
+						engine->RegisterObjectMethod("sound", "bool pause()", WRAP_MFN(sound, pause), asCALL_GENERIC);
+							engine->RegisterObjectMethod("sound", "bool pause_fade(const uint64 length)", WRAP_MFN(sound, pause_fade), asCALL_GENERIC);
+								engine->RegisterObjectMethod("sound", "bool pause_fade_in_frames(const uint64 frames)", WRAP_MFN(sound, pause_fade_in_frames), asCALL_GENERIC);
+									engine->RegisterObjectMethod("sound", "bool pause_fade_in_milliseconds(const uint64 milliseconds)", WRAP_MFN(sound, pause_fade_in_milliseconds), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "void set_timed_fade(const float start_volume, const float end_volume, const uint64 length, const uint64 absolute_time)", WRAP_MFN(sound, set_timed_fade), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "void set_timed_fade_in_frames(const float start_volume, const float end_volume, const uint64 length, const uint64 absolute_time)", WRAP_MFN(sound, set_timed_fade_in_frames), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "void set_timed_fade_in_milliseconds(const float start_volume, const float end_volume, const uint64 length, const uint64 absolute_time)", WRAP_MFN(sound, set_timed_fade_in_milliseconds), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade(const uint64 absolute_time, const uint64 fade_length)", WRAP_MFN(sound, set_stop_time_with_fade), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade_in_frames(const uint64 absolute_time, const uint64 fade_length)", WRAP_MFN(sound, set_stop_time_with_fade_in_frames), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade_in_milliseconds(const uint64 absolute_time, const uint64 fade_length)", WRAP_MFN(sound, set_stop_time_with_fade_in_milliseconds), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "void set_looping(const bool looping) property", WRAP_MFN(sound, set_looping), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "bool get_looping() property", WRAP_MFN(sound, get_looping), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "bool get_at_end() property", WRAP_MFN(sound, get_at_end), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "bool seek(const uint64 position)", WRAP_MFN(sound, seek), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "bool seek_in_frames(const uint64 position)", WRAP_MFN(sound, seek_in_frames), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "bool seek_in_milliseconds(const uint64 position)", WRAP_MFN(sound, seek_in_milliseconds), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "uint64 get_position() property", WRAP_MFN(sound, get_position), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "uint64 get_position_in_frames() property", WRAP_MFN(sound, get_position_in_frames), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "uint64 get_position_in_ms", WRAP_MFN(sound, get_position_in_milliseconds), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "uint64 get_length() property", WRAP_MFN(sound, get_length), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "uint64 get_length_in_frames() property", WRAP_MFN(sound, get_length_in_frames), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "uint64 get_length_in_ms() property", WRAP_MFN(sound, get_length_in_milliseconds), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "bool get_data_format(audio_format@ out format, uint32@ out channels, uint32@ out sample_rate)", WRAP_MFN(sound, get_data_format), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "bool play()", WRAP_MFN(sound, play), asCALL_GENERIC);
+										engine->RegisterObjectMethod("sound", "bool stop()", WRAP_MFN(sound, stop), asCALL_GENERIC);
 	engine->RegisterGlobalFunction("const string[]@ get_sound_input_devices() property", asFUNCTION(get_sound_input_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("const string[]@ get_sound_output_devices() property", asFUNCTION(get_sound_output_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);
