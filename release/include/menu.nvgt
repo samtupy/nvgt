@@ -24,6 +24,8 @@ class menu {
 	string wrap_sound; // Played when the menu wraps (only happens when bool wrap = true).
 	string open_sound; // Played when the void intro() function is called.
 	string close_sound; // Played when the user escapes out of the menu.
+	string sounds_prefix; // The value set here is prepended to any sound filenames that are loaded. A value could be sounds/, for example.
+	string sounds_suffix; // The value set here is appended to any sound filenames that are loaded. A value could be .ogg, for example.
 	menu_callback@ background_callback = null; // A function called every time the monitor() method of this class is called.
 	string background_callback_data;
 	bool wrap = false; // If the user moves beyond an edge of the menu, set this to true to jump them to the other edge, or false to play an edge sound and repeat the last item.
@@ -41,7 +43,7 @@ class menu {
 	// The following function resets the menu to it's default state. If reset_settings is true, the sounds which have been set and other such options are cleared.
 	void reset(bool reset_settings = false) {
 		if (reset_settings) {
-			intro_text = click_sound = select_sound = edge_sound = wrap_sound = open_sound = close_sound = "";
+			intro_text = click_sound = select_sound = edge_sound = wrap_sound = open_sound = close_sound = sounds_prefix = sound_suffix = "";
 			wrap = false;
 			automatic_intro = true;
 			wrap_delay = 10;
@@ -187,7 +189,7 @@ class menu {
 	bool play(const string&in soundpath) {
 		if (soundpath.empty()) return false;
 		sound s;
-		if (!s.load(soundpath, @pack_file != null? @pack_file : @sound_default_pack)) return false;
+		if (!s.load(sounds_prefix + soundpath + sounds_suffix, @pack_file != null? @pack_file : @sound_default_pack)) return false;
 		bool r = s.play();
 		// Clean sounds that have finished playing.
 		for (uint i = 0; i < playing_sounds.length(); i++) {
