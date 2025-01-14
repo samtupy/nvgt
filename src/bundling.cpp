@@ -155,7 +155,7 @@ public:
 		stubpath = format("%snvgt_%s%s.bin", stubpath.toString(), platform, (stub != "" ? string("_") + stub : ""));
 		outpath = config.getString("build.output_basename", Path(input_file).setExtension("").toString());
 		alter_output_path(outpath);
-		string precommand = config.getString("build.precommand_" + g_platform + "_"s + (g_debug? "debug" : "release"), config.getString("build.precommand" + g_platform, config.getString("build.precommand", "")));
+		string precommand = config.getString("build.precommand_" + g_platform + "_"s + (g_debug? "debug" : "release"), config.getString("build.precommand_" + g_platform, config.getString("build.precommand", "")));
 		if (!precommand.empty()) {
 			set_status("executing prebuild command...");
 			if (!user_command(precommand)) throw Exception("prebuild command failed");
@@ -183,7 +183,7 @@ public:
 		fs.close();
 		finalize_product(outpath);
 		output_file = outpath.toString();
-		string postcommand = config.getString("build.postcommand_" + g_platform + "_"s + (g_debug? "debug" : "release"), config.getString("build.postcommand" + g_platform, config.getString("build.postcommand", "")));
+		string postcommand = config.getString("build.postcommand_" + g_platform + "_"s + (g_debug? "debug" : "release"), config.getString("build.postcommand_" + g_platform, config.getString("build.postcommand", "")));
 		if (!postcommand.empty()) {
 			set_status("executing postbuild command...");
 			if (!user_command(postcommand)) throw Exception("postbuild command failed");
