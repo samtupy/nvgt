@@ -21,6 +21,7 @@
 #include "nvgt_angelscript.h" // get_array_type
 #include "sound.h"
 #include <atomic>
+#include <utility>
 #include <cstdint>
 
 using namespace std;
@@ -649,11 +650,35 @@ sound* new_global_sound() { init_sound(); return new sound_impl(g_audio_engine);
 int get_sound_output_device() { init_sound(); return g_audio_engine->get_device(); }
 bool set_sound_output_device(int device) { init_sound(); return g_audio_engine->set_device(device); }
 
+// Chat GPT generated the following template:
+template <class T, auto Function, typename ReturnType, typename... Args> ReturnType virtual_call(T* object, Args&&... args) {
+    return (object->*Function)(std::forward<Args>(args)...);
+}
+template <class T> void RegisterSoundsystemAudioNode(asIScriptEngine* engine, const string& type) {
+	engine->RegisterObjectType(type.c_str(), 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call<T, &T::duplicate, void>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call<T, &T::release, void>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_input_bus_count() const property", asFUNCTION((virtual_call<T, &T::get_input_bus_count, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_output_bus_count() const property", asFUNCTION((virtual_call<T, &T::get_output_bus_count, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_input_channels(uint bus) const", asFUNCTION((virtual_call<T, &T::get_input_channels, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_output_channels(uint bus) const", asFUNCTION((virtual_call<T, &T::get_output_channels, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool attach_output_bus(uint output_bus, audio_node@ destination, uint destination_input_bus)", asFUNCTION((virtual_call<T, &T::attach_output_bus, bool, unsigned int, audio_node*, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool detach_output_bus(uint bus)", asFUNCTION((virtual_call<T, &T::detach_output_bus, bool, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool detach_all_output_buses()", asFUNCTION((virtual_call<T, &T::detach_all_output_buses, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_output_bus_volume(uint bus, float volume)", asFUNCTION((virtual_call<T, &T::set_output_bus_volume, bool, unsigned int, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float get_output_bus_volume(uint bus)", asFUNCTION((virtual_call<T, &T::get_output_bus_volume, float, unsigned int>)), asCALL_CDECL_OBJFIRST);
+}
+template <class T> void RegisterSoundsystemMixer(asIScriptEngine* engine, const string& type) {
+	RegisterSoundsystemAudioNode<T>(engine, type);
+}
 void RegisterSoundsystem(asIScriptEngine* engine) {
-	engine->RegisterObjectType("sound", 0, asOBJ_REF);
+	engine->RegisterEnum("audio_node_state");
+	engine->RegisterEnumValue("audio_node_state", "AUDIO_NODE_STATE_STARTED", ma_node_state_started);
+	engine->RegisterEnumValue("audio_node_state", "AUDIO_NODE_STATE_STOPPED", ma_node_state_stopped);
+	engine->RegisterEnum("audio_format");
+	engine->RegisterEnumValue("audio_format", "AUDIO_FORMAT_UNKNOWN", ma_format_unknown);
+	RegisterSoundsystemMixer<sound>(engine, "sound");
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("sound", asBEHAVE_ADDREF, "void f()", WRAP_MFN_PR(mixer, duplicate, (), void), asCALL_GENERIC);
-	engine->RegisterObjectBehaviour("sound", asBEHAVE_RELEASE, "void f()", WRAP_MFN_PR(mixer, release, (), void), asCALL_GENERIC);
 	engine->RegisterObjectMethod("sound", "bool load(const string&in filename)", WRAP_MFN_PR(sound, load, (const string&), bool), asCALL_GENERIC);
 	engine->RegisterObjectMethod("sound", "bool load_memory(const string&in data)", WRAP_MFN_PR(sound, load_memory, (const string&), bool), asCALL_GENERIC);
 	engine->RegisterObjectMethod("sound", "bool close()", WRAP_MFN_PR(sound, close, (), bool), asCALL_GENERIC);
