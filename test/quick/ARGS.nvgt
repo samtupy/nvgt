@@ -3,5 +3,5 @@
 // License: zlib (see license.md in the root of the NVGT distribution)
 
 void main() {
-	alert("test", string(ARGS));
+	alert(COMMAND_LINE, string(ARGS));
 }
