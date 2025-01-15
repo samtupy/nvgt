@@ -43,7 +43,7 @@ class menu {
 	// The following function resets the menu to it's default state. If reset_settings is true, the sounds which have been set and other such options are cleared.
 	void reset(bool reset_settings = false) {
 		if (reset_settings) {
-			intro_text = click_sound = select_sound = edge_sound = wrap_sound = open_sound = close_sound = sounds_prefix = sound_suffix = "";
+			intro_text = click_sound = select_sound = edge_sound = wrap_sound = open_sound = close_sound = sounds_prefix = sounds_suffix = "";
 			wrap = false;
 			automatic_intro = true;
 			wrap_delay = 10;
