@@ -646,6 +646,7 @@ public:
 audio_engine* new_audio_engine() { return new audio_engine_impl(); }
 mixer* new_mixer(audio_engine* engine) { return new mixer_impl(engine); }
 sound* new_sound(audio_engine* engine) { return new sound_impl(engine); }
+mixer* new_global_mixer() { init_sound(); return new mixer_impl(g_audio_engine); }
 sound* new_global_sound() { init_sound(); return new sound_impl(g_audio_engine); }
 int get_sound_output_device() { init_sound(); return g_audio_engine->get_device(); }
 bool set_sound_output_device(int device) { init_sound(); return g_audio_engine->set_device(device); }
@@ -677,6 +678,16 @@ void RegisterSoundsystem(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("audio_node_state", "AUDIO_NODE_STATE_STOPPED", ma_node_state_stopped);
 	engine->RegisterEnum("audio_format");
 	engine->RegisterEnumValue("audio_format", "AUDIO_FORMAT_UNKNOWN", ma_format_unknown);
+	engine->RegisterEnumValue("audio_format", "AUDIO_FORMAT_U8", ma_format_u8);
+	engine->RegisterEnumValue("audio_format", "AUDIO_FORMAT_S16", ma_format_s16);
+	engine->RegisterEnumValue("audio_format", "AUDIO_FORMAT_S24", ma_format_s24);
+	engine->RegisterEnumValue("audio_format", "AUDIO_FORMAT_S32", ma_format_s32);
+	engine->RegisterEnumValue("audio_format", "AUDIO_FORMAT_F32", ma_format_f32);
+	engine->RegisterEnum("audio_engine_flags");
+	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_DURATIONS_IN_FRAMES", audio_engine::DURATIONS_IN_FRAMES);
+	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_AUTO_START", audio_engine::NO_AUTO_START);
+	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_DEVICE", audio_engine::NO_DEVICE);
+	RegisterSoundsystemAudioNode<audio_node>(engine, "audio_node");
 	RegisterSoundsystemMixer<sound>(engine, "sound");
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
 	engine->RegisterObjectMethod("sound", "bool load(const string&in filename)", WRAP_MFN_PR(sound, load, (const string&), bool), asCALL_GENERIC);
@@ -706,7 +717,7 @@ void RegisterSoundsystem(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("sound", "uint64 get_length() property", WRAP_MFN_PR(sound, get_length, (), unsigned long long), asCALL_GENERIC);
 	engine->RegisterObjectMethod("sound", "uint64 get_length_in_frames( ) const property", WRAP_MFN_PR(sound, get_length_in_frames, (), unsigned long long), asCALL_GENERIC);
 	engine->RegisterObjectMethod("sound", "uint64 get_length_in_ms() const property", WRAP_MFN_PR(sound, get_length_in_milliseconds, (), unsigned long long), asCALL_GENERIC);
-	//engine->RegisterObjectMethod("sound", "bool get_data_format(audio_format&out format, uint32&out channels, uint32&out sample_rate)", WRAP_MFN(sound, get_data_format), asCALL_GENERIC);
+	engine->RegisterObjectMethod("sound", "bool get_data_format(audio_format&out format, uint32&out channels, uint32&out sample_rate)", WRAP_MFN_PR(sound, get_data_format, (ma_format*, unsigned int*, unsigned int*), bool), asCALL_GENERIC);
 	engine->RegisterObjectMethod("sound", "bool play()", WRAP_MFN_PR(sound, play, (), bool), asCALL_GENERIC);
 	engine->RegisterObjectMethod("sound", "bool stop()", WRAP_MFN_PR(sound, stop, (), bool), asCALL_GENERIC);
 	engine->RegisterGlobalFunction("const string[]@ get_sound_input_devices() property", asFUNCTION(get_sound_input_devices), asCALL_CDECL);
