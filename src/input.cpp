@@ -104,7 +104,7 @@ void regained_window_focus() {
 	if (g_keyhook_active) install_keyhook();
 	#endif
 }
-string GetKeyName(unsigned int key) {
+std::string GetKeyName(unsigned int key) {
 	return SDL_GetKeyName(key);
 }
 bool KeyPressed(unsigned int key) {
