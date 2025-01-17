@@ -104,6 +104,9 @@ void regained_window_focus() {
 	if (g_keyhook_active) install_keyhook();
 	#endif
 }
+string GetKeyName(unsigned int key) {
+	return SDL_GetKeyName(key);
+}
 bool KeyPressed(unsigned int key) {
 	if (key > 511) return false;
 	bool r = g_KeysPressed[key] == 1;
@@ -468,6 +471,8 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnum(_O("joystick_bind_type"));
 	engine->RegisterEnum(_O("joystick_power_level"));
 	engine->RegisterEnum(_O("joystick_control_type"));
+	engine->RegisterGlobalFunction(_O("bool has_keyboard()"), asFUNCTION(SDL_HasKeyboard), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string get_key_name(uint)"), asFUNCTION(GetKeyName), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_pressed(uint)"), asFUNCTION(KeyPressed), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_repeating(uint)"), asFUNCTION(KeyRepeating), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_down(uint)"), asFUNCTION(key_down), asCALL_CDECL);
