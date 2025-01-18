@@ -2378,7 +2378,7 @@ class audio_form {
 			int current_form_focus = current_form.get_current_focus();
 			if (audioform_input_disable_ralt && current_form_focus > -1 and current_form_focus < current_form.get_control_count() and current_form.get_control_type(current_form_focus) == ct_input and !c_form[control_focus].read_only)
 				ralt = false;
-			if ((key_down(KEY_LALT) || ralt && key_down(KEY_RALT)) && (key_repeating(c_form[counter].hotkey))) {
+			if ((key_down(KEY_LALT) || ralt && key_down(KEY_RALT)) && (key_repeating(key_code(c_form[counter].hotkey)))) {
 				if (!for_subform)
 					focus(counter, true);
 				else
@@ -4138,7 +4138,7 @@ class search_for : utility_form {
 timer key_repeating_timer;
 int key_repeating_last_key_pressed;
 int key_repeating_status;
-bool key_repeating(int key, int repeat_delay, int prerepeat_delay) {
+bool key_repeating(key_code key, int repeat_delay, int prerepeat_delay) {
 	if (key_pressed(key)) {
 		key_repeating_status = 1;
 		key_repeating_last_key_pressed = key;
