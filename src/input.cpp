@@ -105,7 +105,7 @@ void regained_window_focus() {
 	#endif
 }
 std::string GetKeyName(unsigned int key) {
-	return SDL_GetKeyName(key);
+	return SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
 }
 bool KeyPressed(unsigned int key) {
 	if (key > 511) return false;
