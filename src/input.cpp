@@ -21,11 +21,17 @@
 #include <obfuscate.h>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include "nvgt_angelscript.h"
 #include "input.h"
 #include "misc_functions.h"
 #include "nvgt.h"
 
+/*
+ * @literary: Since SDL requires pointer to the key name stay till the program life span,
+ * following map variable makes this possible.
+*/
+static std::unordered_map<unsigned int, std::string> g_KeyNames;
 static unsigned char g_KeysPressed[512];
 static unsigned char g_KeysRepeating[512];
 static unsigned char g_KeysForced[512];
@@ -105,7 +111,13 @@ void regained_window_focus() {
 	#endif
 }
 std::string GetKeyName(unsigned int key) {
+	if (key > 511) return "";
 	return SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
+}
+bool SetKeyName(unsigned int key, const std::string name) {
+	if (key > 511) return false;
+	g_KeyNames[key] = name;
+	return SDL_SetScancodeName(static_cast<SDL_Scancode>(key), g_KeyNames[key].c_str());
 }
 bool KeyPressed(unsigned int key) {
 	if (key > 511) return false;
@@ -473,6 +485,7 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnum(_O("joystick_control_type"));
 	engine->RegisterGlobalFunction(_O("bool has_keyboard()"), asFUNCTION(SDL_HasKeyboard), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_key_name(key_code key)"), asFUNCTION(GetKeyName), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool set_key_name(key_code key, string name)"), asFUNCTION(SetKeyName), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_pressed(key_code key)"), asFUNCTION(KeyPressed), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_repeating(key_code key)"), asFUNCTION(KeyRepeating), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_down(key_code key)"), asFUNCTION(key_down), asCALL_CDECL);
