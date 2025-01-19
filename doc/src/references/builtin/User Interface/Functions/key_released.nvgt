@@ -1,8 +1,8 @@
 /**
 	Determine if a particular key was just released.
-	bool key_released(key_code key);
+	bool key_released(uint key);
 	## Arguments:
-		* key_code key: the key to check.
+		* uint key: the key to check.
 	## Returns:
 		bool: true if the key was just released, false otherwise.
 	## Remarks:
