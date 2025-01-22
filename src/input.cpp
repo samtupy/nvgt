@@ -483,7 +483,7 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnum(_O("joystick_bind_type"));
 	engine->RegisterEnum(_O("joystick_power_level"));
 	engine->RegisterEnum(_O("joystick_control_type"));
-	engine->RegisterGlobalFunction(_O("bool has_keyboard()"), asFUNCTION(SDL_HasKeyboard), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool get_KEYBOARD_AVAILABLE() property"), asFUNCTION(SDL_HasKeyboard), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_key_name(uint key)"), asFUNCTION(GetKeyName), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool set_key_name(uint key, string name)"), asFUNCTION(SetKeyName), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_pressed(uint)"), asFUNCTION(KeyPressed), asCALL_CDECL);
