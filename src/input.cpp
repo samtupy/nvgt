@@ -285,6 +285,14 @@ void mouse_update() {
 	g_MousePrevY = g_MouseAbsY;
 	g_MousePrevZ = g_MouseAbsZ;
 }
+void SetCursorVisible(bool state) {
+	if (state == true)
+		SDL_ShowCursor();
+	else
+		SDL_HideCursor();
+
+}
+
 
 /* unfinished joystick stuff - to be converted to SDL3
 int joystick_count(bool only_active = true) {
@@ -507,6 +515,8 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool mouse_up(uint8)"), asFUNCTION(mouse_up), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void mouse_update()"), asFUNCTION(mouse_update), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_MOUSE_AVAILABLE() property"), asFUNCTION(SDL_HasMouse), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool get_cursor_visible() property"), asFUNCTION(SDL_CursorVisible), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("set set_cursor_visible(bool state) property"), asFUNCTION(SetCursorVisible), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_characters()"), asFUNCTION(get_characters), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool install_keyhook(bool=true)"), asFUNCTION(install_keyhook), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void uninstall_keyhook()"), asFUNCTION(uninstall_keyhook), asCALL_CDECL);
