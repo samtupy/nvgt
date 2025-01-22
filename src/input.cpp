@@ -515,12 +515,12 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("uint total_keys_down()"), asFUNCTION(total_keys_down), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("key_code[]@ keys_released()"), asFUNCTION(keys_released), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("key_modifier get_keyboard_modifiers() property"), asFUNCTION(SDL_GetModState), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("void set_keyboard_modifiers(key_modifier) property"), asFUNCTION(SDL_SetModState), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void set_keyboard_modifiers(key_modifier modifier) property"), asFUNCTION(SDL_SetModState), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void reset_keyboard()"), asFUNCTION(SDL_ResetKeyboard), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool mouse_pressed(uint8)"), asFUNCTION(MousePressed), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool mouse_down(uint8)"), asFUNCTION(mouse_down), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool mouse_released(uint8)"), asFUNCTION(MouseReleased), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool mouse_up(uint8)"), asFUNCTION(mouse_up), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool mouse_pressed(uint8 button)"), asFUNCTION(MousePressed), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool mouse_down(uint8 button)"), asFUNCTION(mouse_down), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool mouse_released(uint8 button)"), asFUNCTION(MouseReleased), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool mouse_up(uint8 button)"), asFUNCTION(mouse_up), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void mouse_update()"), asFUNCTION(mouse_update), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_MOUSE_AVAILABLE() property"), asFUNCTION(SDL_HasMouse), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_mouse_grab() property"), asFUNCTION(GetMouseGrab), asCALL_CDECL);
