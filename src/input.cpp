@@ -26,6 +26,7 @@
 #include "input.h"
 #include "misc_functions.h"
 #include "nvgt.h"
+#include "UI.h"
 
 /*
  * @literary: Since SDL requires pointer to the key name stay till the program life span,
@@ -292,6 +293,13 @@ void SetCursorVisible(bool state) {
 		SDL_HideCursor();
 
 }
+bool GetMouseGrab() {
+	return SDL_GetWindowMouseGrab(g_WindowHandle);
+}
+void SetMouseGrab(bool grabbed) {
+	SDL_SetWindowMouseGrab(g_WindowHandle, grabbed);
+}
+
 
 
 /* unfinished joystick stuff - to be converted to SDL3
@@ -515,6 +523,8 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool mouse_up(uint8)"), asFUNCTION(mouse_up), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void mouse_update()"), asFUNCTION(mouse_update), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_MOUSE_AVAILABLE() property"), asFUNCTION(SDL_HasMouse), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool get_mouse_grab() property"), asFUNCTION(GetMouseGrab), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void set_mouse_grab(bool grabbed) property"), asFUNCTION(SetMouseGrab), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_cursor_visible() property"), asFUNCTION(SDL_CursorVisible), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void set_cursor_visible(bool state) property"), asFUNCTION(SetCursorVisible), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_characters()"), asFUNCTION(get_characters), asCALL_CDECL);
