@@ -111,6 +111,9 @@ void regained_window_focus() {
 	if (g_keyhook_active) install_keyhook();
 	#endif
 }
+bool ScreenKeyboardShown() {
+	return SDL_ScreenKeyboardShown(g_WindowHandle);
+}
 std::string GetKeyName(unsigned int key) {
 	if (key > 511) return "";
 	return SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
@@ -527,6 +530,7 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("void set_mouse_grab(bool grabbed) property"), asFUNCTION(SetMouseGrab), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_cursor_visible() property"), asFUNCTION(SDL_CursorVisible), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void set_cursor_visible(bool state) property"), asFUNCTION(SetCursorVisible), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool get_SCREEN_KEYBOARD_SUPPORTED() property"), asFUNCTION(SDL_HasScreenKeyboardSupport), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_characters()"), asFUNCTION(get_characters), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool install_keyhook(bool=true)"), asFUNCTION(install_keyhook), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void uninstall_keyhook()"), asFUNCTION(uninstall_keyhook), asCALL_CDECL);
