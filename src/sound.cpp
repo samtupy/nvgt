@@ -157,7 +157,6 @@ public:
 		ma_device* old_dev = ma_engine_get_device(&*engine);
 		if (!old_dev || memcmp(&old_dev->playback.id, &g_sound_output_devices[device].id, sizeof(ma_device_id)) == 0) return false;
 		ma_engine_stop(&*engine);
-		ma_device_data_proc proc = old_dev->onData;
 		ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
 		cfg.playback.pDeviceID = &g_sound_output_devices[device].id;
 		cfg.playback.channels = old_dev->playback.channels;
@@ -166,10 +165,12 @@ public:
 		cfg.noClip = old_dev->noClip;
 		cfg.noDisableDenormals = old_dev->noDisableDenormals;
 		cfg.noFixedSizedCallback = old_dev->noFixedSizedCallback;
+		cfg.notificationCallback = old_dev->onNotification;
 		cfg.dataCallback = old_dev->onData;
-		cfg.pUserData = &*engine;
+		cfg.pUserData = old_dev->pUserData;
+		ma_device_stop(old_dev);
 		ma_device_uninit(old_dev);
-		ma_device_init(&g_sound_context, &cfg, old_dev);
+		if ((g_soundsystem_last_error = ma_device_init(nullptr, &cfg, old_dev)) != MA_SUCCESS) return false;
 		return (g_soundsystem_last_error = ma_engine_start(&*engine)) == MA_SUCCESS;
 	}
 	bool read(void* buffer, unsigned long long frame_count, unsigned long long* frames_read) override { return engine ? (g_soundsystem_last_error = ma_engine_read_pcm_frames(&*engine, buffer, frame_count, frames_read)) == MA_SUCCESS : false; }
@@ -236,7 +237,7 @@ public:
 	mixer_impl(audio_engine* engine) : mixer(), audio_node_impl(), engine(static_cast<audio_engine_impl*>(engine)), snd(nullptr) {}
 	inline void duplicate() override { audio_node_impl::duplicate(); }
 	inline void release() override { audio_node_impl::release(); }
-	bool play() override { return snd ? ma_sound_start(&*snd) : false; }
+	bool play() override { return snd ? ma_sound_start(&*snd) == MA_SUCCESS : false; }
 	ma_sound* get_ma_sound() override { return &*snd; }
 	audio_engine* get_engine() override {
 		return engine;
@@ -461,7 +462,7 @@ public:
 		return snd ? ma_sound_is_playing(&*snd) : false;
 	}
 };
-class sound_impl final : public mixer_impl, public sound {
+class sound_impl final : public mixer_impl, public virtual sound {
 public:
 	sound_impl(audio_engine* e) : mixer_impl(static_cast<audio_engine_impl*>(e)), sound() {
 		snd = nullptr;
@@ -651,8 +652,7 @@ sound* new_global_sound() { init_sound(); return new sound_impl(g_audio_engine);
 int get_sound_output_device() { init_sound(); return g_audio_engine->get_device(); }
 bool set_sound_output_device(int device) { init_sound(); return g_audio_engine->set_device(device); }
 
-// Chat GPT generated the following template:
-template <class T, auto Function, typename ReturnType, typename... Args> ReturnType virtual_call(T* object, Args&&... args) {
+template <class T, auto Function, typename ReturnType, typename... Args> ReturnType virtual_call(T* object, Args... args) {
     return (object->*Function)(std::forward<Args>(args)...);
 }
 template <class T> void RegisterSoundsystemAudioNode(asIScriptEngine* engine, const string& type) {
@@ -703,6 +703,7 @@ void RegisterSoundsystem(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_DURATIONS_IN_FRAMES", audio_engine::DURATIONS_IN_FRAMES);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_AUTO_START", audio_engine::NO_AUTO_START);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_DEVICE", audio_engine::NO_DEVICE);
+	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_PERCENTAGE_ATTRIBUTES", audio_engine::PERCENTAGE_ATTRIBUTES);
 	RegisterSoundsystemAudioNode<audio_node>(engine, "audio_node");
 	RegisterSoundsystemMixer<sound>(engine, "sound");
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);

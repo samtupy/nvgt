@@ -55,7 +55,8 @@ public:
 	enum engine_flags {
 		DURATIONS_IN_FRAMES = 1, // If set, all durations possible will expect a value in PCM frames rather than milliseconds.
 		NO_AUTO_START = 2, // if set, audio_engine::start must be called after initialization.
-		NO_DEVICE = 4 // If set, audio_engine::read() must be used to receive raw audio samples from the engine instead.
+		NO_DEVICE = 4, // If set, audio_engine::read() must be used to receive raw audio samples from the engine instead.
+		PERCENTAGE_ATTRIBUTES = 8 // If this is set, attributes for sounds will be in percentages such as 100 instead of decimals such as 1.0, ecentially a multiplication by 100 for backwards compatibility or preference.
 	};
 	virtual void duplicate() = 0; // reference counting
 	virtual void release() = 0;

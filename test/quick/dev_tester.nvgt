@@ -10,6 +10,10 @@ void main() {
 	uint c = 0;
 	sound ding;
 	ding.load("C:\\windows\\media\\ding.wav");
+	ding.pitch = 2;
+	alert("test", ding.pitch);
+	ding.pan=-1;
+	ding.gain = 10;
 	while (!key_pressed(KEY_ESCAPE)) {
 		wait(5);
 		if (key_pressed(KEY_UP)) {
@@ -25,7 +29,7 @@ void main() {
 		if (key_pressed(KEY_RETURN)) {
 			ding.seek(0);
 			sound_output_device = c;
-			ding.play();
+			screen_reader_speak(ding.play());
 		}
 	}
 }

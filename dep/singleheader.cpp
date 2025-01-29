@@ -35,3 +35,5 @@
 #include "speech.h"
 #define THREAD_IMPLEMENTATION
 #include "thread.h"
+#define MINIAUDIO_IMPLEMENTATION
+#include "miniaudio.h"
