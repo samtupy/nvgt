@@ -114,6 +114,10 @@ void regained_window_focus() {
 bool ScreenKeyboardShown() {
 	return SDL_ScreenKeyboardShown(g_WindowHandle);
 }
+unsigned int GetKeyCode(const std::string name) {
+	if (name.empty()) return 0;
+	return SDL_GetScancodeFromName(name.c_str());
+}
 std::string GetKeyName(unsigned int key) {
 	if (key > 511) return "";
 	return SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
@@ -503,6 +507,7 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnum(_O("joystick_power_level"));
 	engine->RegisterEnum(_O("joystick_control_type"));
 	engine->RegisterGlobalFunction(_O("bool get_KEYBOARD_AVAILABLE() property"), asFUNCTION(SDL_HasKeyboard), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint get_key_code(string name)"), asFUNCTION(GetKeyCode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_key_name(uint key)"), asFUNCTION(GetKeyName), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool set_key_name(uint key, string name)"), asFUNCTION(SetKeyName), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_pressed(uint key)"), asFUNCTION(KeyPressed), asCALL_CDECL);
@@ -530,6 +535,7 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("void set_mouse_grab(bool grabbed) property"), asFUNCTION(SetMouseGrab), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_cursor_visible() property"), asFUNCTION(SDL_CursorVisible), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void set_cursor_visible(bool state) property"), asFUNCTION(SetCursorVisible), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool is_screen_keyboard_shown()"), asFUNCTION(ScreenKeyboardShown), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_SCREEN_KEYBOARD_SUPPORTED() property"), asFUNCTION(SDL_HasScreenKeyboardSupport), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_characters()"), asFUNCTION(get_characters), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool install_keyhook(bool=true)"), asFUNCTION(install_keyhook), asCALL_CDECL);
