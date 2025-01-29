@@ -529,8 +529,36 @@ template<typename T> poco_shared<Dynamic::Var>* poco_var_factory_value_shared(po
 poco_json_object* poco_json_object_factory() {
 	return new poco_json_object(new JSON::Object());
 }
+poco_json_object* poco_json_object_list_factory(asBYTE* buffer) {
+	poco_json_object* r = new poco_json_object(new JSON::Object());
+	asUINT length = *(asUINT*)buffer;
+	buffer += 4;
+	while (length--) {
+		if (asPWORD(buffer) & 0x3)
+			buffer += 4 - (asPWORD(buffer) & 0x3);
+		std::string name = *(std::string*) buffer;
+		buffer += sizeof(std::string);
+		poco_shared<Dynamic::Var>* value = *(poco_shared<Dynamic::Var>**) buffer;
+		buffer += sizeof(void*);
+		r->set(name, value);
+	}
+	return r;
+}
 poco_json_array* poco_json_array_factory() {
 	return new poco_json_array(new JSON::Array());
+}
+poco_json_array* poco_json_array_list_factory(asBYTE* buffer) {
+	poco_json_array* r = new poco_json_array(new JSON::Array());
+	asUINT length = *(asUINT*)buffer;
+	buffer += 4;
+	while (length--) {
+		if (asPWORD(buffer) & 0x3)
+			buffer += 4 - (asPWORD(buffer) & 0x3);
+		poco_shared<Dynamic::Var>* value = *(poco_shared<Dynamic::Var>**) buffer;
+		buffer += sizeof(void*);
+		r->add(value);
+	}
+	return r;
 }
 // value constructors and destructors
 template <class T, typename... A> void poco_value_construct(T* mem, A... args) { new (mem) T(args...); }
@@ -603,6 +631,7 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("var", "var& opAssign(const json_array&in) const", asFUNCTION(poco_var_assign_shared<JSON::Array>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("var", "json_array@ opImplCast() const", asFUNCTION(poco_var_extract_shared<JSON::Array>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("json_object", asBEHAVE_FACTORY, "json_object @o()", asFUNCTION(poco_json_object_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("json_object", asBEHAVE_LIST_FACTORY, "json_object@ f(int&in) {repeat {string, var@}}", asFUNCTION(poco_json_object_list_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("json_object", asBEHAVE_ADDREF, "void f()", asMETHOD(poco_json_object, duplicate), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("json_object", asBEHAVE_RELEASE, "void f()", asMETHOD(poco_json_object, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_object", "var@ get_opIndex(const string&in) const property", asMETHOD(poco_json_object, get), asCALL_THISCALL);
@@ -624,6 +653,7 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("json_object", "bool is_object(const string&in) const", asMETHOD(poco_json_object, is_object), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_object", "string[]@ get_keys() const", asMETHOD(poco_json_object, get_keys), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("json_array", asBEHAVE_FACTORY, "json_array @a()", asFUNCTION(poco_json_array_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("json_array", asBEHAVE_LIST_FACTORY, "json_array@ f(int&in) {repeat var@}", asFUNCTION(poco_json_array_list_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("json_array", asBEHAVE_ADDREF, "void f()", asMETHOD(poco_json_array, duplicate), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("json_array", asBEHAVE_RELEASE, "void f()", asMETHOD(poco_json_array, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "var@ get_opIndex(uint) property", asMETHOD(poco_json_array, get), asCALL_THISCALL);
