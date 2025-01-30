@@ -55,7 +55,7 @@ static HHOOK g_keyhook_hHook = nullptr;
 bool g_keyhook_active = false;
 #endif
 // Wrapper function for sdl
-// GetDevices function useful for getting keyboard, mice and touch devices.
+//  This function is useful for getting keyboard, mice and touch devices.
 // Pass the callback with the signature `unsigned int*(int*)`
 CScriptArray* GetDevices(std::function<uint32_t*(int*)> callback) {
 	asITypeInfo* array_type = get_array_type("uint[]");
@@ -140,7 +140,9 @@ unsigned int GetKeyCode(const std::string name) {
 }
 std::string GetKeyName(unsigned int key) {
 	if (key > 511) return "";
-	return SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
+	const char* result = SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
+	if (!result) return "";
+	return result;
 }
 bool SetKeyName(unsigned int key, const std::string name) {
 	if (key > 511 || name.empty()) return false;
@@ -325,6 +327,22 @@ bool GetMouseGrab() {
 }
 void SetMouseGrab(bool grabbed) {
 	SDL_SetWindowMouseGrab(g_WindowHandle, grabbed);
+}
+CScriptArray* GetKeyboards() {
+	return GetDevices(SDL_GetKeyboards);
+}
+std::string GetKeyboardName(unsigned int id) {
+	const char* result = SDL_GetKeyboardNameForID((SDL_KeyboardID)id);
+	if (!result) return "";
+	return result;
+}
+CScriptArray* GetMice() {
+	return GetDevices(SDL_GetMice);
+}
+std::string GetMouseName(unsigned int id) {
+	const char* result = SDL_GetMouseNameForID((SDL_MouseID)id);
+	if (!result) return "";
+	return result;
 }
 
 
@@ -560,6 +578,10 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("string get_characters()"), asFUNCTION(get_characters), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool install_keyhook(bool=true)"), asFUNCTION(install_keyhook), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void uninstall_keyhook()"), asFUNCTION(uninstall_keyhook), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint[]@ get_keyboards()"), asFUNCTION(GetKeyboards), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string get_keyboard_name(uint id)"), asFUNCTION(GetKeyboardName), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint[]@ get_mice()"), asFUNCTION(GetMice), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string get_mouse_name(uint id)"), asFUNCTION(GetMouseName), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64[]@ get_touch_devices()"), asFUNCTION(get_touch_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_touch_device_name(uint64 device_id)"), asFUNCTION(get_touch_device_name), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("touch_device_type get_touch_device_type(uint64 device_id)"), asFUNCTION(get_touch_device_type), asCALL_CDECL);
