@@ -22,6 +22,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <functional>
 #include "nvgt_angelscript.h"
 #include "input.h"
 #include "misc_functions.h"
@@ -53,6 +54,25 @@ static asITypeInfo* joystick_mapping_array_type = nullptr;
 static HHOOK g_keyhook_hHook = nullptr;
 bool g_keyhook_active = false;
 #endif
+// Wrapper function for sdl
+// GetDevices function useful for getting keyboard, mice and touch devices.
+// Pass the callback with the signature `unsigned int*(int*)`
+CScriptArray* GetDevices(std::function<uint32_t*(int*)> callback) {
+	asITypeInfo* array_type = get_array_type("uint[]");
+	if (!array_type) return nullptr;
+	int device_count = 0;
+	uint32_t* devices = callback(&device_count);
+	if (!devices) return nullptr;
+	CScriptArray* array = CScriptArray::Create(array_type);
+	if (!array) {
+		SDL_free(devices);
+		return nullptr;
+	}
+	array->Reserve(device_count);
+	for (int i = 0; i < device_count; i++) array->InsertLast(devices + i);
+	SDL_free(devices);
+	return array;
+}
 void InputInit() {
 	if (SDL_WasInit(0)&SDL_INIT_VIDEO) return;
 	memset(g_KeysPressed, 0, 512);
