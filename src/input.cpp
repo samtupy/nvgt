@@ -135,7 +135,7 @@ bool ScreenKeyboardShown() {
 	return SDL_ScreenKeyboardShown(g_WindowHandle);
 }
 unsigned int GetKeyCode(const std::string name) {
-	if (name.empty()) return 0;
+	if (name.empty()) return SDLK_UNKNOWN;
 	return SDL_GetScancodeFromName(name.c_str());
 }
 std::string GetKeyName(unsigned int key) {
@@ -143,7 +143,7 @@ std::string GetKeyName(unsigned int key) {
 	return SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
 }
 bool SetKeyName(unsigned int key, const std::string name) {
-	if (key > 511) return false;
+	if (key > 511 || name.empty()) return false;
 	g_KeyNames[key] = name;
 	return SDL_SetScancodeName(static_cast<SDL_Scancode>(key), g_KeyNames[key].c_str());
 }
