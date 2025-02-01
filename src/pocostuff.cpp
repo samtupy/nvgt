@@ -340,12 +340,21 @@ poco_shared<Dynamic::Var>* json_parse_datastream(datastream* input) {
 }
 // We make a custom json_object class for a couple reasons, mostly so that we can build in poco's json querying as well as other more easily wrapped functions. We'll do very similar for arrays below, I'm not even remotely good enough at this c++ templating thing to avoid this duplicated code and I don't want to meld it all into one class.
 poco_json_object::poco_json_object(JSON::Object::Ptr o) : poco_shared<JSON::Object>(std::move(o)) {}
-poco_shared<Dynamic::Var>* poco_json_object::get(const std::string& key) const {
-	return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(key)))); // Oof, more duplication that I like probably?
+poco_json_object::poco_json_object(poco_json_object* other) : poco_shared<Poco::JSON::Object>(new Poco::JSON::Object(*other->ptr)) {}
+poco_json_object& poco_json_object::operator=(poco_json_object* other) {
+	(*ptr) = *other->ptr;
+	return *this;
 }
-poco_shared<Dynamic::Var>* poco_json_object::query(const std::string& path) const {
+poco_shared<Dynamic::Var>* poco_json_object::get(const std::string& key, poco_shared<Dynamic::Var>* default_value) const {
+	return ptr->has(key)? new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(key)))) : default_value; // Oof, more duplication than I like probably?
+}
+poco_shared<Dynamic::Var>* poco_json_object::get_indexed(const std::string& key) const {
+	return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(key)))); // Oof, more duplication than I like probably?
+}
+poco_shared<Dynamic::Var>* poco_json_object::query(const std::string& path, poco_shared<Dynamic::Var>* default_value) const {
 	JSON::Query q(shared); // I tried to cache the query object in the class variable above, and spent an hour or 2 figuring out that this causes a memory access violation in Poco::Dynamic::Var::Var.
-	return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(q.find(path))));
+	Dynamic::Var result = q.find(path);
+	return !result.isEmpty()? new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(result))) : default_value;
 }
 poco_json_array* poco_json_object::get_array(const std::string& key) const {
 	JSON::Array::Ptr obj = ptr->getArray(key);
@@ -389,6 +398,11 @@ CScriptArray* poco_json_object::get_keys() const {
 }
 
 poco_json_array::poco_json_array(JSON::Array::Ptr a) : poco_shared<JSON::Array>(std::move(a)) {}
+poco_json_array::poco_json_array(poco_json_array* other) : poco_shared<Poco::JSON::Array>(new Poco::JSON::Array(*other->ptr)) {}
+poco_json_array& poco_json_array::operator=(poco_json_array* other) {
+	(*ptr) = *other->ptr;
+	return *this;
+}
 poco_shared<Dynamic::Var>* poco_json_array::get(unsigned int index) const {
 	return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(index))));
 }
@@ -529,6 +543,9 @@ template<typename T> poco_shared<Dynamic::Var>* poco_var_factory_value_shared(po
 poco_json_object* poco_json_object_factory() {
 	return new poco_json_object(new JSON::Object());
 }
+poco_json_object* poco_json_object_copy_factory(poco_json_object* other) {
+	return new poco_json_object(other);
+}
 poco_json_object* poco_json_object_list_factory(asBYTE* buffer) {
 	poco_json_object* r = new poco_json_object(new JSON::Object());
 	asUINT length = *(asUINT*)buffer;
@@ -546,6 +563,9 @@ poco_json_object* poco_json_object_list_factory(asBYTE* buffer) {
 }
 poco_json_array* poco_json_array_factory() {
 	return new poco_json_array(new JSON::Array());
+}
+poco_json_array* poco_json_array_copy_factory(poco_json_array* other) {
+	return new poco_json_array(other);
 }
 poco_json_array* poco_json_array_list_factory(asBYTE* buffer) {
 	poco_json_array* r = new poco_json_array(new JSON::Array());
@@ -631,74 +651,79 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("var", "var& opAssign(const json_array&in) const", asFUNCTION(poco_var_assign_shared<JSON::Array>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("var", "json_array@ opImplCast() const", asFUNCTION(poco_var_extract_shared<JSON::Array>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("json_object", asBEHAVE_FACTORY, "json_object @o()", asFUNCTION(poco_json_object_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("json_object", asBEHAVE_FACTORY, "json_object @o(json_object@ other)", asFUNCTION(poco_json_object_copy_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("json_object", asBEHAVE_LIST_FACTORY, "json_object@ f(int&in) {repeat {string, var@}}", asFUNCTION(poco_json_object_list_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("json_object", asBEHAVE_ADDREF, "void f()", asMETHOD(poco_json_object, duplicate), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("json_object", asBEHAVE_RELEASE, "void f()", asMETHOD(poco_json_object, release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_object", "var@ get_opIndex(const string&in) const property", asMETHOD(poco_json_object, get), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_object", "void set_opIndex(const string&in, const var&in) property", asMETHOD(poco_json_object, set), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_object", "void set(const string&in, const var&in)", asMETHOD(poco_json_object, set), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_object", "var@ opCall(const string&in) const", asMETHOD(poco_json_object, query), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_object", "json_array@ get_array(const string&in) const", asMETHOD(poco_json_object, get_array), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_object", "json_object@ get_object(const string&in) const", asMETHOD(poco_json_object, get_object), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "json_object& opAssign(json_object@ other)", asMETHODPR(poco_json_object, operator=, (poco_json_object*), poco_json_object&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "var@ get_opIndex(const string&in key) const property", asMETHOD(poco_json_object, get_indexed), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "void set_opIndex(const string&in key, const var&in value) property", asMETHOD(poco_json_object, set), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "void set(const string&in key, const var&in value)", asMETHOD(poco_json_object, set), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "var@ get(const string&in key, var@ default_value = null) const", asMETHOD(poco_json_object, get), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "var@ opCall(const string&in path, var@ default_value = null) const", asMETHOD(poco_json_object, query), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "json_array@ get_array(const string&in key) const", asMETHOD(poco_json_object, get_array), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "json_object@ get_object(const string&in key) const", asMETHOD(poco_json_object, get_object), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_object", "string stringify(uint indent = 0, int step = -1) const", asMETHODPR(poco_json_object, stringify, (unsigned int, int) const, std::string), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_object", "void stringify(datastream@, uint indent = 0, int step = -1) const", asMETHODPR(poco_json_object, stringify, (datastream*, unsigned int, int) const, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "void stringify(datastream@ stream, uint indent = 0, int step = -1) const", asMETHODPR(poco_json_object, stringify, (datastream*, unsigned int, int) const, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_object", "uint size() const", asMETHOD(JSON::Object, size), asCALL_THISCALL, 0, asOFFSET(poco_json_object, ptr), true);
 	engine->RegisterObjectMethod("json_object", "bool get_escape_unicode() const property", asMETHOD(JSON::Object, getEscapeUnicode), asCALL_THISCALL, 0, asOFFSET(poco_json_object, ptr), true);
-	engine->RegisterObjectMethod("json_object", "void set_escape_unicode(bool) property", asMETHOD(JSON::Object, setEscapeUnicode), asCALL_THISCALL, 0, asOFFSET(poco_json_object, ptr), true);
+	engine->RegisterObjectMethod("json_object", "void set_escape_unicode(bool value) property", asMETHOD(JSON::Object, setEscapeUnicode), asCALL_THISCALL, 0, asOFFSET(poco_json_object, ptr), true);
 	engine->RegisterObjectMethod("json_object", "void clear()", asMETHOD(JSON::Object, clear), asCALL_THISCALL, 0, asOFFSET(poco_json_object, ptr), true);
-	engine->RegisterObjectMethod("json_object", "void remove(const string&in)", asMETHOD(JSON::Object, remove), asCALL_THISCALL, 0, asOFFSET(poco_json_object, ptr), true);
-	engine->RegisterObjectMethod("json_object", "bool exists(const string&in) const", asMETHOD(JSON::Object, has), asCALL_THISCALL, 0, asOFFSET(poco_json_object, ptr), true);
-	engine->RegisterObjectMethod("json_object", "bool is_array(const string&in) const", asMETHOD(poco_json_object, is_array), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_object", "bool is_null(const string&in) const", asMETHOD(poco_json_object, is_null), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_object", "bool is_object(const string&in) const", asMETHOD(poco_json_object, is_object), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "void remove(const string&in key)", asMETHOD(JSON::Object, remove), asCALL_THISCALL, 0, asOFFSET(poco_json_object, ptr), true);
+	engine->RegisterObjectMethod("json_object", "bool exists(const string&in key) const", asMETHOD(JSON::Object, has), asCALL_THISCALL, 0, asOFFSET(poco_json_object, ptr), true);
+	engine->RegisterObjectMethod("json_object", "bool is_array(const string&in key) const", asMETHOD(poco_json_object, is_array), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "bool is_null(const string&in key) const", asMETHOD(poco_json_object, is_null), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_object", "bool is_object(const string&in key) const", asMETHOD(poco_json_object, is_object), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_object", "string[]@ get_keys() const", asMETHOD(poco_json_object, get_keys), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("json_array", asBEHAVE_FACTORY, "json_array @a()", asFUNCTION(poco_json_array_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("json_array", asBEHAVE_FACTORY, "json_array @a(json_array@ other)", asFUNCTION(poco_json_array_copy_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("json_array", asBEHAVE_LIST_FACTORY, "json_array@ f(int&in) {repeat var@}", asFUNCTION(poco_json_array_list_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("json_array", asBEHAVE_ADDREF, "void f()", asMETHOD(poco_json_array, duplicate), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("json_array", asBEHAVE_RELEASE, "void f()", asMETHOD(poco_json_array, release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_array", "var@ get_opIndex(uint) property", asMETHOD(poco_json_array, get), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_array", "void set_opIndex(uint, const var&in) property", asMETHOD(poco_json_array, set), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_array", "void add(var@)", asMETHOD(poco_json_array, add), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_array", "var@ opCall(const string&in) const", asMETHOD(poco_json_array, query), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_array", "json_array@ get_array(uint) const", asMETHOD(poco_json_array, get_array), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_array", "json_object@ get_object(uint) const", asMETHOD(poco_json_array, get_object), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "json_array& opAssign(json_array@ other)", asMETHODPR(poco_json_array, operator=, (poco_json_array*), poco_json_array&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "var@ get_opIndex(uint index) property", asMETHOD(poco_json_array, get), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "void set_opIndex(uint index, const var&in value) property", asMETHOD(poco_json_array, set), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "void add(var@ value)", asMETHOD(poco_json_array, add), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "var@ opCall(const string&in path) const", asMETHOD(poco_json_array, query), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "json_array@ get_array(uint index) const", asMETHOD(poco_json_array, get_array), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "json_object@ get_object(uint index) const", asMETHOD(poco_json_array, get_object), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "string stringify(uint indent = 0, int step = -1)", asMETHODPR(poco_json_array, stringify, (unsigned int, int) const, std::string), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_array", "void stringify(datastream@, uint indent = 0, int step = -1)", asMETHODPR(poco_json_array, stringify, (datastream*, unsigned int, int) const, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "void stringify(datastream@ stream, uint indent = 0, int step = -1)", asMETHODPR(poco_json_array, stringify, (datastream*, unsigned int, int) const, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "uint length()", asMETHOD(JSON::Array, size), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
 	engine->RegisterObjectMethod("json_array", "uint size()", asMETHOD(JSON::Array, size), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
 	engine->RegisterObjectMethod("json_array", "bool get_escape_unicode() property", asMETHOD(JSON::Array, getEscapeUnicode), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
-	engine->RegisterObjectMethod("json_array", "void set_escape_unicode(bool) property", asMETHOD(JSON::Array, setEscapeUnicode), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
+	engine->RegisterObjectMethod("json_array", "void set_escape_unicode(bool value) property", asMETHOD(JSON::Array, setEscapeUnicode), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
 	engine->RegisterObjectMethod("json_array", "bool get_empty() property", asMETHOD(JSON::Array, empty), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
 	engine->RegisterObjectMethod("json_array", "void clear()", asMETHOD(JSON::Array, clear), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
-	engine->RegisterObjectMethod("json_array", "void remove(uint)", asMETHOD(JSON::Array, remove), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
-	engine->RegisterObjectMethod("json_array", "bool is_array(uint)", asMETHOD(poco_json_array, is_array), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_array", "bool is_null(uint)", asMETHOD(poco_json_array, is_null), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_array", "bool is_object(uint)", asMETHOD(poco_json_array, is_object), asCALL_THISCALL);
-	engine->RegisterGlobalFunction("var@ parse_json(const string&in)", asFUNCTION(json_parse), asCALL_CDECL);
-	engine->RegisterGlobalFunction("var@ parse_json(datastream@)", asFUNCTION(json_parse_datastream), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_to_hex(const string& in)"), asFUNCTION(string_to_hex), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string hex_to_string(const string& in)"), asFUNCTION(hex_to_string), asCALL_CDECL);
+	engine->RegisterObjectMethod("json_array", "void remove(uint index)", asMETHOD(JSON::Array, remove), asCALL_THISCALL, 0, asOFFSET(poco_json_array, ptr), true);
+	engine->RegisterObjectMethod("json_array", "bool is_array(uint index)", asMETHOD(poco_json_array, is_array), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "bool is_null(uint index)", asMETHOD(poco_json_array, is_null), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "bool is_object(uint index)", asMETHOD(poco_json_array, is_object), asCALL_THISCALL);
+	engine->RegisterGlobalFunction("var@ parse_json(const string&in payload)", asFUNCTION(json_parse), asCALL_CDECL);
+	engine->RegisterGlobalFunction("var@ parse_json(datastream@ stream)", asFUNCTION(json_parse_datastream), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_to_hex(const string& in binary)"), asFUNCTION(string_to_hex), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string hex_to_string(const string& in hex)"), asFUNCTION(hex_to_string), asCALL_CDECL);
 	engine->RegisterEnum("string_base64_options");
 	engine->RegisterEnumValue("string_base64_options", "STRING_BASE64_DEFAULT", 0);
 	engine->RegisterEnumValue("string_base64_options", "STRING_BASE64_URL", 1);
 	engine->RegisterEnumValue("string_base64_options", "STRING_BASE64_PADLESS", 2);
 	engine->RegisterEnumValue("string_base64_options", "STRING_BASE64_URL_PADLESS", 3);
-	engine->RegisterGlobalFunction(_O("string string_base64_encode(const string& in, string_base64_options = STRING_BASE64_DEFAULT)"), asFUNCTION(base64_encode), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_base64_decode(const string& in, string_base64_options = STRING_BASE64_PADLESS)"), asFUNCTION(base64_decode), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_base32_encode(const string& in)"), asFUNCTION(base32_encode), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_base32_decode(const string& in)"), asFUNCTION(base32_decode), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_recode(const string&in, const string&in, const string&in, int&out = void)"), asFUNCTION(string_recode), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_base64_encode(const string& in binary, string_base64_options options = STRING_BASE64_DEFAULT)"), asFUNCTION(base64_encode), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_base64_decode(const string& in encoded, string_base64_options options = STRING_BASE64_PADLESS)"), asFUNCTION(base64_decode), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_base32_encode(const string& in binary)"), asFUNCTION(base32_encode), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_base32_decode(const string& in encoded)"), asFUNCTION(base32_decode), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_recode(const string&in text, const string&in in_encoding, const string&in out_encoding, int&out error_count = void)"), asFUNCTION(string_recode), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
-	engine->RegisterGlobalFunction(_O("void c_debug_message(const string&in)"), asFUNCTIONPR(Debugger::message, (const std::string&), void), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void c_debug_message(const string&in message)"), asFUNCTIONPR(Debugger::message, (const std::string&), void), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void c_debug_break()"), asFUNCTIONPR(Debugger::enter, (), void), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("void c_debug_break(const string&in)"), asFUNCTIONPR(Debugger::enter, (const std::string&), void), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void c_debug_break(const string&in message)"), asFUNCTIONPR(Debugger::enter, (const std::string&), void), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_HOME() property"), asFUNCTION(Path::home), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_COMMON_APPDATA() property"), asFUNCTION(Path::config), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_DIRECTORY_LOCAL_APPDATA() property"), asFUNCTION(Path::dataHome), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool environment_variable_exists(const string&in)"), asFUNCTION(Environment::has), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string expand_environment_variables(const string& in)"), asFUNCTION(Path::expand), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string read_environment_variable(const string&in, const string&in = \"\")"), asFUNCTIONPR(Environment::get, (const std::string&, const std::string&), std::string), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("void write_environment_variable(const string&in, const string&in)"), asFUNCTION(Environment::set), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool environment_variable_exists(const string&in variable)"), asFUNCTION(Environment::has), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string expand_environment_variables(const string& in text)"), asFUNCTION(Path::expand), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string read_environment_variable(const string&in variable, const string&in default_value = \"\")"), asFUNCTIONPR(Environment::get, (const std::string&, const std::string&), std::string), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void write_environment_variable(const string&in variable, const string&in value)"), asFUNCTION(Environment::set), asCALL_CDECL);
 	engine->RegisterGlobalProperty("const string PLATFORM", &g_platform_name);
 	engine->RegisterGlobalProperty("const string PLATFORM_DISPLAY_NAME", &g_platform_display_name);
 	engine->RegisterGlobalProperty("const string PLATFORM_VERSION", &g_platform_version);

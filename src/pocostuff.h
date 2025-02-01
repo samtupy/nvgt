@@ -30,8 +30,11 @@ class poco_json_array;
 class poco_json_object : public poco_shared<Poco::JSON::Object> {
 public:
 	poco_json_object(Poco::JSON::Object::Ptr o);
-	poco_shared<Poco::Dynamic::Var>* get(const std::string& key) const;
-	poco_shared<Poco::Dynamic::Var>* query(const std::string& path) const;
+	poco_json_object(poco_json_object* other);
+	poco_json_object& operator=(poco_json_object* other);
+	poco_shared<Poco::Dynamic::Var>* get(const std::string& key, poco_shared<Poco::Dynamic::Var>* default_value = nullptr) const;
+	poco_shared<Poco::Dynamic::Var>* get_indexed(const std::string& key) const;
+	poco_shared<Poco::Dynamic::Var>* query(const std::string& path, poco_shared<Poco::Dynamic::Var>* default_value = nullptr) const;
 	poco_json_array* get_array(const std::string& key) const;
 	poco_json_object* get_object(const std::string& key) const;
 	void set(const std::string& key, poco_shared<Poco::Dynamic::Var>* v);
@@ -45,6 +48,8 @@ public:
 class poco_json_array : public poco_shared<Poco::JSON::Array> {
 public:
 	poco_json_array(Poco::JSON::Array::Ptr a);
+	poco_json_array(poco_json_array* other);
+	poco_json_array& operator=(poco_json_array* other);
 	poco_shared<Poco::Dynamic::Var>* get(unsigned int index) const;
 	poco_shared<Poco::Dynamic::Var>* query(const std::string& path) const;
 	poco_json_array* get_array(unsigned int index) const;
