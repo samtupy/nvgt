@@ -1,13 +1,13 @@
 /**
 	Generates a random string of characters (a token).
-	string generate_token(int token_length, int mode = token_gen_flag_all)
+	string generate_token(int token_length, int mode = TOKEN_CHARACTERS | TOKEN_NUMBERS)
 	## Arguments:
 		* int token_length: the length of the token to generate.
-		* int mode = token_gen_flag_all: allows you to specify which characters you would like in the generated token (see remarks).
+		* int mode = TOKEN_CHARACTERS | TOKEN_NUMBERS: allows you to specify which characters you would like in the generated token (see remarks).
 	## returns:
-		String: a random token depending on the mode.
+		String: a random token depending on the modes.
 	## Remarks:
-		This function uses the `generate_custom_token` function to generate. The characters used to generate the token will depend on the mode you specified. See `token_gen_flags` enum constants.
+		This function uses the `generate_custom_token` function to generate. The characters used to generate the token will depend on the modes you specified. See `token_gen_flags` enum constants for a list of supported modes that can be passed to the mode parameter.
 */
 
 // Example:
@@ -15,6 +15,6 @@
 
 void main() {
 	alert("Info", "Your token is: " + generate_token(10));
-	alert("Info", "Numbers only token is: " + generate_token(10, token_gen_flag_numbers));
-	alert("Info", "Characters only token is: " + generate_token(10, token_gen_flag_characters));
+	alert("Info", "Numbers only token is: " + generate_token(10, TOKEN_NUMBERS));
+	alert("Info", "Characters only token is: " + generate_token(10, TOKEN_CHARACTERS));
 }

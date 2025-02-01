@@ -1,5 +1,5 @@
 # play_stationary
-Play a sound without using dimension and return a slot.
+Play a stationary sound and return a slot.
 
 1. `int sound_pool::play_stationary(string filename, bool looping, bool persistent = false);`
 2. `int sound_pool::play_stationary(string filename, pack@ packfile, bool looping, bool persistent = false);`
@@ -20,3 +20,5 @@ int: the index of the sound which can be modified later, or -1 if error. This me
 
 ## Remarks:
 If the looping parameter is set to true and the sound object is inactive, the sound is still considered to be active as this just means that we are currently out of earshot. A non-looping sound that has finished playing is considered to be dead, and will be cleaned up if it is not set to be persistent.
+
+This method will play the sound in stationary mode. This means that sounds played by this method have no movement updates as if they are stationary, and coordinate update functions will not work.

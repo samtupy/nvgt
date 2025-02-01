@@ -6,4 +6,4 @@ This enum holds various constants that can be passed to the mode parameter of th
 * TOKEN_SYMBOLS = 4: Uses only symbols, \`\~\!\@\#\$\%\^\&\*\(\)\_\+\=\-\[\]\{\}\/\.\,\;\:\|\?\>\<
 
 ## Remarks:
-These are flags that should be combined together using the bitwise OR operator. To generate a token containing characters and symbols, for example, you would pass `TOKEN_CHARACTERS | TOKEN_NUMBERS | TOKEN_SYMBOLS` to the mode argument of generate_token. The default flags are TOKEN_CHARACTERS | TOKEN_NUMBERS.
+These are flags that should be combined together using the bitwise OR operator. To generate a token containing characters, numbers and symbols, for example, you would pass `TOKEN_CHARACTERS | TOKEN_NUMBERS | TOKEN_SYMBOLS` to the mode argument of generate_token. The default flags are `TOKEN_CHARACTERS | TOKEN_NUMBERS`.

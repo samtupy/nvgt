@@ -1,0 +1,16 @@
+/**
+	Extracts a substring starting at the given index and containing a specific number of characters.
+	string string::substr(uint start = 0, int count = -1);
+	## Arguments:
+		* uint start = 0: The index where the substring begins (inclusive).
+		* int count = -1: The number of characters to include in the substring. -1 means all remaining characters after the start index.
+	## Returns:
+		string: A new string with the characters modified.
+*/
+
+// Example:
+void main() {
+	string text = "Hello, world!";
+	string substring = text.substr(7, 5); // Extracts "world"
+	alert("Info", substring);
+}
