@@ -1,0 +1,19 @@
+/**
+	Extracts a substring starting at the given index and ending just before the index end (exclusive).
+	string string::slice(int start = 0, int end = 0);
+	## Arguments:
+		* int start = 0: The index where the substring begins (inclusive).
+		* int end = 0: The index where the substring ends (exclusive).
+	## Returns:
+		string: A new string with the characters modified.
+*/
+
+// Example:
+void main() {
+	string text = "Hello, world!";
+	string substring = text.slice(0, 5);
+	alert("Info", substring);
+	text = "Welcome to NVGT";
+	substring = text.slice(11, 16);
+	alert("Info", substring);
+}
