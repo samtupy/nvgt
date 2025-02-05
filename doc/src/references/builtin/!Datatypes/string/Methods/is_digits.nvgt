@@ -1,0 +1,18 @@
+/**
+    Checks if a string is only digits (numbers).
+    ## Arguments:
+        * string encoding = "UTF8": The encoding to check against, with the UTF8 encoding being cached for speed.
+    ## Returns:
+        bool: true if the input string is only digits; false otherwise.
+    ## Remarks:
+        This function only returns true if the string contains digits in the given encoding. If a single non-numaric character is encountered, this function will return false.
+        If this function is called on a string that contains data that is not in the specified encoding, the results are undefined.
+*/
+
+// Example:
+void main() {
+	alert("Example", "123".is_digits()); // Should return true.
+	string input = input_box("Example", "Enter a string");
+	if (input.is_digits()) alert("Example", "This string is only digits.");
+	else alert("Example", "This input contains non-numaric characters.");
+}
