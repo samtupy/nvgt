@@ -48,6 +48,18 @@ AABB aabb_from_triangle(CScriptArray* points) {
 	return AABB::createAABBForTriangle(reinterpret_cast<const Vector3*>(points->GetBuffer()));
 }
 
+CScriptArray* face_get_vertices(const HalfEdgeStructure::Face & f) {
+	CScriptArray* array = CScriptArray::Create(get_array_type("array<uint>"), f.faceVertices.size());
+	memcpy(array->GetBuffer(), &f.faceVertices[0], f.faceVertices.size()*sizeof(uint32));
+	return array;
+}
+void face_set_vertices(HalfEdgeStructure::Face & f, CScriptArray* array) {
+	f.faceVertices.clear();
+	f.faceVertices.reserve(array->GetSize());
+	memcpy(&f.faceVertices[0], array->GetBuffer(), array->GetSize()*sizeof(uint32));
+}
+
+
 // registration templates
 template <class T> void RegisterCollisionShape(asIScriptEngine* engine, const string& type) {
 	engine->RegisterObjectMethod(type.c_str(), "physics_shape_name get_name() const property", asMETHOD(T, getName), asCALL_THISCALL);
@@ -76,6 +88,26 @@ template <class T> void RegisterPhysicsBody(asIScriptEngine* engine, const strin
 	engine->RegisterObjectMethod(type.c_str(), "bool raycast(const ray& point, physics_raycast_info& raycast_info)", asMETHOD(T, raycast), asCALL_THISCALL);
 }
 
+template <class T> void RegisterConvexShape(asIScriptEngine* engine, const string& type) {
+	RegisterCollisionShape<T>(engine, type);
+	engine->RegisterObjectMethod(type.c_str(), "float get_margin() const property", asMETHOD(T, getMargin), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_is_convex() const property", asMETHOD(T, isConvex), asCALL_THISCALL);
+}
+
+template <class T> void RegisterConvexPolyhedronShape(asIScriptEngine* engine, const string& type) {
+	RegisterConvexShape<T>(engine, type);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_nb_faces() const property", asMETHOD(T, getNbFaces), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const physics_half_edge_structure_face& get_face(uint face_index)", asMETHOD(T, getFace), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_nb_vertices() const property", asMETHOD(T, getNbVertices), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const physics_half_edge_structure_vertex& get_vertex(uint vertex_index)", asMETHOD(T, getVertex), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const vector get_vertex_position(uint vertex_index)", asMETHOD(T, getVertexPosition), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const vector get_face_normal(uint vertex_index)", asMETHOD(T, getFaceNormal), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_nb_half_edges() const property", asMETHOD(T, getNbHalfEdges), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const physics_half_edge_structure_edge& get_half_edge(uint edge_index) const", asMETHOD(T, getHalfEdge), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_centroid() const property", asMETHOD(T, getCentroid), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "uint find_most_anti_parallel_face(const vector&in direction) const", asMETHOD(T, findMostAntiParallelFace), asCALL_THISCALL);
+}
+
 void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("int clamp(int value, int min, int max)", asFUNCTIONPR(clamp, (int, int, int), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float clamp(float value, float min, float max)", asFUNCTIONPR(clamp, (decimal, decimal, decimal), decimal), asCALL_CDECL);
@@ -92,6 +124,12 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("physics_shape_name", "SHAPE_CONVEX_MESH", int(CollisionShapeName::CONVEX_MESH));
 	engine->RegisterEnumValue("physics_shape_name", "SHAPE_TRIANGLE_MESH", int(CollisionShapeName::TRIANGLE_MESH));
 	engine->RegisterEnumValue("physics_shape_name", "SHAPE_HEIGHTFIELD", int(CollisionShapeName::HEIGHTFIELD));
+
+	engine->RegisterEnum("physics_triangle_raycast_side");
+	engine->RegisterEnumValue("physics_triangle_raycast_side", "TRIANGLE_RAYCAST_SIDE_FRONT", int(TriangleRaycastSide::FRONT));
+	engine->RegisterEnumValue("physics_triangle_raycast_side", "TRIANGLE_RAYCAST_SIDE_BACK", int(TriangleRaycastSide::BACK));
+	engine->RegisterEnumValue("physics_triangle_raycast_side", "TRIANGLE_RAYCAST_SIDE_FRONT_AND_BACK", int(TriangleRaycastSide::FRONT_AND_BACK));
+
 	engine->RegisterGlobalProperty("const float EPSILON", (void*)&MACHINE_EPSILON);
 
 	engine->RegisterObjectType("physics_entity", sizeof(Entity), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Entity>() | asOBJ_APP_CLASS_ALLFLOATS);
@@ -298,4 +336,41 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("physics_world", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("physics_world", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world_settings", "bool test_overlap(physics_body& body1, physics_body& body2)", asMETHODPR(PhysicsWorld, testOverlap, (Body*, Body*), bool), asCALL_THISCALL);
+
+	engine->RegisterObjectType("physics_half_edge_structure_edge", sizeof(HalfEdgeStructure::Edge), asOBJ_VALUE | asGetTypeTraits<HalfEdgeStructure::Edge>());
+	engine->RegisterObjectBehaviour("physics_half_edge_structure_edge", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<HalfEdgeStructure::Edge>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectProperty("physics_half_edge_structure_edge", "uint vertex_index", asOFFSET(HalfEdgeStructure::Edge, vertexIndex));
+	engine->RegisterObjectProperty("physics_half_edge_structure_edge", "uint twin_edge_index", asOFFSET(HalfEdgeStructure::Edge, twinEdgeIndex));
+	engine->RegisterObjectProperty("physics_half_edge_structure_edge", "uint face_index", asOFFSET(HalfEdgeStructure::Edge, faceIndex));
+	engine->RegisterObjectProperty("physics_half_edge_structure_edge", "uint next_edge_index", asOFFSET(HalfEdgeStructure::Edge, nextEdgeIndex));
+
+	engine->RegisterObjectType("physics_half_edge_structure_face", sizeof(HalfEdgeStructure::Face), asOBJ_VALUE | asGetTypeTraits<HalfEdgeStructure::Face>());
+	engine->RegisterObjectMethod("physics_half_edge_structure_face", "void set_face_vertices(uint[]@ face_vertices)", asFUNCTION(face_set_vertices), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_half_edge_structure_face", "uint[]@ get_face_vertices() const", asFUNCTION(face_get_vertices), asCALL_CDECL_OBJFIRST);
+
+	engine->RegisterObjectType("physics_half_edge_structure_vertex", sizeof(HalfEdgeStructure::Vertex), asOBJ_VALUE | asGetTypeTraits<HalfEdgeStructure::Vertex>());
+	engine->RegisterObjectProperty("physics_half_edge_structure_vertex", "uint vertex_point_index", asOFFSET(HalfEdgeStructure::Vertex, vertexPointIndex));
+	engine->RegisterObjectProperty("physics_half_edge_structure_vertex", "uint vertex_edge_index", asOFFSET(HalfEdgeStructure::Vertex, edgeIndex));
+
+	RegisterConvexShape<CapsuleShape>(engine, "physics_capsule_shape");
+	engine->RegisterObjectMethod("physics_capsule_shape", "float get_radius() const property", asMETHOD(CapsuleShape, getRadius), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_capsule_shape", "void set_radius(float radius) property", asMETHOD(CapsuleShape, setRadius), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_capsule_shape", "float get_height() const property", asMETHOD(CapsuleShape, getHeight), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_capsule_shape", "void set_height(float height) property", asMETHOD(CapsuleShape, setHeight), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_capsule_shape", "string opImplConv()", asMETHOD(CapsuleShape, to_string), asCALL_THISCALL);
+	
+	RegisterConvexShape<SphereShape>(engine, "physics_sphere_shape");
+	engine->RegisterObjectMethod("physics_sphere_shape", "float get_radius() const property", asMETHOD(SphereShape, getRadius), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_sphere_shape", "void set_radius(float radius) property", asMETHOD(SphereShape, setRadius), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_sphere_shape", "string opImplConv()", asMETHOD(SphereShape, to_string), asCALL_THISCALL);
+
+	RegisterConvexPolyhedronShape<BoxShape>(engine, "physics_box_shape");
+	engine->RegisterObjectMethod("physics_box_shape", "vector& get_half_extents() const property", asMETHOD(BoxShape, getHalfExtents), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_box_shape", "void set_half_extents(const vector&in half_extents) property", asMETHOD(BoxShape, setHalfExtents), asCALL_THISCALL);
+
+	RegisterConvexPolyhedronShape<TriangleShape>(engine, "physics_triangle_shape");
+	engine->RegisterObjectMethod("physics_triangle_shape", "physics_triangle_raycast_side get_raycast_test_type() const property", asMETHOD(TriangleShape, getRaycastTestType), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_shape", "void set_raycast_test_type(physics_triangle_raycast_side test_type) const property", asMETHOD(TriangleShape, setRaycastTestType), asCALL_THISCALL);
+	engine->RegisterGlobalFunction("void physics_triangle_shape_compute_smooth_triangle_mesh_contact(const physics_collision_shape &in shape1, const physics_collision_shape &in shape2, vector & local_contact_point_shape1, vector & local_contact_point_shape2, const transform &in shape1_to_world, const transform &in shape2_to_world, float penitration_depth, vector & out_smooth_vertex_normal)", asFUNCTION(TriangleShape::computeSmoothTriangleMeshContact), asCALL_CDECL);
+
 }
