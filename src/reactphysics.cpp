@@ -74,17 +74,38 @@ class raycast_callback : public RaycastCallback {
 		return v;
 	}
 };
+class overlap_callback : public OverlapCallback {
+	public:
+	asIScriptFunction* callback;
+	overlap_callback(asIScriptFunction* callback) : callback(callback) {}
+	// Perhaps we should make these callbacks some sort of templates if they get too numerous?
+	void onOverlap(OverlapCallback::CallbackData& data) override {
+		asIScriptContext* ACtx = asGetActiveContext();
+		bool new_context = ACtx == NULL || ACtx->PushState() < 0;
+		asIScriptContext* ctx = (new_context ? g_ScriptEngine->RequestContext() : ACtx);
+		if (!ctx) return;
+		if (ctx->Prepare(callback) < 0) {
+			if (new_context) g_ScriptEngine->ReturnContext(ctx);
+			else ctx->PopState();
+			return;
+		}
+		ctx->SetArgObject(0, (void*)&data);
+		ctx->Execute();
+		if (new_context) g_ScriptEngine->ReturnContext(ctx);
+		else ctx->PopState();
+	}
+};
 void world_raycast(PhysicsWorld& world, const Ray& ray, asIScriptFunction* callback, unsigned short bits) {
 	raycast_callback rcb(callback);
 	world.raycast(ray, &rcb, bits);
 }
 void world_test_overlap_body(PhysicsWorld& world, Body* body, asIScriptFunction* callback) {
-	raycast_callback rcb(callback);
-	world.testOverlap(body, &rcb);
+	overlap_callback cb(callback);
+	world.testOverlap(body, cb);
 }
 void world_test_overlap(PhysicsWorld& world, Body* body, asIScriptFunction* callback) {
-	raycast_callback rcb(callback);
-	world.testOverlap(&rcb);
+	overlap_callback cb(callback);
+	world.testOverlap(cb);
 }
 
 CScriptArray* face_get_vertices(const HalfEdgeStructure::Face & f) {
@@ -144,7 +165,6 @@ template <class T> void RegisterPhysicsBody(asIScriptEngine* engine, const strin
 template <class T> void RegisterConvexShape(asIScriptEngine* engine, const string& type) {
 	RegisterCollisionShape<T>(engine, type);
 	engine->RegisterObjectMethod(type.c_str(), "float get_margin() const property", asMETHOD(T, getMargin), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "bool get_is_convex() const property", asMETHOD(T, isConvex), asCALL_THISCALL);
 }
 
 template <class T> void RegisterConvexPolyhedronShape(asIScriptEngine* engine, const string& type) {
@@ -164,6 +184,7 @@ template <class T> void RegisterConvexPolyhedronShape(asIScriptEngine* engine, c
 void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("int clamp(int value, int min, int max)", asFUNCTIONPR(clamp, (int, int, int), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float clamp(float value, float min, float max)", asFUNCTIONPR(clamp, (decimal, decimal, decimal), decimal), asCALL_CDECL);
+
 	engine->RegisterEnum("physics_shape_type");
 	engine->RegisterEnumValue("physics_shape_type", "SHAPE_TYPE_SPHERE", int(CollisionShapeType::SPHERE));
 	engine->RegisterEnumValue("physics_shape_type", "SHAPE_TYPE_CAPSULE", int(CollisionShapeType::CAPSULE));
@@ -177,6 +198,15 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("physics_shape_name", "SHAPE_CONVEX_MESH", int(CollisionShapeName::CONVEX_MESH));
 	engine->RegisterEnumValue("physics_shape_name", "SHAPE_TRIANGLE_MESH", int(CollisionShapeName::TRIANGLE_MESH));
 	engine->RegisterEnumValue("physics_shape_name", "SHAPE_HEIGHTFIELD", int(CollisionShapeName::HEIGHTFIELD));
+
+	engine->RegisterEnum("physics_overlap_event_type");
+	engine->RegisterEnumValue("physics_overlap_event_type", "PHYSICS_OVERLAP_START", int(OverlapCallback::OverlapPair::EventType::OverlapStart));
+	engine->RegisterEnumValue("physics_overlap_event_type", "PHYSICS_OVERLAP_STAY", int(OverlapCallback::OverlapPair::EventType::OverlapStay));
+	engine->RegisterEnumValue("physics_overlap_event_type", "PHYSICS_OVERLAP_EXIT", int(OverlapCallback::OverlapPair::EventType::OverlapExit));
+	engine->RegisterEnum("physics_contact_event_type");
+	engine->RegisterEnumValue("physics_contact_event_type", "PHYSICS_CONTACT_START", int(CollisionCallback::ContactPair::EventType::ContactStart));
+	engine->RegisterEnumValue("physics_contact_event_type", "PHYSICS_CONTACT_STAY", int(CollisionCallback::ContactPair::EventType::ContactStay));
+	engine->RegisterEnumValue("physics_contact_event_type", "PHYSICS_CONTACT_EXIT", int(CollisionCallback::ContactPair::EventType::ContactExit));
 
 	engine->RegisterEnum("physics_triangle_raycast_side");
 	engine->RegisterEnumValue("physics_triangle_raycast_side", "TRIANGLE_RAYCAST_SIDE_FRONT", int(TriangleRaycastSide::FRONT));
@@ -198,12 +228,30 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterObjectType("raycast_info", sizeof(RaycastInfo), asOBJ_VALUE | asGetTypeTraits<RaycastInfo>());
 	engine->RegisterObjectType("transform", sizeof(Transform), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Transform>() | asOBJ_APP_CLASS_ALLFLOATS);
 	engine->RegisterObjectType("vector", sizeof(Vector3), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Vector3>() | asOBJ_APP_CLASS_ALLFLOATS);
+	
 	RegisterCollisionShape<CollisionShape>(engine, "physics_collision_shape");
 	engine->RegisterObjectType("physics_collider", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("physics_collider", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("physics_collider", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
 	RegisterPhysicsBody<Body>(engine, "physics_body");
 	RegisterPhysicsBody<RigidBody>(engine, "physics_rigid_body");
+
+	engine->RegisterObjectType("physics_contact_point", sizeof(CollisionCallback::ContactPoint), asOBJ_VALUE | asGetTypeTraits<CollisionCallback::ContactPoint>());
+	engine->RegisterObjectBehaviour("physics_contact_point", asBEHAVE_CONSTRUCT, "void f(const physics_contact_point&in point)", asFUNCTION((rp_construct<CollisionCallback::ContactPoint, const CollisionCallback::ContactPoint&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_contact_point", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<CollisionCallback::ContactPoint>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_contact_point", "const vector& get_world_normal() const property", asMETHOD(CollisionCallback::ContactPoint, getWorldNormal), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_contact_point", "const vector& get_local_point_on_collider1() const property", asMETHOD(CollisionCallback::ContactPoint, getLocalPointOnCollider1), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_contact_point", "const vector& get_local_point_on_collider2() const property", asMETHOD(CollisionCallback::ContactPoint, getLocalPointOnCollider2), asCALL_THISCALL);
+	engine->RegisterObjectType("physics_contact_pair", sizeof(CollisionCallback::ContactPair), asOBJ_VALUE | asGetTypeTraits<CollisionCallback::ContactPair>());
+	engine->RegisterObjectBehaviour("physics_contact_pair", asBEHAVE_CONSTRUCT, "void f(const physics_contact_pair&in pair)", asFUNCTION((rp_construct<CollisionCallback::ContactPair, const CollisionCallback::ContactPair&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_contact_pair", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<CollisionCallback::ContactPair>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_contact_pair", "uint get_nb_contact_points() const property", asMETHOD(CollisionCallback::ContactPair, getNbContactPoints), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_contact_pair", "physics_contact_point get_contact_point(uint index) const", asMETHOD(CollisionCallback::ContactPair, getContactPoint), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_contact_pair", "physics_body& get_body1() const property", asMETHOD(CollisionCallback::ContactPair, getBody1), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_contact_pair", "physics_body& get_body2() const property", asMETHOD(CollisionCallback::ContactPair, getBody2), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_contact_pair", "physics_collider& get_collider1() const property", asMETHOD(CollisionCallback::ContactPair, getCollider1), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_contact_pair", "physics_collider& get_collider2() const property", asMETHOD(CollisionCallback::ContactPair, getCollider2), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_contact_pair", "physics_contact_event_type get_event_type() const property", asMETHOD(CollisionCallback::ContactPair, getEventType), asCALL_THISCALL);
 
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<Vector3>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f(float x, float y, float z = 0.0f)", asFUNCTION((rp_construct<Vector3, decimal, decimal, decimal>)), asCALL_CDECL_OBJFIRST);
@@ -393,18 +441,20 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("physics_world", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world_settings", "bool test_overlap(physics_body& body1, physics_body& body2)", asMETHODPR(PhysicsWorld, testOverlap, (Body*, Body*), bool), asCALL_THISCALL);
 
-	engine->RegisterObjectType("physics_half_edge_structure_edge", sizeof(HalfEdgeStructure::Edge), asOBJ_VALUE | asGetTypeTraits<HalfEdgeStructure::Edge>());
+	engine->RegisterObjectType("physics_half_edge_structure_edge", sizeof(HalfEdgeStructure::Edge), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<HalfEdgeStructure::Edge>());
 	engine->RegisterObjectBehaviour("physics_half_edge_structure_edge", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<HalfEdgeStructure::Edge>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectProperty("physics_half_edge_structure_edge", "uint vertex_index", asOFFSET(HalfEdgeStructure::Edge, vertexIndex));
 	engine->RegisterObjectProperty("physics_half_edge_structure_edge", "uint twin_edge_index", asOFFSET(HalfEdgeStructure::Edge, twinEdgeIndex));
 	engine->RegisterObjectProperty("physics_half_edge_structure_edge", "uint face_index", asOFFSET(HalfEdgeStructure::Edge, faceIndex));
 	engine->RegisterObjectProperty("physics_half_edge_structure_edge", "uint next_edge_index", asOFFSET(HalfEdgeStructure::Edge, nextEdgeIndex));
 
-	engine->RegisterObjectType("physics_half_edge_structure_face", sizeof(HalfEdgeStructure::Face), asOBJ_VALUE | asGetTypeTraits<HalfEdgeStructure::Face>());
+	engine->RegisterObjectType("physics_half_edge_structure_face", 0, asOBJ_REF | asOBJ_NOHANDLE);
 	engine->RegisterObjectMethod("physics_half_edge_structure_face", "void set_face_vertices(uint[]@ face_vertices)", asFUNCTION(face_set_vertices), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_half_edge_structure_face", "uint[]@ get_face_vertices() const", asFUNCTION(face_get_vertices), asCALL_CDECL_OBJFIRST);
 
 	engine->RegisterObjectType("physics_half_edge_structure_vertex", sizeof(HalfEdgeStructure::Vertex), asOBJ_VALUE | asGetTypeTraits<HalfEdgeStructure::Vertex>());
+	engine->RegisterObjectBehaviour("physics_half_edge_structure_vertex", asBEHAVE_CONSTRUCT, "void f(uint vertex_coords_index)", asFUNCTION((rp_construct<HalfEdgeStructure::Vertex, uint32>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_half_edge_structure_vertex", asBEHAVE_DESTRUCT, "void f()", asFUNCTION((rp_destruct<HalfEdgeStructure::Vertex>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectProperty("physics_half_edge_structure_vertex", "uint vertex_point_index", asOFFSET(HalfEdgeStructure::Vertex, vertexPointIndex));
 	engine->RegisterObjectProperty("physics_half_edge_structure_vertex", "uint vertex_edge_index", asOFFSET(HalfEdgeStructure::Vertex, edgeIndex));
 
