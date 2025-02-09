@@ -383,6 +383,17 @@ static string& string_multiply_assign(string& str, asUINT multiplier)
 	for (asUINT i = 0; i < multiplier -1; i++) str += tmp;
 	return str;
 }
+static asQWORD string_count(string& str, const string& search, asQWORD start) {
+	if (str.empty() || search.empty()) return 0;
+	asUINT c = 0;
+	while (true) {
+		size_t pos = str.find(search, start);
+		if (pos == std::string::npos) break;
+		start = pos + 1;
+		c++;
+	}
+	return c;
+}
 
 // This is where the utility functions are registered.
 // The string type must have been registered first.
@@ -409,6 +420,7 @@ void RegisterStdStringUtils(asIScriptEngine *engine)
 		r = engine->RegisterObjectMethod("string", "string reverse_bytes() const", asFUNCTION(StringReverse), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 		r = engine->RegisterObjectMethod("string", "string opMul(uint) const", asFUNCTION(string_multiply), asCALL_CDECL_OBJFIRST); assert( r >= 0 );
 		r = engine->RegisterObjectMethod("string", "string& opMulAssign(uint)", asFUNCTION(string_multiply_assign), asCALL_CDECL_OBJFIRST); assert( r >= 0 );
+		r = engine->RegisterObjectMethod("string", "uint64 count(const string&in search, uint64 start = 0) const", asFUNCTION(string_count), asCALL_CDECL_OBJFIRST); assert( r >= 0 );
 		// r = engine->RegisterObjectMethod("string", "string lower() const", asFUNCTION(StringLower), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 		// r = engine->RegisterObjectMethod("string", "string upper() const", asFUNCTION(StringUpper), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 		// r = engine->RegisterObjectMethod("string", "bool is_lower() const", asFUNCTION(StringIsLower), asCALL_CDECL_OBJLAST); assert( r >= 0 );
