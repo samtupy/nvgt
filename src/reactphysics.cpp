@@ -26,6 +26,9 @@ template <class T, typename... A> void rp_construct(void* mem, A... args) { new 
 template <class T> void rp_copy_construct(void* mem, const T& obj) { new(mem) T(obj); }
 template <class T> void rp_destruct(T* obj) { obj->~T(); }
 
+// No-Op ref counting function. This is needed because reactphysics has it's own memory management that does not include reference counting and until we find a way to make things safer, we'll just have to go with that for now. Many handles returned to the script from this library will be similar to raw pointers, it will be possible for objects to be deleted without all script references being released!
+void no_refcount(void* obj) {}
+
 // Some functions require manual wrapping, especially anything dealing with arrays or force inline.
 CScriptArray* transform_get_opengl_matrix(const Transform& t) {
 	CScriptArray* array = CScriptArray::Create(get_array_type("array<float>"), 16);
@@ -58,6 +61,20 @@ template <class T> void RegisterCollisionShape(asIScriptEngine* engine, const st
 	engine->RegisterObjectMethod(type.c_str(), "aabb compute_transformed_aabb(const transform&in transform) const", asMETHOD(T, computeTransformedAABB), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "string opImplConv() const", asMETHOD(T, to_string), asCALL_THISCALL);
 }
+template <class T> void RegisterPhysicsBody(asIScriptEngine* engine, const string& type) {
+	engine->RegisterObjectType(type.c_str(), 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "physics_entity get_entity() const property", asMETHOD(T, getEntity), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_is_active() const property", asMETHOD(T, isActive), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_is_active(bool is_active) property", asMETHOD(T, setIsActive), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const transform& get_transform() const property", asMETHOD(T, getTransform), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_transform(const transform&in transform) property", asMETHOD(T, setTransform), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "physics_collider@ add_collider(collision_shape&in shape, const transform&in transform)", asMETHOD(T, addCollider), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void remove_collider(physics_collider&in collider)", asMETHOD(T, removeCollider), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool test_point_inside(const vector&in point)", asMETHOD(T, testPointInside), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool raycast(const ray& point, physics_raycast_info& raycast_info)", asMETHOD(T, raycast), asCALL_THISCALL);
+}
 
 void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("int clamp(int value, int min, int max)", asFUNCTIONPR(clamp, (int, int, int), int), asCALL_CDECL);
@@ -76,6 +93,19 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("physics_shape_name", "SHAPE_TRIANGLE_MESH", int(CollisionShapeName::TRIANGLE_MESH));
 	engine->RegisterEnumValue("physics_shape_name", "SHAPE_HEIGHTFIELD", int(CollisionShapeName::HEIGHTFIELD));
 	engine->RegisterGlobalProperty("const float EPSILON", (void*)&MACHINE_EPSILON);
+
+	engine->RegisterObjectType("physics_entity", sizeof(Entity), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Entity>() | asOBJ_APP_CLASS_ALLFLOATS);
+	engine->RegisterObjectBehaviour("physics_entity", asBEHAVE_CONSTRUCT, "void f(uint index, uint generation)", asFUNCTION((rp_construct<Entity, uint32, uint32>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_entity", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<Entity>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectProperty("physics_entity", "uint id", asOFFSET(Entity, id));
+	engine->RegisterObjectMethod("physics_entity", "uint get_index() const property", asMETHOD(Entity, getIndex), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_entity", "uint get_generation() const property", asMETHOD(Entity, getGeneration), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_entity", "bool opEquals(const physics_entity&in entity) const", asMETHOD(Entity, operator==), asCALL_THISCALL);
+
+	engine->RegisterObjectType("physics_collider", 0, asOBJ_REF);
+	RegisterPhysicsBody<Body>(engine, "PhysicsBody");
+	engine->RegisterObjectType("physics_rigid_body", 0, asOBJ_REF);
+
 	engine->RegisterObjectType("vector", sizeof(Vector3), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Vector3>() | asOBJ_APP_CLASS_ALLFLOATS);
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<Vector3>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f(float x, float y, float z = 0.0f)", asFUNCTION((rp_construct<Vector3, decimal, decimal, decimal>)), asCALL_CDECL_OBJFIRST);
@@ -115,10 +145,19 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 
 	engine->RegisterObjectType("ray", sizeof(Ray), asOBJ_VALUE | asGetTypeTraits<Ray>() | asOBJ_APP_CLASS_ALLFLOATS);
 	engine->RegisterObjectBehaviour("ray", asBEHAVE_CONSTRUCT, "void f(const vector&in p1, const vector&in p2, float max_frac = 1.0f)", asFUNCTION((rp_construct<Ray, const Vector3&, const Vector3&, decimal>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("ray", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<Vector3>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("ray", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<Ray>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectProperty("ray", "vector point1", asOFFSET(Ray, point1));
 	engine->RegisterObjectProperty("ray", "vector point2", asOFFSET(Ray, point2));
 	engine->RegisterObjectProperty("ray", "float max_fraction", asOFFSET(Ray, maxFraction));
+	engine->RegisterObjectType("raycast_info", sizeof(RaycastInfo), asOBJ_VALUE | asGetTypeTraits<RaycastInfo>());
+	engine->RegisterObjectBehaviour("raycast_info", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION((rp_construct<RaycastInfo>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("raycast_info", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<RaycastInfo>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectProperty("raycast_info", "vector world_point", asOFFSET(RaycastInfo, worldPoint));
+	engine->RegisterObjectProperty("raycast_info", "vector world_normal", asOFFSET(RaycastInfo, worldNormal));
+	engine->RegisterObjectProperty("raycast_info", "float hit_fraction", asOFFSET(RaycastInfo, hitFraction));
+	engine->RegisterObjectProperty("raycast_info", "int triangle_index", asOFFSET(RaycastInfo, triangleIndex));
+	engine->RegisterObjectProperty("raycast_info", "physics_body@ body", asOFFSET(RaycastInfo, body));
+	engine->RegisterObjectProperty("raycast_info", "physics_collider@ collider", asOFFSET(RaycastInfo, collider));
 
 	engine->RegisterObjectType("matrix3x3", sizeof(Matrix3x3), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Matrix3x3>() | asOBJ_APP_CLASS_ALLFLOATS);
 	engine->RegisterObjectBehaviour("matrix3x3", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<Matrix3x3>), asCALL_CDECL_OBJFIRST);
@@ -253,4 +292,10 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterObjectProperty("physics_world_settings", "float cos_angle_similar_contact_manifold", asOFFSET(PhysicsWorld::WorldSettings, cosAngleSimilarContactManifold));
 	engine->RegisterObjectMethod("physics_world_settings", "string opImplConv()", asMETHOD(PhysicsWorld::WorldSettings, to_string), asCALL_THISCALL);
 
+	engine->RegisterObjectType("physics_world", 0, asOBJ_REF);
+	engine->RegisterGlobalFunction("void physics_world_destroy(physics_world& world)", asMETHOD(PhysicsCommon, destroyPhysicsWorld), asCALL_THISCALL_ASGLOBAL, &g_physics);
+	engine->RegisterObjectBehaviour("physics_world", asBEHAVE_FACTORY, "physics_world@ w(const physics_world_settings&in world_settings)", asMETHOD(PhysicsCommon, createPhysicsWorld), asCALL_THISCALL_ASGLOBAL, &g_physics);
+	engine->RegisterObjectBehaviour("physics_world", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_world", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world_settings", "bool test_overlap(physics_body& body1, physics_body& body2)", asMETHODPR(PhysicsWorld, testOverlap, (Body*, Body*), bool), asCALL_THISCALL);
 }
