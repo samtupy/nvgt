@@ -12,8 +12,10 @@ void main() {
 	ding.load("C:\\windows\\media\\ding.wav");
 	ding.pitch = 2;
 	alert("test", ding.pitch);
+	alert("test", ding.pinned_listener);
+	if (SOUNDSYSTEM_LAST_ERROR == AUDIO_ERROR_STATE_SUCCESS) alert("yay", SOUNDSYSTEM_LAST_ERROR);
 	ding.pan=-1;
-	ding.gain = 10;
+	ding.volume = 10;
 	while (!key_pressed(KEY_ESCAPE)) {
 		wait(5);
 		if (key_pressed(KEY_UP)) {

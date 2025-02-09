@@ -16,7 +16,6 @@
 #include <vector>
 #include <Poco/Format.h>
 #include <angelscript.h>
-#include <aswrappedcall.h>
 #include <scriptarray.h>
 #include "nvgt_angelscript.h" // get_array_type
 #include "sound.h"
@@ -244,9 +243,9 @@ public:
 	}
 	bool stop() override { return snd ? ma_sound_stop(&*snd) : false; }
 	void set_volume(float volume) override {
-		if (snd) ma_sound_set_volume(&*snd, volume);
+		if (snd) ma_sound_set_volume(&*snd, engine->flags &audio_engine::PERCENTAGE_ATTRIBUTES? ma_volume_db_to_linear(volume) : volume);
 	}
-	float get_volume() override { return snd ? ma_sound_get_volume(&*snd) : NAN; }
+	float get_volume() override { return snd ? (engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES? ma_volume_linear_to_db(ma_sound_get_volume(&*snd)) : ma_sound_get_volume(&*snd)) : NAN; }
 	void set_pan(float pan) override {
 		if (snd)
 			ma_sound_set_pan(&*snd, pan);
@@ -477,22 +476,16 @@ public:
 		return g_soundsystem_last_error == MA_SUCCESS;
 	}
 	bool seek_in_milliseconds(unsigned long long offset) override { return snd ? (g_soundsystem_last_error = ma_sound_seek_to_pcm_frame(&*snd, offset * ma_engine_get_sample_rate(engine->get_ma_engine()) / 1000)) == MA_SUCCESS : false; }
-	bool load_memory(const std::string& data) override {
-		if (!snd) snd = make_unique<ma_sound>();
-		auto config = ma_decoder_config_init(ma_format_f32, ma_engine_get_channels(engine->get_ma_engine()), ma_engine_get_sample_rate(engine->get_ma_engine()));
-		ma_decoder decoder;
-		g_soundsystem_last_error = ma_decoder_init_memory(data.c_str(), data.size(), &config, &decoder);
-		if (g_soundsystem_last_error != MA_SUCCESS) snd.reset();
-		g_soundsystem_last_error = ma_sound_init_from_data_source(engine->get_ma_engine(), &decoder, 0, nullptr, &*snd);
-		if (g_soundsystem_last_error != MA_SUCCESS) snd.reset();
-		return g_soundsystem_last_error == MA_SUCCESS;
-	}
-	bool load_memory(void* buffer, unsigned int size) override {
+	bool load_string(const std::string& data) override { return load_memory(data.data(), data.size()); }
+	bool load_memory(const void* buffer, unsigned int size) override {
 		if (!snd) snd = make_unique<ma_sound>();
 		auto config = ma_decoder_config_init(ma_format_f32, ma_engine_get_channels(engine->get_ma_engine()), ma_engine_get_sample_rate(engine->get_ma_engine()));
 		ma_decoder decoder;
 		g_soundsystem_last_error = ma_decoder_init_memory(buffer, size, &config, &decoder);
-		if (g_soundsystem_last_error != MA_SUCCESS) snd.reset();
+		if (g_soundsystem_last_error != MA_SUCCESS) {
+			snd.reset();
+			return false;
+		}
 		g_soundsystem_last_error = ma_sound_init_from_data_source(engine->get_ma_engine(), &decoder, 0, nullptr, &*snd);
 		if (g_soundsystem_last_error != MA_SUCCESS) snd.reset();
 		return g_soundsystem_last_error == MA_SUCCESS;
@@ -651,6 +644,7 @@ mixer* new_global_mixer() { init_sound(); return new mixer_impl(g_audio_engine);
 sound* new_global_sound() { init_sound(); return new sound_impl(g_audio_engine); }
 int get_sound_output_device() { init_sound(); return g_audio_engine->get_device(); }
 bool set_sound_output_device(int device) { init_sound(); return g_audio_engine->set_device(device); }
+int get_soundsystem_last_error() { return g_soundsystem_last_error; }
 
 template <class T, auto Function, typename ReturnType, typename... Args> ReturnType virtual_call(T* object, Args... args) {
     return (object->*Function)(std::forward<Args>(args)...);
@@ -685,10 +679,110 @@ template <class T> void RegisterSoundsystemMixer(asIScriptEngine* engine, const 
 	engine->RegisterObjectMethod(type.c_str(), "float get_volume() const property", asFUNCTION((virtual_call<T, &T::get_volume, float>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_pan(float pan) property", asFUNCTION((virtual_call<T, &T::set_pan, void, float>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "float get_pan() const property", asFUNCTION((virtual_call<T, &T::get_pan, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_pan_mode(audio_pan_mode mode) property", asFUNCTION((virtual_call<T, &T::set_pan_mode, void, ma_pan_mode>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_pan_mode get_pan_mode() const property", asFUNCTION((virtual_call<T, &T::get_pan_mode, ma_pan_mode>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_pitch(float pitch) property", asFUNCTION((virtual_call<T, &T::set_pitch, void, float>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "float get_pitch() const property", asFUNCTION((virtual_call<T, &T::get_pitch, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_spatialization_enabled(bool enabled) property", asFUNCTION((virtual_call<T, &T::set_spatialization_enabled, void, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_spatialization_enabled() const property", asFUNCTION((virtual_call<T, &T::get_spatialization_enabled, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_pinned_listener(uint index) property", asFUNCTION((virtual_call<T, &T::set_pinned_listener, void, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_pinned_listener() const property", asFUNCTION((virtual_call<T, &T::get_pinned_listener, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_listener() const property", asFUNCTION((virtual_call<T, &T::get_listener, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_direction_to_listener() const", asFUNCTION((virtual_call<T, &T::get_direction_to_listener, reactphysics3d::Vector3>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_position_3d(float x, float y, float z)", asFUNCTION((virtual_call<T, &T::set_position_3d, void, float, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_position_3d() const", asFUNCTION((virtual_call<T, &T::get_position_3d, reactphysics3d::Vector3>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_direction(float x, float y, float z)", asFUNCTION((virtual_call<T, &T::set_direction, void, float, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_direction() const", asFUNCTION((virtual_call<T, &T::get_direction, reactphysics3d::Vector3>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(float x, float y, float z)", asFUNCTION((virtual_call<T, &T::set_velocity, void, float, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_velocity() const", asFUNCTION((virtual_call<T, &T::get_velocity, reactphysics3d::Vector3>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_attenuation_model(audio_attenuation_model model) property", asFUNCTION((virtual_call<T, &T::set_attenuation_model, void, ma_attenuation_model>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_attenuation_model get_attenuation_model() const property", asFUNCTION((virtual_call<T, &T::get_attenuation_model, ma_attenuation_model>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_positioning(audio_positioning_mode mode) property", asFUNCTION((virtual_call<T, &T::set_positioning, void, ma_positioning>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_positioning_mode get_positioning() const property", asFUNCTION((virtual_call<T, &T::get_positioning, ma_positioning>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_rolloff(float rolloff) property", asFUNCTION((virtual_call<T, &T::set_rolloff, void, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float get_rolloff() const property", asFUNCTION((virtual_call<T, &T::get_rolloff, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_min_gain(float gain) property", asFUNCTION((virtual_call<T, &T::set_min_gain, void, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float get_min_gain() const property", asFUNCTION((virtual_call<T, &T::get_min_gain, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_max_gain(float gain) property", asFUNCTION((virtual_call<T, &T::set_max_gain, void, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float get_max_gain() const property", asFUNCTION((virtual_call<T, &T::get_max_gain, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_min_distance(float distance) property", asFUNCTION((virtual_call<T, &T::set_min_distance, void, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float get_min_distance() const property", asFUNCTION((virtual_call<T, &T::get_min_distance, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_max_distance(float distance) property", asFUNCTION((virtual_call<T, &T::set_max_distance, void, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float get_max_distance() const property", asFUNCTION((virtual_call<T, &T::get_max_distance, float>)), asCALL_CDECL_OBJFIRST);
 }
 void RegisterSoundsystem(asIScriptEngine* engine) {
+	engine->RegisterEnum("audio_error_state");
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_SUCCESS", MA_SUCCESS);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_ERROR", MA_ERROR);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_INVALID_ARGS", MA_INVALID_ARGS);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_INVALID_OPERATION", MA_INVALID_OPERATION);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_OUT_OF_MEMORY", MA_OUT_OF_MEMORY);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_OUT_OF_RANGE", MA_OUT_OF_RANGE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_ACCESS_DENIED", MA_ACCESS_DENIED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_DOES_NOT_EXIST", MA_DOES_NOT_EXIST);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_ALREADY_EXISTS", MA_ALREADY_EXISTS);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_TOO_MANY_OPEN_FILES", MA_TOO_MANY_OPEN_FILES);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_INVALID_FILE", MA_INVALID_FILE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_TOO_BIG", MA_TOO_BIG);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_PATH_TOO_LONG", MA_PATH_TOO_LONG);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NAME_TOO_LONG", MA_NAME_TOO_LONG);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NOT_DIRECTORY", MA_NOT_DIRECTORY);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_IS_DIRECTORY", MA_IS_DIRECTORY);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_DIRECTORY_NOT_EMPTY", MA_DIRECTORY_NOT_EMPTY);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_AT_END", MA_AT_END);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NO_SPACE", MA_NO_SPACE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_BUSY", MA_BUSY);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_IO_ERROR", MA_IO_ERROR);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_INTERRUPT", MA_INTERRUPT);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_UNAVAILABLE", MA_UNAVAILABLE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_ALREADY_IN_USE", MA_ALREADY_IN_USE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_BAD_ADDRESS", MA_BAD_ADDRESS);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_BAD_SEEK", MA_BAD_SEEK);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_BAD_PIPE", MA_BAD_PIPE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_DEADLOCK", MA_DEADLOCK);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_TOO_MANY_LINKS", MA_TOO_MANY_LINKS);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NOT_IMPLEMENTED", MA_NOT_IMPLEMENTED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NO_MESSAGE", MA_NO_MESSAGE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_BAD_MESSAGE", MA_BAD_MESSAGE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NO_DATA_AVAILABLE", MA_NO_DATA_AVAILABLE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_INVALID_DATA", MA_INVALID_DATA);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_TIMEOUT", MA_TIMEOUT);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NO_NETWORK", MA_NO_NETWORK);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NOT_UNIQUE", MA_NOT_UNIQUE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NOT_SOCKET", MA_NOT_SOCKET);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NO_ADDRESS", MA_NO_ADDRESS);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_BAD_PROTOCOL", MA_BAD_PROTOCOL);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_PROTOCOL_UNAVAILABLE", MA_PROTOCOL_UNAVAILABLE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_PROTOCOL_NOT_SUPPORTED", MA_PROTOCOL_NOT_SUPPORTED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_PROTOCOL_FAMILY_NOT_SUPPORTED", MA_PROTOCOL_FAMILY_NOT_SUPPORTED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_ADDRESS_FAMILY_NOT_SUPPORTED", MA_ADDRESS_FAMILY_NOT_SUPPORTED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_SOCKET_NOT_SUPPORTED", MA_SOCKET_NOT_SUPPORTED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_CONNECTION_RESET", MA_CONNECTION_RESET);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_ALREADY_CONNECTED", MA_ALREADY_CONNECTED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NOT_CONNECTED", MA_NOT_CONNECTED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_CONNECTION_REFUSED", MA_CONNECTION_REFUSED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NO_HOST", MA_NO_HOST);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_IN_PROGRESS", MA_IN_PROGRESS);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_CANCELLED", MA_CANCELLED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_MEMORY_ALREADY_MAPPED", MA_MEMORY_ALREADY_MAPPED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_CRC_MISMATCH", MA_CRC_MISMATCH);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_FORMAT_NOT_SUPPORTED", MA_FORMAT_NOT_SUPPORTED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_DEVICE_TYPE_NOT_SUPPORTED", MA_DEVICE_TYPE_NOT_SUPPORTED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_SHARE_MODE_NOT_SUPPORTED", MA_SHARE_MODE_NOT_SUPPORTED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NO_BACKEND", MA_NO_BACKEND);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_NO_DEVICE", MA_NO_DEVICE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_API_NOT_FOUND", MA_API_NOT_FOUND);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_INVALID_DEVICE_CONFIG", MA_INVALID_DEVICE_CONFIG);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_LOOP", MA_LOOP);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_BACKEND_NOT_ENABLED", MA_BACKEND_NOT_ENABLED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_DEVICE_NOT_INITIALIZED", MA_DEVICE_NOT_INITIALIZED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_DEVICE_ALREADY_INITIALIZED", MA_DEVICE_ALREADY_INITIALIZED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_DEVICE_NOT_STARTED", MA_DEVICE_NOT_STARTED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_DEVICE_NOT_STOPPED", MA_DEVICE_NOT_STOPPED);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_FAILED_TO_INIT_BACKEND", MA_FAILED_TO_INIT_BACKEND);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_FAILED_TO_OPEN_BACKEND_DEVICE", MA_FAILED_TO_OPEN_BACKEND_DEVICE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_FAILED_TO_START_BACKEND_DEVICE", MA_FAILED_TO_START_BACKEND_DEVICE);
+	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_FAILED_TO_STOP_BACKEND_DEVICE", MA_FAILED_TO_STOP_BACKEND_DEVICE);
 	engine->RegisterEnum("audio_node_state");
 	engine->RegisterEnumValue("audio_node_state", "AUDIO_NODE_STATE_STARTED", ma_node_state_started);
 	engine->RegisterEnumValue("audio_node_state", "AUDIO_NODE_STATE_STOPPED", ma_node_state_stopped);
@@ -699,6 +793,17 @@ void RegisterSoundsystem(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("audio_format", "AUDIO_FORMAT_S24", ma_format_s24);
 	engine->RegisterEnumValue("audio_format", "AUDIO_FORMAT_S32", ma_format_s32);
 	engine->RegisterEnumValue("audio_format", "AUDIO_FORMAT_F32", ma_format_f32);
+	engine->RegisterEnum("audio_pan_mode");
+	engine->RegisterEnumValue("audio_pan_mode", "AUDIO_PAN_MODE_BALANCE", ma_pan_mode_balance);
+	engine->RegisterEnumValue("audio_pan_mode", "AUDIO_PAN_MODE_PAN", ma_pan_mode_pan);
+	engine->RegisterEnum("audio_positioning_mode");
+	engine->RegisterEnumValue("audio_positioning_mode", "AUDIO_POSITIONING_ABSOLUTE", ma_positioning_absolute);
+	engine->RegisterEnumValue("audio_positioning_mode", "AUDIO_POSITIONING_RELATIVE", ma_positioning_relative);
+	engine->RegisterEnum("audio_attenuation_model");
+	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_NONE", ma_attenuation_model_none);
+	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_INVERSE", ma_attenuation_model_inverse);
+	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_LINEAR", ma_attenuation_model_linear);
+	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_EXPONENTIAL", ma_attenuation_model_exponential);
 	engine->RegisterEnum("audio_engine_flags");
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_DURATIONS_IN_FRAMES", audio_engine::DURATIONS_IN_FRAMES);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_AUTO_START", audio_engine::NO_AUTO_START);
@@ -707,36 +812,37 @@ void RegisterSoundsystem(asIScriptEngine* engine) {
 	RegisterSoundsystemAudioNode<audio_node>(engine, "audio_node");
 	RegisterSoundsystemMixer<sound>(engine, "sound");
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
-	engine->RegisterObjectMethod("sound", "bool load(const string&in filename)", WRAP_MFN_PR(sound, load, (const string&), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool load_memory(const string&in data)", WRAP_MFN_PR(sound, load_memory, (const string&), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool close()", WRAP_MFN_PR(sound, close, (), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool get_active() const property", WRAP_MFN_PR(sound, get_active, (), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool get_paused() const property", WRAP_MFN_PR(sound, get_paused, (), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool pause()", WRAP_MFN_PR(sound, pause, (), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool pause_fade(const uint64 length)", WRAP_MFN_PR(sound, pause_fade, (unsigned long long), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool pause_fade_in_frames(const uint64 frames)", WRAP_MFN_PR(sound, pause_fade_in_frames, (unsigned long long), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool pause_fade_in_milliseconds(uint64 milliseconds)", WRAP_MFN_PR(sound, pause_fade_in_milliseconds, (unsigned long long), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_timed_fade(float start_volume, float end_volume, uint64 length, uint64 absolute_time)", WRAP_MFN_PR(sound, set_timed_fade, (float, float, unsigned long long, unsigned long long), void), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_timed_fade_in_frames(float start_volume, float end_volume, uint64 length, uint64 absolute_time)", WRAP_MFN_PR(sound, set_timed_fade_in_frames, (float, float, unsigned long long, unsigned long long), void), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_timed_fade_in_milliseconds(float start_volume, float end_volume, uint64 length, uint64 absolute_time)", WRAP_MFN_PR(sound, set_timed_fade_in_milliseconds, (float, float, unsigned long long, unsigned long long), void), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade(uint64 absolute_time, uint64 fade_length)", WRAP_MFN_PR(sound, set_stop_time_with_fade, (unsigned long long, unsigned long long), void), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade_in_frames(uint64 absolute_time, uint64 fade_length)", WRAP_MFN_PR(sound, set_stop_time_with_fade_in_frames, (unsigned long long, unsigned long long), void), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade_in_milliseconds(uint64 absolute_time, uint64 fade_length)", WRAP_MFN_PR(sound, set_stop_time_with_fade_in_milliseconds, (unsigned long long, unsigned long long), void), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "void set_looping(bool looping) property", WRAP_MFN_PR(sound, set_looping, (bool), void), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool get_looping() const property", WRAP_MFN_PR(sound, get_looping, (), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool get_at_end() const property", WRAP_MFN_PR(sound, get_at_end, (), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool seek(const uint64 position)", WRAP_MFN_PR(sound, seek, (unsigned long long), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool seek_in_frames(const uint64 position)", WRAP_MFN_PR(sound, seek_in_frames, (unsigned long long), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool seek_in_milliseconds(const uint64 position)", WRAP_MFN_PR(sound, seek_in_milliseconds, (unsigned long long), bool), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "uint64 get_position() property", WRAP_MFN_PR(sound, get_position, (), unsigned long long), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "uint64 get_position_in_frames() const property", WRAP_MFN(sound, get_position_in_frames), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "uint64 get_position_in_ms() const property", WRAP_MFN_PR(sound, get_position_in_milliseconds, (), unsigned long long), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "uint64 get_length() property", WRAP_MFN_PR(sound, get_length, (), unsigned long long), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "uint64 get_length_in_frames( ) const property", WRAP_MFN_PR(sound, get_length_in_frames, (), unsigned long long), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "uint64 get_length_in_ms() const property", WRAP_MFN_PR(sound, get_length_in_milliseconds, (), unsigned long long), asCALL_GENERIC);
-	engine->RegisterObjectMethod("sound", "bool get_data_format(audio_format&out format, uint32&out channels, uint32&out sample_rate)", WRAP_MFN_PR(sound, get_data_format, (ma_format*, unsigned int*, unsigned int*), bool), asCALL_GENERIC);
+	engine->RegisterObjectMethod("sound", "bool load(const string&in filename)", asFUNCTION((virtual_call<sound, &sound::load, bool, const string&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_memory(const string&in data)", asFUNCTION((virtual_call<sound, &sound::load_string, bool, const string&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool close()", asFUNCTION((virtual_call<sound, &sound::close, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool get_active() const property", asFUNCTION((virtual_call<sound, &sound::get_active, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool get_paused() const property", asFUNCTION((virtual_call<sound, &sound::get_paused, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool pause()", asFUNCTION((virtual_call<sound, &sound::pause, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool pause_fade(const uint64 length)", asFUNCTION((virtual_call<sound, &sound::pause_fade, bool, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool pause_fade_in_frames(const uint64 length_in_frames)", asFUNCTION((virtual_call<sound, &sound::pause_fade_in_frames, bool, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool pause_fade_in_milliseconds(const uint64 length_in_milliseconds)", asFUNCTION((virtual_call<sound, &sound::pause_fade_in_milliseconds, bool, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "void set_timed_fade(float start_volume, float end_volume, uint64 length, uint64 absolute_time)", asFUNCTION((virtual_call<sound, &sound::set_timed_fade, void, float, float, unsigned long long, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "void set_timed_fade_in_frames(float start_volume, float end_volume, uint64 length, uint64 absolute_time)", asFUNCTION((virtual_call<sound, &sound::set_timed_fade_in_frames, void, float, float, unsigned long long, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "void set_timed_fade_in_milliseconds(float start_volume, float end_volume, uint64 length, uint64 absolute_time)", asFUNCTION((virtual_call<sound, &sound::set_timed_fade_in_milliseconds, void, float, float, unsigned long long, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade(uint64 absolute_time, uint64 fade_length)", asFUNCTION((virtual_call<sound, &sound::set_stop_time_with_fade, void, unsigned long long, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade_in_frames(uint64 absolute_time, uint64 fade_length)", asFUNCTION((virtual_call<sound, &sound::set_stop_time_with_fade_in_frames, void, unsigned long long, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "void set_stop_time_with_fade_in_milliseconds(uint64 absolute_time, uint64 fade_length)", asFUNCTION((virtual_call<sound, &sound::set_stop_time_with_fade_in_milliseconds, void, unsigned long long, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "void set_looping(bool looping) property", asFUNCTION((virtual_call<sound, &sound::set_looping, void, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool get_looping() const property", asFUNCTION((virtual_call<sound, &sound::get_looping, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool get_at_end() const property", asFUNCTION((virtual_call<sound, &sound::get_looping, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool seek(const uint64 position)", asFUNCTION((virtual_call<sound, &sound::seek, bool, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool seek_in_frames(const uint64 position)", asFUNCTION((virtual_call<sound, &sound::seek_in_frames, bool, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool seek_in_milliseconds(const uint64 position)", asFUNCTION((virtual_call<sound, &sound::seek_in_milliseconds, bool, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "uint64 get_position() property", asFUNCTION((virtual_call<sound, &sound::get_position, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "uint64 get_position_in_frames() const property", asFUNCTION((virtual_call<sound, &sound::get_position_in_frames, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "uint64 get_position_in_milliseconnds() const property", asFUNCTION((virtual_call<sound, &sound::get_position_in_milliseconds, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "uint64 get_length() property", asFUNCTION((virtual_call<sound, &sound::get_length, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "uint64 get_length_in_frames( ) const property", asFUNCTION((virtual_call<sound, &sound::get_length_in_frames, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "uint64 get_length_in_ms() const property", asFUNCTION((virtual_call<sound, &sound::get_length_in_milliseconds, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool get_data_format(audio_format&out format, uint32&out channels, uint32&out sample_rate)", asFUNCTION((virtual_call<sound, &sound::get_data_format, bool, ma_format*, unsigned int*, unsigned int*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterGlobalFunction("const string[]@ get_sound_input_devices() property", asFUNCTION(get_sound_input_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("const string[]@ get_sound_output_devices() property", asFUNCTION(get_sound_output_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_output_device(int device) property", asFUNCTION(set_sound_output_device), asCALL_CDECL);
+	engine->RegisterGlobalFunction("audio_error_state get_SOUNDSYSTEM_LAST_ERROR() property", asFUNCTION(get_soundsystem_last_error), asCALL_CDECL);
 }
