@@ -13,6 +13,7 @@
 #include <angelscript.h>
 #include <scriptarray.h>
 #include <reactphysics3d/reactphysics3d.h>
+#include "nvgt.h"
 #include "nvgt_angelscript.h"
 #include "reactphysics.h"
 
@@ -47,6 +48,44 @@ AABB aabb_from_triangle(CScriptArray* points) {
 	if (points->GetSize() != 3) throw runtime_error("triangle must have 3 points");
 	return AABB::createAABBForTriangle(reinterpret_cast<const Vector3*>(points->GetBuffer()));
 }
+class raycast_callback : public RaycastCallback {
+	public:
+	asIScriptFunction* callback;
+	raycast_callback(asIScriptFunction* callback) : callback(callback) {}
+	decimal notifyRaycastHit(const RaycastInfo& info) override {
+		asIScriptContext* ACtx = asGetActiveContext();
+		bool new_context = ACtx == NULL || ACtx->PushState() < 0;
+		asIScriptContext* ctx = (new_context ? g_ScriptEngine->RequestContext() : ACtx);
+		if (!ctx) return 0;
+		if (ctx->Prepare(callback) < 0) {
+			if (new_context) g_ScriptEngine->ReturnContext(ctx);
+			else ctx->PopState();
+			return 0;
+		}
+		ctx->SetArgObject(0, (void*)&info);
+		if (ctx->Execute() != asEXECUTION_FINISHED) {
+			if (new_context) g_ScriptEngine->ReturnContext(ctx);
+			else ctx->PopState();
+			return 0;
+		}
+		float v = ctx->GetReturnFloat();
+		if (new_context) g_ScriptEngine->ReturnContext(ctx);
+		else ctx->PopState();
+		return v;
+	}
+};
+void world_raycast(PhysicsWorld& world, const Ray& ray, asIScriptFunction* callback, unsigned short bits) {
+	raycast_callback rcb(callback);
+	world.raycast(ray, &rcb, bits);
+}
+void world_test_overlap_body(PhysicsWorld& world, Body* body, asIScriptFunction* callback) {
+	raycast_callback rcb(callback);
+	world.testOverlap(body, &rcb);
+}
+void world_test_overlap(PhysicsWorld& world, Body* body, asIScriptFunction* callback) {
+	raycast_callback rcb(callback);
+	world.testOverlap(&rcb);
+}
 
 CScriptArray* face_get_vertices(const HalfEdgeStructure::Face & f) {
 	CScriptArray* array = CScriptArray::Create(get_array_type("array<uint>"), f.faceVertices.size());
@@ -62,6 +101,9 @@ void face_set_vertices(HalfEdgeStructure::Face & f, CScriptArray* array) {
 
 // registration templates
 template <class T> void RegisterCollisionShape(asIScriptEngine* engine, const string& type) {
+	engine->RegisterObjectType(type.c_str(), 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "physics_shape_name get_name() const property", asMETHOD(T, getName), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "physics_shape_type get_type() const property", asMETHOD(T, getType), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_is_convex() const property", asMETHOD(T, isConvex), asCALL_THISCALL);
@@ -82,10 +124,21 @@ template <class T> void RegisterPhysicsBody(asIScriptEngine* engine, const strin
 	engine->RegisterObjectMethod(type.c_str(), "void set_is_active(bool is_active) property", asMETHOD(T, setIsActive), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const transform& get_transform() const property", asMETHOD(T, getTransform), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_transform(const transform&in transform) property", asMETHOD(T, setTransform), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "physics_collider@ add_collider(collision_shape&in shape, const transform&in transform)", asMETHOD(T, addCollider), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "physics_collider@ add_collider(physics_collision_shape&in shape, const transform&in transform)", asMETHOD(T, addCollider), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void remove_collider(physics_collider&in collider)", asMETHOD(T, removeCollider), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "bool test_point_inside(const vector&in point)", asMETHOD(T, testPointInside), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "bool raycast(const ray& point, physics_raycast_info& raycast_info)", asMETHOD(T, raycast), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool test_point_inside(const vector&in point) const", asMETHOD(T, testPointInside), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool raycast(const ray& point, raycast_info& raycast_info) const", asMETHOD(T, raycast), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool test_aabb_overlap(const aabb&in world_aabb) const", asMETHOD(T, testAABBOverlap), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "aabb get_aabb() const property", asMETHOD(T, getAABB), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const physics_collider& get_collider(uint index) const", asMETHODPR(T, getCollider, (uint32) const, const Collider*), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "physics_collider& get_collider(uint index)", asMETHODPR(T, getCollider, (uint32), Collider*), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_nb_colliders() const property", asMETHOD(T, getNbColliders), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_world_point(const vector&in local_point) const", asMETHOD(T, getWorldPoint), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_world_vector(const vector&in local_vector) const", asMETHOD(T, getWorldVector), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_local_point(const vector&in world_point) const", asMETHOD(T, getLocalPoint), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_local_vector(const vector&in world_vector) const", asMETHOD(T, getLocalVector), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_is_debug_enabled() const property", asMETHOD(T, isDebugEnabled), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_debug_enabled(bool enabled) property", asMETHOD(T, setIsDebugEnabled), asCALL_THISCALL);
 }
 
 template <class T> void RegisterConvexShape(asIScriptEngine* engine, const string& type) {
@@ -140,11 +193,18 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_entity", "uint get_generation() const property", asMETHOD(Entity, getGeneration), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_entity", "bool opEquals(const physics_entity&in entity) const", asMETHOD(Entity, operator==), asCALL_THISCALL);
 
-	engine->RegisterObjectType("physics_collider", 0, asOBJ_REF);
-	RegisterPhysicsBody<Body>(engine, "PhysicsBody");
-	engine->RegisterObjectType("physics_rigid_body", 0, asOBJ_REF);
-
+	engine->RegisterObjectType("aabb", sizeof(AABB), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<AABB>() | asOBJ_APP_CLASS_ALLFLOATS);
+	engine->RegisterObjectType("ray", sizeof(Ray), asOBJ_VALUE | asGetTypeTraits<Ray>() | asOBJ_APP_CLASS_ALLFLOATS);
+	engine->RegisterObjectType("raycast_info", sizeof(RaycastInfo), asOBJ_VALUE | asGetTypeTraits<RaycastInfo>());
+	engine->RegisterObjectType("transform", sizeof(Transform), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Transform>() | asOBJ_APP_CLASS_ALLFLOATS);
 	engine->RegisterObjectType("vector", sizeof(Vector3), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Vector3>() | asOBJ_APP_CLASS_ALLFLOATS);
+	RegisterCollisionShape<CollisionShape>(engine, "physics_collision_shape");
+	engine->RegisterObjectType("physics_collider", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("physics_collider", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_collider", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	RegisterPhysicsBody<Body>(engine, "physics_body");
+	RegisterPhysicsBody<RigidBody>(engine, "physics_rigid_body");
+
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<Vector3>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f(float x, float y, float z = 0.0f)", asFUNCTION((rp_construct<Vector3, decimal, decimal, decimal>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<Vector3>), asCALL_CDECL_OBJFIRST);
@@ -181,13 +241,11 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("vector", "const float& opIndex(int index) const", asMETHODPR(Vector3, operator[], (int) const, const float&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "string opImplConv() const", asMETHOD(Vector3, to_string), asCALL_THISCALL);
 
-	engine->RegisterObjectType("ray", sizeof(Ray), asOBJ_VALUE | asGetTypeTraits<Ray>() | asOBJ_APP_CLASS_ALLFLOATS);
 	engine->RegisterObjectBehaviour("ray", asBEHAVE_CONSTRUCT, "void f(const vector&in p1, const vector&in p2, float max_frac = 1.0f)", asFUNCTION((rp_construct<Ray, const Vector3&, const Vector3&, decimal>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("ray", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<Ray>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectProperty("ray", "vector point1", asOFFSET(Ray, point1));
 	engine->RegisterObjectProperty("ray", "vector point2", asOFFSET(Ray, point2));
 	engine->RegisterObjectProperty("ray", "float max_fraction", asOFFSET(Ray, maxFraction));
-	engine->RegisterObjectType("raycast_info", sizeof(RaycastInfo), asOBJ_VALUE | asGetTypeTraits<RaycastInfo>());
 	engine->RegisterObjectBehaviour("raycast_info", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION((rp_construct<RaycastInfo>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("raycast_info", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<RaycastInfo>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectProperty("raycast_info", "vector world_point", asOFFSET(RaycastInfo, worldPoint));
@@ -267,7 +325,6 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("quaternion quaternion_from_euler_angles(float angle_x, float angle_y, float angle_z)", asFUNCTIONPR(Quaternion::fromEulerAngles, (decimal, decimal, decimal), Quaternion), asCALL_CDECL);
 	engine->RegisterGlobalFunction("quaternion quaternion_from_euler_angles(const vector& angles)", asFUNCTIONPR(Quaternion::fromEulerAngles, (const Vector3&), Quaternion), asCALL_CDECL);
 
-	engine->RegisterObjectType("transform", sizeof(Transform), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Transform>() | asOBJ_APP_CLASS_ALLFLOATS);
 	engine->RegisterObjectBehaviour("transform", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<Transform>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("transform", asBEHAVE_CONSTRUCT, "void f(const vector&in position, const matrix3x3&in orientation)", asFUNCTION((rp_construct<Transform, const Vector3&, const Matrix3x3&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("transform", asBEHAVE_CONSTRUCT, "void f(const vector&in position, const quaternion&in orientation)", asFUNCTION((rp_construct<Transform, const Vector3&, const Quaternion&>)), asCALL_CDECL_OBJFIRST);
@@ -288,7 +345,6 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("transform get_IDENTITY_TRANSFORM() property", asFUNCTION(Transform::identity), asCALL_CDECL);
 	engine->RegisterGlobalFunction("transform transforms_interpolate()", asFUNCTION(Transform::interpolateTransforms), asCALL_CDECL);
 
-	engine->RegisterObjectType("aabb", sizeof(AABB), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<AABB>() | asOBJ_APP_CLASS_ALLFLOATS);
 	engine->RegisterObjectBehaviour("aabb", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<AABB>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("aabb", asBEHAVE_CONSTRUCT, "void f(const vector&in min, const vector&in max)", asFUNCTION((rp_construct<AABB, const Vector3&, const Vector3&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("aabb", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<AABB>), asCALL_CDECL_OBJFIRST);
