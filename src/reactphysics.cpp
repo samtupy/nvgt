@@ -11,6 +11,7 @@
 */
 
 #include <angelscript.h>
+#include <scriptany.h>
 #include <scriptarray.h>
 #include <reactphysics3d/reactphysics3d.h>
 #include "nvgt.h"
@@ -19,8 +20,10 @@
 
 using namespace std;
 using namespace reactphysics3d;
+class event_listener;
 
 PhysicsCommon g_physics;
+unordered_map<PhysicsWorld*, event_listener*> g_physics_event_listeners; // These need to be kept alive while the world exists, and the PhysicsWorld class has no user data.
 
 // Angelscript factories.
 template <class T, typename... A> void rp_construct(void* mem, A... args) { new (mem) T(args...); }
@@ -48,6 +51,21 @@ AABB aabb_from_triangle(CScriptArray* points) {
 	if (points->GetSize() != 3) throw runtime_error("triangle must have 3 points");
 	return AABB::createAABBForTriangle(reinterpret_cast<const Vector3*>(points->GetBuffer()));
 }
+void simple_void_callback(asIScriptFunction* callback, const void* data) {
+	asIScriptContext* ACtx = asGetActiveContext();
+	bool new_context = ACtx == NULL || ACtx->PushState() < 0;
+	asIScriptContext* ctx = (new_context ? g_ScriptEngine->RequestContext() : ACtx);
+	if (!ctx) return;
+	if (ctx->Prepare(callback) < 0) {
+		if (new_context) g_ScriptEngine->ReturnContext(ctx);
+		else ctx->PopState();
+		return;
+	}
+	ctx->SetArgObject(0, (void*)&data);
+	ctx->Execute();
+	if (new_context) g_ScriptEngine->ReturnContext(ctx);
+	else ctx->PopState();
+}
 class raycast_callback : public RaycastCallback {
 	public:
 	asIScriptFunction* callback;
@@ -74,26 +92,25 @@ class raycast_callback : public RaycastCallback {
 		return v;
 	}
 };
+class collision_callback : public CollisionCallback {
+	public:
+	asIScriptFunction* callback;
+	collision_callback(asIScriptFunction* callback) : callback(callback) {}
+	void onContact(const CollisionCallback::CallbackData& data) override { simple_void_callback(callback, &data); }
+};
 class overlap_callback : public OverlapCallback {
 	public:
 	asIScriptFunction* callback;
 	overlap_callback(asIScriptFunction* callback) : callback(callback) {}
-	// Perhaps we should make these callbacks some sort of templates if they get too numerous?
-	void onOverlap(OverlapCallback::CallbackData& data) override {
-		asIScriptContext* ACtx = asGetActiveContext();
-		bool new_context = ACtx == NULL || ACtx->PushState() < 0;
-		asIScriptContext* ctx = (new_context ? g_ScriptEngine->RequestContext() : ACtx);
-		if (!ctx) return;
-		if (ctx->Prepare(callback) < 0) {
-			if (new_context) g_ScriptEngine->ReturnContext(ctx);
-			else ctx->PopState();
-			return;
-		}
-		ctx->SetArgObject(0, (void*)&data);
-		ctx->Execute();
-		if (new_context) g_ScriptEngine->ReturnContext(ctx);
-		else ctx->PopState();
-	}
+	void onOverlap(OverlapCallback::CallbackData& data) override { simple_void_callback(callback, &data); }
+};
+class event_listener : public EventListener {
+	public:
+	asIScriptFunction* on_contact_callback;
+	asIScriptFunction* on_overlap_callback;
+	event_listener(asIScriptFunction* on_contact_callback, asIScriptFunction* on_overlap_callback) : on_contact_callback(on_contact_callback), on_overlap_callback(on_overlap_callback) {}
+	void onContact(const CollisionCallback::CallbackData& data) override { simple_void_callback(on_contact_callback, &data); }
+	void onTrigger(const OverlapCallback::CallbackData& data) override { simple_void_callback(on_overlap_callback, &data); }
 };
 
 void world_raycast(PhysicsWorld& world, const Ray& ray, asIScriptFunction* callback, unsigned short bits) {
@@ -104,9 +121,38 @@ void world_test_overlap_body(PhysicsWorld& world, Body* body, asIScriptFunction*
 	overlap_callback cb(callback);
 	world.testOverlap(body, cb);
 }
-void world_test_overlap(PhysicsWorld& world, Body* body, asIScriptFunction* callback) {
+void world_test_overlap(PhysicsWorld& world, asIScriptFunction* callback) {
 	overlap_callback cb(callback);
 	world.testOverlap(cb);
+}
+void world_test_collision_bodies(PhysicsWorld& world, Body* body1, Body* body2, asIScriptFunction* callback) {
+	collision_callback cb(callback);
+	world.testCollision(body1, body2, cb);
+}
+void world_test_collision_body(PhysicsWorld& world, Body* body, asIScriptFunction* callback) {
+	collision_callback cb(callback);
+	world.testCollision(body, cb);
+}
+void world_test_collision(PhysicsWorld& world, asIScriptFunction* callback) {
+	collision_callback cb(callback);
+	world.testCollision(cb);
+}
+void world_destroy_listener(PhysicsWorld* world) {
+	if (!g_physics_event_listeners.contains(world)) return;
+	event_listener* l = g_physics_event_listeners[world];
+	if(l->on_contact_callback) l->on_contact_callback->Release();
+	if(l->on_overlap_callback) l->on_overlap_callback->Release();
+	delete l;
+	g_physics_event_listeners.erase(world);
+}
+void world_set_callbacks(PhysicsWorld* world, asIScriptFunction* on_contact, asIScriptFunction* on_overlap) {
+	world_destroy_listener(world);
+	g_physics_event_listeners[world] = new event_listener(on_contact, on_overlap);
+	world->setEventListener(g_physics_event_listeners[world]);
+}
+void world_destroy(PhysicsWorld* world) {
+	world_destroy_listener(world);
+	g_physics.destroyPhysicsWorld(world);
 }
 
 CScriptArray* face_get_vertices(const HalfEdgeStructure::Face & f) {
@@ -217,6 +263,13 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("physics_contact_event_type", "PHYSICS_CONTACT_STAY", int(CollisionCallback::ContactPair::EventType::ContactStay));
 	engine->RegisterEnumValue("physics_contact_event_type", "PHYSICS_CONTACT_EXIT", int(CollisionCallback::ContactPair::EventType::ContactExit));
 
+	engine->RegisterEnum("physics_joints_position_correction_technique");
+	engine->RegisterEnumValue("physics_joints_position_correction_technique", "JOINTS_CORRECTION_TECHNIQUE_BAUMGARTE_JOINTS", int(JointsPositionCorrectionTechnique::BAUMGARTE_JOINTS));
+	engine->RegisterEnumValue("physics_joints_position_correction_technique", "JOINTS_CORRECTION_TECHNIQUE_NON_LINEAR_GAUSS_SEIDEL", int(JointsPositionCorrectionTechnique::NON_LINEAR_GAUSS_SEIDEL));
+	engine->RegisterEnum("physics_contact_position_correction_technique");
+	engine->RegisterEnumValue("physics_contact_position_correction_technique", "POSITION_CORRECTION_TECHNIQUE_BAUMGARTE_CONTACTS", int(ContactsPositionCorrectionTechnique::BAUMGARTE_CONTACTS));
+	engine->RegisterEnumValue("physics_contact_position_correction_technique", "POSITION_CORRECTION_TECHNIQUE_SPLIT_IMPULSES", int(ContactsPositionCorrectionTechnique::SPLIT_IMPULSES));
+
 	engine->RegisterEnum("physics_triangle_raycast_side");
 	engine->RegisterEnumValue("physics_triangle_raycast_side", "TRIANGLE_RAYCAST_SIDE_FRONT", int(TriangleRaycastSide::FRONT));
 	engine->RegisterEnumValue("physics_triangle_raycast_side", "TRIANGLE_RAYCAST_SIDE_BACK", int(TriangleRaycastSide::BACK));
@@ -261,6 +314,45 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_contact_pair", "physics_collider& get_collider1() const property", asMETHOD(CollisionCallback::ContactPair, getCollider1), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_contact_pair", "physics_collider& get_collider2() const property", asMETHOD(CollisionCallback::ContactPair, getCollider2), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_contact_pair", "physics_contact_event_type get_event_type() const property", asMETHOD(CollisionCallback::ContactPair, getEventType), asCALL_THISCALL);
+	engine->RegisterObjectType("physics_collision_callback_data", 0, asOBJ_REF | asOBJ_NOHANDLE);
+	engine->RegisterObjectMethod("physics_collision_callback_data", "uint get_nb_contact_pairs() const property", asMETHOD(CollisionCallback::CallbackData, getNbContactPairs), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collision_callback_data", "physics_contact_pair get_contact_pair(uint64 index) const", asMETHOD(CollisionCallback::CallbackData, getContactPair), asCALL_THISCALL);
+	engine->RegisterObjectType("physics_overlap_pair", sizeof(OverlapCallback::OverlapPair), asOBJ_VALUE | asGetTypeTraits<OverlapCallback::OverlapPair>());
+	engine->RegisterObjectBehaviour("physics_overlap_pair", asBEHAVE_CONSTRUCT, "void f(const physics_overlap_pair&in pair)", asFUNCTION((rp_construct<OverlapCallback::OverlapPair, const OverlapCallback::OverlapPair&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_overlap_pair", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<OverlapCallback::OverlapPair>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_overlap_pair", "physics_body& get_body1() const property", asMETHOD(OverlapCallback::OverlapPair, getBody1), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_overlap_pair", "physics_body& get_body2() const property", asMETHOD(OverlapCallback::OverlapPair, getBody2), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_overlap_pair", "physics_collider& get_collider1() const property", asMETHOD(OverlapCallback::OverlapPair, getCollider1), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_overlap_pair", "physics_collider& get_collider2() const property", asMETHOD(OverlapCallback::OverlapPair, getCollider2), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_overlap_pair", "physics_overlap_event_type get_event_type() const property", asMETHOD(OverlapCallback::OverlapPair, getEventType), asCALL_THISCALL);
+	engine->RegisterObjectType("physics_overlap_callback_data", 0, asOBJ_REF | asOBJ_NOHANDLE);
+	engine->RegisterObjectMethod("physics_overlap_callback_data", "uint get_nb_overlap_pairs() const property", asMETHOD(OverlapCallback::CallbackData, getNbOverlappingPairs), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_overlap_callback_data", "physics_overlap_pair get_overlapping_pair(uint index) const", asMETHOD(OverlapCallback::CallbackData, getOverlappingPair), asCALL_THISCALL);
+
+	engine->RegisterEnum("physics_joint_type");
+	engine->RegisterEnumValue("physics_joint_type", "BALL_SOCKET_JOINT", int(JointType::BALLSOCKETJOINT));
+	engine->RegisterEnumValue("physics_joint_type", "SLIDER_JOINT", int(JointType::SLIDERJOINT));
+	engine->RegisterEnumValue("physics_joint_type", "HINGE_JOINT", int(JointType::HINGEJOINT));
+	engine->RegisterEnumValue("physics_joint_type", "FIXED_JOINT", int(JointType::FIXEDJOINT));
+	engine->RegisterObjectType("physics_joint_info", sizeof(JointInfo), asOBJ_VALUE | asGetTypeTraits<JointInfo>());
+	engine->RegisterObjectBehaviour("physics_joint_info", asBEHAVE_CONSTRUCT, "void f(physics_rigid_body@ body1, physics_rigid_body@ body2, physics_joint_type constraint_type)", asFUNCTION((rp_construct<JointInfo, RigidBody*, RigidBody*, JointType>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_joint_info", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<JointInfo>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectProperty("physics_joint_info", "physics_rigid_body@ body1", asOFFSET(JointInfo, body1));
+	engine->RegisterObjectProperty("physics_joint_info", "physics_rigid_body@ body2", asOFFSET(JointInfo, body2));
+	engine->RegisterObjectProperty("physics_joint_info", "physics_joint_type type", asOFFSET(JointInfo, type));
+	engine->RegisterObjectProperty("physics_joint_info", "physics_joints_position_correction_technique position_correction_technique", asOFFSET(JointInfo, positionCorrectionTechnique));
+	engine->RegisterObjectProperty("physics_joint_info", "bool isCollisionEnabled", asOFFSET(JointInfo, isCollisionEnabled));
+	engine->RegisterObjectType("physics_joint", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("physics_joint", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_joint", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_joint", "physics_rigid_body@ get_body1() const property", asMETHOD(Joint, getBody1), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_joint", "physics_rigid_body@ get_body2() const property", asMETHOD(Joint, getBody2), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_joint", "physics_joint_type get_type() const property", asMETHOD(Joint, getType), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_joint", "vector get_reaction_force(float time_step) const", asMETHOD(Joint, getReactionForce), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_joint", "vector get_reaction_torque(float time_step) const", asMETHOD(Joint, getReactionTorque), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_joint", "bool get_is_collision_enabled() const property", asMETHOD(Joint, isCollisionEnabled), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_joint", "physics_entity get_entity() const property", asMETHOD(Joint, getEntity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_joint", "string opImplConv()", asMETHOD(Joint, to_string), asCALL_THISCALL);
 
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<Vector3>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f(float x, float y, float z = 0.0f)", asFUNCTION((rp_construct<Vector3, decimal, decimal, decimal>)), asCALL_CDECL_OBJFIRST);
@@ -443,12 +535,50 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterObjectProperty("physics_world_settings", "float cos_angle_similar_contact_manifold", asOFFSET(PhysicsWorld::WorldSettings, cosAngleSimilarContactManifold));
 	engine->RegisterObjectMethod("physics_world_settings", "string opImplConv()", asMETHOD(PhysicsWorld::WorldSettings, to_string), asCALL_THISCALL);
 
+	engine->RegisterFuncdef("float physics_raycast_callback(const raycast_info&in info)");
+	engine->RegisterFuncdef("void physics_collision_callback(const physics_collision_callback_data& data)");
+	engine->RegisterFuncdef("void physics_overlap_callback(const physics_overlap_callback_data& data)");
 	engine->RegisterObjectType("physics_world", 0, asOBJ_REF);
-	engine->RegisterGlobalFunction("void physics_world_destroy(physics_world& world)", asMETHOD(PhysicsCommon, destroyPhysicsWorld), asCALL_THISCALL_ASGLOBAL, &g_physics);
+	engine->RegisterGlobalFunction("void physics_world_destroy(physics_world& world)", asFUNCTION(world_destroy), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("physics_world", asBEHAVE_FACTORY, "physics_world@ w(const physics_world_settings&in world_settings)", asMETHOD(PhysicsCommon, createPhysicsWorld), asCALL_THISCALL_ASGLOBAL, &g_physics);
 	engine->RegisterObjectBehaviour("physics_world", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("physics_world", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world_settings", "bool test_overlap(physics_body& body1, physics_body& body2)", asMETHODPR(PhysicsWorld, testOverlap, (Body*, Body*), bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void raycast(const ray&in ray, physics_raycast_callback@ callback, uint16 category_mask = 0xffff)", asFUNCTION(world_raycast), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "bool test_overlap(physics_body@ body1, physics_body@ body2)", asMETHODPR(PhysicsWorld, testOverlap, (Body*, Body*), bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void test_overlap(physics_body@ body, physics_overlap_callback@ callback)", asFUNCTION(world_test_overlap_body), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void test_overlap(physics_overlap_callback@ callback)", asFUNCTION(world_test_overlap), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void test_collision(physics_body@ body1, physics_body@ body2, physics_collision_callback@ callback)", asFUNCTION(world_test_collision_bodies), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void test_collision(physics_body@ body, physics_collision_callback@ callback)", asFUNCTION(world_test_collision_body), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void test_collision(physics_collision_callback@ callback)", asFUNCTION(world_test_collision), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "aabb get_world_aabb(const physics_collider@ collider) const", asMETHOD(PhysicsWorld, getWorldAABB), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "const string& get_name() const property", asMETHOD(PhysicsWorld, getName), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void update(float time_step)", asMETHOD(PhysicsWorld, update), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "uint16 get_nb_iterations_velocity_solver() const property", asMETHOD(PhysicsWorld, getNbIterationsVelocitySolver), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void set_nb_iterations_velocity_solver(uint16 iterations) property", asMETHOD(PhysicsWorld, setNbIterationsVelocitySolver), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "uint16 get_nb_iterations_position_solver() const property", asMETHOD(PhysicsWorld, getNbIterationsPositionSolver), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void set_nb_iterations_position_solver(uint16 iterations) property", asMETHOD(PhysicsWorld, setNbIterationsPositionSolver), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void set_contacts_position_correction_technique(physics_contact_position_correction_technique technique) property", asMETHOD(PhysicsWorld, setContactsPositionCorrectionTechnique), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "physics_rigid_body@ create_rigid_body(const transform&in transform)", asMETHOD(PhysicsWorld, createRigidBody), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void destroy_rigid_body(physics_rigid_body& body)", asMETHOD(PhysicsWorld, destroyRigidBody), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "physics_joint@ create_joint(const physics_joint_info&in joint_info)", asMETHOD(PhysicsWorld, createJoint), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void destroy_joint(physics_joint& joint)", asMETHOD(PhysicsWorld, destroyJoint), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "vector get_gravity() const property", asMETHOD(PhysicsWorld, getGravity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void set_gravity(const vector&in gravity) property", asMETHOD(PhysicsWorld, setGravity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "bool get_is_gravity_enabled() const property", asMETHOD(PhysicsWorld, isGravityEnabled), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void set_is_gravity_enabled(bool enabled) property", asMETHOD(PhysicsWorld, setIsGravityEnabled), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "bool get_is_sleeping_enabled() const property", asMETHOD(PhysicsWorld, isSleepingEnabled), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void set_is_sleeping_enabled(bool enabled) property", asMETHOD(PhysicsWorld, enableSleeping), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "float get_sleep_linear_velocity() const property", asMETHOD(PhysicsWorld, getSleepLinearVelocity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void set_sleep_linear_velocity(float sleep_linear_velocity) property", asMETHOD(PhysicsWorld, setSleepLinearVelocity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "float get_sleep_angular_velocity() const property", asMETHOD(PhysicsWorld, getSleepAngularVelocity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void set_sleep_angular_velocity(float sleep_angular_velocity) property", asMETHOD(PhysicsWorld, setSleepAngularVelocity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "float get_time_before_sleep() const property", asMETHOD(PhysicsWorld, getTimeBeforeSleep), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void set_time_before_sleep(float time_before_sleep) property", asMETHOD(PhysicsWorld, setTimeBeforeSleep), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void set_callbacks(physics_collision_callback@ collision_callback, physics_overlap_callback@ trigger_callback)", asFUNCTION(world_set_callbacks), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "uint get_nb_rigid_bodies() const property", asMETHOD(PhysicsWorld, getNbRigidBodies), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "const physics_rigid_body& get_rigid_body(uint index) const", asMETHODPR(PhysicsWorld, getRigidBody, (uint32) const, const RigidBody*), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "physics_rigid_body& get_rigid_body(uint index)", asMETHODPR(PhysicsWorld, getRigidBody, (uint32), RigidBody*), asCALL_THISCALL);
 
 	engine->RegisterObjectType("physics_half_edge_structure_edge", sizeof(HalfEdgeStructure::Edge), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<HalfEdgeStructure::Edge>());
 	engine->RegisterObjectBehaviour("physics_half_edge_structure_edge", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<HalfEdgeStructure::Edge>), asCALL_CDECL_OBJFIRST);
