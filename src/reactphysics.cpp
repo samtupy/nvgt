@@ -183,7 +183,6 @@ template <class T> void RegisterCollisionShape(asIScriptEngine* engine, const st
 	engine->RegisterObjectMethod(type.c_str(), "string opImplConv() const", asMETHOD(T, to_string), asCALL_THISCALL);
 }
 template <class T> void RegisterPhysicsBody(asIScriptEngine* engine, const string& type) {
-	engine->RegisterObjectType(type.c_str(), 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "physics_entity get_entity() const property", asMETHOD(T, getEntity), asCALL_THISCALL);
@@ -231,6 +230,10 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("int clamp(int value, int min, int max)", asFUNCTIONPR(clamp, (int, int, int), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float clamp(float value, float min, float max)", asFUNCTIONPR(clamp, (decimal, decimal, decimal), decimal), asCALL_CDECL);
 
+	engine->RegisterEnum("physics_body_type");
+	engine->RegisterEnumValue("physics_body_type", "PHYSICS_BODY_STATIC", int(BodyType::STATIC));
+	engine->RegisterEnumValue("physics_body_type", "PHYSICS_BODY_KINEMATIC", int(BodyType::KINEMATIC));
+	engine->RegisterEnumValue("physics_body_type", "PHYSICS_BODY_DYNAMIC", int(BodyType::DYNAMIC));
 	engine->RegisterEnum("physics_shape_type");
 	engine->RegisterEnumValue("physics_shape_type", "SHAPE_TYPE_SPHERE", int(CollisionShapeType::SPHERE));
 	engine->RegisterEnumValue("physics_shape_type", "SHAPE_TYPE_CAPSULE", int(CollisionShapeType::CAPSULE));
@@ -277,17 +280,83 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_entity", "bool opEquals(const physics_entity&in entity) const", asMETHOD(Entity, operator==), asCALL_THISCALL);
 
 	engine->RegisterObjectType("aabb", sizeof(AABB), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<AABB>() | asOBJ_APP_CLASS_ALLFLOATS);
+	engine->RegisterObjectType("physics_body", 0, asOBJ_REF);
+	engine->RegisterObjectType("physics_rigid_body", 0, asOBJ_REF);
 	engine->RegisterObjectType("ray", sizeof(Ray), asOBJ_VALUE | asGetTypeTraits<Ray>() | asOBJ_APP_CLASS_ALLFLOATS);
 	engine->RegisterObjectType("raycast_info", sizeof(RaycastInfo), asOBJ_VALUE | asGetTypeTraits<RaycastInfo>());
 	engine->RegisterObjectType("transform", sizeof(Transform), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Transform>() | asOBJ_APP_CLASS_ALLFLOATS);
 	engine->RegisterObjectType("vector", sizeof(Vector3), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Vector3>() | asOBJ_APP_CLASS_ALLFLOATS);
-	
+
+	engine->RegisterObjectType("physics_material", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("physics_material", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_material", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_material", "float get_bounciness() const property", asMETHOD(Material, getBounciness), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_material", "void set_bounciness(float bounciness) property", asMETHOD(Material, setBounciness), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_material", "float get_friction_coefficient() const property", asMETHOD(Material, getFrictionCoefficient), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_material", "void set_friction_coefficient(float friction_coefficient) property", asMETHOD(Material, setFrictionCoefficient), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_material", "float get_friction_coefficient_sqrt() const property", asMETHOD(Material, getFrictionCoefficientSqrt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_material", "float get_mass_density() const property", asMETHOD(Material, getMassDensity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_material", "void set_mass_density(float mass_density) property", asMETHOD(Material, setMassDensity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_material", "string opImplConv()", asMETHOD(Material, to_string), asCALL_THISCALL);
+
 	RegisterCollisionShape<CollisionShape>(engine, "physics_collision_shape");
 	engine->RegisterObjectType("physics_collider", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("physics_collider", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("physics_collider", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_collider", "physics_entity get_entity() const property", asMETHOD(Collider, getEntity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "physics_collision_shape@ get_collision_shape() property", asMETHODPR(Collider, getCollisionShape, (), CollisionShape*), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "const physics_collision_shape@ get_collision_shape() const property", asMETHODPR(Collider, getCollisionShape, () const, const CollisionShape*), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "physics_body@ get_body() const property", asMETHOD(Collider, getBody), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "const transform& get_local_to_body_transform() const property", asMETHOD(Collider, getLocalToBodyTransform), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "void set_local_to_body_transform(const transform&in transform) property", asMETHOD(Collider, setLocalToBodyTransform), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "const transform get_local_to_world_transform() const", asMETHOD(Collider, getLocalToWorldTransform), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "const aabb get_world_aabb() const property", asMETHOD(Collider, getWorldAABB), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "bool test_aabb_overlap(const aabb&in world_aabb) const", asMETHOD(Collider, testAABBOverlap), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "bool test_point_inside(const vector&in world_point)", asMETHOD(Collider, testPointInside), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "bool raycast(const ray&in ray, raycast_info& raycast_info)", asMETHOD(Collider, raycast), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "uint16 get_collide_with_mask() const property", asMETHOD(Collider, getCollideWithMaskBits), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "void set_collide_with_mask(uint16 bits) property", asMETHOD(Collider, setCollideWithMaskBits), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "uint16 get_collision_category() const property", asMETHOD(Collider, getCollisionCategoryBits), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "void set_collision_category(uint16 bits) property", asMETHOD(Collider, setCollisionCategoryBits), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "uint16 get_broad_phase_id() const property", asMETHOD(Collider, getBroadPhaseId), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "physics_material& get_material() property", asMETHOD(Collider, getMaterial), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "void set_material(const physics_material&in material) property", asMETHOD(Collider, setMaterial), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "bool get_is_trigger() const property", asMETHOD(Collider, getIsTrigger), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "void set_is_trigger(bool is_trigger) property", asMETHOD(Collider, setIsTrigger), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "bool get_is_simulation_collider() const property", asMETHOD(Collider, getIsSimulationCollider), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "void set_is_simulation_collider(bool is_simulation_collider) property", asMETHOD(Collider, setIsSimulationCollider), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "bool get_is_world_query_collider() const property", asMETHOD(Collider, getIsWorldQueryCollider), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "void set_is_world_query_collider(bool is_world_query_collider) property", asMETHOD(Collider, setIsWorldQueryCollider), asCALL_THISCALL);
+
 	RegisterPhysicsBody<Body>(engine, "physics_body");
 	RegisterPhysicsBody<RigidBody>(engine, "physics_rigid_body");
+	engine->RegisterObjectMethod("physics_rigid_body", "float get_mass() const property", asMETHOD(RigidBody, getMass), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void set_mass(float mass) property", asMETHOD(RigidBody, setMass), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "vector get_linear_velocity() const property", asMETHOD(RigidBody, getLinearVelocity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void set_linear_velocity(const vector&in linear_velocity) property", asMETHOD(RigidBody, setLinearVelocity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "vector get_angular_velocity() const property", asMETHOD(RigidBody, getAngularVelocity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void set_angular_velocity(const vector&in angular_velocity) property", asMETHOD(RigidBody, setAngularVelocity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "const vector& get_local_inertia_tensor() const property", asMETHOD(RigidBody, getLocalInertiaTensor), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void set_local_inertia_tensor(const vector&in local_inertia_tensor) property", asMETHOD(RigidBody, setLocalInertiaTensor), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "const vector& get_local_center_of_mass() const property", asMETHOD(RigidBody, getLocalCenterOfMass), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void set_local_center_of_mass(const vector&in local_center_of_mass) property", asMETHOD(RigidBody, setLocalCenterOfMass), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void update_local_center_of_mass_from_colliders()", asMETHOD(RigidBody, updateLocalCenterOfMassFromColliders), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void update_local_inertia_tensor_from_colliders()", asMETHOD(RigidBody, updateLocalInertiaTensorFromColliders), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void update_mass_from_colliders()", asMETHOD(RigidBody, updateMassFromColliders), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void update_mass_properties_from_colliders()", asMETHOD(RigidBody, updateMassPropertiesFromColliders), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "physics_body_type get_type() const property", asMETHOD(RigidBody, getType), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void set_type(physics_body_type type) property", asMETHOD(RigidBody, setType), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "bool get_is_gravity_enabled() const property", asMETHOD(RigidBody, isGravityEnabled), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void set_is_gravity_enabled(bool enabled) property", asMETHOD(RigidBody, enableGravity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void set_is_sleeping(bool enabled)", asMETHOD(RigidBody, setIsSleeping), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "float get_linear_damping() const property", asMETHOD(RigidBody, getLinearDamping), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void set_linear_damping(float linear_damping) property", asMETHOD(RigidBody, setLinearDamping), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "float get_angular_damping() const property", asMETHOD(RigidBody, getAngularDamping), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void set_angular_damping(float angular_damping) property", asMETHOD(RigidBody, setAngularDamping), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "const vector& get_linear_lock_axis_factor() const property", asMETHOD(RigidBody, getLinearLockAxisFactor), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void set_linear_lock_axis_factor(const vector&in linear_lock_axis_factor) property", asMETHOD(RigidBody, setLinearLockAxisFactor), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "const vector& get_angular_lock_axis_factor() const property", asMETHOD(RigidBody, getAngularLockAxisFactor), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_rigid_body", "void set_angular_lock_axis_factor(const vector&in angular_lock_axis_factor) property", asMETHOD(RigidBody, setAngularLockAxisFactor), asCALL_THISCALL);
 
 	engine->RegisterObjectType("physics_contact_point", sizeof(CollisionCallback::ContactPoint), asOBJ_VALUE | asGetTypeTraits<CollisionCallback::ContactPoint>());
 	engine->RegisterObjectBehaviour("physics_contact_point", asBEHAVE_CONSTRUCT, "void f(const physics_contact_point&in point)", asFUNCTION((rp_construct<CollisionCallback::ContactPoint, const CollisionCallback::ContactPoint&>)), asCALL_CDECL_OBJFIRST);
