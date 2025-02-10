@@ -112,6 +112,7 @@ class event_listener : public EventListener {
 	void onContact(const CollisionCallback::CallbackData& data) override { simple_void_callback(on_contact_callback, &data); }
 	void onTrigger(const OverlapCallback::CallbackData& data) override { simple_void_callback(on_overlap_callback, &data); }
 };
+
 void world_raycast(PhysicsWorld& world, const Ray& ray, asIScriptFunction* callback, unsigned short bits) {
 	raycast_callback rcb(callback);
 	world.raycast(ray, &rcb, bits);
@@ -224,6 +225,14 @@ template <class T> void RegisterConvexPolyhedronShape(asIScriptEngine* engine, c
 	engine->RegisterObjectMethod(type.c_str(), "const physics_half_edge_structure_edge& get_half_edge(uint edge_index) const", asMETHOD(T, getHalfEdge), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "vector get_centroid() const property", asMETHOD(T, getCentroid), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "uint find_most_anti_parallel_face(const vector&in direction) const", asMETHOD(T, findMostAntiParallelFace), asCALL_THISCALL);
+}
+
+template <class T> void RegisterConcaveShape(asIScriptEngine* engine, const string& type) {
+	RegisterCollisionShape<T>(engine, type);
+	engine->RegisterObjectMethod(type.c_str(), "physics_triangle_raycast_side get_raycast_test_type() const property", asMETHOD(ConcaveShape, getRaycastTestType), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_raycast_test_type(physics_triangle_raycast_side side) property", asMETHOD(ConcaveShape, setRaycastTestType), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_scale() const property", asMETHOD(ConcaveShape, getScale), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_scale(const vector &in scale) property", asMETHOD(ConcaveShape, setScale), asCALL_THISCALL);
 }
 
 void RegisterReactphysics(asIScriptEngine* engine) {
@@ -677,5 +686,52 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_triangle_shape", "physics_triangle_raycast_side get_raycast_test_type() const property", asMETHOD(TriangleShape, getRaycastTestType), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_triangle_shape", "void set_raycast_test_type(physics_triangle_raycast_side test_type) const property", asMETHOD(TriangleShape, setRaycastTestType), asCALL_THISCALL);
 	engine->RegisterGlobalFunction("void physics_triangle_shape_compute_smooth_triangle_mesh_contact(const physics_collision_shape &in shape1, const physics_collision_shape &in shape2, vector & local_contact_point_shape1, vector & local_contact_point_shape2, const transform &in shape1_to_world, const transform &in shape2_to_world, float penitration_depth, vector & out_smooth_vertex_normal)", asFUNCTION(TriangleShape::computeSmoothTriangleMeshContact), asCALL_CDECL);
+
+	engine->RegisterObjectType("physics_message", sizeof(Message), asOBJ_VALUE | asGetTypeTraits<Message>());
+	engine->RegisterObjectBehaviour("physics_message", asBEHAVE_CONSTRUCT, "void f(string text, type=PHYSICS_MESSAGE_ERROR)", asFUNCTION((rp_construct<Message, std::string, Message::Type>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_message", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<Message>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterEnum("physics_message_type");
+	engine->RegisterEnumValue("physics_message_type", "PHYSICS_MESSAGE_ERROR", int(Message::Type::Error));
+	engine->RegisterEnumValue("physics_message_type", "PHYSICS_MESSAGE_WARNING", int(Message::Type::Warning));
+	engine->RegisterEnumValue("physics_message_type", "PHYSICS_MESSAGE_INFORMATION", int(Message::Type::Information));
+	engine->RegisterObjectProperty("physics_message", "string text", asOFFSET(Message, text));
+	engine->RegisterObjectProperty("physics_message", "physics_message_type", asOFFSET(Message, type));
+	
+	engine->RegisterObjectType("physics_height_field", sizeof(HeightField), asOBJ_VALUE | asGetTypeTraits<HeightField>());
+	engine->RegisterEnum("physics_height_data_type");
+	engine->RegisterEnumValue("physics_height_data_type", "PHYSICS_HEIGHT_FLOAT_TYPE", int(HeightField::HeightDataType::HEIGHT_FLOAT_TYPE));
+	engine->RegisterEnumValue("physics_height_data_type", "PHYSICS_HEIGHT_DOUBLE_TYPE", int(HeightField::HeightDataType::HEIGHT_DOUBLE_TYPE));
+	engine->RegisterEnumValue("physics_height_data_type", "PHYSICS_HEIGHT_INT_TYPE", int(HeightField::HeightDataType::HEIGHT_INT_TYPE));
+	engine->RegisterObjectMethod("physics_height_field", "uint get_nb_rows() const property", asMETHOD(HeightField, getNbRows), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_height_field", "uint get_nb_columns() const property", asMETHOD(HeightField, getNbColumns), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_height_field", "float get_min_height() const property", asMETHOD(HeightField, getMinHeight), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_height_field", "float get_max_height() const property", asMETHOD(HeightField, getMaxHeight), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_height_field", "float get_integer_height_scale() const property", asMETHOD(HeightField, getIntegerHeightScale), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_height_field", "vector get_vertex_at(uint x, uint y) const", asMETHOD(HeightField, getVertexAt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_height_field", "float get_height_at(uint x, uint y) const", asMETHOD(HeightField, getHeightAt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_height_field", "physics_height_data_type get_height_data_type() const property", asMETHOD(HeightField, getHeightDataType), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_height_field", "aabb& get_bounds() const property", asMETHOD(HeightField, getBounds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_height_field", "string opImplConv() const", asMETHOD(HeightField, to_string), asCALL_THISCALL);
+
+	RegisterConcaveShape<HeightFieldShape>(engine, "physics_height_field_shape");
+	engine->RegisterObjectMethod("physics_height_field_shape", "physics_height_field@ get_height_field() const property", asMETHOD(HeightFieldShape, getHeightField), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_height_field_shape", "vector get_vertex_at(uint x, uint y) const", asMETHOD(HeightFieldShape, getVertexAt), asCALL_THISCALL);
+
+	engine->RegisterObjectType("physics_convex_mesh", sizeof(ConvexMesh), asOBJ_VALUE | asGetTypeTraits<ConvexMesh>());
+	engine->RegisterObjectMethod("physics_convex_mesh", "uint get_nb_vertices() const property", asMETHOD(ConvexMesh, getNbVertices), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_convex_mesh", "vector& get_vertex(uint index) const", asMETHOD(ConvexMesh, getVertex), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_convex_mesh", "uint get_nb_faces() const property", asMETHOD(ConvexMesh, getNbFaces), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_convex_mesh", "vector& get_face_normal(uint index) const", asMETHOD(ConvexMesh, getFaceNormal), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_convex_mesh", "physics_half_structure& get_half_edge_structure() const property", asMETHOD(ConvexMesh, getHalfEdgeStructure), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_convex_mesh", "vector& get_centroid() const property", asMETHOD(ConvexMesh, getCentroid), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_convex_mesh", "aabb& get_bounds() const property", asMETHOD(ConvexMesh, getBounds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_convex_mesh", "float get_volume() const property", asMETHOD(ConvexMesh, getVolume), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_convex_mesh", "vector& get_local_inertia_tensor(float mass, vector scale) const", asMETHOD(ConvexMesh, getLocalInertiaTensor), asCALL_THISCALL);
+
+	RegisterConvexPolyhedronShape<ConvexMeshShape>(engine, "physics_convex_mesh_shape");
+	engine->RegisterObjectMethod("physics_convex_mesh_shape", "vector& get_scale() const property", asMETHOD(ConvexMeshShape, getScale), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_convex_mesh_shape", "void set_scale(vector& scale) const property", asMETHOD(ConvexMeshShape, setScale), asCALL_THISCALL);
+
+
 
 }
