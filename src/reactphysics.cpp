@@ -666,6 +666,15 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	engine->RegisterObjectProperty("physics_half_edge_structure_vertex", "uint vertex_point_index", asOFFSET(HalfEdgeStructure::Vertex, vertexPointIndex));
 	engine->RegisterObjectProperty("physics_half_edge_structure_vertex", "uint vertex_edge_index", asOFFSET(HalfEdgeStructure::Vertex, edgeIndex));
 
+	engine->RegisterObjectType("physics_half_edge_structure", 0, asOBJ_REF|asOBJ_NOHANDLE);
+	engine->RegisterObjectMethod("physics_half_edge_structure", "void compute_half_edges()", asMETHOD(HalfEdgeStructure, computeHalfEdges), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_half_edge_structure", "uint add_vertex(uint vertex_point_index)", asMETHOD(HalfEdgeStructure, addVertex), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_half_edge_structure", "uint get_nb_faces() const property", asMETHOD(HalfEdgeStructure, getNbFaces), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_half_edge_structure", "uint get_nb_half_edges() const property", asMETHOD(HalfEdgeStructure, getNbHalfEdges), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_half_edge_structure", "uint get_nb_vertices() const property", asMETHOD(HalfEdgeStructure, getNbVertices), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_half_edge_structure", "const physics_half_edge_structure_face& get_face(uint index) const property", asMETHOD(HalfEdgeStructure, getFace), asCALL_THISCALL);
+
+
 	RegisterConvexShape<CapsuleShape>(engine, "physics_capsule_shape");
 	engine->RegisterObjectMethod("physics_capsule_shape", "float get_radius() const property", asMETHOD(CapsuleShape, getRadius), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_capsule_shape", "void set_radius(float radius) property", asMETHOD(CapsuleShape, setRadius), asCALL_THISCALL);
