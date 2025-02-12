@@ -189,7 +189,7 @@ class music_track {
 			@track = next_track;
 			@next_track = null;
 		}
-		if (repeat_point > 0 and @track != null and track.length > 0) {
+		if (repeat_point > 0 and @track != null and track.loaded_filename == main_filename and track.length > 0) {
 			int cur_ms = track.position;
 			if (@next_track == null and track.length - cur_ms < repeat_point + 500) {
 				@next_track = sound();
