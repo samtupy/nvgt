@@ -1,0 +1,23 @@
+tts_voice tts;
+
+void main() {
+	show_window("Testing get_key_name");
+	while (!key_pressed(KEY_ESCAPE)) {
+		announce_keys();
+		wait(5);
+	}
+
+}
+
+void announce_keys() {
+	key_code[]@ key_codes = keys_pressed();
+	if (key_codes.empty())
+		return;
+
+	string[] key_names;
+	key_names.resize(key_codes.length());
+	for (uint i = 0, l = key_codes.length(); i < l; i ++)
+		key_names[i] = get_key_name(key_codes[i]);
+
+	tts.speak(join(key_names, " "), true);
+}
