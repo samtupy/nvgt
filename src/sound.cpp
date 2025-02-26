@@ -26,9 +26,6 @@
 using namespace std;
 
 class sound_impl;
-audio_engine* new_audio_engine();
-mixer* new_mixer(audio_engine* engine);
-sound* new_sound(audio_engine* engine);
 
 // Globals, currently NVGT does not support instanciating multiple miniaudio contexts and NVGT provides a global sound engine.
 static ma_context g_sound_context;
@@ -41,7 +38,7 @@ bool init_sound() {
 	if ((g_soundsystem_last_error = ma_context_init(nullptr, 0, nullptr, &g_sound_context)) != MA_SUCCESS) return false;
 	g_soundsystem_initialized.test_and_set();
 	refresh_audio_devices();
-	g_audio_engine = new_audio_engine();
+	g_audio_engine = new_audio_engine(audio_engine::PERCENTAGE_ATTRIBUTES);
 	return true;
 }
 
@@ -79,6 +76,19 @@ CScriptArray* get_sound_output_devices() {
 }
 
 reactphysics3d::Vector3 ma_vec3_to_rp_vec3(const ma_vec3f& v) { return reactphysics3d::Vector3(v.x, v.y, v.z); }
+
+// BGT seems to have used db for it's pan, we need to emulate that if the user chooses to enable backward compatibility options.
+float pan_linear_to_db(float linear) {
+	linear = clamp(linear, -1.0f, 1.0f);
+	float db = ma_volume_linear_to_db(linear > 0? 1.0f - linear : linear + 1.0f);
+	return linear > 0? db * -1.0f : db;
+}
+float pan_db_to_linear(float db) {
+	db = clamp(db, -100.0f, 100.0f);
+	float l = ma_volume_db_to_linear(fabs(db) * -1.0f);
+	return db > 0? 1.0f - l : -1.0f + l;
+}
+
 
 // Miniaudio objects must be allocated on the heap as nvgt's API introduces the concept of an uninitialized sound, which a stack based system would make more difficult to implement.
 class audio_node_impl : public virtual audio_node {
@@ -118,9 +128,9 @@ class audio_engine_impl final : public audio_engine {
 	int refcount;
 public:
 	engine_flags flags;
-	audio_engine_impl() : audio_engine(), engine(nullptr), engine_endpoint(nullptr), refcount(1) {
-		// default constructor initializes a miniaudio engine ourselves.
+	audio_engine_impl(int flags) : audio_engine(), engine(nullptr), engine_endpoint(nullptr), flags(static_cast<engine_flags>(flags)), refcount(1) {
 		ma_engine_config cfg = ma_engine_config_init();
+		// cfg.pContext = &g_sound_context; // Miniaudio won't let us quickly uninitilize then reinitialize a device sometimes when using the same context, so we won't manage it until we figure that out.
 		engine = make_unique<ma_engine>();
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS) {
 			engine.reset();
@@ -154,7 +164,7 @@ public:
 	bool set_device(int device) override {
 		if (!engine || device < 0 || device >= g_sound_output_devices.size()) return false;
 		ma_device* old_dev = ma_engine_get_device(&*engine);
-		if (!old_dev || memcmp(&old_dev->playback.id, &g_sound_output_devices[device].id, sizeof(ma_device_id)) == 0) return false;
+		if (!old_dev || ma_device_id_equal(&old_dev->playback.id, &g_sound_output_devices[device].id)) return false;
 		ma_engine_stop(&*engine);
 		ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
 		cfg.playback.pDeviceID = &g_sound_output_devices[device].id;
@@ -248,10 +258,10 @@ public:
 	float get_volume() override { return snd ? (engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES? ma_volume_linear_to_db(ma_sound_get_volume(&*snd)) : ma_sound_get_volume(&*snd)) : NAN; }
 	void set_pan(float pan) override {
 		if (snd)
-			ma_sound_set_pan(&*snd, pan);
+			ma_sound_set_pan(&*snd, engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES? pan_db_to_linear(pan) : pan);
 	}
 	float get_pan() override {
-		return snd ? ma_sound_get_pan(&*snd) : NAN;
+		return snd ? (engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES? pan_linear_to_db(ma_sound_get_pan(&*snd)) : ma_sound_get_pan(&*snd)) : NAN;
 	}
 	void set_pan_mode(ma_pan_mode mode) override {
 		if (snd)
@@ -262,10 +272,10 @@ public:
 	}
 	void set_pitch(float pitch) override {
 		if (snd)
-			ma_sound_set_pitch(&*snd, pitch);
+			ma_sound_set_pitch(&*snd, engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES? pitch / 100.0f : pitch);
 	}
 	float get_pitch() override {
-		return snd ? ma_sound_get_pitch(&*snd) : NAN;
+		return snd ? (engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES? ma_sound_get_pitch(&*snd) * 100 : ma_sound_get_pitch(&*snd)) : NAN;
 	}
 	void set_spatialization_enabled(bool enabled) override {
 		if (snd)
@@ -637,7 +647,7 @@ public:
 	}
 };
 
-audio_engine* new_audio_engine() { return new audio_engine_impl(); }
+audio_engine* new_audio_engine(int flags) { return new audio_engine_impl(flags); }
 mixer* new_mixer(audio_engine* engine) { return new mixer_impl(engine); }
 sound* new_sound(audio_engine* engine) { return new sound_impl(engine); }
 mixer* new_global_mixer() { init_sound(); return new mixer_impl(g_audio_engine); }

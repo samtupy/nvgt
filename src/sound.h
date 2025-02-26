@@ -202,6 +202,8 @@ public:
 	virtual bool get_data_format(ma_format* format, unsigned int* channels, unsigned int* sample_rate) = 0;
 };
 
-// audio_engine* new_audio_engine();
+audio_engine* new_audio_engine(int flags);
+mixer* new_mixer(audio_engine* engine);
+sound* new_sound(audio_engine* engine);
 
 void RegisterSoundsystem(asIScriptEngine* engine);
