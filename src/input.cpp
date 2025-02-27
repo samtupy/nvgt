@@ -34,12 +34,12 @@
  * following map variable makes this possible.
 */
 static std::unordered_map<unsigned int, std::string> g_KeyNames;
-static unsigned char g_KeysPressed[512];
-static unsigned char g_KeysRepeating[512];
-static unsigned char g_KeysForced[512];
+static unsigned char g_KeysPressed[SDL_SCANCODE_COUNT];
+static unsigned char g_KeysRepeating[SDL_SCANCODE_COUNT];
+static unsigned char g_KeysForced[SDL_SCANCODE_COUNT];
 static const bool* g_KeysDown = NULL;
 static int g_KeysDownArrayLen = 0;
-static unsigned char g_KeysReleased[512];
+static unsigned char g_KeysReleased[SDL_SCANCODE_COUNT];
 static unsigned char g_MouseButtonsPressed[32];
 static unsigned char g_MouseButtonsReleased[32];
 std::string g_UserInput = "";
@@ -75,10 +75,10 @@ CScriptArray* GetDevices(std::function<uint32_t*(int*)> callback) {
 }
 void InputInit() {
 	if (SDL_WasInit(0)&SDL_INIT_VIDEO) return;
-	memset(g_KeysPressed, 0, 512);
-	memset(g_KeysRepeating, 0, 512);
-	memset(g_KeysForced, 0, 512);
-	memset(g_KeysReleased, 0, 512);
+	memset(g_KeysPressed, 0, SDL_SCANCODE_COUNT);
+	memset(g_KeysRepeating, 0, SDL_SCANCODE_COUNT);
+	memset(g_KeysForced, 0, SDL_SCANCODE_COUNT);
+	memset(g_KeysReleased, 0, SDL_SCANCODE_COUNT);
 	SDL_Init(SDL_INIT_VIDEO);
 	g_KeysDown = SDL_GetKeyboardState(&g_KeysDownArrayLen);
 }
@@ -139,35 +139,35 @@ unsigned int GetKeyCode(const std::string name) {
 	return SDL_GetScancodeFromName(name.c_str());
 }
 std::string GetKeyName(unsigned int key) {
-	if (key > 511) return "";
+	if (key >= SDL_SCANCODE_COUNT) return "";
 	const char* result = SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
 	if (!result) return "";
 	return result;
 }
 bool SetKeyName(unsigned int key, const std::string name) {
-	if (key > 511 || name.empty()) return false;
+	if (key >= SDL_SCANCODE_COUNT || name.empty()) return false;
 	g_KeyNames[key] = name;
 	return SDL_SetScancodeName(static_cast<SDL_Scancode>(key), g_KeyNames[key].c_str());
 }
 bool KeyPressed(unsigned int key) {
-	if (key > 511) return false;
+	if (key >= SDL_SCANCODE_COUNT) return false;
 	bool r = g_KeysPressed[key] == 1;
 	g_KeysPressed[key] = 0;
 	return r;
 }
 bool KeyRepeating(unsigned int key) {
-	if (key > 511) return false;
+	if (key >= SDL_SCANCODE_COUNT) return false;
 	bool r = g_KeysPressed[key] == 1 || g_KeysRepeating[key] == 1;
 	g_KeysPressed[key] = 0;
 	g_KeysRepeating[key] = 0;
 	return r;
 }
 bool key_down(unsigned int key) {
-	if (key > 511 || !g_KeysDown) return false;
+	if (key >= SDL_SCANCODE_COUNT || !g_KeysDown) return false;
 	return g_KeysReleased[key] == 0 && (g_KeysDown[key] == 1 || g_KeysForced[key]);
 }
 bool KeyReleased(unsigned int key) {
-	if (key > 511 || !g_KeysDown) return false;
+	if (key >= SDL_SCANCODE_COUNT || !g_KeysDown) return false;
 	bool r = g_KeysReleased[key] == 1;
 	if (r && g_KeysDown[key] == 1) return false;
 	g_KeysReleased[key] = 0;
@@ -177,7 +177,7 @@ bool key_up(unsigned int key) {
 	return !key_down(key);
 }
 bool insure_key_up(unsigned short key) {
-	if (key > 511 || !g_KeysDown) return false;
+	if (key >= SDL_SCANCODE_COUNT || !g_KeysDown) return false;
 	if (g_KeysDown[key] == 1)
 		g_KeysReleased[key] = 1;
 	else
@@ -186,7 +186,7 @@ bool insure_key_up(unsigned short key) {
 	return true;
 }
 inline bool post_key_event(unsigned int key, SDL_EventType evt_type) {
-	if (key > 511 || !g_KeysDown) return false;
+	if (key >= SDL_SCANCODE_COUNT || !g_KeysDown) return false;
 	SDL_Event e{};
 	e.type = evt_type;
 	e.common.timestamp = SDL_GetTicksNS();
@@ -237,7 +237,7 @@ CScriptArray* keys_pressed() {
 	if (!key_code_array_type)
 		key_code_array_type = engine->GetTypeInfoByDecl("array<key_code>");
 	CScriptArray* array = CScriptArray::Create(key_code_array_type);
-	for (int i = 0; i < 512; i++) {
+	for (int i = 0; i < SDL_SCANCODE_COUNT; i++) {
 		unsigned int k = (unsigned int)i;
 		if (KeyPressed(k))
 			array->InsertLast(&k);
