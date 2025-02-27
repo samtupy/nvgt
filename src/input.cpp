@@ -134,7 +134,7 @@ void regained_window_focus() {
 bool ScreenKeyboardShown() {
 	return SDL_ScreenKeyboardShown(g_WindowHandle);
 }
-unsigned int GetKeyCode(const std::string name) {
+unsigned int GetKeyCode(const std::string& name) {
 	if (name.empty()) return SDLK_UNKNOWN;
 	return SDL_GetScancodeFromName(name.c_str());
 }
@@ -144,7 +144,7 @@ std::string GetKeyName(unsigned int key) {
 	if (!result) return "";
 	return result;
 }
-bool SetKeyName(unsigned int key, const std::string name) {
+bool SetKeyName(unsigned int key, const std::string& name) {
 	if (key >= SDL_SCANCODE_COUNT || name.empty()) return false;
 	g_KeyNames[key] = name;
 	return SDL_SetScancodeName(static_cast<SDL_Scancode>(key), g_KeyNames[key].c_str());
@@ -316,11 +316,7 @@ void mouse_update() {
 	g_MousePrevZ = g_MouseAbsZ;
 }
 void SetCursorVisible(bool state) {
-	if (state == true)
-		SDL_ShowCursor();
-	else
-		SDL_HideCursor();
-
+	state? SDL_ShowCursor() : SDL_HideCursor();
 }
 bool GetMouseGrab() {
 	return SDL_GetWindowMouseGrab(g_WindowHandle);
@@ -545,9 +541,9 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnum(_O("joystick_power_level"));
 	engine->RegisterEnum(_O("joystick_control_type"));
 	engine->RegisterGlobalFunction(_O("bool get_KEYBOARD_AVAILABLE() property"), asFUNCTION(SDL_HasKeyboard), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("uint get_key_code(string name)"), asFUNCTION(GetKeyCode), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint get_key_code(const string&in name)"), asFUNCTION(GetKeyCode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_key_name(uint key)"), asFUNCTION(GetKeyName), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool set_key_name(uint key, string name)"), asFUNCTION(SetKeyName), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool set_key_name(uint key, const string&in name)"), asFUNCTION(SetKeyName), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_pressed(uint key)"), asFUNCTION(KeyPressed), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_repeating(uint key)"), asFUNCTION(KeyRepeating), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool key_down(uint key)"), asFUNCTION(key_down), asCALL_CDECL);
