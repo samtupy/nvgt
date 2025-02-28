@@ -1,3 +1,4 @@
+# speed_hack_detected
 Attempts to determine if speed-hacking technology is being used.
 
 ```nvgt
