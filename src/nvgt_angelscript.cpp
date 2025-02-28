@@ -85,6 +85,7 @@
 #include "scriptmathcomplex.h"
 #include "contextmgr.h"
 #include "weakref.h"
+#include "anticheat.h"
 #ifndef NVGT_STUB
 	int PragmaCallback(const std::string& pragmaText, CScriptBuilder& builder, void* /*userParam*/);
 #endif
@@ -459,6 +460,7 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("xplatform");
 	RegisterXplatform(engine);
+	register_anticheat(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_SOUND);
 	engine->BeginConfigGroup("sound");

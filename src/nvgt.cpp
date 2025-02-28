@@ -52,6 +52,7 @@
 #include "UI.h" // message
 #include "version.h"
 #include "xplatform.h"
+#include "anticheat.h"
 
 using namespace std;
 using namespace Poco;
@@ -320,6 +321,7 @@ protected:
 		InputDestroy();
 		if (g_ScriptEngine) g_ScriptEngine->ShutDownAndRelease();
 		g_ScriptEngine = nullptr;
+		anticheat_deinit();
 	}
 };
 
