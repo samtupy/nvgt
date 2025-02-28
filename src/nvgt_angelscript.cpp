@@ -460,7 +460,6 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("xplatform");
 	RegisterXplatform(engine);
-	register_anticheat(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_SOUND);
 	engine->BeginConfigGroup("sound");
@@ -504,6 +503,7 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	g_ctxMgr->RegisterCoRoutineSupport(engine);
 	engine->SetContextCallbacks(RequestContextCallback, ReturnContextCallback, 0);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
+		register_anticheat(engine);
 	return 0;
 }
 #ifndef NVGT_STUB
