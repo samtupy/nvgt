@@ -1,3 +1,7 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
 void main() {
 	show_window("Test get_characters");
 	// It is necessary to start text input on android for get _characters to work.
@@ -14,6 +18,7 @@ void main() {
 	tts_voice tts;
 	string characters;
 
+	tts.speak_interrupt("Type any character on the keyboard, and I will speak that for you!");
 	while (!key_pressed(KEY_ESCAPE)) {
 		wait(5);
 		characters = get_characters();
