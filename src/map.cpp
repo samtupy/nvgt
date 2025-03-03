@@ -136,10 +136,8 @@ void map_area::unframe() {
 		auto it = std::find(f->areas.begin(), f->areas.end(), this);
 		while (it != f->areas.end()) {
 			f->areas.erase(it);
-			if (ref_count > 1)
-			release();
-			else
-				it = std::find(f->areas.begin(), f->areas.end(), this);
+			if (ref_count > 1) release();
+			it = std::find(f->areas.begin(), f->areas.end(), this);
 		}
 	}
 	framed = false;
