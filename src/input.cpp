@@ -527,6 +527,18 @@ CScriptArray* query_touch_device(uint64_t device_id) {
 	return array;
 }
 
+bool StartTextInput() {
+	return SDL_StartTextInput(g_WindowHandle);
+}
+
+bool StopTextInput() {
+	return SDL_StopTextInput(g_WindowHandle);
+}
+
+bool TextInputActive() {
+	return SDL_TextInputActive(g_WindowHandle);
+}
+
 void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterObjectType("touch_finger", sizeof(SDL_Finger), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<SDL_Finger>());
 	engine->RegisterObjectProperty("touch_finger", "const uint64 id", asOFFSET(SDL_Finger, id));
@@ -540,6 +552,9 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnum(_O("joystick_bind_type"));
 	engine->RegisterEnum(_O("joystick_power_level"));
 	engine->RegisterEnum(_O("joystick_control_type"));
+	engine->RegisterGlobalFunction(_O("bool start_text_input()"), asFUNCTION(StartTextInput), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool stop_text_input()"), asFUNCTION(StopTextInput), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool text_input_active()"), asFUNCTION(TextInputActive), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_KEYBOARD_AVAILABLE() property"), asFUNCTION(SDL_HasKeyboard), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint get_key_code(const string&in name)"), asFUNCTION(GetKeyCode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_key_name(uint key)"), asFUNCTION(GetKeyName), asCALL_CDECL);
