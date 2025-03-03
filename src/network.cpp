@@ -10,9 +10,20 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include<cassert>
+#include <memory>
+#include <monocypher.h>
+#include <noise.h>
 #include <obfuscate.h>
 #include "nvgt_angelscript.h" // get_array_type
 #include "network.h"
+
+struct peer_data {
+	asQWORD id;
+	std::unique_ptr<noise::HandshakeState> handshake;
+	noise::CipherState send;
+	noise::CipherState recv;
+};
 
 bool g_enet_initialized = false;
 network_event g_enet_none_event; // The none event is static and never changes, why reallocate it every time network::request() doesn't come up with an event?
@@ -55,11 +66,35 @@ void network::destroy(bool flush) {
 		enet_host_destroy(host);
 		host = NULL;
 	}
+	encryption_state.reset();
 	peers.clear();
 	next_peer = 1;
 	channel_count = 0;
 	is_client = false;
 	reset_totals();
+}
+
+bool network::set_encryption(bool enabled, const std::string& password) {
+	if (host) return false; // At the moment encryption can only be modified when no server/client is set up.
+	if (!enabled && !encryption_state) return false; // Encryption already disabled.
+	if (!enabled) {
+		encryption_state.reset();
+		return true;
+	}
+	if (!encryption_state) encryption_state = std::make_unique<noise::HandshakeStateConfiguration>();
+	encryption_state->pattern = noise::HandshakePattern::NN;
+	if (password.empty()) encryption_state->prologue.clear();
+	else {
+		encryption_state->prologue.resize(64);
+		crypto_blake2b(encryption_state->prologue.data(), encryption_state->prologue.size(), reinterpret_cast<const uint8_t*>(password.c_str()), password.size());
+	}
+	return true;
+}
+
+peer_data* network::new_peer_data(asQWORD id) {
+		if (!encryption_state) return new peer_data {next_peer, nullptr};
+		encryption_state->initiator = !is_client;
+		return new peer_data {next_peer, std::make_unique<noise::HandshakeState>(*encryption_state)};
 }
 
 bool network::setup_client(unsigned char max_channels, unsigned short max_peers) {
@@ -101,7 +136,7 @@ asQWORD network::connect(const std::string& hostname, unsigned short port) {
 	ENetPeer* svr = enet_host_connect(host, &addr, channel_count, 0);
 	if (!svr) return 0;
 	peers[next_peer] = svr;
-	svr->data = reinterpret_cast<void*>(next_peer);
+	svr->data = new_peer_data(next_peer);
 	next_peer += 1;
 	return next_peer - 1;
 }
@@ -125,20 +160,26 @@ const network_event* network::request(uint32_t timeout) {
 	if (event.type == ENET_EVENT_TYPE_CONNECT) {
 		enet_peer_timeout(event.peer, 128, 10000, 35000);
 		if (!is_client) {
-			event.peer->data = reinterpret_cast<void*>(next_peer);
+			event.peer->data = new_peer_data(next_peer);
 			peers[next_peer] = event.peer;
 			e->peer_id = next_peer;
 			next_peer++;
 		} else
-			e->peer_id = (asQWORD)event.peer->data;
+			e->peer_id = reinterpret_cast<peer_data*>(event.peer->data)->id;
 	} else if (event.type == ENET_EVENT_TYPE_DISCONNECT || event.type == ENET_EVENT_TYPE_DISCONNECT_TIMEOUT) {
-		asQWORD peer_id = (asQWORD)event.peer->data;
+		assert(event.peer->data != nullptr);
+		asQWORD peer_id = reinterpret_cast<peer_data*>(event.peer->data)->id;
+		free(event.peer->data);
 		event.peer->data = NULL;
 		if (peer_id > 0)
 			peers.erase(peer_id);
 		e->peer_id = peer_id;
 	} else if (event.type == ENET_EVENT_TYPE_RECEIVE) {
-		e->peer_id = (asQWORD)event.peer->data;
+		peer_data* pd = reinterpret_cast<peer_data*>(event.peer->data);
+if (pd->handshake && pd->handshake->is_my_turn()) {
+			
+		}
+				e->peer_id = pd->id;
 		e->message.append((char*)event.packet->data, event.packet->dataLength);
 		enet_packet_destroy(event.packet);
 	}
