@@ -1,4 +1,4 @@
-/* android.h - header containing functions only applictable to the Android platform
+/* android.h - header containing functions only applicable to the Android platform
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy

@@ -23,7 +23,7 @@
 #endif
 #include <string>
 #include <Poco/AtomicFlag.h>
-	#include <Poco/SharedLibrary.h>
+#include <Poco/SharedLibrary.h>
 #include <Poco/UnicodeConverter.h>
 #include "srspeech.h"
 
