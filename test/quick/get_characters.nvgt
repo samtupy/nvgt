@@ -7,6 +7,8 @@ void main() {
 	// It is necessary to start text input on android for get _characters to work.
 	// Because SDL shows on screen keyboard by default when you start input,
 	//you have to set a hint once that disables this behavior.
+	//  We do this so the touch.nvgt and onscreen keyboards don't have a conflict.
+	// Useful for the times when the user has disabled the screen reader and is using the tts_voice for reader output.
 	// Note: the hint should be set before calling start_text_input.
 	sdl_set_hint("SDL_ENABLE_SCREEN_KEYBOARD", "0");
 	start_text_input();
