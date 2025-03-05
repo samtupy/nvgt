@@ -1973,7 +1973,7 @@ class audio_form {
 		}
 		return true;
 	}
-	bool set_input_read_only(int control_index, bool read_only) {
+	bool set_read_only(int control_index, bool read_only) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
@@ -1983,7 +1983,7 @@ class audio_form {
 			form_error = form_error_invalid_index;
 			return false;
 		}
-		if (c_form[control_index].type != ct_input) {
+		if (c_form[control_index].type != ct_input && c_form[control_index].type != ct_checkbox) {
 			form_error = form_error_invalid_control;
 			return false;
 		}
