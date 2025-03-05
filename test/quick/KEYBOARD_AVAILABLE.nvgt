@@ -4,5 +4,5 @@
 
 void main() {
 	show_window("Test");
-	alert("Alert", (has_keyboard()) ? "Keyboard atached" : "Keyboard not atached");
+	alert("Alert", (KEYBOARD_AVAILABLE) ? "Keyboard atached" : "Keyboard not atached");
 }
