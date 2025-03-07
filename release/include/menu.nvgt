@@ -133,6 +133,9 @@ class menu {
 	bool set_item_text(int index, const string&in new_text) {
 		return form.edit_list_item(f_list, new_text, index);
 	}
+	string get_item_text(int index) {
+		return form.get_list_item(f_list, index);
+	}
 	bool set_item_id(int index, const string&in new_id) {
 		return form.edit_list_item_id(f_list, new_id, index);
 	}
