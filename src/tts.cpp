@@ -507,7 +507,12 @@ void RegisterTTSVoice(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("tts_voice", "bool refresh()", asMETHOD(tts_voice, refresh), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool stop()", asMETHOD(tts_voice, stop), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "array<string>@ list_voices() const", asMETHOD(tts_voice, list_voices), asCALL_THISCALL);
+	//Alias the above as get_voice_names() for legacy BGT code.
+	engine->RegisterObjectMethod("tts_voice", "array<string>@ get_voice_names() const", asMETHOD(tts_voice, list_voices), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool set_voice(int index)", asMETHOD(tts_voice, set_voice), asCALL_THISCALL);
+	//Alias the above as set_current_voice() for legacy BGT code.
+	engine->RegisterObjectMethod("tts_voice", "bool set_current_voice(int index)", asMETHOD(tts_voice, set_voice), asCALL_THISCALL);
+
 	engine->RegisterObjectMethod("tts_voice", "int get_rate() const property", asMETHOD(tts_voice, get_rate), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "void set_rate(int rate) property", asMETHOD(tts_voice, set_rate), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "int get_pitch() const property", asMETHOD(tts_voice, get_pitch), asCALL_THISCALL);
