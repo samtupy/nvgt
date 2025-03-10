@@ -210,6 +210,7 @@ public:
 	BOOL slide_pitch_alt(float pitch, unsigned int time);
 	BOOL set_volume_alt(float volume);
 	BOOL slide_volume_alt(float volume, unsigned int time);
+	const double pitch_lower_limit();
 };
 
 class mixer : public sound_base {
