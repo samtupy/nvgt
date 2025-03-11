@@ -42,17 +42,14 @@ Poco::DateTime g_time_values;
 Poco::FastMutex g_time_mutex;
 
 static asIScriptContext *callback_ctx = NULL;
-timer_queue_item::timer_queue_item(timer_queue *parent, const std::string &id, asIScriptFunction *callback, const std::string &callback_data, int timeout, bool repeating) : parent(parent), id(id), callback(callback), callback_data(callback_data), timeout(timeout), repeating(repeating), is_scheduled(true)
-{
+timer_queue_item::timer_queue_item(timer_queue *parent, const std::string &id, asIScriptFunction *callback, const std::string &callback_data, int timeout, bool repeating) : parent(parent), id(id), callback(callback), callback_data(callback_data), timeout(timeout), repeating(repeating), is_scheduled(true) {
 }
-void timer_queue_item::execute()
-{
+void timer_queue_item::execute() {
 	is_scheduled = false;
 	asIScriptContext *ACtx = asGetActiveContext();
 	bool new_context = ACtx == NULL || ACtx->PushState() < 0;
 	asIScriptContext *ctx = (new_context ? g_ScriptEngine->RequestContext() : ACtx);
-	if (!ctx)
-	{
+	if (!ctx) {
 		parent->failures += id;
 		parent->failures += "; can't get context.\r\n";
 		parent->failures += get_call_stack();
@@ -60,8 +57,7 @@ void timer_queue_item::execute()
 		return;
 	}
 	int rp = 0;
-	if ((rp = ctx->Prepare(callback)) < 0)
-	{
+	if ((rp = ctx->Prepare(callback)) < 0) {
 		char tmp[200];
 		snprintf(tmp, 200, "%s; can't prepare; %d\r\n", id.c_str(), rp);
 		parent->failures += tmp;
@@ -87,36 +83,27 @@ void timer_queue_item::execute()
 		g_ScriptEngine->ReturnContext(ctx);
 	else
 		ctx->PopState();
-	if (!is_scheduled)
-	{
-		if (ms > 0)
-		{
+	if (!is_scheduled) {
+		if (ms > 0) {
 			parent->schedule(this, ms);
 			is_scheduled = true;
-		}
-		else
+		} else
 			parent->erase(id);
 	}
 }
-timer_queue::timer_queue() : RefCount(1), last_looped(ticks()), open_tick(false)
-{
+timer_queue::timer_queue() : RefCount(1), last_looped(ticks()), open_tick(false) {
 }
-void timer_queue::add_ref()
-{
+void timer_queue::add_ref() {
 	asAtomicInc(RefCount);
 }
-void timer_queue::release()
-{
-	if (asAtomicDec(RefCount) < 1)
-	{
+void timer_queue::release() {
+	if (asAtomicDec(RefCount) < 1) {
 		reset();
 		delete this;
 	}
 }
-void timer_queue::reset()
-{
-	for (auto it = timer_objects.begin(); it != timer_objects.end(); it++)
-	{
+void timer_queue::reset() {
+	for (auto it = timer_objects.begin(); it != timer_objects.end(); it++) {
 		if (it->second->callback)
 			it->second->callback->Release();
 		if (it->second->is_scheduled)
@@ -124,19 +111,16 @@ void timer_queue::reset()
 		delete it->second;
 	}
 	timer_objects.clear();
-	for (auto i : deleting_timers)
-	{
+	for (auto i : deleting_timers) {
 		if (i->callback)
 			i->callback->Release();
 		delete i;
 	}
 	deleting_timers.clear();
 }
-void timer_queue::set(const std::string &id, asIScriptFunction *callback, const std::string &callback_data, uint64_t timeout, bool repeating)
-{
+void timer_queue::set(const std::string &id, asIScriptFunction *callback, const std::string &callback_data, uint64_t timeout, bool repeating) {
 	auto it = timer_objects.find(id);
-	if (it != timer_objects.end())
-	{
+	if (it != timer_objects.end()) {
 		if (it->second->callback)
 			it->second->callback->Release();
 		it->second->callback = callback;
@@ -151,22 +135,19 @@ void timer_queue::set(const std::string &id, asIScriptFunction *callback, const 
 	timer_objects[id] = new timer_queue_item(this, id, callback, callback_data, timeout, repeating);
 	timers.schedule(timer_objects[id], timeout);
 }
-uint64_t timer_queue::elapsed(const std::string &id)
-{
+uint64_t timer_queue::elapsed(const std::string &id) {
 	auto it = timer_objects.find(id);
 	if (it == timer_objects.end())
 		return 0;
 	return it->second->scheduled_at() - timers.now();
 }
-uint64_t timer_queue::timeout(const std::string &id)
-{
+uint64_t timer_queue::timeout(const std::string &id) {
 	auto it = timer_objects.find(id);
 	if (it == timer_objects.end())
 		return 0;
 	return it->second->timeout;
 }
-bool timer_queue::restart(const std::string &id)
-{
+bool timer_queue::restart(const std::string &id) {
 	auto it = timer_objects.find(id);
 	if (it == timer_objects.end())
 		return false;
@@ -175,29 +156,25 @@ bool timer_queue::restart(const std::string &id)
 	timers.schedule(it->second, it->second->timeout);
 	return true;
 }
-bool timer_queue::is_repeating(const std::string &id)
-{
+bool timer_queue::is_repeating(const std::string &id) {
 	auto it = timer_objects.find(id);
 	if (it == timer_objects.end())
 		return false;
 	return it->second->repeating;
 }
-bool timer_queue::set_timeout(const std::string &id, uint64_t timeout, bool repeating)
-{
+bool timer_queue::set_timeout(const std::string &id, uint64_t timeout, bool repeating) {
 	auto it = timer_objects.find(id);
 	if (it == timer_objects.end())
 		return false;
 	it->second->timeout = timeout;
 	it->second->repeating = repeating;
-	if (timeout > 0 || repeating)
-	{
+	if (timeout > 0 || repeating) {
 		it->second->is_scheduled = true;
 		timers.schedule(it->second, timeout);
 	}
 	return true;
 }
-bool timer_queue::erase(const std::string &id)
-{
+bool timer_queue::erase(const std::string &id) {
 	auto it = timer_objects.find(id);
 	if (it == timer_objects.end())
 		return false;
@@ -206,10 +183,8 @@ bool timer_queue::erase(const std::string &id)
 	timer_objects.erase(it);
 	return true;
 }
-void timer_queue::flush()
-{
-	for (auto i : deleting_timers)
-	{
+void timer_queue::flush() {
+	for (auto i : deleting_timers) {
 		if (i->callback)
 			i->callback->Release();
 		delete i;
@@ -217,10 +192,8 @@ void timer_queue::flush()
 	deleting_timers.clear();
 	last_looped = ticks();
 }
-bool timer_queue::loop(int max_timers, int max_catchup)
-{
-	for (auto i : deleting_timers)
-	{
+bool timer_queue::loop(int max_timers, int max_catchup) {
+	for (auto i : deleting_timers) {
 		if (i->callback)
 			i->callback->Release();
 		delete i;
@@ -237,8 +210,7 @@ bool timer_queue::loop(int max_timers, int max_catchup)
 	return !open_tick;
 }
 
-void update_tm()
-{
+void update_tm() {
 	Timestamp ts;
 	if (ts.epochTime() == g_time_cache.epochTime())
 		return;
@@ -248,75 +220,62 @@ void update_tm()
 	g_time_values.makeLocal(Poco::Timezone::tzd());
 }
 
-int get_date_year()
-{
+int get_date_year() {
 	update_tm();
 	return g_time_values.year();
 }
-int get_date_month()
-{
+int get_date_month() {
 	update_tm();
 	return g_time_values.month();
 }
-std::string get_date_month_name()
-{
+std::string get_date_month_name() {
 	update_tm();
 	return DateTimeFormat::MONTH_NAMES[g_time_values.month() - 1];
 }
-int get_date_day()
-{
+int get_date_day() {
 	update_tm();
 	return g_time_values.day();
 }
-int get_date_weekday()
-{
+int get_date_weekday() {
 	update_tm();
 	return g_time_values.dayOfWeek() + 1;
 }
-std::string get_date_weekday_name()
-{
+std::string get_date_weekday_name() {
 	update_tm();
 	return DateTimeFormat::WEEKDAY_NAMES[g_time_values.dayOfWeek()];
 }
-int get_time_hour()
-{
+int get_time_hour() {
 	update_tm();
 	return g_time_values.hour();
 }
-int get_time_minute()
-{
+int get_time_minute() {
 	update_tm();
 	return g_time_values.minute();
 }
-int get_time_second()
-{
+int get_time_second() {
 	update_tm();
 	return g_time_values.second();
 }
 
 bool speedhack_protection = true;
-uint64_t secure_ticks()
-{
+uint64_t secure_ticks() {
 	return g_secure_clock.elapsed() / Timespan::MILLISECONDS;
 }
-uint64_t ticks(bool secure)
-{
+uint64_t ticks(bool secure) {
 	return (!secure ? g_clock.elapsed() : g_secure_clock.elapsed()) / Timespan::MILLISECONDS;
 }
-uint64_t microticks(bool secure)
-{
+uint64_t microticks(bool secure) {
 	return !secure ? g_clock.elapsed() : g_secure_clock.elapsed();
 }
 
 // Replace the following function with something from an external library or something as soon as we find it.
 #ifdef _WIN32
-#include <windows.h>
+	#include <windows.h>
 #endif
-asINT64 system_running_milliseconds()
-{
-#ifdef _WIN32
+asINT64 system_running_milliseconds() {
+	#ifdef _WIN32
 	return GetTickCount64();
-#else
+	#else
 	FILE *f = fopen("/proc/uptime", "r");
 	char tmp[40];
 	if (!fgets(tmp, 40, f))
@@ -325,7 +284,7 @@ asINT64 system_running_milliseconds()
 	if (space)
 		*space = '\0';
 	return strtof(tmp, NULL) * 1000;
-#endif
+	#endif
 }
 
 // timer class
@@ -336,10 +295,9 @@ timer::timer(int64_t initial_value, bool secure) : value(int64_t(microticks(secu
 timer::timer(int64_t initial_value, uint64_t initial_accuracy, bool secure) : value(int64_t(microticks(secure)) - initial_value * initial_accuracy), accuracy(initial_accuracy), paused(false), secure(secure) {}
 int64_t timer::get_elapsed() const { return int64_t(paused ? value : microticks(secure) - value) / int64_t(accuracy); }
 bool timer::has_elapsed(int64_t value) const { return get_elapsed() >= value; }
-void timer::force(int64_t new_value) { paused ? value = new_value *accuracy : value = microticks(secure) - new_value * accuracy; }
-void timer::adjust(int64_t new_value) { paused ? value += new_value *accuracy : value -= new_value * accuracy; }
-void timer::restart()
-{
+void timer::force(int64_t new_value) { paused ? value = new_value * accuracy : value = microticks(secure) - new_value * accuracy; }
+void timer::adjust(int64_t new_value) { paused ? value += new_value * accuracy : value -= new_value * accuracy; }
+void timer::restart() {
 	value = int64_t(microticks(secure));
 	paused = false;
 }
@@ -348,28 +306,24 @@ bool timer::get_paused() const { return paused; }
 bool timer::get_running() const { return !paused; }
 bool timer::pause() { return paused ? false : set_paused(true); }
 bool timer::resume() { return !paused ? false : set_paused(false); }
-void timer::toggle_pause()
-{
+void timer::toggle_pause() {
 	value = microticks(secure) - value;
 	paused = !paused;
 }
-bool timer::tick(int64_t value)
-{
+bool timer::tick(int64_t value) {
 	if (!has_elapsed(value))
 		return false;
 	restart();
 	return true;
 }
-bool timer::set_paused(bool new_paused)
-{
+bool timer::set_paused(bool new_paused) {
 	if (paused == new_paused)
 		return false;
 	value = int64_t(microticks(secure)) - value;
 	paused = new_paused;
 	return true;
 }
-bool timer::set_secure(bool new_secure)
-{
+bool timer::set_secure(bool new_secure) {
 	if (secure == new_secure)
 		return false;
 	bool is_paused = paused;
@@ -382,8 +336,7 @@ bool timer::set_secure(bool new_secure)
 }
 
 // Angelscript factories.
-template <class T, typename... A>
-void timestuff_construct(void *mem, A... args) { new (mem) T(args...); }
+template <class T, typename... A> void timestuff_construct(void *mem, A... args) { new (mem) T(args...); }
 template <class T>
 void timestuff_copy_construct(void *mem, const T &obj) { new (mem) T(obj); }
 template <class T>
@@ -391,8 +344,7 @@ void timestuff_destruct(T *obj) { obj->~T(); }
 template <class T, typename... A>
 void *timestuff_factory(A... args) { return new T(args...); }
 template <class T, typename O>
-int timestuff_opCmp(T *self, O other)
-{
+int timestuff_opCmp(T *self, O other) {
 	if (*self < other)
 		return -1;
 	else if (*self > other)
@@ -410,99 +362,72 @@ void timestuff_reset(T *obj) { (*obj) = T(); }
 /**
  * Makes sure the values stored within a LocalDateTime or DateTime object are valid, and raises a script exception if not.
  */
-template <class t>
-bool verify_date_time(t &dt)
-{
-	if (!DateTime::isValid(dt.year(), dt.month(), dt.day(), dt.hour(), dt.minute(), dt.second(), dt.millisecond(), dt.microsecond()))
-	{
+template <class t> bool verify_date_time(t &dt) {
+	if (!DateTime::isValid(dt.year(), dt.month(), dt.day(), dt.hour(), dt.minute(), dt.second(), dt.millisecond(), dt.microsecond())) {
 		asGetActiveContext()->SetException("Invalid date/time.");
 		return false;
 	}
 	return true;
 }
-std::string get_month_name(LocalDateTime &dt)
-{
+std::string get_month_name(LocalDateTime &dt) {
 	if (verify_date_time(dt))
-	{
 		return DateTimeFormat::MONTH_NAMES[dt.month() - 1];
-	}
 	return "";
 }
-std::string get_weekday_name(LocalDateTime &dt)
-{
+std::string get_weekday_name(LocalDateTime &dt) {
 	if (verify_date_time(dt))
-	{
 		return DateTimeFormat::WEEKDAY_NAMES[dt.dayOfWeek()];
-	}
 	return "";
 }
 /**
  * Either adds or subtracts a timespan from either a LocalDateTime or a DateTime.
  * Always returns boolean true.
  */
-template <class t>
-bool add_timespan(t &dt, Timespan &timespan, bool negative)
-{
+template <class t> bool add_timespan(t &dt, Timespan &timespan, bool negative) {
 	if (negative)
-	{
 		dt -= timespan;
-	}
 	else
-	{
 		dt += timespan;
-	}
 	return true;
 }
 
 /**
  * Convenience methods for adding days, hours, minutes and seconds to a datetime or calendar.
  */
-#define make_add_units(x, a, b, c, d, e)               \
-	template <class t>                                 \
-	bool add_##x(t &dt, asINT32 amount)                \
-	{                                                  \
-		if (amount == 0)                               \
-		{                                              \
-			return false;                              \
-		}                                              \
-		Timespan timespan(##a, ##b, ##c, ##d, ##e);    \
+#define make_add_units(x, a, b, c, d, e) \
+	template <class t> \
+	bool add_##x(t &dt, asINT32 amount) \
+	{ \
+		if (amount == 0) \
+		{ \
+			return false; \
+		} \
+		Timespan timespan(##a, ##b, ##c, ##d, ##e); \
 		return add_timespan(dt, timespan, amount < 0); \
 	}
 make_add_units(days, abs(amount), 0, 0, 0, 0)
-	make_add_units(hours, 0, abs(amount), 0, 0, 0)
-		make_add_units(minutes, 0, 0, abs(amount), 0, 0)
-			make_add_units(seconds, 0, 0, 0, abs(amount), 0)
+make_add_units(hours, 0, abs(amount), 0, 0, 0)
+make_add_units(minutes, 0, 0, abs(amount), 0, 0)
+make_add_units(seconds, 0, 0, 0, abs(amount), 0)
 
-				template <class t>
-				bool add_years(t &dt, asINT32 amount)
-{
+template <class t> bool add_years(t &dt, asINT32 amount) {
 	if (amount == 0)
-	{
 		return false;
-	}
 	dt.assign(dt.year() + amount, dt.month(), dt.day(), dt.hour(), dt.minute(), dt.second(), dt.microsecond());
 	return true;
 }
-template <class t>
-bool add_months(t &dt, asINT32 amount)
-{
+template <class t> bool add_months(t &dt, asINT32 amount) {
 	if (amount == 0)
-	{
 		return false;
-	}
 	asINT32 monthToAssign = dt.month() + amount;
 	asINT32 yearsToAdd = 0;
-	if (monthToAssign > 12)
-	{
+	if (monthToAssign > 12) {
 		yearsToAdd = (monthToAssign - 1) / 12;
 		monthToAssign -= (yearsToAdd * 12);
-	}
-	else if (monthToAssign <= 0)
-	{
+	} else if (monthToAssign <= 0) {
 		yearsToAdd = (int64_t)ceil(abs(monthToAssign) / 12.0f) * -1;
 		monthToAssign = (abs(yearsToAdd) * 12) - abs(monthToAssign);
-		if (monthToAssign == 0)
-		{
+		if (monthToAssign == 0) {
 			monthToAssign = 12;
 			yearsToAdd -= 1;
 		}
@@ -515,147 +440,100 @@ bool add_months(t &dt, asINT32 amount)
  * Computes the difference between two dates either in years, months, days, hours, minutes or seconds.
  * These also match BGT's calendar API.
  */
-template <class t>
-Timespan make_diff_timespan(t &first, t &second)
-{
-	if (!verify_date_time(first) || !verify_date_time(second))
-	{
+template <class t> Timespan make_diff_timespan(t &first, t &second) {
+	if (!verify_date_time(first) || !verify_date_time(second)) {
 		return Timespan(); // Script will crash anyway.
 	}
 	return Timespan(abs(first.utcTime() - second.utcTime()));
 }
-template <class t>
-asQWORD diff_days(t &first, t &second)
-{
+template <class t> asQWORD diff_days(t &first, t &second) {
 	return make_diff_timespan(first, second).days() / 10; // Poco timestamps give these values to you multiplied by a factor of 10; why not float or double? Weird.
 }
-template <class t>
-asQWORD diff_hours(t &first, t &second)
-{
+template <class t> asQWORD diff_hours(t &first, t &second) {
 	return make_diff_timespan(first, second).totalHours() / 10;
 }
-template <class t>
-asQWORD diff_minutes(t &first, t &second)
-{
+template <class t> asQWORD diff_minutes(t &first, t &second) {
 	return make_diff_timespan(first, second).totalMinutes() / 10;
 }
-template <class t>
-asQWORD diff_seconds(t &first, t &second)
-{
+template <class t> asQWORD diff_seconds(t &first, t &second) {
 	return make_diff_timespan(first, second).totalSeconds() / 10;
 }
 /**
  * Computes the total duration of the current year as represented by the given object.
  * Used internally by diff_years.
  */
-template <class t>
-Timespan::TimeDiff get_duration_of_year(t &dt)
-{
+template <class t> Timespan::TimeDiff get_duration_of_year(t &dt) {
 	return t(dt.year() + 1, 1, 1).utcTime() - t(dt.year(), 1, 1).utcTime();
 }
 /**
  * Computes the amount of time that has elapsed since the start of the year as represented by the given object.
  * Used internally for diff_years.
  */
-template <class t>
-double time_since_year_start(t &dt)
-{
+template <class t> double time_since_year_start(t &dt) {
 	return (dt.utcTime() - t(dt.year(), 1, 1).utcTime()) / (double)get_duration_of_year(dt);
 }
-template <class t>
-double diff_years(t &first, t &second)
-{
+template <class t> double diff_years(t &first, t &second) {
 	t *high, *low;
-	if (first.utcTime() > second.utcTime())
-	{
+	if (first.utcTime() > second.utcTime()) {
 		high = &first;
 		low = &second;
-	}
-	else
-	{
+	} else {
 		high = &second;
 		low = &first;
 	}
 	asINT64 years = high->year() - low->year();
 	double delta = time_since_year_start(*low) - time_since_year_start(*high);
 	if (years > 0 && delta > 0)
-	{
 		years -= 1;
-	}
 	return years + abs(delta);
 }
 /**
  * Computes the span of time that has elapsed since midnight on the current day as represented by the given object.
  */
-template <class t>
-Timespan::TimeDiff time_since_midnight(t &dt)
-{
+template <class t> Timespan::TimeDiff time_since_midnight(t &dt) {
 	return dt.utcTime() - t(dt.year(), dt.month(), dt.day()).utcTime();
 }
-template <class t>
-bool is_further_into_month(t &high, t &low)
-{
+template <class t> bool is_further_into_month(t &high, t &low) {
 	if (high.day() > low.day())
-	{
 		return false;
-	}
 	if (high.day() < low.day())
-	{
 		return true;
-	}
 	// They're same day, so just check which one is a later time.
 	return time_since_midnight(high) < time_since_midnight(low);
 }
 /**
  * Computes the difference between two dates in months.
  */
-template <class t>
-asQWORD diff_months(t &first, t &second)
-{
+template <class t> asQWORD diff_months(t &first, t &second) {
 	t *high, *low;
-	if (first.utcTime() > second.utcTime())
-	{
+	if (first.utcTime() > second.utcTime()) {
 		high = &first;
 		low = &second;
-	}
-	else
-	{
+	} else {
 		high = &second;
 		low = &first;
 	}
 	asQWORD months = 0;
 	if (high->year() != low->year())
-	{
 		months = (asQWORD)diff_years(*high, *low) * 12;
-	}
 	if (low->month() > high->month() && low->year() < high->year())
-	{
 		months += (12 - abs(low->month() - high->month()));
-	}
 	else
-	{
 		months += abs(high->month() - low->month());
-	}
 	if (is_further_into_month(*high, *low))
-	{
 		months--;
-	}
 	return months;
 }
 /**
  * Checks if the date held within the object is valid.
  */
-template <class t>
-bool is_valid(t &dt)
-{
+template <class t> bool is_valid(t &dt) {
 	return DateTime::isValid(dt.year(), dt.month(), dt.day(), dt.hour(), dt.minute(), dt.second(), dt.millisecond(), dt.microsecond());
 }
 /**
  * Checks if the current year of the object is a leap year.
  */
-template <class t>
-bool is_leap_year(t &dt)
-{
+template <class t> bool is_leap_year(t &dt) {
 	return DateTime::isLeapYear(dt.year());
 }
 /**
@@ -664,9 +542,7 @@ bool is_leap_year(t &dt)
 #define register_add_units(x) engine->RegisterObjectMethod(classname.c_str(), "bool add_" #x "(int32 amount)", asFUNCTION(add_##x<t>), asCALL_CDECL_OBJFIRST);
 #define register_diff_units(r, x) engine->RegisterObjectMethod(classname.c_str(), format(#r " diff_" #x "(%s@ other)", classname).c_str(), asFUNCTION(diff_##x<t>), asCALL_CDECL_OBJFIRST);
 
-template <class t>
-void register_date_time_extensions(asIScriptEngine *engine, std::string classname)
-{
+template <class t> void register_date_time_extensions(asIScriptEngine *engine, std::string classname) {
 	engine->RegisterObjectMethod(classname.c_str(), "string get_month_name() const property", asFUNCTION(get_month_name), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(classname.c_str(), "string get_weekday_name() const property", asFUNCTION(get_weekday_name), asCALL_CDECL_OBJFIRST);
 	register_add_units(days);
@@ -683,10 +559,8 @@ void register_date_time_extensions(asIScriptEngine *engine, std::string classnam
 	register_diff_units(uint64, months);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_valid() const property", asFUNCTION(is_valid<t>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_leap_year()", asFUNCTION(is_leap_year<t>), asCALL_CDECL_OBJFIRST);
-	assert(r >= 0);
 }
-void RegisterScriptTimestuff(asIScriptEngine *engine)
-{
+void RegisterScriptTimestuff(asIScriptEngine *engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
 	engine->RegisterGlobalFunction("int get_DATE_YEAR() property", asFUNCTION(get_date_year), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_DATE_MONTH() property", asFUNCTION(get_date_month), asCALL_CDECL);
@@ -894,8 +768,8 @@ void RegisterScriptTimestuff(asIScriptEngine *engine)
 	engine->RegisterObjectMethod("calendar", "int64 get_UTC_time() const property", asMETHOD(LocalDateTime, utcTime), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "bool opEquals(const calendar&in) const", asMETHOD(LocalDateTime, operator==), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "int opCmp(const calendar&in) const", asFUNCTION((timestuff_opCmp<LocalDateTime, const LocalDateTime &>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("calendar", "calendar@ opAdd(const timespan&in) const", asFUNCTION((angelscript_refcounted_duplicating_method<LocalDateTime, &LocalDateTime::operator+, const Timespan &>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("calendar", "calendar@ opSub(const timespan&in) const", asFUNCTION((angelscript_refcounted_duplicating_method<LocalDateTime, static_cast<LocalDateTime (LocalDateTime::*)(const Timespan &) const>(&LocalDateTime::operator-), const Timespan &>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("calendar", "calendar@ opAdd(const timespan&in) const", asFUNCTION((angelscript_refcounted_duplicating_method < LocalDateTime, &LocalDateTime::operator+, const Timespan & >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("calendar", "calendar@ opSub(const timespan&in) const", asFUNCTION((angelscript_refcounted_duplicating_method < LocalDateTime, static_cast<LocalDateTime(LocalDateTime::*)(const Timespan &) const>(&LocalDateTime::operator-), const Timespan & >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("calendar", "timespan opSub(const calendar&in) const", asMETHODPR(LocalDateTime, operator-, (const LocalDateTime &) const, Timespan), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "calendar& opAddAssign(const timespan&in)", asMETHODPR(LocalDateTime, operator+=, (const Timespan &), LocalDateTime &), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "calendar& opSubAssign(const timespan&in)", asMETHODPR(LocalDateTime, operator-=, (const Timespan &), LocalDateTime &), asCALL_THISCALL);
