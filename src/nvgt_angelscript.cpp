@@ -119,7 +119,6 @@ std::string g_stub = "";
 std::string g_platform = "auto";
 bool g_make_console = false;
 std::unordered_map<std::string, asITypeInfo*> g_TypeInfoCache;
-std::unordered_map<std::string, std::string> g_included_filenames; // maps included filenames to their paths, so that the same file from multiple locations can't get included twice.
 Timestamp g_script_build_time;
 
 class NVGTBytecodeStream : public asIBinaryStream {
@@ -300,34 +299,23 @@ void nvgt_line_callback(asIScriptContext* ctx, void* obj) {
 	profiler_callback(ctx, obj);
 }
 #ifndef NVGT_STUB
-int add_script_include(const Path& path, CScriptBuilder* builder) {
-	// Mostly a wrapper around builder->AddSectionFromFile, but also caches where the include came from so that it will be loaded from the same place again in the future.
-	std::string fn = path.getFileName();
-	if (!g_included_filenames.contains(fn)) g_included_filenames[fn] = path.toString();
-	return builder->AddSectionFromFile(path.toString().c_str());
-}
 int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilder* builder, void* param) {
 	// First, because it is the most platform agnostic method of accessing a file, we'll try loading the include manually with file_get_contents.
 	string include_text = file_get_contents(filename);
-	if (!include_text.empty()) return builder->AddSectionFromMemory(filename, include_text.c_str());
+	if (!include_text.empty()) return builder->AddSectionFromMemory(Path(filename).makeAbsolute().toString(Path::PATH_UNIX).c_str() + 1, include_text.c_str());
 	File include_file;
 	try {
 		Path include(Path::expand(filename));
 		include.makeAbsolute();
 		include_file = include;
 		if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str()); // Don't cache locations for scripts that are directly included.
-		if (g_included_filenames.contains(include.getFileName())) {
-			include = g_included_filenames[include.getFileName()];
+		include = Path(sectionname).parent().append(filename).makeAbsolute();
+		include_file = include;
+		if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str());
+		for (int i = 0; i < g_IncludeDirs.size(); i++) {
+			include = Path(g_IncludeDirs[i]).append(filename).makeAbsolute();
 			include_file = include;
 			if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str());
-		}
-		include = Path(sectionname).parent().append(filename);
-		include_file = include;
-		if (include_file.exists() && include_file.isFile()) return add_script_include(include.toString(), builder);
-		for (int i = 0; i < g_IncludeDirs.size(); i++) {
-			include = Path(g_IncludeDirs[i]).append(filename);
-			include_file = include;
-			if (include_file.exists() && include_file.isFile()) return add_script_include(include.toString(), builder);
 		}
 	} catch (Exception& e) {} // Might be wildcards.
 	try {
@@ -339,7 +327,7 @@ int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilde
 		}
 		for (const std::string& i : includes) {
 			include_file = i;
-			if (include_file.exists() && include_file.isFile()) add_script_include(i, builder);
+			if (include_file.exists() && include_file.isFile()) builder->AddSectionFromFile(i.c_str());
 		}
 		if (includes.size() > 0) return 1; // So that the below failure message won't execute.
 	} catch (Exception& e) {
@@ -535,7 +523,6 @@ void ConfigureEngineOptions(asIScriptEngine* engine) {
 int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
 	Path global_include(Path(Path::self()).parent().append("include"));
 	g_IncludeDirs.push_back(global_include.toString());
-	g_included_filenames[Path(scriptFile).getFileName()] = scriptFile;
 	if (!g_debug) engine->SetEngineProperty(asEP_BUILD_WITHOUT_LINE_CUES, true);
 	if (g_platform == "auto") determine_compile_platform(); // Insure that platform defines work whether compiling or executing a script.
 	CScriptBuilder builder;
@@ -546,7 +533,7 @@ int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
 	asIScriptModule* mod = builder.GetModule();
 	if (mod) mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
 	try {
-		if (builder.AddSectionFromFile(scriptFile.c_str()) < 0)
+		if (builder.AddSectionFromFile(Path(scriptFile).makeAbsolute().toString().c_str()) < 0)
 			return -1;
 		for (unsigned int i = 0; i < g_IncludeScripts.size(); i++) {
 			if (builder.AddSectionFromFile(g_IncludeScripts[i].c_str()) < 0)
