@@ -146,7 +146,7 @@ class touch_gesture_manager {
 		}
 			else {
 			if(interfaces.length()<=0) return false;
-			this.interfaces.insert_last(interfaces);
+			this.interfaces.extend(interfaces);
 		}
 		return true;
 	}
