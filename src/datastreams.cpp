@@ -193,14 +193,14 @@ std::string datastream::read_line() {
 	std::getline(*_istr, result);
 	return result;
 }
-unsigned long long datastream::read_7bit_encoded() {
+UInt64 datastream::read_7bit_encoded() {
 	if (!_istr) return 0;
-	unsigned long long integer;
+	UInt64 integer;
 	r->read7BitEncoded(integer);
 	return integer;
 }
-void datastream::read_7bit_encoded(unsigned long long& integer) { if(_istr) r->read7BitEncoded(integer); }
-void datastream::write_7bit_encoded(unsigned long long integer) { if(_ostr) w->write7BitEncoded(integer); }
+void datastream::read_7bit_encoded(UInt64& integer) { if(_istr) r->read7BitEncoded(integer); }
+void datastream::write_7bit_encoded(UInt64 integer) { if(_ostr) w->write7BitEncoded(integer); }
 bool datastream::can_write() {
 	// Todo: Cache whether most of the logic in this function needs to be performed so it doesn't happen on consequtive writes.
 	if (!w) return false;
@@ -324,9 +324,9 @@ template <class T, datastream_factory_type factory> void RegisterDatastreamType(
 	engine->RegisterObjectMethod(classname.c_str(), "string read(uint = 0)", asMETHODPR(datastream, read, (unsigned int), std::string), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read_line()", asMETHOD(datastream, read_line), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read_until(const string&in text, bool require_full)", asMETHOD(datastream, read_until), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "uint64 read_7bit_encoded()", asMETHODPR(datastream, read_7bit_encoded, (), unsigned long long), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "void read_7bit_encoded(uint64&out integer)", asMETHODPR(datastream, read_7bit_encoded, (unsigned long long&), void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "void write_7bit_encoded(uint64 integer)", asMETHODPR(datastream, write_7bit_encoded, (unsigned long long), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "uint64 read_7bit_encoded()", asMETHODPR(datastream, read_7bit_encoded, (), UInt64), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "void read_7bit_encoded(uint64&out integer)", asMETHODPR(datastream, read_7bit_encoded, (UInt64&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "void write_7bit_encoded(uint64 integer)", asMETHODPR(datastream, write_7bit_encoded, (UInt64), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "uint write(const string&in)", asMETHODPR(datastream, write, (const std::string&), unsigned int), asCALL_THISCALL);
 	RegisterDatastreamReadwrite<char>(engine, classname, "int8");
 	RegisterDatastreamReadwrite<unsigned char>(engine, classname, "uint8");

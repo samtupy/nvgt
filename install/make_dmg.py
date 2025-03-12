@@ -80,21 +80,10 @@ def main():
 	relpath = "../release"
 	ver = get_version_info()
 	print(f"Creating NVGT {ver} release...")
-	ftp_creds = []
 	if len(sys.argv) > 1:
 		relpath = sys.argv[1]
-		if len(sys.argv) > 2:
-			ftp_creds = sys.argv[2].split(":")
 	make_app_bundle("nvgt.app", relpath, ver)
 	make_dmg("nvgt.app", f"nvgt_{ver}.dmg")
-	if ftp_creds:
-		try:
-			ftp = ftplib.FTP("nvgt.gg", ftp_creds[0], ftp_creds[1])
-			with open(f"nvgt_{ver}.dmg", "rb") as f:
-				ftp.storbinary(f"STOR nvgt_{ver}.dmg", f)
-			ftp.quit()
-		except Exception as e:
-			print(f"Warning, cannot upload to ftp {e}")
 
 if __name__ == "__main__":
 	main()
