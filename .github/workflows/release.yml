@@ -194,7 +194,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/download-artifact@v4
       with:
-        pattern: *_package
+        pattern: '*_package'
     - uses: actions/download-artifact@v4
       with:
         name: android_release
@@ -215,4 +215,4 @@ jobs:
       with:
         checksumGenerateAssets: "false"
         assets: |
-          - path: *_package/nvgt_${{env.nvgt_version}}.*
+          - path: '*_package/nvgt_${{env.nvgt_version}}.*'
