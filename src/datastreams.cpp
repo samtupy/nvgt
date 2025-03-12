@@ -193,13 +193,13 @@ std::string datastream::read_line() {
 	std::getline(*_istr, result);
 	return result;
 }
-unsigned long long datastream::read_7bit_encoded() {
+UInt64 datastream::read_7bit_encoded() {
 	if (!_istr) return 0;
-	unsigned long long integer;
+	UInt64 integer;
 	r->read7BitEncoded(integer);
 	return integer;
 }
-void datastream::read_7bit_encoded(unsigned long long& integer) { if(_istr) r->read7BitEncoded(integer); }
+void datastream::read_7bit_encoded(UInt64& integer) { if(_istr) r->read7BitEncoded(integer); }
 void datastream::write_7bit_encoded(unsigned long long integer) { if(_ostr) w->write7BitEncoded(integer); }
 bool datastream::can_write() {
 	// Todo: Cache whether most of the logic in this function needs to be performed so it doesn't happen on consequtive writes.
