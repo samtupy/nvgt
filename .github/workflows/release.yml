@@ -64,7 +64,7 @@ jobs:
       if: github.event.repository.fork == false
       run: |
         cd jni
-        keytool -genkey -keyalg RSA -keysize 2048 -v -keystore android.keystore -dname cn=NVGT -storepass Android1422207 -validity 10000 -alias runner
+        keytool -genkey -keyalg RSA -keysize 2048 -v -keystore android.keystore -dname cn=NVGT -storepass Android1422207 -validity 10000 -alias app
         echo "ANDROID_RUNNER_KEYSTORE_PW=Android1422207">>$GITHUB_ENV
         cd ..
     - name: build
