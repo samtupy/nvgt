@@ -186,8 +186,7 @@ jobs:
   publish_release:
     runs-on: ubuntu-latest
     needs: ["windows_package", "mac_package", "linux_package"]
-    if: github.ref_type == 'tag'
-    if: github.event.repository.fork == false
+    if: github.ref_type == 'tag' && github.event.repository.fork == false
     permissions:
       contents: write
     steps:
