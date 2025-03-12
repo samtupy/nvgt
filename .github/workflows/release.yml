@@ -53,7 +53,7 @@ jobs:
         link-to-sdk: true
         add-to-path: true
     - name: keystore_official
-      if: github.event.repository.fork == false
+      if: github.event.repository.fork == true
       run: |
         cd jni
         echo "${{secrets.ANDROID_RUNNER_KEYSTORE}}" > android_enc.keystore
@@ -61,7 +61,7 @@ jobs:
         echo "ANDROID_RUNNER_KEYSTORE_PW=${{secrets.ANDROID_RUNNER_KEYSTORE_PW}}" >> $GITHUB_ENV
         cd ..
     - name: keystore_unofficial
-      if: github.event.repository.fork == true
+      if: github.event.repository.fork == false
       run: |
         cd jni
         keytool -genkey -keyalg RSA -keysize 2048 -v -keystore android.keystore -dname cn=NVGT -storepass Android1422207 -validity 10000 -alias runner
