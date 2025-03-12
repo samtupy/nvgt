@@ -52,6 +52,21 @@ jobs:
         ndk-version: r25c
         link-to-sdk: true
         add-to-path: true
+    - name: keystore_official
+      if: github.event.repository.fork == false
+      run: |
+        cd jni
+        echo "${{secrets.ANDROID_RUNNER_KEYSTORE}}" > android_enc.keystore
+        cat android_enc.keystore | base64 -d > android.keystore
+        echo "ANDROID_RUNNER_KEYSTORE_PW=${{secrets.ANDROID_RUNNER_KEYSTORE_PW}}" >> $GITHUB_ENV
+        cd ..
+    - name: keystore_unofficial
+      if: github.event.repository.fork == true
+      run: |
+        cd jni
+        keytool -genkey -keyalg RSA -keysize 2048 -v -keystore android.keystore -dname cn=NVGT -storepass Android1422207 -validity 10000 -alias runner
+        echo "ANDROID_RUNNER_KEYSTORE_PW=Android1422207">>$GITHUB_ENV
+        cd ..
     - name: build
       run: |
         curl -s -O https://nvgt.gg/droidev.zip
@@ -59,9 +74,7 @@ jobs:
         cd droidev
         unzip -q ../droidev.zip
         cd ../jni
-        echo "${{secrets.ANDROID_RUNNER_KEYSTORE}}" > android_enc.keystore
-        cat android_enc.keystore | base64 -d > android.keystore
-        ./gradlew assembleRunnerRelease AssembleStubRelease --no-daemon -Pandroid.injected.signing.store.file=android.keystore -Pandroid.injected.signing.store.password=${{secrets.ANDROID_RUNNER_KEYSTORE_PW}} -Pandroid.injected.signing.key.alias=app -Pandroid.injected.signing.key.password="${{secrets.ANDROID_RUNNER_KEYSTORE_PW}}"
+        ./gradlew assembleRunnerRelease AssembleStubRelease --no-daemon -Pandroid.injected.signing.store.file=android.keystore -Pandroid.injected.signing.store.password=${{env.ANDROID_RUNNER_KEYSTORE_PW}} -Pandroid.injected.signing.key.alias=app -Pandroid.injected.signing.key.password="${{env.ANDROID_RUNNER_KEYSTORE_PW}}"
         mv build/outputs/apk/runner/release/nvgt-runner-release.apk ../release/nvgt.apk
         cd ..
     - uses: actions/upload-artifact@v4
