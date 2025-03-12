@@ -200,7 +200,7 @@ UInt64 datastream::read_7bit_encoded() {
 	return integer;
 }
 void datastream::read_7bit_encoded(UInt64& integer) { if(_istr) r->read7BitEncoded(integer); }
-void datastream::write_7bit_encoded(unsigned long long integer) { if(_ostr) w->write7BitEncoded(integer); }
+void datastream::write_7bit_encoded(UInt64 integer) { if(_ostr) w->write7BitEncoded(integer); }
 bool datastream::can_write() {
 	// Todo: Cache whether most of the logic in this function needs to be performed so it doesn't happen on consequtive writes.
 	if (!w) return false;
