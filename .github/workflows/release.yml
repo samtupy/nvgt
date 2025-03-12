@@ -10,6 +10,8 @@ jobs:
     runs-on: macos-14
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: true
     - name: build
       run: |
         cp build/build_macos.sh .
@@ -24,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: true
     - name: build
       run: |
         pip3 install scons
@@ -69,6 +73,8 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: true
     - name: build
       run: |
         pip3 install scons
