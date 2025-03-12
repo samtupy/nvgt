@@ -402,7 +402,7 @@ template <class t> bool add_timespan(t &dt, Timespan &timespan, bool negative) {
 		{ \
 			return false; \
 		} \
-		Timespan timespan(##a, ##b, ##c, ##d, ##e); \
+		Timespan timespan(a, b, c, d, e); \
 		return add_timespan(dt, timespan, amount < 0); \
 	}
 make_add_units(days, abs(amount), 0, 0, 0, 0)
