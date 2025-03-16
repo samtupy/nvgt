@@ -1,11 +1,11 @@
 /**
 	Appends an element to an array.
-	1. void array::insert_last(const T&in);
-	2. void array::push_back(const T&in);
+	1. void array::insert_last(const T&in element);
+	2. void array::extend(const T&in element);
 	## Arguments
-		* <type> element: the element to be inserted.
+		* const T&in element: the element to be inserted.
 	## Remarks
-		This method adds an element to the end of an array.
+		This method will add the specified element to the end of the array.
 */
 
 // Example
