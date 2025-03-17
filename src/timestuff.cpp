@@ -643,7 +643,7 @@ void RegisterScriptTimestuff(asIScriptEngine *engine) {
 	engine->RegisterObjectType("timespan", sizeof(Timespan), asOBJ_VALUE | asGetTypeTraits<Timespan>());
 	engine->RegisterObjectType("timestamp", sizeof(Timestamp), asOBJ_VALUE | asGetTypeTraits<Timestamp>());
 	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(timestuff_construct<Timestamp>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_CONSTRUCT, "void f(int64)", asFUNCTION((timestuff_construct<Timestamp, Int64>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_CONSTRUCT, "void f(int64)", asFUNCTION((timestuff_construct<Timestamp, Timestamp::TimeVal>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_CONSTRUCT, "void f(const timestamp&in)", asFUNCTION(timestuff_copy_construct<Timestamp>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("timestamp", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(timestuff_destruct<Timestamp>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("timestamp", "timestamp& opAssign(const timestamp&in)", asMETHODPR(Timestamp, operator=, (const Timestamp &), Timestamp &), asCALL_THISCALL);
@@ -699,6 +699,7 @@ void RegisterScriptTimestuff(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("timespan", "int get_useconds() const property", asMETHOD(Timespan, useconds), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "int get_total_microseconds() const property", asMETHOD(Timespan, totalMicroseconds), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("datetime", asBEHAVE_FACTORY, "datetime@ f()", asFUNCTION(angelscript_refcounted_factory<DateTime>), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("datetime", asBEHAVE_FACTORY, "datetime@ f(const timestamp&in timestamp)", asFUNCTION((angelscript_refcounted_factory<DateTime, const Timestamp&>)), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("datetime", asBEHAVE_FACTORY, "datetime@ f(double julian_day)", asFUNCTION((angelscript_refcounted_factory<DateTime, double>)), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("datetime", asBEHAVE_FACTORY, "datetime@ f(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION((angelscript_refcounted_factory<DateTime, int, int, int, int, int, int, int, int>)), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("datetime", asBEHAVE_FACTORY, "datetime@ f(const datetime&in)", asFUNCTION((angelscript_refcounted_factory<DateTime, const DateTime &>)), asCALL_CDECL);
