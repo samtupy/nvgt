@@ -170,7 +170,7 @@ class basic_character_controller {
 			} else {
 				const float vx = velocity.x;
 				const float vz = velocity.z;
-				const float length = std::sqrt(vx * vx + vz * vz);
+				const float length = sqrt(vx * vx + vz * vz);
 				if (length > 0.0001f) {
 					velocity.x = (vx / length) * current_speed;
 					velocity.z = (vz / length) * current_speed;
