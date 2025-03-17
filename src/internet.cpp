@@ -184,8 +184,8 @@ template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, con
 	engine->RegisterObjectMethod(type.c_str(), "uint64 size() const", asMETHOD(T, size), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void erase(const string&in)", asMETHOD(T, erase), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void clear()", asMETHOD(T, clear), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "const string& name_at(uint)", asFUNCTION(name_value_collection_name_at<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "const string& value_at(uint)", asFUNCTION(name_value_collection_value_at<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "const string& name_at(uint) const", asFUNCTION(name_value_collection_name_at<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "const string& value_at(uint) const", asFUNCTION(name_value_collection_value_at<T>), asCALL_CDECL_OBJFIRST);
 }
 template <class T, class P> void RegisterMessageHeader(asIScriptEngine* engine, const string& type, const string& parent) {
 	RegisterNameValueCollection<T>(engine, type);
