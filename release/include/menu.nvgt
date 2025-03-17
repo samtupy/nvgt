@@ -28,10 +28,12 @@ class menu {
 	string sounds_suffix; // The value set here is appended to any sound filenames that are loaded. A value could be .ogg, for example.
 	menu_callback@ background_callback = null; // A function called every time the monitor() method of this class is called.
 	string background_callback_data;
+	dictionary user_data; // Optional data for this menu that you can do anything you want with, such as storing an extra identifier or piece of information your script wants to use in regards to this menu.
 	bool wrap = false; // If the user moves beyond an edge of the menu, set this to true to jump them to the other edge, or false to play an edge sound and repeat the last item.
 	uint wrap_delay = 10; // How much time should the menu block when wrapping.
 	bool focus_first_item = false; // If this is false, the user will be required to press an arrow key to focus either the first or last item of the menu after the intro function has been called. Otherwise they will be focused on the first item.
 	bool automatic_intro = true; // If this is true, the intro function will be automatically called the first time the monitor method is invoqued, then the variable will be set to false. It can be set to true again at any time to cause the intro sequence to repeat, or the intro function can be called manually.
+	bool intro_interrupt = true; // This boolean is passed directly to the speak function when speaking the menu's intro, then it's reset to true. You can set it to false to speak a message prior to the next menu intro.
 	private bool _repeat_boundary_items = false; // Menu items will not speak when the user repeatedly hits the edge of a non-wrapping menu if this is set to false.
 	private bool _allow_escape = true; // If set to false, the user must click on an option manually and will not be able to use escape to exit the menu.
 	private bool _allow_go_to_index = true; // If set to false, the user can no longer press ctrl+g to select a menu item by number.
@@ -87,7 +89,8 @@ class menu {
 			return;
 		}
 		play(open_sound);
-		speak(intro_text.format(form.get_list_count(0)));
+		speak(intro_text.format(form.get_list_count(0)), intro_interrupt);
+		intro_interrupt = true;
 		if (focus_first_item) form.set_list_position(0, 0, true);
 		else {
 			string text = form.get_list_item(0, form.get_list_position(0));
@@ -223,16 +226,14 @@ class menu {
 
 // helper menus:
 // learn_game_sounds: takes a dictionary of sound descriptions mapped to sound filenames or lists of sound filenames and displays a menu which allows users to press enter on sound descriptions to hear associated sounds.
-void learn_game_sounds_menu(dictionary@ sfx, const string&in audio_prefix = "", menu@ m = null) {
+void learn_game_sounds_menu(const name_value_collection&in sfx, const string&in audio_prefix = "", menu@ m = null, string go_back = "Go back") {
 	sound audio;
 	if (@m == null) @m = menu();
 	if (m.intro_text.empty()) m.intro_text = "Select a sound with the up and down arrow keys and press enter to preview it.";
 	string select_sound = m.select_sound;
 	m.select_sound = "";
-	string[]@ sfx_names = sfx.get_keys();
-	sfx_names.sort_ascending();
-	m.add_items(sfx_names);
-	m.add_item("Go back");
+	for (uint i = 0; i < sfx.size(); i++) m.add_item(sfx.name_at(i));
+	m.add_item(go_back);
 	m.intro();
 	while (true) {
 		wait(5);
@@ -248,25 +249,29 @@ void learn_game_sounds_menu(dictionary@ sfx, const string&in audio_prefix = "", 
 			m.play(select_sound);
 			return;
 		}
-		string filename = "";
-		if (!sfx.get(sfx_names[m.selected_item], filename)) {
-			string[]@ filenames = cast<string[]@>(sfx[sfx_names[m.selected_item]]);
-			if (filenames.length() > 0) filename = filenames[random(0, filenames.length() -1)];
+		string filename = sfx.value_at(m.selected_item);
+		if (filename.find(",")>-1) {
+			string[]@ options = filename.split(",");
+			filename = options.random();
 		}
+		bool loop = filename.starts_with("~");
+		if (loop) filename.erase(0, 1);
 		if (!filename.empty()) {
-			audio.load(audio_prefix + filename);
-			audio.play();
+			if (filename[0] != "/") filename = audio_prefix + filename;
+			else filename.erase(0, 1);
+			audio.load(filename);
+			loop? audio.play_looped() : audio.play();
 		}
-		else speak("Unable to play "+sfx_names[m.selected_item]);
+		else speak("Unable to play "+sfx.name_at(m.selected_item));
 	}
 }
 // yes_no: A simple yes no menu that returns true if the user clicked yes, false if they clicked no or pressed escape. The prompt is inserted as the first item in the menu so that users can repeat it.
-bool yes_no(const string&in prompt, menu@ m = null) {
+bool yes_no(const string&in prompt, menu@ m = null, string yes = "yes", string no = "no") {
 	if (@m == null) @m = menu();
 	m.focus_first_item = true;
 	m.add_item(prompt);
-	m.add_item("yes");
-	m.add_item("no");
+	m.add_item(yes);
+	m.add_item(no);
 	speak(prompt);
 	m.automatic_intro = false;
 	while (m.selected_item < 1) {
