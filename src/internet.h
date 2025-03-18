@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include <string>
 #include <angelscript.h>
 
+std::string html_entities_decode(const std::string& input);
 void RegisterInternet(asIScriptEngine* engine);
