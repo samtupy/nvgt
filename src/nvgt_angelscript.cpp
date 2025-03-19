@@ -1,4 +1,4 @@
-/* angelscript.cpp - Angelscript integration code
+/* nvgt_angelscript.cpp - Angelscript integration code
  * This contains much of the code that revolves around Angelscript specifically. Random amounts of this code were initially taken from the Angelscript asrun and asbuild samples before being heavily modified for our purposes.
  * I wrote much of this at the beginning of nvgt's development and haven't touched it enough since, such that parts of this could definetly be cleaner.
  *
