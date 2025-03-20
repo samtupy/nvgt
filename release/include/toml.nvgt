@@ -62,7 +62,7 @@ class toml {
 			int ei = l.find("=");
 			if (ei > -1) {
 				key = l.substr(0, ei).trim_whitespace();
-				value = l.substr(ei + 1);
+				value = l.substr(ei + 1).trim_whitespace();
 			}
 			int comment = value.find("#");
 			if (comment > -1) {
