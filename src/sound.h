@@ -210,3 +210,4 @@ public:
 audio_engine *new_audio_engine(int flags);
 mixer *new_mixer(audio_engine *engine);
 sound *new_sound(audio_engine *engine);
+void RegisterSoundsystem(asIScriptEngine *engine);
