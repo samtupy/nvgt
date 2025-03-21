@@ -1,0 +1,14 @@
+/**
+	Count the number of times a substring appears in another string.
+	uint64 string::count(const string&in search, uint64 start = 0);
+	## Arguments:
+		* const string&in search: the substring to search for.
+		* uint64 start = 0: the zero-based position to start searching at.
+	## Returns:
+		uint64: the number of occurances of the given substring found.
+*/
+
+// Example:
+void main() {
+	alert("test", "testtest".count("test"));
+}

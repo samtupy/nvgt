@@ -5,9 +5,9 @@
 void main() {
 	http_request req(HTTP_GET, "/wp-json/wp/v2/posts?_fields=id,title&tags=9");
 	http_response resp;
-	https_client http("samtupy.com");
-	http.send_request(req);
-	datastream@ ds = http.receive_response(resp);
+	https_client httpc("samtupy.com");
+	httpc.send_request(req);
+	datastream@ ds = httpc.receive_response(resp);
 	if (resp.status != HTTP_OK) {
 		alert("error", "failed to fetch posts " + resp.status);
 		exit();

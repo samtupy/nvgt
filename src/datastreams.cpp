@@ -193,6 +193,14 @@ std::string datastream::read_line() {
 	std::getline(*_istr, result);
 	return result;
 }
+UInt64 datastream::read_7bit_encoded() {
+	if (!_istr) return 0;
+	UInt64 integer;
+	r->read7BitEncoded(integer);
+	return integer;
+}
+void datastream::read_7bit_encoded(UInt64& integer) { if(_istr) r->read7BitEncoded(integer); }
+void datastream::write_7bit_encoded(UInt64 integer) { if(_ostr) w->write7BitEncoded(integer); }
 bool datastream::can_write() {
 	// Todo: Cache whether most of the logic in this function needs to be performed so it doesn't happen on consequtive writes.
 	if (!w) return false;
@@ -290,8 +298,8 @@ template <class T, datastream_factory_type factory> void RegisterDatastreamType(
 	engine->RegisterObjectType(classname.c_str(), 0, asOBJ_REF);
 	if constexpr(factory == datastream_factory_closed) engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ d()", classname).c_str(), asFUNCTION(datastream_empty_factory), asCALL_CDECL);
 	else if constexpr(factory == datastream_factory_opened) {
-		engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(const string&in = \"\", int byteorder = 1)", classname).c_str(), asFUNCTION((datastream_simple_factory<T>)), asCALL_CDECL);
-		engine->RegisterObjectMethod(classname.c_str(), "bool open(const string&in = \"\", int byteorder = 1)", asFUNCTION((datastream_simple_open<T>)), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(const string&in encoding = \"\", int byteorder = 1)", classname).c_str(), asFUNCTION((datastream_simple_factory<T>)), asCALL_CDECL);
+		engine->RegisterObjectMethod(classname.c_str(), "bool open(const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((datastream_simple_open<T>)), asCALL_CDECL_OBJFIRST);
 	}
 	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_ADDREF, "void f()", asMETHOD(datastream, duplicate), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_RELEASE, "void f()", asMETHOD(datastream, release), asCALL_THISCALL);
@@ -316,6 +324,9 @@ template <class T, datastream_factory_type factory> void RegisterDatastreamType(
 	engine->RegisterObjectMethod(classname.c_str(), "string read(uint = 0)", asMETHODPR(datastream, read, (unsigned int), std::string), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read_line()", asMETHOD(datastream, read_line), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read_until(const string&in text, bool require_full)", asMETHOD(datastream, read_until), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "uint64 read_7bit_encoded()", asMETHODPR(datastream, read_7bit_encoded, (), UInt64), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "void read_7bit_encoded(uint64&out integer)", asMETHODPR(datastream, read_7bit_encoded, (UInt64&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "void write_7bit_encoded(uint64 integer)", asMETHODPR(datastream, write_7bit_encoded, (UInt64), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "uint write(const string&in)", asMETHODPR(datastream, write, (const std::string&), unsigned int), asCALL_THISCALL);
 	RegisterDatastreamReadwrite<char>(engine, classname, "int8");
 	RegisterDatastreamReadwrite<unsigned char>(engine, classname, "uint8");
@@ -579,8 +590,8 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->SetDefaultNamespace("");
 	RegisterDatastreamType<std::stringstream, datastream_factory_none>(engine, "datastream");
 	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in = \"\")", asFUNCTION(stringstream_implicit_factory), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in, const string&in encoding, int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_factory), asCALL_CDECL);
-	engine->RegisterObjectMethod("datastream", "bool open(const string&in = \"\", const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_open), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in initial_data, const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_factory), asCALL_CDECL);
+	engine->RegisterObjectMethod("datastream", "bool open(const string&in initial_data = \"\", const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_open), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datastream", "string str()", asFUNCTION(stringstream_str), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_TERMINAL);
 	engine->RegisterGlobalFunction("datastream@ get_cin() property", asFUNCTION(get_cin), asCALL_CDECL);

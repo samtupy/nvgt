@@ -8,7 +8,7 @@
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
-*/
+ */
 
 #pragma once
 
@@ -21,22 +21,23 @@ class audio_engine;
 class mixer;
 class sound;
 
-//extern audio_engine* g_audio_engine;
+// extern audio_engine* g_audio_engine;
 bool init_sound();
 bool refresh_audio_devices();
 
-class audio_node {
+class audio_node
+{
 public:
 	virtual void duplicate() = 0; // reference counting
 	virtual void release() = 0;
 	virtual ~audio_node() = default;
-	virtual ma_node_base* get_ma_node() = 0;
-	virtual audio_engine* get_engine() const = 0;
+	virtual ma_node_base *get_ma_node() = 0;
+	virtual audio_engine *get_engine() const = 0;
 	virtual unsigned int get_input_bus_count() = 0;
 	virtual unsigned int get_output_bus_count() = 0;
 	virtual unsigned int get_input_channels(unsigned int bus) = 0;
 	virtual unsigned int get_output_channels(unsigned int bus) = 0;
-	virtual bool attach_output_bus(unsigned int output_bus, audio_node* destination, unsigned int destination_input_bus) = 0;
+	virtual bool attach_output_bus(unsigned int output_bus, audio_node *destination, unsigned int destination_input_bus) = 0;
 	virtual bool detach_output_bus(unsigned int bus) = 0;
 	virtual bool detach_all_output_buses() = 0;
 	virtual bool set_output_bus_volume(unsigned int bus, float volume) = 0;
@@ -50,12 +51,14 @@ public:
 	virtual unsigned long long get_time() = 0;
 	virtual bool set_time(unsigned long long local_time) = 0;
 };
-class audio_engine {
+class audio_engine
+{
 public:
-	enum engine_flags {
-		DURATIONS_IN_FRAMES = 1, // If set, all durations possible will expect a value in PCM frames rather than milliseconds unless explicitly specified.
-		NO_AUTO_START = 2, // if set, audio_engine::start must be called after initialization.
-		NO_DEVICE = 4, // If set, audio_engine::read() must be used to receive raw audio samples from the engine instead.
+	enum engine_flags
+	{
+		DURATIONS_IN_FRAMES = 1,  // If set, all durations possible will expect a value in PCM frames rather than milliseconds unless explicitly specified.
+		NO_AUTO_START = 2,		  // if set, audio_engine::start must be called after initialization.
+		NO_DEVICE = 4,			  // If set, audio_engine::read() must be used to receive raw audio samples from the engine instead.
 		PERCENTAGE_ATTRIBUTES = 8 // If this is set, attributes for sounds will be in percentages such as 100 instead of decimals such as 1.0, ecentially a multiplication by 100 for backwards compatibility or preference. This also causes sound.volume to work in db.
 	};
 	virtual void duplicate() = 0; // reference counting
@@ -63,10 +66,10 @@ public:
 	virtual ~audio_engine() = default;
 	virtual int get_device() = 0;
 	virtual bool set_device(int device) = 0;
-	virtual audio_node* get_endpoint() = 0;
-	virtual ma_engine* get_ma_engine() = 0;
-	virtual bool read(void* buffer, unsigned long long frame_count, unsigned long long* frames_read) = 0;
-	virtual CScriptArray* read(unsigned long long frame_count) = 0;
+	virtual audio_node *get_endpoint() = 0;
+	virtual ma_engine *get_ma_engine() = 0;
+	virtual bool read(void *buffer, unsigned long long frame_count, unsigned long long *frames_read) = 0;
+	virtual CScriptArray *read(unsigned long long frame_count) = 0;
 	virtual unsigned long long get_time() = 0;
 	virtual bool set_time(unsigned long long time) = 0; // depends on DURATIONS_IN_FRAMES flag.
 	virtual unsigned long long get_time_in_frames() = 0;
@@ -75,42 +78,43 @@ public:
 	virtual bool set_time_in_milliseconds(unsigned long long time) = 0;
 	virtual int get_channels() = 0;
 	virtual int get_sample_rate() = 0;
-	virtual bool start() = 0; // Begins audio playback <ma_engine_start>, only needs to be called if NO_AUTO_START flag is set in engine construction or after stop is called.
-	virtual bool stop() = 0; // Stops audio playback.
+	virtual bool start() = 0;				   // Begins audio playback <ma_engine_start>, only needs to be called if NO_AUTO_START flag is set in engine construction or after stop is called.
+	virtual bool stop() = 0;				   // Stops audio playback.
 	virtual bool set_volume(float volume) = 0; // 0.0 to 1.0.
 	virtual float get_volume() = 0;
 	virtual bool set_gain(float db) = 0;
 	virtual float get_gain() = 0;
 	virtual unsigned int get_listener_count() = 0;
 	virtual int find_closest_listener(float x, float y, float z) = 0;
-	virtual int find_closest_listener(const reactphysics3d::Vector3& position) = 0;
+	virtual int find_closest_listener(const reactphysics3d::Vector3 &position) = 0;
 	virtual void set_listener_position(unsigned int index, float x, float y, float z) = 0;
-	virtual void set_listener_position(unsigned int index, const reactphysics3d::Vector3& position) = 0;
+	virtual void set_listener_position(unsigned int index, const reactphysics3d::Vector3 &position) = 0;
 	virtual reactphysics3d::Vector3 get_listener_position(unsigned int index) = 0;
 	virtual void set_listener_direction(unsigned int index, float x, float y, float z) = 0;
-	virtual void set_listener_direction(unsigned int index, const reactphysics3d::Vector3& direction) = 0;
+	virtual void set_listener_direction(unsigned int index, const reactphysics3d::Vector3 &direction) = 0;
 	virtual reactphysics3d::Vector3 get_listener_direction(unsigned int index) = 0;
 	virtual void set_listener_velocity(unsigned int index, float x, float y, float z) = 0;
-	virtual void set_listener_velocity(unsigned int index, const reactphysics3d::Vector3& velocity) = 0;
+	virtual void set_listener_velocity(unsigned int index, const reactphysics3d::Vector3 &velocity) = 0;
 	virtual reactphysics3d::Vector3 get_listener_velocity(unsigned int index) = 0;
 	virtual void set_listener_cone(unsigned int index, float inner_radians, float outer_radians, float outer_gain) = 0;
-	virtual void get_listener_cone(unsigned int index, float* inner_radians, float* outer_radians, float* outer_gain) = 0;
+	virtual void get_listener_cone(unsigned int index, float *inner_radians, float *outer_radians, float *outer_gain) = 0;
 	virtual void set_listener_world_up(unsigned int index, float x, float y, float z) = 0;
-	virtual void set_listener_world_up(unsigned int index, const reactphysics3d::Vector3& world_up) = 0;
+	virtual void set_listener_world_up(unsigned int index, const reactphysics3d::Vector3 &world_up) = 0;
 	virtual reactphysics3d::Vector3 get_listener_world_up(unsigned int index) = 0;
 	virtual void set_listener_enabled(unsigned int index, bool enabled) = 0;
 	virtual bool get_listener_enabled(unsigned int index) = 0;
-	virtual bool play(const std::string& path, audio_node* node, unsigned int input_bus_index) = 0;
-	virtual bool play(const std::string& path, mixer* mixer = nullptr) = 0;
-	virtual mixer* new_mixer() = 0;
-	virtual sound* new_sound() = 0;
+	virtual bool play(const std::string &path, audio_node *node, unsigned int input_bus_index) = 0;
+	virtual bool play(const std::string &path, mixer *mixer = nullptr) = 0;
+	virtual mixer *new_mixer() = 0;
+	virtual sound *new_sound() = 0;
 };
-class mixer : public virtual audio_node {
+class mixer : public virtual audio_node
+{
 public:
 	virtual void duplicate() = 0; // reference counting
 	virtual void release() = 0;
-	virtual audio_engine* get_engine() = 0;
-	virtual ma_sound* get_ma_sound() = 0;
+	virtual audio_engine *get_engine() = 0;
+	virtual ma_sound *get_ma_sound() = 0;
 	virtual bool play() = 0;
 	virtual bool stop() = 0;
 	virtual void set_volume(float volume) = 0;
@@ -148,7 +152,7 @@ public:
 	virtual void set_max_distance(float distance) = 0;
 	virtual float get_max_distance() = 0;
 	virtual void set_cone(float inner_radians, float outer_radians, float outer_gain) = 0;
-	virtual void get_cone(float* inner_radians, float* outer_radians, float* outer_gain) = 0;
+	virtual void get_cone(float *inner_radians, float *outer_radians, float *outer_gain) = 0;
 	virtual void set_doppler_factor(float factor) = 0;
 	virtual float get_doppler_factor() = 0;
 	virtual void set_directional_attenuation_factor(float factor) = 0;
@@ -168,12 +172,13 @@ public:
 	virtual unsigned long long get_time_in_milliseconds() = 0;
 	virtual bool get_playing() = 0;
 };
-class sound : public virtual mixer {
+class sound : public virtual mixer
+{
 public:
-	virtual bool load(const std::string& filename) = 0;
-	virtual bool load_string(const std::string& data) = 0;
-	virtual bool load_memory(const void* buffer, unsigned int size) = 0;
-	virtual bool load_pcm(void* buffer, unsigned int size, ma_format format, int samplerate, int channels) = 0;
+	virtual bool load(const std::string &filename) = 0;
+	virtual bool load_string(const std::string &data) = 0;
+	virtual bool load_memory(const void *buffer, unsigned int size) = 0;
+	virtual bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) = 0;
 	virtual bool close() = 0;
 	virtual bool get_active() = 0;
 	virtual bool get_paused() = 0;
@@ -199,11 +204,9 @@ public:
 	virtual unsigned long long get_length() = 0; // DURATIONS_IN_FRAMES
 	virtual unsigned long long get_length_in_frames() = 0;
 	virtual unsigned long long get_length_in_milliseconds() = 0;
-	virtual bool get_data_format(ma_format* format, unsigned int* channels, unsigned int* sample_rate) = 0;
+	virtual bool get_data_format(ma_format *format, unsigned int *channels, unsigned int *sample_rate) = 0;
 };
 
-audio_engine* new_audio_engine(int flags);
-mixer* new_mixer(audio_engine* engine);
-sound* new_sound(audio_engine* engine);
-
-void RegisterSoundsystem(asIScriptEngine* engine);
+audio_engine *new_audio_engine(int flags);
+mixer *new_mixer(audio_engine *engine);
+sound *new_sound(audio_engine *engine);

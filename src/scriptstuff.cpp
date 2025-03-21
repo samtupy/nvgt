@@ -706,6 +706,14 @@ void RegisterScripting(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("script_function"), _O("string get_namespace() property"), asFUNCTION(script_function_get_namespace), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("string get_script() property"), asFUNCTION(script_function_get_script), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("int get_line() property"), asFUNCTION(script_function_get_line), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("bool get_is_explicit() property"), asMETHOD(asIScriptFunction, IsExplicit), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_function"), _O("bool get_is_final() property"), asMETHOD(asIScriptFunction, IsFinal), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_function"), _O("bool get_is_override() property"), asMETHOD(asIScriptFunction, IsOverride), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_function"), _O("bool get_is_private() property"), asMETHOD(asIScriptFunction, IsPrivate), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_function"), _O("bool get_is_property() property"), asMETHOD(asIScriptFunction, IsProperty), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_function"), _O("bool get_is_protected() property"), asMETHOD(asIScriptFunction, IsProtected), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_function"), _O("bool get_is_read_only() property"), asMETHOD(asIScriptFunction, IsReadOnly), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_function"), _O("bool get_is_shared() property"), asMETHOD(asIScriptFunction, IsShared), asCALL_THISCALL);
 	engine->RegisterObjectType(_O("script_module"), 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(_O("script_module"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(script_module, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("script_module"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(script_module, Release), asCALL_THISCALL);

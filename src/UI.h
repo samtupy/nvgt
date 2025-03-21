@@ -19,6 +19,9 @@
 #elif defined(__APPLE__)
 	typedef struct _NSWindow NSWindow;
 	extern NSWindow* g_OSWindowHandle;
+#elif defined(__ANDROID__)
+	#include <android/native_window.h>
+	extern ANativeWindow* g_OSWindowHandle;
 #else
 	extern void* g_OSWindowHandle;
 #endif

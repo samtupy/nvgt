@@ -3,5 +3,6 @@
 // License: zlib (see license.md in the root of the NVGT distribution)
 
 void main() {
-	alert(COMMAND_LINE, string(ARGS));
+	show_window("Test");
+	alert("Alert", (KEYBOARD_AVAILABLE) ? "Keyboard atached" : "Keyboard not atached");
 }

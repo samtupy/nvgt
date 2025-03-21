@@ -3,5 +3,10 @@
 // License: zlib (see license.md in the root of the NVGT distribution)
 
 void main() {
-	alert(COMMAND_LINE, string(ARGS));
+	int[] nums = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+	for (uint i = 0; i < 10; i++) {
+		int[] nums2 = nums;
+		nums2.shuffle();
+		alert("test", string(nums2));
+	}
 }

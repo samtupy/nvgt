@@ -5,7 +5,7 @@
 		* int&out seconds = void: Where to store the number of remaining charge time in seconds.
 		* int&out percent = void: Where to store the percentage of battery charge remaining.
 	## Returns:
-		system_power_state: One of POWER_STATE_ERROR, POWER_STATE_UNKNOWN, POWER_STATE_ON_BATTERY, POWER_STATE_NO_BATTERY, POWER_STATE_CHARGING or POWER_STATE_CHARGED.
+		system_power_state: One of the system_power_state constants.
 	## Remarks:
 		This could be useful for various reasons, such as backing up game data on low battery or showing extra mercy to online game players who run out of battery power who you might otherwise punish/tag for unlawful disconnection.
 		If the battery percentage or time remaining cannot be determined, that value will be set to -1.

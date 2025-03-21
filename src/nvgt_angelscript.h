@@ -1,4 +1,4 @@
-/* angelscript.h - Angelscript integration header
+/* nvgt_angelscript.h - Angelscript integration header
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy

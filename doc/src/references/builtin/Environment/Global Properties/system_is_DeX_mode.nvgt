@@ -1,0 +1,12 @@
+/**
+	This property is true if the application is running in Samsung DeX mode, which is a desktop-like environment available on certain Samsung devices. It allows a mobile device to provide a desktop experience when connected to an external display.
+	const bool system_is_DeX_mode;
+*/
+
+// example:
+void main() {
+	if(system_is_DeX_mode)
+		alert("example", "This application is running in Samsung DeX mode!");
+	else
+		alert("example", "This application is not running in Samsung DeX mode.");
+}

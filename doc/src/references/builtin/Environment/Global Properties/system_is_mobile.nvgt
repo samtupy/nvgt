@@ -1,0 +1,12 @@
+/**
+	This property is true if the application is running on any mobile device, for example a cell phone.
+	const bool system_is_mobile;
+*/
+
+// example:
+void main() {
+	if(system_is_mobile)
+		alert("example", "This application is running on a mobile device!");
+	else
+		alert("example", "This application is not running on a mobile device.");
+}

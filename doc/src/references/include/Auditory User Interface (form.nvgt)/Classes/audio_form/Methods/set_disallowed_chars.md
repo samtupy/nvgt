@@ -16,3 +16,5 @@ bool: true if the characters were successfully set, false otherwise.
 Setting the `use_only_disallowed_chars` parameter to true will restrict all characters that are not in the list. This is useful to prevent other characters in number inputs.
 
 Setting the chars parameter to empty will clear the characters and will switch back to default.
+
+Please note that these character sets will also restrict the text from being pasted if the clipboard contains disallowed characters.
