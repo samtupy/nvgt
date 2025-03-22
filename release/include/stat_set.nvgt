@@ -1,0 +1,232 @@
+/* stat_set.nvgt - easy management and printing of game statistics.
+ *
+ * Copyright (c) 2024-2025 Quin G with modifications and additions by Sam Tupy, written for and distributed under the same license as
+ * NVGT - NonVisual Gaming Toolkit
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.gg
+ * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+ * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+ * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+*/
+
+funcdef string stat_callback(stat@);
+stat_callback@ default_stat_callback = default_stat_callback_impl;
+string default_stat_callback_impl(stat@ stat) { return stat.text.format(string(stat.val)); }
+enum stat_sort_mode {STAT_SORT_MODE_NONE, STAT_SORT_MODE_ADD_ORDER, STAT_SORT_MODE_VALUE};
+uint64 _next_stat = 0; // Counter that increases every time a new stat is added to any stat set, used ONLY to allow stats to be sorted by the order in which they were added.
+class stat {
+	string name;
+	var val;
+	string text;
+	stat_callback@ callback;
+	dictionary user; // Not touched by statset, allows the linkage of any user values to a stat to help with display, not serialized.
+	uint64 sort_counter = _next_stat++;
+
+	stat(const string&in name, var@ val, string text = "", stat_callback@ callback = default_stat_callback, dictionary@ user = null) {
+		this.name = name;
+		if (text.is_empty())
+			text = "%0";
+		this.val = val;
+		this.text = text;
+		if (@callback == null) @callback = default_stat_callback;
+		@this.callback = callback;
+		if (@user != null) this.user = user;
+	}
+
+	const string opImplConv() {
+		if (@this.callback !is null)
+			return this.callback(this);
+		return name +"=" + string(val);
+	}
+
+	double opConv() {
+		return val;
+	}
+
+	var@ opAssign(const string&in value) {
+		return this.val = value;
+	}
+
+	var@ opAddAssign(const string&in value) {
+		return this.val += value;
+	}
+
+	// I think int and double are the best things to use here, at least for now. I tried to make them return stat handles, but the var type is still slightly limited and couldn't cast to a stat@, even with int opImplConv() implemented on the stat object.
+	double opAssign(double value) {
+		return this.val = value;
+	}
+
+	int opPostInc() {
+		return this.val++;
+	}
+
+	int opPostDec() {
+		return this.val--;
+	}
+
+	double opAdd(double value) {
+		return this.val + value;
+	}
+
+	double opAddAssign(double value) {
+		return this.val += value;
+	}
+
+	double opSub(double value) {
+		return this.val - value;
+	}
+
+	double opSubAssign(double value) {
+		return this.val -= value;
+	}
+
+	double opMul(double value) {
+		return this.val * value;
+	}
+
+	double opMulAssign(double value) {
+		return this.val *= value;
+	}
+
+	double opDiv(double value) {
+		return this.val / value;
+	}
+
+	double opDivAssign(double value) {
+		return this.val /= value;
+	}
+	double opMod(int64 value) {
+		return this.val % value;
+	}
+
+	double opModAssign(int64 value) {
+		return this.val %= value;
+	}
+}
+
+class stat_set {
+	dictionary stats;
+
+	stat_set() {}
+
+	stat_set(const stat_set&in other) { opAssign(other); }
+
+	stat_set@ opAssign(const stat_set&in other) {
+		stats.delete_all();
+		string[]@ keys = other.stats.get_keys();
+		for (uint i = 0; i < keys.length(); i++) {
+			stat@ stat = other[keys[i]];
+			add(keys[i], stat.val, stat.text, stat.callback, stat.user);
+		}
+		return this;
+	}
+
+	void add(const string&in name, var@ value, const string&in text = "", stat_callback@ callback = null, dictionary@ user = null) {
+		if (!this.stats.exists(name)) this.stats.set(name, @stat(name, value, text, callback, user));
+	}
+
+	void update(const string&in name, var@ value) {
+		if (!stats.exists(name)) return;
+		cast<stat@>(stats[name]).val = value;
+	}
+	void mod(const string&in name, int64 value) {
+		if (!stats.exists(name)) return;
+		cast<stat@>(stats[name]).val += value;
+	}
+	void mod(const string&in name, double value) {
+		if (!stats.exists(name)) return;
+		cast<stat@>(stats[name]).val += value;
+	}
+
+	bool delete(const string&in name) { return stats.delete(name); }
+
+	stat@ opIndex(const string&in stat_name) const {
+		if (!this.stats.exists(stat_name)) return null;
+		return cast<stat@>(this.stats[stat_name]);
+	}
+
+	int get_size() const property {
+		return stats.size();
+	}
+
+	string[]@ list(stat_sort_mode sort_mode = STAT_SORT_MODE_NONE, const string[]@ sort_in_front = {}, const string[]@ sort_behind = {}) const {
+		if (stats.empty()) return {};
+		string[]@ keys = stats.get_keys();
+		stat@[] tmp_stats;
+		for (uint i = 0; i < keys.length(); i++) tmp_stats.insert_last(this[keys[i]]);
+		string[] result(tmp_stats.length());
+		if (sort_mode == STAT_SORT_MODE_ADD_ORDER) tmp_stats.sort(function(A, B) { return A.sort_counter < B.sort_counter; });
+		else if (sort_mode == STAT_SORT_MODE_VALUE) tmp_stats.sort(function(A, B) { return A.val < B.val; });
+		for (uint i = 0; i < tmp_stats.length(); i++) result[i] = tmp_stats[i].name;
+		for (int i = sort_in_front.length() -1; i >= 0; i--) {
+			int idx = result.find(sort_in_front[i]);
+			if (idx < 0) continue;
+			result.insert_at(0, result[idx]);
+			result.remove_at(idx + 1);
+		}
+		for (uint i = 0; i < sort_behind.length(); i++) {
+			int idx = result.find(sort_behind[i]);
+			if (idx < 0) continue;
+			result.insert_last(result[idx]);
+			result.remove_at(idx + 1);
+		}
+		return result;
+	}
+
+	bool exists(const string& in stat_name) {
+		return this.stats.exists(stat_name);
+	}
+
+	string[]@ opImplConv() {
+		string[] res;
+		string[]@ keys = this.stats.get_keys();
+		for (uint i = 0; i < keys.length(); i++)
+			res.insert_last(string(this.stats[keys[i]]));
+		return res;
+	}
+
+	stat_set@ opAddAssign(const stat_set&in other) {
+		string[]@ keys_to_add = other.stats.get_keys();
+		for (uint i = 0; i < keys_to_add.length(); i++) {
+			string key = keys_to_add[i];
+			stat@ st = other[key];
+			if (this.exists(key))
+				this[key] += st.val;
+			else
+				add(key, st.val, st.text, st.callback, st.user);
+		}
+		return this;
+	}
+
+	string serialize() {
+		datastream ds;
+		ds.write_int(stats.size());
+		string[]@ k = stats.get_keys();
+		for (uint i = 0; i < k.length(); i++) {
+			var@ v = cast<stat@>(stats[k[i]]).val;
+			int t = v.is_string? 1 : v.is_numeric? v.is_integer? 2 : 3 : 4;
+			ds.write_string(k[i]);
+			ds.write_int8(t);
+			if (v.is_string) ds.write_string(v);
+			else if(v.is_integer) ds.write_7bit_encoded(v);
+			else if(v.is_numeric) ds.write_float(v);
+		}
+		return ds.str();
+	}
+
+	bool deserialize(datastream@ ds) {
+		int count = ds.read_int();
+		if (count < 1) return false;
+		for (uint i = 0; i < count; i++) {
+			if (!ds.good) return false;
+			string name = ds.read_string();
+			int8 t = ds.read_int8();
+			if (t == 1) update(name, ds.read_string());
+			else if (t == 2) update(name, ds.read_7bit_encoded());
+			else if (t == 3) update(name, ds.read_float());
+		}
+		return true;
+	}
+}
