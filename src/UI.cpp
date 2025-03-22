@@ -203,6 +203,7 @@ std::string input_box(const std::string& title, const std::string& text, const s
 	}
 	std::string resultA;
 	Poco::UnicodeConverter::convert(r, resultA);
+	if (g_WindowHandle) SDL_RaiseWindow(g_WindowHandle);
 	return resultA;
 	#elif defined(__APPLE__)
 	std::string r = apple_input_box(title, text, default_value, false, false);
