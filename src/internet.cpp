@@ -644,7 +644,7 @@ public:
 					_session = nullptr;
 					unlock();
 					continue;
-				} else if (_response.getStatus() == HTTPResponse::HTTP_UNAUTHORIZED && !authorize) {
+				} else if (_response.getStatus() == HTTPResponse::HTTP_UNAUTHORIZED && !authorize && !_creds.empty()) {
 					unlock();
 					authorize = true;
 					NullOutputStream null;
