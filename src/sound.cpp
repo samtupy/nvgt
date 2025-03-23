@@ -19,6 +19,8 @@
 #include <scriptarray.h>
 #include "nvgt_angelscript.h" // get_array_type
 #include "sound.h"
+#include "sound_service.h"
+#include "encryption_filter.h"
 #include <atomic>
 #include <utility>
 #include <cstdint>
@@ -32,13 +34,22 @@ static ma_context g_sound_context;
 audio_engine *g_audio_engine = nullptr;
 static std::atomic_flag g_soundsystem_initialized;
 static std::atomic<ma_result> g_soundsystem_last_error = MA_SUCCESS;
-
+static std::unique_ptr<sound_service> g_sound_service;
+static size_t g_encryption_filter_slot = 0;
 bool init_sound()
 {
 	if (g_soundsystem_initialized.test())
 		return true;
 	if ((g_soundsystem_last_error = ma_context_init(nullptr, 0, nullptr, &g_sound_context)) != MA_SUCCESS)
 		return false;
+	g_sound_service = sound_service::make();
+	if (g_sound_service == nullptr)
+	{
+		ma_context_uninit(&g_sound_context);
+		return false;
+	}
+	// Register encryption support:
+	g_sound_service->register_filter(encryption_filter::get_instance(), g_encryption_filter_slot);
 	g_soundsystem_initialized.test_and_set();
 	refresh_audio_devices();
 	g_audio_engine = new_audio_engine(audio_engine::PERCENTAGE_ATTRIBUTES);
@@ -155,6 +166,8 @@ public:
 	audio_engine_impl(int flags) : audio_engine(), engine(nullptr), engine_endpoint(nullptr), flags(static_cast<engine_flags>(flags)), refcount(1)
 	{
 		ma_engine_config cfg = ma_engine_config_init();
+		// Attach the engine to the sound service so that it can receive audio from custom sources.
+		cfg.pResourceManagerVFS = g_sound_service->get_vfs();
 		// cfg.pContext = &g_sound_context; // Miniaudio won't let us quickly uninitilize then reinitialize a device sometimes when using the same context, so we won't manage it until we figure that out.
 		engine = make_unique<ma_engine>();
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS)
@@ -874,10 +887,18 @@ int get_sound_output_device()
 	init_sound();
 	return g_audio_engine->get_device();
 }
-bool set_sound_output_device(int device)
+void set_sound_output_device(int device)
 {
 	init_sound();
-	return g_audio_engine->set_device(device);
+	g_audio_engine->set_device(device);
+}
+// Encryption.
+void set_default_decryption_key(const std::string &key)
+{
+	if (!init_sound())
+		return;
+	g_sound_service->set_filter_directive(g_encryption_filter_slot, std::make_shared<std::string>(key));
+	g_sound_service->set_default_filter(key.empty() ? sound_service::null_filter_slot : g_encryption_filter_slot);
 }
 int get_soundsystem_last_error() { return g_soundsystem_last_error; }
 
@@ -1086,5 +1107,6 @@ void RegisterSoundsystem(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("const string[]@ get_sound_output_devices() property", asFUNCTION(get_sound_output_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_output_device(int device) property", asFUNCTION(set_sound_output_device), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_default_decryption_key(const string& in key) property", asFUNCTION(set_default_decryption_key), asCALL_CDECL);
 	engine->RegisterGlobalFunction("audio_error_state get_SOUNDSYSTEM_LAST_ERROR() property", asFUNCTION(get_soundsystem_last_error), asCALL_CDECL);
 }
