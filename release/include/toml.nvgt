@@ -96,7 +96,8 @@ class toml {
 				if (value.find('"') > -1) va = value.split('",');
 				if (va.length() < 1) continue;
 				t.set(key, va);
-			}
+			} else if (value.lower() == "true" || value.lower() == "false")
+				t.set(key, (value.lower() == "true" ? true : false));
 		}
 	}
 	string[] get_keys(string name, bool all = false) {
