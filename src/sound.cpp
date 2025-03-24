@@ -21,6 +21,8 @@
 #include "sound.h"
 #include "sound_service.h"
 #include "encryption_filter.h"
+#include "pack_protocol.h"
+#include "pack2.h"
 #include <atomic>
 #include <utility>
 #include <cstdint>
@@ -35,7 +37,9 @@ audio_engine *g_audio_engine = nullptr;
 static std::atomic_flag g_soundsystem_initialized;
 static std::atomic<ma_result> g_soundsystem_last_error = MA_SUCCESS;
 static std::unique_ptr<sound_service> g_sound_service;
+// These slots are what you use to refer to protocols (which are data sources like archives) and filters (which are transformations like encryption) after they've been plugged into the sound service.
 static size_t g_encryption_filter_slot = 0;
+static size_t g_pack_protocol_slot = 0;
 bool init_sound()
 {
 	if (g_soundsystem_initialized.test())
@@ -50,6 +54,8 @@ bool init_sound()
 	}
 	// Register encryption support:
 	g_sound_service->register_filter(encryption_filter::get_instance(), g_encryption_filter_slot);
+	// And access to packs:
+	g_sound_service->register_protocol(pack_protocol::get_instance(), g_pack_protocol_slot);
 	g_soundsystem_initialized.test_and_set();
 	refresh_audio_devices();
 	g_audio_engine = new_audio_engine(audio_engine::PERCENTAGE_ATTRIBUTES);
@@ -658,7 +664,13 @@ public:
 	{
 		if (!snd)
 			snd = make_unique<ma_sound>();
-		g_soundsystem_last_error = ma_sound_init_from_file(engine->get_ma_engine(), filename.c_str(), 0, nullptr, nullptr, &*snd);
+		// The sound service converts our file name into a "tripplet" which includes information about the origin an asset is expected to come from. This guarantees that we don't mistake assets from different origins as the same just because they have the same name.
+		std::string triplet = g_sound_service->name_to_triplet(filename);
+		if (triplet.empty())
+		{
+			return false;
+		}
+		g_soundsystem_last_error = ma_sound_init_from_file(engine->get_ma_engine(), triplet.c_str(), 0, nullptr, nullptr, &*snd);
 		if (g_soundsystem_last_error != MA_SUCCESS)
 			snd.reset();
 		return g_soundsystem_last_error == MA_SUCCESS;
@@ -900,6 +912,22 @@ void set_default_decryption_key(const std::string &key)
 	g_sound_service->set_filter_directive(g_encryption_filter_slot, std::make_shared<std::string>(key));
 	g_sound_service->set_default_filter(key.empty() ? sound_service::null_filter_slot : g_encryption_filter_slot);
 }
+// Set default pack storage for future sounds. Null means go back to local file system.
+// Note: a pack must be marked immutable in order to be used with sound service.
+void set_sound_default_storage(new_pack::pack *obj)
+{
+	if (!init_sound())
+	{
+		return;
+	}
+	if (obj == nullptr)
+	{
+		g_sound_service->set_default_protocol(sound_service::fs_protocol_slot);
+		return;
+	}
+	g_sound_service->set_protocol_directive(g_pack_protocol_slot, obj->to_shared());
+	g_sound_service->set_default_protocol(g_pack_protocol_slot);
+}
 int get_soundsystem_last_error() { return g_soundsystem_last_error; }
 
 template <class T, auto Function, typename ReturnType, typename... Args>
@@ -1108,5 +1136,7 @@ void RegisterSoundsystem(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_output_device(int device) property", asFUNCTION(set_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_decryption_key(const string& in key) property", asFUNCTION(set_default_decryption_key), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_default_storage(new_pack::pack_file@ storage) property", asFUNCTION(set_sound_default_storage), asCALL_CDECL);
+
 	engine->RegisterGlobalFunction("audio_error_state get_SOUNDSYSTEM_LAST_ERROR() property", asFUNCTION(get_soundsystem_last_error), asCALL_CDECL);
 }

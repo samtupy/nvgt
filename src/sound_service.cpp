@@ -15,6 +15,10 @@
 #include <vector>
 #include <cassert>
 #include "miniaudio.h"
+#include "text_validation.h"
+#include <poco/Format.h>
+#include <Poco/StringTokenizer.h>
+#include <poco/NumberParser.h>
 /**
  * The VFS is the glue between the sound service and MiniAudio.
  * We have an opaque structure -- in this case a pointer to the sound_service implementation -- and a series of callbacks which provide MiniAudio an interface to it.
@@ -51,7 +55,7 @@ class sound_service_impl : public sound_service
 		{
 			return &instance;
 		}
-		std::istream *open_uri(const char *uri) const
+		virtual std::istream *open_uri(const char *uri, const directive_t directive) const
 		{
 			Poco::FileInputStream *stream;
 			try
@@ -63,6 +67,10 @@ class sound_service_impl : public sound_service
 			{
 				return NULL; // Likely out of memory.
 			}
+		}
+		virtual const std::string get_suffix(const directive_t &directive) const
+		{
+			return "fs";
 		}
 	};
 	/**
@@ -88,12 +96,15 @@ class sound_service_impl : public sound_service
 	class service_registration
 	{
 		const t *item;
-		std::atomic<directive_t> directive; // Arbitrary data that will be sent to the filter (such as a decryption key).
+		std::atomic<directive_t> directive; // Arbitrary data that will be sent to the filter or protocol (such as a decryption key).
+		size_t slot;
+
 	public:
-		service_registration(const t *item, bool on = true)
+		service_registration(const t *item, size_t slot)
 			: directive()
 		{
 			this->item = item;
+			this->slot = slot;
 		}
 		inline const t *get() const
 		{
@@ -106,6 +117,10 @@ class sound_service_impl : public sound_service
 		inline void set_directive(const directive_t &directive)
 		{
 			this->directive.store(directive, std::memory_order_release);
+		}
+		inline const size_t get_slot() const
+		{
+			return slot;
 		}
 	};
 	typedef service_registration<protocol> protocol_reg_t;
@@ -153,7 +168,7 @@ public:
 	{
 		try
 		{
-			protocols.push_back(std::make_shared<protocol_reg_t>(proto));
+			protocols.push_back(std::make_shared<protocol_reg_t>(proto, protocols.size()));
 			slot = protocols.size() - 1;
 			return true;
 		}
@@ -166,7 +181,7 @@ public:
 	{
 		try
 		{
-			filters.push_back(std::make_shared<filter_reg_t>(the_filter));
+			filters.push_back(std::make_shared<filter_reg_t>(the_filter, filters.size()));
 			slot = filters.size() - 1;
 			return true;
 		}
@@ -240,11 +255,15 @@ public:
 		filters[slot]->set_directive(new_directive);
 		return true;
 	}
-	std::istream *open_uri(const char *uri, size_t protocol_slot = 0, const directive_t protocol_directive = nullptr, size_t filter_slot = 0, const directive_t filter_directive = nullptr)
+	const std::string name_to_triplet(const std::string &name, const size_t protocol_slot, const directive_t protocol_directive)
 	{
 		if (protocol_slot >= protocols.size())
 		{
-			return NULL;
+			return "";
+		}
+		if (!is_valid_utf8(name))
+		{
+			return "";
 		}
 		protocol_registration reg;
 		const protocol *proto;
@@ -252,7 +271,38 @@ public:
 		// Slot zero means use default:
 		reg = (protocol_slot == 0 ? default_protocol.load() : protocols[protocol_slot]);
 		proto = reg->get();
-		std::istream *result = proto->open_uri(uri);
+		return Poco::format("%s\x1e%z\x1e%s", name, reg->get_slot(), proto->get_suffix(protocol_directive == nullptr ? reg->get_directive() : protocol_directive));
+	}
+	std::istream *open_triplet(const char *triplet, size_t protocol_slot = 0, const directive_t protocol_directive = nullptr, size_t filter_slot = 0, const directive_t filter_directive = nullptr)
+	{
+		// Convert our triplet back into its three components. Only the first one is used to find the asset, the other two only provide verification.
+		Poco::StringTokenizer tok(triplet, "\x1e");
+		if (tok.count() != 3)
+		{
+			return nullptr;
+		}
+		if (protocol_slot >= protocols.size())
+		{
+			return nullptr;
+		}
+		protocol_registration reg;
+		const protocol *proto;
+		directive_t directive;
+		// Slot zero means use default:
+		reg = (protocol_slot == 0 ? default_protocol.load() : protocols[protocol_slot]);
+		proto = reg->get();
+		directive = protocol_directive == nullptr ? reg->get_directive() : protocol_directive;
+		// Make sure we actually resolved to the asset source expected by the triplet.
+		// The middle token is the protocol registration slot:
+		if (Poco::NumberParser::parseUnsigned64(tok[1]) != reg->get_slot())
+		{
+			return nullptr;
+		}
+		if (tok[2] != proto->get_suffix(directive))
+		{
+			return nullptr;
+		}
+		std::istream *result = proto->open_uri(tok[0].c_str(), directive);
 
 		if (result)
 		{
@@ -296,12 +346,13 @@ private:
 	static ma_result onOpen(ma_vfs *pVFS, const char *pFilePath, ma_uint32 openMode, ma_vfs_file *pFile)
 	{
 		vfs_cast(pVFS);
-		std::istream *file = vfs->service->open_uri(pFilePath);
+		std::istream *file = vfs->service->open_triplet(pFilePath);
 		if (file == NULL)
 		{
 			return MA_ERROR; // Not found, not permitted, etc.
 		}
 		*pFile = file;
+
 		return MA_SUCCESS;
 	}
 	static ma_result onClose(ma_vfs *pVFS, ma_vfs_file file)

@@ -36,7 +36,8 @@ public:
 	class protocol
 	{
 	public:
-		virtual std::istream *open_uri(const char *uri) const = 0;
+		virtual std::istream *open_uri(const char *uri, const directive_t directive) const = 0;
+		virtual const std::string get_suffix(const directive_t &directive) const = 0;
 	};
 	/**
 	 * Sound_service filter class.
@@ -82,8 +83,20 @@ public:
 	virtual bool set_protocol_directive(size_t slot, const directive_t &new_directive) = 0;
 	// Changes the default directive (such as a decryption key) that the given filter uses.
 	virtual bool set_filter_directive(size_t slot, const directive_t &new_directive) = 0;
-	// Opens the given URI using the given protocol.
-	virtual std::istream *open_uri(const char *uri, size_t protocol_slot = 0, const directive_t protocol_directive = nullptr, size_t filter_slot = 0, const directive_t filter_directive = nullptr) = 0;
+	/**
+	 * Converts a plain URI into a triplet that can be uniquely identified by the sound system.
+	 * A triplet contains the original URI, a protocol identifier and a suffix, each separated by an ASCII "Record separator" character (0X1E).
+	 * Since this method's input is validated as printable text, this separator character is guaranteed not to appear, making it ideal as a separator.
+	 * The protocol identifier is just its slot number, as this is guaranteed to be unique for the lifetime of an application instance.
+	 * The suffix is up to the protocol, but should be derived from the provided directive. For example, the suffix provided by the pack protocol is just the absolute path to the pack file on disk.
+	 * This guarantees that assets are always loaded even if they have the same name as a previously loaded asset from a different origin.
+	 */
+	virtual const std::string name_to_triplet(const std::string &name, const size_t protocol = 0, const directive_t protocol_directive = nullptr) = 0;
+	/**
+	 * Opens a triplet
+	 * Pass the same arguments to this that you passed to name_to_triplet earlier.
+	 */
+	virtual std::istream *open_triplet(const char *triplet, size_t protocol_slot = 0, const directive_t protocol_directive = nullptr, size_t filter_slot = 0, const directive_t filter_directive = nullptr) = 0;
 	// The VFS is how Miniaudio itself communicates with this.
 	virtual sound_service_vfs *get_vfs() = 0;
 	static std::unique_ptr<sound_service> make();
