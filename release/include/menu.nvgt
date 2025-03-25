@@ -59,7 +59,7 @@ class menu {
 		}
 		form.reset();
 		form.create_window();
-		f_list = form.create_list("Menu", repeat_boundary_items : true);
+		f_list = form.create_list("Menu", repeat_boundary_items : _repeat_boundary_items);
 		form.set_event_callback(f_list, on_control_event_callback(on_form_list_event));
 		f_ok = form.create_button("OK", true);
 		form.set_state(f_ok, true, false);
