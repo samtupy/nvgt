@@ -25,7 +25,13 @@ public:
 	chacha_ostreambuf(std::ostream &sink, const std::string &key, const std::string &nonce);
 	virtual ~chacha_ostreambuf();
 	void own_sink(bool owns);
-	int writeToDevice(const char *buffer, std::streamsize length);
+	virtual int writeToDevice(const char *buffer, std::streamsize length);
+	/**
+	 * Extremely limited seeking support.
+	 * Only supports seeking to 0 cur (so that tellp works) and 0 beg (so that pack header updates can work).
+	 */
+	virtual std::streampos seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::out);
+	virtual std::streampos seekpos(std::streampos pos, std::ios_base::openmode which = std::ios_base::out);
 };
 class chacha_istreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_traits<char>>
 {
@@ -42,9 +48,9 @@ public:
 	chacha_istreambuf(std::istream &source, const std::string &key);
 	virtual ~chacha_istreambuf();
 	void own_source(bool owns);
-	int readFromDevice(char *buffer, std::streamsize length);
-	std::streampos seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in);
-	std::streampos seekpos(std::streampos pos, std::ios_base::openmode which = std::ios_base::in);
+	virtual int readFromDevice(char *buffer, std::streamsize length);
+	virtual std::streampos seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in);
+	virtual std::streampos seekpos(std::streampos pos, std::ios_base::openmode which = std::ios_base::in);
 };
 class chacha_istream : public std::istream
 {
@@ -53,7 +59,7 @@ class chacha_istream : public std::istream
 public:
 	chacha_istream(std::istream &source, const std::string &key);
 	virtual ~chacha_istream();
-	std::istream &own_source(bool owns = true);
+	virtual std::istream &own_source(bool owns = true);
 };
 class chacha_ostream : public std::ostream
 {
@@ -64,6 +70,6 @@ public:
 	// Preferred overload where the nonce will be chosen for you (using rng_get_bytes):
 	chacha_ostream(std::ostream &sink, const std::string &key);
 
-	~chacha_ostream();
-	std::ostream &own_sink(bool owns = true);
+	virtual ~chacha_ostream();
+	virtual std::ostream &own_sink(bool owns = true);
 };

@@ -15,24 +15,26 @@
 #include <sstream>
 #include <rng_get_bytes.h>
 static const int32_t chacha_iostream_magic = 0xAceFaded; // We prepend this to the first block of plaintext before encrypting to help identify the resource as a NVGT encrypted asset.
+static const int nonce_length = 24;
 chacha_ostreambuf::chacha_ostreambuf(std::ostream &sink, const std::string &key, const std::string &nonce)
 	: BasicBufferedStreamBuf(64, std::ios_base::out)
 {
+
 	if (key.empty())
 	{
 		throw std::invalid_argument("Key must not be blank.");
 	}
-	if (nonce.length() != 24)
+	if (nonce.length() != nonce_length)
 	{
-		throw std::invalid_argument("Nonce is expected to be 24 bytes.");
+		throw std::invalid_argument("Incorrect nonce length.");
 	}
 	// Todo discuss this with people. Blake2B is not appropriate for key derivation because it's fast, but for a game that needs to load thousands of assets in seconds, we can't really afford something like Argon2 either. We should probably decide on a default function and expose it in nvgt_config.h for commercial devs to customize.
 	crypto_blake2b(this->key, 32, (uint8_t *)key.data(), key.size());
 	memcpy(this->nonce, nonce.data(), 24);
 	// Put the nonce directly into the sink in cleartext.
-	sink.write((const char *)this->nonce, 24);
+	sink.write((const char *)this->nonce, nonce_length);
 	// Encrypt the magic asset identifier:
-	sputn((const char *)&chacha_iostream_magic, 4);
+	sputn((const char *)&chacha_iostream_magic, sizeof(chacha_iostream_magic));
 
 	counter = 0;
 	this->sink = &sink;
@@ -43,7 +45,7 @@ chacha_ostreambuf::~chacha_ostreambuf()
 
 	// Should explicitly destroy the contents of the internal buffers.
 	crypto_wipe((void *)key, 32);
-	crypto_wipe((void *)nonce, 24);
+	crypto_wipe((void *)nonce, nonce_length);
 	if (owns_sink)
 	{
 		delete sink;
@@ -55,12 +57,43 @@ void chacha_ostreambuf::own_sink(bool owns)
 }
 int chacha_ostreambuf::writeToDevice(const char *buffer, std::streamsize length)
 {
+
 	counter = crypto_chacha20_x((uint8_t *)work, (const uint8_t *)buffer, length, key, nonce, counter);
 
 	sink->write((const char *)work, length);
 	// Q: what am I expected to return here? The Poco docs don't say. A: count of bytes written... but why is the return type shorter than the length argument?
 	return (int)length;
 }
+std::streampos chacha_ostreambuf::seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which)
+{
+	// Support 0 cur to enable tellp().
+	if (dir == std::ios_base::cur && off == 0)
+	{
+
+		return sink->tellp() + in_avail() - (std::streampos)nonce_length;
+	}
+	if (dir == std::ios_base::beg && off == 0)
+	{
+		return seekpos(0);
+	}
+	return -1;
+}
+std::streampos chacha_ostreambuf::seekpos(std::streampos pos, std::ios_base::openmode which)
+{
+	// Only support returning to 0.
+	if (pos != 0)
+	{
+		return -1;
+	}
+	this->sync();
+	// Seek the sink back to just after the nonce:
+	sink->seekp(nonce_length);
+	// Now rewrite the magic and reset the counter.
+	counter = 0;
+	sputn((const char *)&chacha_iostream_magic, sizeof(chacha_iostream_magic));
+	return 0;
+}
+
 chacha_istreambuf::chacha_istreambuf(std::istream &source, const std::string &key)
 	: BasicBufferedStreamBuf(8192 + 4, std::ios_base::in)
 {

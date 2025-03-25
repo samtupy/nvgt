@@ -1,5 +1,5 @@
 /* pack.cpp - pack file implementation code
- * Note: temporarily namespaced as new_packto avoid name collision problems on the C++ side during integration: will be changed once the original packfile is removed.
+ * Note: temporarily namespaced as new_pack to avoid name collision problems on the C++ side during integration: will be changed once the original packfile is removed.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -23,6 +23,7 @@
 #include <angelscript.h>
 #include <Poco/Path.h>
 #include <iostream>
+#include "chacha_stream.h"
 namespace new_pack
 {
 	static const int header_size = 64;
@@ -39,10 +40,12 @@ namespace new_pack
 	{
 		toc_map toc;
 		std::istream *file;
+		uint64_t pack_offset; // Used for packs that are part of a larger file.
+		uint64_t pack_size;	  // Used for packs that are part of a larger file.
 		bool load();
 
 	public:
-		read_mode_internals(std::istream &file);
+		read_mode_internals(std::istream &file, const std::string &key = "", uint64_t pack_offset = 0, uint64_t pack_size = 0);
 		~read_mode_internals();
 		const toc_entry *get(const std::string &filename) const;
 	};
@@ -51,6 +54,7 @@ namespace new_pack
 		std::ostream *file;
 		toc_map toc;
 		toc_list ordered_toc; // Because we need to write the TOC entries in the same order as they were inserted.
+		uint64_t data_size;	  // Tracked manually instead of relying on tellp(), which is needlessly hard to implement for custom ostreams.
 		// Writes a block of zeros to the head of the file. Called once when a file is created. This header is updated when the file is finalized.
 		bool put_blank_header();
 
@@ -59,21 +63,21 @@ namespace new_pack
 		bool finalize();
 
 		// Pack itself is responsible for composing the stream it wants and passing it in. Internals take ownership though.
-		write_mode_internals(std::ostream &file);
+		write_mode_internals(std::ostream &file, const std::string &key = "");
 		~write_mode_internals();
 		bool put(const std::string &filename, const std::string &internal_name);
-		// Get current position in the output stream.
-		std::streampos tell();
 	};
 	bool pack::read_mode_internals::load()
 	{
 		file->seekg(0, file->end);
-		uint64_t file_size = file->tellg();
+		size_t file_size = file->tellg();
+
 		file->seekg(0);
 		if (!file->good())
 		{
 			return false; // Unseekable stream presumably.
 		}
+
 		Poco::BinaryReader direct_reader(*file, Poco::BinaryReader::LITTLE_ENDIAN_BYTE_ORDER);
 		Poco::BinaryReader *reader = &direct_reader; // Because BinaryReader deletes the assignment operator and we're going to swap underlying streams later.
 		// File should begin with magic constant.
@@ -83,14 +87,18 @@ namespace new_pack
 		{
 			return false;
 		}
+
 		uint64_t toc_offset;
 		*reader >> toc_offset;
+
 		if (toc_offset >= file_size || toc_offset < 64)
 		{
 			return false;
 		}
+
 		uint32_t checksum;
 		*reader >> checksum;
+
 		file->seekg(toc_offset);
 		if (!file->good())
 		{
@@ -105,6 +113,7 @@ namespace new_pack
 		uint64_t current_offset = 64; // Just past the header.
 		while (true)
 		{
+
 			toc_entry entry;
 			uint64_t name_length = 0;
 			reader->read7BitEncoded(name_length);
@@ -126,7 +135,7 @@ namespace new_pack
 			{
 				return false;
 			}
-			entry.offset = current_offset;
+			entry.offset = current_offset + pack_offset;
 			// Because the checksum stream is in-between the source file and binary reader, we must perform goodness checks on the checksum stream, not directly on the file.
 			if (!check.good())
 			{
@@ -153,18 +162,40 @@ namespace new_pack
 		}
 		return true;
 	}
-	pack::read_mode_internals::read_mode_internals(std::istream &file)
+	pack::read_mode_internals::read_mode_internals(std::istream &file, const std::string &key, uint64_t pack_offset, uint64_t pack_size)
 		: toc()
 	{
-		this->file = &file;
-
-		if (!load())
+		try
 		{
-			throw std::runtime_error("Unable to load this pack file.");
+			this->file = &file;
+			if (pack_offset != 0 || pack_size != 0)
+			{
+				this->file = new section_istream(*this->file, pack_offset, pack_size);
+			}
+			if (!key.empty())
+			{
+				chacha_istream *chacha = new chacha_istream(*this->file, key);
+				chacha->own_source(true);
+				this->file = chacha;
+			}
+			this->pack_offset = pack_offset;
+			this->pack_size = pack_size;
+			if (!load())
+			{
+				throw std::runtime_error("Unable to load this pack file.");
+			}
+		}
+		catch (std::exception &e)
+		{
+
+			delete this->file;
+			this->file = nullptr;
+			throw e;
 		}
 	}
 	pack::read_mode_internals::~read_mode_internals()
 	{
+		delete file;
 	}
 	const pack::toc_entry *pack::read_mode_internals::get(const std::string &filename) const
 	{
@@ -184,15 +215,17 @@ namespace new_pack
 		char header[header_size];
 		memset(header, 0, header_size);
 		file->write(header, header_size);
+		data_size = header_size;
 		return true;
 	}
 	bool pack::write_mode_internals::finalize()
 	{
-		std::streampos toc_offset = file->tellp();
-		if (toc_offset == -1)
+		std::streampos toc_offset = data_size;
+		if (!file->good())
 		{
 			return false;
 		}
+
 		// This ostream computes a checksum on incoming data and then passes it through to the attached sink.
 		checksum_ostream check(*file);
 		Poco::BinaryWriter writer(check, Poco::BinaryWriter::LITTLE_ENDIAN_BYTE_ORDER);
@@ -216,17 +249,34 @@ namespace new_pack
 
 		return file->tellp() != -1;
 	}
-	pack::write_mode_internals::write_mode_internals(std::ostream &file)
+	pack::write_mode_internals::write_mode_internals(std::ostream &file, const std::string &key)
 		: toc()
 	{
-		this->file = &file;
-		if (!put_blank_header())
+		try
 		{
-			throw std::runtime_error("Unable to write header to the file.");
+			this->file = &file;
+			if (!key.empty())
+			{
+
+				chacha_ostream *chacha = new chacha_ostream(*this->file, key);
+				chacha->own_sink(true);
+				this->file = chacha;
+			}
+			if (!put_blank_header())
+			{
+				throw std::runtime_error("Unable to write header to the file.");
+			}
+		}
+		catch (std::exception &e)
+		{
+			delete this->file;
+			this->file = nullptr;
+			throw e;
 		}
 	}
 	pack::write_mode_internals::~write_mode_internals()
 	{
+
 		delete file;
 	}
 	bool pack::write_mode_internals::put(const std::string &filename, const std::string &internal_name)
@@ -261,6 +311,7 @@ namespace new_pack
 			*inserted = entry;
 			ordered_toc.push_back(inserted);
 			Poco::StreamCopier::copyStream(in_file, *file);
+			data_size += size;
 		}
 		catch (std::exception &)
 		{
@@ -268,16 +319,12 @@ namespace new_pack
 			toc_map::iterator i = toc.find(internal_name);
 			if (i != toc.end())
 			{
-				// This is a file system error, out of disk space, etc. Throw here and don't bother fixing bookkeeping, because your pack is almost certainly corrupt at this point anyway.
+				// This is a file system error, out of disk space, etc. Throw here and don't bother trying to fix bookkeeping, because your pack is almost certainly corrupt at this point anyway.
 				throw std::runtime_error("Critical error while writing data to pack.");
 			}
 			return false;
 		}
 		return true;
-	}
-	std::streampos pack::write_mode_internals::tell()
-	{
-		return file->tellp();
 	}
 	void pack::set_pack_name(const std::string &name)
 	{
@@ -292,12 +339,13 @@ namespace new_pack
 		if (other.open_mode != OPEN_READ)
 		{
 
-			throw std::invalid_argument("Only read mode packs can be copy constructed.");
+			throw std::invalid_argument("Only packs that are opened in read mode can be copy constructed. If you're trying to load sounds from a pack, please check the return value from your open call as your pack was not opened successfully.");
 		}
 
 		open_mode = OPEN_READ;
 		read = other.read;
 		pack_name = other.pack_name;
+		key = other.key;
 	}
 	pack::~pack()
 	{
@@ -311,38 +359,33 @@ namespace new_pack
 		try
 		{
 			file = new Poco::FileOutputStream(filename);
-			write = std::make_shared<write_mode_internals>(*file);
+			write = std::make_shared<write_mode_internals>(*file, key);
 		}
 		catch (std::exception &)
 		{
-			if (file != NULL)
-			{
-				delete file;
-			}
+			// Don't delete here; internals may have chained several mutations onto the stream before it failed, so trust that it cleaned up.
 			return false;
 		}
 		set_pack_name(filename);
 		open_mode = OPEN_WRITE;
 		return true;
 	}
-	bool pack::open(const std::string &filename, const std::string &key)
+	bool pack::open(const std::string &filename, const std::string &key, uint64_t pack_offset, uint64_t pack_size)
 	{
 		close();
 		Poco::FileInputStream *file = NULL;
 		try
 		{
 			file = new Poco::FileInputStream(filename);
-			read = std::make_shared<read_mode_internals>(*file);
+			read = std::make_shared<read_mode_internals>(*file, key, pack_offset, pack_size);
 		}
 		catch (std::exception &)
 		{
-			if (file != NULL)
-			{
-				delete file;
-			}
+			// Don't delete here; internals may have chained several mutations onto the stream before it failed, so trust that it cleaned up.
 			return false;
 		}
 		set_pack_name(filename);
+		this->key = key;
 		open_mode = OPEN_READ;
 		return true;
 	}
@@ -383,10 +426,14 @@ namespace new_pack
 			return nullptr;
 		}
 
-		Poco::FileInputStream *fis = nullptr;
+		std::istream *fis = nullptr;
 		try
 		{
 			fis = new Poco::FileInputStream(pack_name, std::ios_base::in);
+			if (!key.empty())
+			{
+				fis = new chacha_istream(*fis, key);
+			}
 			return new section_istream(*fis, entry->offset, entry->size);
 		}
 		catch (std::exception &)
@@ -421,7 +468,7 @@ namespace new_pack
 		engine->RegisterObjectBehaviour("pack_file", asBEHAVE_RELEASE, "void c()", asMETHOD(pack, release), asCALL_THISCALL);
 		engine->RegisterObjectMethod("pack_file", "bool create(const string &in filename, const string&in key = \"\")",
 									 asMETHOD(pack, create), asCALL_THISCALL);
-		engine->RegisterObjectMethod("pack_file", "bool open(const string &in filename, const string &in key = \"\")",
+		engine->RegisterObjectMethod("pack_file", "bool open(const string &in filename, const string &in key = \"\", uint64 pack_offset = 0, uint64 pack_size = 0)",
 									 asMETHOD(pack, open), asCALL_THISCALL);
 		engine->RegisterObjectMethod("pack_file", "bool close()", asMETHOD(pack, close), asCALL_THISCALL);
 		engine->RegisterObjectMethod("pack_file", "bool add_file(const string &in filename, const string &in internal_name)", asMETHOD(pack, add_file), asCALL_THISCALL);

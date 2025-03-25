@@ -15,6 +15,7 @@
 #include <Poco/RefCountedObject.h>
 #include <memory>
 class asIScriptEngine;
+class datastream;
 namespace new_pack
 {
 	class pack : public Poco::RefCountedObject
@@ -33,6 +34,7 @@ namespace new_pack
 		std::shared_ptr<read_mode_internals> read;
 		std::shared_ptr<write_mode_internals> write;
 		std::string pack_name; // When a pack is opened for reading, this should be set to the name of the pack file so we can create new streams to open files.
+		std::string key;
 		// Sets the pack name, converting it to an absolute path if necessary.
 		void set_pack_name(const std::string &name);
 
@@ -44,11 +46,15 @@ namespace new_pack
 		pack(const pack &other);
 		~pack();
 		bool create(const std::string &filename, const std::string &key = "");
-		bool open(const std::string &filename, const std::string &key);
+		bool open(const std::string &filename, const std::string &key = "", uint64_t pack_offset = 0, uint64_t pack_size = 0);
 
 		bool close();
 		bool add_file(const std::string &filename, const std::string &internal_name);
+		// Gets a raw istream that points to the requested file. This is not the version that's given to script.
 		std::istream *get_file(const std::string &filename) const;
+		// Returns a datastream for script that points to the requested file.
+		datastream *get_file_script(const std::string &filename);
+
 		// Returns the absolute path to this pack file on disk.
 		const std::string get_pack_name() const;
 		/**
