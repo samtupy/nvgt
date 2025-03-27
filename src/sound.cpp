@@ -19,13 +19,14 @@
 #include <scriptarray.h>
 #include "nvgt_angelscript.h" // get_array_type
 #include "sound.h"
-#include "sound_service.h"
 #include "encryption_filter.h"
 #include "pack_protocol.h"
 #include "pack2.h"
+#include "memory_protocol.h"
 #include <atomic>
 #include <utility>
 #include <cstdint>
+#include <iostream> //debugging.
 
 using namespace std;
 
@@ -40,6 +41,7 @@ static std::unique_ptr<sound_service> g_sound_service;
 // These slots are what you use to refer to protocols (which are data sources like archives) and filters (which are transformations like encryption) after they've been plugged into the sound service.
 static size_t g_encryption_filter_slot = 0;
 static size_t g_pack_protocol_slot = 0;
+static size_t g_memory_protocol_slot = 0;
 bool init_sound()
 {
 	if (g_soundsystem_initialized.test())
@@ -54,8 +56,9 @@ bool init_sound()
 	}
 	// Register encryption support:
 	g_sound_service->register_filter(encryption_filter::get_instance(), g_encryption_filter_slot);
-	// And access to packs:
+	// And access to packs, et al:
 	g_sound_service->register_protocol(pack_protocol::get_instance(), g_pack_protocol_slot);
+	g_sound_service->register_protocol(memory_protocol::get_instance(), g_memory_protocol_slot);
 	g_soundsystem_initialized.test_and_set();
 	refresh_audio_devices();
 	g_audio_engine = new_audio_engine(audio_engine::PERCENTAGE_ATTRIBUTES);
@@ -355,7 +358,20 @@ public:
 	mixer_impl(audio_engine *engine) : mixer(), audio_node_impl(), engine(static_cast<audio_engine_impl *>(engine)), snd(nullptr) {}
 	inline void duplicate() override { audio_node_impl::duplicate(); }
 	inline void release() override { audio_node_impl::release(); }
-	bool play() override { return snd ? ma_sound_start(&*snd) == MA_SUCCESS : false; }
+	bool play() override
+	{
+		if (snd == nullptr)
+			return false;
+		ma_sound_set_looping(&*snd, false);
+		return ma_sound_start(&*snd) == MA_SUCCESS;
+	}
+	bool play_looped()
+	{
+		if (snd == nullptr)
+			return false;
+		ma_sound_set_looping(&*snd, true);
+		return ma_sound_start(&*snd) == MA_SUCCESS;
+	}
 	ma_sound *get_ma_sound() override { return &*snd; }
 	audio_engine *get_engine() override
 	{
@@ -660,39 +676,36 @@ public:
 	{
 		close();
 	}
-	bool load(const string &filename) override
+	bool load_special(const std::string &filename, const size_t protocol_slot = 0, directive_t protocol_directive = nullptr, const size_t filter_slot = 0, directive_t filter_directive = nullptr, ma_uint32 ma_flags = MA_SOUND_FLAG_DECODE) override
 	{
 		if (!snd)
 			snd = make_unique<ma_sound>();
 		// The sound service converts our file name into a "tripplet" which includes information about the origin an asset is expected to come from. This guarantees that we don't mistake assets from different origins as the same just because they have the same name.
-		std::string triplet = g_sound_service->name_to_triplet(filename);
+		std::string triplet = g_sound_service->prepare_triplet(filename, protocol_slot, protocol_directive, filter_slot, filter_directive);
 		if (triplet.empty())
 		{
 			return false;
 		}
-		g_soundsystem_last_error = ma_sound_init_from_file(engine->get_ma_engine(), triplet.c_str(), 0, nullptr, nullptr, &*snd);
+
+		g_soundsystem_last_error = ma_sound_init_from_file(engine->get_ma_engine(), triplet.c_str(), ma_flags, nullptr, nullptr, &*snd);
+
 		if (g_soundsystem_last_error != MA_SUCCESS)
 			snd.reset();
 		return g_soundsystem_last_error == MA_SUCCESS;
+	}
+	bool load(const string &filename) override
+	{
+		return load_special(filename, 0, nullptr, 0, nullptr, MA_SOUND_FLAG_DECODE);
+	}
+	bool stream(const std::string &filename) override
+	{
+		return load_special(filename, 0, nullptr, 0, nullptr, MA_SOUND_FLAG_STREAM);
 	}
 	bool seek_in_milliseconds(unsigned long long offset) override { return snd ? (g_soundsystem_last_error = ma_sound_seek_to_pcm_frame(&*snd, offset * ma_engine_get_sample_rate(engine->get_ma_engine()) / 1000)) == MA_SUCCESS : false; }
 	bool load_string(const std::string &data) override { return load_memory(data.data(), data.size()); }
 	bool load_memory(const void *buffer, unsigned int size) override
 	{
-		if (!snd)
-			snd = make_unique<ma_sound>();
-		auto config = ma_decoder_config_init(ma_format_f32, ma_engine_get_channels(engine->get_ma_engine()), ma_engine_get_sample_rate(engine->get_ma_engine()));
-		ma_decoder decoder;
-		g_soundsystem_last_error = ma_decoder_init_memory(buffer, size, &config, &decoder);
-		if (g_soundsystem_last_error != MA_SUCCESS)
-		{
-			snd.reset();
-			return false;
-		}
-		g_soundsystem_last_error = ma_sound_init_from_data_source(engine->get_ma_engine(), &decoder, 0, nullptr, &*snd);
-		if (g_soundsystem_last_error != MA_SUCCESS)
-			snd.reset();
-		return g_soundsystem_last_error == MA_SUCCESS;
+		return load_special("::memory", g_memory_protocol_slot, memory_protocol::directive(buffer, size));
 	}
 	bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) override
 	{
@@ -879,6 +892,11 @@ public:
 		}
 		return false;
 	}
+	// A completely pointless API here, but needed for code that relies on legacy BGT includes. Always returns 0.
+	double get_pitch_lower_limit()
+	{
+		return 0;
+	}
 };
 
 audio_engine *new_audio_engine(int flags) { return new audio_engine_impl(flags); }
@@ -964,6 +982,8 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type)
 {
 	RegisterSoundsystemAudioNode<T>(engine, type);
 	engine->RegisterObjectMethod(type.c_str(), "bool play()", asFUNCTION((virtual_call<T, &T::play, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool play_looped()", asFUNCTION((virtual_call<T, &T::play_looped, bool>)), asCALL_CDECL_OBJFIRST);
+
 	engine->RegisterObjectMethod(type.c_str(), "bool stop()", asFUNCTION((virtual_call<T, &T::stop, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_volume(float volume) property", asFUNCTION((virtual_call<T, &T::set_volume, void, float>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "float get_volume() const property", asFUNCTION((virtual_call<T, &T::get_volume, float>)), asCALL_CDECL_OBJFIRST);
@@ -1104,6 +1124,7 @@ void RegisterSoundsystem(asIScriptEngine *engine)
 	RegisterSoundsystemMixer<sound>(engine, "sound");
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
 	engine->RegisterObjectMethod("sound", "bool load(const string&in filename)", asFUNCTION((virtual_call<sound, &sound::load, bool, const string &>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream(const string&in filename)", asFUNCTION((virtual_call<sound, &sound::stream, bool, const string &>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool load_memory(const string&in data)", asFUNCTION((virtual_call<sound, &sound::load_string, bool, const string &>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool close()", asFUNCTION((virtual_call<sound, &sound::close, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_active() const property", asFUNCTION((virtual_call<sound, &sound::get_active, bool>)), asCALL_CDECL_OBJFIRST);
@@ -1131,12 +1152,13 @@ void RegisterSoundsystem(asIScriptEngine *engine)
 	engine->RegisterObjectMethod("sound", "uint64 get_length_in_frames( ) const property", asFUNCTION((virtual_call<sound, &sound::get_length_in_frames, unsigned long long>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "uint64 get_length_in_ms() const property", asFUNCTION((virtual_call<sound, &sound::get_length_in_milliseconds, unsigned long long>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_data_format(audio_format&out format, uint32&out channels, uint32&out sample_rate)", asFUNCTION((virtual_call<sound, &sound::get_data_format, bool, ma_format *, unsigned int *, unsigned int *>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "double get_pitch_lower_limit() const property", asFUNCTION((virtual_call<sound, &sound::get_pitch_lower_limit, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterGlobalFunction("const string[]@ get_sound_input_devices() property", asFUNCTION(get_sound_input_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("const string[]@ get_sound_output_devices() property", asFUNCTION(get_sound_output_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_output_device(int device) property", asFUNCTION(set_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_decryption_key(const string& in key) property", asFUNCTION(set_default_decryption_key), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void set_sound_default_storage(new_pack::pack_file@ storage) property", asFUNCTION(set_sound_default_storage), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_default_pack(new_pack::pack_file@ storage) property", asFUNCTION(set_sound_default_storage), asCALL_CDECL);
 
 	engine->RegisterGlobalFunction("audio_error_state get_SOUNDSYSTEM_LAST_ERROR() property", asFUNCTION(get_soundsystem_last_error), asCALL_CDECL);
 }

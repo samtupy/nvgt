@@ -16,9 +16,12 @@
 #include <cassert>
 #include "miniaudio.h"
 #include "text_validation.h"
-#include <poco/Format.h>
 #include <Poco/StringTokenizer.h>
 #include <poco/NumberParser.h>
+#include <sstream>
+#include <iostream>
+#include <unordered_map>
+#include <mutex>
 /**
  * The VFS is the glue between the sound service and MiniAudio.
  * We have an opaque structure -- in this case a pointer to the sound_service implementation -- and a series of callbacks which provide MiniAudio an interface to it.
@@ -133,6 +136,26 @@ class sound_service_impl : public sound_service
 	filter_array filters;
 	std::atomic<filter_registration> default_filter;
 	sound_service_vfs vfs;
+	typedef std::unordered_map<std::string, vfs_args> temp_args_t;
+	temp_args_t temp_args;
+	std::mutex temp_args_mtx;
+	bool set_temp_args(const std::string &triplet, const vfs_args &args)
+	{
+		std::unique_lock<std::mutex> lock(temp_args_mtx);
+		return temp_args.try_emplace(triplet, args).second;
+	}
+	bool get_temp_args(const std::string &triplet, vfs_args &dest)
+	{
+		std::unique_lock<std::mutex> lock(temp_args_mtx);
+		temp_args_t::iterator i = temp_args.find(triplet);
+		if (i == temp_args.end())
+		{
+			return false;
+		}
+		dest = i->second;
+		temp_args.erase(i);
+		return true;
+	}
 
 public:
 	sound_service_impl()
@@ -255,7 +278,7 @@ public:
 		filters[slot]->set_directive(new_directive);
 		return true;
 	}
-	const std::string name_to_triplet(const std::string &name, const size_t protocol_slot, const directive_t protocol_directive)
+	std::string prepare_triplet(const std::string &name, const size_t protocol_slot, const directive_t protocol_directive, const size_t filter_slot, directive_t filter_directive)
 	{
 		if (protocol_slot >= protocols.size())
 		{
@@ -265,48 +288,44 @@ public:
 		{
 			return "";
 		}
-		protocol_registration reg;
-		const protocol *proto;
-		directive_t directive;
+		vfs_args args;
+		protocol_registration preg;
 		// Slot zero means use default:
-		reg = (protocol_slot == 0 ? default_protocol.load() : protocols[protocol_slot]);
-		proto = reg->get();
-		return Poco::format("%s\x1e%z\x1e%s", name, reg->get_slot(), proto->get_suffix(protocol_directive == nullptr ? reg->get_directive() : protocol_directive));
+		preg = (protocol_slot == 0 ? default_protocol.load() : protocols[protocol_slot]);
+		args.name = name;
+		args.protocol_slot = preg->get_slot();
+		args.protocol_directive = protocol_directive == nullptr ? preg->get_directive() : protocol_directive;
+		// Filter selection.
+		filter_registration freg;
+		// Filter slot zero means use default:
+		freg = (filter_slot == 0 ? default_filter.load() : filters[filter_slot]);
+		args.filter_slot = freg->get_slot();
+		args.filter_directive = (filter_directive == nullptr ? freg->get_directive() : filter_directive);
+		// Build our triplet. This is the name that will actually be remembered by MiniAudio's resource manager.
+		std::stringstream triplet;
+		triplet << name
+				<< "\x1e"
+				<< args.protocol_slot
+				<< "\x1e"
+				<< preg->get()->get_suffix(args.protocol_directive);
+		set_temp_args(triplet.str(), args);
+
+		return triplet.str();
 	}
-	std::istream *open_triplet(const char *triplet, size_t protocol_slot = 0, const directive_t protocol_directive = nullptr, size_t filter_slot = 0, const directive_t filter_directive = nullptr)
+	std::istream *open_triplet(const char *triplet, size_t filter_slot = 0, const directive_t filter_directive = nullptr)
 	{
-		// Convert our triplet back into its three components. Only the first one is used to find the asset, the other two only provide verification.
-		Poco::StringTokenizer tok(triplet, "\x1e");
-		if (tok.count() != 3)
+		// Get our VFS args back.
+		vfs_args args;
+		if (!get_temp_args(triplet, args))
 		{
 			return nullptr;
 		}
-		if (protocol_slot >= protocols.size())
-		{
-			return nullptr;
-		}
-		protocol_registration reg;
-		const protocol *proto;
-		directive_t directive;
-		// Slot zero means use default:
-		reg = (protocol_slot == 0 ? default_protocol.load() : protocols[protocol_slot]);
-		proto = reg->get();
-		directive = protocol_directive == nullptr ? reg->get_directive() : protocol_directive;
-		// Make sure we actually resolved to the asset source expected by the triplet.
-		// The middle token is the protocol registration slot:
-		if (Poco::NumberParser::parseUnsigned64(tok[1]) != reg->get_slot())
-		{
-			return nullptr;
-		}
-		if (tok[2] != proto->get_suffix(directive))
-		{
-			return nullptr;
-		}
-		std::istream *result = proto->open_uri(tok[0].c_str(), directive);
+		const protocol *proto = protocols[args.protocol_slot]->get();
+		std::istream *result = proto->open_uri(args.name.c_str(), args.protocol_directive);
 
 		if (result)
 		{
-			return apply_filter(result, filter_slot, filter_directive);
+			return apply_filter(result, args.filter_slot, args.filter_directive);
 		}
 		return nullptr;
 	}
@@ -316,15 +335,8 @@ public:
 		{
 			return NULL;
 		}
-		filter_registration reg;
-		const filter *f;
-		directive_t directive;
-		// Filter slot zero means use default:
-		reg = (filter_slot == 0 ? default_filter.load() : filters[filter_slot]);
-		f = reg->get();
-		directive = (filter_directive == nullptr ? reg->get_directive() : filter_directive);
-
-		std::istream *filtered = f->wrap(*source, directive);
+		const filter *f = filters[filter_slot]->get();
+		std::istream *filtered = f->wrap(*source, filter_directive);
 		// For now just return the raw source if the filter rejects it.
 		// Todo: decide how we want to handle filter rejection. Should it pass through? reject the source outright? Make this configurable globally at the sound service level? Or let filters handle it case by case via directive?
 		if (filtered == nullptr)

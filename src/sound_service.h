@@ -13,6 +13,14 @@
 #include <istream>
 typedef std::shared_ptr<const void> directive_t;
 struct sound_service_vfs;
+struct vfs_args
+{
+	std::string name;
+	size_t protocol_slot = 0;
+	directive_t protocol_directive;
+	size_t filter_slot = 0;
+	directive_t filter_directive;
+};
 class sound_service
 {
 
@@ -91,12 +99,12 @@ public:
 	 * The suffix is up to the protocol, but should be derived from the provided directive. For example, the suffix provided by the pack protocol is just the absolute path to the pack file on disk.
 	 * This guarantees that assets are always loaded even if they have the same name as a previously loaded asset from a different origin.
 	 */
-	virtual const std::string name_to_triplet(const std::string &name, const size_t protocol = 0, const directive_t protocol_directive = nullptr) = 0;
+	virtual std::string prepare_triplet(const std::string &name, const size_t protocol_slot = 0, const directive_t protocol_directive = nullptr, const size_t filter_slot = 0, const directive_t filter_directive = nullptr) = 0;
 	/**
 	 * Opens a triplet
 	 * Pass the same arguments to this that you passed to name_to_triplet earlier.
 	 */
-	virtual std::istream *open_triplet(const char *triplet, size_t protocol_slot = 0, const directive_t protocol_directive = nullptr, size_t filter_slot = 0, const directive_t filter_directive = nullptr) = 0;
+	virtual std::istream *open_triplet(const char *triplet, size_t filter_slot = 0, const directive_t filter_directive = nullptr) = 0;
 	// The VFS is how Miniaudio itself communicates with this.
 	virtual sound_service_vfs *get_vfs() = 0;
 	static std::unique_ptr<sound_service> make();

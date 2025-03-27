@@ -14,6 +14,7 @@
 
 #include <miniaudio.h>
 #include <reactphysics3d/mathematics/Vector3.h>
+#include "sound_service.h"
 
 class CScriptArray;
 class asIScriptEngine;
@@ -116,6 +117,7 @@ public:
 	virtual audio_engine *get_engine() = 0;
 	virtual ma_sound *get_ma_sound() = 0;
 	virtual bool play() = 0;
+	virtual bool play_looped() = 0;
 	virtual bool stop() = 0;
 	virtual void set_volume(float volume) = 0;
 	virtual float get_volume() = 0;
@@ -175,7 +177,25 @@ public:
 class sound : public virtual mixer
 {
 public:
+	/**
+	 * The lowest level method to load from the sound service.
+	 * Except for load_pcm, all other sound loading methods use this.
+	 * Arguments:
+	 * const std::string &filename: the name of an asset on disk, in your archive, etc.
+	 * const size_t protocol_slot = 0: A slot number previously returned from sound_service::register_protocol.
+	 * directive_t protocol_directive = nullptr: an arbitrary piece of data for your protocol to use while fetching the asset (such as which packed archive to fetch from).
+	 * size_t filter_slot = 0: a slot number previously returned from sound_service::register_filter.
+	 * ma_uint32 flags = 0: MiniAudio specific flags that govern how MiniAudio will load the data.
+	 * directive_t filter_directive = nullptr: an arbitrary piece of data for your filter to use (such as a decryption key).
+	 * Remarks:
+	 * Directive_t is simply short for std::shared_ptr <void>
+	 * The sound service does not retain your directives after this method returns, so it's okay to allocate them on the stack.
+	 * A warning to protocol and filter developers: never store directive_t handles.
+	 * Also to those implementing custom sound methods: review the MiniAudio documentation to be sure you understand what the flags passed to ma_sound_init_from_file do. Some data sources, by their nature, only make sense in combination with certain flags. For example, MA_SOUND_FLAG_STREAM would be inappropriate for a string source unless you can guarantee it won't go away or be modified by script during playback.
+	 */
+	virtual bool load_special(const std::string &filename, const size_t protocol_slot = 0, directive_t protocol_directive = nullptr, const size_t filter_slot = 0, directive_t filter_directive = nullptr, ma_uint32 ma_flags = MA_SOUND_FLAG_DECODE) = 0;
 	virtual bool load(const std::string &filename) = 0;
+	virtual bool stream(const std::string &filename) = 0;
 	virtual bool load_string(const std::string &data) = 0;
 	virtual bool load_memory(const void *buffer, unsigned int size) = 0;
 	virtual bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) = 0;
@@ -205,6 +225,8 @@ public:
 	virtual unsigned long long get_length_in_frames() = 0;
 	virtual unsigned long long get_length_in_milliseconds() = 0;
 	virtual bool get_data_format(ma_format *format, unsigned int *channels, unsigned int *sample_rate) = 0;
+	// A completely pointless API here, but needed for code that relies on legacy BGT includes. Always returns 0.
+	virtual double get_pitch_lower_limit() = 0;
 };
 
 audio_engine *new_audio_engine(int flags);
