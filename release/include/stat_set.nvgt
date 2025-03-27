@@ -26,8 +26,7 @@ class stat {
 
 	stat(const string&in name, var@ val, string text = "", stat_callback@ callback = default_stat_callback, dictionary@ user = null) {
 		this.name = name;
-		if (text.is_empty())
-			text = "%0";
+		if (text.is_empty()) text = "%0";
 		this.val = val;
 		this.text = text;
 		if (@callback == null) @callback = default_stat_callback;
@@ -36,8 +35,7 @@ class stat {
 	}
 
 	const string opImplConv() {
-		if (@this.callback !is null)
-			return this.callback(this);
+		if (@this.callback !is null) return this.callback(this);
 		return name +"=" + string(val);
 	}
 
@@ -211,7 +209,7 @@ class stat_set {
 			ds.write_int8(t);
 			if (v.is_string) ds.write_string(v);
 			else if(v.is_integer) ds.write_7bit_encoded(v);
-			else if(v.is_numeric) ds.write_float(v);
+			else if(v.is_numeric) ds.write_double(v);
 		}
 		return ds.str();
 	}
@@ -225,7 +223,7 @@ class stat_set {
 			int8 t = ds.read_int8();
 			if (t == 1) update(name, ds.read_string());
 			else if (t == 2) update(name, ds.read_7bit_encoded());
-			else if (t == 3) update(name, ds.read_float());
+			else if (t == 3) update(name, ds.read_double());
 		}
 		return true;
 	}
