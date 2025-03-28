@@ -1,0 +1,4 @@
+description = "A library to interact with TOML data"
+[author]
+	name = "Harry Min Khant"
+	homepage = "https://harrymkt.github.io"
