@@ -34,7 +34,7 @@ class menu {
 	bool focus_first_item = false; // If this is false, the user will be required to press an arrow key to focus either the first or last item of the menu after the intro function has been called. Otherwise they will be focused on the first item.
 	bool automatic_intro = true; // If this is true, the intro function will be automatically called the first time the monitor method is invoqued, then the variable will be set to false. It can be set to true again at any time to cause the intro sequence to repeat, or the intro function can be called manually.
 	bool intro_interrupt = true; // This boolean is passed directly to the speak function when speaking the menu's intro, then it's reset to true. You can set it to false to speak a message prior to the next menu intro.
-	private bool _repeat_boundary_items = false; // Menu items will not speak when the user repeatedly hits the edge of a non-wrapping menu if this is set to false.
+	bool repeat_boundary_items = false; // Menu items will not speak when the user repeatedly hits the edge of a non-wrapping menu if this is set to false.
 	private bool _allow_escape = true; // If set to false, the user must click on an option manually and will not be able to use escape to exit the menu.
 	private bool _allow_go_to_index = true; // If set to false, the user can no longer press ctrl+g to select a menu item by number.
 	private bool _allow_search = true; // If set to false, the user can no longer press ctrl+f to search for an item in the menu by text.
@@ -51,8 +51,8 @@ class menu {
 			wrap_delay = 10;
 			focus_first_item = false;
 			allow_escape = true;
-			_repeat_boundary_items = false;
-			_allow_escape = true;
+			repeat_boundary_items = false;
+			intro_interrupt = true;
 			_allow_go_to_index = true;
 			_allow_search = true;
 			@pack_file = null;
@@ -158,13 +158,6 @@ class menu {
 	string get_selected_item_id() const property {
 		return last_selected_id;
 	}
-	bool get_repeat_boundary_items() const property {
-		return _repeat_boundary_items;
-	}
-	void set_repeat_boundary_items(bool enabled) property {
-		_repeat_boundary_items = enabled;
-		form.set_list_properties(f_list, false, enabled);
-	}
 	bool get_allow_escape() const property {
 		return _allow_escape;
 	}
@@ -211,6 +204,7 @@ class menu {
 		if (args.exists("boundary")) {
 			if (!wrap) {
 				play(edge_sound);
+				if (!repeat_boundary_items) args.set("silent", true);
 				return 0;
 			}
 			play(wrap_sound);

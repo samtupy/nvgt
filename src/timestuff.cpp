@@ -289,6 +289,7 @@ asINT64 system_running_milliseconds() {
 
 // timer class
 uint64_t timer_default_accuracy = Timespan::MILLISECONDS;
+uint64_t TIMESPAN_MICROSECONDS = 1; // This so that all timer accuracies can have a constant named after them, Poco starts these at milliseconds.
 timer::timer() : value(microticks()), accuracy(timer_default_accuracy), paused(false), secure(speedhack_protection) {}
 timer::timer(bool secure) : value(microticks(secure)), accuracy(timer_default_accuracy), paused(false), secure(secure) {}
 timer::timer(int64_t initial_value, bool secure) : value(int64_t(microticks(secure)) - initial_value * timer_default_accuracy), accuracy(timer_default_accuracy), paused(false), secure(secure) {}
@@ -632,6 +633,7 @@ void RegisterScriptTimestuff(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod(_O("timer"), _O("bool resume()"), asMETHOD(timer, resume), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer"), _O("bool set_paused(bool paused)"), asMETHOD(timer, set_paused), asCALL_THISCALL);
 	engine->RegisterObjectProperty(_O("timer"), _O("uint64 accuracy"), asOFFSET(timer, accuracy));
+	engine->RegisterGlobalProperty(_O("const int64 MICROSECONDS"), (void *)&TIMESPAN_MICROSECONDS);
 	engine->RegisterGlobalProperty(_O("const int64 MILLISECONDS"), (void *)&Timespan::MILLISECONDS);
 	engine->RegisterGlobalProperty(_O("const int64 SECONDS"), (void *)&Timespan::SECONDS);
 	engine->RegisterGlobalProperty(_O("const int64 MINUTES"), (void *)&Timespan::MINUTES);
