@@ -26,6 +26,7 @@
 #include <atomic>
 #include <utility>
 #include <cstdint>
+#include <miniaudio_libvorbis.h>
 #include <iostream> //debugging.
 
 using namespace std;
@@ -42,6 +43,19 @@ static std::unique_ptr<sound_service> g_sound_service;
 static size_t g_encryption_filter_slot = 0;
 static size_t g_pack_protocol_slot = 0;
 static size_t g_memory_protocol_slot = 0;
+static std::vector<ma_decoding_backend_vtable *> g_decoders;
+bool add_decoder(ma_decoding_backend_vtable *vtable)
+{
+	try
+	{
+		g_decoders.push_back(vtable);
+		return true;
+	}
+	catch (std::exception &)
+	{
+		return false;
+	}
+}
 bool init_sound()
 {
 	if (g_soundsystem_initialized.test())
@@ -59,6 +73,8 @@ bool init_sound()
 	// And access to packs, et al:
 	g_sound_service->register_protocol(pack_protocol::get_instance(), g_pack_protocol_slot);
 	g_sound_service->register_protocol(memory_protocol::get_instance(), g_memory_protocol_slot);
+	// Install default decoders into miniaudio.
+	add_decoder(ma_decoding_backend_libvorbis);
 	g_soundsystem_initialized.test_and_set();
 	refresh_audio_devices();
 	g_audio_engine = new_audio_engine(audio_engine::PERCENTAGE_ATTRIBUTES);
@@ -166,19 +182,42 @@ public:
 };
 class audio_engine_impl final : public audio_engine
 {
-	unique_ptr<ma_engine> engine;
+	std::unique_ptr<ma_engine> engine;
+	std::unique_ptr<ma_resource_manager> resource_manager;
 	audio_node *engine_endpoint; // Upon engine creation we'll call ma_engine_get_endpoint once so as to avoid creating more than one of our wrapper objects when our engine->get_endpoint() function is called.
 	int refcount;
 
 public:
 	engine_flags flags;
-	audio_engine_impl(int flags) : audio_engine(), engine(nullptr), engine_endpoint(nullptr), flags(static_cast<engine_flags>(flags)), refcount(1)
+	audio_engine_impl(int flags)
+		: audio_engine(),
+		  engine(nullptr),
+		  resource_manager(nullptr),
+		  engine_endpoint(nullptr),
+		  flags(static_cast<engine_flags>(flags)),
+		  refcount(1)
 	{
+		// We need a self managed resource manager because we need to plug decoders in.
+		{
+			ma_resource_manager_config cfg = ma_resource_manager_config_init();
+			// Attach the resource manager to the sound service so that it can receive audio from custom sources.
+			cfg.pVFS = g_sound_service->get_vfs();
+			if (!g_decoders.empty())
+			{
+				cfg.ppCustomDecodingBackendVTables = &g_decoders[0];
+				cfg.customDecodingBackendCount = g_decoders.size();
+			}
+			resource_manager = std::make_unique<ma_resource_manager>();
+			if ((g_soundsystem_last_error = ma_resource_manager_init(&cfg, &*resource_manager)) != MA_SUCCESS)
+			{
+				resource_manager.reset();
+				return;
+			}
+		}
 		ma_engine_config cfg = ma_engine_config_init();
-		// Attach the engine to the sound service so that it can receive audio from custom sources.
-		cfg.pResourceManagerVFS = g_sound_service->get_vfs();
 		// cfg.pContext = &g_sound_context; // Miniaudio won't let us quickly uninitilize then reinitialize a device sometimes when using the same context, so we won't manage it until we figure that out.
-		engine = make_unique<ma_engine>();
+		cfg.pResourceManager = &*resource_manager;
+		engine = std::make_unique<ma_engine>();
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS)
 		{
 			engine.reset();
@@ -188,6 +227,8 @@ public:
 	}
 	~audio_engine_impl()
 	{
+		std::cout << "Night?" << std::endl;
+
 		if (engine_endpoint)
 			engine_endpoint->release();
 		if (engine)
@@ -199,6 +240,7 @@ public:
 	void duplicate() override { asAtomicInc(refcount); }
 	void release() override
 	{
+
 		if (asAtomicDec(refcount) < 1)
 			delete this;
 	}
@@ -587,7 +629,7 @@ public:
 	{
 		return snd ? ma_sound_get_directional_attenuation_factor(&*snd) : NAN;
 	}
-	void set_fade(float start_volume, float end_volume, unsigned long long length) override
+	void set_fade(float start_volume, float end_volume, ma_uint64 length) override
 	{
 		if (!snd)
 			return;
@@ -596,12 +638,12 @@ public:
 		else
 			set_fade_in_milliseconds(start_volume, end_volume, length);
 	}
-	void set_fade_in_frames(float start_volume, float end_volume, unsigned long long frames) override
+	void set_fade_in_frames(float start_volume, float end_volume, ma_uint64 frames) override
 	{
 		if (snd)
 			ma_sound_set_fade_in_pcm_frames(&*snd, start_volume, end_volume, frames);
 	}
-	void set_fade_in_milliseconds(float start_volume, float end_volume, unsigned long long milliseconds) override
+	void set_fade_in_milliseconds(float start_volume, float end_volume, ma_uint64 milliseconds) override
 	{
 		if (snd)
 			ma_sound_set_fade_in_milliseconds(&*snd, start_volume, end_volume, milliseconds);
@@ -610,7 +652,7 @@ public:
 	{
 		return snd ? ma_sound_get_current_fade_volume(&*snd) : NAN;
 	}
-	void set_start_time(unsigned long long absolute_time) override
+	void set_start_time(ma_uint64 absolute_time) override
 	{
 		if (!snd)
 			return;
@@ -619,17 +661,17 @@ public:
 		else
 			set_start_time_in_milliseconds(absolute_time);
 	}
-	void set_start_time_in_frames(unsigned long long absolute_time) override
+	void set_start_time_in_frames(ma_uint64 absolute_time) override
 	{
 		if (snd)
 			ma_sound_set_start_time_in_pcm_frames(&*snd, absolute_time);
 	}
-	void set_start_time_in_milliseconds(unsigned long long absolute_time) override
+	void set_start_time_in_milliseconds(ma_uint64 absolute_time) override
 	{
 		if (snd)
 			ma_sound_set_start_time_in_milliseconds(&*snd, absolute_time);
 	}
-	void set_stop_time(unsigned long long absolute_time) override
+	void set_stop_time(ma_uint64 absolute_time) override
 	{
 		if (!snd)
 			return;
@@ -638,25 +680,25 @@ public:
 		else
 			set_stop_time_in_milliseconds(absolute_time);
 	}
-	void set_stop_time_in_frames(unsigned long long absolute_time) override
+	void set_stop_time_in_frames(ma_uint64 absolute_time) override
 	{
 		if (snd)
 			ma_sound_set_stop_time_in_pcm_frames(&*snd, absolute_time);
 	}
-	void set_stop_time_in_milliseconds(unsigned long long absolute_time) override
+	void set_stop_time_in_milliseconds(ma_uint64 absolute_time) override
 	{
 		if (snd)
 			ma_sound_set_stop_time_in_milliseconds(&*snd, absolute_time);
 	}
-	unsigned long long get_time() override
+	ma_uint64 get_time() override
 	{
 		return snd ? ((engine->flags & audio_engine::DURATIONS_IN_FRAMES) ? get_time_in_frames() : get_time_in_milliseconds()) : 0;
 	}
-	unsigned long long get_time_in_frames() override
+	ma_uint64 get_time_in_frames() override
 	{
 		return snd ? ma_sound_get_time_in_pcm_frames(&*snd) : 0;
 	}
-	unsigned long long get_time_in_milliseconds() override
+	ma_uint64 get_time_in_milliseconds() override
 	{
 		return snd ? ma_sound_get_time_in_milliseconds(&*snd) : 0ULL;
 	}
@@ -893,7 +935,7 @@ public:
 		return false;
 	}
 	// A completely pointless API here, but needed for code that relies on legacy BGT includes. Always returns 0.
-	double get_pitch_lower_limit()
+	double get_pitch_lower_limit() override
 	{
 		return 0;
 	}
@@ -1019,6 +1061,17 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type)
 	engine->RegisterObjectMethod(type.c_str(), "float get_min_distance() const property", asFUNCTION((virtual_call<T, &T::get_min_distance, float>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_max_distance(float distance) property", asFUNCTION((virtual_call<T, &T::set_max_distance, void, float>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "float get_max_distance() const property", asFUNCTION((virtual_call<T, &T::get_max_distance, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_cone(float inner_radians, float outer_radians, float outer_gain)", asFUNCTION((virtual_call<T, &T::set_cone, void, float, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void get_cone(float &out inner_radians, float &out outer_radians, float &out outer_gain)", asFUNCTION((virtual_call<T, &T::get_cone, void, float *, float *, float *>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_doppler_factor(float factor) property", asFUNCTION((virtual_call<T, &T::set_doppler_factor, void, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float get_doppler_factor() const property", asFUNCTION((virtual_call<T, &T::get_doppler_factor, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_directional_attenuation_factor(float factor) property", asFUNCTION((virtual_call<T, &T::set_directional_attenuation_factor, void, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float get_directional_attenuation_factor() const property", asFUNCTION((virtual_call<T, &T::get_directional_attenuation_factor, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_fade(float start_volume, float end_volume, uint64 length)", asFUNCTION((virtual_call<T, &T::set_fade, void, float, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float get_current_fade_volume() const property", asFUNCTION((virtual_call<T, &T::get_current_fade_volume, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_start_time(uint64 absolute_time) property", asFUNCTION((virtual_call<T, &T::set_start_time, void, ma_uint64>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_stop_time(uint64 absolute_time)", asFUNCTION((virtual_call<T, &T::set_stop_time, void, ma_uint64>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_playing() const property", asFUNCTION((virtual_call<T, &T::get_playing, bool>)), asCALL_CDECL_OBJFIRST);
 }
 void RegisterSoundsystem(asIScriptEngine *engine)
 {

@@ -23,6 +23,8 @@ class mixer;
 class sound;
 
 // extern audio_engine* g_audio_engine;
+// Add support for a new audio format by plugging in a ma_decoding_backend_vtable.
+bool add_decoder(ma_decoding_backend_vtable *vtable);
 bool init_sound();
 bool refresh_audio_devices();
 
@@ -159,19 +161,19 @@ public:
 	virtual float get_doppler_factor() = 0;
 	virtual void set_directional_attenuation_factor(float factor) = 0;
 	virtual float get_directional_attenuation_factor() = 0;
-	virtual void set_fade(float start_volume, float end_volume, unsigned long long length) = 0; // depends on DURATIONS_IN_FRAMES flag in parent engine
-	virtual void set_fade_in_frames(float start_volume, float end_volume, unsigned long long frames) = 0;
-	virtual void set_fade_in_milliseconds(float start_volume, float end_volume, unsigned long long milliseconds) = 0;
+	virtual void set_fade(float start_volume, float end_volume, ma_uint64 length) = 0; // depends on DURATIONS_IN_FRAMES flag in parent engine
+	virtual void set_fade_in_frames(float start_volume, float end_volume, ma_uint64 frames) = 0;
+	virtual void set_fade_in_milliseconds(float start_volume, float end_volume, ma_uint64 milliseconds) = 0;
 	virtual float get_current_fade_volume() = 0;
-	virtual void set_start_time(unsigned long long absolute_time) = 0; // DURATIONS_IN_FRAMES
-	virtual void set_start_time_in_frames(unsigned long long absolute_time) = 0;
-	virtual void set_start_time_in_milliseconds(unsigned long long absolute_time) = 0;
-	virtual void set_stop_time(unsigned long long absolute_time) = 0; // DURATIONS_IN_FRAMES
-	virtual void set_stop_time_in_frames(unsigned long long absolute_time) = 0;
-	virtual void set_stop_time_in_milliseconds(unsigned long long absolute_time) = 0;
-	virtual unsigned long long get_time() = 0; // DURATIONS_IN_FRAMES
-	virtual unsigned long long get_time_in_frames() = 0;
-	virtual unsigned long long get_time_in_milliseconds() = 0;
+	virtual void set_start_time(ma_uint64 absolute_time) = 0; // DURATIONS_IN_FRAMES
+	virtual void set_start_time_in_frames(ma_uint64 absolute_time) = 0;
+	virtual void set_start_time_in_milliseconds(ma_uint64 absolute_time) = 0;
+	virtual void set_stop_time(ma_uint64 absolute_time) = 0; // DURATIONS_IN_FRAMES
+	virtual void set_stop_time_in_frames(ma_uint64 absolute_time) = 0;
+	virtual void set_stop_time_in_milliseconds(ma_uint64 absolute_time) = 0;
+	virtual ma_uint64 get_time() = 0; // DURATIONS_IN_FRAMES
+	virtual ma_uint64 get_time_in_frames() = 0;
+	virtual ma_uint64 get_time_in_milliseconds() = 0;
 	virtual bool get_playing() = 0;
 };
 class sound : public virtual mixer
