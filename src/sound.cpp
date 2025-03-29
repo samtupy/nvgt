@@ -14,7 +14,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <Poco/Format.h>
+#include <Poco/MemoryStream.h>
 #include <angelscript.h>
 #include <scriptarray.h>
 #include "nvgt_angelscript.h" // get_array_type
@@ -143,6 +143,28 @@ float pan_db_to_linear(float db)
 	float l = ma_volume_db_to_linear(fabs(db) * -1.0f);
 	return db > 0 ? 1.0f - l : -1.0f + l;
 }
+// Callbacks for MiniAudio to write raw PCM to wav in memory.
+ma_result wav_write_proc(ma_encoder *pEncoder, const void *pBufferIn, size_t bytesToWrite, size_t *pBytesWritten)
+{
+	std::ostream *stream = static_cast<std::ostream *>(pEncoder->pUserData);
+	stream->write((const char *)pBufferIn, bytesToWrite);
+	*pBytesWritten = bytesToWrite;
+	return MA_SUCCESS;
+}
+ma_result wav_seek_proc(ma_encoder *pEncoder, ma_int64 offset, ma_seek_origin origin)
+{
+	if (origin != ma_seek_origin_start)
+	{
+		return MA_NOT_IMPLEMENTED;
+	}
+	std::ostream *stream = static_cast<std::ostream *>(pEncoder->pUserData);
+	stream->seekp(offset);
+	if (!stream->good())
+	{
+		return MA_ERROR;
+	}
+	return MA_SUCCESS;
+}
 
 // Miniaudio objects must be allocated on the heap as nvgt's API introduces the concept of an uninitialized sound, which a stack based system would make more difficult to implement.
 class audio_node_impl : public virtual audio_node
@@ -227,7 +249,6 @@ public:
 	}
 	~audio_engine_impl()
 	{
-		std::cout << "Night?" << std::endl;
 
 		if (engine_endpoint)
 			engine_endpoint->release();
@@ -751,15 +772,46 @@ public:
 	}
 	bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) override
 	{
-		auto config = ma_audio_buffer_config_init(format, channels, (size / channels) * (32 / 8), buffer, nullptr);
-		ma_audio_buffer audio_buffer;
-		g_soundsystem_last_error = ma_audio_buffer_init(&config, &audio_buffer);
+		// At least for now, the strat here is just to write the PCM to wav and then load it the normal way.
+		// Should optimization become necessary (this does result in a couple of copies), a protocol could be written that simulates its input having a RIFF header on it.
+		int frame_size = 0;
+		switch (format)
+		{
+		case ma_format_u8:
+			frame_size = 1;
+			break;
+		case ma_format_s16:
+			frame_size = 2;
+			break;
+		case ma_format_s24:
+			frame_size = 3;
+			break;
+		case ma_format_s32:
+			frame_size = 4;
+			break;
+		default:
+			return false;
+		}
+		frame_size /= channels;
+		std::vector<char> wav(size + 44);
+		Poco::MemoryOutputStream stream(&wav[0], wav.size());
+		ma_encoder_config cfg = ma_encoder_config_init(ma_encoding_format_wav, format, channels, samplerate);
+		ma_encoder encoder;
+		g_soundsystem_last_error = ma_encoder_init(wav_write_proc, wav_seek_proc, &stream, &cfg, &encoder);
 		if (g_soundsystem_last_error != MA_SUCCESS)
-			snd.reset();
-		g_soundsystem_last_error = ma_sound_init_from_data_source(engine->get_ma_engine(), &buffer, 0, nullptr, &*snd);
+		{
+			return false;
+		}
+		// Should be okay to push the content in one go:
+		ma_uint64 frames_written;
+		g_soundsystem_last_error = ma_encoder_write_pcm_frames(&encoder, buffer, size / frame_size, &frames_written);
+		ma_encoder_uninit(&encoder);
 		if (g_soundsystem_last_error != MA_SUCCESS)
-			snd.reset();
-		return g_soundsystem_last_error == MA_SUCCESS;
+		{
+			return false;
+		}
+		// At this point we can just use the sound service to load this. We use the low level API though because we need to be clear that no filters apply.
+		return load_special(":pcm", g_memory_protocol_slot, memory_protocol::directive(&wav[0], wav.size()), sound_service::null_filter_slot, nullptr, MA_SOUND_FLAG_DECODE);
 	}
 	bool close() override
 	{

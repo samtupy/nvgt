@@ -22,7 +22,7 @@ class audio_engine;
 class mixer;
 class sound;
 
-// extern audio_engine* g_audio_engine;
+extern audio_engine *g_audio_engine;
 // Add support for a new audio format by plugging in a ma_decoding_backend_vtable.
 bool add_decoder(ma_decoding_backend_vtable *vtable);
 bool init_sound();
