@@ -116,13 +116,19 @@ class stat_set {
 		string[]@ keys = other.stats.get_keys();
 		for (uint i = 0; i < keys.length(); i++) {
 			stat@ stat = other[keys[i]];
-			add(keys[i], stat.val, stat.text, stat.callback, stat.user);
+			stat@ s = add(keys[i], stat.val, stat.text, stat.callback, stat.user);
+			if (@s != null) s.sort_counter = stat.sort_counter;
 		}
 		return this;
 	}
 
-	void add(const string&in name, var@ value, const string&in text = "", stat_callback@ callback = null, dictionary@ user = null) {
-		if (!this.stats.exists(name)) this.stats.set(name, @stat(name, value, text, callback, user));
+	stat@ add(const string&in name, var@ value, const string&in text = "", stat_callback@ callback = null, dictionary@ user = null) {
+		if (!this.stats.exists(name)) {
+			stat s(name, value, text, callback, user);
+			this.stats.set(name, @s);
+			return s;
+		}
+		return null;
 	}
 
 	void update(const string&in name, var@ value) {
