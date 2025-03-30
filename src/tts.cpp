@@ -30,7 +30,6 @@
 #include <Poco/Format.h>
 #include <SDL3/SDL.h>
 #endif
-
 static char *minitrim(char *data, unsigned long *size, int bitrate, int channels, int begin_threshold = 512, int end_threshold = 128)
 {
 	int samplesPerFrame = channels * (bitrate / 8);
@@ -70,7 +69,65 @@ static char *minitrim(char *data, unsigned long *size, int bitrate, int channels
 	*size = (endIndex - startIndex + 1) * samplesPerFrame;
 	return data + startIndex * samplesPerFrame;
 }
-
+bool tts_voice::schedule(soundptr &s, bool interrupt)
+{
+	try
+	{
+		ma_sound_set_end_callback(s->get_ma_sound(), at_end, this);
+		std::unique_lock<std::mutex> lock(queue_mtx);
+		if (interrupt)
+		{
+			clear();
+		}
+		queue.push(s);
+		speaking.test_and_set();
+		if (queue.size() == 1)
+		{
+			s->play();
+		}
+		return true;
+	}
+	catch (std::exception &)
+	{
+		return false;
+	}
+}
+void tts_voice::clear()
+{
+	while (!queue.empty())
+	{
+		queue.pop();
+	}
+	speaking.clear();
+}
+void tts_voice::at_end(void *pUserData, ma_sound *pSound)
+{
+	tts_voice *voice = static_cast<tts_voice *>(pUserData);
+	// We're in the audio thread so can't do the heavy lifting involved in starting the next sound here. Instead we'll submit a job to MiniAudio's job system.
+	ma_job job = ma_job_init(MA_JOB_TYPE_CUSTOM);
+	job.data.custom.data0 = (ma_uintptr)voice;
+	job.data.custom.data1 = (ma_uintptr)pSound; // This is the sound we expect to see at the front of the queue when the job starts. If there's a different sound there, then the job should be cancelled because script or something else has made changes.
+	job.data.custom.proc = job_proc;
+	ma_resource_manager_post_job(g_audio_engine->get_ma_engine()->pResourceManager, &job);
+}
+ma_result tts_voice::job_proc(ma_job *pJob)
+{
+	tts_voice *voice = (tts_voice *)pJob->data.custom.data0;
+	ma_sound *expected_front = (ma_sound *)pJob->data.custom.data1;
+	std::unique_lock<std::mutex> lock(voice->queue_mtx);
+	if (voice->queue.front()->get_ma_sound() != expected_front)
+	{
+		return MA_CANCELLED; // Script probably called speak_interrupt or some such while we were waiting for the lock.
+	}
+	voice->queue.pop();
+	if (voice->queue.size() == 0)
+	{
+		voice->speaking.clear();
+		return MA_SUCCESS;
+	}
+	voice->queue.front()->play();
+	return MA_SUCCESS;
+}
 tts_voice::tts_voice(const std::string &builtin_voice_name)
 {
 	init_sound();
@@ -84,7 +141,7 @@ tts_voice::tts_voice(const std::string &builtin_voice_name)
 	builtin_index = builtin_voice_name.size() > 0 ? 0 : -1;
 	this->builtin_voice_name = builtin_voice_name;
 	setup();
-	audioout = nullptr;
+	speaking.clear();
 }
 tts_voice::~tts_voice()
 {
@@ -145,11 +202,6 @@ void tts_voice::setup()
 }
 void tts_voice::destroy()
 {
-	if (audioout)
-	{
-		audioout->release();
-		audioout = nullptr;
-	}
 #ifdef _WIN32
 	if (destroyed || !inst)
 		return;
@@ -186,8 +238,8 @@ bool tts_voice::speak(const std::string &text, bool interrupt)
 {
 	if (text.empty())
 	{
-		if (audioout)
-			audioout->stop();
+		std::unique_lock<std::mutex> lock(queue_mtx);
+		clear();
 		return true;
 	}
 	unsigned long bufsize;
@@ -199,11 +251,6 @@ bool tts_voice::speak(const std::string &text, bool interrupt)
 			samprate = 48000;
 			bitrate = 16;
 			channels = 2;
-			if (audioout)
-			{
-				audioout->release();
-				audioout = nullptr;
-			}
 		}
 	}
 #ifdef _WIN32
@@ -214,16 +261,11 @@ bool tts_voice::speak(const std::string &text, bool interrupt)
 		data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
 		if (!data)
 			return false;
-		if (!audioout || (inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels))
+		if ((inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels))
 		{
 			samprate = inst->sample_rate;
 			bitrate = inst->bits_per_sample;
 			channels = inst->channels;
-			if (audioout)
-			{
-				audioout->release();
-				audioout = nullptr;
-			}
 		}
 	}
 #elif defined(__APPLE__)
@@ -244,25 +286,16 @@ bool tts_voice::speak(const std::string &text, bool interrupt)
 		data = (char *)speech_gen(&samples, text.c_str(), NULL);
 		bufsize = samples * 4;
 	}
-	if (interrupt)
-	{
-		if (audioout)
-			audioout->close();
-		if (text.empty())
-			return true;
-	}
-	if (!data || text.empty())
-		return interrupt;
-	if (!audioout)
-		audioout = g_audio_engine->new_sound();
+	if (!data)
+		return false;
 	char *ptr = minitrim(data, &bufsize, bitrate, channels);
-	bool ret = audioout->load_pcm(ptr, bufsize, bitrate == 16 ? ma_format_s16 : ma_format_u8, samprate, channels);
+	soundptr s(g_audio_engine->new_sound());
+	bool ret = s->load_pcm(ptr, bufsize, bitrate == 16 ? ma_format_s16 : ma_format_u8, samprate, channels);
 	if (voice_index == builtin_index)
 		free(data);
 	if (!ret)
 		return false;
-	audioout->play();
-	return true;
+	return schedule(s, interrupt);
 }
 bool tts_voice::speak_to_file(const std::string &filename, const std::string &text)
 {
@@ -277,9 +310,6 @@ bool tts_voice::speak_to_file(const std::string &filename, const std::string &te
 			samprate = 48000;
 			bitrate = 16;
 			channels = 2;
-			if (audioout)
-				audioout->release();
-			audioout = nullptr;
 		}
 		int samples;
 		data = (char *)speech_gen(&samples, text.c_str(), NULL);
@@ -291,14 +321,11 @@ bool tts_voice::speak_to_file(const std::string &filename, const std::string &te
 		if (!inst && !refresh())
 			return FALSE;
 		data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
-		if (!audioout || (inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels))
+		if ((inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels))
 		{
 			samprate = inst->sample_rate;
 			bitrate = inst->bits_per_sample;
 			channels = inst->channels;
-			if (audioout)
-				audioout->release();
-			audioout = nullptr;
 		}
 	}
 #elif defined(__APPLE__)
@@ -335,9 +362,6 @@ std::string tts_voice::speak_to_memory(const std::string &text)
 			samprate = 48000;
 			bitrate = 16;
 			channels = 2;
-			if (audioout)
-				audioout->release();
-			audioout = nullptr;
 		}
 		int samples;
 		data = (char *)speech_gen(&samples, text.c_str(), NULL);
@@ -349,14 +373,11 @@ std::string tts_voice::speak_to_memory(const std::string &text)
 		if (!inst && !refresh())
 			return "";
 		data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
-		if (!audioout || (inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels))
+		if ((inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels))
 		{
 			samprate = inst->sample_rate;
 			bitrate = inst->bits_per_sample;
 			channels = inst->channels;
-			if (audioout)
-				audioout->release();
-			audioout = nullptr;
 		}
 	}
 #elif defined(__APPLE__) || defined(__ANDROID__)
@@ -380,11 +401,11 @@ bool tts_voice::speak_wait(const std::string &text, bool interrupt)
 	if (!speak(text, interrupt))
 		return false;
 #ifdef __APPLE__
-	while (voice_index == builtin_index && audioout && audioout->get_playing() || inst->isSpeaking())
+	while (voice_index == builtin_index && speaking.test_and_set() || inst->isSpeaking())
 #elif defined(__ANDROID__)
-	while (voice_index == builtin_index && audioout && audioout->get_playing() || get_speaking())
+	while (voice_index == builtin_index && speaking.test_and_set() || get_speaking())
 #else
-	while (audioout && audioout->get_playing())
+	while (speaking.test_and_set())
 #endif
 		wait(5);
 	return true;
@@ -512,17 +533,15 @@ bool tts_voice::set_voice(int voice)
 bool tts_voice::get_speaking()
 {
 #ifdef __APPLE__
-	if (voice_index == builtin_index && audioout && audioout->get_playing())
+	if (voice_index == builtin_index && speaking.test_and_set())
 		return true;
 	return inst->isSpeaking();
 #elif defined(__ANDROID__)
-	if (voice_index == builtin_index && audioout && audioout->get_playing())
+	if (voice_index == builtin_index && speaking.test_and_set())
 		return true;
 	return env->CallBooleanMethod(TTSObj, midIsSpeaking) == JNI_TRUE;
 #else
-	if (!audioout)
-		return false;
-	return audioout->get_playing();
+	return speaking.test_and_set();
 #endif
 }
 CScriptArray *tts_voice::list_voices()

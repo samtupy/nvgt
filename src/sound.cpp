@@ -27,7 +27,6 @@
 #include <utility>
 #include <cstdint>
 #include <miniaudio_libvorbis.h>
-#include <iostream> //debugging.
 
 using namespace std;
 
@@ -730,6 +729,15 @@ public:
 };
 class sound_impl final : public mixer_impl, public virtual sound
 {
+	// Always called before associating the object with a new sound.
+	void reset()
+	{
+		if (!snd)
+			snd = make_unique<ma_sound>();
+		else
+			ma_sound_uninit(&*snd);
+	}
+
 public:
 	sound_impl(audio_engine *e) : mixer_impl(static_cast<audio_engine_impl *>(e)), sound()
 	{
@@ -741,8 +749,7 @@ public:
 	}
 	bool load_special(const std::string &filename, const size_t protocol_slot = 0, directive_t protocol_directive = nullptr, const size_t filter_slot = 0, directive_t filter_directive = nullptr, ma_uint32 ma_flags = MA_SOUND_FLAG_DECODE) override
 	{
-		if (!snd)
-			snd = make_unique<ma_sound>();
+		reset();
 		// The sound service converts our file name into a "tripplet" which includes information about the origin an asset is expected to come from. This guarantees that we don't mistake assets from different origins as the same just because they have the same name.
 		std::string triplet = g_sound_service->prepare_triplet(filename, protocol_slot, protocol_directive, filter_slot, filter_directive);
 		if (triplet.empty())
