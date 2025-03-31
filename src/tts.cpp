@@ -73,6 +73,7 @@ bool tts_voice::schedule(soundptr &s, bool interrupt)
 {
 	try
 	{
+		cleanup_completed_fades();
 		ma_sound_set_end_callback(s->get_ma_sound(), at_end, this);
 		std::unique_lock<std::mutex> lock(queue_mtx);
 		if (interrupt)
@@ -94,11 +95,41 @@ bool tts_voice::schedule(soundptr &s, bool interrupt)
 }
 void tts_voice::clear()
 {
+	if (!queue.empty() && queue.front()->get_playing())
+	{
+		fade(queue.front());
+	}
 	while (!queue.empty())
 	{
 		queue.pop();
 	}
 	speaking.clear();
+}
+bool tts_voice::fade(soundptr &item)
+{
+	item->set_fade(-1, 0, 20);
+	try
+	{
+		fade_queue.push(item);
+		return true;
+	}
+	catch (const std::exception &)
+	{
+		return false;
+	}
+}
+void tts_voice::cleanup_completed_fades()
+{
+
+	if (!fade_queue.empty() && (fade_queue.front()->get_playing() && fade_queue.front()->get_current_fade_volume() > 0))
+	{
+		return; // If this item is still fading, then surely any that might be behind it are still fading too.
+	}
+
+	while (!fade_queue.empty())
+	{
+		fade_queue.pop();
+	}
 }
 void tts_voice::at_end(void *pUserData, ma_sound *pSound)
 {
@@ -115,7 +146,7 @@ ma_result tts_voice::job_proc(ma_job *pJob)
 	tts_voice *voice = (tts_voice *)pJob->data.custom.data0;
 	ma_sound *expected_front = (ma_sound *)pJob->data.custom.data1;
 	std::unique_lock<std::mutex> lock(voice->queue_mtx);
-	if (voice->queue.front()->get_ma_sound() != expected_front)
+	if (voice->queue.empty() || voice->queue.front()->get_ma_sound() != expected_front)
 	{
 		return MA_CANCELLED; // Script probably called speak_interrupt or some such while we were waiting for the lock.
 	}
@@ -401,11 +432,11 @@ bool tts_voice::speak_wait(const std::string &text, bool interrupt)
 	if (!speak(text, interrupt))
 		return false;
 #ifdef __APPLE__
-	while (voice_index == builtin_index && speaking.test_and_set() || inst->isSpeaking())
+	while (voice_index == builtin_index && speaking.test() || inst->isSpeaking())
 #elif defined(__ANDROID__)
-	while (voice_index == builtin_index && speaking.test_and_set() || get_speaking())
+	while (voice_index == builtin_index && speaking.test() || get_speaking())
 #else
-	while (speaking.test_and_set())
+	while (speaking.test())
 #endif
 		wait(5);
 	return true;
@@ -533,15 +564,15 @@ bool tts_voice::set_voice(int voice)
 bool tts_voice::get_speaking()
 {
 #ifdef __APPLE__
-	if (voice_index == builtin_index && speaking.test_and_set())
+	if (voice_index == builtin_index && speaking.test())
 		return true;
 	return inst->isSpeaking();
 #elif defined(__ANDROID__)
-	if (voice_index == builtin_index && speaking.test_and_set())
+	if (voice_index == builtin_index && speaking.test())
 		return true;
 	return env->CallBooleanMethod(TTSObj, midIsSpeaking) == JNI_TRUE;
 #else
-	return speaking.test_and_set();
+	return speaking.test();
 #endif
 }
 CScriptArray *tts_voice::list_voices()

@@ -23,11 +23,11 @@
 #include "pack_protocol.h"
 #include "pack2.h"
 #include "memory_protocol.h"
+#include "resampler.h"
 #include <atomic>
 #include <utility>
 #include <cstdint>
 #include <miniaudio_libvorbis.h>
-
 using namespace std;
 
 class sound_impl;
@@ -223,6 +223,11 @@ public:
 			ma_resource_manager_config cfg = ma_resource_manager_config_init();
 			// Attach the resource manager to the sound service so that it can receive audio from custom sources.
 			cfg.pVFS = g_sound_service->get_vfs();
+			// Set a static decoded sample rate for now. We probably want to make this configurable.
+			cfg.decodedSampleRate = 44100;
+
+			cfg.resampling.algorithm = ma_resample_algorithm_custom;
+			cfg.resampling.pBackendVTable = &wdl_resampler_backend_vtable;
 			if (!g_decoders.empty())
 			{
 				cfg.ppCustomDecodingBackendVTables = &g_decoders[0];
@@ -729,6 +734,7 @@ public:
 };
 class sound_impl final : public mixer_impl, public virtual sound
 {
+	std::vector<char> pcm_buffer; // When loading from raw PCM (like TTS) we store the intermediate wav data here so we can take advantage of async loading to return quickly. Makes a substantial difference in the responsiveness of TTS calls.
 	// Always called before associating the object with a new sound.
 	void reset()
 	{
@@ -736,10 +742,11 @@ class sound_impl final : public mixer_impl, public virtual sound
 			snd = make_unique<ma_sound>();
 		else
 			ma_sound_uninit(&*snd);
+		pcm_buffer.resize(0);
 	}
 
 public:
-	sound_impl(audio_engine *e) : mixer_impl(static_cast<audio_engine_impl *>(e)), sound()
+	sound_impl(audio_engine *e) : mixer_impl(static_cast<audio_engine_impl *>(e)), pcm_buffer(), sound()
 	{
 		snd = nullptr;
 	}
@@ -779,6 +786,7 @@ public:
 	}
 	bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) override
 	{
+		reset();
 		// At least for now, the strat here is just to write the PCM to wav and then load it the normal way.
 		// Should optimization become necessary (this does result in a couple of copies), a protocol could be written that simulates its input having a RIFF header on it.
 		int frame_size = 0;
@@ -800,8 +808,8 @@ public:
 			return false;
 		}
 		frame_size /= channels;
-		std::vector<char> wav(size + 44);
-		Poco::MemoryOutputStream stream(&wav[0], wav.size());
+		pcm_buffer.resize(size + 44);
+		Poco::MemoryOutputStream stream(&pcm_buffer[0], pcm_buffer.size());
 		ma_encoder_config cfg = ma_encoder_config_init(ma_encoding_format_wav, format, channels, samplerate);
 		ma_encoder encoder;
 		g_soundsystem_last_error = ma_encoder_init(wav_write_proc, wav_seek_proc, &stream, &cfg, &encoder);
@@ -818,7 +826,8 @@ public:
 			return false;
 		}
 		// At this point we can just use the sound service to load this. We use the low level API though because we need to be clear that no filters apply.
-		return load_special(":pcm", g_memory_protocol_slot, memory_protocol::directive(&wav[0], wav.size()), sound_service::null_filter_slot, nullptr, MA_SOUND_FLAG_DECODE);
+		// Also, our PCM buffer is a permanent class property so we can enjoy the speed of async loading.
+		return load_special(":pcm", g_memory_protocol_slot, memory_protocol::directive(&pcm_buffer[0], pcm_buffer.size()), sound_service::null_filter_slot, nullptr, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC);
 	}
 	bool close() override
 	{

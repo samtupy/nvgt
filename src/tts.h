@@ -50,11 +50,16 @@ class tts_voice
 	typedef std::queue<soundptr> sound_queue;
 	sound_queue queue; // This is so that non-interrupting speech is possible. When speech is rendered, it's preloaded into a sound and held here to wait its turn to play.
 	std::mutex queue_mtx;
+	sound_queue fade_queue; // To enable smooth transitions when interrupting speech, we use a short fade and put fading sounds here pending destruction. This one doesn't get threadsafety; we're only going to touch it from the thread that calls speak.
 	std::atomic_flag speaking;
 	// Puts a sound representing prerendered speech into the queue.
 	bool schedule(soundptr &s, bool interrupt);
 	// Empties the queue. This is how interrupt is implemented. Lock before calling this.
 	void clear();
+	// Fades the currently playing item and schedules it for destruction when finished.
+	bool fade(soundptr &item);
+	// Clears the fading queue. No lock needed.
+	void cleanup_completed_fades();
 	// A callback that MiniAudio will fire when a sound reaches its end. The user data is to be a pointer to this.
 	static void at_end(void *pUserData, ma_sound *pSound);
 	// This gets called from Miniaudio's job infrastructure to start the next sound when one finishes.
