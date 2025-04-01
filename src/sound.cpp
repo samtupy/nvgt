@@ -28,6 +28,7 @@
 #include <utility>
 #include <cstdint>
 #include <miniaudio_libvorbis.h>
+#include <iostream> //Debugging.
 using namespace std;
 
 class sound_impl;
@@ -205,8 +206,15 @@ class audio_engine_impl final : public audio_engine
 {
 	std::unique_ptr<ma_engine> engine;
 	std::unique_ptr<ma_resource_manager> resource_manager;
+	std::unique_ptr<ma_device> device;
 	audio_node *engine_endpoint; // Upon engine creation we'll call ma_engine_get_endpoint once so as to avoid creating more than one of our wrapper objects when our engine->get_endpoint() function is called.
 	int refcount;
+	static void data_callback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 frameCount)
+	{
+		ma_engine *engine = (ma_engine *)pDevice->pUserData;
+		ma_uint64 frames_read;
+		ma_engine_read_pcm_frames(engine, pOutput, frameCount, &frames_read);
+	}
 
 public:
 	engine_flags flags;
@@ -218,14 +226,43 @@ public:
 		  flags(static_cast<engine_flags>(flags)),
 		  refcount(1)
 	{
+		engine = std::make_unique<ma_engine>();
+		device = std::make_unique<ma_device>();
+		// We need a self-managed device because at least on Windows, we can't meet low-latency requirements without specific configurations.
+		{
+			ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
+			// Just set to some hard-coded defaults for now.
+			cfg.playback.channels = 2;
+			cfg.playback.format = ma_format_f32;
+			cfg.sampleRate = 0; // Let the device decide.
+			cfg.periods = 1;
+
+			// Hook up high quality resampling, because we want the app to accommodate the device's sample rate, not the other way around.
+			cfg.resampling.algorithm = ma_resample_algorithm_custom;
+			cfg.resampling.pBackendVTable = &wdl_resampler_backend_vtable;
+			cfg.wasapi.noAutoConvertSRC = true;
+
+			cfg.dataCallback = data_callback;
+			cfg.pUserData = &*engine;
+			g_soundsystem_last_error = ma_device_init(0, &cfg, &*device);
+			if (g_soundsystem_last_error != MA_SUCCESS)
+			{
+
+				engine.reset();
+				device.reset();
+				return;
+			}
+		}
+		std::cout << "Period is " << device->wasapi.actualBufferSizeInFramesPlayback << std::endl;
+
 		// We need a self managed resource manager because we need to plug decoders in.
 		{
 			ma_resource_manager_config cfg = ma_resource_manager_config_init();
 			// Attach the resource manager to the sound service so that it can receive audio from custom sources.
 			cfg.pVFS = g_sound_service->get_vfs();
-			// Set a static decoded sample rate for now. We probably want to make this configurable.
-			cfg.decodedSampleRate = 44100;
-
+			// This is the sample rate that sounds will be resampled to if necessary during loading. We set this equal to whatever sample rate the device got. This is maximally efficient as long as the user doesn't switch devices to one that runs at a different rate.
+			cfg.decodedSampleRate = device->playback.internalSampleRate;
+			// Set the resampler used during decoding to a high quality one. At the time of writing this, this is relying on support that I added to MiniAudio myself and has not yet been merged upstream.
 			cfg.resampling.algorithm = ma_resample_algorithm_custom;
 			cfg.resampling.pBackendVTable = &wdl_resampler_backend_vtable;
 			if (!g_decoders.empty())
@@ -236,6 +273,9 @@ public:
 			resource_manager = std::make_unique<ma_resource_manager>();
 			if ((g_soundsystem_last_error = ma_resource_manager_init(&cfg, &*resource_manager)) != MA_SUCCESS)
 			{
+				ma_device_uninit(&*device);
+				device.reset();
+				engine.reset();
 				resource_manager.reset();
 				return;
 			}
@@ -243,7 +283,7 @@ public:
 		ma_engine_config cfg = ma_engine_config_init();
 		// cfg.pContext = &g_sound_context; // Miniaudio won't let us quickly uninitilize then reinitialize a device sometimes when using the same context, so we won't manage it until we figure that out.
 		cfg.pResourceManager = &*resource_manager;
-		engine = std::make_unique<ma_engine>();
+		cfg.pDevice = &*device;
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS)
 		{
 			engine.reset();
@@ -253,6 +293,11 @@ public:
 	}
 	~audio_engine_impl()
 	{
+		if (device)
+		{
+			ma_device_stop(&*device);
+			ma_device_uninit(&*device);
+		}
 
 		if (engine_endpoint)
 			engine_endpoint->release();
@@ -260,6 +305,10 @@ public:
 		{
 			ma_engine_uninit(&*engine);
 			engine = nullptr;
+		}
+		if (resource_manager)
+		{
+			ma_resource_manager_uninit(&*resource_manager);
 		}
 	}
 	void duplicate() override { asAtomicInc(refcount); }
