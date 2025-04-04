@@ -37,9 +37,9 @@
 #include <Poco/Net/WebSocket.h>
 #include <scriptarray.h>
 #include <scriptdictionary.h>
+#include <entities.h>
 #include "datastreams.h"
 #include "internet.h"
-#include "entities.h"
 #include "nvgt.h"
 #include "nvgt_angelscript.h"
 #include "pocostuff.h" // angelscript_refcounted
