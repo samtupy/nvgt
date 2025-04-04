@@ -121,6 +121,7 @@ form_background_callback@ audioform_default_background_callback = null;
 class audio_form {
 	bool active;
 	bool speak_control_attributes_separately;
+	bool speak_type_separately;
 	int subform_control_index = -1;
 	on_control_event_callback@ event_callback = null;
 	form_background_callback@ background_callback = @audioform_default_background_callback;
@@ -2654,7 +2655,7 @@ class control {
 		this.enable_go_to_index = true;
 		this.enable_search = true;
 	}
-	void focus(bool interrupt_previous_speech, bool separate_attributes, bool silent = false) {
+	void focus(bool interrupt_previous_speech, bool separate_attributes, bool silent = false, bool separate_type = false) {
 		if (silent == true) {
 			focused = true;
 			return;
@@ -2673,6 +2674,7 @@ class control {
 			return;
 		}
 		string typename = type_to_name();
+		string typetext = "";
 		string hotkey_text = "";
 		if (hotkey_letter != "")
 			hotkey_text = " Alt+" + hotkey_letter;
@@ -2683,38 +2685,56 @@ class control {
 				speak(caption, false);
 			speak(typename, false);
 		} else {
-			if (interrupt_previous_speech == true)
-				speak(caption + " " + typename + hotkey_text, true);
+			if (separate_type)
+				speak(caption + " " + typename + hotkey_text, interrupt_previous_speech);
 			else
-				speak(caption + " " + typename + hotkey_text, false);
+				typetext = caption + " " + typename + hotkey_text;
 		}
 		if (hotkey_letter != "" && separate_attributes == true)
 			speak("Alt+" + hotkey_letter, false);
 		if ((type == ct_input) && (password_mask != "")) {
-			if (text.length() > 0)
-				speak(text.length() + " characters", false);
-			else
-				speak("Blank", false);
+			if (text.length() > 0) {
+				if (separate_type) speak(text.length() + " characters", false);
+				else typetext += " " + text.length() + " characters";
+			} else {
+				if (separate_type) speak("Blank", false);
+				else typetext += " Blank";
+			}
 		}
 		if ((type == ct_input) && (password_mask == "")) {
 			if (text.length() > 0) {
 				if (sel_start >= 0) {
-					if (sel_end - sel_start >= 1024)
-						speak(highlight_selection_speech_text + " " + (sel_end - sel_start + 1) + " characters", false);
-					else
-						speak(highlight_selection_speech_text + " " + text.substr(sel_start, sel_end - sel_start + 1), false);
-				} else
-					speak(read_line(current_line_start_position()), false);
-			} else
-				speak("Blank", false);
+					if (sel_end - sel_start >= 1024){
+						if (separate_type) speak(highlight_selection_speech_text + " " + (sel_end - sel_start + 1) + " characters", false);
+						else typetext += " " + highlight_selection_speech_text + " " + (sel_end - sel_start + 1) + " characters";
+					} else {
+						if (separate_type) speak(highlight_selection_speech_text + " " + text.substr(sel_start, sel_end - sel_start + 1), false);
+						else typetext += " " + highlight_selection_speech_text + " " + text.substr(sel_start, sel_end - sel_start + 1);
+					}
+				} else {
+					if (separate_type) speak(read_line(current_line_start_position()), false);
+					else typetext += " " + read_line(current_line_start_position());
+				}
+			} else {
+				if (separate_type) speak("Blank", false);
+				else typetext += " Blank";
+			}
 		}
-		if (type == ct_status_bar)
-			speak(text, false);
+		if (type == ct_status_bar) {
+			if (separate_type) speak(text, false);
+			else typetext += " " + text;
+		}
 		if (type == ct_progress)
 			speak_progress(false);
-		if (type == ct_slider)
-			speak(slider_value_string(), false);
-		if ((type == ct_list) && (list_position > -1)) speak_list_item(false);
+		if (type == ct_slider) {
+			if (separate_type) speak(slider_value_string(), false);
+			else typetext += " " + slider_value_string();
+		}
+		if ((type == ct_list) && (list_position > -1)) {
+			if (separate_type) speak_list_item(false);
+			else typetext += " " + speak_list_item(false, false);
+		}
+		if (typetext != "" && !separate_type) speak(typetext, interrupt_previous_speech);
 		focused = true;
 	}
 	bool is_disallowed_char(string char, bool search_all = true) {
@@ -3972,10 +3992,13 @@ class control {
 		sel_start = start;
 		sel_end = end;
 	}
-	void speak_list_item(bool interrupt = true) {
-		if (list_is_tab_panel) speak(list[list_position].item + " tab", (interrupt ? true : false));
-		else if (!list_is_tab_panel and list[list_position].checked) speak(list[list_position].item + " Checked", (interrupt ? true : false));
-		else speak(list[list_position].item, (interrupt ? true : false));
+	string speak_list_item(bool interrupt = true, bool actually_speak = true) {
+		string msg;
+		if (list_is_tab_panel) msg = list[list_position].item + " tab";
+		else if (!list_is_tab_panel and list[list_position].checked) msg = list[list_position].item + " Checked";
+		else msg = list[list_position].item;
+		if (actually_speak) speak(msg, interrupt);
+	return msg;
 	}
 	/*
 	bool speak(string text, bool interrupt)
