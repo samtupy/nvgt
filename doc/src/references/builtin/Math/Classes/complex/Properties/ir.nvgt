@@ -1,0 +1,15 @@
+/**
+	Accesses the complex number in imaginary-real order.
+	complex complex::ir [property];
+*/
+
+// Example:
+// Helper function to print a complex number.
+string to_string(const complex&in c) {
+	return "(" + c.r + ", " + c.i + ")";
+}
+
+void main() {
+	complex c(1, 2);
+	alert("Imaginary-Real =", to_string(c.ir));
+}

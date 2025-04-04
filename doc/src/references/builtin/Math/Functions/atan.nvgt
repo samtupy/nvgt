@@ -4,7 +4,7 @@
 	## Arguments:
 		* double x: The value whose arc tangent is to be calculated.
 	## Returns:
-		The arc tangent of the given value.
+		double: the arc tangent of the given value.
 */
 
 // Example:
