@@ -105,6 +105,11 @@ public:
 	 * Pass the same arguments to this that you passed to name_to_triplet earlier.
 	 */
 	virtual std::istream *open_triplet(const char *triplet, size_t filter_slot = 0, const directive_t filter_directive = nullptr) = 0;
+	/**
+	 * Preparing a triplet involves provision of internal state that must be dealt with after opening the asset.ABC
+	 * Don't forget to call this or you leak.
+	 */
+	virtual bool cleanup_triplet(const std::string &triplet) = 0;
 	// The VFS is how Miniaudio itself communicates with this.
 	virtual sound_service_vfs *get_vfs() = 0;
 	static std::unique_ptr<sound_service> make();

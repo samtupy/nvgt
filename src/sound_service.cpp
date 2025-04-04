@@ -142,6 +142,7 @@ class sound_service_impl : public sound_service
 	bool set_temp_args(const std::string &triplet, const vfs_args &args)
 	{
 		std::unique_lock<std::mutex> lock(temp_args_mtx);
+
 		return temp_args.try_emplace(triplet, args).second;
 	}
 	bool get_temp_args(const std::string &triplet, vfs_args &dest)
@@ -153,7 +154,6 @@ class sound_service_impl : public sound_service
 			return false;
 		}
 		dest = i->second;
-		temp_args.erase(i);
 		return true;
 	}
 
@@ -328,6 +328,17 @@ public:
 			return apply_filter(result, args.filter_slot, args.filter_directive);
 		}
 		return nullptr;
+	}
+	bool cleanup_triplet(const std::string &triplet)
+	{
+		std::unique_lock<std::mutex> lock(temp_args_mtx);
+		temp_args_t::iterator i = temp_args.find(triplet);
+		if (i == temp_args.end())
+		{
+			return false;
+		}
+		temp_args.erase(i);
+		return true;
 	}
 	std::istream *apply_filter(std::istream *source, size_t filter_slot = 0, const directive_t filter_directive = nullptr)
 	{

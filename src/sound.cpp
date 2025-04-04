@@ -9,6 +9,9 @@
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
  */
+// #define _CRTDBG_MAP_ALLOC
+// #include <stdlib.h>
+// #include <crtdbg.h>
 
 #define NOMINMAX
 #include <memory>
@@ -235,7 +238,6 @@ public:
 			cfg.playback.channels = 2;
 			cfg.playback.format = ma_format_f32;
 			cfg.sampleRate = 0; // Let the device decide.
-			cfg.periods = 1;
 
 			// Hook up high quality resampling, because we want the app to accommodate the device's sample rate, not the other way around.
 			cfg.resampling.algorithm = ma_resample_algorithm_custom;
@@ -253,7 +255,7 @@ public:
 				return;
 			}
 		}
-		std::cout << "Period is " << device->wasapi.actualBufferSizeInFramesPlayback << std::endl;
+		// std::cout << "Period is " << device->wasapi.actualBufferSizeInFramesPlayback << std::endl;
 
 		// We need a self managed resource manager because we need to plug decoders in.
 		{
@@ -787,11 +789,11 @@ class sound_impl final : public mixer_impl, public virtual sound
 	// Always called before associating the object with a new sound.
 	void reset()
 	{
-		if (!snd)
-			snd = make_unique<ma_sound>();
-		else
-			ma_sound_uninit(&*snd);
-		pcm_buffer.resize(0);
+		if (snd)
+		{
+			close();
+		}
+		snd = make_unique<ma_sound>();
 	}
 
 public:
@@ -802,6 +804,7 @@ public:
 	~sound_impl()
 	{
 		close();
+		//_CrtDumpMemoryLeaks();
 	}
 	bool load_special(const std::string &filename, const size_t protocol_slot = 0, directive_t protocol_directive = nullptr, const size_t filter_slot = 0, directive_t filter_directive = nullptr, ma_uint32 ma_flags = MA_SOUND_FLAG_DECODE) override
 	{
@@ -817,6 +820,8 @@ public:
 
 		if (g_soundsystem_last_error != MA_SUCCESS)
 			snd.reset();
+		// Sound service has to store data pertaining to our triplet, and this is the earliest point at which it's safe to clean that up.
+		g_sound_service->cleanup_triplet(triplet);
 		return g_soundsystem_last_error == MA_SUCCESS;
 	}
 	bool load(const string &filename) override
@@ -884,6 +889,7 @@ public:
 		{
 			ma_sound_uninit(&*snd);
 			snd.reset();
+			pcm_buffer.resize(0);
 			return true;
 		}
 		return false;
@@ -1106,6 +1112,26 @@ void set_sound_default_storage(new_pack::pack *obj)
 	g_sound_service->set_default_protocol(g_pack_protocol_slot);
 }
 int get_soundsystem_last_error() { return g_soundsystem_last_error; }
+void set_sound_master_volume(float db)
+{
+	if (!g_soundsystem_initialized.test())
+	{
+		return;
+	}
+	if (db > 0 || db < -100)
+	{
+		return;
+	}
+	ma_engine_set_volume(g_audio_engine->get_ma_engine(), ma_volume_db_to_linear(db));
+}
+float get_sound_master_volume()
+{
+	if (!g_soundsystem_initialized.test())
+	{
+		return 0;
+	}
+	return ma_volume_linear_to_db(ma_engine_get_volume(g_audio_engine->get_ma_engine()));
+}
 
 template <class T, auto Function, typename ReturnType, typename... Args>
 ReturnType virtual_call(T *object, Args... args)
@@ -1329,6 +1355,8 @@ void RegisterSoundsystem(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("void set_sound_output_device(int device) property", asFUNCTION(set_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_decryption_key(const string& in key) property", asFUNCTION(set_default_decryption_key), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_pack(new_pack::pack_file@ storage) property", asFUNCTION(set_sound_default_storage), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_master_volume(float db) property", asFUNCTION(set_sound_master_volume), asCALL_CDECL);
+	engine->RegisterGlobalFunction("float get_sound_master_volume() property", asFUNCTION(get_sound_master_volume), asCALL_CDECL);
 
 	engine->RegisterGlobalFunction("audio_error_state get_SOUNDSYSTEM_LAST_ERROR() property", asFUNCTION(get_soundsystem_last_error), asCALL_CDECL);
 }

@@ -485,11 +485,11 @@ int tts_voice::get_volume()
 		return builtin_volume;
 #ifdef _WIN32
 	if (!inst && !refresh())
-		return 100;
+		return 0;
 	long result;
 	if (!blastspeak_get_voice_volume(inst, &result))
 		return 0;
-	return result;
+	return result - 100;
 #elif defined(__APPLE__)
 	return inst->getRate();
 #elif defined(__ANDROID__)
@@ -530,7 +530,7 @@ void tts_voice::set_volume(int volume)
 #ifdef _WIN32
 	if (!inst && !refresh())
 		return;
-	blastspeak_set_voice_volume(inst, volume);
+	blastspeak_set_voice_volume(inst, volume + 100);
 #elif defined(__APPLE__)
 	inst->setVolume(volume);
 #elif defined(__ANDROID__)

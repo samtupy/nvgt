@@ -24,6 +24,7 @@
 #include <Poco/Path.h>
 #include <iostream>
 #include "chacha_stream.h"
+#include "datastreams.h"
 namespace new_pack
 {
 	static const int header_size = 64;
@@ -48,6 +49,7 @@ namespace new_pack
 		read_mode_internals(std::istream &file, const std::string &key = "", uint64_t pack_offset = 0, uint64_t pack_size = 0);
 		~read_mode_internals();
 		const toc_entry *get(const std::string &filename) const;
+		bool exists(const std::string &filename);
 	};
 	class pack::write_mode_internals
 	{
@@ -66,6 +68,7 @@ namespace new_pack
 		write_mode_internals(std::ostream &file, const std::string &key = "");
 		~write_mode_internals();
 		bool put(const std::string &filename, const std::string &internal_name);
+		bool exists(const std::string &filename);
 	};
 	bool pack::read_mode_internals::load()
 	{
@@ -206,6 +209,10 @@ namespace new_pack
 		}
 		return &(i->second);
 	}
+	bool pack::read_mode_internals::exists(const std::string &filename)
+	{
+		return toc.find(filename) != toc.end();
+	}
 	bool pack::write_mode_internals::put_blank_header()
 	{
 		if (!file->good())
@@ -326,6 +333,10 @@ namespace new_pack
 		}
 		return true;
 	}
+	bool pack::write_mode_internals::exists(const std::string &filename)
+	{
+		return toc.find(filename) != toc.end();
+	}
 	void pack::set_pack_name(const std::string &name)
 	{
 		pack_name = Poco::Path(name).absolute().toString();
@@ -414,6 +425,18 @@ namespace new_pack
 		}
 		return write->put(filename, internal_name);
 	}
+	bool pack::file_exists(const std::string &filename)
+	{
+		if (open_mode == OPEN_READ)
+		{
+			return read->exists(filename);
+		}
+		if (open_mode == OPEN_WRITE)
+		{
+			return write->exists(filename);
+		}
+		return false;
+	}
 	std::istream *pack::get_file(const std::string &filename) const
 	{
 		if (open_mode != OPEN_READ)
@@ -442,6 +465,25 @@ namespace new_pack
 			return nullptr;
 		}
 		return nullptr;
+	}
+	// Gets a file from the pack as a script compatible datastream. BGT-compatible interface that returns an inactive datastream if the file doesn't exist. To avoid header blote, this doesn't have its default arguments on the C++ side.
+	datastream *pack::get_file_script(const std::string &filename, const std::string &encoding, int byteorder)
+	{
+		std::istream *str = get_file(filename);
+		if (str == nullptr)
+		{
+			return new datastream();
+		}
+		try
+		{
+			return new datastream(str, encoding, byteorder);
+		}
+		catch (const std::exception &)
+		{
+			// Expect this if script supplies bogus encoding or byteorder.
+			delete str;
+			return nullptr;
+		}
 	}
 	const std::string pack::get_pack_name() const
 	{
@@ -472,6 +514,8 @@ namespace new_pack
 									 asMETHOD(pack, open), asCALL_THISCALL);
 		engine->RegisterObjectMethod("pack_file", "bool close()", asMETHOD(pack, close), asCALL_THISCALL);
 		engine->RegisterObjectMethod("pack_file", "bool add_file(const string &in filename, const string &in internal_name)", asMETHOD(pack, add_file), asCALL_THISCALL);
+		engine->RegisterObjectMethod("pack_file", "bool file_exists(const string &in filename)", asMETHOD(pack, file_exists), asCALL_THISCALL);
+		engine->RegisterObjectMethod("pack_file", "datastream @get_file(const string &in filename, const string &in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asMETHOD(pack, get_file_script), asCALL_THISCALL);
 
 		engine->SetDefaultNamespace("");
 	}

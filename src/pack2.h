@@ -50,10 +50,11 @@ namespace new_pack
 
 		bool close();
 		bool add_file(const std::string &filename, const std::string &internal_name);
+		bool file_exists(const std::string &filename);
 		// Gets a raw istream that points to the requested file. This is not the version that's given to script.
 		std::istream *get_file(const std::string &filename) const;
 		// Returns a datastream for script that points to the requested file.
-		datastream *get_file_script(const std::string &filename);
+		datastream *get_file_script(const std::string &filename, const std::string &encoding, int byteorder);
 
 		// Returns the absolute path to this pack file on disk.
 		const std::string get_pack_name() const;
