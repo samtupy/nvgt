@@ -121,7 +121,7 @@ form_background_callback@ audioform_default_background_callback = null;
 class audio_form {
 	bool active;
 	bool speak_control_attributes_separately;
-	bool speak_type_separately;
+	bool speak_type_separately = true;
 	int subform_control_index = -1;
 	on_control_event_callback@ event_callback = null;
 	form_background_callback@ background_callback = @audioform_default_background_callback;
@@ -2314,7 +2314,7 @@ class audio_form {
 		if (@c_form[tab_index].event_callback != null)
 			c_form[tab_index].event_callback(this, tab_index, event_focus, {{"interrupt_previous_speech", interrupt_previous_speech}, {"silent", silent}});
 		control_focus = tab_index;
-		c_form[tab_index].focus(interrupt_previous_speech, speak_control_attributes_separately, silent);
+		c_form[tab_index].focus(interrupt_previous_speech, speak_control_attributes_separately, silent, speak_type_separately);
 		for (int counter = 0; counter < c_form.length(); counter++) {
 			if (counter == tab_index)
 				continue;
