@@ -324,6 +324,7 @@ bool tts_voice::speak(const std::string &text, bool interrupt)
 	bool ret = s->load_pcm(ptr, bufsize, bitrate == 16 ? ma_format_s16 : ma_format_u8, samprate, channels);
 	if (voice_index == builtin_index)
 		free(data);
+
 	if (!ret)
 		return false;
 	return schedule(s, interrupt);
