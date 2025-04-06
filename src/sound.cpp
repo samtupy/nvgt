@@ -255,14 +255,13 @@ public:
 				return;
 			}
 		}
-		// std::cout << "Period is " << device->wasapi.actualBufferSizeInFramesPlayback << std::endl;
 
-		// We need a self managed resource manager because we need to plug decoders in.
+		// We need a self managed resource manager because we need to plug decoders in and configure the job thread count.
 		{
 			ma_resource_manager_config cfg = ma_resource_manager_config_init();
 			// Attach the resource manager to the sound service so that it can receive audio from custom sources.
 			cfg.pVFS = g_sound_service->get_vfs();
-			// This is the sample rate that sounds will be resampled to if necessary during loading. We set this equal to whatever sample rate the device got. This is maximally efficient as long as the user doesn't switch devices to one that runs at a different rate.
+			// This is the sample rate that sounds will be resampled to if necessary during loading. We set this equal to whatever sample rate the device got. This is maximally efficient as long as the user doesn't switch devices to one that runs at a different rate. When they do, a single resampler kicks in.
 			cfg.decodedSampleRate = device->playback.internalSampleRate;
 			// Set the resampler used during decoding to a high quality one. At the time of writing this, this is relying on support that I added to MiniAudio myself and has not yet been merged upstream.
 			cfg.resampling.algorithm = ma_resample_algorithm_custom;
@@ -272,6 +271,7 @@ public:
 				cfg.ppCustomDecodingBackendVTables = &g_decoders[0];
 				cfg.customDecodingBackendCount = g_decoders.size();
 			}
+			cfg.jobThreadCount = std::thread::hardware_concurrency();
 			resource_manager = std::make_unique<ma_resource_manager>();
 			if ((g_soundsystem_last_error = ma_resource_manager_init(&cfg, &*resource_manager)) != MA_SUCCESS)
 			{
@@ -499,7 +499,7 @@ public:
 	void set_volume(float volume) override
 	{
 		if (snd)
-			ma_sound_set_volume(&*snd, engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_db_to_linear(volume) : volume);
+			ma_sound_set_volume(&*snd, std::min((engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_db_to_linear(volume) : volume), 1.0f));
 	}
 	float get_volume() override { return snd ? (engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_linear_to_db(ma_sound_get_volume(&*snd)) : ma_sound_get_volume(&*snd)) : NAN; }
 	void set_pan(float pan) override
@@ -826,7 +826,7 @@ public:
 	}
 	bool load(const string &filename) override
 	{
-		return load_special(filename, 0, nullptr, 0, nullptr, MA_SOUND_FLAG_DECODE);
+		return load_special(filename, 0, nullptr, 0, nullptr, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC);
 	}
 	bool stream(const std::string &filename) override
 	{
