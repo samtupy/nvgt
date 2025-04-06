@@ -421,12 +421,31 @@ std::string tts_voice::speak_to_memory(const std::string &text)
 	if (!data)
 		return "";
 	char *ptr = minitrim(data, &bufsize, bitrate, channels);
-	wav_header h = make_wav_header(44 + bufsize, samprate, bitrate, channels);
-	std::string output((char *)&h, sizeof(wav_header));
-	output.append(ptr, bufsize);
+	std::string output;
+	output.resize(bufsize + 44);
+	if (!sound::pcm_to_wav(ptr, bufsize, bitrate == 16 ? ma_format_s16 : ma_format_u8, samprate, channels, &output[0]))
+	{
+		return "";
+	}
 	if (voice_index == builtin_index)
 		free(data);
 	return output;
+}
+sound *tts_voice::speak_to_sound(const std::string &text)
+{
+
+	std::string speech = speak_to_memory(text);
+	if (speech.empty())
+	{
+		return nullptr;
+	}
+	sound *s = g_audio_engine->new_sound();
+	if (!s->load_string_async(speech))
+	{
+		s->release();
+		return nullptr;
+	}
+	return s;
 }
 bool tts_voice::speak_wait(const std::string &text, bool interrupt)
 {
@@ -661,6 +680,7 @@ void RegisterTTSVoice(asIScriptEngine *engine)
 	engine->RegisterObjectMethod("tts_voice", "bool speak_to_file(const string& in filename, const string &in text)", asMETHOD(tts_voice, speak_to_file), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool speak_wait(const string &in text, bool interrupt = false)", asMETHOD(tts_voice, speak_wait), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "string speak_to_memory(const string &in text)", asMETHOD(tts_voice, speak_to_memory), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "sound @speak_to_sound(const string &in text)", asMETHOD(tts_voice, speak_to_sound), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool speak_interrupt_wait(const string &in text)", asMETHOD(tts_voice, speak_interrupt_wait), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool refresh()", asMETHOD(tts_voice, refresh), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool stop()", asMETHOD(tts_voice, stop), asCALL_THISCALL);

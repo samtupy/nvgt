@@ -180,15 +180,14 @@ class sound : public virtual mixer
 {
 public:
 	/**
-	 * The lowest level method to load from the sound service.
-	 * Except for load_pcm, all other sound loading methods use this.
+	 * The lowest level method to load from the sound service; everything uses this.
 	 * Arguments:
 	 * const std::string &filename: the name of an asset on disk, in your archive, etc.
 	 * const size_t protocol_slot = 0: A slot number previously returned from sound_service::register_protocol.
 	 * directive_t protocol_directive = nullptr: an arbitrary piece of data for your protocol to use while fetching the asset (such as which packed archive to fetch from).
 	 * size_t filter_slot = 0: a slot number previously returned from sound_service::register_filter.
-	 * ma_uint32 flags = 0: MiniAudio specific flags that govern how MiniAudio will load the data.
 	 * directive_t filter_directive = nullptr: an arbitrary piece of data for your filter to use (such as a decryption key).
+	 * ma_uint32 flags = 0: MiniAudio specific flags that govern how MiniAudio will load the data.
 	 * Remarks:
 	 * Directive_t is simply short for std::shared_ptr <void>
 	 * The sound service does not retain your directives after this method returns, so it's okay to allocate them on the stack.
@@ -199,7 +198,15 @@ public:
 	virtual bool load(const std::string &filename) = 0;
 	virtual bool stream(const std::string &filename) = 0;
 	virtual bool load_string(const std::string &data) = 0;
+	virtual bool load_string_async(const std::string &data) = 0; // Makes an extra copy. Good for short sounds that need to start immediately. Used by speak_to_sound.
 	virtual bool load_memory(const void *buffer, unsigned int size) = 0;
+	/**
+	 * Create a wav file in memory from a raw PCM buffer.
+	 * Used internally by TTS.
+	 * Format is the format of the input data; it will not be converted.
+	 * Output must be preallocated and must be at least 44 bytes larger than the input buffer.
+	 */
+	static bool pcm_to_wav(const void *buffer, unsigned int size, ma_format format, int samplerate, int channels, void *output);
 	virtual bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) = 0;
 	virtual bool close() = 0;
 	virtual bool get_active() = 0;

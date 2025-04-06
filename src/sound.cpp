@@ -785,7 +785,7 @@ public:
 };
 class sound_impl final : public mixer_impl, public virtual sound
 {
-	std::vector<char> pcm_buffer; // When loading from raw PCM (like TTS) we store the intermediate wav data here so we can take advantage of async loading to return quickly. Makes a substantial difference in the responsiveness of TTS calls.
+	std::string pcm_buffer; // When loading from raw PCM (like TTS) we store the intermediate wav data here so we can take advantage of async loading to return quickly. Makes a substantial difference in the responsiveness of TTS calls.
 	// Always called before associating the object with a new sound.
 	void reset()
 	{
@@ -834,6 +834,12 @@ public:
 	}
 	bool seek_in_milliseconds(unsigned long long offset) override { return snd ? (g_soundsystem_last_error = ma_sound_seek_to_pcm_frame(&*snd, offset * ma_engine_get_sample_rate(engine->get_ma_engine()) / 1000)) == MA_SUCCESS : false; }
 	bool load_string(const std::string &data) override { return load_memory(data.data(), data.size()); }
+	bool load_string_async(const std::string &data) override
+	{
+		// Same as load_pcm, but without the setup.
+		pcm_buffer = data;
+		return load_special(":quickstring", g_memory_protocol_slot, memory_protocol::directive(&pcm_buffer[0], pcm_buffer.size()), sound_service::null_filter_slot, nullptr, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC);
+	}
 	bool load_memory(const void *buffer, unsigned int size) override
 	{
 		return load_special("::memory", g_memory_protocol_slot, memory_protocol::directive(buffer, size));
@@ -843,39 +849,8 @@ public:
 		reset();
 		// At least for now, the strat here is just to write the PCM to wav and then load it the normal way.
 		// Should optimization become necessary (this does result in a couple of copies), a protocol could be written that simulates its input having a RIFF header on it.
-		int frame_size = 0;
-		switch (format)
-		{
-		case ma_format_u8:
-			frame_size = 1;
-			break;
-		case ma_format_s16:
-			frame_size = 2;
-			break;
-		case ma_format_s24:
-			frame_size = 3;
-			break;
-		case ma_format_s32:
-			frame_size = 4;
-			break;
-		default:
-			return false;
-		}
-		frame_size /= channels;
 		pcm_buffer.resize(size + 44);
-		Poco::MemoryOutputStream stream(&pcm_buffer[0], pcm_buffer.size());
-		ma_encoder_config cfg = ma_encoder_config_init(ma_encoding_format_wav, format, channels, samplerate);
-		ma_encoder encoder;
-		g_soundsystem_last_error = ma_encoder_init(wav_write_proc, wav_seek_proc, &stream, &cfg, &encoder);
-		if (g_soundsystem_last_error != MA_SUCCESS)
-		{
-			return false;
-		}
-		// Should be okay to push the content in one go:
-		ma_uint64 frames_written;
-		g_soundsystem_last_error = ma_encoder_write_pcm_frames(&encoder, buffer, size / frame_size, &frames_written);
-		ma_encoder_uninit(&encoder);
-		if (g_soundsystem_last_error != MA_SUCCESS)
+		if (!pcm_to_wav(buffer, size, format, samplerate, channels, &pcm_buffer[0]))
 		{
 			return false;
 		}
@@ -1131,6 +1106,45 @@ float get_sound_master_volume()
 		return 0;
 	}
 	return ma_volume_linear_to_db(ma_engine_get_volume(g_audio_engine->get_ma_engine()));
+}
+bool sound::pcm_to_wav(const void *buffer, unsigned int size, ma_format format, int samplerate, int channels, void *output)
+{
+	int frame_size = 0;
+	switch (format)
+	{
+	case ma_format_u8:
+		frame_size = 1;
+		break;
+	case ma_format_s16:
+		frame_size = 2;
+		break;
+	case ma_format_s24:
+		frame_size = 3;
+		break;
+	case ma_format_s32:
+		frame_size = 4;
+		break;
+	default:
+		return false;
+	}
+	frame_size /= channels;
+	Poco::MemoryOutputStream stream((char *)output, size + 44);
+	ma_encoder_config cfg = ma_encoder_config_init(ma_encoding_format_wav, format, channels, samplerate);
+	ma_encoder encoder;
+	g_soundsystem_last_error = ma_encoder_init(wav_write_proc, wav_seek_proc, &stream, &cfg, &encoder);
+	if (g_soundsystem_last_error != MA_SUCCESS)
+	{
+		return false;
+	}
+	// Should be okay to push the content in one go:
+	ma_uint64 frames_written;
+	g_soundsystem_last_error = ma_encoder_write_pcm_frames(&encoder, buffer, size / frame_size, &frames_written);
+	ma_encoder_uninit(&encoder);
+	if (g_soundsystem_last_error != MA_SUCCESS)
+	{
+		return false;
+	}
+	return true;
 }
 
 template <class T, auto Function, typename ReturnType, typename... Args>
