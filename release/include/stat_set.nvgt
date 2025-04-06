@@ -116,23 +116,31 @@ class stat_set {
 		string[]@ keys = other.stats.get_keys();
 		for (uint i = 0; i < keys.length(); i++) {
 			stat@ stat = other[keys[i]];
-			add(keys[i], stat.val, stat.text, stat.callback, stat.user);
+			stat@ s = add(keys[i], stat.val, stat.text, stat.callback, stat.user);
+			if (@s != null) s.sort_counter = stat.sort_counter;
 		}
 		return this;
 	}
 
-	void add(const string&in name, var@ value, const string&in text = "", stat_callback@ callback = null, dictionary@ user = null) {
-		if (!this.stats.exists(name)) this.stats.set(name, @stat(name, value, text, callback, user));
+	stat@ add(const string&in name, var@ value, const string&in text = "", stat_callback@ callback = null, dictionary@ user = null) {
+		if (!this.stats.exists(name)) {
+			stat s(name, value, text, callback, user);
+			this.stats.set(name, @s);
+			return s;
+		}
+		return null;
 	}
 
 	void update(const string&in name, var@ value) {
 		if (!stats.exists(name)) return;
 		cast<stat@>(stats[name]).val = value;
 	}
+
 	void mod(const string&in name, int64 value) {
 		if (!stats.exists(name)) return;
 		cast<stat@>(stats[name]).val += value;
 	}
+
 	void mod(const string&in name, double value) {
 		if (!stats.exists(name)) return;
 		cast<stat@>(stats[name]).val += value;
@@ -145,9 +153,7 @@ class stat_set {
 		return cast<stat@>(this.stats[stat_name]);
 	}
 
-	int get_size() const property {
-		return stats.size();
-	}
+	int get_size() const property {return stats.size();}
 
 	string[]@ list(stat_sort_mode sort_mode = STAT_SORT_MODE_NONE, const string[]@ sort_in_front = {}, const string[]@ sort_behind = {}) const {
 		if (stats.empty()) return {};
@@ -173,15 +179,12 @@ class stat_set {
 		return result;
 	}
 
-	bool exists(const string& in stat_name) {
-		return this.stats.exists(stat_name);
-	}
+	bool exists(const string&in stat_name) {return stats.exists(stat_name);}
 
-	string[]@ opImplConv() {
+	string[]@ opImplConv() const {
 		string[] res;
-		string[]@ keys = this.stats.get_keys();
-		for (uint i = 0; i < keys.length(); i++)
-			res.insert_last(string(this.stats[keys[i]]));
+		string[]@ keys = stats.get_keys();
+		for (uint i = 0; i < keys.length(); i++) res.insert_last(string(this.stats[keys[i]]));
 		return res;
 	}
 
@@ -190,10 +193,8 @@ class stat_set {
 		for (uint i = 0; i < keys_to_add.length(); i++) {
 			string key = keys_to_add[i];
 			stat@ st = other[key];
-			if (this.exists(key))
-				this[key] += st.val;
-			else
-				add(key, st.val, st.text, st.callback, st.user);
+			if (this.exists(key)) this[key] += st.val;
+			else add(key, st.val, st.text, st.callback, st.user);
 		}
 		return this;
 	}

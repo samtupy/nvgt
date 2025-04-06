@@ -4,17 +4,16 @@
 	## Remarks:
 		This method waits for the current request to cancel successfully, which is usually instant. However from time to time you could see a small delay as the request thread runs to the next point where it can check the cancelation event.
 		This method is implicitly called whenever the http object destructs.
-		*/
-		
-		// Example:
-		void main() {
-			http h;
-			h.get("https://nvgt.gg");
-			wait(20);
-			h.reset();
-			h.get("https://samtupy.com/ip.php");
-			h.wait();
-			if (h.status_code != 200) alert("oops " + h.status_code, h.response_body);
-			else alert("IP address displayed after http reset", h.response_body);
-		}
-		
+*/
+
+// Example:
+void main() {
+	http h;
+	h.get("https://nvgt.gg");
+	wait(20);
+	h.reset();
+	h.get("https://samtupy.com/ip.php");
+	h.wait();
+	if (h.status_code != 200) alert("oops " + h.status_code, h.response_body);
+	else alert("IP address displayed after http reset", h.response_body);
+}

@@ -5,7 +5,7 @@
 		* double x: The base.
 		* double y: The exponent.
 	## Returns:
-		x raised to the power of y.
+		double: x raised to the power of y.
 */
 
 // Example:

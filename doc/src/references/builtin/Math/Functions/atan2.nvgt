@@ -5,7 +5,7 @@
 		* double y: The ordinate coordinate.
 		* double x: The abscissa coordinate.
 	## Returns:
-		The arc tangent of y/x.
+		double: the arc tangent of y/x.
 */
 
 // Example:
