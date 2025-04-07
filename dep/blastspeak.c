@@ -414,11 +414,8 @@ extern "C" {
         }
         return 1;
     }
-
-    int blastspeak_speak ( blastspeak* instance, const char* text )
+    static int blastspeak_reset_output(blastspeak *instance)
     {
-        if ( instance->must_reset_output )
-        {
             HRESULT hr;
             VARIANT return_value;
             VARIANT argument;
@@ -438,6 +435,17 @@ extern "C" {
             }
             VariantClear ( &return_value );
             instance->must_reset_output = 0;
+            return 1;
+    }
+
+    int blastspeak_speak ( blastspeak* instance, const char* text )
+    {
+        if ( instance->must_reset_output )
+        {
+            if(!blastspeak_reset_output(instance))
+            {
+                return 0;
+            }
         }
 
         return blastspeak_speak_internal ( instance, text );
@@ -480,6 +488,13 @@ extern "C" {
 
     int blastspeak_set_voice ( blastspeak* instance, unsigned int voice_index )
     {
+        if ( instance->must_reset_output )
+        {
+            if(!blastspeak_reset_output(instance))
+            {
+                return 0;
+            }
+        }
         IDispatch* voice_token = blastspeak_get_voice ( instance, voice_index );
         HRESULT hr;
         DISPPARAMS parameters;
@@ -520,12 +535,10 @@ extern "C" {
             return 0;
         }
         VariantClear ( &return_value );
-
         if ( blastspeak_get_stream_format ( instance, 0, &instance->sample_rate, &instance->bits_per_sample, &instance->channels ) == 0 )
         {
             return 0;
         }
-
         return 1;
     }
 
@@ -1083,6 +1096,10 @@ goto done;
         }
         VariantClear ( &return_value );
 done:
+if(instance->must_reset_output)
+{
+    blastspeak_reset_output(instance);
+}
 //Several operations performed here involving the stream have called AddRef on it, and they never get cleaned up. So we'll have to find out how many references the stream has and clear all of them so that it doesn't just leak.
 for(num_refs = stream->lpVtbl->AddRef(stream) ; num_refs > 0; num_refs--)
 {
