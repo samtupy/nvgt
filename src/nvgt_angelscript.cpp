@@ -450,7 +450,6 @@ int ConfigureEngine(asIScriptEngine *engine)
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	RegisterExceptionRoutines(engine);
 	engine->RegisterGlobalProperty("const string last_exception_call_stack", &g_last_exception_callstack);
-	engine->RegisterGlobalFunction("const string get_call_stack() const property", asFUNCTION(get_call_stack), asCALL_CDECL);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->BeginConfigGroup("physics");
