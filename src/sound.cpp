@@ -31,7 +31,6 @@
 #include <utility>
 #include <cstdint>
 #include <miniaudio_libvorbis.h>
-#include <iostream> //Debugging.
 using namespace std;
 
 class sound_impl;
@@ -786,15 +785,6 @@ public:
 class sound_impl final : public mixer_impl, public virtual sound
 {
 	std::string pcm_buffer; // When loading from raw PCM (like TTS) we store the intermediate wav data here so we can take advantage of async loading to return quickly. Makes a substantial difference in the responsiveness of TTS calls.
-	// Always called before associating the object with a new sound.
-	void reset()
-	{
-		if (snd)
-		{
-			close();
-		}
-		snd = make_unique<ma_sound>();
-	}
 
 public:
 	sound_impl(audio_engine *e) : mixer_impl(static_cast<audio_engine_impl *>(e)), pcm_buffer(), sound()
@@ -808,7 +798,11 @@ public:
 	}
 	bool load_special(const std::string &filename, const size_t protocol_slot = 0, directive_t protocol_directive = nullptr, const size_t filter_slot = 0, directive_t filter_directive = nullptr, ma_uint32 ma_flags = MA_SOUND_FLAG_DECODE) override
 	{
-		reset();
+		if (snd)
+		{
+			close();
+		}
+		snd = make_unique<ma_sound>();
 		// The sound service converts our file name into a "tripplet" which includes information about the origin an asset is expected to come from. This guarantees that we don't mistake assets from different origins as the same just because they have the same name.
 		std::string triplet = g_sound_service->prepare_triplet(filename, protocol_slot, protocol_directive, filter_slot, filter_directive);
 		if (triplet.empty())
@@ -846,7 +840,11 @@ public:
 	}
 	bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) override
 	{
-		reset();
+		if (snd)
+		{
+			close();
+		}
+		pcm_buffer.clear();
 		// At least for now, the strat here is just to write the PCM to wav and then load it the normal way.
 		// Should optimization become necessary (this does result in a couple of copies), a protocol could be written that simulates its input having a RIFF header on it.
 		pcm_buffer.resize(size + 44);
