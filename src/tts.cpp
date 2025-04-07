@@ -431,8 +431,9 @@ std::string tts_voice::speak_to_memory(const std::string &text)
 		free(data);
 	return output;
 }
-sound *tts_voice::speak_to_sound(const std::string &text)
+sound *tts_voice::speak_to_sound(const std::string &text, bool unknown_param)
 {
+	(void)unknown_param;
 
 	std::string speech = speak_to_memory(text);
 	if (speech.empty())
@@ -680,7 +681,7 @@ void RegisterTTSVoice(asIScriptEngine *engine)
 	engine->RegisterObjectMethod("tts_voice", "bool speak_to_file(const string& in filename, const string &in text)", asMETHOD(tts_voice, speak_to_file), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool speak_wait(const string &in text, bool interrupt = false)", asMETHOD(tts_voice, speak_wait), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "string speak_to_memory(const string &in text)", asMETHOD(tts_voice, speak_to_memory), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tts_voice", "sound @speak_to_sound(const string &in text)", asMETHOD(tts_voice, speak_to_sound), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tts_voice", "sound @speak_to_sound(const string &in text, bool unknown_param = true)", asMETHOD(tts_voice, speak_to_sound), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool speak_interrupt_wait(const string &in text)", asMETHOD(tts_voice, speak_interrupt_wait), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool refresh()", asMETHOD(tts_voice, refresh), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tts_voice", "bool stop()", asMETHOD(tts_voice, stop), asCALL_THISCALL);
