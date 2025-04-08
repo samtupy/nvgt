@@ -82,6 +82,9 @@ class menu {
 	void add_items(string[]@ item_list) {
 		for (uint i = 0; i < item_list.length(); i++) add_item(item_list[i]);
 	}
+	bool delete_item(int index, bool reset_cursor = true) {
+		return form.delete_list_item(f_list, index, reset_cursor);
+	}
 	// Call this function to produce the intro sequence for the menu. You don't need to call it at all, if you like.
 	void intro() {
 		if (intro_text.empty()) {

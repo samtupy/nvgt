@@ -148,6 +148,8 @@ class stat_set {
 
 	bool delete(const string&in name) { return stats.delete(name); }
 
+	void reset() { stats.delete_all(); }
+
 	stat@ opIndex(const string&in stat_name) const {
 		if (!this.stats.exists(stat_name)) return null;
 		return cast<stat@>(this.stats[stat_name]);
