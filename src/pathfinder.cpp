@@ -304,6 +304,11 @@ void pathfinder::AdjacentCost(void *node, micropather::MPVector<micropather::Sta
 			must_reset = true;
 			continue;
 		}
+		// If we're not allowing diagonals, then diagonals are not neighbours.
+		if (!allow_diagonals && abs((nx + ny + z) - (x + y + z)) != 1)
+		{
+			continue;
+		}
 		float c = get_difficulty(nx, ny, nz, x, y, z);
 		if (c != FLT_MAX)
 			c++;
