@@ -181,6 +181,13 @@ class stat_set {
 		return result;
 	}
 
+	stat@[] get_stats() {	
+		stat@[] r(stats.get_size());
+		string[]@ k = stats.get_keys();
+		for (uint i = 0; i < k.length(); i++) @r[i] = cast<stat@>(stats[k[i]]);
+		return r;
+	}
+
 	bool exists(const string&in stat_name) {return stats.exists(stat_name);}
 
 	string[]@ opImplConv() const {
@@ -229,5 +236,29 @@ class stat_set {
 			else if (t == 3) update(name, ds.read_double());
 		}
 		return true;
+	}
+
+	string serialize_linear() {
+		string output;
+		string[]@ k = stats.get_keys();
+		for (uint i = 0; i < k.length(); i++) {
+			output += k[i] + "=" + string(cast<stat@>(stats[k[i]]).val) + "\n";
+		}
+		return output;
+	}
+
+	bool deserialize_linear(const string&in data) {
+		if (data.empty()) return false;
+		string[]@ ln = data.split("\n");
+		bool found_value = false;
+		for (uint i = 0; i < ln.length(); i++) {
+			string[]@ p = ln[i].split("=");
+			if (p.length() != 2) continue;
+			double number = parse_double(p[1]);
+			if (number != 0 or p[0] == "0") update(p[0], number);
+			else update(p[0], p[1]);
+			found_value = true;
+		}
+		return found_value;
 	}
 }
