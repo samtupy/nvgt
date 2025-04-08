@@ -474,6 +474,7 @@ MA_API ma_result ma_libvorbis_get_cursor_in_pcm_frames(ma_libvorbis* pVorbis, ma
 
 MA_API ma_result ma_libvorbis_get_length_in_pcm_frames(ma_libvorbis* pVorbis, ma_uint64* pLength)
 {
+    ogg_int64_t length;
     if (pLength == NULL) {
         return MA_INVALID_ARGS;
     }
@@ -486,9 +487,16 @@ MA_API ma_result ma_libvorbis_get_length_in_pcm_frames(ma_libvorbis* pVorbis, ma
 
     #if !defined(MA_NO_LIBVORBIS)
     {
-        /* I don't know how to reliably retrieve the length in frames using libvorbis, so returning 0 for now. */
-        *pLength = 0;
-
+        /* Will work in the supermajority of cases where a file has a single logical bitstream. Concatenated streams are much harder to determine the length of since they can have sample rate changes, but they should be extremely rair outside of unseekable livestreams anyway. */
+        if(ov_streams((OggVorbis_File *) pVorbis->vf) == 1)
+        {
+            length = ov_pcm_total((OggVorbis_File *) pVorbis->vf, 0);
+            if(length != OV_EINVAL)
+            {
+                *pLength = length;
+            }
+        }
+        /* Else: stream is unseekable or has more than one bitstream, so just return 0. */
         return MA_SUCCESS;
     }
     #else
