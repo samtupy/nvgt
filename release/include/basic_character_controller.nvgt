@@ -60,6 +60,18 @@ class basic_character_controller {
 			velocity.y = 0.0;
 	}
 
+	public void set_target_yaw(const float value) property {
+		target_yaw = value;
+	}
+
+	public float get_target_yaw() property {
+		return target_yaw;
+	}
+
+	public float get_yaw() property {
+		return yaw;
+	}
+
 	public void update(const float delta_time) final {
 		handle_rotation(delta_time);
 		handle_vertical_movement(delta_time);
@@ -74,15 +86,17 @@ class basic_character_controller {
 		apply_friction(delta_time);
 	}
 
-	public void rotate_to_left_cardinal() {
-		float snapped = nearest_90(yaw) - 90.0;
+	public void rotate_left_by(const float degree, const float step = 2.8125) {
+		const float temp_yaw = yaw - degree;
+		float snapped = snap ? cast<float>(round(temp_yaw / step)) * step : temp_yaw;
 		if (snapped < 0.0) snapped += 360.0;
 		target_yaw = fmodf(snapped, 360.0);
 		update_running_state();
 	}
 
-	public void rotate_to_right_cardinal() {
-		float snapped = nearest_90(yaw) + 90.0;
+	public void rotate_right_by(const float degree, const float step = 2.8125, const bool snap = true) {
+		const float temp_yaw = yaw + degree;
+		float snapped = snap ? cast<float>(round(temp_yaw / step)) * step : temp_yaw;
 		if (snapped < 0.0) snapped += 360.0;
 		target_yaw = fmodf(snapped, 360.0);
 		update_running_state();
@@ -94,8 +108,8 @@ class basic_character_controller {
 		update_running_state();
 	}
 
-	public void realign_to_nearest_90() {
-		const float snapped = nearest_90(yaw);
+	public void realign_to_nearest_degree() {
+		const float snapped = nearest_compass_point(yaw);
 		target_yaw = fmodf(snapped, 360.0);
 	}
 
@@ -523,20 +537,24 @@ string translate_yaw_to_direction(const float yaw) {
 }
 
 float snap_to_degree(const float deg, const float[] snaps) {
-	float result = -90.0;
-	float min_distance = 180;
+	float result = snaps[0];
+	float min_distance = 360.0;
 	const auto len = snaps.length();
 	for (int i = 0; i < len; i++) {
-		const float absolute_distance = abs(deg - snaps[i]);
-		if (min_distance > absolute_distance) {
-			min_distance = absolute_distance;
+		float raw_diff = deg - snaps[i];
+		float normalized_diff = fmodf(raw_diff + 180.0, 360.0);
+		if (normalized_diff < 0.0) normalized_diff += 360.0;
+		normalized_diff -= 180.0;
+		float distance = absf(normalized_diff);
+		if (distance < min_distance) {
+			min_distance = distance;
 			result = snaps[i];
 		}
 	}
 	return result;
 }
 
-float nearest_90(const float deg) {
-	static const float[4] cardinals = {0.0, 90.0, 180.0, 270.0};
-	return snap_to_degree(deg, cardinals);
+float nearest_compass_point(const float deg, const float step = 2.8125) {
+	const float raw = cast<float>(round(deg / step)) * step;
+	return raw - 360.0 * floorf(raw / 360.0);
 }
