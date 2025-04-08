@@ -434,18 +434,13 @@ std::string tts_voice::speak_to_memory(const std::string &text)
 sound *tts_voice::speak_to_sound(const std::string &text, bool unknown_param)
 {
 	(void)unknown_param;
-
+	sound *s = g_audio_engine->new_sound();
 	std::string speech = speak_to_memory(text);
 	if (speech.empty())
 	{
-		return nullptr;
+		return s;
 	}
-	sound *s = g_audio_engine->new_sound();
-	if (!s->load_string_async(speech))
-	{
-		s->release();
-		return nullptr;
-	}
+	s->load_string_async(speech); // Return whether it fails or not.
 	return s;
 }
 bool tts_voice::speak_wait(const std::string &text, bool interrupt)
