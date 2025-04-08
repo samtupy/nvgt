@@ -84,7 +84,7 @@ string get_last_error_text() {
 	return "";
 }
 shared double string_to_number(const string& in num) {
-	return parse_float(num.trim_whitespace_left());
+	return parse_double(num.trim_whitespace_left());
 }
 bool show_game_window(const string& in title) {
 	return show_window(title);
