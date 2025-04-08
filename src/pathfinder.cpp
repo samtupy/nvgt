@@ -51,7 +51,7 @@ pathfinder::pathfinder(int size, bool cache) : gc_flag(false)
 	callback_data = NULL;
 	RefCount = 1;
 	desperation_factor = 0;
-	allow_diagonals = true;
+	allow_diagonals = false;
 	must_reset = false;
 	search_range = 0;
 	abort = false;
@@ -254,10 +254,11 @@ CScriptArray *pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 			reset();
 		return array;
 	}
-	array->Reserve(path.size());
+	array->Reserve(path.size() - 1);
 	reactphysics3d::Vector3 v;
 	int x, y, z;
-	for (int i = 0; i < path.size(); i++)
+	// BGT did not include the starting location here. Changing to match for now; discussion welcome.
+	for (int i = 1; i < path.size(); i++)
 	{
 		decode_state(path[i], &x, &y, &z);
 		v.setAllValues(x, y, z);
