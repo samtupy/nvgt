@@ -19,6 +19,8 @@
 #include <angelscript.h>
 #include <iostream>
 
+#define NVGT_PLUGIN_API_VERSION 1
+
 // Subsystem flags, used for controling access to certain functions during development.
 enum NVGT_SUBSYSTEM {
 	NVGT_SUBSYSTEM_GENERAL = 0x01,
@@ -49,6 +51,7 @@ enum NVGT_SUBSYSTEM {
 typedef const char* t_asGetLibraryVersion();
 typedef const char* t_asGetLibraryOptions();
 typedef asIScriptContext* t_asGetActiveContext();
+typedef int t_asPrepareMultithread(asIThreadManager*);
 typedef void t_asAcquireExclusiveLock();
 typedef void t_asReleaseExclusiveLock();
 typedef void t_asAcquireSharedLock();
@@ -63,9 +66,11 @@ typedef void* t_nvgt_datastream_create(std::ios* stream, const std::string& enco
 typedef std::ios* t_nvgt_datastream_get_ios(void* stream);
 
 typedef struct {
+	int version;
 	t_asGetLibraryVersion* f_asGetLibraryVersion;
 	t_asGetLibraryOptions* f_asGetLibraryOptions;
 	t_asGetActiveContext* f_asGetActiveContext;
+	t_asPrepareMultithread* f_asPrepareMultithread;
 	t_asAcquireExclusiveLock* f_asAcquireExclusiveLock;
 	t_asReleaseExclusiveLock* f_asReleaseExclusiveLock;
 	t_asAcquireSharedLock* f_asAcquireSharedLock;
@@ -78,6 +83,7 @@ typedef struct {
 	t_nvgt_datastream_create* f_nvgt_datastream_create;
 	t_nvgt_datastream_get_ios* f_nvgt_datastream_get_ios;
 	asIScriptEngine* script_engine;
+	asIThreadManager* script_thread_manager;
 	void* user;
 } nvgt_plugin_shared;
 
@@ -91,6 +97,7 @@ typedef bool nvgt_plugin_entry(nvgt_plugin_shared*);
 		t_asGetLibraryVersion* asGetLibraryVersion = NULL;
 		t_asGetLibraryOptions* asGetLibraryOptions = NULL;
 		t_asGetActiveContext* asGetActiveContext = NULL;
+		t_asPrepareMultithread* asPrepareMultithread = NULL;
 		t_asAcquireExclusiveLock* asAcquireExclusiveLock = NULL;
 		t_asReleaseExclusiveLock* asReleaseExclusiveLock = NULL;
 		t_asAcquireSharedLock* asAcquireSharedLock = NULL;
@@ -106,6 +113,7 @@ typedef bool nvgt_plugin_entry(nvgt_plugin_shared*);
 		extern t_asGetLibraryVersion* asGetLibraryVersion;
 		extern t_asGetLibraryOptions* asGetLibraryOptions;
 		extern t_asGetActiveContext* asGetActiveContext;
+		extern t_asPrepareMultithread* asPrepareMultithread;
 		extern t_asAcquireExclusiveLock* asAcquireExclusiveLock;
 		extern t_asReleaseExclusiveLock* asReleaseExclusiveLock;
 		extern t_asAcquireSharedLock* asAcquireSharedLock;
@@ -137,11 +145,13 @@ typedef bool nvgt_plugin_entry(nvgt_plugin_shared*);
 	#endif
 #endif
 // Pass a pointer to an nvgt_plugin_shared structure to this function, making Angelscript available for use in any file that includes nvgt_plugin.h after calling this function.
-inline void prepare_plugin(nvgt_plugin_shared* shared) {
-	#ifndef NVGT_PLUGIN_STATIC // If a static plugin, the following symbols are available by default.
+inline bool prepare_plugin(nvgt_plugin_shared* shared) {
+	if (shared->version != NVGT_PLUGIN_API_VERSION) return false;
+	#ifndef NVGT_PLUGIN_STATIC // If a static plugin, the following symbols are available by default as well as the thread manager.
 	asGetLibraryVersion = shared->f_asGetLibraryVersion;
 	asGetLibraryOptions = shared->f_asGetLibraryOptions;
 	asGetActiveContext = shared->f_asGetActiveContext;
+	asPrepareMultithread = shared->f_asPrepareMultithread;
 	asAcquireExclusiveLock = shared->f_asAcquireExclusiveLock;
 	asReleaseExclusiveLock = shared->f_asReleaseExclusiveLock;
 	asAcquireSharedLock = shared->f_asAcquireSharedLock;
@@ -153,7 +163,9 @@ inline void prepare_plugin(nvgt_plugin_shared* shared) {
 	asFreeMem = shared->f_asFreeMem;
 	nvgt_datastream_create = shared->f_nvgt_datastream_create;
 	nvgt_datastream_get_ios = shared->f_nvgt_datastream_get_ios;
+	asPrepareMultithread(shared->script_thread_manager);
 	#endif
+	return true;
 }
 #else
 #include <ios>
@@ -164,9 +176,11 @@ std::ios* nvgt_datastream_get_ios(void* stream);
 
 // This function prepares an nvgt_plugin_shared structure for passing to a plugins entry point. Sane input expected, no error checking.
 inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* engine, void* user = NULL) {
+	shared->version = NVGT_PLUGIN_API_VERSION;
 	shared->f_asGetLibraryVersion = asGetLibraryVersion;
 	shared->f_asGetLibraryOptions = asGetLibraryOptions;
 	shared->f_asGetActiveContext = asGetActiveContext;
+	shared->f_asPrepareMultithread = asPrepareMultithread;
 	shared->f_asAcquireExclusiveLock = asAcquireExclusiveLock;
 	shared->f_asReleaseExclusiveLock = asReleaseExclusiveLock;
 	shared->f_asAcquireSharedLock = asAcquireSharedLock;
@@ -179,6 +193,7 @@ inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* e
 	shared->f_nvgt_datastream_create = nvgt_datastream_create;
 	shared->f_nvgt_datastream_get_ios = nvgt_datastream_get_ios;
 	shared->script_engine = engine;
+	shared->script_thread_manager = asGetThreadManager();
 	shared->user = user;
 }
 // Forward declarations only needed when compiling for nvgt and not for a plugin, thus the following functions are in nvgt_plugin.cpp.

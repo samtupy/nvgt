@@ -1,0 +1,9 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#pragma plugin test_plugin
+void main() {
+	do_test();
+	do_exception();
+}

@@ -1,0 +1,8 @@
+Import("env")
+
+if ARGUMENTS.get("test_plugin", "0") != "1": Return()
+if ARGUMENTS.get("no_shared_plugins", "0") == "0":
+	env.SharedLibrary("#release/lib/test_plugin", ["test_plugin.cpp"], LIBS = ["user32"])
+static = env.Object("test_plugin_static", "test_plugin.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "systemd_notify")])
+static = env.StaticLibrary("#build/lib/test_plugin", [static])
+Return("static")
