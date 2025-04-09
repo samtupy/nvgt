@@ -165,9 +165,9 @@ float pathfinder::get_difficulty(int x, int y, int z, int parent_x, int parent_y
 	ctx->SetArgDWord(2, z);
 	if (callback_wants_parent)
 	{
-		ctx->SetArgDWord(3, x);
-		ctx->SetArgDWord(4, y);
-		ctx->SetArgDWord(5, z);
+		ctx->SetArgDWord(3, parent_x);
+		ctx->SetArgDWord(4, parent_y);
+		ctx->SetArgDWord(5, parent_y);
 		ctx->SetArgObject(6, callback_data);
 	}
 	else
