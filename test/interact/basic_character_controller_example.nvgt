@@ -7,7 +7,9 @@ character_controller() {
 // Call the base constructore to initialize all the internal state
 super();
 step_sound.load("../data/audio/footstep.ogg");
-acceleration = 5.0;
+acceleration = 1.0;
+deceleration = 1.0;
+walk_step_length = 0.2;
 }
 
 /*
@@ -29,7 +31,7 @@ step_sound.play();
 void main() {
 show_window("Character controller test");
 character_controller@ cc = character_controller();
-float last_time;
+//float last_time;
 while (true) {
 // To turn the character, or tell it to move, we just set these flags. The controller will figure out the rest for us automatically.
 // Remember to set them to false when the key is released -- the controller will NOT do this for you!
@@ -43,10 +45,7 @@ if (key_released(KEY_LEFT)) cc.turn_left = false;
 if (key_released(KEY_RIGHT)) cc.turn_right = false;
 if (key_pressed(KEY_F)) speak(translate_yaw_to_direction(cc.yaw), true);
 if (key_pressed(KEY_ESCAPE)) exit(0);
-const float current_time = float(ticks());
-const float dt = fmax((current_time - last_time) / 1000.0, 0.001);
-last_time = current_time;
-cc.update(dt);
-refresh_window();
+cc.update(0.001);
+wait(1);
 }
 }
