@@ -34,14 +34,12 @@ class stat {
 		if (@user != null) this.user = user;
 	}
 
-	const string opImplConv() {
+	string opImplConv() const {
 		if (@this.callback !is null) return this.callback(this);
 		return name +"=" + string(val);
 	}
 
-	double opConv() {
-		return val;
-	}
+	double opConv() const {return val;}
 
 	var@ opAssign(const string&in value) {
 		return this.val = value;
@@ -188,7 +186,7 @@ class stat_set {
 		return r;
 	}
 
-	bool exists(const string&in stat_name) {return stats.exists(stat_name);}
+	bool exists(const string&in stat_name) const {return stats.exists(stat_name);}
 
 	string[]@ opImplConv() const {
 		string[] res;
