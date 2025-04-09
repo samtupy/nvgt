@@ -1,78 +1,84 @@
 abstract class basic_character_controller {
-	public bool move_forward, move_backward, turn_left, turn_right, strafe_left, strafe_right, jump;
+	bool move_forward, move_backward, turn_left, turn_right, strafe_left, strafe_right, jump;
 	protected bool is_grounded, is_crouching, is_running;
-	public vector position, velocity, forward, up, right;
+	vector position, velocity, forward, up, right;
 	protected vector old_position, old_velocity, old_forward, old_up, old_right;
 	protected float max_speed, walk_speed, run_speed, crouch_speed, acceleration, deceleration, air_control, rotation_speed, current_speed, jump_force, gravity, ground_friction, air_friction, player_height, crouch_height, stand_height, mass, step_distance, distance_traveled, step_cycle, run_step_length, walk_step_length, crouch_step_length, yaw, target_yaw, old_yaw;
-	private const float PI = acosf(-1.0);
+	private float PI = acosf(-1.0);
 
-	public basic_character_controller() {
-		this.position.setToZero();
-		this.velocity.setToZero();
-		this.forward.set(0, 0, 1);
-		this.up.set(0, 1, 0);
-		this.right = up.cross(forward).normalize(); // This is for left-handed coordinate systems, do we need to change this?
-		this.move_forward = false;
-		this.move_backward = false;
-		this.turn_left = false;
-		this.turn_right = false;
-		this.strafe_left = false;
-		this.strafe_right = false;
-		this.jump = false;
-		this.yaw = 0.0;
-		this.target_yaw = yaw;
-		this.max_speed = 100.0;
-		this.walk_speed = 3.0;
-		this.run_speed = 15.0;
-		this.crouch_speed = 1.0;
-		this.acceleration = 2.0;
-		this.deceleration = 2.0;
-		this.air_control = 0.3;
-		this.rotation_speed = 11.25 * PI / 180.0; // Degrees per second
-		this.current_speed = 0.0;
-		this.jump_force = 6.0;
-		this.gravity = 9.81;
-		this.ground_friction = 6.0;
-		this.air_friction = 0.5;
-		this.is_grounded = true;
-		this.is_crouching = false;
-		this.is_running = false;
-		this.player_height = 1.8;
-		this.crouch_height = 1.0;
-		this.stand_height = 1.8;
-		this.mass = 80.0; // kg
-		this.step_distance = 0.0;
-		this.distance_traveled = 0.0;
-		this.step_cycle = 0.0;
-		this.run_step_length = 0.7;
-		this.walk_step_length = 0.5;
-		this.crouch_step_length = 0.3;
+	basic_character_controller() {
+		position.setToZero();
+		velocity.setToZero();
+		forward.set(0, 0, 1);
+		up.set(0, 1, 0);
+		// This is for left-handed coordinate systems, do we need to change this?
+		right = up.cross(forward);
+		right.normalize();
+		move_forward = false;
+		move_backward = false;
+		turn_left = false;
+		turn_right = false;
+		strafe_left = false;
+		strafe_right = false;
+		jump = false;
+		yaw = 0.0;
+		target_yaw = yaw;
+		max_speed = 100.0;
+		walk_speed = 3.0;
+		run_speed = 15.0;
+		crouch_speed = 1.0;
+		acceleration = 2.0;
+		deceleration = 2.0;
+		air_control = 0.3;
+		rotation_speed = 11.25 * PI / 180.0; // Degrees per second
+		current_speed = 0.0;
+		jump_force = 6.0;
+		gravity = 9.81;
+		ground_friction = 6.0;
+		air_friction = 0.5;
+		is_grounded = true;
+		is_crouching = false;
+		is_running = false;
+		player_height = 1.8;
+		crouch_height = 1.0;
+		stand_height = 1.8;
+		mass = 80.0; // kg
+		step_distance = 0.0;
+		distance_traveled = 0.0;
+		step_cycle = 0.0;
+		run_step_length = 0.7;
+		walk_step_length = 0.5;
+		crouch_step_length = 0.3;
 	}
 
-	public void toggle_crouch() final {
+	void toggle_crouch() final {
 		is_crouching = !is_crouching;
-		height = is_crouching ? crouch_height : stand_height;
+		player_height = is_crouching ? crouch_height : stand_height;
 	}
 
-	public void set_grounded(const bool grounded) property final {
+	void set_grounded(const bool grounded) property final {
 		is_grounded = grounded;
 		if (is_grounded && velocity.y < 0.0)
 			velocity.y = 0.0;
 	}
 
-	public void set_target_yaw(const float value) property {
+	void set_target_yaw(const float value) property {
 		target_yaw = value;
 	}
 
-	public float get_target_yaw() property {
+	float get_target_yaw() property {
 		return target_yaw;
 	}
 
-	public float get_yaw() property {
+	float get_yaw() property {
 		return yaw;
 	}
 
-	public void update(const float delta_time) final {
+	private void set_yaw(const float value) property {
+		yaw = value;
+	}
+
+	void update(const float delta_time) final {
 		handle_rotation(delta_time);
 		handle_vertical_movement(delta_time);
 		handle_horizontal_movement(delta_time);
@@ -86,31 +92,31 @@ abstract class basic_character_controller {
 		apply_friction(delta_time);
 	}
 
-	public void rotate_left_by(const float degree, const float step = 2.8125) final {
+	void rotate_left_by(const float degree, const float step = 2.8125, const bool snap = false) final {
 		const float temp_yaw = yaw - degree;
-		float snapped = snap ? cast<float>(round(temp_yaw / step)) * step : temp_yaw;
+		float snapped = snap ? float(round(double(temp_yaw / step), 5)) * step : temp_yaw;
 		if (snapped < 0.0) snapped += 360.0;
-		target_yaw = fmodf(snapped, 360.0);
+		target_yaw = fmod(snapped, 360.0);
 		update_running_state();
 	}
 
-	public void rotate_right_by(const float degree, const float step = 2.8125, const bool snap = true) final {
+	void rotate_right_by(const float degree, const float step = 2.8125, const bool snap = true) final {
 		const float temp_yaw = yaw + degree;
-		float snapped = snap ? cast<float>(round(temp_yaw / step)) * step : temp_yaw;
+		float snapped = snap ? float(round(double(temp_yaw / step), 5)) * step : temp_yaw;
 		if (snapped < 0.0) snapped += 360.0;
-		target_yaw = fmodf(snapped, 360.0);
+		target_yaw = fmod(snapped, 360.0);
 		update_running_state();
 	}
 
-	public void turn_around() final {
+	void turn_around() final {
 		target_yaw = yaw + 180.0;
 		if (target_yaw >= 360.0) target_yaw -= 360.0;
 		update_running_state();
 	}
 
-	public void realign_to_nearest_degree() final {
+	void realign_to_nearest_degree() final {
 		const float snapped = nearest_compass_point(yaw);
-		target_yaw = fmodf(snapped, 360.0);
+		target_yaw = fmod(snapped, 360.0);
 	}
 
 	protected void handle_rotation(const float dt) final {
@@ -138,7 +144,8 @@ abstract class basic_character_controller {
 		forward.x = sinf(yaw * PI / 180.0);
 		forward.y = 0.0;
 		forward.z = cosf(yaw * PI / 180.0);
-		right = up.cross(forward).normalized();
+		right = up.cross(forward);
+		right.normalize();
 		if (!on_rotation_changed()) {
 			yaw = old_yaw;
 			forward = old_forward;
@@ -178,14 +185,14 @@ abstract class basic_character_controller {
 			direction.normalize();
 			const float target_speed = get_target_speed();
 			const float effective_acceleration = is_grounded ? acceleration : (acceleration * air_control);
-			current_speed = min(current_speed + effective_acceleration * dt, target_speed);
+			current_speed = fmin(current_speed + effective_acceleration * dt, target_speed);
 			vector horizontal_velocity = direction * current_speed;
 			velocity.x = horizontal_velocity.x;
 			velocity.z = horizontal_velocity.z;
 		}
 		if (!on_horizontal_movement()) {
 			velocity = old_velocity;
-			if (move_forwward) move_forward = false;
+			if (move_forward) move_forward = false;
 			if (move_backward) move_backward = false;
 			if (strafe_left) strafe_left = false;
 			if (strafe_right) strafe_right = false;
@@ -215,7 +222,7 @@ abstract class basic_character_controller {
 			} else {
 				const float vx = velocity.x;
 				const float vz = velocity.z;
-				const float length = sqrt(vx * vx + vz * vz);
+				const float length = sqrtf(vx * vx + vz * vz);
 				if (length > 0.0001f) {
 					velocity.x = (vx / length) * current_speed;
 					velocity.z = (vz / length) * current_speed;
@@ -534,7 +541,7 @@ string translate_yaw_to_direction(const float yaw) {
 		"North by West Three Quarter North"
 	};
 	assert(yaw >= 0.0 && yaw <= 360.0);
-	const auto idx = cast<uint>(floor(yaw / 2.8125));
+	const auto idx = floorf(yaw / 2.8125);
 	return DIRECTIONS[idx < 0 ? 0 : idx > 127 ? 127 : idx];
 }
 
@@ -544,7 +551,7 @@ float snap_to_degree(const float deg, const float[] snaps) {
 	const auto len = snaps.length();
 	for (int i = 0; i < len; i++) {
 		float raw_diff = deg - snaps[i];
-		float normalized_diff = fmodf(raw_diff + 180.0, 360.0);
+		float normalized_diff = fmod(raw_diff + 180.0, 360.0);
 		if (normalized_diff < 0.0) normalized_diff += 360.0;
 		normalized_diff -= 180.0;
 		float distance = absf(normalized_diff);
@@ -557,6 +564,6 @@ float snap_to_degree(const float deg, const float[] snaps) {
 }
 
 float nearest_compass_point(const float deg, const float step = 2.8125) {
-	const float raw = cast<float>(round(deg / step)) * step;
+	const float raw = float(round(double(deg / step), 5)) * step;
 	return raw - 360.0 * floorf(raw / 360.0);
 }
