@@ -1,9 +1,9 @@
-class basic_character_controller {
+abstract class basic_character_controller {
 	public bool move_forward, move_backward, turn_left, turn_right, strafe_left, strafe_right, jump;
-	private bool is_grounded, is_crouching, is_running;
+	protected bool is_grounded, is_crouching, is_running;
 	public vector position, velocity, forward, up, right;
-	private vector old_position, old_velocity, old_forward, old_up, old_right;
-	private float max_speed, walk_speed, run_speed, crouch_speed, acceleration, deceleration, air_control, rotation_speed, current_speed, jump_force, gravity, ground_friction, air_friction, player_height, crouch_height, stand_height, mass, step_distance, distance_traveled, step_cycle, run_step_length, walk_step_length, crouch_step_length, yaw, target_yaw, old_yaw;
+	protected vector old_position, old_velocity, old_forward, old_up, old_right;
+	protected float max_speed, walk_speed, run_speed, crouch_speed, acceleration, deceleration, air_control, rotation_speed, current_speed, jump_force, gravity, ground_friction, air_friction, player_height, crouch_height, stand_height, mass, step_distance, distance_traveled, step_cycle, run_step_length, walk_step_length, crouch_step_length, yaw, target_yaw, old_yaw;
 	private const float PI = acosf(-1.0);
 
 	public basic_character_controller() {
@@ -49,12 +49,12 @@ class basic_character_controller {
 		this.crouch_step_length = 0.3;
 	}
 
-	public void toggle_crouch() {
+	public void toggle_crouch() final {
 		is_crouching = !is_crouching;
 		height = is_crouching ? crouch_height : stand_height;
 	}
 
-	public void set_grounded(const bool grounded) property {
+	public void set_grounded(const bool grounded) property final {
 		is_grounded = grounded;
 		if (is_grounded && velocity.y < 0.0)
 			velocity.y = 0.0;
@@ -86,7 +86,7 @@ class basic_character_controller {
 		apply_friction(delta_time);
 	}
 
-	public void rotate_left_by(const float degree, const float step = 2.8125) {
+	public void rotate_left_by(const float degree, const float step = 2.8125) final {
 		const float temp_yaw = yaw - degree;
 		float snapped = snap ? cast<float>(round(temp_yaw / step)) * step : temp_yaw;
 		if (snapped < 0.0) snapped += 360.0;
@@ -94,7 +94,7 @@ class basic_character_controller {
 		update_running_state();
 	}
 
-	public void rotate_right_by(const float degree, const float step = 2.8125, const bool snap = true) {
+	public void rotate_right_by(const float degree, const float step = 2.8125, const bool snap = true) final {
 		const float temp_yaw = yaw + degree;
 		float snapped = snap ? cast<float>(round(temp_yaw / step)) * step : temp_yaw;
 		if (snapped < 0.0) snapped += 360.0;
@@ -102,18 +102,18 @@ class basic_character_controller {
 		update_running_state();
 	}
 
-	public void turn_around() {
+	public void turn_around() final {
 		target_yaw = yaw + 180.0;
 		if (target_yaw >= 360.0) target_yaw -= 360.0;
 		update_running_state();
 	}
 
-	public void realign_to_nearest_degree() {
+	public void realign_to_nearest_degree() final {
 		const float snapped = nearest_compass_point(yaw);
 		target_yaw = fmodf(snapped, 360.0);
 	}
 
-	private void handle_rotation(const float dt) {
+	protected void handle_rotation(const float dt) final {
 		old_yaw = yaw;
 		old_forward = forward;
 		old_right = right;
@@ -149,7 +149,7 @@ class basic_character_controller {
 		}
 	}
 
-	private void handle_vertical_movement(const float dt) {
+	protected void handle_vertical_movement(const float dt) final {
 		old_velocity = velocity;
 		velocity.y -= gravity * dt;
 		if (jump && is_grounded) {
@@ -162,7 +162,7 @@ class basic_character_controller {
 		}
 	}
 
-	private void handle_horizontal_movement(const float dt) {
+	protected void handle_horizontal_movement(const float dt) final {
 		old_velocity = velocity;
 		vector direction;
 		if (move_forward)
@@ -192,7 +192,7 @@ class basic_character_controller {
 		}
 	}
 
-	private float get_target_speed() const {
+	protected float get_target_speed() const {
 		if (!is_grounded)
 			return (is_running ? run_speed : walk_speed) * air_control;
 		if (is_crouching)
@@ -200,7 +200,7 @@ class basic_character_controller {
 		return is_running ? run_speed : walk_speed;
 	}
 
-	private void apply_friction(const float dt) {
+	protected void apply_friction(const float dt) final {
 		old_velocity = velocity;
 		const bool no_horizontal_movement = !(move_forward || move_backward || strafe_left || strafe_right);
 		if (no_horizontal_movement && current_speed > 0.0) {
@@ -210,7 +210,7 @@ class basic_character_controller {
 				current_speed = 0.0;
 				velocity.x = 0;
 				velocity.z = 0;
-				if (!old_friction_applied())
+				if (!on_friction_applied())
 					old_velocity = velocity;
 			} else {
 				const float vx = velocity.x;
@@ -226,7 +226,7 @@ class basic_character_controller {
 		}
 	}
 
-	private void update_step_cycle(const float distance_moved) {
+	protected void update_step_cycle(const float distance_moved) final {
 		if (!is_grounded)
 			return;
 		distance_traveled += distance_moved;
@@ -238,26 +238,26 @@ class basic_character_controller {
 		step_cycle = distance_traveled / step_length;
 	}
 
-	private float get_step_length() const {
+	protected float get_step_length() const {
 		if (is_crouching)
 			return crouch_step_length;
 		return is_running ? run_step_length : walk_step_length;
 	}
 
-	public void update_running_state() {
+	protected void update_running_state() final {
 		const bool has_horizontal_movement = (move_forward || move_backward || strafe_left || strafe_right);
 		if (is_crouching) {
 			is_running = false;
 			return;
 		}
 		if (has_horizontal_movement) {
-			// is_running = true; // Uncomment if you want your player to run, not walk
+			is_running = should_run();
 			return;
 		}
 	}
 
 	// Callbacks
-	public bool on_position_changed() {
+	protected bool on_position_changed() {
 		if (position.y < 0.0) {
 			position.y = 0.0;
 			velocity.y = 0.0;
@@ -265,11 +265,13 @@ class basic_character_controller {
 		}
 		return true;
 	}
-	public bool on_rotation_changed() { return true; }
-	public bool on_vertical_movement() { return true; }
-	public bool on_horizontal_movement() { return true; }
-	public bool on_friction_applied() { return true; }
-	public void on_step_cycle() { }
+
+	protected bool on_rotation_changed() { return true; }
+	protected bool on_vertical_movement() { return true; }
+	protected bool on_horizontal_movement() { return true; }
+	protected bool on_friction_applied() { return true; }
+	protected void on_step_cycle() { }
+	protected bool should_run() { return false; }
 }
 
 string translate_yaw_to_direction(const float yaw) {
