@@ -81,7 +81,7 @@ class pathfinder : public micropather::Graph
 	bool abort;
 	bool must_reset;
 	bool gc_flag;
-	bool cache; // Because Micropather doesn't expose a method to determine if path caching is enabled.
+	bool cache; // Because Micropather doesn't expose a method to determine if path caching is enabled, and disabling of cache should disable our local cache too.
 	bool callback_wants_parent;
 
 public:

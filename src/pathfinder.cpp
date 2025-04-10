@@ -167,7 +167,7 @@ float pathfinder::get_difficulty(int x, int y, int z, int parent_x, int parent_y
 	{
 		ctx->SetArgDWord(3, parent_x);
 		ctx->SetArgDWord(4, parent_y);
-		ctx->SetArgDWord(5, parent_y);
+		ctx->SetArgDWord(5, parent_z);
 		ctx->SetArgObject(6, callback_data);
 	}
 	else
@@ -227,7 +227,7 @@ CScriptArray *pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 		return array;
 	if (search_range > 0 && allow_diagonals && hypot(end_x - start_x, end_y - start_y, end_z - start_z) > search_range || search_range > 0 && !allow_diagonals && (abs(end_x - start_x) + abs(end_y - start_y) + abs(end_z - start_z)) > search_range)
 		return array;
-	if (automatic_reset)
+	if (automatic_reset || !cache)
 		reset();
 	callback_data = data;
 	if (data)
@@ -305,7 +305,7 @@ void pathfinder::AdjacentCost(void *node, micropather::MPVector<micropather::Sta
 			continue;
 		}
 		// If we're not allowing diagonals, then diagonals are not neighbours.
-		if (!allow_diagonals && abs((nx + ny + z) - (x + y + z)) != 1)
+		if (!allow_diagonals && abs(((abs(nx) + abs(ny) + abs(nz)) - (abs(x) + abs(y) + abs(z)))) != 1)
 		{
 			continue;
 		}
