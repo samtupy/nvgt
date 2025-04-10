@@ -30,6 +30,92 @@
 #include <Poco/Format.h>
 #include <SDL3/SDL.h>
 #endif
+#include <limits>
+#include <miniaudio.h>
+// Normalize TTS.
+// Size is in samples (not frames or bytes).
+template <class t>
+static void tts_normalize(t *data, unsigned long size_in_samples)
+{
+	t max_value = 0;
+	for (unsigned long i = 0; i < size_in_samples; i++)
+	{
+		max_value = std::max<t>(max_value, abs(data[i]));
+	}
+	double scalar = (double)std::numeric_limits<t>::max() / (double)max_value;
+	for (unsigned long i = 0; i < size_in_samples; i++)
+	{
+		int64_t sample = data[i] * scalar;
+		data[i] = (t)sample;
+	}
+}
+// Trim prenormalized TTS based on minimum threshholds in dB.
+// Size is in frames.
+template <class t>
+t *tts_trim_internal(t *data, unsigned long *size_in_frames, int channels, float begin_db, float end_db)
+{
+	tts_normalize<t>(data, *size_in_frames * channels);
+	t min_begin_sample = std::ceil(ma_volume_db_to_linear(begin_db) * (double)std::numeric_limits<t>::max());
+	t min_end_sample = std::ceil(ma_volume_db_to_linear(end_db) * (double)std::numeric_limits<t>::max());
+	for (unsigned long i = 0; i < *size_in_frames; i++)
+	{
+		double mean = 0;
+		for (int c = 0; c < channels; c++)
+		{
+			mean += abs(data[(i * channels) + c]);
+		}
+		mean /= channels;
+		if (mean >= min_begin_sample)
+		{
+			*size_in_frames -= i;
+			data += i * channels;
+			break;
+		}
+	}
+	for (unsigned long i = *size_in_frames - 1; i >= 0; i--)
+	{
+		double mean = 0;
+		for (int c = 0; c < channels; c++)
+		{
+			mean += abs(data[(i * channels) + c]);
+		}
+		mean /= channels;
+		if (mean > 0)
+		{
+		}
+
+		if (mean > min_end_sample)
+		{
+			if (i < *size_in_frames - 1)
+			{
+				i++;
+			}
+			*size_in_frames -= (*size_in_frames - i);
+			break;
+		}
+	}
+	return data;
+}
+static char *tts_trim(char *data, unsigned long *size, int bps, int channels, float begin_db = -60, float end_db = -60)
+{
+	unsigned long size_in_frames;
+	switch (bps)
+	{
+	case 16:
+		size_in_frames = *size / 2 / channels;
+		data = (char *)tts_trim_internal<int16_t>((int16_t *)data, &size_in_frames, channels, begin_db, end_db);
+		*size = size_in_frames * 2 * channels;
+		return data;
+	case 8:
+		size_in_frames = *size / channels;
+		data = tts_trim_internal<char>(data, &size_in_frames, channels, begin_db, end_db);
+		*size = size_in_frames * channels;
+		return data;
+	default:
+		return data;
+	}
+}
+// Unused; left here for reference.
 static char *minitrim(char *data, unsigned long *size, int bitrate, int channels, int begin_threshold = 512, int end_threshold = 128)
 {
 	int samplesPerFrame = channels * (bitrate / 8);
@@ -319,7 +405,7 @@ bool tts_voice::speak(const std::string &text, bool interrupt)
 	}
 	if (!data)
 		return false;
-	char *ptr = minitrim(data, &bufsize, bitrate, channels);
+	char *ptr = tts_trim(data, &bufsize, bitrate, channels);
 	soundptr s(g_audio_engine->new_sound());
 	bool ret = s->load_pcm(ptr, bufsize, bitrate == 16 ? ma_format_s16 : ma_format_u8, samprate, channels);
 	if (voice_index == builtin_index)
@@ -369,7 +455,7 @@ bool tts_voice::speak_to_file(const std::string &filename, const std::string &te
 	else
 		return false;
 #endif
-	char *ptr = minitrim(data, &bufsize, bitrate, channels);
+	char *ptr = tts_trim(data, &bufsize, bitrate, channels);
 	FILE *f = fopen(filename.c_str(), "wb");
 	if (!f)
 		return false;
@@ -420,7 +506,7 @@ std::string tts_voice::speak_to_memory(const std::string &text)
 #endif
 	if (!data)
 		return "";
-	char *ptr = minitrim(data, &bufsize, bitrate, channels);
+	char *ptr = tts_trim(data, &bufsize, bitrate, channels);
 	std::string output;
 	output.resize(bufsize + 44);
 	if (!sound::pcm_to_wav(ptr, bufsize, bitrate == 16 ? ma_format_s16 : ma_format_u8, samprate, channels, &output[0]))
