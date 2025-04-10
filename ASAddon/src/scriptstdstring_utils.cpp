@@ -54,7 +54,7 @@ static CScriptArray *StringSplit(const string &delim, bool full, bool allow_blan
 			array->Reserve(reserved);
 		}
 		// Add the part to the array
-		if (allow_blanks || pos - prev > 1)
+		if (allow_blanks || pos - prev > 0)
 		{
 			array->Resize(array->GetSize() + 1);
 			((string *)array->At(count))->assign(&str[prev], pos - prev);
