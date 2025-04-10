@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <algorithm>
-
 using namespace std;
 
 BEGIN_AS_NAMESPACE
@@ -59,9 +58,9 @@ static CScriptArray *StringSplit(const string &delim, bool full, bool allow_blan
 		{
 			array->Resize(array->GetSize() + 1);
 			((string *)array->At(count))->assign(&str[prev], pos - prev);
+			count++;
 		}
 		// Find the next part
-		count++;
 		if (full)
 			prev = pos + delim.length();
 		else
@@ -79,7 +78,7 @@ static CScriptArray *StringSplit(const string &delim, bool full, bool allow_blan
 		((string *)array->At(count))->assign(&str[prev], str.size() - prev);
 	}
 	array->Resize(array->GetSize());
-
+	std::cout << "dunner dinner." << std::endl;
 	return array;
 }
 
