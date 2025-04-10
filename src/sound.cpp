@@ -1497,8 +1497,13 @@ void mixer::AddRef() {
 	asAtomicInc(RefCount);
 }
 void mixer::Release() {
-	if (asAtomicDec(RefCount) < 1)
+	if (asAtomicDec(RefCount) < 1) {
+		if (channel) {
+			BASS_StreamFree(channel); // Apparently I was having a problem with extraneous calls to BASS_StreamFree when trying to do it in mixer destructor years ago, since miniaudio switch iminent we'll just leave this here rather than figuring out what I was doing wrong back then.
+			channel = 0;
+		}
 		delete this;
+	}
 }
 
 int mixer::get_data(const unsigned char* buffer, int bufsize) {
