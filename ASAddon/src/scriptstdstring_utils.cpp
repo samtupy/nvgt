@@ -78,7 +78,6 @@ static CScriptArray *StringSplit(const string &delim, bool full, bool allow_blan
 		((string *)array->At(count))->assign(&str[prev], str.size() - prev);
 	}
 	array->Resize(array->GetSize());
-	std::cout << "dunner dinner." << std::endl;
 	return array;
 }
 
