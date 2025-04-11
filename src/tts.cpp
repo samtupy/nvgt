@@ -37,12 +37,14 @@
 template <class t>
 static void tts_normalize(t *data, unsigned long size_in_samples)
 {
+	// We'll target -1dB to leave some headroom for resampling. Otherwise, at least with Eloquence, we clip from time to time.
+	t safe_limit = (t)(ma_volume_db_to_linear(-1) * std::numeric_limits<t>::max());
 	t max_value = 0;
 	for (unsigned long i = 0; i < size_in_samples; i++)
 	{
 		max_value = std::max<t>(max_value, abs(data[i]));
 	}
-	double scalar = (double)std::numeric_limits<t>::max() / (double)max_value;
+	double scalar = (double)safe_limit / (double)max_value;
 	for (unsigned long i = 0; i < size_in_samples; i++)
 	{
 		int64_t sample = data[i] * scalar;
