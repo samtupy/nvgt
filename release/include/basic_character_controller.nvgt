@@ -114,8 +114,8 @@ abstract class basic_character_controller {
 		update_running_state();
 	}
 
-	void realign_to_nearest_degree() final {
-		const float snapped = nearest_compass_point(yaw);
+	void realign_to_nearest_degree(const float step=2.8125) final {
+		const float snapped = nearest_compass_point(yaw, step);
 		target_yaw = fmod(snapped, 360.0);
 	}
 
