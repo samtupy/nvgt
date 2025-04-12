@@ -31,10 +31,11 @@
 #include <utility>
 #include <cstdint>
 #include <miniaudio_libvorbis.h>
+#include <iostream>
 using namespace std;
 
 class sound_impl;
-
+void wait(int ms);
 // Globals, currently NVGT does not support instanciating multiple miniaudio contexts and NVGT provides a global sound engine.
 static ma_context g_sound_context;
 audio_engine *g_audio_engine = nullptr;
@@ -809,8 +810,22 @@ public:
 		{
 			return false;
 		}
-
-		g_soundsystem_last_error = ma_sound_init_from_file(engine->get_ma_engine(), triplet.c_str(), ma_flags, nullptr, nullptr, &*snd);
+		/*
+		MiniAudio currently returns an error code of MA_OUT_OF_MEMORY (-4) if sound initialization fails due to the job queue being at capacity.
+		IMHO this is a poor choice of error code; MA_BUSY would be better as it conveys the temporary nature of the situation.
+		I'll raise an issue with MA to see if he'd be okay with this change. For now we'll just wait a few milliseconds for the backlog to clear and fail permanently if we see multiple MA_OUT_OF_MEMORY conditions back  to back. This should give the job queue time
+		*/
+		for (int i = 0; i < 10; i++)
+		{
+			g_soundsystem_last_error = ma_sound_init_from_file(engine->get_ma_engine(), triplet.c_str(), ma_flags, nullptr, nullptr, &*snd);
+			if (g_soundsystem_last_error == MA_OUT_OF_MEMORY)
+			{
+				// See above; this is probably job queue backlog rather than an actual out of memory. Take a break and try again.
+				wait(5);
+				continue;
+			}
+			break; // Don't retry any other failure case.
+		}
 
 		if (g_soundsystem_last_error != MA_SUCCESS)
 			snd.reset();
