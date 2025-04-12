@@ -91,13 +91,14 @@ class toml {
 			}
 			else if (oneval.is_digits())
 				t.set(key, parse_int(oneval));
+			else if (value.lower() == "true" || value.lower() == "false")
+				t.set(key, ((value.lower() == "true" ? true : false)));
 			else if (value.starts_with("[") && value.ends_with("]")) {
 				string[] va = value.split(",");
 				if (value.find('"') > -1) va = value.split('",');
 				if (va.length() < 1) continue;
 				t.set(key, va);
-			} else if (value.lower() == "true" || value.lower() == "false")
-				t.set(key, (value.lower() == "true" ? true : false));
+			}
 		}
 	}
 	string[] get_keys(string name, bool all = false) {
@@ -129,7 +130,7 @@ class toml {
 	}
 	bool set(string section, string key = "", any@ value = null) {
 		toml_section@ t = this.initialize_section(section, true);
-		return @t != null && key != "" && @value != null && t.set(key, value);
+		return @t != null && key != "" && t.set(key, value);
 	}
 	int get_section_index(string section) property {
 		if (this.sections.length() < 1) return -1;
@@ -161,9 +162,11 @@ class toml_section {
 		string vstr;
 		double vdouble;
 		int vint;
+		bool vbool;
 		if (v.retrieve(vstr)) this.data.set(key, vstr);
 		else if (v.retrieve(vdouble)) this.data.set(key, vdouble);
 		else if (v.retrieve(vint)) this.data.set(key, vint);
+		else if (v.retrieve(vbool)) this.data.set(key, vbool);
 		else r = false;
 		return r;
 	}
@@ -180,9 +183,11 @@ class toml_section {
 		string vstr;
 		double vdouble;
 		int vint;
+		bool vbool;
 		if (this.data.get(key, vstr)) return vstr;
 		else if (this.data.get(key, vdouble)) return vdouble;
 		else if (this.data.get(key, vint)) return vint;
+		else if (this.data.get(key, vbool)) return vbool;
 		else return def;
 	}
 	bool remove(string key) {
@@ -207,7 +212,7 @@ class toml_section {
 		if (head && this.name != "") final += "%0[%1]\n".format(indenthead, this.name);
 		string[] k = this.keys;
 		for (uint a = 0; a < k.length(); a++) {
-			var@ v = this.get(k[a], 0);
+			var@ v = this.get(k[a]);
 			if (@v is null) continue;
 			string[] vals = {string(v)};
 			if (v.is_string) vals = {'"', v, '"'};

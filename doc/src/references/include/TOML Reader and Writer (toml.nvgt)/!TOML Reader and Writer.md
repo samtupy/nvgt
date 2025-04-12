@@ -8,4 +8,4 @@ This is a class designed to read and write TOML configuration files.
 - Strings.
 - Intagers.
 - Floatingpoints.
-- Boolians.
+- Booleans.
