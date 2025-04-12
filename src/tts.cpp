@@ -20,8 +20,6 @@
 #ifdef __APPLE__
 #include "apple.h"
 #endif
-#define riffheader_impl
-#include "riffheader.h"
 #include "tts.h"
 #include "UI.h"
 #ifdef __ANDROID__
@@ -32,6 +30,7 @@
 #endif
 #include <limits>
 #include <miniaudio.h>
+#include <poco/FileStream.h>
 // Normalize TTS.
 // Size is in samples (not frames or bytes).
 template <class t>
@@ -419,55 +418,22 @@ bool tts_voice::speak(const std::string &text, bool interrupt)
 }
 bool tts_voice::speak_to_file(const std::string &filename, const std::string &text)
 {
-	if (text == "" || filename == "")
-		return false;
-	char *data;
-	unsigned long bufsize;
-	if (voice_index == builtin_index)
+	try
 	{
-		if (samprate != 48000 || bitrate != 16 || channels != 2)
+		std::string output = speak_to_memory(text);
+		if (text.empty())
 		{
-			samprate = 48000;
-			bitrate = 16;
-			channels = 2;
+			return false;
 		}
-		int samples;
-		data = (char *)speech_gen(&samples, text.c_str(), NULL);
-		bufsize = samples * 4;
+		Poco::FileOutputStream fos(filename, std::ios_base::out);
+		fos.write((const char *)output.data(), output.size());
+		fos.close();
+		return true;
 	}
-#ifdef _WIN32
-	else
+	catch (std::exception &)
 	{
-		if (!inst && !refresh())
-			return FALSE;
-		data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
-		if ((inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels))
-		{
-			samprate = inst->sample_rate;
-			bitrate = inst->bits_per_sample;
-			channels = inst->channels;
-		}
-	}
-#elif defined(__APPLE__)
-	else
-	{
-		return false; // not implemented yet.
-	}
-#elif defined(__ANDROID__)
-	else
 		return false;
-#endif
-	char *ptr = tts_trim(data, &bufsize, bitrate, channels);
-	FILE *f = fopen(filename.c_str(), "wb");
-	if (!f)
-		return false;
-	wav_header h = make_wav_header(44 + bufsize, samprate, bitrate, channels);
-	fwrite(&h, 1, sizeof(wav_header), f);
-	fwrite(ptr, bufsize, 1, f);
-	fclose(f);
-	if (voice_index == builtin_index)
-		free(data);
-	return true;
+	}
 }
 std::string tts_voice::speak_to_memory(const std::string &text)
 {
