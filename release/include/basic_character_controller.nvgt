@@ -1,4 +1,4 @@
-abstract class basic_character_controller {
+shared abstract class basic_character_controller {
 	bool move_forward, move_backward, turn_left, turn_right, strafe_left, strafe_right, jump;
 	protected bool is_grounded, is_crouching, is_running;
 	vector position, velocity, forward, up, right;
@@ -281,7 +281,7 @@ abstract class basic_character_controller {
 	protected bool should_run() { return false; }
 }
 
-string translate_yaw_to_direction(const float yaw) {
+shared string translate_yaw_to_direction(const float yaw) {
 	const string[] DIRECTIONS = {
 		// 0   [0.0 .. 2.8125)
 		"North",
@@ -545,7 +545,7 @@ string translate_yaw_to_direction(const float yaw) {
 	return DIRECTIONS[idx < 0 ? 0 : idx > 127 ? 127 : idx];
 }
 
-float snap_to_degree(const float deg, const float[] snaps) {
+shared float snap_to_degree(const float deg, const float[] snaps) {
 	float result = snaps[0];
 	float min_distance = 360.0;
 	const auto len = snaps.length();
@@ -563,7 +563,7 @@ float snap_to_degree(const float deg, const float[] snaps) {
 	return result;
 }
 
-float nearest_compass_point(const float deg, const float step = 2.8125) {
+shared float nearest_compass_point(const float deg, const float step = 2.8125) {
 	const float raw = float(round(double(deg / step), 5)) * step;
 	return raw - 360.0 * floorf(raw / 360.0);
 }
