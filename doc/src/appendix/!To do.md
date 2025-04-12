@@ -74,7 +74,7 @@ No work has been done here yet, but a goal of ours is to utilize sdl / sdlttf to
 
 ### wrap more of Poco
 Poco is a massive library with many useful classes that touch on many areas, from networking to a process launcher to our datetime facility to several other utilities. We want to wrap much more of this library, including but not limited to:
-* configuration facility, it supports various formats and is extensable
+* configuration facility, it supports various formats and is extensible.
 * SMTP, we can send emails directly from nvgt game servers if we wrap this.
 * more sockets, we've registered raw tcp socket and web_socket, we should register the datagram socket, dialog socket, raw socket and more, though some are pretty low priority.
 * ProcessRunner and pipes or at least something similar to it, people want to capture process output.
@@ -89,7 +89,7 @@ While the current audio form will always be here for backwards compatibility, it
 The input_box function is currently only implemented on Windows and MacOS, we need to get it working on all platforms.
 
 ### reactphysics3d
-We're working on integrating a physics engine into NVGT for much more advanced games. There are many of these out there, we chose reactphysics3d because it builds on all of our desired platforms, it's not utterly massive, it seems to contain many of the features we can imagine needing and it does not come with a huge learning curb. Much work has been put into implementing reactphysics, though  most of it is on a different branch at this time called rp3d.
+We're working on integrating a physics engine into NVGT for much more advanced games. There are many of these out there, we chose reactphysics3d because it builds on all of our desired platforms, it's not utterly massive, it seems to contain many of the features we can imagine needing, and it does not come with a huge learning curve. Much work has been put into implementing reactphysics, though  most of it is on a different branch at this time called rp3d.
 
 ### tts_voice parameter scaling
 In bgt, tts_voice parameters went from -10 to 10 for rate and pitch, and -100 to 0 for volume. However in NVGT, this currently differs per platform. We need to set up a couple of conversion functions that make bgt's old values work across the board, though possibly in floatingpoint so as to give NVGT users more precision if they desire it.
@@ -108,7 +108,6 @@ Currently nvgt's official installers are unsigned and I am hoping to fix that.
 
 ### Android touchups
 Android support is getting pretty stable, but there are a couple of areas that still need improvement. We still need to finish asset management, and so until that is done you must embed a pack file into your app for sounds to be played. More improvements to tts_voice will follow as well, you can only use the default voice at this time and parameter ranges may need adjustment. The gesture support though functional is still very young, and needs more testing and expansion.
-
 
 ## Code improvements
 This section specifically lists tasks we wish to perform related to NVGT's c++ code, repository, or other backend. Other than performance, items here should rarely effect application functionality but are instead designed to allow developers to engage in a bit less painful wincing when reading or contributing to NVGT's code.
@@ -132,4 +131,4 @@ Currently when someone wants to build NVGT, they download something like windev.
 At the moment, I directly register the c interfaces of the public domain rnd.h library we are using with Angelscript. This however has created some undesirable issues, for example it's not possible to select a default rng, array.random() has several overloads for each type because they don't have a base class etc. Instead, create a base random interface with whatever generaters we want inheriting from it, then allow the user to select the default generator instance that the random() function uses.
 
 ### test cases
-NVGT has a test runner, but it only tests a minimal subset of the engine at this time. Once we have more tests, we will hook the test runner up to the CI so we can instantly see if something goes wrong with engine.
+NVGT has a test runner, but it only tests a minimal subset of the engine at this time. Once we have more tests, we will hook the test runner up to the CI so we can instantly see if something goes wrong with the engine.
