@@ -16,6 +16,7 @@
 #include <memory>
 class asIScriptEngine;
 class datastream;
+class CScriptArray;
 namespace new_pack
 {
 	class pack : public Poco::RefCountedObject
@@ -55,7 +56,11 @@ namespace new_pack
 		std::istream *get_file(const std::string &filename) const;
 		// Returns a datastream for script that points to the requested file.
 		datastream *get_file_script(const std::string &filename, const std::string &encoding, int byteorder);
+		bool get_active();
+		int64_t get_file_count();
+		bool extract_file(const std::string &internal_name, const std::string &file_on_disk);
 
+		CScriptArray *list_files();
 		// Returns the absolute path to this pack file on disk.
 		const std::string get_pack_name() const;
 		/**

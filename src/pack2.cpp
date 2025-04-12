@@ -25,6 +25,7 @@
 #include <iostream>
 #include "chacha_stream.h"
 #include "datastreams.h"
+#include <scriptarray.h>
 namespace new_pack
 {
 	static const int header_size = 64;
@@ -50,6 +51,7 @@ namespace new_pack
 		~read_mode_internals();
 		const toc_entry *get(const std::string &filename) const;
 		bool exists(const std::string &filename);
+		toc_map &get_toc_map(); // Used to implement at least get_file_count and list_files.
 	};
 	class pack::write_mode_internals
 	{
@@ -69,6 +71,7 @@ namespace new_pack
 		~write_mode_internals();
 		bool put(const std::string &filename, const std::string &internal_name);
 		bool exists(const std::string &filename);
+		toc_map &get_toc_map(); // Used to implement at least get_file_count and list_files.
 	};
 	bool pack::read_mode_internals::load()
 	{
@@ -213,6 +216,10 @@ namespace new_pack
 	{
 		return toc.find(filename) != toc.end();
 	}
+	toc_map &pack::read_mode_internals::get_toc_map()
+	{
+		return toc;
+	}
 	bool pack::write_mode_internals::put_blank_header()
 	{
 		if (!file->good())
@@ -336,6 +343,10 @@ namespace new_pack
 	bool pack::write_mode_internals::exists(const std::string &filename)
 	{
 		return toc.find(filename) != toc.end();
+	}
+	toc_map &pack::write_mode_internals::get_toc_map()
+	{
+		return toc;
 	}
 	void pack::set_pack_name(const std::string &name)
 	{
@@ -485,6 +496,74 @@ namespace new_pack
 			return nullptr;
 		}
 	}
+	bool pack::get_active()
+	{
+		return open_mode != OPEN_NOT;
+	}
+	int64_t pack::get_file_count()
+	{
+		if (open_mode == OPEN_NOT)
+		{
+			return -1;
+		}
+		return (open_mode == OPEN_READ ? read->get_toc_map() : write->get_toc_map()).size();
+	}
+	CScriptArray *pack::list_files()
+	{
+		asIScriptContext *context = asGetActiveContext();
+		if (context == nullptr)
+		{
+			return nullptr;
+		}
+		asIScriptEngine *engine = context->GetEngine();
+		if (engine == nullptr)
+		{
+			return nullptr;
+		}
+		asITypeInfo *string_array = engine->GetTypeInfoByDecl("string[]");
+		if (string_array == nullptr)
+		{
+			return nullptr;
+		}
+		CScriptArray *array = CScriptArray::Create(string_array);
+		if (array == nullptr)
+		{
+			return nullptr;
+		}
+		if (open_mode == OPEN_NOT)
+		{
+			return array;
+		}
+		toc_map &toc = (open_mode == OPEN_READ ? read->get_toc_map() : write->get_toc_map());
+		array->Reserve(toc.size());
+		for (toc_map::iterator i = toc.begin(); i != toc.end(); i++)
+		{
+			array->InsertLast((void *)&i->first);
+		}
+		return array;
+	}
+	bool pack::extract_file(const std::string &internal_name, const std::string &file_on_disk)
+	{
+		std::istream *fis = get_file(internal_name);
+		if (fis == nullptr)
+		{
+			return false;
+		}
+		bool result = false;
+		try
+		{
+			Poco::FileOutputStream fos(file_on_disk, std::ios_base::out);
+			Poco::StreamCopier::copyStream(*fis, fos);
+			result = true;
+		}
+		catch (std::exception &)
+		{
+			result = false;
+		}
+		delete fis;
+		return result;
+	}
+
 	const std::string pack::get_pack_name() const
 	{
 		return pack_name;
@@ -516,6 +595,10 @@ namespace new_pack
 		engine->RegisterObjectMethod("pack_file", "bool add_file(const string &in filename, const string &in internal_name)", asMETHOD(pack, add_file), asCALL_THISCALL);
 		engine->RegisterObjectMethod("pack_file", "bool file_exists(const string &in filename)", asMETHOD(pack, file_exists), asCALL_THISCALL);
 		engine->RegisterObjectMethod("pack_file", "datastream @get_file(const string &in filename, const string &in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asMETHOD(pack, get_file_script), asCALL_THISCALL);
+		engine->RegisterObjectMethod("pack_file", "bool get_active() const property", asMETHOD(pack, get_active), asCALL_THISCALL);
+		engine->RegisterObjectMethod("pack_file", "int64 get_file_count() const property", asMETHOD(pack, get_file_count), asCALL_THISCALL);
+		engine->RegisterObjectMethod("pack_file", "string[]@ list_files() const", asMETHOD(pack, list_files), asCALL_THISCALL);
+		engine->RegisterObjectMethod("pack_file", "bool extract_file(const string &in internal_name, const string &in file_on_disk)", asMETHOD(pack, extract_file), asCALL_THISCALL);
 
 		engine->SetDefaultNamespace("");
 	}
