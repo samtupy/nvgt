@@ -26,7 +26,7 @@ The handedness can be controlled by using the `coordinate_handedness` enumeratio
 
 ## Input signals
 
-The basic character controller is devorsed from any specific input system. This allows it to be used by both human and machine operators; for example, the player could have a character controller class, as could an AI character in your game.
+The basic character controller is independent of any specific input system. This allows it to be used by both human and machine operators; for example, the player could have a character controller class, as could an AI character in your game.
 
 To facilitate movement and other operations, you set any of the following input signals. As long as they are true, the appropriate action will be called per frame.
 
