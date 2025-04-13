@@ -77,7 +77,7 @@ public:
 	bool speak_to_file(const std::string &filename, const std::string &text);
 	std::string speak_to_memory(const std::string &text);
 	bool speak_wait(const std::string &text, bool interrupt = false);
-	sound *speak_to_sound(const std::string &text
+	sound *speak_to_sound(const std::string &text);
 
 	bool speak_interrupt(const std::string &text)
 	{
