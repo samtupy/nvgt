@@ -1,3 +1,5 @@
+# `update`
+
 Instructs the controller that a new frame is about to begin and it should perform all necessary actions to realize field/property changes.
 
 ```nvgt

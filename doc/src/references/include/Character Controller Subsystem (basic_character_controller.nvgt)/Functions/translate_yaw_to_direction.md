@@ -1,3 +1,5 @@
+# `translate_yaw_to_direction`
+
 Translates the given yaw to a direction string.
 
 ```nvgt

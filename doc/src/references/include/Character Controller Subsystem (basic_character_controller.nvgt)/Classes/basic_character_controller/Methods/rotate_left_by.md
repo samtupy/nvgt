@@ -1,3 +1,5 @@
+# `rotate_left_by`
+
 Instructs the controller that it should begin rotation of the character to the left by the given amount on it's vertical axis.
 
 ```nvgt

@@ -1,3 +1,5 @@
+# `rotate_right_by`
+
 Instructs the controller that it should begin rotation of the character to the right by the given amount on it's vertical axis.
 
 ```nvgt

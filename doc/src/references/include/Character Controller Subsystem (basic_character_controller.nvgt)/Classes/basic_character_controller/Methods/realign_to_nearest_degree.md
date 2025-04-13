@@ -1,3 +1,5 @@
+# `realign_to_nearest_degree`
+
 Instructs the controller that it should reorient itself such that it is facing the closest valid compass point to it's current yaw.
 
 ```nvgt

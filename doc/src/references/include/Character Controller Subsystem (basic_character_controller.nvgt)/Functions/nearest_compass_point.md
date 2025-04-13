@@ -1,3 +1,5 @@
+# `nearest_compass_point`
+
 Snaps the provided yaw to the closest compass point based on `step`.
 
 ```nvgt

@@ -1,3 +1,5 @@
+# `snap_to_degree`
+
 Attempts to snap the degree to any of the given points. The behavior is undefined if no points are provided.
 
 ```nvgt
