@@ -2,7 +2,7 @@
 
 Determines the target yaw to which the character should rotate.
 
-``nvgt
+```nvgt
 void set_target_yaw(const float value) property;
 float get_target_yaw() property;
 ```
