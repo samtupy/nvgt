@@ -407,6 +407,7 @@ void RegisterScriptPathfinder(asIScriptEngine *engine)
 	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback@)", asMETHOD(pathfinder, set_callback_function), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_ex@)", asMETHOD(pathfinder, set_callback_function_ex), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void cancel()", asMETHOD(pathfinder, cancel), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_legacy@)", asMETHOD(pathfinder, set_callback_function_legacy), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void reset()", asMETHOD(pathfinder, reset), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int, int, int, int, int, int, any@+ = null)", asMETHOD(pathfinder, find), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int, int, int, int, string="
