@@ -541,8 +541,8 @@ shared string translate_yaw_to_direction(const float yaw) {
 		"North by West Three Quarter North"
 	};
 	assert(yaw >= 0.0 && yaw <= 360.0);
-	const auto idx = floorf(yaw / 2.8125);
-	return DIRECTIONS[idx < 0 ? 0 : idx > 127 ? 127 : idx];
+	const auto idx = floorf((yaw + 1.40625) / 2.8125);
+	return DIRECTIONS[idx < 0 ? 0 : idx > 127 ? 0 : idx];
 }
 
 shared float snap_to_degree(const float deg, const float[] snaps) {
