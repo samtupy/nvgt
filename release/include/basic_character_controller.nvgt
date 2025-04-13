@@ -1,0 +1,569 @@
+shared abstract class basic_character_controller {
+	bool move_forward, move_backward, turn_left, turn_right, strafe_left, strafe_right, jump;
+	protected bool is_grounded, is_crouching, is_running;
+	vector position, velocity, forward, up, right;
+	protected vector old_position, old_velocity, old_forward, old_up, old_right;
+	protected float max_speed, walk_speed, run_speed, crouch_speed, acceleration, deceleration, air_control, rotation_speed, current_speed, jump_force, gravity, ground_friction, air_friction, player_height, crouch_height, stand_height, mass, step_distance, distance_traveled, step_cycle, run_step_length, walk_step_length, crouch_step_length, yaw, target_yaw, old_yaw;
+	private float PI = acosf(-1.0);
+
+	basic_character_controller() {
+		position.setToZero();
+		velocity.setToZero();
+		forward.set(0, 0, 1);
+		up.set(0, 1, 0);
+		// This is for left-handed coordinate systems, do we need to change this?
+		right = up.cross(forward);
+		right.normalize();
+		move_forward = false;
+		move_backward = false;
+		turn_left = false;
+		turn_right = false;
+		strafe_left = false;
+		strafe_right = false;
+		jump = false;
+		yaw = 0.0;
+		target_yaw = yaw;
+		max_speed = 100.0;
+		walk_speed = 3.0;
+		run_speed = 15.0;
+		crouch_speed = 1.0;
+		acceleration = 2.0;
+		deceleration = 2.0;
+		air_control = 0.3;
+		rotation_speed = 11.25 * PI / 180.0; // Degrees per second
+		current_speed = 0.0;
+		jump_force = 6.0;
+		gravity = 9.81;
+		ground_friction = 6.0;
+		air_friction = 0.5;
+		is_grounded = true;
+		is_crouching = false;
+		is_running = false;
+		player_height = 1.8;
+		crouch_height = 1.0;
+		stand_height = 1.8;
+		mass = 80.0; // kg
+		step_distance = 0.0;
+		distance_traveled = 0.0;
+		step_cycle = 0.0;
+		run_step_length = 0.7;
+		walk_step_length = 0.5;
+		crouch_step_length = 0.3;
+	}
+
+	void toggle_crouch() final {
+		is_crouching = !is_crouching;
+		player_height = is_crouching ? crouch_height : stand_height;
+	}
+
+	void set_grounded(const bool grounded) property final {
+		is_grounded = grounded;
+		if (is_grounded && velocity.y < 0.0)
+			velocity.y = 0.0;
+	}
+
+	void set_target_yaw(const float value) property {
+		target_yaw = value;
+	}
+
+	float get_target_yaw() property {
+		return target_yaw;
+	}
+
+	float get_yaw() property {
+		return yaw;
+	}
+
+	private void set_yaw(const float value) property {
+		yaw = value;
+	}
+
+	void update(const float delta_time) final {
+		handle_rotation(delta_time);
+		handle_vertical_movement(delta_time);
+		handle_horizontal_movement(delta_time);
+		old_position = position;
+		position += velocity * delta_time;
+		if (!on_position_changed())
+			position = old_position;
+		vector horizontal_movement(position.x - old_position.x, 0, position.z - old_position.z);
+		const float distance_moved = sqrtf(horizontal_movement.x ** 2.0 + horizontal_movement.y ** 2.0 + horizontal_movement.z ** 2.0); // Compute L2 norm
+		update_step_cycle(distance_moved);
+		apply_friction(delta_time);
+	}
+
+	void rotate_left_by(const float degree, const float step = 2.8125, const bool snap = false) final {
+		const float temp_yaw = yaw - degree;
+		float snapped = snap ? float(round(double(temp_yaw / step), 5)) * step : temp_yaw;
+		if (snapped < 0.0) snapped += 360.0;
+		target_yaw = fmod(snapped, 360.0);
+		update_running_state();
+	}
+
+	void rotate_right_by(const float degree, const float step = 2.8125, const bool snap = true) final {
+		const float temp_yaw = yaw + degree;
+		float snapped = snap ? float(round(double(temp_yaw / step), 5)) * step : temp_yaw;
+		if (snapped < 0.0) snapped += 360.0;
+		target_yaw = fmod(snapped, 360.0);
+		update_running_state();
+	}
+
+	void turn_around() final {
+		target_yaw = yaw + 180.0;
+		if (target_yaw >= 360.0) target_yaw -= 360.0;
+		update_running_state();
+	}
+
+	void realign_to_nearest_degree(const float step=2.8125) final {
+		const float snapped = nearest_compass_point(yaw, step);
+		target_yaw = fmod(snapped, 360.0);
+	}
+
+	protected void handle_rotation(const float dt) final {
+		old_yaw = yaw;
+		old_forward = forward;
+		old_right = right;
+		if (turn_left) target_yaw -= (((rotation_speed * 180.0) / PI) * dt);
+		if (turn_right) target_yaw += (((rotation_speed * 180.0) / PI) * dt);
+		if (target_yaw < 0.0) target_yaw += 360.0;
+		if (target_yaw >= 360.0) target_yaw -= 360.0;
+		const float max_step = ((rotation_speed * 180.0) / PI) * dt;
+		float diff = target_yaw - yaw;
+		while (diff < -180.)
+			diff += 360.0;
+		while (diff > 180.)
+			diff -= 360.0;
+		if (abs(diff) <= max_step)
+			yaw = target_yaw;
+		else
+			yaw += max_step * (diff < 0.f ? -1.f : 1.f);
+		if (yaw < 0.0)
+			yaw += 360.0;
+		if (yaw >= 360.0)
+			yaw -= 360.0;
+		forward.x = sinf(yaw * PI / 180.0);
+		forward.y = 0.0;
+		forward.z = cosf(yaw * PI / 180.0);
+		right = up.cross(forward);
+		right.normalize();
+		if (!on_rotation_changed()) {
+			yaw = old_yaw;
+			forward = old_forward;
+			right = old_right;
+			target_yaw = yaw;
+			turn_left = false;
+			turn_right = false;
+		}
+	}
+
+	protected void handle_vertical_movement(const float dt) final {
+		old_velocity = velocity;
+		velocity.y -= gravity * dt;
+		if (jump && is_grounded) {
+			velocity.y = jump_force;
+			is_grounded = false;
+		}
+		if (!on_vertical_movement()) {
+			velocity = old_velocity;
+			if (jump && !is_grounded) is_grounded = true; // Should we do this or not?
+		}
+	}
+
+	protected void handle_horizontal_movement(const float dt) final {
+		old_velocity = velocity;
+		vector direction;
+		if (move_forward)
+			direction += forward;
+		if (move_backward)
+			direction -= forward;
+		if (strafe_left)
+			direction -= right;
+		if (strafe_right)
+			direction += right;
+		direction.y = 0;
+		if (sqrtf(direction.x ** 2.0 + direction.y ** 2.0 + direction.z ** 2.0) > 0.0001) {
+			direction.normalize();
+			const float target_speed = get_target_speed();
+			const float effective_acceleration = is_grounded ? acceleration : (acceleration * air_control);
+			current_speed = fmin(current_speed + effective_acceleration * dt, target_speed);
+			vector horizontal_velocity = direction * current_speed;
+			velocity.x = horizontal_velocity.x;
+			velocity.z = horizontal_velocity.z;
+		}
+		if (!on_horizontal_movement()) {
+			velocity = old_velocity;
+			if (move_forward) move_forward = false;
+			if (move_backward) move_backward = false;
+			if (strafe_left) strafe_left = false;
+			if (strafe_right) strafe_right = false;
+		}
+	}
+
+	protected float get_target_speed() const {
+		if (!is_grounded)
+			return (is_running ? run_speed : walk_speed) * air_control;
+		if (is_crouching)
+			return crouch_speed;
+		return is_running ? run_speed : walk_speed;
+	}
+
+	protected void apply_friction(const float dt) final {
+		old_velocity = velocity;
+		const bool no_horizontal_movement = !(move_forward || move_backward || strafe_left || strafe_right);
+		if (no_horizontal_movement && current_speed > 0.0) {
+			const float effective_friction = is_grounded ? ground_friction : air_friction;
+			current_speed -= effective_friction * dt;
+			if (current_speed < 0.0) {
+				current_speed = 0.0;
+				velocity.x = 0;
+				velocity.z = 0;
+				if (!on_friction_applied())
+					old_velocity = velocity;
+			} else {
+				const float vx = velocity.x;
+				const float vz = velocity.z;
+				const float length = sqrtf(vx * vx + vz * vz);
+				if (length > 0.0001f) {
+					velocity.x = (vx / length) * current_speed;
+					velocity.z = (vz / length) * current_speed;
+					if (!on_friction_applied())
+						velocity = old_velocity;
+				}
+			}
+		}
+	}
+
+	protected void update_step_cycle(const float distance_moved) final {
+		if (!is_grounded)
+			return;
+		distance_traveled += distance_moved;
+		const float step_length = get_step_length();
+		if (distance_traveled >= step_length) {
+			distance_traveled = 0.0;
+			on_step_cycle();
+		}
+		step_cycle = distance_traveled / step_length;
+	}
+
+	protected float get_step_length() const {
+		if (is_crouching)
+			return crouch_step_length;
+		return is_running ? run_step_length : walk_step_length;
+	}
+
+	protected void update_running_state() final {
+		const bool has_horizontal_movement = (move_forward || move_backward || strafe_left || strafe_right);
+		if (is_crouching) {
+			is_running = false;
+			return;
+		}
+		if (has_horizontal_movement) {
+			is_running = should_run();
+			return;
+		}
+	}
+
+	// Callbacks
+	protected bool on_position_changed() {
+		if (position.y < 0.0) {
+			position.y = 0.0;
+			velocity.y = 0.0;
+			set_grounded(true);
+		}
+		return true;
+	}
+
+	protected bool on_rotation_changed() { return true; }
+	protected bool on_vertical_movement() { return true; }
+	protected bool on_horizontal_movement() { return true; }
+	protected bool on_friction_applied() { return true; }
+	protected void on_step_cycle() { }
+	protected bool should_run() { return false; }
+}
+
+shared string translate_yaw_to_direction(const float yaw) {
+	const string[] DIRECTIONS = {
+		// 0   [0.0 .. 2.8125)
+		"North",
+		// 1   [2.8125 .. 5.6250)
+		"North Quarter East",
+		// 2   [5.6250 .. 8.4375)
+		"North Half East",
+		// 3   [8.4375 .. 11.2500)
+		"North Three Quarter East",
+		// 4   [11.2500 .. 14.0625)
+		"North by East",
+		// 5   [14.0625 .. 16.8750)
+		"North by East Quarter East",
+		// 6   [16.8750 .. 19.6875)
+		"North by East Half East",
+		// 7   [19.6875 .. 22.5000)
+		"North by East Three Quarter East",
+		// 8   [22.5000 .. 25.3125)
+		"North-northeast",
+		// 9   [25.3125 .. 28.1250)
+		"North-northeast Quarter East",
+		// 10  [28.1250 .. 30.9375)
+		"North-northeast Half East",
+		// 11  [30.9375 .. 33.7500)
+		"North-northeast Three Quarter East",
+		// 12  [33.7500 .. 36.5625)
+		"Northeast by North",
+		// 13  [36.5625 .. 39.3750)
+		"Northeast by North Quarter East",
+		// 14  [39.3750 .. 42.1875)
+		"Northeast by North Half East",
+		// 15  [42.1875 .. 45.0000)
+		"Northeast by North Three Quarter East",
+		// 16  [45.0000 .. 47.8125)
+		"Northeast",
+		// 17  [47.8125 .. 50.6250)
+		"Northeast Quarter East",
+		// 18  [50.6250 .. 53.4375)
+		"Northeast Half East",
+		// 19  [53.4375 .. 56.2500)
+		"Northeast Three Quarter East",
+		// 20  [56.2500 .. 59.0625)
+		"Northeast by East",
+		// 21  [59.0625 .. 61.8750)
+		"Northeast by East Quarter East",
+		// 22  [61.8750 .. 64.6875)
+		"Northeast by East Half East",
+		// 23  [64.6875 .. 67.5000)
+		"Northeast by East Three Quarter East",
+		// 24  [67.5000 .. 70.3125)
+		"East-northeast",
+		// 25  [70.3125 .. 73.1250)
+		"East-northeast Quarter East",
+		// 26  [73.1250 .. 75.9375)
+		"East-northeast Half East",
+		// 27  [75.9375 .. 78.7500)
+		"East-northeast Three Quarter East",
+		// 28  [78.7500 .. 81.5625)
+		"East by North",
+		// 29  [81.5625 .. 84.3750)
+		"East by North Quarter East",
+		// 30  [84.3750 .. 87.1875)
+		"East by North Half East",
+		// 31  [87.1875 .. 90.0000)
+		"East by North Three Quarter East",
+		// 32  [90.0000 .. 92.8125)
+		"East",
+		// 33  [92.8125 .. 95.6250)
+		"East Quarter South",
+		// 34  [95.6250 .. 98.4375)
+		"East Half South",
+		// 35  [98.4375 .. 101.2500)
+		"East Three Quarter South",
+		// 36  [101.2500 .. 104.0625)
+		"East by South",
+		// 37  [104.0625 .. 106.8750)
+		"East by South Quarter South",
+		// 38  [106.8750 .. 109.6875)
+		"East by South Half South",
+		// 39  [109.6875 .. 112.5000)
+		"East by South Three Quarter South",
+		// 40  [112.5000 .. 115.3125)
+		"East-southeast",
+		// 41  [115.3125 .. 118.1250)
+		"East-southeast Quarter South",
+		// 42  [118.1250 .. 120.9375)
+		"East-southeast Half South",
+		// 43  [120.9375 .. 123.7500)
+		"East-southeast Three Quarter South",
+		// 44  [123.7500 .. 126.5625)
+		"Southeast by East",
+		// 45  [126.5625 .. 129.3750)
+		"Southeast by East Quarter South",
+		// 46  [129.3750 .. 132.1875)
+		"Southeast by East Half South",
+		// 47  [132.1875 .. 135.0000)
+		"Southeast by East Three Quarter South",
+		// 48  [135.0000 .. 137.8125)
+		"Southeast",
+		// 49  [137.8125 .. 140.6250)
+		"Southeast Quarter South",
+		// 50  [140.6250 .. 143.4375)
+		"Southeast Half South",
+		// 51  [143.4375 .. 146.2500)
+		"Southeast Three Quarter South",
+		// 52  [146.2500 .. 149.0625)
+		"Southeast by South",
+		// 53  [149.0625 .. 151.8750)
+		"Southeast by South Quarter South",
+		// 54  [151.8750 .. 154.6875)
+		"Southeast by South Half South",
+		// 55  [154.6875 .. 157.5000)
+		"Southeast by South Three Quarter South",
+		// 56  [157.5000 .. 160.3125)
+		"South-southeast",
+		// 57  [160.3125 .. 163.1250)
+		"South-southeast Quarter South",
+		// 58  [163.1250 .. 165.9375)
+		"South-southeast Half South",
+		// 59  [165.9375 .. 168.7500)
+		"South-southeast Three Quarter South",
+		// 60  [168.7500 .. 171.5625)
+		"South by East",
+		// 61  [171.5625 .. 174.3750)
+		"South by East Quarter South",
+		// 62  [174.3750 .. 177.1875)
+		"South by East Half South",
+		// 63  [177.1875 .. 180.0000)
+		"South by East Three Quarter South",
+		// 64  [180.0000 .. 182.8125)
+		"South",
+		// 65  [182.8125 .. 185.6250)
+		"South Quarter West",
+		// 66  [185.6250 .. 188.4375)
+		"South Half West",
+		// 67  [188.4375 .. 191.2500)
+		"South Three Quarter West",
+		// 68  [191.2500 .. 194.0625)
+		"South by West",
+		// 69  [194.0625 .. 196.8750)
+		"South by West Quarter West",
+		// 70  [196.8750 .. 199.6875)
+		"South by West Half West",
+		// 71  [199.6875 .. 202.5000)
+		"South by West Three Quarter West",
+		// 72  [202.5000 .. 205.3125)
+		"South-southwest",
+		// 73  [205.3125 .. 208.1250)
+		"South-southwest Quarter West",
+		// 74  [208.1250 .. 210.9375)
+		"South-southwest Half West",
+		// 75  [210.9375 .. 213.7500)
+		"South-southwest Three Quarter West",
+		// 76  [213.7500 .. 216.5625)
+		"Southwest by South",
+		// 77  [216.5625 .. 219.3750)
+		"Southwest by South Quarter West",
+		// 78  [219.3750 .. 222.1875)
+		"Southwest by South Half West",
+		// 79  [222.1875 .. 225.0000)
+		"Southwest by South Three Quarter West",
+		// 80  [225.0000 .. 227.8125)
+		"Southwest",
+		// 81  [227.8125 .. 230.6250)
+		"Southwest Quarter West",
+		// 82  [230.6250 .. 233.4375)
+		"Southwest Half West",
+		// 83  [233.4375 .. 236.2500)
+		"Southwest Three Quarter West",
+		// 84  [236.2500 .. 239.0625)
+		"Southwest by West",
+		// 85  [239.0625 .. 241.8750)
+		"Southwest by West Quarter West",
+		// 86  [241.8750 .. 244.6875)
+		"Southwest by West Half West",
+		// 87  [244.6875 .. 247.5000)
+		"Southwest by West Three Quarter West",
+		// 88  [247.5000 .. 250.3125)
+		"West-southwest",
+		// 89  [250.3125 .. 253.1250)
+		"West-southwest Quarter West",
+		// 90  [253.1250 .. 255.9375)
+		"West-southwest Half West",
+		// 91  [255.9375 .. 258.7500)
+		"West-southwest Three Quarter West",
+		// 92  [258.7500 .. 261.5625)
+		"West by South",
+		// 93  [261.5625 .. 264.3750)
+		"West by South Quarter West",
+		// 94  [264.3750 .. 267.1875)
+		"West by South Half West",
+		// 95  [267.1875 .. 270.0000)
+		"West by South Three Quarter West",
+		// 96  [270.0000 .. 272.8125)
+		"West",
+		// 97  [272.8125 .. 275.6250)
+		"West Quarter North",
+		// 98  [275.6250 .. 278.4375)
+		"West Half North",
+		// 99  [278.4375 .. 281.2500)
+		"West Three Quarter North",
+		// 100 [281.2500 .. 284.0625)
+		"West by North",
+		// 101 [284.0625 .. 286.8750)
+		"West by North Quarter North",
+		// 102 [286.8750 .. 289.6875)
+		"West by North Half North",
+		// 103 [289.6875 .. 292.5000)
+		"West by North Three Quarter North",
+		// 104 [292.5000 .. 295.3125)
+		"West-northwest",
+		// 105 [295.3125 .. 298.1250)
+		"West-northwest Quarter North",
+		// 106 [298.1250 .. 300.9375)
+		"West-northwest Half North",
+		// 107 [300.9375 .. 303.7500)
+		"West-northwest Three Quarter North",
+		// 108 [303.7500 .. 306.5625)
+		"Northwest by West",
+		// 109 [306.5625 .. 309.3750)
+		"Northwest by West Quarter North",
+		// 110 [309.3750 .. 312.1875)
+		"Northwest by West Half North",
+		// 111 [312.1875 .. 315.0000)
+		"Northwest by West Three Quarter North",
+		// 112 [315.0000 .. 317.8125)
+		"Northwest",
+		// 113 [317.8125 .. 320.6250)
+		"Northwest Quarter North",
+		// 114 [320.6250 .. 323.4375)
+		"Northwest Half North",
+		// 115 [323.4375 .. 326.2500)
+		"Northwest Three Quarter North",
+		// 116 [326.2500 .. 329.0625)
+		"Northwest by North",
+		// 117 [329.0625 .. 331.8750)
+		"Northwest by North Quarter North",
+		// 118 [331.8750 .. 334.6875)
+		"Northwest by North Half North",
+		// 119 [334.6875 .. 337.5000)
+		"Northwest by North Three Quarter North",
+		// 120 [337.5000 .. 340.3125)
+		"North-northwest",
+		// 121 [340.3125 .. 343.1250)
+		"North-northwest Quarter North",
+		// 122 [343.1250 .. 345.9375)
+		"North-northwest Half North",
+		// 123 [345.9375 .. 348.7500)
+		"North-northwest Three Quarter North",
+		// 124 [348.7500 .. 351.5625)
+		"North by West",
+		// 125 [351.5625 .. 354.3750)
+		"North by West Quarter North",
+		// 126 [354.3750 .. 357.1875)
+		"North by West Half North",
+		// 127 [357.1875 .. 360.0]
+		"North by West Three Quarter North"
+	};
+	assert(yaw >= 0.0 && yaw <= 360.0);
+	const auto idx = floorf(yaw / 2.8125);
+	return DIRECTIONS[idx < 0 ? 0 : idx > 127 ? 127 : idx];
+}
+
+shared float snap_to_degree(const float deg, const float[] snaps) {
+	float result = snaps[0];
+	float min_distance = 360.0;
+	const auto len = snaps.length();
+	for (int i = 0; i < len; i++) {
+		float raw_diff = deg - snaps[i];
+		float normalized_diff = fmod(raw_diff + 180.0, 360.0);
+		if (normalized_diff < 0.0) normalized_diff += 360.0;
+		normalized_diff -= 180.0;
+		float distance = absf(normalized_diff);
+		if (distance < min_distance) {
+			min_distance = distance;
+			result = snaps[i];
+		}
+	}
+	return result;
+}
+
+shared float nearest_compass_point(const float deg, const float step = 2.8125) {
+	const float raw = float(round(double(deg / step), 5)) * step;
+	return raw - 360.0 * floorf(raw / 360.0);
+}
