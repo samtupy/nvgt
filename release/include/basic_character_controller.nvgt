@@ -1,19 +1,24 @@
+shared enum coordinate_handedness {
+	COORDINATE_HANDEDNESS_LEFT,
+	COORDINATE_HANDEDNESS_RIGHT
+}
+
 shared abstract class basic_character_controller {
 	bool move_forward, move_backward, turn_left, turn_right, strafe_left, strafe_right, jump;
 	protected bool is_grounded, is_crouching, is_running;
 	vector position, velocity, forward, up, right;
 	protected vector old_position, old_velocity, old_forward, old_up, old_right;
+	private bool is_right_handed;
 	protected float max_speed, walk_speed, run_speed, crouch_speed, acceleration, deceleration, air_control, rotation_speed, current_speed, jump_force, gravity, ground_friction, air_friction, player_height, crouch_height, stand_height, mass, step_distance, distance_traveled, step_cycle, run_step_length, walk_step_length, crouch_step_length, yaw, target_yaw, old_yaw;
 	private float PI = acosf(-1.0);
 
-	basic_character_controller() {
+	basic_character_controller(const coordinate_handedness handedness = COORDINATE_HANDEDNESS_RIGHT) {
+		assert (handedness == COORDINATE_HANDEDNESS_LEFT || handedness == COORDINATE_HANDEDNESS_RIGHT);
+		is_right_handed = handedness == COORDINATE_HANDEDNESS_RIGHT;
 		position.setToZero();
 		velocity.setToZero();
-		forward.set(0, 0, 1);
 		up.set(0, 1, 0);
-		// This is for left-handed coordinate systems, do we need to change this?
-		right = up.cross(forward);
-		right.normalize();
+		update_initial_orientation_vectors();
 		move_forward = false;
 		move_backward = false;
 		turn_left = false;
@@ -76,6 +81,29 @@ shared abstract class basic_character_controller {
 
 	private void set_yaw(const float value) property {
 		yaw = value;
+	}
+
+	coordinate_handedness get_handedness() property final {
+		return is_right_handed ? COORDINATE_HANDEDNESS_RIGHT : COORDINATE_HANDEDNESS_LEFT;
+	}
+
+	void set_handedness(const coordinate_handedness value) property final {
+				assert (value == COORDINATE_HANDEDNESS_LEFT || value == COORDINATE_HANDEDNESS_RIGHT);
+		is_right_handed = value == COORDINATE_HANDEDNESS_RIGHT;
+		update_initial_orientation_vectors();
+	}
+
+	private void update_initial_orientation_vectors() final {
+		forward.x = sinf(yaw * PI / 180.0);
+		if (is_right_handed)
+			forward.z = -cosf(yaw * PI / 180.0);
+		else
+			forward.z = cosf(yaw * PI / 180.0);
+		if (is_right_handed)
+			right = forward.cross(up);
+		else
+			right = up.cross(forward);
+		right.normalize();
 	}
 
 	void update(const float delta_time) final {
@@ -143,8 +171,14 @@ shared abstract class basic_character_controller {
 			yaw -= 360.0;
 		forward.x = sinf(yaw * PI / 180.0);
 		forward.y = 0.0;
-		forward.z = cosf(yaw * PI / 180.0);
-		right = up.cross(forward);
+		if (is_right_handed)
+			forward.z = -cosf(yaw * PI / 180.0);
+		else
+			forward.z = cosf(yaw * PI / 180.0);
+		if (is_right_handed)
+			right = forward.cross(up);
+		else
+			right = up.cross(forward);
 		right.normalize();
 		if (!on_rotation_changed()) {
 			yaw = old_yaw;

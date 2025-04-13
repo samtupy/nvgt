@@ -18,6 +18,12 @@ When instantiating your derived class, set any of the below input signals to cau
 
 You will also need to compute delta time. Delta time is the duration between frames.
 
+### A note on handedness
+
+Handedness defines the orientation convention for three-dimensional coordinate systems. In a left-handed system, the forward direction is defined as the positive Z-axis and the right direction is computed by taking the cross product of the upward vector with the forward vector. In a right-handed system, the forward direction is defined as the negative Z-axis and the right direction is computed by reversing the order of the cross product used in a left-handed system. The controller defaults to a right-handed coordinate system.
+
+The handedness can be controlled by using the `coordinate_handedness` enumeration. When inheriting from this class, implementors can either control the handedness at instantiation time by passing the mode to the superclasses constructor, or they can alter it on the fly by setting the `handedness` property to the desired mode.
+
 ## Input signals
 
 The basic character controller is devorsed from any specific input system. This allows it to be used by both human and machine operators; for example, the player could have a character controller class, as could an AI character in your game.
