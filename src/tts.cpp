@@ -487,7 +487,6 @@ std::string tts_voice::speak_to_memory(const std::string &text)
 }
 sound *tts_voice::speak_to_sound(const std::string &text)
 {
-	(void)unknown_param;
 	sound *s = g_audio_engine->new_sound();
 	std::string speech = speak_to_memory(text);
 	if (speech.empty())
