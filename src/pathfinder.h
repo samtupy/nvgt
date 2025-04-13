@@ -20,6 +20,12 @@
 #include "scriptarray.h"
 #include "scriptany.h"
 #include "nvgt.h"
+enum callback_modes
+{
+	CALLBACK_SIMPLE = 0,
+	CALLBACK_ADVANCED,	 // Same as simple but with parent_x, parent_y, parent_z.
+	CALLBACK_LEGACY = 2, // BGT compatible. Effectively 2D mode with legacy user_data string instead of any.
+};
 
 class hashpoint
 {
@@ -82,7 +88,7 @@ class pathfinder : public micropather::Graph
 	bool must_reset;
 	bool gc_flag;
 	bool cache; // Because Micropather doesn't expose a method to determine if path caching is enabled, and disabling of cache should disable our local cache too.
-	bool callback_wants_parent;
+	callback_modes callback_mode;
 
 public:
 	bool solving;
@@ -100,14 +106,16 @@ public:
 	int get_ref_count();
 	void set_gc_flag();
 	bool get_gc_flag();
-	void set_callback_function(asIScriptFunction *func);	// Basic callback with only x, y, z, user_data.
-	void set_callback_function_ex(asIScriptFunction *func); // Advanced callback with x, y, z, parent_x, parent_y, parent_z, user_data.
+	void set_callback_function(asIScriptFunction *func);		// Basic callback with only x, y, z, user_data.
+	void set_callback_function_ex(asIScriptFunction *func);		// Advanced callback with x, y, z, parent_x, parent_y, parent_z, user_data.
+	void set_callback_function_legacy(asIScriptFunction *func); // 2D BGT legacy mode with string as user_data.
 
 	float get_difficulty(void *state, void *parent_state);
 	float get_difficulty(int x, int y, int z, int parent_x, int parent_y, int parent_z);
 	void cancel();
 	void reset();
 	CScriptArray *find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny *data);
+	CScriptArray *find_legacy(int start_x, int start_y, int parent_x, int parent_y, std::string user_data);
 	virtual float LeastCostEstimate(void *nodeStart, void *nodeEnd);
 	virtual void AdjacentCost(void *node, micropather::MPVector<micropather::StateCost> *neighbors);
 	virtual void PrintStateInfo(void *state)

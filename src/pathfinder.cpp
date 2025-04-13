@@ -17,6 +17,7 @@
 #include <cmath>
 using namespace std;
 static asITypeInfo *VectorArrayType = NULL;
+static asITypeInfo *StringType = nullptr;
 #define NODE_BIT_SIZE 19
 inline void *encode_state(int64_t x, int64_t y, int64_t z, int64_t d)
 {
@@ -62,6 +63,7 @@ pathfinder::pathfinder(int size, bool cache) : gc_flag(false)
 	asIScriptContext *ctx = asGetActiveContext();
 	if (ctx)
 		ctx->GetEngine()->NotifyGarbageCollectorOfNewObject(this, ctx->GetEngine()->GetTypeInfoByName("pathfinder"));
+	callback_mode = CALLBACK_SIMPLE;
 }
 int pathfinder::AddRef()
 {
@@ -115,7 +117,7 @@ void pathfinder::set_callback_function(asIScriptFunction *func)
 		callback->Release();
 	if (func)
 		callback = func;
-	callback_wants_parent = false;
+	callback_mode = CALLBACK_SIMPLE;
 }
 void pathfinder::set_callback_function_ex(asIScriptFunction *func)
 {
@@ -126,7 +128,18 @@ void pathfinder::set_callback_function_ex(asIScriptFunction *func)
 		return;
 	}
 	set_callback_function(func);
-	callback_wants_parent = true;
+	callback_mode = CALLBACK_ADVANCED;
+}
+void pathfinder::set_callback_function_legacy(asIScriptFunction *func)
+{
+	// This callback type is also fundamentally incompatible with path caching.
+	if (cache)
+	{
+		asGetActiveContext()->SetException("A legacy callback cannot be used with path caching enabled.");
+		return;
+	}
+	set_callback_function(func);
+	callback_mode = CALLBACK_LEGACY;
 }
 
 float pathfinder::get_difficulty(void *state, void *parent_state)
@@ -160,18 +173,39 @@ float pathfinder::get_difficulty(int x, int y, int z, int parent_x, int parent_y
 			ctx->PopState();
 		return FLT_MAX;
 	}
-	ctx->SetArgDWord(0, x);
-	ctx->SetArgDWord(1, y);
-	ctx->SetArgDWord(2, z);
-	if (callback_wants_parent)
+	switch (callback_mode)
 	{
+	case CALLBACK_SIMPLE:
+		ctx->SetArgDWord(0, x);
+		ctx->SetArgDWord(1, y);
+		ctx->SetArgDWord(2, z);
+		ctx->SetArgObject(3, callback_data);
+		break;
+	case CALLBACK_ADVANCED:
+		ctx->SetArgDWord(0, x);
+		ctx->SetArgDWord(1, y);
+		ctx->SetArgDWord(2, z);
 		ctx->SetArgDWord(3, parent_x);
 		ctx->SetArgDWord(4, parent_y);
 		ctx->SetArgDWord(5, parent_z);
 		ctx->SetArgObject(6, callback_data);
+		break;
+	case CALLBACK_LEGACY:
+		ctx->SetArgDWord(0, x);
+		ctx->SetArgDWord(1, y);
+		ctx->SetArgDWord(2, parent_x);
+		ctx->SetArgDWord(3, parent_y);
+		string ud;
+		if (StringType == nullptr)
+		{
+			StringType = g_ScriptEngine->GetTypeInfoByDecl("string");
+		}
+		if (callback_data != nullptr)
+		{
+			callback_data->Retrieve((void *)&ud, StringType->GetTypeId());
+		}
+		ctx->SetArgObject(4, (void *)&ud);
 	}
-	else
-		ctx->SetArgObject(3, callback_data);
 	if (ctx->Execute() != asEXECUTION_FINISHED)
 	{
 		if (new_context)
@@ -266,6 +300,22 @@ CScriptArray *pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	}
 	return array;
 }
+CScriptArray *pathfinder::find_legacy(int start_x, int start_y, int parent_x, int parent_y, string user_data)
+{
+	if (callback_mode != CALLBACK_LEGACY)
+	{
+		return nullptr;
+	}
+	if (StringType == nullptr)
+	{
+		StringType = g_ScriptEngine->GetTypeInfoByDecl("string");
+	}
+	CScriptAny *ud = new CScriptAny(g_ScriptEngine);
+	ud->Store((void *)&user_data, StringType->GetTypeId());
+	CScriptArray *result = find(start_x, start_y, 0, parent_x, parent_y, 0, ud);
+	ud->Release();
+	return result;
+}
 float pathfinder::LeastCostEstimate(void *nodeStart, void *nodeEnd)
 {
 	int start_x, start_y, start_z, end_x, end_y, end_z;
@@ -309,6 +359,12 @@ void pathfinder::AdjacentCost(void *node, micropather::MPVector<micropather::Sta
 		{
 			continue;
 		}
+		// If we're in legacy (2D) mode, save some unnecessary calls into script by rejecting nonzero Z right here.
+		if (callback_mode == CALLBACK_LEGACY && (z != 0 || nz != 0))
+		{
+			continue;
+		}
+
 		float c = get_difficulty(nx, ny, nz, x, y, z);
 		if (c != FLT_MAX)
 			c++;
@@ -347,9 +403,13 @@ void RegisterScriptPathfinder(asIScriptEngine *engine)
 	engine->RegisterObjectProperty("pathfinder", "int search_range", asOFFSET(pathfinder, search_range));
 	engine->RegisterFuncdef("int pathfinder_callback(int, int, int, any@ = null)");
 	engine->RegisterFuncdef("int pathfinder_callback_ex(int, int, int, int, int, int, any@ = null)");
+	engine->RegisterFuncdef("int pathfinder_callback_legacy(int, int, int, int, string)");
 	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback@)", asMETHOD(pathfinder, set_callback_function), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_ex@)", asMETHOD(pathfinder, set_callback_function_ex), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void cancel()", asMETHOD(pathfinder, cancel), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void reset()", asMETHOD(pathfinder, reset), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int, int, int, int, int, int, any@+ = null)", asMETHOD(pathfinder, find), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int, int, int, int, string="
+											   ")",
+								 asMETHOD(pathfinder, find_legacy), asCALL_THISCALL);
 }
