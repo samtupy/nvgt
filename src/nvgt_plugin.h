@@ -222,3 +222,18 @@ public:
 
 #endif // NVGT_BUILDING
 
+class pack_interface {
+	int refcount;
+	public:
+	pack_interface() : refcount(1) {}
+	void duplicate() { asAtomicInc(refcount); }
+	void release() { if (asAtomicDec(refcount) < 1) delete this; }
+	virtual std::istream* get_file(const std::string& filename) const { return nullptr; }
+	virtual const std::string get_pack_name() const { return ""; }
+	template <class A, class B> static B* op_cast(A* from) {
+		B* casted = dynamic_cast<B*>(from);
+		if (!casted) return nullptr;
+		casted->duplicate();
+		return casted;
+	}
+};

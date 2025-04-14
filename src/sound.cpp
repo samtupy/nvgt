@@ -1,7 +1,7 @@
 /* sound.cpp - sound system implementation code
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
+ * Copyright (c) 2022-2025 Sam Tupy
  * https://nvgt.gg
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
@@ -18,12 +18,10 @@
 #include <angelscript.h>
 #include <scriptarray.h>
 #include "nvgt_angelscript.h" // get_array_type
+#include "nvgt_plugin.h" // pack_interface
 #include "sound.h"
-#include "encryption_filter.h"
-#include "pack_protocol.h"
-#include "pack2.h"
-#include "memory_protocol.h"
-#include "resampler.h"
+#include "pack.h"
+#include <miniaudio_wdl_resampler.h>
 #include <atomic>
 #include <utility>
 #include <cstdint>
@@ -1082,7 +1080,7 @@ void set_default_decryption_key(const std::string &key)
 }
 // Set default pack storage for future sounds. Null means go back to local file system.
 // Note: a pack must be marked immutable in order to be used with sound service.
-void set_sound_default_storage(new_pack::pack *obj)
+void set_sound_default_storage(pack_interface *obj)
 {
 	if (!init_sound())
 	{
@@ -1093,7 +1091,7 @@ void set_sound_default_storage(new_pack::pack *obj)
 		g_sound_service->set_default_protocol(sound_service::fs_protocol_slot);
 		return;
 	}
-	g_sound_service->set_protocol_directive(g_pack_protocol_slot, obj->to_shared());
+	g_sound_service->set_protocol_directive(g_pack_protocol_slot, std::make_shared<pack_interface>(*obj));
 	g_sound_service->set_default_protocol(g_pack_protocol_slot);
 }
 int get_soundsystem_last_error() { return g_soundsystem_last_error; }
@@ -1378,7 +1376,7 @@ void RegisterSoundsystem(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_output_device(int device) property", asFUNCTION(set_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_decryption_key(const string& in key) property", asFUNCTION(set_default_decryption_key), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void set_sound_default_pack(new_pack::pack_file@ storage) property", asFUNCTION(set_sound_default_storage), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_default_pack(pack_interface@ storage) property", asFUNCTION(set_sound_default_storage), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_master_volume(float db) property", asFUNCTION(set_sound_master_volume), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float get_sound_master_volume() property", asFUNCTION(get_sound_master_volume), asCALL_CDECL);
 

@@ -11,6 +11,7 @@
  */
 #pragma once
 #include <istream>
+#include <mutex>
 typedef std::shared_ptr<const void> directive_t;
 struct sound_service_vfs;
 struct vfs_args
@@ -23,7 +24,6 @@ struct vfs_args
 };
 class sound_service
 {
-
 public:
 	static const size_t fs_protocol_slot = 1;
 	static const size_t null_filter_slot = 1;
@@ -113,4 +113,35 @@ public:
 	// The VFS is how Miniaudio itself communicates with this.
 	virtual sound_service_vfs *get_vfs() = 0;
 	static std::unique_ptr<sound_service> make();
+};
+
+// filters and protocols
+class encryption_filter : public sound_service::filter
+{
+public:
+    static const sound_service::filter *get_instance();
+    encryption_filter();
+    virtual std::istream *wrap(std::istream &source, const directive_t directive) const;
+    static encryption_filter instance;
+};
+class memory_protocol : public sound_service::protocol
+{
+    static const memory_protocol instance;
+public:
+    virtual std::istream *open_uri(const char *uri, const directive_t directive) const;
+    virtual const std::string get_suffix(const directive_t &directive) const;
+    static const protocol *get_instance();
+    /**
+     * Returns a directive_t that wraps a memory buffer; don't try to do this any other way!
+     * This does not take ownership of your data pointer; you're still responsible for cleaning it up!
+     */
+    static directive_t directive(const void *data, size_t size);
+};
+class pack_protocol : public sound_service::protocol
+{
+    static const pack_protocol instance;
+public:
+    virtual std::istream *open_uri(const char *uri, const directive_t directive) const;
+    virtual const std::string get_suffix(const directive_t &directive) const;
+    static const protocol *get_instance();
 };

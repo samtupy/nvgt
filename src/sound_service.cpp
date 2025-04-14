@@ -1,4 +1,4 @@
-/* sound_service.cpp - sound service implementation code
+/* sound_service.cpp - sound service implementation code written by Caturria
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -14,9 +14,13 @@
 #include <Poco/FileStream.h>
 #include <vector>
 #include <cassert>
-#include "miniaudio.h"
-#include "text_validation.h"
+#include <miniaudio.h>
+#include "crypto.h"
+#include "misc_functions.h" // is_valid_utf8
+#include "pack.h"
 #include <Poco/StringTokenizer.h>
+#include <poco/NumberFormatter.h>
+#include <Poco/MemoryStream.h>
 #include <poco/NumberParser.h>
 #include <sstream>
 #include <iostream>
@@ -454,3 +458,95 @@ sound_service::~sound_service()
 }
 const sound_service_impl::fs_protocol sound_service_impl::fs_protocol::instance;
 const sound_service_impl::null_filter sound_service_impl::null_filter::instance;
+
+// ChaCha encryption sound service filter
+const sound_service::filter *encryption_filter::get_instance()
+{
+    return &instance;
+}
+encryption_filter::encryption_filter()
+{
+}
+std::istream *encryption_filter::wrap(std::istream &source, const directive_t directive) const
+{
+    // Key is expected to have been passed in through the directive interface.
+    const std::shared_ptr<const std::string> key = std::static_pointer_cast<const std::string>(directive);
+    if (key == nullptr)
+    {
+        return &source;
+    }
+    try
+    {
+        return new chacha_istream(source, *key);
+    }
+    catch (std::exception &)
+    {
+        // Not encrypted or not valid.
+        return nullptr;
+    }
+}
+encryption_filter encryption_filter::instance;
+
+// Memory buffer sound service protocol implementation
+static std::atomic<uint64_t> next_memory_id = 0;
+struct memory_args
+{
+    const void *data;
+    size_t size;
+    uint64_t id; // Prevents caching by resource manager.
+};
+
+std::istream *memory_protocol::open_uri(const char *uri, const directive_t directive) const
+{
+    // This proto doesn't care about the URI itself.
+    std::shared_ptr<const memory_args> args = std::static_pointer_cast<const memory_args>(directive);
+    if (args == nullptr)
+    {
+        return nullptr;
+    }
+    return new Poco::MemoryInputStream((const char *)args->data, args->size);
+}
+const std::string memory_protocol::get_suffix(const directive_t &directive) const
+{
+    std::shared_ptr<const memory_args> args = std::static_pointer_cast<const memory_args>(directive);
+    return Poco::NumberFormatter::format(args->id);
+}
+directive_t memory_protocol::directive(const void *data, size_t size)
+{
+    std::shared_ptr<memory_args> args = std::make_shared<memory_args>();
+    args->data = data;
+    args->size = size;
+    args->id = next_memory_id++;
+    return args;
+}
+const memory_protocol memory_protocol::instance;
+const sound_service::protocol *memory_protocol::get_instance()
+{
+    return &instance;
+}
+
+// pack file sound service protocol
+std::istream *pack_protocol::open_uri(const char *uri, const directive_t directive) const
+{
+    std::shared_ptr<const pack_interface> obj = std::static_pointer_cast<const pack>(directive);
+    if (obj == nullptr)
+    {
+        return nullptr;
+    }
+    std::istream *item = obj->get_file(uri);
+    return item;
+}
+const std::string pack_protocol::get_suffix(const directive_t &directive) const
+{
+    std::shared_ptr<const pack_interface> obj = std::static_pointer_cast<const pack>(directive);
+    if (obj == nullptr)
+    {
+        return "error";
+    }
+    return obj->get_pack_name();
+}
+const pack_protocol pack_protocol::instance;
+const sound_service::protocol *pack_protocol::get_instance()
+{
+    return &instance;
+}

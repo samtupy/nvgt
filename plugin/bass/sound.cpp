@@ -47,6 +47,7 @@
 #include "sound.h"
 #include <scriptarray.h>
 #include "timestuff.h" //ticks() sound preloading
+#include "xplatform.h" // running_on_mobile
 #include <system_error>
 #include <fast_float.h>
 #include <Poco/StringTokenizer.h>
@@ -120,10 +121,10 @@ BOOL init_sound(unsigned int dev) {
 	if (BASS_Init(dev, 44100, 0, NULL, NULL))
 		sound_initialized = TRUE;
 	if (sound_initialized) {
-		if (!BASS_PluginLoad("lib\\bassflac.dll", 0))
-			BASS_PluginLoad("bassflac.dll", 0);
-		if (!BASS_PluginLoad("lib\\bassopus.dll", 0))
-			BASS_PluginLoad("bassopus.dll", 0);
+		if (!BASS_PluginLoad("lib\\bassflac", 0))
+			BASS_PluginLoad("bassflac", 0);
+		if (!BASS_PluginLoad("lib\\bassopus", 0))
+			BASS_PluginLoad("bassopus", 0);
 		BASS_GetVersion();
 		BASS_FX_GetVersion();
 		output = new mixer(NULL);
@@ -1082,7 +1083,7 @@ BOOL sound::postload(const string& filename) {
 		iplBinauralEffectCreate(phonon_context, &phonon_audio_settings, &effect_settings, &hrtf_effect);
 	}
 	if (!parent_mixer)
-		parent_mixer = output;
+		parent_mixer = g_default_mixer? g_default_mixer : output;
 	if (!output_mixer) {
 		output_mixer = new mixer(parent_mixer, !env);
 		if (listener_x != x || listener_y != y || listener_z != z || env)
@@ -1090,8 +1091,6 @@ BOOL sound::postload(const string& filename) {
 	} else if (!pos_effect && (listener_x != x || listener_y != y || listener_z != z || env))
 		pos_effect = BASS_ChannelSetDSP(output_mixer->channel, positioning_dsp, this, 0);
 	store_channel = register_hstream(channel);
-	if (g_default_mixer != NULL)
-		set_mixer(g_default_mixer);
 	output_mixer->add_sound(*this, TRUE);
 	script_loading = FALSE;
 	return TRUE;
@@ -1438,6 +1437,14 @@ BOOL sound::slide_volume(float volume, unsigned int time) {
 BOOL sound::slide_volume_alt(float volume, unsigned int time) {
 	return slide_volume((volume + 100) / 100, time);
 }
+/**
+ * A dummy version of sound.pitch_lower_limit that just returns const 0 all the time.
+ * Since this is not using legacy DirectSound there's no need for this API except for BGT compat.
+ */
+const double sound::pitch_lower_limit()
+{
+	return 0;
+}
 
 int mixer::get_effect_index(const std::string& id) {
 	if (id.size() < 2) return -1;
@@ -1490,8 +1497,13 @@ void mixer::AddRef() {
 	asAtomicInc(RefCount);
 }
 void mixer::Release() {
-	if (asAtomicDec(RefCount) < 1)
+	if (asAtomicDec(RefCount) < 1) {
+		if (channel) {
+			BASS_StreamFree(channel); // Apparently I was having a problem with extraneous calls to BASS_StreamFree when trying to do it in mixer destructor years ago, since miniaudio switch iminent we'll just leave this here rather than figuring out what I was doing wrong back then.
+			channel = 0;
+		}
 		delete this;
+	}
 }
 
 int mixer::get_data(const unsigned char* buffer, int bufsize) {
@@ -1992,6 +2004,7 @@ sound_environment* ScriptSound_Environment_Factory() {
 	return new sound_environment();
 }
 void RegisterScriptSound(asIScriptEngine* engine) {
+	engine->SetDefaultNamespace("legacy");
 	engine->RegisterGlobalProperty("pack@ sound_default_pack", &g_sound_default_pack);
 	engine->RegisterFuncdef(_O("void sound_close_callback(string)"));
 	engine->RegisterFuncdef(_O("uint sound_length_callback(string)"));
@@ -2007,23 +2020,23 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_RELEASE, "void f()", asMETHOD(sound, Release), asCALL_THISCALL);
 	engine->RegisterObjectProperty("sound", "const string loaded_filename", asOFFSET(sound, loaded_filename));
 	engine->RegisterObjectMethod("sound", "bool close()", asMETHOD(sound, close), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool load(const string &in, pack@ = sound_default_pack, bool = true)", asMETHOD(sound, load), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load(const string &in filename, pack@ pack_file = sound_default_pack, bool allow_preloads = !system_is_mobile)", asMETHOD(sound, load), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool load(sound_close_callback@, sound_length_callback@, sound_read_callback@, sound_seek_callback@, const string &in, const string&in = \"\")", asMETHOD(sound, load_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool load(string&, uint, const string&in = \"\", bool = false)", asMETHOD(sound, load_memstream), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool load_url(const string &in)", asMETHOD(sound, load_url), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool stream(const string &in, pack@ = sound_default_pack)", asMETHOD(sound, stream), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool push_memory(const string &in, bool = false, int = 0, int = 0)", asMETHOD(sound, push_string), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool set_position(float, float, float, float, float, float, float, float, float)", asMETHOD(sound, set_position), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool set_mixer(mixer@ = null)", asMETHOD(sound, set_mixer), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "void set_hrtf(bool = true)", asMETHOD(sound, set_hrtf), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "void set_length(float = 0.0)", asMETHOD(sound, set_length), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool set_fx(const string &in, int = -1)", asMETHOD(sound, set_fx), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool play(bool = true)", asMETHOD(sound, play), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load(string& data, uint size, const string&in preload_filename = \"\", bool legacy_encrypt = false)", asMETHOD(sound, load_memstream), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load_url(const string &in url)", asMETHOD(sound, load_url), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool stream(const string &in filename, pack@ containing_pack = sound_default_pack)", asMETHOD(sound, stream), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool push_memory(const string &in data, bool end_stream = false, int pcm_rate = 0, int pcm_channels = 0)", asMETHOD(sound, push_string), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool set_position(float listener_x, float listener_y, float listener_z, float sound_x, float sound_y, float sound_z, float rotation = 0.0, float pan_step = 1.0, float volume_step = 1.0)", asMETHOD(sound, set_position), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool set_mixer(mixer@ mixer = null)", asMETHOD(sound, set_mixer), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_hrtf(bool enable = true)", asMETHOD(sound, set_hrtf), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_length(float length = 0.0)", asMETHOD(sound, set_length), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool set_fx(const string &in fx, int index = -1)", asMETHOD(sound, set_fx), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool play(bool reset_loop_state = true)", asMETHOD(sound, play), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool play_wait()", asMETHOD(sound, play_wait), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool play_looped()", asMETHOD(sound, play_looped), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool pause()", asMETHOD(sound, pause), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool stop()", asMETHOD(sound, stop), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool seek(float)", asMETHOD(sound, seek), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool seek(float position)", asMETHOD(sound, seek), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool get_active() const property", asMETHOD(sound, is_active), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool get_playing() const property", asMETHOD(sound, is_playing), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool get_paused() const property", asMETHOD(sound, is_paused), asCALL_THISCALL);
@@ -2042,9 +2055,11 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("sound", "float get_volume() const property", asMETHOD(sound, get_volume_alt), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "void set_volume(float) property", asMETHOD(sound, set_volume_alt), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool slide_volume(float, uint)", asMETHOD(sound, slide_volume_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "double get_pitch_lower_limit() const property", asMETHOD(sound, pitch_lower_limit), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool set_fx(const string &in, int = -1)", asMETHOD(mixer, set_fx), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool set_position(float, float, float, float, float, float, float, float, float)", asMETHOD(mixer, set_position), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool set_mixer(mixer@ = null)", asMETHOD(mixer, set_mixer), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "void set_hrtf(bool = true)", asMETHOD(mixer, set_hrtf), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool get_sliding() const property", asMETHOD(mixer, is_sliding), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool get_pan_sliding() const property", asMETHOD(mixer, is_pan_sliding), asCALL_THISCALL);
 	engine->RegisterObjectMethod("mixer", "bool get_pitch_sliding() const property", asMETHOD(mixer, is_pitch_sliding), asCALL_THISCALL);
@@ -2084,4 +2099,5 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool get_sound_global_hrtf() property", asFUNCTION(get_global_hrtf), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_global_hrtf(bool) property", asFUNCTION(set_global_hrtf), asCALL_CDECL);
 	engine->RegisterGlobalProperty("mixer@ sound_default_mixer", &g_default_mixer);
+	engine->SetDefaultNamespace("");
 }
