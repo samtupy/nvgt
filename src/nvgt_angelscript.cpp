@@ -54,7 +54,6 @@
 #endif
 #include "nvgt_plugin.h"
 #include "pack.h"
-#include "pack2.h" //Eventually expected to replace pack.h
 #include "pathfinder.h"
 #include "pocostuff.h"
 #include "random.h"
@@ -493,7 +492,6 @@ int ConfigureEngine(asIScriptEngine *engine)
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_FS);
 	engine->BeginConfigGroup("pack");
 	RegisterScriptPack(engine);
-	new_pack::register_pack(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_PATHFINDER);
 	engine->BeginConfigGroup("pathfinder");

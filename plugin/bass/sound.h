@@ -128,7 +128,7 @@ public:
 	float volume_step;
 	unsigned int channel;
 	hstream_entry* store_channel;
-	sound_base() : env(NULL), source(NULL), direct_effect(NULL), reflection_effect(NULL), reflection_decode_effect(NULL) {}
+	sound_base() : env(NULL), source(NULL), direct_effect(NULL), reflection_effect(NULL), reflection_decode_effect(NULL), use_hrtf(false) {}
 	virtual void AddRef();
 	virtual void Release();
 	void set_hrtf(BOOL enable) {
@@ -210,6 +210,7 @@ public:
 	BOOL slide_pitch_alt(float pitch, unsigned int time);
 	BOOL set_volume_alt(float volume);
 	BOOL slide_volume_alt(float volume, unsigned int time);
+	const double pitch_lower_limit();
 };
 
 class mixer : public sound_base {

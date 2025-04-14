@@ -41,7 +41,7 @@
 #include <string>
 #include "datastreams.h"
 #include "nvgt.h"		   // subsystems.
-#include "chacha_stream.h" //Custom asset encryption stream.
+#include "crypto.h" //Custom asset encryption stream.
 
 using namespace Poco;
 

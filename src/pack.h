@@ -1,4 +1,5 @@
 /* pack.h - pack file implementation header
+ * Note: temporarily namespaced as new_pack to avoid name collision problems on the C++ side during integration: will be changed once the original packfile is removed.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -8,109 +9,100 @@
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
-*/
-
+ */
 #pragma once
-
-#include <angelscript.h>
-#include <stdio.h>
-#include <cstring>
-#include <unordered_map>
 #include <string>
-#include <vector>
-#include <Poco/BinaryReader.h>
-#include <Poco/BinaryWriter.h>
-#include <scriptarray.h>
-#include "nvgt.h"
-
-typedef struct {
-	unsigned int filesize; // Size of this file in unsigned chars.
-	unsigned int namelen; // Length of this filename in unsigned chars.
-	unsigned int magic; // whatever value results from the expression filesize*namelen*2, it doesn't matter if our unsigned int overflows because this is for verification and we don't care about the actual value.
-	unsigned int offset; // Not actually saved in the final output stream, contains the true offset in the loaded binary file to this item's data.
-} pack_item;
-
-typedef struct {
-	char ident[8];
-	unsigned int filecount;
-} pack_header;
-
-typedef struct {
-	std::string filename; // Filename associated with the stream, passed to pack::read_file.
-	unsigned int offset; // Current offset in the stream.
-	unsigned int filesize; // For convenience, only fetch it once and save it here.
-	FILE* reader;
-	bool reading;
-	bool close;
-	unsigned int stridx;
-} pack_stream;
-
-typedef enum { PACK_OPEN_MODE_NONE, PACK_OPEN_MODE_APPEND, PACK_OPEN_MODE_CREATE, PACK_OPEN_MODE_READ, PACK_OPEN_MODES_TOTAL } pack_open_mode;
-class pack {
-	FILE* fptr;
-	unsigned char* mptr;
-	std::unordered_map<std::string, pack_item> pack_items;
-	std::vector<std::string> pack_filenames;
-	std::unordered_map<unsigned int, pack_stream*>pack_streams;
-	std::string current_filename;
-	pack_open_mode open_mode;
-	std::string pack_ident;
-	unsigned int file_offset; // Offset into opened file where pack is contained, used for embedding packs into executables.
-	int RefCount;
-public:
-	unsigned int next_stream_idx;
-	bool delay_close;
-	pack();
-	void AddRef();
-	void Release();
-	bool set_pack_identifier(const std::string& ident);
-	bool open(const std::string& filename, pack_open_mode mode, bool memload);
-	bool close();
-	bool add_file(const std::string& disk_filename, const std::string& pack_filename, bool allow_replace = false);
-	bool add_memory(const std::string& pack_filename, unsigned char* data, unsigned int size, bool allow_replace = false);
-	bool add_memory(const std::string& pack_filename, const std::string& data, bool allow_replace = false);
-	bool delete_file(const std::string& pack_filename);
-	bool file_exists(const std::string& pack_filename);
-	unsigned int get_file_name(int idx, char* buffer, unsigned int size);
-	std::string get_file_name(int idx);
-	void list_files(std::vector<std::string>& files);
-	CScriptArray* list_files();
-	unsigned int get_file_size(const std::string& pack_filename);
-	unsigned int get_file_offset(const std::string& pack_filename);
-	unsigned int read_file(const std::string& pack_filename, unsigned int offset, unsigned char* buffer, unsigned int size, FILE* reader = NULL);
-	std::string read_file_string(const std::string& pack_filename, unsigned int offset, unsigned int size);
-	bool raw_seek(int offset);
-	bool stream_close(pack_stream* stream, bool while_reading = false);
-	pack_stream* stream_open(const std::string& pack_filename, unsigned int offset = 0);
-	unsigned int stream_pos(pack_stream* stream) {
-		return stream->offset;
-	}
-	unsigned int stream_read(pack_stream* stream, unsigned char* buffer, unsigned int size);
-	bool stream_seek(pack_stream* stream, unsigned int offset, int origen = SEEK_SET);
-	unsigned int stream_size(pack_stream* stream) {
-		return stream->filesize;
-	}
-	bool stream_close_script(unsigned int idx);
-	unsigned int stream_open_script(const std::string& pack_filename, unsigned int offset = 0);
-	unsigned int stream_pos_script(unsigned int idx) {
-		return pack_streams.find(idx) != pack_streams.end() ? pack_streams[idx]->offset : 0xffffffff;
-	}
-	unsigned int stream_read_script(unsigned int idx, unsigned char* buffer, unsigned int size);
-	std::string stream_read_string(unsigned int idx, unsigned int size);
-	bool stream_seek_script(unsigned int idx, unsigned int offset, int origen = SEEK_SET);
-	unsigned int stream_size_script(unsigned int idx) {
-		return pack_streams.find(idx) != pack_streams.end() ? pack_streams[idx]->filesize : 0;
-	}
-	unsigned int size() {
-		return pack_items.size();
-	}
-	bool is_active() {
-		return fptr || mptr;
+#include <Poco/RefCountedObject.h>
+#include <Poco/BufferedStreamBuf.h>
+#include <istream>
+#include <memory>
+#include "nvgt_plugin.h" // pack_interface
+namespace Poco { class BinaryReader; class BinaryWriter; }
+class asIScriptEngine;
+class datastream;
+class CScriptArray;
+class pack : public pack_interface
+{
+	enum open_modes
+	{
+		OPEN_NOT = 0,
+		OPEN_READ,
+		OPEN_WRITE,
 	};
-};
+	class read_mode_internals;
+	class write_mode_internals;
 
+	open_modes open_mode;
+	// bleh... can't be a union because these need to be shared_ptrs.
+	std::shared_ptr<read_mode_internals> read;
+	std::shared_ptr<write_mode_internals> write;
+	std::string pack_name; // When a pack is opened for reading, this should be set to the name of the pack file so we can create new streams to open files.
+	std::string key;
+	const pack_interface* mutable_ptr; // If a pack is made immutable for the sound system, contains 2a pointer to the mutable version.
+	// Sets the pack name, converting it to an absolute path if necessary.
+	void set_pack_name(const std::string &name);
+
+public:
+	struct toc_entry;
+
+	pack();
+	// Copy constructor. Can only copy read mode packs. Only for safely providing immutable packs to the sound system. Don't give this to script.
+	pack(const pack &other);
+	~pack();
+	inline const pack_interface* make_immutable() const override { return new pack(*this); }
+	inline const pack_interface* get_mutable() const override { if (mutable_ptr) mutable_ptr->duplicate(); return mutable_ptr; }
+	bool create(const std::string &filename, const std::string &key = "");
+	bool open(const std::string &filename, const std::string &key = "", uint64_t pack_offset = 0, uint64_t pack_size = 0);
+
+	bool close();
+	bool add_file(const std::string &filename, const std::string &internal_name);
+	bool add_stream(const std::string &internal_name, datastream* ds);
+	bool add_memory(const std::string& internal_name, const std::string& data);
+	bool file_exists(const std::string &filename);
+	int64_t get_file_size(const std::string& filename);
+	// Gets a raw istream that points to the requested file. This is not the version that's given to script.
+	std::istream *get_file(const std::string &filename) const override;
+	// Returns a datastream for script that points to the requested file.
+	datastream *get_file_script(const std::string &filename, const std::string &encoding, int byteorder);
+	bool get_active();
+	int64_t get_file_count();
+	bool extract_file(const std::string &internal_name, const std::string &file_on_disk);
+
+	CScriptArray *list_files();
+	// Returns the absolute path to this pack file on disk.
+	const std::string get_pack_name() const override;
+	/**
+	 * Creates a shared pointer to this object that can be used as a sound_service directive.
+	 * It calls duplicate() on the object, then returns a shared pointer which calls release() instead of deleting directly.
+	 */
+	std::shared_ptr<pack> to_shared();
+	// Releases the given pack object. Used by to_shared().
+	static void release_pack(pack *obj);
+	// Angelscript factory behaviour
+	static pack *make();
+};
+// sectioned istream
+class section_istreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_traits<char>>
+{
+	std::istream *source;
+	std::streamoff start;
+	std::streamsize size;
+public:
+	section_istreambuf(std::istream &source, std::streamoff start, std::streamsize size);
+	~section_istreambuf();
+	int readFromDevice(char *buffer, std::streamsize length);
+	std::streampos seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in);
+	std::streampos seekpos(std::streampos pos, std::ios_base::openmode which = std::ios_base::in);
+};
+class section_istream : public std::istream
+{
+public:
+	section_istream(std::istream &source, std::streamoff start, std::streamsize size);
+	~section_istream();
+};
+// Pack embedding
 void embed_pack(const std::string& disc_filename, const std::string& embed_filename);
 bool load_embedded_packs(Poco::BinaryReader& br);
 void write_embedded_packs(Poco::BinaryWriter& bw);
-
-void RegisterScriptPack(asIScriptEngine* engine);
+// Engine registration
+void RegisterScriptPack(asIScriptEngine *engine);
