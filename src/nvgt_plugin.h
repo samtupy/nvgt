@@ -222,12 +222,15 @@ public:
 
 #endif // NVGT_BUILDING
 
+// This class must be derived from for any custom pack or vfs objects that wish to integrate with NVGT's sound system.
 class pack_interface {
-	int refcount;
+	mutable int refcount;
 	public:
 	pack_interface() : refcount(1) {}
-	void duplicate() { asAtomicInc(refcount); }
-	void release() { if (asAtomicDec(refcount) < 1) delete this; }
+	void duplicate() const { asAtomicInc(refcount); }
+	void release() const { if (asAtomicDec(refcount) < 1) delete this; }
+	virtual const pack_interface* make_immutable() const = 0;
+	virtual const pack_interface* get_mutable() const = 0;
 	virtual std::istream* get_file(const std::string& filename) const { return nullptr; }
 	virtual const std::string get_pack_name() const { return ""; }
 	template <class A, class B> static B* op_cast(A* from) {

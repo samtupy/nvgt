@@ -38,7 +38,7 @@ class menu {
 	private bool _allow_escape = true; // If set to false, the user must click on an option manually and will not be able to use escape to exit the menu.
 	private bool _allow_go_to_index = true; // If set to false, the user can no longer press ctrl+g to select a menu item by number.
 	private bool _allow_search = true; // If set to false, the user can no longer press ctrl+f to search for an item in the menu by text.
-	pack@ pack_file; // Optionally set this to a pack containing sounds.
+	pack_file@ pack_file; // Optionally set this to a pack containing sounds.
 	menu() {
 		reset();
 	}

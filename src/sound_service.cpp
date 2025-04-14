@@ -273,6 +273,14 @@ public:
 		protocols[slot]->set_directive(new_directive);
 		return true;
 	}
+	const directive_t get_protocol_directive(size_t slot) const
+	{
+		if (slot < 0 || slot >= protocols.size())
+		{
+			return nullptr;
+		}
+		return protocols[slot]->get_directive();
+	}
 	bool set_filter_directive(size_t slot, const directive_t &new_directive)
 	{
 		if (slot < 0 || slot >= filters.size())
@@ -528,7 +536,7 @@ const sound_service::protocol *memory_protocol::get_instance()
 // pack file sound service protocol
 std::istream *pack_protocol::open_uri(const char *uri, const directive_t directive) const
 {
-    std::shared_ptr<const pack_interface> obj = std::static_pointer_cast<const pack>(directive);
+    std::shared_ptr<const pack_interface> obj = std::static_pointer_cast<const pack_interface>(directive);
     if (obj == nullptr)
     {
         return nullptr;
@@ -538,7 +546,7 @@ std::istream *pack_protocol::open_uri(const char *uri, const directive_t directi
 }
 const std::string pack_protocol::get_suffix(const directive_t &directive) const
 {
-    std::shared_ptr<const pack_interface> obj = std::static_pointer_cast<const pack>(directive);
+    std::shared_ptr<const pack_interface> obj = std::static_pointer_cast<const pack_interface>(directive);
     if (obj == nullptr)
     {
         return "error";

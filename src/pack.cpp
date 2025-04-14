@@ -353,15 +353,14 @@ void pack::set_pack_name(const std::string &name)
 {
 	pack_name = Poco::Path(name).absolute().toString();
 }
-pack::pack()
+pack::pack() : mutable_ptr(nullptr)
 {
 	open_mode = OPEN_NOT;
 }
-pack::pack(const pack &other)
+pack::pack(const pack &other) : mutable_ptr(&other)
 {
 	if (other.open_mode != OPEN_READ)
 	{
-
 		throw std::invalid_argument("Only packs that are opened in read mode can be copy constructed. If you're trying to load sounds from a pack, please check the return value from your open call as your pack was not opened successfully.");
 	}
 
@@ -369,10 +368,11 @@ pack::pack(const pack &other)
 	read = other.read;
 	pack_name = other.pack_name;
 	key = other.key;
+	other.duplicate(); // We have no choice but to hold on to a reference to the pack we're cloning so that the user can safely query the pack in use.
 }
 pack::~pack()
 {
-
+	if (mutable_ptr) mutable_ptr->release();
 	close();
 }
 bool pack::create(const std::string &filename, const std::string &key)
@@ -770,8 +770,8 @@ void RegisterScriptPack(asIScriptEngine *engine)
 	engine->RegisterObjectBehaviour("pack_interface", asBEHAVE_RELEASE, "void c()", asMETHOD(pack_interface, release), asCALL_THISCALL);
 	engine->RegisterObjectType("pack_file", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("pack_file", asBEHAVE_FACTORY, "pack_file@ a()", asFUNCTION(pack::make), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("pack_file", asBEHAVE_ADDREF, "void b()", asMETHOD(pack, duplicate), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("pack_file", asBEHAVE_RELEASE, "void c()", asMETHOD(pack, release), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("pack_file", asBEHAVE_ADDREF, "void b()", asMETHODPR(pack, duplicate, () const, void), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("pack_file", asBEHAVE_RELEASE, "void c()", asMETHODPR(pack, release, () const, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "pack_interface@ opImplCast()", asFUNCTION((pack_interface::op_cast<pack, pack_interface>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("pack_interface", "pack_file@ opCast()", asFUNCTION((pack_interface::op_cast<pack_interface, pack>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("pack_file", "bool create(const string &in filename, const string&in key = \"\")", asMETHOD(pack, create), asCALL_THISCALL);

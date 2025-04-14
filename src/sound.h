@@ -18,6 +18,7 @@
 
 class CScriptArray;
 class asIScriptEngine;
+class pack_interface;
 class audio_engine;
 class mixer;
 class sound;
@@ -118,7 +119,11 @@ public:
 	virtual void release() = 0;
 	virtual audio_engine *get_engine() = 0;
 	virtual ma_sound *get_ma_sound() = 0;
-	virtual bool play() = 0;
+	virtual bool set_mixer(mixer* mix) = 0;
+	virtual mixer* get_mixer() const = 0;
+	virtual bool set_hrtf(bool hrtf) = 0;
+	virtual bool get_hrtf() const = 0;
+	virtual bool play(bool looping = false) = 0;
 	virtual bool play_looped() = 0;
 	virtual bool stop() = 0;
 	virtual void set_volume(float volume) = 0;
@@ -195,8 +200,8 @@ public:
 	 * Also to those implementing custom sound methods: review the MiniAudio documentation to be sure you understand what the flags passed to ma_sound_init_from_file do. Some data sources, by their nature, only make sense in combination with certain flags. For example, MA_SOUND_FLAG_STREAM would be inappropriate for a string source unless you can guarantee it won't go away or be modified by script during playback.
 	 */
 	virtual bool load_special(const std::string &filename, const size_t protocol_slot = 0, directive_t protocol_directive = nullptr, const size_t filter_slot = 0, directive_t filter_directive = nullptr, ma_uint32 ma_flags = MA_SOUND_FLAG_DECODE) = 0;
-	virtual bool load(const std::string &filename) = 0;
-	virtual bool stream(const std::string &filename) = 0;
+	virtual bool load(const std::string &filename, const pack_interface* pack_file = nullptr) = 0;
+	virtual bool stream(const std::string &filename, const pack_interface* pack_file = nullptr) = 0;
 	virtual bool load_string(const std::string &data) = 0;
 	virtual bool load_string_async(const std::string &data) = 0; // Makes an extra copy. Good for short sounds that need to start immediately. Used by speak_to_sound.
 	virtual bool load_memory(const void *buffer, unsigned int size) = 0;
@@ -209,6 +214,7 @@ public:
 	static bool pcm_to_wav(const void *buffer, unsigned int size, ma_format format, int samplerate, int channels, void *output);
 	virtual bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) = 0;
 	virtual bool close() = 0;
+	virtual const std::string& get_loaded_filename() const = 0;
 	virtual bool get_active() = 0;
 	virtual bool get_paused() = 0;
 	virtual bool pause() = 0;

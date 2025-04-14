@@ -38,6 +38,7 @@ class pack : public pack_interface
 	std::shared_ptr<write_mode_internals> write;
 	std::string pack_name; // When a pack is opened for reading, this should be set to the name of the pack file so we can create new streams to open files.
 	std::string key;
+	const pack_interface* mutable_ptr; // If a pack is made immutable for the sound system, contains 2a pointer to the mutable version.
 	// Sets the pack name, converting it to an absolute path if necessary.
 	void set_pack_name(const std::string &name);
 
@@ -48,6 +49,8 @@ public:
 	// Copy constructor. Can only copy read mode packs. Only for safely providing immutable packs to the sound system. Don't give this to script.
 	pack(const pack &other);
 	~pack();
+	inline const pack_interface* make_immutable() const override { return new pack(*this); }
+	inline const pack_interface* get_mutable() const override { if (mutable_ptr) mutable_ptr->duplicate(); return mutable_ptr; }
 	bool create(const std::string &filename, const std::string &key = "");
 	bool open(const std::string &filename, const std::string &key = "", uint64_t pack_offset = 0, uint64_t pack_size = 0);
 

@@ -89,6 +89,7 @@ public:
 	virtual bool is_default_filter(size_t slot) = 0;
 	// Changes the default directive (such as an archive file name) that the given protocol uses.
 	virtual bool set_protocol_directive(size_t slot, const directive_t &new_directive) = 0;
+	virtual const directive_t get_protocol_directive(size_t slot) const = 0;
 	// Changes the default directive (such as a decryption key) that the given filter uses.
 	virtual bool set_filter_directive(size_t slot, const directive_t &new_directive) = 0;
 	/**
