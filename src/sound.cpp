@@ -14,6 +14,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <Poco/FileStream.h>
+#include <Poco/format.h>
 #include <Poco/MemoryStream.h>
 #include <angelscript.h>
 #include <scriptarray.h>
@@ -157,10 +159,7 @@ ma_result wav_seek_proc(ma_encoder *pEncoder, ma_int64 offset, ma_seek_origin or
 	}
 	std::ostream *stream = static_cast<std::ostream *>(pEncoder->pUserData);
 	stream->seekp(offset);
-	if (!stream->good())
-	{
-		return MA_ERROR;
-	}
+	if (!stream->good()) return MA_ERROR;
 	return MA_SUCCESS;
 }
 
@@ -224,10 +223,11 @@ public:
 		  flags(static_cast<engine_flags>(flags)),
 		  refcount(1)
 	{
+		init_sound();
 		engine = std::make_unique<ma_engine>();
-		device = std::make_unique<ma_device>();
 		// We need a self-managed device because at least on Windows, we can't meet low-latency requirements without specific configurations.
-		{
+		if (flags & NO_DEVICE == 0) {
+			device = std::make_unique<ma_device>();
 			ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
 			// Just set to some hard-coded defaults for now.
 			cfg.playback.channels = 2;
@@ -257,7 +257,7 @@ public:
 			// Attach the resource manager to the sound service so that it can receive audio from custom sources.
 			cfg.pVFS = g_sound_service->get_vfs();
 			// This is the sample rate that sounds will be resampled to if necessary during loading. We set this equal to whatever sample rate the device got. This is maximally efficient as long as the user doesn't switch devices to one that runs at a different rate. When they do, a single resampler kicks in.
-			cfg.decodedSampleRate = device->playback.internalSampleRate;
+			cfg.decodedSampleRate = device? device->playback.internalSampleRate : 48000; // Todo: get rid of this magic number and set up a constructor argument.
 			// Set the resampler used during decoding to a high quality one. At the time of writing this, this is relying on support that I added to MiniAudio myself and has not yet been merged upstream.
 			cfg.resampling.algorithm = ma_resample_algorithm_custom;
 			cfg.resampling.pBackendVTable = &wdl_resampler_backend_vtable;
@@ -280,12 +280,15 @@ public:
 		ma_engine_config cfg = ma_engine_config_init();
 		// cfg.pContext = &g_sound_context; // Miniaudio won't let us quickly uninitilize then reinitialize a device sometimes when using the same context, so we won't manage it until we figure that out.
 		cfg.pResourceManager = &*resource_manager;
-		cfg.pDevice = &*device;
+		cfg.noAutoStart = flags & NO_AUTO_START? MA_TRUE : MA_FALSE;
+		if (flags & NO_DEVICE == 0) cfg.pDevice = &*device;
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS)
 		{
 			engine.reset();
 			return;
 		}
+		set_listener_direction(0, 0, 1, 0);
+		set_listener_world_up(0, 0, 0, 1);
 		engine_endpoint = new audio_node_impl(reinterpret_cast<ma_node_base *>(ma_engine_get_endpoint(&*engine)), this);
 	}
 	~audio_engine_impl()
@@ -315,11 +318,11 @@ public:
 		if (asAtomicDec(refcount) < 1)
 			delete this;
 	}
-	ma_engine *get_ma_engine() override { return engine.get(); }
-	audio_node *get_endpoint() override { return engine_endpoint; } // Implement after audio_node
-	int get_device() override
+	ma_engine *get_ma_engine() const override { return engine.get(); }
+	audio_node *get_endpoint() const override { return engine_endpoint; }
+	int get_device() const override
 	{
-		if (!engine)
+		if (!engine || flags & NO_DEVICE)
 			return -1;
 		ma_device *dev = ma_engine_get_device(&*engine);
 		ma_device_info info;
@@ -334,7 +337,7 @@ public:
 	}
 	bool set_device(int device) override
 	{
-		if (!engine || device < 0 || device >= g_sound_output_devices.size())
+		if (!engine || flags & NO_DEVICE || device < 0 || device >= g_sound_output_devices.size())
 			return false;
 		ma_device *old_dev = ma_engine_get_device(&*engine);
 		if (!old_dev || ma_device_id_equal(&old_dev->playback.id, &g_sound_output_devices[device].id))
@@ -358,7 +361,7 @@ public:
 		return (g_soundsystem_last_error = ma_engine_start(&*engine)) == MA_SUCCESS;
 	}
 	bool read(void *buffer, unsigned long long frame_count, unsigned long long *frames_read) override { return engine ? (g_soundsystem_last_error = ma_engine_read_pcm_frames(&*engine, buffer, frame_count, frames_read)) == MA_SUCCESS : false; }
-	CScriptArray *read(unsigned long long frame_count) override
+	CScriptArray *read_script(unsigned long long frame_count) override
 	{
 		if (!engine)
 			return nullptr;
@@ -372,62 +375,62 @@ public:
 		result->Resize(frames_read * ma_engine_get_channels(&*engine));
 		return result;
 	}
-	unsigned long long get_time() override { return engine ? (flags & DURATIONS_IN_FRAMES ? get_time_in_frames() : get_time_in_milliseconds()) : 0; }
+	unsigned long long get_time() const override { return engine ? (flags & DURATIONS_IN_FRAMES ? get_time_in_frames() : get_time_in_milliseconds()) : 0; }
 	bool set_time(unsigned long long time) override { return engine ? (flags & DURATIONS_IN_FRAMES) ? set_time_in_frames(time) : set_time_in_milliseconds(time) : false; }
-	unsigned long long get_time_in_frames() override { return engine ? ma_engine_get_time_in_pcm_frames(&*engine) : 0; }
+	unsigned long long get_time_in_frames() const override { return engine ? ma_engine_get_time_in_pcm_frames(&*engine) : 0; }
 	bool set_time_in_frames(unsigned long long time) override { return engine ? (g_soundsystem_last_error = ma_engine_set_time_in_pcm_frames(&*engine, time)) == MA_SUCCESS : false; }
-	unsigned long long get_time_in_milliseconds() override { return engine ? ma_engine_get_time_in_milliseconds(&*engine) : 0; }
+	unsigned long long get_time_in_milliseconds() const override { return engine ? ma_engine_get_time_in_milliseconds(&*engine) : 0; }
 	bool set_time_in_milliseconds(unsigned long long time) override { return engine ? (g_soundsystem_last_error = ma_engine_set_time_in_milliseconds(&*engine, time)) == MA_SUCCESS : false; }
-	int get_channels() override { return engine ? ma_engine_get_channels(&*engine) : 0; }
-	int get_sample_rate() override { return engine ? ma_engine_get_sample_rate(&*engine) : 0; }
+	int get_channels() const override { return engine ? ma_engine_get_channels(&*engine) : 0; }
+	int get_sample_rate() const override { return engine ? ma_engine_get_sample_rate(&*engine) : 0; }
 	bool start() override { return engine ? (ma_engine_start(&*engine)) == MA_SUCCESS : false; }
 	bool stop() override { return engine ? (ma_engine_stop(&*engine)) == MA_SUCCESS : false; }
 	bool set_volume(float volume) override { return engine ? (g_soundsystem_last_error = ma_engine_set_volume(&*engine, volume)) == MA_SUCCESS : false; }
-	float get_volume() override { return engine ? ma_engine_get_volume(&*engine) : 0; }
+	float get_volume() const override { return engine ? ma_engine_get_volume(&*engine) : 0; }
 	bool set_gain(float db) override { return engine ? (g_soundsystem_last_error = ma_engine_set_gain_db(&*engine, db)) == MA_SUCCESS : false; }
-	float get_gain() override { return engine ? ma_engine_get_gain_db(&*engine) : 0; }
-	unsigned int get_listener_count() override { return engine ? ma_engine_get_listener_count(&*engine) : 0; }
-	int find_closest_listener(float x, float y, float z) override { return engine ? ma_engine_find_closest_listener(&*engine, x, y, z) : -1; }
-	int find_closest_listener(const reactphysics3d::Vector3 &position) override { return engine ? ma_engine_find_closest_listener(&*engine, position.x, position.y, position.z) : -1; }
+	float get_gain() const override { return engine ? ma_engine_get_gain_db(&*engine) : 0; }
+	unsigned int get_listener_count() const override { return engine ? ma_engine_get_listener_count(&*engine) : 0; }
+	int find_closest_listener(float x, float y, float z) const override { return engine ? ma_engine_find_closest_listener(&*engine, x, y, z) : -1; }
+	int find_closest_listener_vector(const reactphysics3d::Vector3 &position) const override { return engine ? ma_engine_find_closest_listener(&*engine, position.x, position.y, position.z) : -1; }
 	void set_listener_position(unsigned int index, float x, float y, float z) override
 	{
 		if (engine)
 			ma_engine_listener_set_position(&*engine, index, x, y, z);
 	}
-	void set_listener_position(unsigned int index, const reactphysics3d::Vector3 &position) override
+	void set_listener_position_vector(unsigned int index, const reactphysics3d::Vector3 &position) override
 	{
 		if (engine)
 			ma_engine_listener_set_position(&*engine, index, position.x, position.y, position.z);
 	}
-	reactphysics3d::Vector3 get_listener_position(unsigned int index) override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_position(&*engine, index)) : reactphysics3d::Vector3(); }
+	reactphysics3d::Vector3 get_listener_position(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_position(&*engine, index)) : reactphysics3d::Vector3(); }
 	void set_listener_direction(unsigned int index, float x, float y, float z) override
 	{
 		if (engine)
 			ma_engine_listener_set_direction(&*engine, index, x, y, z);
 	}
-	void set_listener_direction(unsigned int index, const reactphysics3d::Vector3 &direction) override
+	void set_listener_direction_vector(unsigned int index, const reactphysics3d::Vector3 &direction) override
 	{
 		if (engine)
 			ma_engine_listener_set_direction(&*engine, index, direction.x, direction.y, direction.z);
 	}
-	reactphysics3d::Vector3 get_listener_direction(unsigned int index) override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_direction(&*engine, index)) : reactphysics3d::Vector3(); }
+	reactphysics3d::Vector3 get_listener_direction(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_direction(&*engine, index)) : reactphysics3d::Vector3(); }
 	void set_listener_velocity(unsigned int index, float x, float y, float z) override
 	{
 		if (engine)
 			ma_engine_listener_set_velocity(&*engine, index, x, y, z);
 	}
-	void set_listener_velocity(unsigned int index, const reactphysics3d::Vector3 &velocity) override
+	void set_listener_velocity_vector(unsigned int index, const reactphysics3d::Vector3 &velocity) override
 	{
 		if (engine)
 			ma_engine_listener_set_velocity(&*engine, index, velocity.x, velocity.y, velocity.z);
 	}
-	reactphysics3d::Vector3 get_listener_velocity(unsigned int index) override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_velocity(&*engine, index)) : reactphysics3d::Vector3(); }
+	reactphysics3d::Vector3 get_listener_velocity(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_velocity(&*engine, index)) : reactphysics3d::Vector3(); }
 	void set_listener_cone(unsigned int index, float inner_radians, float outer_radians, float outer_gain) override
 	{
 		if (engine)
 			ma_engine_listener_set_cone(&*engine, index, inner_radians, outer_radians, outer_gain);
 	}
-	void get_listener_cone(unsigned int index, float *inner_radians, float *outer_radians, float *outer_gain) override
+	void get_listener_cone(unsigned int index, float *inner_radians, float *outer_radians, float *outer_gain) const override
 	{
 		if (engine)
 			ma_engine_listener_get_cone(&*engine, index, inner_radians, outer_radians, outer_gain);
@@ -437,19 +440,19 @@ public:
 		if (engine)
 			ma_engine_listener_set_world_up(&*engine, index, x, y, z);
 	}
-	void set_listener_world_up(unsigned int index, const reactphysics3d::Vector3 &world_up) override
+	void set_listener_world_up_vector(unsigned int index, const reactphysics3d::Vector3 &world_up) override
 	{
 		if (engine)
 			ma_engine_listener_set_world_up(&*engine, index, world_up.x, world_up.y, world_up.z);
 	}
-	reactphysics3d::Vector3 get_listener_world_up(unsigned int index) override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_world_up(&*engine, index)) : reactphysics3d::Vector3(); }
+	reactphysics3d::Vector3 get_listener_world_up(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_world_up(&*engine, index)) : reactphysics3d::Vector3(); }
 	void set_listener_enabled(unsigned int index, bool enabled) override
 	{
 		if (engine)
 			ma_engine_listener_set_enabled(&*engine, index, enabled);
 	}
-	bool get_listener_enabled(unsigned int index) override { return ma_engine_listener_is_enabled(&*engine, index); }
-	bool play(const string &filename, audio_node *node, unsigned int bus_index) override { return engine ? (g_soundsystem_last_error = ma_engine_play_sound_ex(&*engine, filename.c_str(), node ? node->get_ma_node() : nullptr, bus_index)) == MA_SUCCESS : false; }
+	bool get_listener_enabled(unsigned int index) const override { return ma_engine_listener_is_enabled(&*engine, index); }
+	bool play_through_node(const string &filename, audio_node *node, unsigned int bus_index) override { return engine ? (g_soundsystem_last_error = ma_engine_play_sound_ex(&*engine, filename.c_str(), node ? node->get_ma_node() : nullptr, bus_index)) == MA_SUCCESS : false; }
 	bool play(const string &filename, mixer *mixer) override { return engine ? (ma_engine_play_sound(&*engine, filename.c_str(), mixer ? mixer->get_ma_sound() : nullptr)) == MA_SUCCESS : false; }
 	mixer *new_mixer() override { return ::new_mixer(this); }
 	sound *new_sound() override { return ::new_sound(this); }
@@ -904,6 +907,16 @@ public:
 		// Also, our PCM buffer is a permanent class property so we can enjoy the speed of async loading.
 		return load_special(":pcm", g_memory_protocol_slot, memory_protocol::directive(&pcm_buffer[0], pcm_buffer.size()), sound_service::null_filter_slot, nullptr, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC);
 	}
+	bool load_pcm_script(CScriptArray* buffer, int samplerate, int channels) override {
+		if (!buffer) return false;
+		ma_format format;
+		if (buffer->GetElementTypeId() == asTYPEID_FLOAT) format = ma_format_f32;
+		else if (buffer->GetElementTypeId() == asTYPEID_INT32) format = ma_format_s32;
+		else if (buffer->GetElementTypeId() == asTYPEID_INT16) format = ma_format_s16;
+		else if (buffer->GetElementTypeId() == asTYPEID_UINT8) format = ma_format_u8;
+		else return false;
+		return load_pcm(buffer->GetBuffer(), buffer->GetSize() * buffer->GetElementSize(), format, samplerate, channels);
+	}
 	bool close() override
 	{
 		if (snd)
@@ -1183,10 +1196,13 @@ bool sound::pcm_to_wav(const void *buffer, unsigned int size, ma_format format, 
 	case ma_format_s32:
 		frame_size = 4;
 		break;
+	case ma_format_f32:
+		frame_size = 4;
+		break;
 	default:
 		return false;
 	}
-	frame_size /= channels;
+	frame_size *= channels;
 	Poco::MemoryOutputStream stream((char *)output, size + 44);
 	ma_encoder_config cfg = ma_encoder_config_init(ma_encoding_format_wav, format, channels, samplerate);
 	ma_encoder encoder;
@@ -1207,17 +1223,60 @@ bool sound::pcm_to_wav(const void *buffer, unsigned int size, ma_format format, 
 }
 
 template <class T, auto Function, typename ReturnType, typename... Args>
-ReturnType virtual_call(T *object, Args... args)
-{
+ReturnType virtual_call(T *object, Args... args) {
 	return (object->*Function)(std::forward<Args>(args)...);
 }
-template <class T>
-void RegisterSoundsystemAudioNode(asIScriptEngine *engine, const string &type)
+void RegisterSoundsystemEngine(asIScriptEngine* engine) {
+	engine->RegisterObjectType("audio_engine", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_FACTORY, "audio_engine@ e(int flags)", asFUNCTION(new_audio_engine), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call<audio_engine, &audio_engine::duplicate, void>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call<audio_engine, &audio_engine::release, void>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "int get_device() const", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_device, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "bool set_device(int device)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_device, bool, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "audio_node@+ get_endpoint() const property", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_endpoint, audio_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "float[]@ read(uint64 frame_count)", asFUNCTION((virtual_call<audio_engine, &audio_engine::read_script, CScriptArray*, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "uint64 get_time() const property", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_time, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "bool set_time(uint64 time)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_time, bool, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "uint64 get_time_in_frames() const property", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_time_in_frames, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "bool set_time_in_frames(uint64 time_frames)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_time_in_frames, bool, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "uint64 get_time_in_milliseconds() const property", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_time_in_milliseconds, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "bool set_time_in_milliseconds(uint64 time_ms)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_time_in_milliseconds, bool, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "int get_channels() const property", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_channels, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "int get_sample_rate() const property", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_sample_rate, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "bool start()", asFUNCTION((virtual_call<audio_engine, &audio_engine::start, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "bool stop()", asFUNCTION((virtual_call<audio_engine, &audio_engine::stop, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "bool set_volume(float volume)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_volume, bool, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "float get_volume() const property", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_volume, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "bool set_gain(float gain)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_gain, bool, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "float get_gain() const property", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_gain, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "uint get_listener_count() const property", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_listener_count, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "int find_closest_listener(float x, float y, float z) const", asFUNCTION((virtual_call<audio_engine, &audio_engine::find_closest_listener, int, float, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "int find_closest_listener(const vector&in position) const", asFUNCTION((virtual_call<audio_engine, &audio_engine::find_closest_listener_vector, int, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_position(int index, float x, float y, float z)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_listener_position, void, int, float, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_position(int index, const vector&in position)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_listener_position_vector, void, int, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "vector get_listener_position(int index) const", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_listener_position, reactphysics3d::Vector3, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_direction(int index, float x, float y, float z)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_listener_direction, void, int, float, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_direction(int index, const vector&in direction)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_listener_direction_vector, void, int, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "vector get_listener_direction(int index) const", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_listener_direction, reactphysics3d::Vector3, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_velocity(int index, float x, float y, float z)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_listener_velocity, void, int, float, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_velocity(int index, const vector&in velocity)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_listener_velocity_vector, void, int, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "vector get_listener_velocity(int index) const", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_listener_velocity, reactphysics3d::Vector3, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_cone(int index, float inner_radians, float outer_radians, float outer_gain)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_listener_cone, void, int, float, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void get_listener_cone(int index, float&out inner_radians, float&out outer_radians, float&out outer_gain) const", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_listener_cone, void, int, float*, float*, float*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_world_up(int index, float x, float y, float z)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_listener_world_up, void, int, float, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_world_up(int index, const vector&in world_up)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_listener_world_up_vector, void, int, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "vector get_listener_world_up(int index) const", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_listener_world_up, reactphysics3d::Vector3, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_enabled(int index, bool enabled)", asFUNCTION((virtual_call<audio_engine, &audio_engine::set_listener_enabled, void, int, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "bool get_listener_enabled(int index) const", asFUNCTION((virtual_call<audio_engine, &audio_engine::get_listener_enabled, bool, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "bool play(const string&in path, audio_node@ node, uint input_bus_index)", asFUNCTION((virtual_call<audio_engine, &audio_engine::play_through_node, bool, const string&, audio_node*, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	// the other play overload and the new_mixer/sound functions are registered later after the definitions of mixer and sound.
+}
+template <class T> void RegisterSoundsystemAudioNode(asIScriptEngine *engine, const string &type)
 {
 	engine->RegisterObjectType(type.c_str(), 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call<T, &T::duplicate, void>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call<T, &T::release, void>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "uint get_input_bus_count() const property", asFUNCTION((virtual_call<T, &T::get_input_bus_count, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_input_bus_count() const property", asFUNCTION((virtual_call<T, &T::get_input_bus_count, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_output_bus_count() const property", asFUNCTION((virtual_call<T, &T::get_output_bus_count, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_input_channels(uint bus) const", asFUNCTION((virtual_call<T, &T::get_input_channels, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_output_channels(uint bus) const", asFUNCTION((virtual_call<T, &T::get_output_channels, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
@@ -1235,10 +1294,10 @@ void RegisterSoundsystemAudioNode(asIScriptEngine *engine, const string &type)
 	engine->RegisterObjectMethod(type.c_str(), "uint64 get_time() const", asFUNCTION((virtual_call<T, &T::get_time, unsigned long long>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_time(uint64 local_time)", asFUNCTION((virtual_call<T, &T::set_time, bool, ma_node_state>)), asCALL_CDECL_OBJFIRST);
 }
-template <class T>
-void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type)
+template <class T> void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type)
 {
 	RegisterSoundsystemAudioNode<T>(engine, type);
+	engine->RegisterObjectMethod(type.c_str(), "audio_engine@+ get_engine() const property", asFUNCTION((virtual_call<T, &T::get_engine, audio_engine*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_mixer(mixer@ parent_mixer)", asFUNCTION((virtual_call<T, &T::set_mixer, bool, mixer*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "mixer@ get_mixer() const", asFUNCTION((virtual_call<T, &T::get_mixer, mixer*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_hrtf(bool hrtf = true)", asFUNCTION((virtual_call<T, &T::set_hrtf, bool, bool>)), asCALL_CDECL_OBJFIRST);
@@ -1396,13 +1455,21 @@ void RegisterSoundsystem(asIScriptEngine *engine)
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_DEVICE", audio_engine::NO_DEVICE);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_PERCENTAGE_ATTRIBUTES", audio_engine::PERCENTAGE_ATTRIBUTES);
 	RegisterSoundsystemAudioNode<audio_node>(engine, "audio_node");
+	RegisterSoundsystemEngine(engine);
 	RegisterSoundsystemMixer<mixer>(engine, "mixer");
 	engine->RegisterObjectBehaviour("mixer", asBEHAVE_FACTORY, "mixer@ m()", asFUNCTION(new_global_mixer), asCALL_CDECL);
 	RegisterSoundsystemMixer<sound>(engine, "sound");
+	engine->RegisterObjectMethod("audio_engine", "bool play(const string&in path, mixer@ mix = null)", asFUNCTION((virtual_call<audio_engine, &audio_engine::play, bool, const string&, mixer*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "mixer@ mixer()", asFUNCTION((virtual_call<audio_engine, &audio_engine::new_mixer, mixer*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "sound@ sound()", asFUNCTION((virtual_call<audio_engine, &audio_engine::new_sound, sound*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
 	engine->RegisterObjectMethod("sound", "bool load(const string&in filename, const pack_interface@ pack = null)", asFUNCTION((virtual_call<sound, &sound::load, bool, const string &, pack_interface*>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool stream(const string&in filename, const pack_interface@ pack)", asFUNCTION((virtual_call<sound, &sound::stream, bool, const string &, pack_interface*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream(const string&in filename, const pack_interface@ pack = null)", asFUNCTION((virtual_call<sound, &sound::stream, bool, const string &, pack_interface*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool load_memory(const string&in data)", asFUNCTION((virtual_call<sound, &sound::load_string, bool, const string &>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const float[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call<sound, &sound::load_pcm_script, bool, CScriptArray*, int, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const int[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call<sound, &sound::load_pcm_script, bool, CScriptArray*, int, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const int16[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call<sound, &sound::load_pcm_script, bool, CScriptArray*, int, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const uint8[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call<sound, &sound::load_pcm_script, bool, CScriptArray*, int, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool close()", asFUNCTION((virtual_call<sound, &sound::close, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "const string& get_loaded_filename() const property", asFUNCTION((virtual_call<sound, &sound::get_loaded_filename, const std::string&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_active() const property", asFUNCTION((virtual_call<sound, &sound::get_active, bool>)), asCALL_CDECL_OBJFIRST);
