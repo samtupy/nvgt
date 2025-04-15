@@ -29,8 +29,7 @@ bool add_decoder(ma_decoding_backend_vtable *vtable);
 bool init_sound();
 bool refresh_audio_devices();
 
-class audio_node
-{
+class audio_node {
 public:
 	virtual void duplicate() = 0; // reference counting
 	virtual void release() = 0;
@@ -55,14 +54,12 @@ public:
 	virtual unsigned long long get_time() = 0;
 	virtual bool set_time(unsigned long long local_time) = 0;
 };
-class audio_engine
-{
+class audio_engine {
 public:
-	enum engine_flags
-	{
-		DURATIONS_IN_FRAMES = 1,  // If set, all durations possible will expect a value in PCM frames rather than milliseconds unless explicitly specified.
-		NO_AUTO_START = 2,		  // if set, audio_engine::start must be called after initialization.
-		NO_DEVICE = 4,			  // If set, audio_engine::read() must be used to receive raw audio samples from the engine instead.
+	enum engine_flags {
+		DURATIONS_IN_FRAMES = 1, // If set, all durations possible will expect a value in PCM frames rather than milliseconds unless explicitly specified.
+		NO_AUTO_START = 2, // if set, audio_engine::start must be called after initialization.
+		NO_DEVICE = 4, // If set, audio_engine::read() must be used to receive raw audio samples from the engine instead.
 		PERCENTAGE_ATTRIBUTES = 8 // If this is set, attributes for sounds will be in percentages such as 100 instead of decimals such as 1.0, ecentially a multiplication by 100 for backwards compatibility or preference. This also causes sound.volume to work in db.
 	};
 	virtual void duplicate() = 0; // reference counting
@@ -82,8 +79,8 @@ public:
 	virtual bool set_time_in_milliseconds(unsigned long long time) = 0;
 	virtual int get_channels() const = 0;
 	virtual int get_sample_rate() const = 0;
-	virtual bool start() = 0;				   // Begins audio playback <ma_engine_start>, only needs to be called if NO_AUTO_START flag is set in engine construction or after stop is called.
-	virtual bool stop() = 0;				   // Stops audio playback.
+	virtual bool start() = 0; // Begins audio playback <ma_engine_start>, only needs to be called if NO_AUTO_START flag is set in engine construction or after stop is called.
+	virtual bool stop() = 0; // Stops audio playback.
 	virtual bool set_volume(float volume) = 0; // 0.0 to 1.0.
 	virtual float get_volume() const = 0;
 	virtual bool set_gain(float db) = 0;
@@ -112,8 +109,7 @@ public:
 	virtual mixer *new_mixer() = 0;
 	virtual sound *new_sound() = 0;
 };
-class mixer : public virtual audio_node
-{
+class mixer : public virtual audio_node {
 public:
 	virtual void duplicate() = 0; // reference counting
 	virtual void release() = 0;
@@ -123,7 +119,7 @@ public:
 	virtual mixer* get_mixer() const = 0;
 	virtual bool set_hrtf(bool hrtf) = 0;
 	virtual bool get_hrtf() const = 0;
-	virtual bool play(bool looping = false) = 0;
+	virtual bool play(bool reset_loop_state = true) = 0;
 	virtual bool play_looped() = 0;
 	virtual bool stop() = 0;
 	virtual void set_volume(float volume) = 0;
@@ -181,8 +177,7 @@ public:
 	virtual ma_uint64 get_time_in_milliseconds() = 0;
 	virtual bool get_playing() = 0;
 };
-class sound : public virtual mixer
-{
+class sound : public virtual mixer {
 public:
 	/**
 	 * The lowest level method to load from the sound service; everything uses this.

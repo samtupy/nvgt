@@ -23,8 +23,7 @@ class asIScriptEngine;
  * A simple istream/ ostream pair that passes data through a checksum before writing or returning it provided by Caturria.
  * does not take ownership of its attached stream.
 */
-class checksum_ostreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_traits<char>>
-{
+class checksum_ostreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_traits<char>> {
 	Poco::Checksum check;
 	std::ostream *sink;
 public:
@@ -33,15 +32,13 @@ public:
 	int writeToDevice(const char *buffer, std::streamsize length);
 	uint32_t get_checksum();
 };
-class checksum_ostream : public std::ostream
-{
+class checksum_ostream : public std::ostream {
 public:
 	checksum_ostream(std::ostream &sink);
 	~checksum_ostream();
 	uint32_t get_checksum();
 };
-class checksum_istreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_traits<char>>
-{
+class checksum_istreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_traits<char>> {
 	Poco::Checksum check;
 	std::istream *source;
 public:
@@ -50,8 +47,7 @@ public:
 	int readFromDevice(char *buffer, std::streamsize length);
 	uint32_t get_checksum();
 };
-class checksum_istream : public std::istream
-{
+class checksum_istream : public std::istream {
 	std::istream *source;
 public:
 	checksum_istream(std::istream &source);

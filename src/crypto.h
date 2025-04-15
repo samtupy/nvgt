@@ -27,8 +27,7 @@
 
 // Exports for Caturria's Monocypher chacha20 asset encrypting iostream implementation
 
-class chacha_ostreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_traits<char>>
-{
+class chacha_ostreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_traits<char>> {
 	std::ostream *sink;
 	uint8_t key[32];
 	uint8_t nonce[24];
@@ -48,8 +47,7 @@ public:
 	virtual std::streampos seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::out);
 	virtual std::streampos seekpos(std::streampos pos, std::ios_base::openmode which = std::ios_base::out);
 };
-class chacha_istreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_traits<char>>
-{
+class chacha_istreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_traits<char>> {
 	std::istream *source;
 	uint8_t key[32];
 	uint8_t nonce[24];
@@ -67,8 +65,7 @@ public:
 	virtual std::streampos seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in);
 	virtual std::streampos seekpos(std::streampos pos, std::ios_base::openmode which = std::ios_base::in);
 };
-class chacha_istream : public std::istream
-{
+class chacha_istream : public std::istream {
 	chacha_istreambuf buf;
 
 public:
@@ -76,8 +73,7 @@ public:
 	virtual ~chacha_istream();
 	virtual std::istream &own_source(bool owns = true);
 };
-class chacha_ostream : public std::ostream
-{
+class chacha_ostream : public std::ostream {
 	static std::string generate_nonce();
 
 public:

@@ -14,16 +14,14 @@
 #include <mutex>
 typedef std::shared_ptr<const void> directive_t;
 struct sound_service_vfs;
-struct vfs_args
-{
+struct vfs_args {
 	std::string name;
 	size_t protocol_slot = 0;
 	directive_t protocol_directive;
 	size_t filter_slot = 0;
 	directive_t filter_directive;
 };
-class sound_service
-{
+class sound_service {
 public:
 	static const size_t fs_protocol_slot = 1;
 	static const size_t null_filter_slot = 1;
@@ -41,8 +39,7 @@ public:
 	 * public:
 	 * sound_service::protocol* get_instance();
 	 */
-	class protocol
-	{
+	class protocol {
 	public:
 		virtual std::istream *open_uri(const char *uri, const directive_t directive) const = 0;
 		virtual const std::string get_suffix(const directive_t &directive) const = 0;
@@ -64,8 +61,7 @@ public:
 	 * sound_service::protocol* get_instance();
 	 *
 	 */
-	class filter
-	{
+	class filter {
 	public:
 		// Attaches itself to the given input stream. The wrapping istream is expected to take ownership of its data source and clean it up on destruction.
 		virtual std::istream *wrap(std::istream &source, const directive_t directive) const = 0;
@@ -82,7 +78,7 @@ public:
 	 */
 	virtual bool register_protocol(const protocol *proto, size_t &slot) = 0;
 	virtual bool register_filter(const filter *the_filter, size_t &slot) = 0; // Takes ownership.
-	virtual bool set_default_protocol(size_t slot) = 0;						  // Must be valid (pre-existing) protocol slot. Once set, requests which don't specify a protocol will go to this one.
+	virtual bool set_default_protocol(size_t slot) = 0; // Must be valid (pre-existing) protocol slot. Once set, requests which don't specify a protocol will go to this one.
 	virtual const protocol *get_protocol(size_t slot) = 0;
 	virtual bool is_default_protocol(size_t slot) = 0;
 	virtual bool set_default_filter(size_t slot) = 0;
@@ -117,32 +113,29 @@ public:
 };
 
 // filters and protocols
-class encryption_filter : public sound_service::filter
-{
+class encryption_filter : public sound_service::filter {
 public:
-    static const sound_service::filter *get_instance();
-    encryption_filter();
-    virtual std::istream *wrap(std::istream &source, const directive_t directive) const;
-    static encryption_filter instance;
+	static const sound_service::filter *get_instance();
+	encryption_filter();
+	virtual std::istream *wrap(std::istream &source, const directive_t directive) const;
+	static encryption_filter instance;
 };
-class memory_protocol : public sound_service::protocol
-{
-    static const memory_protocol instance;
+class memory_protocol : public sound_service::protocol {
+	static const memory_protocol instance;
 public:
-    virtual std::istream *open_uri(const char *uri, const directive_t directive) const;
-    virtual const std::string get_suffix(const directive_t &directive) const;
-    static const protocol *get_instance();
-    /**
-     * Returns a directive_t that wraps a memory buffer; don't try to do this any other way!
-     * This does not take ownership of your data pointer; you're still responsible for cleaning it up!
-     */
-    static directive_t directive(const void *data, size_t size);
+	virtual std::istream *open_uri(const char *uri, const directive_t directive) const;
+	virtual const std::string get_suffix(const directive_t &directive) const;
+	static const protocol *get_instance();
+	/**
+	 * Returns a directive_t that wraps a memory buffer; don't try to do this any other way!
+	 * This does not take ownership of your data pointer; you're still responsible for cleaning it up!
+	 */
+	static directive_t directive(const void *data, size_t size);
 };
-class pack_protocol : public sound_service::protocol
-{
-    static const pack_protocol instance;
+class pack_protocol : public sound_service::protocol {
+	static const pack_protocol instance;
 public:
-    virtual std::istream *open_uri(const char *uri, const directive_t directive) const;
-    virtual const std::string get_suffix(const directive_t &directive) const;
-    static const protocol *get_instance();
+	virtual std::istream *open_uri(const char *uri, const directive_t directive) const;
+	virtual const std::string get_suffix(const directive_t &directive) const;
+	static const protocol *get_instance();
 };

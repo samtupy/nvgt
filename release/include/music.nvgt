@@ -121,7 +121,7 @@ class music_track {
 			if (intro_end > 0 or repeat_point != 0) handle.play();
 			else handle.play_looped();
 		}
-		if (fade_ms > 0) handle.set_fade(-100, 0, fade_ms);
+		handle.set_fade(-100, 0, fade_ms);
 	}
 	void play(int fade_ms = 0) {
 		start_playing = -1;
