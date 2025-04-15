@@ -22,6 +22,7 @@
 #include "nvgt_angelscript.h" // get_array_type
 #include "nvgt_plugin.h" // pack_interface
 #include "sound.h"
+#include "sound_nodes.h"
 #include "pack.h"
 #include <miniaudio_wdl_resampler.h>
 #include <atomic>
@@ -37,7 +38,7 @@ void wait(int ms);
 static ma_context g_sound_context;
 audio_engine *g_audio_engine = nullptr;
 static std::atomic_flag g_soundsystem_initialized;
-static std::atomic<ma_result> g_soundsystem_last_error = MA_SUCCESS;
+std::atomic<ma_result> g_soundsystem_last_error = MA_SUCCESS;
 static std::unique_ptr<sound_service> g_sound_service;
 // These slots are what you use to refer to protocols (which are data sources like archives) and filters (which are transformations like encryption) after they've been plugged into the sound service.
 static size_t g_encryption_filter_slot = 0;
@@ -117,6 +118,13 @@ CScriptArray *get_sound_output_devices() {
 
 reactphysics3d::Vector3 ma_vec3_to_rp_vec3(const ma_vec3f &v) { return reactphysics3d::Vector3(v.x, v.y, v.z); }
 
+template <class A, class B> static B* op_cast(A* from) {
+	B* casted = dynamic_cast<B*>(from);
+	if (!casted) return nullptr;
+	casted->duplicate();
+	return casted;
+}
+
 // BGT seems to have used db for it's pan, we need to emulate that if the user chooses to enable backward compatibility options.
 float pan_linear_to_db(float linear) {
 	linear = clamp(linear, -1.0f, 1.0f);
@@ -145,39 +153,6 @@ ma_result wav_seek_proc(ma_encoder *pEncoder, ma_int64 offset, ma_seek_origin or
 }
 
 // Miniaudio objects must be allocated on the heap as nvgt's API introduces the concept of an uninitialized sound, which a stack based system would make more difficult to implement.
-class audio_node_impl : public virtual audio_node {
-protected:
-	ma_node_base* node; // Must be set by subclasses
-	audio_engine *engine;
-	int refcount;
-public:
-	audio_node_impl() : audio_node(), node(nullptr), refcount(1) {}
-	audio_node_impl(ma_node_base *node, audio_engine *engine) : audio_node(), node(node), engine(engine), refcount(1) {}
-	void duplicate() { asAtomicInc(refcount); }
-	void release() {
-		if (asAtomicDec(refcount) < 1)
-			delete this;
-	}
-	audio_engine *get_engine() const { return engine; }
-	ma_node_base *get_ma_node() { return node; }
-	unsigned int get_input_bus_count() { return node ? ma_node_get_input_bus_count(node) : 0; }
-	unsigned int get_output_bus_count() { return node ? ma_node_get_output_bus_count(node) : 0; }
-	unsigned int get_input_channels(unsigned int bus) { return node ? ma_node_get_input_channels(node, bus) : 0; }
-	unsigned int get_output_channels(unsigned int bus) { return node ? ma_node_get_output_channels(node, bus) : 0; }
-	bool attach_output_bus(unsigned int output_bus, audio_node *destination, unsigned int destination_input_bus) { return node ? (g_soundsystem_last_error = ma_node_attach_output_bus(node, output_bus, destination->get_ma_node(), destination_input_bus)) == MA_SUCCESS : false; }
-	bool detach_output_bus(unsigned int bus) { return node ? (g_soundsystem_last_error = ma_node_detach_output_bus(node, bus)) == MA_SUCCESS : false; }
-	bool detach_all_output_buses() { return node ? (g_soundsystem_last_error = ma_node_detach_all_output_buses(node)) == MA_SUCCESS : false; }
-	bool set_output_bus_volume(unsigned int bus, float volume) { return node ? (g_soundsystem_last_error = ma_node_set_output_bus_volume(node, bus, volume)) == MA_SUCCESS : false; }
-	float get_output_bus_volume(unsigned int bus) { return node ? ma_node_get_output_bus_volume(node, bus) : 0; }
-	bool set_state(ma_node_state state) { return node ? (g_soundsystem_last_error = ma_node_set_state(node, state)) == MA_SUCCESS : false; }
-	ma_node_state get_state() { return node ? ma_node_get_state(node) : ma_node_state_stopped; }
-	bool set_state_time(ma_node_state state, unsigned long long time) { return node ? (g_soundsystem_last_error = ma_node_set_state_time(node, state, time)) == MA_SUCCESS : false; }
-	unsigned long long get_state_time(ma_node_state state) { return node ? ma_node_get_state_time(node, state) : static_cast<unsigned long long>(ma_node_state_stopped); }
-	ma_node_state get_state_by_time(unsigned long long global_time) { return node ? ma_node_get_state_by_time(node, global_time) : ma_node_state_stopped; }
-	ma_node_state get_state_by_time_range(unsigned long long global_time_begin, unsigned long long global_time_end) { return node ? ma_node_get_state_by_time_range(node, global_time_begin, global_time_end) : ma_node_state_stopped; }
-	unsigned long long get_time() { return node ? ma_node_get_time(node) : 0; }
-	bool set_time(unsigned long long local_time) { return node ? (g_soundsystem_last_error = ma_node_set_time(node, local_time)) == MA_SUCCESS : false; }
-};
 class audio_engine_impl final : public audio_engine {
 	std::unique_ptr<ma_engine> engine;
 	std::unique_ptr<ma_resource_manager> resource_manager;
@@ -254,6 +229,7 @@ public:
 		// cfg.pContext = &g_sound_context; // Miniaudio won't let us quickly uninitilize then reinitialize a device sometimes when using the same context, so we won't manage it until we figure that out.
 		cfg.pResourceManager = &*resource_manager;
 		cfg.noAutoStart = flags & NO_AUTO_START ? MA_TRUE : MA_FALSE;
+		cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE; // Steam Audio requires fixed sized updates. We can make this not be a magic constant if anyone has some reason for wanting to change it.
 		if (flags & NO_DEVICE == 0) cfg.pDevice = &*device;
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS) {
 			engine.reset();
@@ -301,14 +277,14 @@ public:
 		return -1; // couldn't determine device?
 	}
 	bool set_device(int device) override {
-		if (!engine || flags & NO_DEVICE || device < 0 || device >= g_sound_output_devices.size())
+		if (!engine || flags & NO_DEVICE || device < -1 || device >= g_sound_output_devices.size())
 			return false;
 		ma_device *old_dev = ma_engine_get_device(&*engine);
 		if (!old_dev || ma_device_id_equal(&old_dev->playback.id, &g_sound_output_devices[device].id))
 			return false;
 		ma_engine_stop(&*engine);
 		ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
-		cfg.playback.pDeviceID = &g_sound_output_devices[device].id;
+		if (device > -1) cfg.playback.pDeviceID = &g_sound_output_devices[device].id;
 		cfg.playback.channels = old_dev->playback.channels;
 		cfg.sampleRate = old_dev->sampleRate;
 		cfg.noPreSilencedOutputBuffer = old_dev->noPreSilencedOutputBuffer;
@@ -1090,7 +1066,7 @@ void RegisterSoundsystemEngine(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("audio_engine", "bool play(const string&in path, audio_node@ node, uint input_bus_index)", asFUNCTION((virtual_call<audio_engine, &audio_engine::play_through_node, bool, const string&, audio_node*, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	// the other play overload and the new_mixer/sound functions are registered later after the definitions of mixer and sound.
 }
-template <class T> void RegisterSoundsystemAudioNode(asIScriptEngine *engine, const string &type) {
+template <class T> inline void RegisterSoundsystemAudioNode(asIScriptEngine *engine, const std::string &type) {
 	engine->RegisterObjectType(type.c_str(), 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call<T, &T::duplicate, void>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call<T, &T::release, void>)), asCALL_CDECL_OBJFIRST);
@@ -1111,6 +1087,7 @@ template <class T> void RegisterSoundsystemAudioNode(asIScriptEngine *engine, co
 	engine->RegisterObjectMethod(type.c_str(), "audio_node_state get_state_by_time_range(uint64 global_time_begin, uint64 global_time_end)", asFUNCTION((virtual_call<T, &T::get_state_by_time_range, ma_node_state, unsigned long long, unsigned long long>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint64 get_time() const", asFUNCTION((virtual_call<T, &T::get_time, unsigned long long>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_time(uint64 local_time)", asFUNCTION((virtual_call<T, &T::set_time, bool, ma_node_state>)), asCALL_CDECL_OBJFIRST);
+	if constexpr(!std::is_same<T, audio_node>::value) engine->RegisterObjectMethod(type.c_str(), "audio_node@ opImplCast()", asFUNCTION((op_cast<T, audio_node>)), asCALL_CDECL_OBJFIRST);
 }
 template <class T> void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	RegisterSoundsystemAudioNode<T>(engine, type);
@@ -1170,6 +1147,15 @@ template <class T> void RegisterSoundsystemMixer(asIScriptEngine *engine, const 
 	engine->RegisterObjectMethod(type.c_str(), "void set_start_time(uint64 absolute_time) property", asFUNCTION((virtual_call<T, &T::set_start_time, void, ma_uint64>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_stop_time(uint64 absolute_time)", asFUNCTION((virtual_call<T, &T::set_stop_time, void, ma_uint64>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_playing() const property", asFUNCTION((virtual_call<T, &T::get_playing, bool>)), asCALL_CDECL_OBJFIRST);
+}
+void RegisterSoundsystemNodes(asIScriptEngine* engine) {
+	RegisterSoundsystemAudioNode<phonon_binaural_node>(engine, "phonon_binaural_node");
+	engine->RegisterObjectBehaviour("phonon_binaural_node", asBEHAVE_FACTORY, "phonon_binaural_node@ n(audio_engine@ engine, int channels, int sample_rate, int frame_size = 0)", asFUNCTION(phonon_binaural_node::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("phonon_binaural_node", "void set_direction(float x, float y, float z)", asFUNCTION((virtual_call<phonon_binaural_node, &phonon_binaural_node::set_direction, void, float, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("phonon_binaural_node", "void set_direction(const vector&in direction)", asFUNCTION((virtual_call<phonon_binaural_node, &phonon_binaural_node::set_direction_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("phonon_binaural_node", "void set_spatial_blend_max_distance(float max_distance)", asFUNCTION((virtual_call<phonon_binaural_node, &phonon_binaural_node::set_spatial_blend_max_distance, void, float>)), asCALL_CDECL_OBJFIRST);
+	RegisterSoundsystemAudioNode<splitter_node>(engine, "audio_splitter_node");
+	engine->RegisterObjectBehaviour("audio_splitter_node", asBEHAVE_FACTORY, "audio_splitter_node@ n(audio_engine@ engine, int channels)", asFUNCTION(splitter_node::create), asCALL_CDECL);
 }
 void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterEnum("audio_error_state");
@@ -1278,6 +1264,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "bool play(const string&in path, mixer@ mix = null)", asFUNCTION((virtual_call<audio_engine, &audio_engine::play, bool, const string&, mixer*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "mixer@ mixer()", asFUNCTION((virtual_call<audio_engine, &audio_engine::new_mixer, mixer*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "sound@ sound()", asFUNCTION((virtual_call<audio_engine, &audio_engine::new_sound, sound*>)), asCALL_CDECL_OBJFIRST);
+	RegisterSoundsystemNodes(engine);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
 	engine->RegisterObjectMethod("sound", "bool load(const string&in filename, const pack_interface@ pack = null)", asFUNCTION((virtual_call<sound, &sound::load, bool, const string &, pack_interface*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool stream(const string&in filename, const pack_interface@ pack = null)", asFUNCTION((virtual_call<sound, &sound::stream, bool, const string &, pack_interface*>)), asCALL_CDECL_OBJFIRST);

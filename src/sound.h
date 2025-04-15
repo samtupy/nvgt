@@ -16,6 +16,8 @@
 #include <reactphysics3d/mathematics/Vector3.h>
 #include "sound_service.h"
 
+#define SOUNDSYSTEM_FRAMESIZE 512 // We can make this be configureable if enough people want it.
+
 class CScriptArray;
 class asIScriptEngine;
 class pack_interface;
@@ -24,6 +26,7 @@ class mixer;
 class sound;
 
 extern audio_engine *g_audio_engine;
+extern std::atomic<ma_result> g_soundsystem_last_error;
 // Add support for a new audio format by plugging in a ma_decoding_backend_vtable.
 bool add_decoder(ma_decoding_backend_vtable *vtable);
 bool init_sound();

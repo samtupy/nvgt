@@ -1,4 +1,5 @@
 /* sound_service.cpp - sound service implementation code written by Caturria
+ * This is responsible for providing miniaudio with data to play from various sources, from an encrypted pack file to a custom stream from the internet.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
