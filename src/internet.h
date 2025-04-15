@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <string>
 #include <angelscript.h>
 
 void RegisterInternet(asIScriptEngine* engine);
