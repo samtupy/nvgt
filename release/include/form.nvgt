@@ -117,11 +117,12 @@ funcdef int on_control_event_callback(audio_form@ f, int c, control_event_type e
 bool audioform_input_disable_ralt = true;
 int audioform_keyboard_echo = textflag_characters;
 form_background_callback@ audioform_default_background_callback = null;
+bool audioform_speak_type_separately = true;
 //main window class
 class audio_form {
 	bool active;
 	bool speak_control_attributes_separately;
-	bool speak_type_separately = true;
+	bool speak_type_separately = audioform_speak_type_separately;
 	int subform_control_index = -1;
 	on_control_event_callback@ event_callback = null;
 	form_background_callback@ background_callback = @audioform_default_background_callback;
