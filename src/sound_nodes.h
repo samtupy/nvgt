@@ -52,12 +52,20 @@ public:
 	unsigned long long get_time() { return node ? ma_node_get_time(node) : 0; }
 	bool set_time(unsigned long long local_time) { return node ? (g_soundsystem_last_error = ma_node_set_time(node, local_time)) == MA_SUCCESS : false; }
 };
+
+bool set_global_hrtf(bool enabled);
+bool get_global_hrtf();
+
 class phonon_binaural_node : public virtual audio_node {
 	public:
 	static phonon_binaural_node* create(audio_engine* engine, int channels, int sample_rate, int frame_size = 0);
 	virtual void set_direction(float x, float y, float z) = 0;
 	virtual void set_direction_vector(const reactphysics3d::Vector3& direction) = 0;
 	virtual void set_spatial_blend_max_distance(float max_distance) = 0;
+};
+class mixer_monitor_node : public virtual audio_node {
+	public:
+	static mixer_monitor_node* create(mixer* m);
 };
 class splitter_node : public virtual audio_node {
 	public:

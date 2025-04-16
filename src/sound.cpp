@@ -392,23 +392,36 @@ protected:
 	audio_engine_impl *engine;
 	unique_ptr<ma_sound> snd;
 	mixer* parent_mixer;
-	audio_node* hrtf;
-
+	mixer_monitor_node* monitor;
+	phonon_binaural_node* hrtf;
+	bool hrtf_desired;
+	audio_node* get_input_node () { return parent_mixer? parent_mixer : engine->get_endpoint(); }
+	audio_node* get_output_node() { return hrtf? hrtf : dynamic_cast<audio_node*>(monitor); }
 public:
-	mixer_impl() : audio_node_impl(), snd(nullptr), parent_mixer(nullptr), hrtf(nullptr) {}
-	mixer_impl(audio_engine* e, bool sound_group = true) : engine(static_cast<audio_engine_impl*>(e)), audio_node_impl(), snd(nullptr), parent_mixer(nullptr), hrtf(nullptr) {
+	mixer_impl() : audio_node_impl(), snd(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(get_global_hrtf()) {}
+	mixer_impl(audio_engine* e, bool sound_group = true) : engine(static_cast<audio_engine_impl*>(e)), audio_node_impl(), snd(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(get_global_hrtf()) {
 		init_sound();
 		if (sound_group) {
 			snd = make_unique<ma_sound>();
 			ma_sound_group_init(e->get_ma_engine(), 0, nullptr, &*snd);
 			node = (ma_node_base*)&*snd;
-			// set_attenuation_model(ma_attenuation_model_linear); // Investigate why this doesn't seem to work even though ma_attenuation_linear returns a correctly attenuated gain.
-			set_rolloff(0.75);
-			play();
 		}
+		// set_attenuation_model(ma_attenuation_model_linear); // Investigate why this doesn't seem to work even though ma_attenuation_linear returns a correctly attenuated gain.
+		set_rolloff(0.75);
+		set_hrtf(get_global_hrtf());
+		audio_node_impl::attach_output_bus(0, monitor, 0);
+		if (sound_group) play();
+	}
+	~mixer_impl() {
+		if (monitor) monitor->release();
+		if (hrtf) hrtf->release();
+		if (snd) ma_sound_group_uninit(&*snd);
 	}
 	inline void duplicate() override { audio_node_impl::duplicate(); }
 	inline void release() override { audio_node_impl::release(); }
+	bool attach_output_bus(unsigned int output_bus_index, audio_node* input_bus, unsigned int input_bus_index) override { return get_output_node()->attach_output_bus(output_bus_index, input_bus, input_bus_index); }
+	bool detach_output_bus(unsigned int output_bus_index) override { return get_output_node()->detach_output_bus(output_bus_index); }
+	bool detach_all_output_buses() override { return get_output_node()->detach_all_output_buses(); }
 	bool set_mixer(mixer* mix) {
 		if (mix == parent_mixer) return false;
 		if (parent_mixer) {
@@ -424,8 +437,26 @@ public:
 		} else return attach_output_bus(0, get_engine()->get_endpoint(), 0);
 	}
 	mixer* get_mixer() const override { return parent_mixer; }
-	bool set_hrtf(bool hrtf) override { return false; }
+	bool set_hrtf(bool enable) override {
+		if (hrtf && enable or !hrtf && !enable) return true;
+		audio_node* i = get_input_node(), *o = get_output_node();
+		if (enable) {
+			if ((hrtf = phonon_binaural_node::create(engine, engine->get_channels(), engine->get_sample_rate())) == nullptr) return false;
+			if (!hrtf->attach_output_bus(0, i, 0)) return false;
+			if (!o->attach_output_bus(0, hrtf, 0)) return false;
+			set_directional_attenuation_factor(0);
+		} else {
+			if (!o->attach_output_bus(0, this, 0)) return false; // This chain will become more complex as we add a builtin reverb node.
+			set_directional_attenuation_factor(1);
+			hrtf->release();
+			hrtf = nullptr;
+		}
+		hrtf_desired = enable;
+		return true;
+	}
 	bool get_hrtf() const override { return hrtf != nullptr; }
+	bool get_hrtf_desired() const override { return hrtf_desired; }
+	audio_node* get_hrtf_node() const override { return hrtf; }
 	bool play(bool reset_loop_state = true) override {
 		if (snd == nullptr)
 			return false;
@@ -687,8 +718,9 @@ public:
 class sound_impl final : public mixer_impl, public virtual sound {
 	std::string pcm_buffer; // When loading from raw PCM (like TTS) we store the intermediate wav data here so we can take advantage of async loading to return quickly. Makes a substantial difference in the responsiveness of TTS calls.
 	std::string loaded_filename; // Contains the loaded filename as passed in the load/stream method, used just for convenience.
+	bool paused;
 public:
-	sound_impl(audio_engine *e) : mixer_impl(static_cast<audio_engine_impl *>(e), false), pcm_buffer(), sound() {
+	sound_impl(audio_engine *e) : paused(false), mixer_impl(static_cast<audio_engine_impl *>(e), false), pcm_buffer(), sound() {
 		init_sound();
 		snd = nullptr;
 	}
@@ -778,6 +810,7 @@ public:
 			node = nullptr;
 			pcm_buffer.resize(0);
 			loaded_filename.clear();
+			paused = false;
 			return true;
 		}
 		return false;
@@ -787,11 +820,20 @@ public:
 		return snd ? true : false;
 	}
 	bool get_paused() override {
-		return snd ? ma_sound_is_playing(&*snd) : false;
+		return snd ? !ma_sound_is_playing(&*snd) && paused : false;
 	}
+	bool play(bool reset_loop_state = true) override { paused = false; return mixer_impl::play(reset_loop_state); }
+	bool play_looped() override { paused = false; return mixer_impl::play_looped(); }
+	bool play_wait() override {
+		if (!play()) return false;
+		while (get_playing()) wait(5);
+		return true;
+	}
+	bool stop() override { paused = false; return mixer_impl::stop(); }
 	bool pause() override {
 		if (snd) {
 			g_soundsystem_last_error = ma_sound_stop(&*snd);
+			if (g_soundsystem_last_error == MA_SUCCESS) paused = true;
 			return g_soundsystem_last_error == MA_SUCCESS;
 		}
 		return false;
@@ -1095,7 +1137,7 @@ template <class T> void RegisterSoundsystemMixer(asIScriptEngine *engine, const 
 	engine->RegisterObjectMethod(type.c_str(), "bool set_mixer(mixer@ parent_mixer)", asFUNCTION((virtual_call<T, &T::set_mixer, bool, mixer*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "mixer@ get_mixer() const", asFUNCTION((virtual_call<T, &T::get_mixer, mixer*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_hrtf(bool hrtf = true)", asFUNCTION((virtual_call<T, &T::set_hrtf, bool, bool>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf() const", asFUNCTION((virtual_call<T, &T::get_hrtf, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf() const property", asFUNCTION((virtual_call<T, &T::get_hrtf, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play(bool reset_loop_state = true)", asFUNCTION((virtual_call<T, &T::play, bool, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play_looped()", asFUNCTION((virtual_call<T, &T::play_looped, bool>)), asCALL_CDECL_OBJFIRST);
 
@@ -1154,6 +1196,8 @@ void RegisterSoundsystemNodes(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("phonon_binaural_node", "void set_direction(float x, float y, float z)", asFUNCTION((virtual_call<phonon_binaural_node, &phonon_binaural_node::set_direction, void, float, float, float>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("phonon_binaural_node", "void set_direction(const vector&in direction)", asFUNCTION((virtual_call<phonon_binaural_node, &phonon_binaural_node::set_direction_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("phonon_binaural_node", "void set_spatial_blend_max_distance(float max_distance)", asFUNCTION((virtual_call<phonon_binaural_node, &phonon_binaural_node::set_spatial_blend_max_distance, void, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterGlobalFunction("bool set_sound_global_hrtf(bool enabled)", asFUNCTION(set_global_hrtf), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool get_sound_global_hrtf() property", asFUNCTION(get_global_hrtf), asCALL_CDECL);
 	RegisterSoundsystemAudioNode<splitter_node>(engine, "audio_splitter_node");
 	engine->RegisterObjectBehaviour("audio_splitter_node", asBEHAVE_FACTORY, "audio_splitter_node@ n(audio_engine@ engine, int channels)", asFUNCTION(splitter_node::create), asCALL_CDECL);
 }
@@ -1277,6 +1321,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("sound", "const string& get_loaded_filename() const property", asFUNCTION((virtual_call<sound, &sound::get_loaded_filename, const std::string&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_active() const property", asFUNCTION((virtual_call<sound, &sound::get_active, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_paused() const property", asFUNCTION((virtual_call<sound, &sound::get_paused, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool play_wait()", asFUNCTION((virtual_call<sound, &sound::play_wait, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool pause()", asFUNCTION((virtual_call<sound, &sound::pause, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool pause_fade(const uint64 length)", asFUNCTION((virtual_call<sound, &sound::pause_fade, bool, unsigned long long>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool pause_fade_in_frames(const uint64 length_in_frames)", asFUNCTION((virtual_call<sound, &sound::pause_fade_in_frames, bool, unsigned long long>)), asCALL_CDECL_OBJFIRST);

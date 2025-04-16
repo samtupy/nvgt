@@ -136,7 +136,7 @@ MA_API ma_result ma_phonon_binaural_node_init(ma_node_graph* pNodeGraph, const m
 	pBinauralNode->iplContext	   = pConfig->iplContext;
 	pBinauralNode->iplHRTF		  = pConfig->iplHRTF;
 
-	pBinauralNode->spatial_blend_max_distance = 4.0;
+	pBinauralNode->spatial_blend_max_distance = 0.0;
 
 	memset(&iplBinauralEffectSettings, 0, sizeof(IPLBinauralEffectSettings));
 	iplBinauralEffectSettings.hrtf = pBinauralNode->iplHRTF;

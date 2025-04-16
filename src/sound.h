@@ -121,7 +121,9 @@ public:
 	virtual bool set_mixer(mixer* mix) = 0;
 	virtual mixer* get_mixer() const = 0;
 	virtual bool set_hrtf(bool hrtf) = 0;
-	virtual bool get_hrtf() const = 0;
+	virtual bool get_hrtf() const = 0; // whether hrtf is currently enabled
+	virtual bool get_hrtf_desired() const = 0; // whether hrtf is desired by the user even if global hrtf is currently off
+	virtual audio_node* get_hrtf_node() const = 0;
 	virtual bool play(bool reset_loop_state = true) = 0;
 	virtual bool play_looped() = 0;
 	virtual bool stop() = 0;
@@ -216,6 +218,7 @@ public:
 	virtual const std::string& get_loaded_filename() const = 0;
 	virtual bool get_active() = 0;
 	virtual bool get_paused() = 0;
+	virtual bool play_wait() = 0;
 	virtual bool pause() = 0;
 	virtual bool pause_fade(unsigned long long length) = 0; // depends on the DURATIONS_IN_FRAMES engine flag.
 	virtual bool pause_fade_in_frames(unsigned long long frames) = 0;
