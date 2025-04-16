@@ -783,6 +783,7 @@ void RegisterScriptPack(asIScriptEngine *engine)
 	engine->RegisterObjectMethod("pack_file", "bool file_exists(const string &in filename)", asMETHOD(pack, file_exists), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "int64 get_file_size(const string &in filename)", asMETHOD(pack, get_file_size), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "datastream @get_file(const string &in filename, const string &in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asMETHOD(pack, get_file_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "string get_pack_name() const property", asMETHOD(pack, get_pack_name), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "bool get_active() const property", asMETHOD(pack, get_active), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "int64 get_file_count() const property", asMETHOD(pack, get_file_count), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "string[]@ list_files() const", asMETHOD(pack, list_files), asCALL_THISCALL);
