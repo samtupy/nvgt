@@ -415,6 +415,7 @@ public:
 	~mixer_impl() {
 		if (monitor) monitor->release();
 		if (hrtf) hrtf->release();
+		if (parent_mixer) parent_mixer->release();
 		if (snd) ma_sound_group_uninit(&*snd);
 	}
 	inline void duplicate() override { audio_node_impl::duplicate(); }
@@ -432,7 +433,6 @@ public:
 		if (mix) {
 			if (node && !attach_output_bus(0, mix, 0)) return false;
 			parent_mixer = mix;
-			mix->duplicate();
 			return true;
 		} else return attach_output_bus(0, get_engine()->get_endpoint(), 0);
 	}
@@ -1116,7 +1116,7 @@ template <class T> inline void RegisterSoundsystemAudioNode(asIScriptEngine *eng
 	engine->RegisterObjectMethod(type.c_str(), "uint get_output_bus_count() const property", asFUNCTION((virtual_call<T, &T::get_output_bus_count, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_input_channels(uint bus) const", asFUNCTION((virtual_call<T, &T::get_input_channels, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_output_channels(uint bus) const", asFUNCTION((virtual_call<T, &T::get_output_channels, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool attach_output_bus(uint output_bus, audio_node@ destination, uint destination_input_bus)", asFUNCTION((virtual_call<T, &T::attach_output_bus, bool, unsigned int, audio_node *, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool attach_output_bus(uint output_bus, audio_node@+ destination, uint destination_input_bus)", asFUNCTION((virtual_call<T, &T::attach_output_bus, bool, unsigned int, audio_node *, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool detach_output_bus(uint bus)", asFUNCTION((virtual_call<T, &T::detach_output_bus, bool, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool detach_all_output_buses()", asFUNCTION((virtual_call<T, &T::detach_all_output_buses, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_output_bus_volume(uint bus, float volume)", asFUNCTION((virtual_call<T, &T::set_output_bus_volume, bool, unsigned int, float>)), asCALL_CDECL_OBJFIRST);
@@ -1135,7 +1135,7 @@ template <class T> void RegisterSoundsystemMixer(asIScriptEngine *engine, const 
 	RegisterSoundsystemAudioNode<T>(engine, type);
 	engine->RegisterObjectMethod(type.c_str(), "audio_engine@+ get_engine() const property", asFUNCTION((virtual_call<T, &T::get_engine, audio_engine*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_mixer(mixer@ parent_mixer)", asFUNCTION((virtual_call<T, &T::set_mixer, bool, mixer*>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "mixer@ get_mixer() const", asFUNCTION((virtual_call<T, &T::get_mixer, mixer*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "mixer@+ get_mixer() const", asFUNCTION((virtual_call<T, &T::get_mixer, mixer*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_hrtf(bool hrtf = true)", asFUNCTION((virtual_call<T, &T::set_hrtf, bool, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf() const property", asFUNCTION((virtual_call<T, &T::get_hrtf, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play(bool reset_loop_state = true)", asFUNCTION((virtual_call<T, &T::play, bool, bool>)), asCALL_CDECL_OBJFIRST);
