@@ -301,23 +301,23 @@ string generate_computer_id(const string& in application_id, bool hardware_only)
 
 //dummy sound storage functions
 
-pack_file@open_pack(const string&in filename, const string&in key = "") {
+pack_file@open_pack(const string&in filename, const string&in key = "", bool force_encryption = false) {
 	if (filename.is_empty()) return null;
 	pack_file p;
 	if (p.open(filename, key)) return p;
-	else return null;
+	else {
+		if(force_encryption) return null;
+		if(p.open(filename, "")) return p;
+	}
+	return null;
 }
 bool set_sound_storage(const string&in filename, const string&in key = "", bool force_encryption = false, bool reset = false) {
 	if (reset and filename.is_empty()) {
 		@sound_default_pack = null;
 		sound_storage = "";
 	}
-	pack_file@p = open_pack(filename, key);
-	if (@p == null and(key.empty() or force_encryption)) return false;
-	else {
-		@p = open_pack(filename);
-		if(@p == null) return false;
-	}
+	pack_file@p = open_pack(filename, key, force_encryption);
+	if(@p == null) return false;
 	@sound_default_pack = p;
 	return true;
 }
