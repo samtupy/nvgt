@@ -22,10 +22,10 @@ protected:
 	int refcount;
 public:
 	audio_node_impl() : audio_node(), node(nullptr), refcount(1) {
-		if (!init_sound()) throw std::exception("sound system was not initialized");
+		if (!init_sound()) throw std::runtime_error("sound system was not initialized");
 	}
 	audio_node_impl(ma_node_base *node, audio_engine *engine) : audio_node(), node(node), engine(engine), refcount(1) {
-		if (!init_sound()) throw std::exception("sound system was not initialized");
+		if (!init_sound()) throw std::runtime_error("sound system was not initialized");
 	}
 	void duplicate() { asAtomicInc(refcount); }
 	void release() {

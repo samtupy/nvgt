@@ -20,9 +20,9 @@
 #include "misc_functions.h" // is_valid_utf8
 #include "pack.h"
 #include <Poco/StringTokenizer.h>
-#include <poco/NumberFormatter.h>
+#include <Poco/NumberFormatter.h>
 #include <Poco/MemoryStream.h>
-#include <poco/NumberParser.h>
+#include <Poco/NumberParser.h>
 #include <sstream>
 #include <iostream>
 #include <unordered_map>
@@ -91,7 +91,7 @@ class sound_service_impl : public sound_service {
 	template <class t>
 	class service_registration {
 		const t *item;
-		std::atomic<directive_t> directive; // Arbitrary data that will be sent to the filter or protocol (such as a decryption key).
+		directive_t directive; // Arbitrary data that will be sent to the filter or protocol (such as a decryption key), always use atomic operations to access.
 		size_t slot;
 
 	public:
@@ -104,10 +104,10 @@ class sound_service_impl : public sound_service {
 			return item;
 		}
 		inline const directive_t get_directive() const {
-			return directive.load(std::memory_order_acquire);
+			return std::atomic_load_explicit(&directive, std::memory_order_acquire);
 		}
 		inline void set_directive(const directive_t &directive) {
-			this->directive.store(directive, std::memory_order_release);
+			std::atomic_store_explicit(&this->directive, directive, std::memory_order_release);
 		}
 		inline const size_t get_slot() const {
 			return slot;
@@ -118,10 +118,10 @@ class sound_service_impl : public sound_service {
 	typedef service_registration<filter> filter_reg_t;
 	typedef std::shared_ptr<filter_reg_t> filter_registration;
 	std::vector<protocol_registration> protocols;
-	std::atomic<protocol_registration> default_protocol;
+	protocol_registration default_protocol; // Always access with atomic operations!
 	typedef std::vector<filter_registration> filter_array;
 	filter_array filters;
-	std::atomic<filter_registration> default_filter;
+	filter_registration default_filter; // Always access with atomic operations!
 	sound_service_vfs vfs;
 	typedef std::unordered_map<std::string, vfs_args> temp_args_t;
 	temp_args_t temp_args;
@@ -189,7 +189,7 @@ public:
 	bool set_default_protocol(size_t slot) {
 		if (slot >= protocols.size())
 			return false;
-		default_protocol = protocols[slot];
+		std::atomic_store(&default_protocol, protocols[slot]);
 		return true;
 	}
 	const protocol *get_protocol(size_t slot) {
@@ -198,23 +198,23 @@ public:
 		return protocols[slot]->get();
 	}
 	const protocol *get_default_protocol() {
-		return default_protocol.load()->get();
+		return std::atomic_load(&default_protocol)->get();
 	}
 	bool is_default_protocol(size_t slot) {
 		if (slot < 0 || slot >= filters.size())
 			return false;
-		return protocols[slot] == default_protocol.load();
+		return protocols[slot] == std::atomic_load(&default_protocol);
 	}
 	bool set_default_filter(size_t slot) {
 		if (slot < 0 || slot > filters.size())
 			return false;
-		default_filter = filters[slot];
+		std::atomic_store(&default_filter, filters[slot]);
 		return true;
 	}
 	bool is_default_filter(size_t slot) {
 		if (slot < 0 || slot >= filters.size())
 			return false;
-		return filters[slot] == default_filter.load();
+		return filters[slot] == std::atomic_load(&default_filter);
 	}
 	bool set_protocol_directive(size_t slot, const directive_t &new_directive) {
 		if (slot < 0 || slot >= protocols.size())
@@ -241,14 +241,14 @@ public:
 		vfs_args args;
 		protocol_registration preg;
 		// Slot zero means use default:
-		preg = (protocol_slot == 0 ? default_protocol.load() : protocols[protocol_slot]);
+		preg = (protocol_slot == 0 ? std::atomic_load(&default_protocol) : protocols[protocol_slot]);
 		args.name = name;
 		args.protocol_slot = preg->get_slot();
 		args.protocol_directive = protocol_directive == nullptr ? preg->get_directive() : protocol_directive;
 		// Filter selection.
 		filter_registration freg;
 		// Filter slot zero means use default:
-		freg = (filter_slot == 0 ? default_filter.load() : filters[filter_slot]);
+		freg = (filter_slot == 0 ? std::atomic_load(&default_filter) : filters[filter_slot]);
 		args.filter_slot = freg->get_slot();
 		args.filter_directive = (filter_directive == nullptr ? freg->get_directive() : filter_directive);
 		// Build our triplet. This is the name that will actually be remembered by MiniAudio's resource manager.

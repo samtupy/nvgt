@@ -247,7 +247,7 @@ bool pack::write_mode_internals::finalize()
 	for (toc_list::iterator i = ordered_toc.begin(); i != ordered_toc.end(); i++)
 	{
 		toc_entry &entry = **i;
-		writer.write7BitEncoded(entry.filename.length());
+		writer.write7BitEncoded(Poco::UInt32(entry.filename.length()));
 		writer.writeRaw(entry.filename);
 		writer.write7BitEncoded(entry.size);
 	}
@@ -649,7 +649,7 @@ int section_istreambuf::readFromDevice(char *buffer, std::streamsize length)
 	{
 		return -1;
 	}
-	length = std::min(length, (start + size - pos));
+	length = std::min(length, std::streamsize(start + size - pos));
 
 	source->read(buffer, length);
 
@@ -673,9 +673,9 @@ std::streampos section_istreambuf::seekoff(std::streamoff off, std::ios_base::se
 		// Istream uses 0 cur to implement tell, so just report the current position without moving anything.
 		if (off == 0)
 		{
-			return source->tellg() - start - in_avail();
+			return source->tellg() - std::streampos(start - in_avail());
 		}
-		return seekpos(source->tellg() - start - in_avail() + off);
+		return seekpos(source->tellg() - std::streampos(start - in_avail() + off));
 	}
 	return -1; // Can't get here.
 }

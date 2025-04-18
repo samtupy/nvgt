@@ -139,7 +139,7 @@ std::streampos chacha_ostreambuf::seekoff(std::streamoff off, std::ios_base::see
 	// Support 0 cur to enable tellp().
 	if (dir == std::ios_base::cur && off == 0)
 
-		return sink->tellp() + in_avail() - (std::streampos)nonce_length;
+		return sink->tellp() + std::streampos(in_avail() - nonce_length);
 	if (dir == std::ios_base::beg && off == 0)
 		return seekpos(0);
 	return -1;

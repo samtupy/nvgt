@@ -182,7 +182,7 @@ std::streampos checksum_istream::tellg() {
 	if (!good())
 		return -1;
 	source->clear();
-	return source->tellg() - rdbuf()->in_avail();
+	return source->tellg() - std::streampos(rdbuf()->in_avail());
 }
 uint32_t checksum_istream::get_checksum() {
 	checksum_istreambuf *buf = static_cast<checksum_istreambuf *>(rdbuf());

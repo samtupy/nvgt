@@ -78,7 +78,7 @@ VariantDir("build/obj_src", "src", duplicate = 0)
 env.Append(LIBS = [["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoZip", "PocoFoundation"] if env["PLATFORM"] != "win32" else [], "phonon", "enet6", "reactphysics3d"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
-	env.Append(LINKFLAGS = ["/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:phonon.dll"])
+	env.Append(CPPDEFINES = ["_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING"], LINKFLAGS = ["/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:phonon.dll"])
 elif env["PLATFORM"] == "darwin":
 	sources.append("apple.mm")
 	sources.append("macos.mm")

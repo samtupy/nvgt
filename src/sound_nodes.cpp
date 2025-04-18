@@ -55,13 +55,13 @@ class phonon_binaural_node_impl : public audio_node_impl, public virtual phonon_
 	unique_ptr<ma_phonon_binaural_node> bn;
 	public:
 		phonon_binaural_node_impl(audio_engine* e, int channels, int sample_rate, int frame_size = 0) {
-			if (!e) throw std::exception("no engine provided");
-			if (!phonon_init()) throw std::exception("Steam Audio was not initialized");
+			if (!e) throw std::invalid_argument("no engine provided");
+			if (!phonon_init()) throw std::runtime_error("Steam Audio was not initialized");
 			if (!frame_size) frame_size = SOUNDSYSTEM_FRAMESIZE;
 			bn = make_unique<ma_phonon_binaural_node>();
 			IPLAudioSettings audio_settings {sample_rate, frame_size};
 			ma_phonon_binaural_node_config cfg = ma_phonon_binaural_node_config_init(channels, audio_settings, g_phonon_context, g_phonon_hrtf);
-			if ((g_soundsystem_last_error = ma_phonon_binaural_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*bn)) != MA_SUCCESS) throw std::exception("phonon_binaural_node was not created");
+			if ((g_soundsystem_last_error = ma_phonon_binaural_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*bn)) != MA_SUCCESS) throw std::runtime_error("phonon_binaural_node was not created");
 			node = (ma_node_base*)&*bn;
 		}
 		~phonon_binaural_node_impl() {
@@ -121,7 +121,7 @@ class mixer_monitor_node_impl : public audio_node_impl, public virtual mixer_mon
 		cfg.vtable          = &ma_mixer_monitor_node_vtable;
 		cfg.pInputChannels  = &channels;
 		cfg.pOutputChannels = &channels;
-		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(m->get_engine()->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*mn)) != MA_SUCCESS) throw std::exception("failed to create mixer_monitor_node");
+		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(m->get_engine()->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*mn)) != MA_SUCCESS) throw std::runtime_error("failed to create mixer_monitor_node");
 		mn->m = m;
 		mn->position_changed = -1;
 		node = (ma_node_base*)&*mn;
@@ -145,7 +145,7 @@ class splitter_node_impl : public audio_node_impl, public virtual splitter_node 
 	splitter_node_impl(audio_engine* e, int channels) {
 		sn = make_unique<ma_splitter_node>();
 		ma_splitter_node_config cfg = ma_splitter_node_config_init(channels);
-		if ((g_soundsystem_last_error = ma_splitter_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*sn)) != MA_SUCCESS) throw std::exception("ma_splitter_node was not initialized");
+		if ((g_soundsystem_last_error = ma_splitter_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*sn)) != MA_SUCCESS) throw std::runtime_error("ma_splitter_node was not initialized");
 		node = (ma_node_base*)&*sn;
 	}
 	~splitter_node_impl() {

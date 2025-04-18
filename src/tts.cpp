@@ -30,7 +30,7 @@
 #endif
 #include <limits>
 #include <miniaudio.h>
-#include <poco/FileStream.h>
+#include <Poco/FileStream.h>
 // Normalize TTS.
 // Size is in samples (not frames or bytes).
 template <class t>

@@ -13,9 +13,10 @@
 #define NOMINMAX
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 #include <Poco/FileStream.h>
-#include <Poco/format.h>
+#include <Poco/Format.h>
 #include <Poco/MemoryStream.h>
 #include <angelscript.h>
 #include <scriptarray.h>
@@ -188,7 +189,7 @@ public:
 		init_sound();
 		engine = std::make_unique<ma_engine>();
 		// We need a self-managed device because at least on Windows, we can't meet low-latency requirements without specific configurations.
-		if (flags & NO_DEVICE == 0) {
+		if ((flags & NO_DEVICE) == 0) {
 			device = std::make_unique<ma_device>();
 			ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
 			// Just set to some hard-coded defaults for now.
@@ -239,9 +240,9 @@ public:
 		ma_engine_config cfg = ma_engine_config_init();
 		// cfg.pContext = &g_sound_context; // Miniaudio won't let us quickly uninitilize then reinitialize a device sometimes when using the same context, so we won't manage it until we figure that out.
 		cfg.pResourceManager = &*resource_manager;
-		cfg.noAutoStart = flags & NO_AUTO_START ? MA_TRUE : MA_FALSE;
+		cfg.noAutoStart = (flags & NO_AUTO_START) ? MA_TRUE : MA_FALSE;
 		cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE; // Steam Audio requires fixed sized updates. We can make this not be a magic constant if anyone has some reason for wanting to change it.
-		if (flags & NO_DEVICE == 0) cfg.pDevice = &*device;
+		if ((flags & NO_DEVICE) == 0) cfg.pDevice = &*device;
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS) {
 			engine.reset();
 			return;
@@ -440,7 +441,7 @@ public:
 	bool attach_output_bus(unsigned int output_bus_index, audio_node* input_bus, unsigned int input_bus_index) override { return get_output_node()->attach_output_bus(output_bus_index, input_bus, input_bus_index); }
 	bool detach_output_bus(unsigned int output_bus_index) override { return get_output_node()->detach_output_bus(output_bus_index); }
 	bool detach_all_output_buses() override { return get_output_node()->detach_all_output_buses(); }
-	bool set_mixer(mixer* mix) {
+	bool set_mixer(mixer* mix) override {
 		if (mix == parent_mixer) return false;
 		if (parent_mixer) {
 			if (!detach_output_bus(0)) return false;
@@ -483,19 +484,17 @@ public:
 		if (snd == nullptr)
 			return false;
 		if (reset_loop_state) ma_sound_set_looping(&*snd, MA_FALSE);
-		return ma_sound_start(&*snd) == MA_SUCCESS;
+		return (g_soundsystem_last_error = ma_sound_start(&*snd)) == MA_SUCCESS;
 	}
-	bool play_looped() {
+	bool play_looped() override {
 		if (snd == nullptr)
 			return false;
 		ma_sound_set_looping(&*snd, true);
-		return ma_sound_start(&*snd) == MA_SUCCESS;
+		return (g_soundsystem_last_error = ma_sound_start(&*snd)) == MA_SUCCESS;
 	}
 	ma_sound *get_ma_sound() const override { return &*snd; }
-	audio_engine *get_engine() const override {
-		return engine;
-	}
-	bool stop() override { return snd ? ma_sound_stop(&*snd) : false; }
+	audio_engine *get_engine() const override { return engine; }
+	bool stop() override { return snd ? (g_soundsystem_last_error = ma_sound_stop(&*snd)) == MA_SUCCESS : false; }
 	void set_volume(float volume) override {
 		if (snd)
 			ma_sound_set_volume(&*snd, std::min((engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_db_to_linear(volume) : volume), 1.0f));
@@ -859,7 +858,7 @@ public:
 		while (get_playing()) wait(5);
 		return true;
 	}
-	bool stop() override { paused = false; return mixer_impl::stop(); }
+	bool stop() override { paused = false; return mixer_impl::stop() && seek(0); }
 	bool pause() override {
 		if (snd) {
 			g_soundsystem_last_error = ma_sound_stop(&*snd);

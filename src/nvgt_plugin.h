@@ -227,6 +227,7 @@ class pack_interface {
 	mutable int refcount;
 	public:
 	pack_interface() : refcount(1) {}
+	virtual ~pack_interface() = default;
 	void duplicate() const { asAtomicInc(refcount); }
 	void release() const { if (asAtomicDec(refcount) < 1) delete this; }
 	virtual const pack_interface* make_immutable() const = 0;
