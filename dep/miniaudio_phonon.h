@@ -25,9 +25,8 @@ typedef struct
     ma_node_base baseNode;
     IPLAudioSettings iplAudioSettings;
     IPLContext iplContext;
-    IPLHRTF iplHRTF;
     IPLBinauralEffect iplEffect;
-    ma_vec3f direction;
+    IPLBinauralEffectParams iplEffectParams;
     float spatial_blend_max_distance;
     
     float* ppBuffersIn[2];      /* Each buffer is an offset of _pHeap. */
@@ -37,7 +36,7 @@ typedef struct
 
 MA_API ma_result ma_phonon_binaural_node_init(ma_node_graph* pNodeGraph, const ma_phonon_binaural_node_config* pConfig, const ma_allocation_callbacks* pAllocationCallbacks, ma_phonon_binaural_node* pBinauralNode);
 MA_API void ma_phonon_binaural_node_uninit(ma_phonon_binaural_node* pBinauralNode, const ma_allocation_callbacks* pAllocationCallbacks);
-MA_API ma_result ma_phonon_binaural_node_set_direction(ma_phonon_binaural_node* pBinauralNode, float x, float y, float z);
+MA_API ma_result ma_phonon_binaural_node_set_direction(ma_phonon_binaural_node* pBinauralNode, float x, float y, float z, float distance);
 MA_API ma_result ma_phonon_binaural_node_set_spatial_blend_max_distance(ma_phonon_binaural_node* pBinauralNode, float max_distance);
 
 #ifdef __cplusplus

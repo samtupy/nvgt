@@ -32,21 +32,10 @@ MA_API ma_phonon_binaural_node_config ma_phonon_binaural_node_config_init(ma_uin
 static void ma_phonon_binaural_node_process_pcm_frames(ma_node* pNode, const float** ppFramesIn, ma_uint32* pFrameCountIn, float** ppFramesOut, ma_uint32* pFrameCountOut)
 {
 	ma_phonon_binaural_node* pBinauralNode = (ma_phonon_binaural_node*)pNode;
-	IPLBinauralEffectParams binauralParams;
 	IPLAudioBuffer inputBufferDesc;
 	IPLAudioBuffer outputBufferDesc;
 	ma_uint32 totalFramesToProcess = *pFrameCountOut;
 	ma_uint32 totalFramesProcessed = 0;
-	float distance = sqrt(pow(pBinauralNode->direction.x, 2.0) + pow(pBinauralNode->direction.y, 2.0) + pow(pBinauralNode->direction.z, 2.0));
-
-	memset(&binauralParams, 0, sizeof(IPLBinauralEffectParams));
-	binauralParams.direction.x   = pBinauralNode->direction.x;
-	binauralParams.direction.y   = pBinauralNode->direction.y;
-	binauralParams.direction.z   = pBinauralNode->direction.z;
-	binauralParams.interpolation = IPL_HRTFINTERPOLATION_NEAREST;
-	binauralParams.spatialBlend = pBinauralNode->spatial_blend_max_distance > 0? distance / pBinauralNode->spatial_blend_max_distance : 1.0f;
-	if (binauralParams.spatialBlend > 1.0) binauralParams.spatialBlend = 1.0;
-	binauralParams.hrtf		  = pBinauralNode->iplHRTF;
 
 	inputBufferDesc.numChannels = (IPLint32)ma_node_get_input_channels(pNode, 0);
 
@@ -73,7 +62,7 @@ static void ma_phonon_binaural_node_process_pcm_frames(ma_node* pNode, const flo
 		inputBufferDesc.numSamples = (IPLint32)framesToProcessThisIteration;
 
 		/* Apply the effect. */
-		iplBinauralEffectApply(pBinauralNode->iplEffect, &binauralParams, &inputBufferDesc, &outputBufferDesc);
+		iplBinauralEffectApply(pBinauralNode->iplEffect, &pBinauralNode->iplEffectParams, &inputBufferDesc, &outputBufferDesc);
 
 		/* Interleave straight into the output buffer. */
 		ma_interleave_pcm_frames(ma_format_f32, 2, framesToProcessThisIteration, (const void**)&pBinauralNode->ppBuffersOut[0], ma_offset_pcm_frames_ptr_f32(ppFramesOut[0], totalFramesProcessed, 2));
@@ -103,6 +92,7 @@ MA_API ma_result ma_phonon_binaural_node_init(ma_node_graph* pNodeGraph, const m
 	ma_uint32 channelsIn;
 	ma_uint32 channelsOut;
 	IPLBinauralEffectSettings iplBinauralEffectSettings;
+	IPLBinauralEffectParams binauralParams;
 	size_t heapSizeInBytes;
 
 	if (pBinauralNode == NULL) {
@@ -134,12 +124,15 @@ MA_API ma_result ma_phonon_binaural_node_init(ma_node_graph* pNodeGraph, const m
 
 	pBinauralNode->iplAudioSettings = pConfig->iplAudioSettings;
 	pBinauralNode->iplContext	   = pConfig->iplContext;
-	pBinauralNode->iplHRTF		  = pConfig->iplHRTF;
 
-	pBinauralNode->spatial_blend_max_distance = 0.0;
+	pBinauralNode->spatial_blend_max_distance = 4.0;
 
 	memset(&iplBinauralEffectSettings, 0, sizeof(IPLBinauralEffectSettings));
-	iplBinauralEffectSettings.hrtf = pBinauralNode->iplHRTF;
+	iplBinauralEffectSettings.hrtf = pConfig->iplHRTF;
+	memset(&binauralParams, 0, sizeof(IPLBinauralEffectParams));
+	binauralParams.interpolation = IPL_HRTFINTERPOLATION_NEAREST;
+	binauralParams.hrtf		  = pConfig->iplHRTF;
+	pBinauralNode->iplEffectParams = binauralParams;
 
 	result = ma_result_from_IPLerror(iplBinauralEffectCreate(pBinauralNode->iplContext, &pBinauralNode->iplAudioSettings, &iplBinauralEffectSettings, &pBinauralNode->iplEffect));
 	if (result != MA_SUCCESS) {
@@ -192,14 +185,16 @@ MA_API void ma_phonon_binaural_node_uninit(ma_phonon_binaural_node* pBinauralNod
 	ma_free(pBinauralNode->_pHeap, pAllocationCallbacks);
 }
 
-MA_API ma_result ma_phonon_binaural_node_set_direction(ma_phonon_binaural_node* pBinauralNode, float x, float y, float z)
+MA_API ma_result ma_phonon_binaural_node_set_direction(ma_phonon_binaural_node* pBinauralNode, float x, float y, float z, float distance)
 {
 	if (pBinauralNode == NULL) {
 		return MA_INVALID_ARGS;
 	}
-	pBinauralNode->direction.x = x;
-	pBinauralNode->direction.y = y;
-	pBinauralNode->direction.z = z;
+	pBinauralNode->iplEffectParams.direction.x = x;
+	pBinauralNode->iplEffectParams.direction.y = y;
+	pBinauralNode->iplEffectParams.direction.z = z;
+	pBinauralNode->iplEffectParams.spatialBlend = pBinauralNode->spatial_blend_max_distance > 0? distance / pBinauralNode->spatial_blend_max_distance : 1.0f;
+	if (pBinauralNode->iplEffectParams.spatialBlend > 1.0) pBinauralNode->iplEffectParams.spatialBlend = 1.0;
 	return MA_SUCCESS;
 }
 
