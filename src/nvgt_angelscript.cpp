@@ -85,6 +85,7 @@
 #include "scriptmathcomplex.h"
 #include "contextmgr.h"
 #include "weakref.h"
+#include "anticheat.h"
 #ifndef NVGT_STUB
 int PragmaCallback(const std::string &pragmaText, CScriptBuilder &builder, void * /*userParam*/);
 #endif
@@ -554,6 +555,7 @@ int ConfigureEngine(asIScriptEngine *engine)
 	g_ctxMgr->RegisterCoRoutineSupport(engine);
 	engine->SetContextCallbacks(RequestContextCallback, ReturnContextCallback, 0);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
+		register_anticheat(engine);
 	return 0;
 }
 #ifndef NVGT_STUB
