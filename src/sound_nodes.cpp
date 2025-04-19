@@ -110,6 +110,7 @@ static void ma_mixer_monitor_node_process_pcm_frames(ma_node* pNode, const float
 			pMonitorNode->position_changed = g_sound_position_changed;
 		}
 	} else if (g_hrtf_enabled && m->get_hrtf_desired() && m->get_spatialization_enabled()) g_hrtf_update_notifications.enqueueNotification(new hrtf_update(m, true));
+	else m->set_directional_attenuation_factor(std::clamp(m->get_distance_to_listener() / 4, 0.0f, 1.0f)); // Should we make 4 a configurable factor?
 }
 static ma_node_vtable ma_mixer_monitor_node_vtable = { ma_mixer_monitor_node_process_pcm_frames, nullptr, 1, 1, MA_NODE_FLAG_PASSTHROUGH | MA_NODE_FLAG_CONTINUOUS_PROCESSING | MA_NODE_FLAG_ALLOW_NULL_INPUT };
 class mixer_monitor_node_impl : public audio_node_impl, public virtual mixer_monitor_node {
