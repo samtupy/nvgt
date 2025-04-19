@@ -80,15 +80,17 @@ class hrtf_update : public Poco::Notification {
 	bool hrtf;
 	hrtf_update(mixer* m, bool hrtf) : m(m), hrtf(hrtf) { if (m) m->duplicate(); }
 	~hrtf_update() { if (m) m->release(); }
-	void process() { m->set_hrtf(hrtf); }
+	void process() { m->set_hrtf_internal(hrtf); }
 };
 Poco::NotificationQueue g_hrtf_update_notifications;
 Poco::Thread g_mixer_monitor_thread;
 void mixer_monitor_thread(void* u) {
-	Poco::Notification::Ptr nptr = g_hrtf_update_notifications.waitDequeueNotification();
-	hrtf_update* n = dynamic_cast<hrtf_update*>(&*nptr);
-	if (!n->m) return;
-	n->process();
+	while (true) {
+		Poco::Notification::Ptr nptr = g_hrtf_update_notifications.waitDequeueNotification();
+		hrtf_update* n = dynamic_cast<hrtf_update*>(&*nptr);
+		if (!n->m) return;
+		n->process();
+	}
 }
 
 // The following node updates the HRTF state for anything it is attached to, and can perform any other checks on a mixer or sound if needed.

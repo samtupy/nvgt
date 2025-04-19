@@ -410,7 +410,7 @@ class mixer_impl : public audio_node_impl, public virtual mixer {
 protected:
 	audio_engine_impl *engine;
 	unique_ptr<ma_sound> snd;
-	mutex hrtf_toggle_mtx;
+	mutable mutex hrtf_toggle_mtx;
 	mixer* parent_mixer;
 	mixer_monitor_node* monitor;
 	phonon_binaural_node* hrtf;
@@ -418,8 +418,8 @@ protected:
 	audio_node* get_input_node () { return parent_mixer? parent_mixer : engine->get_endpoint(); }
 	audio_node* get_output_node() { return hrtf? hrtf : dynamic_cast<audio_node*>(monitor); }
 public:
-	mixer_impl() : audio_node_impl(), snd(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(get_global_hrtf()) {}
-	mixer_impl(audio_engine* e, bool sound_group = true) : engine(static_cast<audio_engine_impl*>(e)), audio_node_impl(), snd(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(get_global_hrtf()) {
+	mixer_impl() : audio_node_impl(), snd(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {}
+	mixer_impl(audio_engine* e, bool sound_group = true) : engine(static_cast<audio_engine_impl*>(e)), audio_node_impl(), snd(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {
 		init_sound();
 		if (sound_group) {
 			snd = make_unique<ma_sound>();
@@ -429,6 +429,7 @@ public:
 		}
 		// set_attenuation_model(ma_attenuation_model_linear); // Investigate why this doesn't seem to work even though ma_attenuation_linear returns a correctly attenuated gain.
 		set_rolloff(0.75);
+		set_directional_attenuation_factor(1);
 		if (sound_group) play();
 	}
 	~mixer_impl() {
@@ -457,13 +458,9 @@ public:
 		} else return attach_output_bus(0, get_engine()->get_endpoint(), 0);
 	}
 	mixer* get_mixer() const override { return parent_mixer; }
-	bool set_hrtf(bool enable) override {
+	bool set_hrtf_internal(bool enable) override {
 		unique_lock<mutex> lock(hrtf_toggle_mtx);
 		if (hrtf && enable or !hrtf && !enable) return true;
-		if (enable && !get_spatialization_enabled()) {
-			hrtf_desired = enable;
-			return true; // HRTF will automatically toggle the next time spatialization is enabled for the sound.
-		}
 		audio_node* i = get_input_node(), *o = get_output_node();
 		if (enable) {
 			if ((hrtf = phonon_binaural_node::create(engine, engine->get_channels(), engine->get_sample_rate())) == nullptr) return false;
@@ -471,16 +468,19 @@ public:
 			if (!o->attach_output_bus(0, hrtf, 0)) return false;
 			set_directional_attenuation_factor(0);
 		} else {
-			if (!monitor->attach_output_bus(0, i, 0)) return false; // This chain will become more complex as we add a builtin reverb node.
 			set_directional_attenuation_factor(1);
+			if (!monitor->attach_output_bus(0, i, 0)) return false; // This chain will become more complex as we add a builtin reverb node.
 			hrtf->release();
 			hrtf = nullptr;
 		}
-		hrtf_desired = enable;
 		return true;
 	}
-	bool get_hrtf() const override { return hrtf != nullptr; }
-	bool get_hrtf_desired() const override { return hrtf_desired; }
+	bool set_hrtf(bool enable) override {
+		hrtf_desired = enable;
+		return set_hrtf_internal(enable);
+	}
+	bool get_hrtf() const override { unique_lock<mutex> lock(hrtf_toggle_mtx); return hrtf != nullptr; }
+	bool get_hrtf_desired() const override { unique_lock<mutex> lock(hrtf_toggle_mtx); return hrtf_desired; }
 	audio_node* get_hrtf_node() const override { return hrtf; }
 	bool play(bool reset_loop_state = true) override {
 		if (snd == nullptr)
@@ -526,8 +526,7 @@ public:
 	void set_spatialization_enabled(bool enabled) override {
 		if (snd)
 			ma_sound_set_spatialization_enabled(&*snd, enabled);
-		if (enabled) set_hrtf(hrtf_desired); // If desired, enable HRTF if we are enabling spatialization.
-		else set_hrtf(false);
+		set_hrtf_internal(enabled && hrtf_desired && get_global_hrtf()); // If desired, enable HRTF if we are enabling spatialization.
 	}
 	bool get_spatialization_enabled() const override {
 		if (snd) return ma_sound_is_spatialization_enabled(&*snd);
@@ -1169,6 +1168,7 @@ template <class T> void RegisterSoundsystemMixer(asIScriptEngine *engine, const 
 	engine->RegisterObjectMethod(type.c_str(), "mixer@+ get_mixer() const", asFUNCTION((virtual_call<T, &T::get_mixer, mixer*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_hrtf(bool hrtf = true)", asFUNCTION((virtual_call<T, &T::set_hrtf, bool, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf() const property", asFUNCTION((virtual_call<T, &T::get_hrtf, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf_desired() const property", asFUNCTION((virtual_call<T, &T::get_hrtf_desired, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play(bool reset_loop_state = true)", asFUNCTION((virtual_call<T, &T::play, bool, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play_looped()", asFUNCTION((virtual_call<T, &T::play_looped, bool>)), asCALL_CDECL_OBJFIRST);
 

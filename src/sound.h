@@ -120,7 +120,8 @@ public:
 	virtual ma_sound *get_ma_sound() const = 0;
 	virtual bool set_mixer(mixer* mix) = 0;
 	virtual mixer* get_mixer() const = 0;
-	virtual bool set_hrtf(bool hrtf) = 0;
+	virtual bool set_hrtf_internal(bool hrtf) = 0;
+	virtual bool set_hrtf(bool hrtf) = 0; // This is what should be called by the user and is what updates the desired state of hrtf and not just hrtf itself.
 	virtual bool get_hrtf() const = 0; // whether hrtf is currently enabled
 	virtual bool get_hrtf_desired() const = 0; // whether hrtf is desired by the user even if global hrtf is currently off
 	virtual audio_node* get_hrtf_node() const = 0;
