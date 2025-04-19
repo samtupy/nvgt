@@ -196,6 +196,7 @@ public:
 			cfg.playback.channels = 2;
 			cfg.playback.format = ma_format_f32;
 			cfg.sampleRate = 0; // Let the device decide.
+			cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE;
 
 			// Hook up high quality resampling, because we want the app to accommodate the device's sample rate, not the other way around.
 			cfg.resampling.algorithm = ma_resample_algorithm_custom;
@@ -297,6 +298,7 @@ public:
 		if (device > -1) cfg.playback.pDeviceID = &g_sound_output_devices[device].id;
 		cfg.playback.channels = old_dev->playback.channels;
 		cfg.sampleRate = old_dev->sampleRate;
+		cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE;
 		cfg.noPreSilencedOutputBuffer = old_dev->noPreSilencedOutputBuffer;
 		cfg.noClip = old_dev->noClip;
 		cfg.noDisableDenormals = old_dev->noDisableDenormals;
