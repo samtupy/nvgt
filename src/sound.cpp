@@ -479,8 +479,8 @@ public:
 		hrtf_desired = enable;
 		return set_hrtf_internal(enable);
 	}
-	bool get_hrtf() const override { unique_lock<mutex> lock(hrtf_toggle_mtx); return hrtf != nullptr; }
-	bool get_hrtf_desired() const override { unique_lock<mutex> lock(hrtf_toggle_mtx); return hrtf_desired; }
+	bool get_hrtf() const override { return hrtf != nullptr; }
+	bool get_hrtf_desired() const override { return hrtf_desired; }
 	audio_node* get_hrtf_node() const override { return hrtf; }
 	bool play(bool reset_loop_state = true) override {
 		if (snd == nullptr)
