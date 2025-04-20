@@ -30,9 +30,9 @@ chmod +x build_linux.sh
 ```
 
 ## Building NVGT manually
-If you wish to build manually, some rather old instructions are below. At this time, it would probably be much more beneficial to read the `build_linux.sh` script or [readme.md](https://github.com/samtupy/nvgt) for much more updated commands; the below commands are here for reference and aren't updated often.
+If you wish to build manually, some rather old instructions are below. At this time, it would probably be much more beneficial to read the `build_linux.sh` script or [readme.md](https://github.com/samtupy/nvgt) for much more updated commands; the below commands are here for reference and are not updated often.
 
-Please keep in mind that this is a very very rough draft, I've only done this once before when I built nvgt's server components for stw. This will attempt to describe, even for a user who doesn't use linux much, how to build nvgt at least on Ubuntu 22.04 LTS.
+Please keep in mind that this is a very very rough draft, I have only done this once before when I built nvgt's server components for stw. This will attempt to describe, even for a user who does not use linux much, how to build nvgt at least on Ubuntu 22.04 LTS.
 
 ## tools
 You will need the GNU compiler collection / GNU make / a few other tools. You can see if you already have these on your installation by running `gcc`, `g++`, `make`. If this fails, run `sudo apt install build-essential gcc g++ make autoconf libtool`.

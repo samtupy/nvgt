@@ -4,14 +4,14 @@ This document lists all major changes that have taken place in NVGT since we sta
 ## New in 0.89.1-beta (10/09/2024):
 * Fixes copying of shared libraries while bundling on MacOS which was resulting in an assertion violation from Poco.
 * Fixes MacOS not changing to the directory of scripts launched from finder or the open command.
-* Hopefully we've finally resolved all of the MacOS includes resolution issues, there should be no more manually adding include paths to your scripts or command line invocations!
+* Hopefully we have finally resolved all of the MacOS includes resolution issues, there should be no more manually adding include paths to your scripts or command line invocations!
 * Fixes the enter key not pressing the default button in audio form lists.
 * Linux cross compilation should work again, the Linux build script was pulling down the wrong version of Angelscript.
 * `#pragma platform` has been deprecated, you should use the command line / menu options / UI to specify platforms instead.
 * Adds preprocessor macros to check platform! You can surround code in `#if android ... #endif` for example, or `#if_not windows ... #endif` as well. You can even use this to specify custom includes or pragmas just on certain platforms.
 
 ## New in 0.89.0-alpha (10/09/2024):
-* NVGT has now switched to using InnoSetup for it's installer, adding several new options such as adding to path, start menu icons etc.
+* NVGT has now switched to using InnoSetup for its installer, adding several new options such as adding to path, start menu icons etc.
 * Added the script_function::get_namespace() method as well as script_function::retrieve() which takes a native function handle derived from a funcdef.
 * Including pack files via the `#include` directive has been removed in favor of being able to include scripts of any extension, you should use the `#pragma embed` directive to do this instead.
 * NVGT games now run on intel as well as arm mac computers!
@@ -41,9 +41,9 @@ This document lists all major changes that have taken place in NVGT since we sta
 * Add datastream.sync_rw_cursors property (true by default).
 * tts_dump_config and tts_load_config in speech.nvgt include can now save screen reader usage setting.
 * ADDED ANDROID PLATFORM SUPPORT, NVGT RUNS ON MOBILE! This includes gesture detection (touch.nvgt include or query_touch_device function), screen reader speech through Android's accessibility event API, and android TextToSpeech engine support through  the tts_voice class! The support is still young and there are many improvements still to be made (only the default tts voice can be used right now and the only way to embed sounds is by using the `#pragma embed pack.dat` feature for example), but even running small nvgt scripts from source is possible at this point with NVGT's Android runner application, and one-click APK bundling is possible!
-* NVGT now has a bundling facility! It can create .apk packages for android (assuming the needed android tools are available), it can create MacOS app bundles on all platforms though only a .dmg on Mac (.app.zip on other platforms), and it can copy Windows/Linux libraries into place as well as bundle your asset files like sounds, readme and changelog all to create a fully distributable package in one click! It can even run custom prebuild and postbuild shell commands in case the bundling facility isn't quite doing enough for your needs. More information is in the compiling for distribution document. This means as an aside that NVGT's compiler application is significantly larger, as it must include the MacOS and Linux libraries on windows, the Windows and Linux libraries on Mac etc for the purposes of creating a fully functional app bundle no matter what platform it is compiled on.
+* NVGT now has a bundling facility! It can create .apk packages for android (assuming the needed android tools are available), it can create MacOS app bundles on all platforms though only a .dmg on Mac (.app.zip on other platforms), and it can copy Windows/Linux libraries into place as well as bundle your asset files like sounds, readme and changelog all to create a fully distributable package in one click! It can even run custom prebuild and postbuild shell commands in case the bundling facility is not quite doing enough for your needs. More information is in the compiling for distribution document. This means as an aside that NVGT's compiler application is significantly larger, as it must include the MacOS and Linux libraries on windows, the Windows and Linux libraries on Mac etc for the purposes of creating a fully functional app bundle no matter what platform it is compiled on.
 * The compile script submenu has changed, it now contains options to compile for all platforms you have stubs for!
-* Trying to embed a pack that doesn't exist no longer makes NVGTW.exe silently exit.
+* Trying to embed a pack that does not exist no longer makes NVGTW.exe silently exit.
 * Added the is_window_hidden function.
 * NVGT's UI application now has a launcher dialog instead of informing the user that no input file was provided. You can run scripts, compile scripts including platform selection, or do a few other things such as viewing the command line arguments/version information.
 * The directory_delete function now includes a recursive boolean argument.
@@ -108,11 +108,11 @@ This document lists all major changes that have taken place in NVGT since we sta
 * several improvements to the audio form:
     * fix the go to line dialog, it had broken a few versions ago when converting the form to no longer need bgt_compat.
     * adds method `bool is_disallowed_char(int control_index, string char, bool search_all=true);` which checks whether the given characters are allowed. It is also possible to make the search_all parameter to true or false to toggle whether the method should search to match full text, or every character. You can also omit the control_index parameter, in which case the method is used internally in the control class.
-    * adds method `bool set_disallowed_chars(int control_index, string chars, bool use_only_disallowed_chars=false, string char_disallowed_description="");` which sets the disallowed characters in a given control. Setting the use_only_disallowed_chars parameter to true will restrict to use only characters that have been set into this list. The char_disallowed_description parameter is also optional and sets the description or the text to speak when the user types the character that isn't allowed. Default is set to empty, meaning there will be silent when the user types the not allowed character. Setting the chars parameter to empty string will clear the list, thus setting to its original state.
+    * adds method `bool set_disallowed_chars(int control_index, string chars, bool use_only_disallowed_chars=false, string char_disallowed_description="");` which sets the disallowed characters in a given control. Setting the use_only_disallowed_chars parameter to true will restrict to use only characters that have been set into this list. The char_disallowed_description parameter is also optional and sets the description or the text to speak when the user types the character that is not allowed. Default is set to empty, meaning there will be silent when the user types the not allowed character. Setting the chars parameter to empty string will clear the list, thus setting to its original state.
     * Adds methods is_list_item_checked and get_checked_list_items, also made the get_list_selections function return a handle to the array.
     * Add a type of list called tab panel. This does not include the ability to assign controls to each tab automatically right now, but instead just the facility to create a list that acts more like a tab control.
 * adds blocking functions to and exposes the pause functionality in the music manager include.
-* adds a boolean to sound.play (true by default) which controls whether to reset the loop state on sound resume, so it's now possible to pause a looping sound and resume it without knowing whether the sound loops.
+* adds a boolean to sound.play (true by default) which controls whether to reset the loop state on sound resume, so it is now possible to pause a looping sound and resume it without knowing whether the sound loops.
 * add functions to var type such as is_integer, is_boolean, is_string and more to determine what is stored in the var, also var.clear().
 * Added `sound_pool_default_y_elevation` property into sound_pool. This property will be useful to set default `y_is_elevation` property of each sound pool without having to change later for every sound pool you declare. Note, however, that it will only work for sound_pools declared after the variable is set, for example a global sound_pool variable will likely initialize before any function in your code could set the property.
 * improve passing arguments to async calls.
@@ -167,7 +167,7 @@ This document lists all major changes that have taken place in NVGT since we sta
 * You can now use the directive `#pragma embed packname.dat` as an alternative to `#including` your pack files.
 * Fix broken quoted strings when handling pragma directives, resolving issues with the `#pragma include` option.
 * Mostly finishes making it possible to configure various Angelscript engine properties as well as other NVGT options using configuration files, just needs polishing.
-* bgt_compat's string_to_number function now trims whitespace to comply with bgt's standard, our new faster parse_float doesn't do that anymore in the name of performance.
+* bgt_compat's string_to_number function now trims whitespace to comply with bgt's standard, our new faster parse_float does not do that anymore in the name of performance.
 * Fix issues with sound::push_memory():
     * actual audio files can be pushed to the function without modifying any other arguments other than the data string.
     * Calling sound.load() with a blank filename is no longer required before push_memory functions.
@@ -190,7 +190,7 @@ This document lists all major changes that have taken place in NVGT since we sta
 
 ## New in 0.86.0-beta (06/08/2024):
 * running nvgtw.exe or the mac app should now show a message box at least rather than silently exiting.
-* Improves the functionality of the JAWS keyhook. We likely still have more to go before it's perfect, but it is at least far better than it was before.
+* Improves the functionality of the JAWS keyhook. We likely still have more to go before it is perfect, but it is at least far better than it was before.
 * pack::open is now set to read mode by default and will try closing any opened pack rather than returning false in that case.
 * Added sound.loaded_filename property to determine the currently loaded filename of a sound object.
 * Added string.reserve() function.
@@ -198,10 +198,10 @@ This document lists all major changes that have taken place in NVGT since we sta
 * Fix issues in sound::set_fx in regards to effect deletion.
 * NVGT's datetime facilities now wrap Poco's implementations. Documentation is not complete, but the 4 new classes are datetime, timestamp, timespan, and calendar (which wraps LocalDateTime) in Poco and is called calendar for bgt backwards compatibility. Global functions include parse_datetime, datetime_is_leap_year and more, and all classes include a format method to convert the objects into strings given a format specifier.
 * Converted most filesystem functions to wrap Poco's implementations.
-* Fix potential issue with network where packets don't destroy on send failure.
+* Fix potential issue with network where packets do not destroy on send failure.
 * Added string_create_from_pointer to library functions.
 * Though the sound pool will soon be superseded by better methods of handling sounds, it has received various improvements nevertheless:
-    * Add y_is_elevation property. When this is set to false, the positioning works as normal, E.G. x is left/right, y is back/forward, and Z is up/down. When it's set to true, y is now up/down and Z is back/forward. This is useful for 2D platforming games for example, or games where y is up/down and Z is back/forward rather than the reverse. At some point this will be built into the engine so that it can be used on sound objects directly.
+    * Add y_is_elevation property. When this is set to false, the positioning works as normal, E.G. x is left/right, y is back/forward, and Z is up/down. When it is set to true, Y is now up/down and Z is back/forward. This is useful for 2D platforming games for example, or games where y is up/down and Z is back/forward rather than the reverse. At some point this will be built into the engine so that it can be used on sound objects directly.
     * Fix a bug when using the new sound_default_pack global property.
     * Cleaned up the constructors and play_extended functions a bit.
     * bgt_compat.nvgt is no longer required to used this include.
@@ -209,7 +209,7 @@ This document lists all major changes that have taken place in NVGT since we sta
 * Fix a couple of issues in the url_post implementation.
 * Register the Angelscript math complex addon.
 * fix missing include of bgt_compat in dynamic_menu.nvgt
-* fix number_to_words implementation appending null character to the end of it's output string
+* fix number_to_words implementation appending null character to the end of its output string
 * Adds a set_sound_storage function to bgt_compat.nvgt which takes advantage of the new sound_default_pack property.
 * Still a long long ways to go, but minor docs updates and a couple of new test cases.
 
@@ -260,9 +260,9 @@ This document lists all major changes that have taken place in NVGT since we sta
 ## New as of 04/18/2024:
 * The var type now has PostEnc and PostDec operators.
 * UTF8 fixes: sound.load, and compiled applications can now execute if they contain non-english characters in their filenames.
-* All code that I wish to share has been forked into what will hopefully be nvgt's long-standing repository which will eventually have it's privacy status switched to public!
-* NVGT now has a build system! I know it's not the fastest one around, but needing a  middle ground between learning even more new things and using what I already know, I chose SCons purely because of the familiar pythonic environment and not needing to learn yet another new set of syntax rules. I'm just glad we're no longer building the engine using a series of shell scripts!
-* Added basic steam audio reverb integration! It needs a lot of work and is far from being production ready (seriously this could slow your game to a crawl until I'm done with this), but nevertheless it is still around for testing!
+* All code that I wish to share has been forked into what will hopefully be nvgt's long-standing repository which will eventually have its privacy status switched to public!
+* NVGT now has a build system! I know it is not the fastest one around, but needing a  middle ground between learning even more new things and using what I already know, I chose SCons purely because of the familiar pythonic environment and not needing to learn yet another new set of syntax rules. I am just glad we are no longer building the engine using a series of shell scripts!
+* Added basic steam audio reverb integration! It needs a lot of work and is far from being production ready (seriously this could slow your game to a crawl until I am done with this), but nevertheless it is still around for testing!
 
 ## New leading up to 02/20/2024:
 * NVGT now finally has a documentation structure!
