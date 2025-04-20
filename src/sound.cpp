@@ -782,6 +782,9 @@ public:
 			}
 			break; // Don't retry any other failure case.
 		}
+		// For the time being, give it one more try without any flags if we got -10 (MA_INVALID_FILE) because MA's support for loading mp3 is limited.
+		if (g_soundsystem_last_error == MA_INVALID_FILE)
+			g_soundsystem_last_error = ma_sound_init_from_file(engine->get_ma_engine(), triplet.c_str(), 0, nullptr, nullptr, &*snd);
 		if (g_soundsystem_last_error != MA_SUCCESS) snd.reset();
 		else {
 			loaded_filename = filename;
