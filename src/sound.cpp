@@ -821,7 +821,8 @@ public:
 			return false;
 		// At this point we can just use the sound service to load this. We use the low level API though because we need to be clear that no filters apply.
 		// Also, our PCM buffer is a permanent class property so we can enjoy the speed of async loading.
-		return load_special(":pcm", g_memory_protocol_slot, memory_protocol::directive(&pcm_buffer[0], pcm_buffer.size()), sound_service::null_filter_slot, nullptr, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC);
+		// Sam: Actually nno we can't right now, this causes the game to crash in the vfs read function on startup if sounds are playing while tts speaks. Haven't had time to debug this as I discovered it hours before an intended release.
+		return load_special(":pcm", g_memory_protocol_slot, memory_protocol::directive(&pcm_buffer[0], pcm_buffer.size()), sound_service::null_filter_slot, nullptr, MA_SOUND_FLAG_DECODE);
 	}
 	bool load_pcm_script(CScriptArray* buffer, int samplerate, int channels) override {
 		if (!buffer) return false;
@@ -1378,8 +1379,8 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("sound", "uint64 get_length_in_ms() const property", asFUNCTION((virtual_call<sound, &sound::get_length_in_milliseconds, unsigned long long>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_data_format(audio_format&out format, uint32&out channels, uint32&out sample_rate)", asFUNCTION((virtual_call<sound, &sound::get_data_format, bool, ma_format *, unsigned int *, unsigned int *>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "double get_pitch_lower_limit() const property", asFUNCTION((virtual_call<sound, &sound::get_pitch_lower_limit, bool>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterGlobalFunction("const string[]@ get_sound_input_devices() property", asFUNCTION(get_sound_input_devices), asCALL_CDECL);
-	engine->RegisterGlobalFunction("const string[]@ get_sound_output_devices() property", asFUNCTION(get_sound_output_devices), asCALL_CDECL);
+	engine->RegisterGlobalFunction("const string[]@+ get_sound_input_devices() property", asFUNCTION(get_sound_input_devices), asCALL_CDECL);
+	engine->RegisterGlobalFunction("const string[]@+ get_sound_output_devices() property", asFUNCTION(get_sound_output_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_output_device(int device) property", asFUNCTION(set_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_decryption_key(const string& in key) property", asFUNCTION(set_default_decryption_key), asCALL_CDECL);

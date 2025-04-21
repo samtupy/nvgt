@@ -323,7 +323,7 @@ private:
 	static ma_result onRead(ma_vfs *pVFS, ma_vfs_file file, void *pDst, size_t sizeInBytes, size_t *pBytesRead) {
 		file_cast(file);
 		stream->read((char *)pDst, sizeInBytes);
-		*pBytesRead = stream->gcount();
+		if (pBytesRead) *pBytesRead = stream->gcount();
 
 		return MA_SUCCESS;
 	}
