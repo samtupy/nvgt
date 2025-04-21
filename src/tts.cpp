@@ -155,7 +155,8 @@ void tts_voice::clear() {
 	speaking.clear();
 }
 bool tts_voice::fade(soundptr &item) {
-	item->set_fade(-1, 0, 20);
+	// Bypass the wrapper here and work directly with the ma_sound because we don't want our inputs changed.
+	ma_sound_set_fade_in_milliseconds(item->get_ma_sound(), -1, 0, 20);
 	try {
 		fade_queue.push(item);
 		return true;
