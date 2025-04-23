@@ -28,6 +28,4 @@ alert("test", "The file contains a total of " + f.lines + " and after decoding, 
 
 More datastreams could be added to the engine at any time.
 
-Note that most datastreams do not support seeking as this would result in needing to store more data in memory than we are comfortable with just as a start, however file objects and raw datastreams that read from a string do support seeking, E source streams. Other than these stream types, you should assume that seek operations will not work unless noted otherwise for each type of stream.
-
 The available datastreams are listed below in this subsection of the documentation.
