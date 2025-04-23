@@ -1,0 +1,18 @@
+/**
+	Overloads the / operator, allowing you to divide two vectors, or divide one vector by a scalar.
+	vector& opDiv(const vector &in other);
+	vector& opDiv(float scalar);
+	## Arguments (1):
+		* const vector&in other: the vector to divide by.
+	## Arguments (2):
+		* float scalar: The scalar to divide by.
+	## Remarks
+		Dividing two vectors will, as you might imagine, divide each axis independently. On the other hand, dividing by a scalar will divide all axes by that scalar.
+*/
+
+// Example:
+void main() {
+	vector v1(3, 12, 24);
+	vector v2=v1/3;
+	alert("The second vector =", "(" + v2.x + ", " + v2.y + ", " + v2.z + ")");
+}

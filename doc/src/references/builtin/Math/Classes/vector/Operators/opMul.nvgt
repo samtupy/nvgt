@@ -1,0 +1,18 @@
+/**
+	Overloads the * operator, allowing you to multiply two vectors, or multiply one vector by a scalar.
+	vector& opMul(const vector &in other);
+	vector& opMul(float scalar);
+	## Arguments (1):
+		* const vector&in other: the vector to multiply.
+	## Arguments (2):
+		* float scalar: The scalar to multiply by.
+	## Remarks
+		Multiplying two vectors will, as you might imagine, multiply each axis independently. On the other hand, multiplying by a scalar will multiply all axes by that scalar.
+*/
+
+// Example:
+void main() {
+	vector v1(1, 4, 8);
+	vector v2=v1*3;
+	alert("The second vector =", "(" + v2.x + ", " + v2.y + ", " + v2.z + ")");
+}

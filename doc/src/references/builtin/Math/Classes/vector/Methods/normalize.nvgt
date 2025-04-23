@@ -1,0 +1,16 @@
+/**
+	Normalizes the vector so that its Euclidian length is 1.
+	vector& normalize();
+	## Arguments:
+		None.
+	## Remarks
+		Vector normalization is useful when you need to find out the direction something is pointing rather than where it goes. This is especially useful in 3D or physics-based games, where movement and aiming often happen in arbitrary directions rather than along fixed axes.
+		Warning: Calling normalize() on a zero vector (0, 0, 0) will return a vector whose values are NAN due to division by zero. Be sure to check the vector's length before normalizing.
+*/
+
+// Example:
+void main() {
+	vector v1(3, 4, 0);
+	v1.normalize();
+	alert("Vector", "(" + v1.x + ", " + v1.y + ", " + v1.z + ")");
+}
