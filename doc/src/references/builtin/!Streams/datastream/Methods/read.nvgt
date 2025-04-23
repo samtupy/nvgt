@@ -1,8 +1,19 @@
 /**
 	Read raw bytes from a stream.
 	string read(uint amount = 0);
+	string read_string(uint amount = 0);
+	int8 read_int8();
+	uint8 read_uint8();
+	int16 read_int16();
+	uint16 read_uint16();
+	int read_int();
+	uint read_uint();
+	int64 read_int64();
+	uint64 read_uint64();
+	float read_float();
+	double read_double();
 	## Arguments:
-		* uint amount = 0: The number of bytes to read, or 0 to read the entire stream.
+		* uint amount = 0: The number of bytes to read, or 0 to read the entire stream. Only applicable for strings.
 	## Returns:
 		string: The data that was read from the stream or an empty string on failure.
 	## Remarks:
