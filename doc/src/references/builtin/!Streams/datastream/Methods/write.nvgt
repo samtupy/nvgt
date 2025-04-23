@@ -1,8 +1,19 @@
 /**
 	Write raw bytes to a stream.
 	uint write(string content);
+	uint write_string(string content);
+	uint write_int8(int8 content);
+	uint write_uint8(uint8 content);
+	uint write_int16(int16 content);
+	uint write_uint16(uint16 content);
+	uint write_int(int content);
+	uint write_uint(uint content);
+	uint write_int64(int64 content);
+	uint write_uint64(uint64 content);
+	uint write_float(float content);
+	uint write_double(double content);
 	## Arguments:
-		* string content: the content that is to be written.
+		* content: The content that is to be written. Use the corresponding write method for the type you wish to write.
 	## Returns:
 		uint: the number of bytes written.
 	## Remarks:
