@@ -323,7 +323,7 @@ void handle_sdl_event(SDL_Event* evt) {
 		regained_window_focus();
 }
 void refresh_window() {
-	anticheat_check();
+	//anticheat_check();
 	SDL_PumpEvents();
 	SDL_Event evt;
 	std::unordered_set<int> keys_pressed_this_frame;

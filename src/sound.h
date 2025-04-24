@@ -16,7 +16,7 @@
 #include <reactphysics3d/mathematics/Vector3.h>
 #include "sound_service.h"
 
-#define SOUNDSYSTEM_FRAMESIZE 512 // We can make this be configureable if enough people want it.
+#define SOUNDSYSTEM_FRAMESIZE 128 // We can make this be configureable if enough people want it.
 
 class CScriptArray;
 class asIScriptEngine;
