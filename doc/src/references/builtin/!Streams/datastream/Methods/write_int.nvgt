@@ -1,0 +1,14 @@
+/**
+	Write the value of a 32-bit integer into a stream.
+	uint write_int(int content);
+	## Arguments:
+		* content: The content that is to be written.
+	## Returns:
+		uint: the number of bytes written.
+*/
+
+// Example:
+void main() {
+	datastream ds;
+	ds.write_int(4);
+}
