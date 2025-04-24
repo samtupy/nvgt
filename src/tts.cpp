@@ -428,7 +428,9 @@ bool tts_voice::speak_wait(const std::string &text, bool interrupt) {
 	return true;
 }
 bool tts_voice::stop() {
-	#ifndef __ANDROID__
+	#ifdef __APPLE__
+	return inst->stopSpeech();
+	#elif (!defined(__ANDROID__))
 	return speak("", true);
 	#else
 	return env->CallBooleanMethod(TTSObj, midSilence);
@@ -612,7 +614,7 @@ bool tts_voice::refresh() {
 	destroy();
 	setup();
 	set_voice(voice);
-	return true;
+	return inst != nullptr;
 }
 
 tts_voice *Script_tts_voice_Factory(const std::string &builtin_voice_name) {
