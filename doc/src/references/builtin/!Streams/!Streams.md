@@ -29,3 +29,5 @@ alert("test", "The file contains a total of " + f.lines + " and after decoding, 
 More datastreams could be added to the engine at any time.
 
 The available datastreams are listed below in this subsection of the documentation.
+
+All streams are derived from the datastream class, so you will want to have a look at the documentation for that class first before seeing what extras are provided by the datastream you want to work with.
