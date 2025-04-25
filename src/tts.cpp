@@ -50,7 +50,7 @@ static void tts_normalize(t *data, unsigned long size_in_samples) {
 // Size is in frames.
 template <class t>
 t *tts_trim_internal(t *data, unsigned long *size_in_frames, int channels, float begin_db, float end_db) {
-	tts_normalize<t>(data, *size_in_frames * channels);
+	// tts_normalize<t>(data, *size_in_frames * channels);
 	t min_begin_sample = std::ceil(ma_volume_db_to_linear(begin_db) * (double)std::numeric_limits<t>::max());
 	t min_end_sample = std::ceil(ma_volume_db_to_linear(end_db) * (double)std::numeric_limits<t>::max());
 	for (unsigned long i = 0; i < *size_in_frames; i++) {
