@@ -32,7 +32,8 @@ bool add_decoder(ma_decoding_backend_vtable *vtable);
 bool init_sound();
 bool refresh_audio_devices();
 
-class audio_node {
+class audio_node
+{
 public:
 	virtual void duplicate() = 0; // reference counting
 	virtual void release() = 0;
@@ -57,12 +58,14 @@ public:
 	virtual unsigned long long get_time() = 0;
 	virtual bool set_time(unsigned long long local_time) = 0;
 };
-class audio_engine {
+class audio_engine
+{
 public:
-	enum engine_flags {
-		DURATIONS_IN_FRAMES = 1, // If set, all durations possible will expect a value in PCM frames rather than milliseconds unless explicitly specified.
-		NO_AUTO_START = 2, // if set, audio_engine::start must be called after initialization.
-		NO_DEVICE = 4, // If set, audio_engine::read() must be used to receive raw audio samples from the engine instead.
+	enum engine_flags
+	{
+		DURATIONS_IN_FRAMES = 1,  // If set, all durations possible will expect a value in PCM frames rather than milliseconds unless explicitly specified.
+		NO_AUTO_START = 2,		  // if set, audio_engine::start must be called after initialization.
+		NO_DEVICE = 4,			  // If set, audio_engine::read() must be used to receive raw audio samples from the engine instead.
 		PERCENTAGE_ATTRIBUTES = 8 // If this is set, attributes for sounds will be in percentages such as 100 instead of decimals such as 1.0, ecentially a multiplication by 100 for backwards compatibility or preference. This also causes sound.volume to work in db.
 	};
 	virtual void duplicate() = 0; // reference counting
@@ -82,8 +85,8 @@ public:
 	virtual bool set_time_in_milliseconds(unsigned long long time) = 0;
 	virtual int get_channels() const = 0;
 	virtual int get_sample_rate() const = 0;
-	virtual bool start() = 0; // Begins audio playback <ma_engine_start>, only needs to be called if NO_AUTO_START flag is set in engine construction or after stop is called.
-	virtual bool stop() = 0; // Stops audio playback.
+	virtual bool start() = 0;				   // Begins audio playback <ma_engine_start>, only needs to be called if NO_AUTO_START flag is set in engine construction or after stop is called.
+	virtual bool stop() = 0;				   // Stops audio playback.
 	virtual bool set_volume(float volume) = 0; // 0.0 to 1.0.
 	virtual float get_volume() const = 0;
 	virtual bool set_gain(float db) = 0;
@@ -112,19 +115,20 @@ public:
 	virtual mixer *new_mixer() = 0;
 	virtual sound *new_sound() = 0;
 };
-class mixer : public virtual audio_node {
+class mixer : public virtual audio_node
+{
 public:
 	virtual void duplicate() = 0; // reference counting
 	virtual void release() = 0;
 	virtual audio_engine *get_engine() const = 0;
 	virtual ma_sound *get_ma_sound() const = 0;
-	virtual bool set_mixer(mixer* mix) = 0;
-	virtual mixer* get_mixer() const = 0;
+	virtual bool set_mixer(mixer *mix) = 0;
+	virtual mixer *get_mixer() const = 0;
 	virtual bool set_hrtf_internal(bool hrtf) = 0;
-	virtual bool set_hrtf(bool hrtf) = 0; // This is what should be called by the user and is what updates the desired state of hrtf and not just hrtf itself.
-	virtual bool get_hrtf() const = 0; // whether hrtf is currently enabled
+	virtual bool set_hrtf(bool hrtf) = 0;	   // This is what should be called by the user and is what updates the desired state of hrtf and not just hrtf itself.
+	virtual bool get_hrtf() const = 0;		   // whether hrtf is currently enabled
 	virtual bool get_hrtf_desired() const = 0; // whether hrtf is desired by the user even if global hrtf is currently off
-	virtual audio_node* get_hrtf_node() const = 0;
+	virtual audio_node *get_hrtf_node() const = 0;
 	virtual bool play(bool reset_loop_state = true) = 0;
 	virtual bool play_looped() = 0;
 	virtual bool stop() = 0;
@@ -184,7 +188,8 @@ public:
 	virtual ma_uint64 get_time_in_milliseconds() const = 0;
 	virtual bool get_playing() const = 0;
 };
-class sound : public virtual mixer {
+class sound : public virtual mixer
+{
 public:
 	/**
 	 * The lowest level method to load from the sound service; everything uses this.
@@ -202,11 +207,12 @@ public:
 	 * Also to those implementing custom sound methods: review the MiniAudio documentation to be sure you understand what the flags passed to ma_sound_init_from_file do. Some data sources, by their nature, only make sense in combination with certain flags. For example, MA_SOUND_FLAG_STREAM would be inappropriate for a string source unless you can guarantee it won't go away or be modified by script during playback.
 	 */
 	virtual bool load_special(const std::string &filename, const size_t protocol_slot = 0, directive_t protocol_directive = nullptr, const size_t filter_slot = 0, directive_t filter_directive = nullptr, ma_uint32 ma_flags = MA_SOUND_FLAG_DECODE) = 0;
-	virtual bool load(const std::string &filename, const pack_interface* pack_file = nullptr) = 0;
-	virtual bool stream(const std::string &filename, const pack_interface* pack_file = nullptr) = 0;
+	virtual bool load(const std::string &filename, const pack_interface *pack_file = nullptr) = 0;
+	virtual bool stream(const std::string &filename, const pack_interface *pack_file = nullptr) = 0;
 	virtual bool load_string(const std::string &data) = 0;
 	virtual bool load_string_async(const std::string &data) = 0; // Makes an extra copy. Good for short sounds that need to start immediately. Used by speak_to_sound.
 	virtual bool load_memory(const void *buffer, unsigned int size) = 0;
+	virtual bool is_load_completed() = 0;
 	/**
 	 * Create a wav file in memory from a raw PCM buffer.
 	 * Used internally by TTS.
@@ -215,9 +221,9 @@ public:
 	 */
 	static bool pcm_to_wav(const void *buffer, unsigned int size, ma_format format, int samplerate, int channels, void *output);
 	virtual bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) = 0;
-	virtual bool load_pcm_script(CScriptArray* buffer, int samplerate, int channels) = 0;
+	virtual bool load_pcm_script(CScriptArray *buffer, int samplerate, int channels) = 0;
 	virtual bool close() = 0;
-	virtual const std::string& get_loaded_filename() const = 0;
+	virtual const std::string &get_loaded_filename() const = 0;
 	virtual bool get_active() = 0;
 	virtual bool get_paused() = 0;
 	virtual bool play_wait() = 0;
