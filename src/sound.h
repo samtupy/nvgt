@@ -30,6 +30,7 @@ extern std::atomic<ma_result> g_soundsystem_last_error;
 // Add support for a new audio format by plugging in a ma_decoding_backend_vtable.
 bool add_decoder(ma_decoding_backend_vtable *vtable);
 bool init_sound();
+void uninit_sound();
 bool refresh_audio_devices();
 
 class audio_node {

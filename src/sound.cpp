@@ -76,6 +76,14 @@ bool init_sound() {
 	g_audio_engine = new_audio_engine(audio_engine::PERCENTAGE_ATTRIBUTES);
 	return true;
 }
+void uninit_sound() {
+	if (!g_soundsystem_initialized.test())
+		return;
+	if (g_audio_engine != nullptr) {
+		delete g_audio_engine;
+		g_audio_engine = nullptr;
+	}
+}
 
 // audio device enumeration, we'll just maintain a global list of available devices, vectors of ma_device_info structures for the c++ side and CScriptArrays of device names on the Angelscript side. It is important that the data in these arrays is index aligned.
 static vector<ma_device_info> g_sound_input_devices, g_sound_output_devices;
