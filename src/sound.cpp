@@ -301,10 +301,10 @@ public:
 		return -1; // couldn't determine device?
 	}
 	bool set_device(int device) override {
-		if (!engine || flags & NO_DEVICE || device < -1 || device >= g_sound_output_devices.size())
+		if (!engine || flags & NO_DEVICE || device < -1 || device >= int(g_sound_output_devices.size()))
 			return false;
 		ma_device *old_dev = ma_engine_get_device(&*engine);
-		if (!old_dev || ma_device_id_equal(&old_dev->playback.id, &g_sound_output_devices[device].id))
+		if (!old_dev || device > -1 && ma_device_id_equal(&old_dev->playback.id, &g_sound_output_devices[device].id))
 			return false;
 		ma_engine_stop(&*engine);
 		ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
