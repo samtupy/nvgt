@@ -1,0 +1,12 @@
+/**
+	Starts the profiler.
+	void start_profiling();
+*/
+
+// Example:
+void main() {
+	
+	start_profiling();
+	wait(1000);
+	alert("Profile", generate_profile());
+}

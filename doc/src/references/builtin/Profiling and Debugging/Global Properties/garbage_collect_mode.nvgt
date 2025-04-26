@@ -1,0 +1,14 @@
+/**
+	Set or retrieve the mode for the garbage collector. Default is 2 (see remarks below).
+	int garbage_collect_mode;
+	# Remarks
+		This has a range of 1 to 3, where:
+		1 is manual (you are responsible for calling the garbage_collect function when convenient).
+		2 is automatic (called every wait() cycle on the main thread before sleeping).
+		3 is asynchronous (same as 2, but called on a dedicated thread).
+*/
+
+// Example:
+void main() {
+	alert("GC mode", garbage_collect_mode);
+}
