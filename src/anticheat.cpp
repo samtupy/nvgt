@@ -14,15 +14,52 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <psapi.h>
-#include <tlhelp32.h>
+#include <winternl.h>
 #endif
 #include <string_view>
 #include <atomic>
 #include <angelscript.h>
+#include <cassert>
 
 #ifdef _WIN32
 static LPVOID mem_addr = nullptr;
 static PSAPI_WORKING_SET_EX_INFORMATION working_set_information;
+static PVOID ldr_dll_cookie = nullptr;
+#ifdef __cplusplus
+extern "C" {
+#endif
+static constexpr ULONG LDR_DLL_NOTIFICATION_REASON_LOADED = 1;
+static constexpr ULONG LDR_DLL_NOTIFICATION_REASON_UNLOADED = 2;
+
+typedef struct _LDR_DLL_LOADED_NOTIFICATION_DATA {
+    ULONG Flags;                    //Reserved.
+    PCUNICODE_STRING FullDllName;   //The full path name of the DLL module.
+    PCUNICODE_STRING BaseDllName;   //The base file name of the DLL module.
+    PVOID DllBase;                  //A pointer to the base address for the DLL in memory.
+    ULONG SizeOfImage;              //The size of the DLL image, in bytes.
+} LDR_DLL_LOADED_NOTIFICATION_DATA, *PLDR_DLL_LOADED_NOTIFICATION_DATA;
+
+typedef struct _LDR_DLL_UNLOADED_NOTIFICATION_DATA {
+    ULONG Flags;                    //Reserved.
+    PCUNICODE_STRING FullDllName;   //The full path name of the DLL module.
+    PCUNICODE_STRING BaseDllName;   //The base file name of the DLL module.
+    PVOID DllBase;                  //A pointer to the base address for the DLL in memory.
+    ULONG SizeOfImage;              //The size of the DLL image, in bytes.
+} LDR_DLL_UNLOADED_NOTIFICATION_DATA, *PLDR_DLL_UNLOADED_NOTIFICATION_DATA;
+
+typedef union _LDR_DLL_NOTIFICATION_DATA {
+    LDR_DLL_LOADED_NOTIFICATION_DATA Loaded;
+    LDR_DLL_UNLOADED_NOTIFICATION_DATA Unloaded;
+} LDR_DLL_NOTIFICATION_DATA, *PLDR_DLL_NOTIFICATION_DATA;
+
+typedef VOID (NTAPI *PLDR_DLL_NOTIFICATION_FUNCTION)(ULONG, const PLDR_DLL_NOTIFICATION_DATA, PVOID);
+#ifdef __cplusplus
+}
+#endif
+using PFN_LdrRegisterDllNotification = NTSTATUS (NTAPI*)(ULONG, PLDR_DLL_NOTIFICATION_FUNCTION, PVOID, PVOID*);
+using PFN_LdrUnregisterDllNotification = NTSTATUS (NTAPI*)(PVOID);
+static PFN_LdrRegisterDllNotification pfn_ldr_register   = nullptr;
+static PFN_LdrUnregisterDllNotification pfn_ldr_unregister = nullptr;
 #endif
 std::atomic_flag memory_scan_detected;
 std::atomic_flag speed_hack_detected;
@@ -30,7 +67,6 @@ std::atomic_flag speed_hack_detected;
 // This function is executed every  game iteration.
 void anticheat_check() {
 	memory_scan_detected.clear();
-	speed_hack_detected.clear();
 #ifdef _WIN32
 	std::memset(&working_set_information, 0, sizeof(working_set_information));
 	working_set_information.VirtualAddress = mem_addr;
@@ -38,30 +74,60 @@ void anticheat_check() {
 	if (res && (working_set_information.VirtualAttributes.Flags & 1) != 0) {
 		memory_scan_detected.test_and_set();
 	}
-	const auto hdl = CreateToolhelp32Snapshot(TH32CS_SNAPHEAPLIST | TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32 | TH32CS_SNAPTHREAD, GetCurrentProcessId());
-	if (hdl != INVALID_HANDLE_VALUE) {
-		MODULEENTRY32 entry;
-		entry.dwSize = sizeof(MODULEENTRY32);
-		if (Module32First(hdl, &entry)) {
-			do {
-				const auto modname = std::wstring_view(entry.szModule);
-				if (modname == L"speedhack-i386.dll" || modname == L"speedhack-x86_64.dll" || GetProcAddress(entry.hModule, "InitializeSpeedhack") || GetProcAddress(entry.hModule, "realGetTickCount") || GetProcAddress(entry.hModule, "realGetTickCount64") || GetProcAddress(entry.hModule, "realQueryPerformanceCounter") || GetProcAddress(entry.hModule, "speedhackversion_GetTickCount") || GetProcAddress(entry.hModule, "speedhackversion_GetTickCount64") || GetProcAddress(entry.hModule, "speedhackversion_QueryPerformanceCounter")) {
-					speed_hack_detected.test_and_set();
-				}
-			} while (Module32Next(hdl, &entry));
-		}
-		CloseHandle(hdl);
-	}
 #endif
 }
 
 void anticheat_deinit() {
-	// To do: do what we need to do to handle POSIX/MacOS...
+	#ifdef _WIN32
+	assert(pfn_ldr_unregister);
+	assert(ldr_dll_cookie);
+	if (pfn_ldr_unregister && ldr_dll_cookie) pfn_ldr_unregister(ldr_dll_cookie);
+	#endif
+}
+
+void handle_dll_loader_notification(ULONG reason, const PLDR_DLL_NOTIFICATION_DATA data, PVOID ctx) {
+	switch (reason) {
+		case LDR_DLL_NOTIFICATION_REASON_LOADED: {
+			const auto name = std::wstring_view(data->Loaded.BaseDllName->Buffer);
+			if (name == L"speedhack-i386.dll" || name == L"speedhack-x86_64.dll") {
+				speed_hack_detected.test_and_set();
+			}
+			HMODULE module_handle = nullptr;
+			if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<LPCWSTR>(data->Loaded.DllBase), &module_handle)) {
+				if (GetProcAddress(module_handle, "InitializeSpeedhack") || GetProcAddress(module_handle, "realGetTickCount") || GetProcAddress(module_handle, "realGetTickCount64") || GetProcAddress(module_handle, "realQueryPerformanceCounter") || GetProcAddress(module_handle, "speedhackversion_GetTickCount") || GetProcAddress(module_handle, "speedhackversion_GetTickCount64") || GetProcAddress(module_handle, "speedhackversion_QueryPerformanceCounter")) {
+					speed_hack_detected.test_and_set();
+				}
+				FreeLibrary(module_handle);
+			}
+		} break;
+		case LDR_DLL_NOTIFICATION_REASON_UNLOADED: {
+			const auto name = std::wstring_view(data->Unloaded.BaseDllName->Buffer);
+			if (name == L"speedhack-i386.dll" || name == L"speedhack-x86_64.dll") {
+				speed_hack_detected.clear();
+			}
+			HMODULE module_handle = nullptr;
+			if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<LPCWSTR>(data->Unloaded.DllBase), &module_handle)) {
+				if (GetProcAddress(module_handle, "InitializeSpeedhack") || GetProcAddress(module_handle, "realGetTickCount") || GetProcAddress(module_handle, "realGetTickCount64") || GetProcAddress(module_handle, "realQueryPerformanceCounter") || GetProcAddress(module_handle, "speedhackversion_GetTickCount") || GetProcAddress(module_handle, "speedhackversion_GetTickCount64") || GetProcAddress(module_handle, "speedhackversion_QueryPerformanceCounter")) {
+					speed_hack_detected.clear();
+				}
+				FreeLibrary(module_handle);
+			}
+		} break;
+	}
 }
 
 void register_anticheat(asIScriptEngine* engine) {
 #ifdef _WIN32
 	mem_addr = VirtualAlloc(nullptr, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	HMODULE ntdll_handle = GetModuleHandle(L"ntdll.dll");
+	assert(ntdll_handle != INVALID_HANDLE_VALUE || ntdll_handle != NULL);
+	// If this fails, consider it a fatal exit condition, because ntdll.dll should (always) be loaded
+	if (ntdll_handle == INVALID_HANDLE_VALUE || ntdll_handle == NULL) FatalAppExit(0, L"NtDll.dll was not found in the module list!");
+	pfn_ldr_register = reinterpret_cast<PFN_LdrRegisterDllNotification>(GetProcAddress(ntdll_handle, "LdrRegisterDllNotification"));
+	pfn_ldr_unregister = reinterpret_cast<PFN_LdrUnregisterDllNotification>(GetProcAddress(ntdll_handle, "LdrUnregisterDllNotification"));
+	assert(pfn_ldr_register != NULL);
+	assert(pfn_ldr_unregister != NULL);
+	if (pfn_ldr_register) pfn_ldr_register(0, &handle_dll_loader_notification, nullptr, &ldr_dll_cookie);
 #endif
 	engine->RegisterGlobalProperty("const atomic_flag speed_hack_detected", (void*)&speed_hack_detected);
 	engine->RegisterGlobalProperty("const atomic_flag memory_scan_detected", (void*)&memory_scan_detected);
