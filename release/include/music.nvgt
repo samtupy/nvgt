@@ -16,7 +16,7 @@ class music_track {
 	int repeat_point;
 	int predelay;
 	int switch_predelay = 300;
-	int switch_fade = 2000;
+	int switch_fade = 500;
 	sound@ track = null;
 	sound@ next_track = null;
 	uint64 intro_end = 0;
@@ -121,7 +121,7 @@ class music_track {
 			if (intro_end > 0 or repeat_point != 0) handle.play();
 			else handle.play_looped();
 		}
-		if (fade_ms > 0) handle.set_fade(-100, 0, fade_ms);
+		handle.set_fade(-100, 0, fade_ms);
 	}
 	void play(int fade_ms = 0) {
 		start_playing = -1;
@@ -234,6 +234,7 @@ class music_manager {
 		music_track@ trk = music_track(track, this);
 		if (@main_track == null) {
 			@main_track = trk;
+			next_play = 0;
 			return true;
 		}
 		@next_track = trk;
@@ -249,6 +250,7 @@ class music_manager {
 	void stop(int fade_ms = 0, bool blocking = false) {
 		if (!playing) return;
 		stopping = true;
+		next_play = 0;
 		if (@main_track != null) main_track.stop(fade_ms);
 		if (@next_track != null) next_track.stop(fade_ms);
 		while (blocking and playing) {

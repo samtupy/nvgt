@@ -822,6 +822,11 @@ int CScriptArray::GetElementTypeId() const
 	return subTypeId;
 }
 
+int CScriptArray::GetElementSize() const
+{
+	return elementSize;
+}
+
 void CScriptArray::InsertAt(asUINT index, void *value)
 {
 	if( index > buffer->numElements )

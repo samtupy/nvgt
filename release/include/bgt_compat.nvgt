@@ -301,31 +301,29 @@ string generate_computer_id(const string& in application_id, bool hardware_only)
 
 //dummy sound storage functions
 
-string get_sound_storage() {
-	return sound_storage;
-}
-
-pack@open_pack(const string&in filename) {
+pack_file@open_pack(const string&in filename, const string&in key = "", bool force_encryption = false) {
 	if (filename.is_empty()) return null;
-	pack p;
-	if (p.open(filename, PACK_OPEN_MODE_READ)) return p;
-	else return null;
+	pack_file p;
+	if (p.open(filename, key)) return p;
+	else {
+		if(force_encryption) return null;
+		if(p.open(filename, "")) return p;
+	}
+	return null;
 }
-
-bool set_sound_storage(const string&in filename, bool reset = false) {
+bool set_sound_storage(const string&in filename, const string&in key = "", bool force_encryption = false, bool reset = false) {
 	if (reset and filename.is_empty()) {
 		@sound_default_pack = null;
 		sound_storage = "";
 	}
-	pack@p = open_pack(filename);
-	if (@p == null) return false;
+	pack_file@p = open_pack(filename, key, force_encryption);
+	if(@p == null) return false;
 	@sound_default_pack = p;
-	sound_storage = filename;
 	return true;
 }
-
-bool set_sound_decryption_key(const string& in key, bool force_encryption) {
-	return (true);
+string get_sound_storage() {
+	if(@sound_default_pack == null) return "";
+	return cast<pack_file@>(sound_default_pack).pack_name;
 }
 
 // legacy generate_profile

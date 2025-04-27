@@ -17,28 +17,27 @@
 #include <scriptarray.h>
 #include "sound.h"
 #ifdef _WIN32
-struct blastspeak;
+	struct blastspeak;
 #elif defined(__APPLE__)
-class AVTTSVoice;
+	class AVTTSVoice;
 #elif defined(__ANDROID__)
-#include <jni.h>
+	#include <jni.h>
 #endif
 #include <queue>
 #include <mutex>
 #include <atomic>
-class tts_voice
-{
+class tts_voice {
 	int RefCount;
-#ifdef _WIN32
+	#ifdef _WIN32
 	blastspeak *inst;
-#elif defined(__APPLE__)
+	#elif defined(__APPLE__)
 	AVTTSVoice *inst;
-#elif defined(__ANDROID__)
+	#elif defined(__ANDROID__)
 	jclass TTSClass;
 	jmethodID constructor, midIsActive, midIsSpeaking, midSpeak, midSilence, midGetVoice, midSetRate, midSetPitch, midSetPan, midSetVolume, midGetVoices, midSetVoice, midGetMaxSpeechInputLength, midGetPitch, midGetPan, midGetRate, midGetVolume;
 	JNIEnv *env;
 	jobject TTSObj;
-#endif
+	#endif
 	bool destroyed;
 	long samprate;
 	short bitrate;
@@ -79,12 +78,10 @@ public:
 	bool speak_wait(const std::string &text, bool interrupt = false);
 	sound *speak_to_sound(const std::string &text);
 
-	bool speak_interrupt(const std::string &text)
-	{
+	bool speak_interrupt(const std::string &text) {
 		return speak(text, true);
 	}
-	bool speak_interrupt_wait(const std::string &text)
-	{
+	bool speak_interrupt_wait(const std::string &text) {
 		return speak_wait(text, true);
 	}
 	int get_rate();

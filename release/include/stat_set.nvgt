@@ -34,8 +34,8 @@ class stat {
 		if (@user != null) this.user = user;
 	}
 
-	string opImplConv() const {
-		if (@this.callback !is null) return this.callback(this);
+	string opImplConv() {
+		if (@this.callback != null) return this.callback(this);
 		return name +"=" + string(val);
 	}
 

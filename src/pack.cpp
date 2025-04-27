@@ -247,7 +247,7 @@ bool pack::write_mode_internals::finalize()
 	for (toc_list::iterator i = ordered_toc.begin(); i != ordered_toc.end(); i++)
 	{
 		toc_entry &entry = **i;
-		writer.write7BitEncoded(entry.filename.length());
+		writer.write7BitEncoded(Poco::UInt32(entry.filename.length()));
 		writer.writeRaw(entry.filename);
 		writer.write7BitEncoded(entry.size);
 	}
@@ -649,7 +649,7 @@ int section_istreambuf::readFromDevice(char *buffer, std::streamsize length)
 	{
 		return -1;
 	}
-	length = std::min(length, (start + size - pos));
+	length = std::min(length, std::streamsize(start + size - pos));
 
 	source->read(buffer, length);
 
@@ -673,9 +673,9 @@ std::streampos section_istreambuf::seekoff(std::streamoff off, std::ios_base::se
 		// Istream uses 0 cur to implement tell, so just report the current position without moving anything.
 		if (off == 0)
 		{
-			return source->tellg() - start - in_avail();
+			return source->tellg() - (std::streampos) start - (std::streampos) in_avail();
 		}
-		return seekpos(source->tellg() - start - in_avail() + off);
+		return seekpos(source->tellg() - std::streampos(start - in_avail() + off));
 	}
 	return -1; // Can't get here.
 }
@@ -783,6 +783,7 @@ void RegisterScriptPack(asIScriptEngine *engine)
 	engine->RegisterObjectMethod("pack_file", "bool file_exists(const string &in filename)", asMETHOD(pack, file_exists), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "int64 get_file_size(const string &in filename)", asMETHOD(pack, get_file_size), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "datastream @get_file(const string &in filename, const string &in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asMETHOD(pack, get_file_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "string get_pack_name() const property", asMETHOD(pack, get_pack_name), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "bool get_active() const property", asMETHOD(pack, get_active), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "int64 get_file_count() const property", asMETHOD(pack, get_file_count), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "string[]@ list_files() const", asMETHOD(pack, list_files), asCALL_THISCALL);
