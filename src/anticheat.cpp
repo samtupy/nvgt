@@ -73,6 +73,8 @@ void anticheat_check() {
 	const auto res = K32QueryWorkingSetEx((HANDLE)-1, &working_set_information, sizeof(working_set_information));
 	if (res && (working_set_information.VirtualAttributes.Flags & 1) != 0) {
 		memory_scan_detected.test_and_set();
+		if (VirtualFree(mem_addr, 0, MEM_RELEASE) == 0) FatalAppExit(0, L"Failed to release an internal memory block"); // Should we do this, or set a flag?
+		mem_addr = VirtualAlloc(nullptr, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	}
 #endif
 }
