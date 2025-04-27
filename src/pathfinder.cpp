@@ -266,7 +266,8 @@ CScriptArray *pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	callback_data = data;
 	if (data)
 		data->AddRef();
-	if (get_difficulty(start_x, start_y, start_z, start_x, start_y, start_z) > 9 || get_difficulty(end_x, end_y, end_z, end_x, end_y, end_z) > 9)
+	// Only perform this fast-fail optimization if callback is "simple", otherwise it will just produce false positives.
+	if (callback_mode == CALLBACK_SIMPLE && (get_difficulty(start_x, start_y, start_z, start_x, start_y, start_z) > 9 || get_difficulty(end_x, end_y, end_z, end_x, end_y, end_z) > 9))
 		return array;
 	void *start = encode_state(start_x, start_y, start_z, desperation_factor);
 	this->start_x = start_x;
