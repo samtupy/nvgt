@@ -31,7 +31,7 @@ class stat {
 		this.text = text;
 		if (@callback == null) @callback = default_stat_callback;
 		@this.callback = callback;
-		if (@user != null) this.user = user;
+		this.user = @user != null? user : null;
 	}
 
 	string opImplConv() {

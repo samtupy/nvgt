@@ -506,7 +506,7 @@ public:
 	}
 	bool set_hrtf(bool enable) override {
 		hrtf_desired = enable;
-		return set_hrtf_internal(enable);
+		return get_global_hrtf()? set_hrtf_internal(enable) : true;
 	}
 	bool get_hrtf() const override { return hrtf != nullptr; }
 	bool get_hrtf_desired() const override { return hrtf_desired; }

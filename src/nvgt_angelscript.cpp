@@ -378,6 +378,7 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->SetTranslateAppExceptionCallback(asFUNCTION(TranslateException), 0, asCALL_CDECL);
 	engine->SetEngineProperty(asEP_ALLOW_UNSAFE_REFERENCES, true);
 	engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
+	engine->SetEngineProperty(asEP_MEMBER_INIT_MODE, 0);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->BeginConfigGroup("core");
 	RegisterStdString(engine);
@@ -1051,6 +1052,10 @@ asITypeInfo *get_array_type(const std::string &decl) {
 	}
 	return g_TypeInfoCache[decl];
 }
+// As of Angelscript 2.38.0, we need a custom dictionary method to retrieve strings because our string class has constructors for int and double, causing dictionary::get(string, ?&out) to throw a multiple defined signature error.
+bool script_dictionary_get(CScriptDictionary* dict, const std::string& key, std::string* value) {
+	return dict->Get(key, value, g_ScriptEngine->GetStringFactory());
+}
 
 // Try not to register things here unless absolutely no other place can be found for them.
 void RegisterUnsorted(asIScriptEngine *engine) {
@@ -1068,4 +1073,5 @@ void RegisterUnsorted(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("void debug_add_func_breakpoint(const string&in)", asFUNCTION(asDebuggerAddFuncBreakpoint), asCALL_CDECL);
 	engine->RegisterGlobalProperty("const string[]@ ARGS", &g_command_line_args);
 	engine->RegisterGlobalProperty("const timestamp SCRIPT_BUILD_TIME", &g_script_build_time);
+	engine->RegisterObjectMethod("dictionary", "bool get(const string&in key, string&out value) const", asFUNCTION(script_dictionary_get), asCALL_CDECL_OBJFIRST);
 }

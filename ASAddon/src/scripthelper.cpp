@@ -919,9 +919,10 @@ string GetExceptionInfo(asIScriptContext *ctx, bool showStack)
 	stringstream text;
 
 	const asIScriptFunction *function = ctx->GetExceptionFunction();
+	const char* section_name;
 	text << "in function: " << function->GetDeclaration() << "\n";
-	if(function->GetScriptSectionName())
-		text << "file: " << (function->GetScriptSectionName() ? function->GetScriptSectionName() : "") << "\n";
+	if(function->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0)
+		text << "file: " << (section_name) << "\n";
 	if(ctx->GetExceptionLineNumber())
 		text << "line: " << ctx->GetExceptionLineNumber() << "\n";
 	text << "description: " << ctx->GetExceptionString() << "\n";
@@ -936,7 +937,8 @@ string GetExceptionInfo(asIScriptContext *ctx, bool showStack)
 			{
 				if( function->GetFuncType() == asFUNC_SCRIPT )
 				{
-					text << (function->GetScriptSectionName() ? function->GetScriptSectionName() : "") << " (" << ctx->GetLineNumber(n) << "): " << function->GetDeclaration() << "\n";
+					const char* section_name;
+					if (function->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0) text << (section_name) << " (" << ctx->GetLineNumber(n) << "): " << function->GetDeclaration() << "\n";
 				}
 				else
 				{
@@ -1000,7 +1002,9 @@ std::string ScriptGetExceptionModule()
 		return "";
 	asIScriptFunction* func=ctx->GetExceptionFunction();
 	if(!func) return "";
-	return std::string(func->GetScriptSectionName());
+	const char* section_name;
+	if (func->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0) return std::string(section_name);
+	else return "";
 }
 
 void RegisterExceptionRoutines(asIScriptEngine *engine)

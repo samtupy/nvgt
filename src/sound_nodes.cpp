@@ -45,7 +45,7 @@ bool phonon_init() {
 
 bool set_global_hrtf(bool enabled) {
 	if (!enabled && !g_hrtf_enabled || enabled && g_hrtf_enabled) return true;
-	if (!phonon_init()) return false;
+	if (enabled && !phonon_init()) return false;
 	g_hrtf_enabled = enabled;
 	return true;
 }
