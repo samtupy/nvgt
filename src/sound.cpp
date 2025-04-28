@@ -792,7 +792,7 @@ class sound_impl final : public mixer_impl, public virtual sound {
 	std::string loaded_filename; // Contains the loaded filename as passed in the load/stream method, used just for convenience.
 	ma_fence fence;
 	async_notification_callbacks notification_callbacks;
-	std::atomic_flag load_completed;
+	mutable std::atomic_flag load_completed;
 	bool paused;
 
 public:
@@ -910,7 +910,7 @@ public:
 			return false;
 		return load_pcm(buffer->GetBuffer(), buffer->GetSize() * buffer->GetElementSize(), format, samplerate, channels);
 	}
-	bool is_load_completed() {
+	bool is_load_completed() const override {
 		return load_completed.test();
 	}
 	bool close() override {
@@ -1453,6 +1453,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("sound", "bool load_pcm(const uint8[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool close()", asFUNCTION((virtual_call < sound, &sound::close, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "const string& get_loaded_filename() const property", asFUNCTION((virtual_call < sound, &sound::get_loaded_filename, const std::string & >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool get_load_complete() const property", asFUNCTION((virtual_call < sound, &sound::is_load_completed, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_active() const property", asFUNCTION((virtual_call < sound, &sound::get_active, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_paused() const property", asFUNCTION((virtual_call < sound, &sound::get_paused, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool play_wait()", asFUNCTION((virtual_call < sound, &sound::play_wait, bool >)), asCALL_CDECL_OBJFIRST);
