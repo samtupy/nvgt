@@ -87,6 +87,7 @@ void anticheat_deinit() {
 	#endif
 }
 
+#ifdef _WIN32
 void handle_dll_loader_notification(ULONG reason, const PLDR_DLL_NOTIFICATION_DATA data, PVOID ctx) {
 	switch (reason) {
 		case LDR_DLL_NOTIFICATION_REASON_LOADED: {
@@ -117,6 +118,7 @@ void handle_dll_loader_notification(ULONG reason, const PLDR_DLL_NOTIFICATION_DA
 		} break;
 	}
 }
+#endif
 
 void register_anticheat(asIScriptEngine* engine) {
 #ifdef _WIN32
