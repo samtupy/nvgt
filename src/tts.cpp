@@ -476,7 +476,7 @@ int tts_voice::get_volume() {
 		return 0;
 	return result - 100;
 	#elif defined(__APPLE__)
-	return inst->getRate();
+	return inst->getVolume();
 	#elif defined(__ANDROID__)
 	return static_cast<int>(env->CallFloatMethod(TTSObj, midGetVolume) - 100.0);
 	#endif
