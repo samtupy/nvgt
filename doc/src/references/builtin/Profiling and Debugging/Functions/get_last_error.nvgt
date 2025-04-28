@@ -1,0 +1,15 @@
+/**
+	Get the last error flagged by the engine.
+	int get_last_error();
+	## Returns:
+		int: the error code that was flagged.
+	## Remarks
+		This will usually be flagged for recoverable errors in functions that can't return error information directly, such as input and conversion functions, or when more information is available, such as in file or threading operations. More serious errors will usually throw exceptions.
+		Please note: At this time there are very few functions that make use of this flag.
+*/
+
+// Example:
+void main() {
+	input_box("Test", "Whatever"); // Error is set if you cancel.
+	alert("Error", get_last_error());
+}
