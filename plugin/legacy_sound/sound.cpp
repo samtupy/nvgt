@@ -1219,7 +1219,7 @@ BOOL legacy_sound::play_wait() {
 	if (len - pos < 0)
 		return FALSE;
 	double time_to_sleep = BASS_ChannelBytes2Seconds(channel, len - pos) / get_pitch();
-	wait(time_to_sleep * 1000);
+	nvgt_wait(time_to_sleep * 1000);
 	return TRUE;
 }
 
