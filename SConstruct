@@ -3,7 +3,7 @@
 # Copyright (c) 2022-2024 Sam Tupy
 # license: zlib
 
-import os, multiprocessing
+import os, multiprocessing, tempfile
 
 Help("""
 	Available custom build switches for NVGT:
@@ -15,6 +15,7 @@ Help("""
 		no_stubs=0 or 1 (default 0): Disable compilation of all stubs?
 		no_user=0 or 1 (default 0): Pretend that the user directory doesn't exist?
 		no_<plugname>_plugin=1: Disable a plugin by name.
+		static_<plugname>_plugin=1: Cause the given plugin to be linked statically if possible.
 		stub_obfuscation=0 or 1 (default 0): Obfuscate some Angelscript function registration strings in the resulting stubs? Could make them bigger.
 		warnings (0 or 1, default 0): enable compiler warnings?
 		warnings_as_errors (0 or 1, default 0): treat compiler warnings as errors?
@@ -59,14 +60,32 @@ env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if AR
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
 # plugins
-plugin_env = env.Clone()
 static_plugins = []
+try:
+	# First, read the list of static plugins we wish to link if available.
+	with open(os.path.join("user", "static_plugins"), "r") as f:
+		lines = f.readlines()
+		for l in lines:
+			if not l or l.startswith("#"): continue
+			static_plugins.append(l.strip())
+except FileNotFoundError: pass
+plugin_env = env.Clone()
+# Then loop through all known plugins and build them.
 for s in Glob("plugin/*/_SConscript") + Glob("plugin/*/SConscript") + Glob("extra/plugin/integrated/*/_SConscript") + Glob("extra/plugin/integrated/*/SConscript"):
 	plugname = str(s).split(os.path.sep)[-2]
 	if ARGUMENTS.get(f"no_{plugname}_plugin", "0") == "1": continue
+	if ARGUMENTS.get(f"static_{plugname}_plugin", "0") == "1" and not plugname in static_plugins: static_plugins.append(plugname)
+	# Build the plugin. A list of static libraries NVGT should link with is returned if the plugin generates any.
 	plug = SConscript(s, variant_dir = f"build/obj_plugin/{plugname}", duplicate = 0, exports = {"env": plugin_env, "nvgt_env": env})
-	if plug: static_plugins.append(plug)
-env.Append(LIBS = static_plugins)
+	if plug and plugname in static_plugins: env.Append(LIBS = plug)
+# Finally generate nvgt_plugins.cpp
+static_plugins_object = None
+static_plugins_path = os.path.join(tempfile.gettempdir(), "nvgt_plugins")
+if len(static_plugins) > 0:
+	with open(static_plugins_path + ".cpp", "w") as f:
+		f.write("#define NVGT_LOAD_STATIC_PLUGINS\n#include <nvgt_plugin.h>\n")
+		for plugin in static_plugins: f.write(f"static_plugin({plugin})" + "\n")
+		static_plugins_object = env.Object(static_plugins_path, static_plugins_path + ".cpp", CPPPATH = env["CPPPATH"] + ["#src"])
 
 # nvgt itself
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
@@ -101,17 +120,22 @@ SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, expo
 stub_env = env.Clone(PROGSUFFIX = ".bin")
 if env["PLATFORM"] == "win32": env.Append(LINKFLAGS = ["/delayload:plist.dll"])
 env.Append(LIBS = ["plist-2.0" if env["PLATFORM"] != "win32" else "plist"])
-nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [version_object], PDB = "#build/debug/nvgt.pdb")
+extra_objects = [version_object]
+if static_plugins_object: extra_objects.append(static_plugins_object)
+nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + extra_objects, PDB = "#build/debug/nvgt.pdb")
 if env["PLATFORM"] == "darwin":
 	# On Mac OS, we need to run install_name_tool to modify the paths of any dynamic libraries we link.
 	env.AddPostAction(nvgt, lambda target, source, env: env.Execute("install_name_tool -change /usr/local/lib/libplist-2.0.4.dylib @rpath/libplist-2.0.4.dylib " + str(target[0])))
 if env["PLATFORM"] == "win32":
 	# Only on windows we must go through the frustrating hastle of compiling a version of nvgt with no console E. the windows subsystem. It is at least set up so that we only need to recompile one object
 	if "nvgt.cpp" in sources: sources.remove("nvgt.cpp")
-	nvgtw = env.Program("release/nvgtw", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [env.Object("build/obj_src/nvgtw", "build/obj_src/nvgt.cpp", CPPDEFINES = ["$CPPDEFINES", "NVGT_WIN_APP"]), version_object], LINKFLAGS = ["$LINKFLAGS", "/subsystem:windows"], PDB = "#build/debug/nvgtw.pdb")
+	nvgtw = env.Program("release/nvgtw", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [env.Object("build/obj_src/nvgtw", "build/obj_src/nvgt.cpp", CPPDEFINES = ["$CPPDEFINES", "NVGT_WIN_APP"]), extra_objects], LINKFLAGS = ["$LINKFLAGS", "/subsystem:windows"], PDB = "#build/debug/nvgtw.pdb")
 	sources.append("nvgt.cpp")
+	# Todo: Properly implement the install target on other platforms
 	env.Install("c:/nvgt", nvgt)
 	env.Install("c:/nvgt", nvgtw)
+	env.Install("c:/nvgt/include", Glob("#release/include/*"))
+	env.Install("c:/nvgt/lib", Glob("#release/lib/*"))
 
 # stubs
 def fix_windows_stub(target, source, env):
@@ -133,7 +157,7 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
 	if env["PLATFORM"] == "win32": stub_env.Append(LINKFLAGS = ["/subsystem:windows"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
-	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + [version_object]
+	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + extra_objects
 	stub = stub_env.Program(f"release/stub/nvgt_{stub_platform}", stub_objects, PDB = "#build/debug/nvgt_windows.pdb")
 	if env["PLATFORM"] == "win32": env.Install("c:/nvgt/stub", stub)
 	if "upx" in env:

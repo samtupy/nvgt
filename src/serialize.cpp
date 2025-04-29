@@ -263,6 +263,9 @@ void packet(asIScriptGeneric* gen) {
 	}
 	gen->SetReturnObject(&output);
 }
+#ifdef GetObject // GetObjectW is a function in the win32 API
+#undef GetObject
+#endif
 void unpacket_str(asIScriptGeneric* gen) {
 	cmp_buffer buf = {(std::string*)gen->GetObject(), gen->GetArgDWord(0)};
 	if (buf.read_cursor < 0 || buf.read_cursor >= buf.data->size()) {

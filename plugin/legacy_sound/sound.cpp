@@ -1,6 +1,6 @@
 /* sound.cpp - sound system implementation code
  * Please note that the beginnings of this file were written way back in 2021 before the NVGT project even really started, and there has been a lot of learning that has taken place since then. This could have been written better putting it kindly, but it does provide the expected functionality.
- * Most likely this entire file will be written from complete scratch when it comes time to transition from bass to miniaudio in the coming months.
+ * You should only use this plugin if you cannot upgrade to the new miniaudio based sound system NVGT now offers in it's core. This legacy sound system is now unsupported and contains known bugs that will very likely not be patched unless by a contributor.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -21,9 +21,13 @@
 	#define WIN32_LEAN_AND_MEAN
 	#define NOMINMAX
 	#include <windows.h>
+	#include <timeapi.h>
 #endif
 #include <math.h>
 #include <unordered_map>
+#ifndef NVGT_PLUGIN_STATIC
+	#define THREAD_IMPLEMENTATION
+#endif
 #include <thread.h>
 #include <bass.h>
 #include <bass_fx.h>
@@ -32,22 +36,13 @@
 #include <Poco/Thread.h>
 #include <Poco/UnicodeConverter.h>
 #include <phonon.h>
-#include "UI.h" // wait
-#include "misc_functions.h" // range_convert
-#include "nvgt.h" // g_ScriptEngine
-#ifndef NVGT_USER_CONFIG // sound_data_char_decrypt
-	#include "nvgt_config.h"
-#else
-	#include "../user/nvgt_config.h"
-#endif
+#include "../../src/nvgt_plugin.h"
+#include "config.h"
 #include "pack.h"
 #define riffheader_impl
 #include "riffheader.h"
-#include "srspeech.h"
 #include "sound.h"
 #include <scriptarray.h>
-#include "timestuff.h" //ticks() sound preloading
-#include "xplatform.h" // running_on_mobile
 #include <system_error>
 #include <fast_float.h>
 #include <Poco/StringTokenizer.h>
@@ -61,9 +56,10 @@
 using namespace std;
 using namespace fast_float;
 
+static asIScriptEngine* g_ScriptEngine;
 static BOOL sound_initialized = FALSE;
-static mixer* output;
-static mixer* g_default_mixer = NULL;
+static legacy_mixer* output;
+static legacy_mixer* g_default_mixer = NULL;
 static bool hrtf = TRUE;
 #define hrtf_framesize 512
 static IPLContext phonon_context = NULL;
@@ -72,7 +68,7 @@ static IPLHRTFSettings phonon_hrtfSettings{};
 static IPLHRTF phonon_hrtf = NULL;
 static IPLHRTF phonon_hrtf_reflections = NULL;
 static thread_mutex_t preload_mutex;
-static pack* g_sound_default_pack = nullptr;
+static legacy_pack* g_sound_default_pack = nullptr;
 
 hstream_entry* last_channel = NULL;
 hstream_entry* register_hstream(unsigned int channel) {
@@ -127,7 +123,7 @@ BOOL init_sound(unsigned int dev) {
 			BASS_PluginLoad("bassopus", 0);
 		BASS_GetVersion();
 		BASS_FX_GetVersion();
-		output = new mixer(NULL);
+		output = new legacy_mixer(NULL);
 		/* HFX reverb=BASS_ChannelSetFX(output->channel, BASS_FX_BFX_FREEVERB, 0);
 		BASS_BFX_FREEVERB freeverb;
 		freeverb.fDryMix=1.0;
@@ -343,7 +339,7 @@ void CALLBACK bass_closeproc_push(void* user) {
 	return;
 }
 QWORD CALLBACK bass_lenproc_push(void* user) {
-	sound* s = (sound*) user;
+	legacy_sound* s = (legacy_sound*) user;
 	if (s->memstream && s->memstream_size == s->memstream->size())
 		return s->memstream_size;
 	return 0;
@@ -351,7 +347,7 @@ QWORD CALLBACK bass_lenproc_push(void* user) {
 DWORD CALLBACK bass_readproc_push(void* buffer, DWORD length, void* user) {
 	if (!buffer || !user)
 		return 0;
-	sound* s = (sound*)user;
+	legacy_sound* s = (legacy_sound*)user;
 	thread_mutex_lock(&s->close_mutex);
 	if (s->memstream) {
 		if (!s->channel && !s->script_loading) {
@@ -414,7 +410,7 @@ DWORD CALLBACK bass_readproc_push(void* buffer, DWORD length, void* user) {
 	return length;
 }
 BOOL CALLBACK bass_seekproc_push(QWORD offset, void* user) {
-	sound* s = (sound*) user;
+	legacy_sound* s = (legacy_sound*) user;
 	if (s->memstream) {
 		if (offset >= s->memstream_size)
 			return FALSE;
@@ -427,7 +423,7 @@ BOOL CALLBACK bass_seekproc_push(QWORD offset, void* user) {
 void CALLBACK bass_closeproc_script(void* user) {
 	if (!user)
 		return;
-	sound* s = (sound*)user;
+	legacy_sound* s = (legacy_sound*)user;
 	if (!s->close_callback)
 		return;
 	asIScriptContext* ctx = g_ScriptEngine->RequestContext();
@@ -444,7 +440,7 @@ finish:
 QWORD CALLBACK bass_lenproc_script(void* user) {
 	if (!user)
 		return 0;
-	sound* s = (sound*)user;
+	legacy_sound* s = (legacy_sound*)user;
 	unsigned long long ret = 0;
 	if (!s->len_callback)
 		return 0;
@@ -465,7 +461,7 @@ finish:
 DWORD CALLBACK bass_readproc_script(void* buffer, DWORD length, void* user) {
 	if (!user)
 		return -1;
-	sound* s = (sound*)user;
+	legacy_sound* s = (legacy_sound*)user;
 	int ret = -1;
 	std::string data;
 	if (!s->read_callback)
@@ -488,7 +484,7 @@ finish:
 BOOL CALLBACK bass_seekproc_script(QWORD offset, void* user) {
 	if (!user)
 		return false;
-	sound* s = (sound*)user;
+	legacy_sound* s = (legacy_sound*)user;
 	bool ret = false;
 	if (!s->seek_callback)
 		return false;
@@ -515,7 +511,7 @@ sound_preload* get_sound_preload(const std::string& filename, bool allow_creatin
 }
 typedef struct {
 	std::string filename;
-	pack* p;
+	legacy_pack* p;
 } sound_preload_transport;
 void sound_preload_perform(HSTREAM channel, const std::string& filename) {
 	if (!channel) return;
@@ -538,7 +534,7 @@ void sound_preload_perform(HSTREAM channel, const std::string& filename) {
 	pre->fn = filename;
 	BASS_ChannelSetPosition(channel, 0, BASS_POS_BYTE);
 	thread_mutex_lock(&preload_mutex);
-	pre->t = ticks();
+	pre->t = ticks(false);
 	thread_mutex_unlock(&preload_mutex);
 }
 int sound_preload_thread(void* args) {
@@ -579,7 +575,7 @@ int sound_preload_thread(void* args) {
 void sound_preload_release(sound_preload* p) {
 	if (p->ref > 0)
 		p->ref -= 1;
-	if (p->ref < 1 && ticks() - p->t > 120000) {
+	if (p->ref < 1 && ticks(false) - p->t > 120000) {
 		lock_mutex scopelock(&preload_mutex);
 		auto it = sound_preloads.find(p->fn);
 		if (it != sound_preloads.end())
@@ -603,7 +599,7 @@ void sound_preloads_clean() {
 			i++;
 			continue;
 		}
-		if (i->second->ref > 0 || ticks() - i->second->t < 120000) {
+		if (i->second->ref > 0 || ticks(false) - i->second->t < 120000) {
 			i++;
 			continue;
 		}
@@ -777,15 +773,15 @@ bool sound_environment::detach(sound_base* s) {
 	if (ref_count > 0) this->release();
 	return true;
 }
-mixer* sound_environment::new_mixer() {
-	mixer* s = new mixer();
+legacy_mixer* sound_environment::new_mixer() {
+	legacy_mixer* s = new legacy_mixer();
 	s->use_hrtf = true;
 	attach(s);
 	if (!s->pos_effect) s->pos_effect = BASS_ChannelSetDSP(s->channel, positioning_dsp, s, 0);
 	return s;
 }
-sound* sound_environment::new_sound() {
-	sound* s = new sound();
+legacy_sound* sound_environment::new_sound() {
+	legacy_sound* s = new legacy_sound();
 	attach(s);
 	return s;
 }
@@ -824,7 +820,7 @@ void sound_environment::set_listener(float x, float y, float z, float rotation) 
 }
 
 
-sound::sound() {
+legacy_sound::legacy_sound() {
 	RefCount = 1;
 	channel = 0;
 	memset(&channel_info, 0, sizeof(BASS_CHANNELINFO));
@@ -861,7 +857,7 @@ sound::sound() {
 	memstream_pos = 0;
 	memstream_legacy_encrypt = false;
 }
-sound::~sound() {
+legacy_sound::~legacy_sound() {
 	if (!sound_initialized)
 		return;
 	close();
@@ -872,7 +868,7 @@ void sound_base::AddRef() {
 void sound_base::Release() {
 	if (asAtomicDec(RefCount) < 1) delete this;
 }
-void sound::Release() {
+void legacy_sound::Release() {
 	if (asAtomicDec(RefCount) < 1) {
 		close();
 		thread_mutex_term(&close_mutex);
@@ -880,7 +876,7 @@ void sound::Release() {
 	}
 }
 
-BOOL sound::load(const string& filename, pack* containing_pack, BOOL allow_preloads) {
+BOOL legacy_sound::load(const string& filename, legacy_pack* containing_pack, BOOL allow_preloads) {
 	if (!sound_initialized)
 		init_sound();
 	if (!sound_initialized)
@@ -894,7 +890,7 @@ BOOL sound::load(const string& filename, pack* containing_pack, BOOL allow_prelo
 	if (pre != NULL) {
 		preload_ref = pre;
 		pre->ref += 1;
-		pre->t = ticks();
+		pre->t = ticks(false);
 		if (pre->data && pre->size)
 			channel = BASS_StreamCreateFile(TRUE, pre->data, 0, pre->size, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE);
 	}
@@ -934,7 +930,7 @@ BOOL sound::load(const string& filename, pack* containing_pack, BOOL allow_prelo
 	return postload(filename);
 }
 
-BOOL sound::load_script(asIScriptFunction* close, asIScriptFunction* len, asIScriptFunction* read, asIScriptFunction* seek, const std::string& data, const std::string& preload_filename) {
+BOOL legacy_sound::load_script(asIScriptFunction* close, asIScriptFunction* len, asIScriptFunction* read, asIScriptFunction* seek, const std::string& data, const std::string& preload_filename) {
 	if (!sound_initialized)
 		init_sound();
 	if (!sound_initialized)
@@ -945,7 +941,7 @@ BOOL sound::load_script(asIScriptFunction* close, asIScriptFunction* len, asIScr
 	if (pre != NULL) {
 		preload_ref = pre;
 		pre->ref += 1;
-		pre->t = ticks();
+		pre->t = ticks(false);
 		if (pre->data && pre->size)
 			channel = BASS_StreamCreateFile(TRUE, pre->data, 0, pre->size, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE);
 		if (channel) {
@@ -977,7 +973,7 @@ BOOL sound::load_script(asIScriptFunction* close, asIScriptFunction* len, asIScr
 	return postload(preload_filename != "" ? preload_filename : "script_stream");
 }
 
-BOOL sound::load_memstream(string& data, unsigned int size, const std::string& preload_filename, bool legacy_encrypt) {
+BOOL legacy_sound::load_memstream(string& data, unsigned int size, const std::string& preload_filename, bool legacy_encrypt) {
 	if (!sound_initialized)
 		init_sound();
 	if (!sound_initialized)
@@ -988,7 +984,7 @@ BOOL sound::load_memstream(string& data, unsigned int size, const std::string& p
 	if (pre != NULL) {
 		preload_ref = pre;
 		pre->ref += 1;
-		pre->t = ticks();
+		pre->t = ticks(false);
 		if (pre->data && pre->size)
 			channel = BASS_StreamCreateFile(TRUE, pre->data, 0, pre->size, BASS_SAMPLE_FLOAT | BASS_STREAM_DECODE);
 	}
@@ -1010,7 +1006,7 @@ BOOL sound::load_memstream(string& data, unsigned int size, const std::string& p
 	return postload(preload_filename != "" ? preload_filename : "script_stream");
 }
 
-BOOL sound::load_url(const string& url) {
+BOOL legacy_sound::load_url(const string& url) {
 	if (!sound_initialized)
 		init_sound();
 	if (!sound_initialized)
@@ -1021,7 +1017,7 @@ BOOL sound::load_url(const string& url) {
 	return postload(url);
 }
 
-BOOL sound::push_memory(unsigned char* buffer, unsigned int length, BOOL stream_end, int pcm_rate, int pcm_chans) {
+BOOL legacy_sound::push_memory(unsigned char* buffer, unsigned int length, BOOL stream_end, int pcm_rate, int pcm_chans) {
 	if (!sound_initialized)
 		init_sound();
 	if (!sound_initialized || !stream_end && length < 1)
@@ -1068,11 +1064,11 @@ BOOL sound::push_memory(unsigned char* buffer, unsigned int length, BOOL stream_
 	}
 	return ret;
 }
-BOOL sound::push_string(const std::string& buffer, BOOL stream_end, int pcm_rate, int pcm_chans) {
+BOOL legacy_sound::push_string(const std::string& buffer, BOOL stream_end, int pcm_rate, int pcm_chans) {
 	return push_memory((unsigned char*)&buffer[0], buffer.size(), stream_end, pcm_rate, pcm_chans);
 }
 
-BOOL sound::postload(const string& filename) {
+BOOL legacy_sound::postload(const string& filename) {
 	if (!channel)
 		return FALSE;
 	BASS_ChannelGetInfo(channel, &channel_info);
@@ -1085,7 +1081,7 @@ BOOL sound::postload(const string& filename) {
 	if (!parent_mixer)
 		parent_mixer = g_default_mixer? g_default_mixer : output;
 	if (!output_mixer) {
-		output_mixer = new mixer(parent_mixer, !env);
+		output_mixer = new legacy_mixer(parent_mixer, !env);
 		if (listener_x != x || listener_y != y || listener_z != z || env)
 			pos_effect = BASS_ChannelSetDSP(output_mixer->channel, positioning_dsp, this, 0);
 	} else if (!pos_effect && (listener_x != x || listener_y != y || listener_z != z || env))
@@ -1096,7 +1092,7 @@ BOOL sound::postload(const string& filename) {
 	return TRUE;
 }
 
-BOOL sound::close() {
+BOOL legacy_sound::close() {
 	if (channel) {
 		stop();
 		thread_mutex_lock(&close_mutex);
@@ -1149,15 +1145,15 @@ BOOL sound::close() {
 	return false;
 }
 
-int sound::set_fx(const std::string& fx, int idx) {
+int legacy_sound::set_fx(const std::string& fx, int idx) {
 	if (!output_mixer)
-		output_mixer = new mixer(parent_mixer, TRUE);
+		output_mixer = new legacy_mixer(parent_mixer, TRUE);
 	if (!output_mixer)
 		return -1;
 	return output_mixer->set_fx(fx, idx);
 }
 
-BOOL sound::set_mixer(mixer* m) {
+BOOL legacy_sound::set_mixer(legacy_mixer* m) {
 	if (!m)
 		m = output;
 	if (output_mixer) {
@@ -1204,7 +1200,7 @@ BOOL sound_base::set_position(float listener_x, float listener_y, float listener
 	return TRUE;
 }
 
-BOOL sound::play(bool reset_loop_state) {
+BOOL legacy_sound::play(bool reset_loop_state) {
 	if (!channel)
 		return FALSE;
 	if (loaded_filename != "" && is_playing())
@@ -1215,7 +1211,7 @@ BOOL sound::play(bool reset_loop_state) {
 	return !(BASS_Mixer_ChannelFlags(channel, 0, BASS_MIXER_CHAN_PAUSE)&BASS_MIXER_CHAN_PAUSE);
 }
 
-BOOL sound::play_wait() {
+BOOL legacy_sound::play_wait() {
 	if (!play())
 		return FALSE;
 	QWORD pos = BASS_Mixer_ChannelGetPosition(channel, BASS_POS_BYTE);
@@ -1227,14 +1223,14 @@ BOOL sound::play_wait() {
 	return TRUE;
 }
 
-BOOL sound::play_looped() {
+BOOL legacy_sound::play_looped() {
 	if (!play())
 		return FALSE;
 	BASS_ChannelFlags(channel, BASS_SAMPLE_LOOP, BASS_SAMPLE_LOOP);
 	return TRUE;
 }
 
-BOOL sound::pause() {
+BOOL legacy_sound::pause() {
 	if (!channel)
 		return FALSE;
 	if (!is_playing())
@@ -1245,7 +1241,7 @@ BOOL sound::pause() {
 	return ret;
 }
 
-BOOL sound::seek(float offset) {
+BOOL legacy_sound::seek(float offset) {
 	if (!channel)
 		return FALSE;
 	QWORD bytes = BASS_ChannelSeconds2Bytes(channel, offset / 1000);
@@ -1255,7 +1251,7 @@ BOOL sound::seek(float offset) {
 	return ret;
 }
 
-BOOL sound::stop() {
+BOOL legacy_sound::stop() {
 	if (!channel)
 		return FALSE;
 	BOOL ret = (BASS_Mixer_ChannelFlags(channel, BASS_MIXER_CHAN_PAUSE, BASS_MIXER_CHAN_PAUSE)&BASS_MIXER_CHAN_PAUSE) > 0;
@@ -1265,35 +1261,35 @@ BOOL sound::stop() {
 	return ret;
 }
 
-BOOL sound::is_active() {
+BOOL legacy_sound::is_active() {
 	return channel > 0 && parent_mixer != NULL;
 }
 
-BOOL sound::is_paused() {
+BOOL legacy_sound::is_paused() {
 	return channel > 0 && parent_mixer && (BASS_Mixer_ChannelFlags(channel, BASS_MIXER_CHAN_PAUSE, 0)&BASS_MIXER_CHAN_PAUSE) > 0;
 }
 
-BOOL sound::is_playing() {
+BOOL legacy_sound::is_playing() {
 	return channel > 0 && parent_mixer && output_mixer && BASS_ChannelIsActive(channel) == BASS_ACTIVE_PLAYING && BASS_Mixer_ChannelGetMixer(channel) == output_mixer->channel && BASS_Mixer_ChannelGetMixer(output_mixer->channel) == parent_mixer->channel && !(BASS_Mixer_ChannelFlags(channel, 0, 0)&BASS_MIXER_CHAN_PAUSE);
 }
 
-BOOL sound::is_sliding() {
+BOOL legacy_sound::is_sliding() {
 	return channel > 0 && BASS_ChannelIsSliding(channel, 0) || output_mixer && output_mixer->channel && BASS_ChannelIsSliding(output_mixer->channel, 0);
 }
 
-BOOL sound::is_pan_sliding() {
+BOOL legacy_sound::is_pan_sliding() {
 	return channel > 0 && BASS_ChannelIsSliding(channel, BASS_ATTRIB_PAN);
 }
 
-BOOL sound::is_pitch_sliding() {
+BOOL legacy_sound::is_pitch_sliding() {
 	return channel > 0 && BASS_ChannelIsSliding(channel, BASS_ATTRIB_FREQ);
 }
 
-BOOL sound::is_volume_sliding() {
+BOOL legacy_sound::is_volume_sliding() {
 	return channel > 0 && output_mixer && BASS_ChannelIsSliding(output_mixer->channel, BASS_ATTRIB_VOL);
 }
 
-float sound::get_length() {
+float legacy_sound::get_length() {
 	if (!channel)
 		return -1;
 	if (length > 0) return length / 1000.0;
@@ -1307,13 +1303,13 @@ float sound::get_length() {
 	else
 		return -1;
 }
-float sound::get_length_ms() {
+float legacy_sound::get_length_ms() {
 	float v = get_length();
 	if (v > -1) v *= 1000;
 	return v;
 }
 
-float sound::get_position() {
+float legacy_sound::get_position() {
 	if (!channel)
 		return -1;
 	QWORD pos = BASS_ChannelGetPosition(channel, BASS_POS_BYTE);
@@ -1322,24 +1318,24 @@ float sound::get_position() {
 	else
 		return -1;
 }
-float sound::get_position_ms() {
+float legacy_sound::get_position_ms() {
 	float v = get_position();
 	if (v > -1) v *= 1000;
 	return v;
 }
 
-float sound::get_pan() {
+float legacy_sound::get_pan() {
 	if (!channel)
 		return 0;
 	float pan = 0;
 	BASS_ChannelGetAttribute(channel, BASS_ATTRIB_PAN, &pan);
 	return pan;
 }
-float sound::get_pan_alt() {
+float legacy_sound::get_pan_alt() {
 	return get_pan() * 100;
 }
 
-float sound::get_pitch() {
+float legacy_sound::get_pitch() {
 	if (!channel)
 		return 0;
 	float pitch = 0.0;
@@ -1348,11 +1344,11 @@ float sound::get_pitch() {
 	pitch /= channel_info.freq;
 	return pitch;
 }
-float sound::get_pitch_alt() {
+float legacy_sound::get_pitch_alt() {
 	return get_pitch() * 100;
 }
 
-float sound::get_volume() {
+float legacy_sound::get_volume() {
 	if (!channel)
 		return 0;
 	float volume = 0;
@@ -1361,33 +1357,33 @@ float sound::get_volume() {
 	BASS_ChannelGetAttribute(channel, BASS_ATTRIB_VOL, &volume);
 	return volume;
 }
-float sound::get_volume_alt() {
+float legacy_sound::get_volume_alt() {
 	return (get_volume() * 100) - 100;
 }
 
-BOOL sound::set_pan(float pan) {
+BOOL legacy_sound::set_pan(float pan) {
 	if (!channel)
 		return FALSE;
 	if (pan < -1.0 || pan > 1.0)
 		return FALSE;
 	return BASS_ChannelSetAttribute(channel, BASS_ATTRIB_PAN, pan);
 }
-BOOL sound::set_pan_alt(float pan) {
+BOOL legacy_sound::set_pan_alt(float pan) {
 	return set_pan(pan / 100);
 }
 
-BOOL sound::slide_pan(float pan, unsigned int time) {
+BOOL legacy_sound::slide_pan(float pan, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (pan < -1.0 || pan > 1.0)
 		return FALSE;
 	return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_PAN, pan, time);
 }
-BOOL sound::slide_pan_alt(float pan, unsigned int time) {
+BOOL legacy_sound::slide_pan_alt(float pan, unsigned int time) {
 	return slide_pan(pan / 100, time);
 }
 
-BOOL sound::set_pitch(float pitch) {
+BOOL legacy_sound::set_pitch(float pitch) {
 	if (!channel)
 		return FALSE;
 	if (pitch < 0.05 || pitch > 5.0) return false;
@@ -1396,21 +1392,21 @@ BOOL sound::set_pitch(float pitch) {
 	BASS_ChannelLock(channel, FALSE);
 	return r;
 }
-BOOL sound::set_pitch_alt(float pitch) {
+BOOL legacy_sound::set_pitch_alt(float pitch) {
 	return set_pitch(pitch / 100);
 }
 
-BOOL sound::slide_pitch(float pitch, unsigned int time) {
+BOOL legacy_sound::slide_pitch(float pitch, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (pitch < 0.05 || pitch > 5.0) return false;
 	return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_FREQ, channel_info.freq * pitch, time);
 }
-BOOL sound::slide_pitch_alt(float pitch, unsigned int time) {
+BOOL legacy_sound::slide_pitch_alt(float pitch, unsigned int time) {
 	return slide_pitch(pitch / 100, time);
 }
 
-BOOL sound::set_volume(float volume) {
+BOOL legacy_sound::set_volume(float volume) {
 	if (!channel)
 		return FALSE;
 	if (volume < 0) volume = 0.0;
@@ -1420,11 +1416,11 @@ BOOL sound::set_volume(float volume) {
 	else
 		return BASS_ChannelSetAttribute(channel, BASS_ATTRIB_VOL, volume);
 }
-BOOL sound::set_volume_alt(float volume) {
+BOOL legacy_sound::set_volume_alt(float volume) {
 	return set_volume((volume + 100) / 100);
 }
 
-BOOL sound::slide_volume(float volume, unsigned int time) {
+BOOL legacy_sound::slide_volume(float volume, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (volume < 0.0 || volume > 1.0)
@@ -1434,19 +1430,19 @@ BOOL sound::slide_volume(float volume, unsigned int time) {
 	else
 		return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_VOL, volume, time);
 }
-BOOL sound::slide_volume_alt(float volume, unsigned int time) {
+BOOL legacy_sound::slide_volume_alt(float volume, unsigned int time) {
 	return slide_volume((volume + 100) / 100, time);
 }
 /**
  * A dummy version of sound.pitch_lower_limit that just returns const 0 all the time.
  * Since this is not using legacy DirectSound there's no need for this API except for BGT compat.
  */
-const double sound::pitch_lower_limit()
+const double legacy_sound::pitch_lower_limit()
 {
 	return 0;
 }
 
-int mixer::get_effect_index(const std::string& id) {
+int legacy_mixer::get_effect_index(const std::string& id) {
 	if (id.size() < 2) return -1;
 	for (DWORD i = 0; i < effects.size(); i++) {
 		if (effects[i].id == id) return i;
@@ -1454,7 +1450,7 @@ int mixer::get_effect_index(const std::string& id) {
 	return -1;
 }
 
-mixer::mixer(mixer* parent, BOOL for_single_sound, BOOL for_decode, BOOL floatingpoint) {
+legacy_mixer::legacy_mixer(legacy_mixer* parent, BOOL for_single_sound, BOOL for_decode, BOOL floatingpoint) {
 	if (!sound_initialized)
 		init_sound();
 	RefCount = 1;
@@ -1482,7 +1478,7 @@ mixer::mixer(mixer* parent, BOOL for_single_sound, BOOL for_decode, BOOL floatin
 	pos_effect = 0;
 }
 
-mixer::~mixer() {
+legacy_mixer::~legacy_mixer() {
 	if (this != output) {
 		for (auto i : mixers)
 			i->set_mixer(output);
@@ -1493,10 +1489,10 @@ mixer::~mixer() {
 	sounds.clear();
 }
 
-void mixer::AddRef() {
+void legacy_mixer::AddRef() {
 	asAtomicInc(RefCount);
 }
-void mixer::Release() {
+void legacy_mixer::Release() {
 	if (asAtomicDec(RefCount) < 1) {
 		if (channel) {
 			BASS_StreamFree(channel); // Apparently I was having a problem with extraneous calls to BASS_StreamFree when trying to do it in mixer destructor years ago, since miniaudio switch iminent we'll just leave this here rather than figuring out what I was doing wrong back then.
@@ -1506,12 +1502,12 @@ void mixer::Release() {
 	}
 }
 
-int mixer::get_data(const unsigned char* buffer, int bufsize) {
+int legacy_mixer::get_data(const unsigned char* buffer, int bufsize) {
 	if (!channel) return 0;
 	return BASS_ChannelGetData(channel, (void*)buffer, bufsize);
 }
 
-BOOL mixer::add_mixer(mixer* m) {
+BOOL legacy_mixer::add_mixer(legacy_mixer* m) {
 	if (!sound_initialized)
 		init_sound();
 	if (find(mixers.begin(), mixers.end(), m) != mixers.end())
@@ -1531,7 +1527,7 @@ BOOL mixer::add_mixer(mixer* m) {
 	}
 	return ret;
 }
-BOOL mixer::remove_mixer(mixer* m, BOOL internal) {
+BOOL legacy_mixer::remove_mixer(legacy_mixer* m, BOOL internal) {
 	auto i = find(mixers.begin(), mixers.end(), m);
 	if (i == mixers.end())
 		return FALSE;
@@ -1543,7 +1539,7 @@ BOOL mixer::remove_mixer(mixer* m, BOOL internal) {
 	m->set_mixer(NULL);
 	return TRUE;
 }
-BOOL mixer::add_sound(sound& s, BOOL internal) {
+BOOL legacy_mixer::add_sound(legacy_sound& s, BOOL internal) {
 	if (!sound_initialized)
 		init_sound();
 	if (sounds.find(&s) != sounds.end())
@@ -1556,7 +1552,7 @@ BOOL mixer::add_sound(sound& s, BOOL internal) {
 	}
 	return ret;
 }
-BOOL mixer::remove_sound(sound& s, BOOL internal) {
+BOOL legacy_mixer::remove_sound(legacy_sound& s, BOOL internal) {
 	auto i = find(sounds.begin(), sounds.end(), &s);
 	if (i == sounds.end())
 		return FALSE;
@@ -1569,7 +1565,7 @@ BOOL mixer::remove_sound(sound& s, BOOL internal) {
 	return TRUE;
 }
 
-int mixer::set_fx(const std::string& fx, int idx) {
+int legacy_mixer::set_fx(const std::string& fx, int idx) {
 	if(fx.size()<1) {
 		if(idx>=0&&idx<effects.size()) {
 			for(DWORD i=idx+1; i<effects.size(); i++)
@@ -1717,7 +1713,7 @@ int mixer::set_fx(const std::string& fx, int idx) {
 	return effects.size()-1;
 }
 
-BOOL mixer::set_mixer(mixer* m) {
+BOOL legacy_mixer::set_mixer(legacy_mixer* m) {
 	if (!m)
 		m = output;
 	if (this == output)
@@ -1729,34 +1725,34 @@ BOOL mixer::set_mixer(mixer* m) {
 	return false;
 }
 
-BOOL mixer::is_sliding() {
+BOOL legacy_mixer::is_sliding() {
 	return channel > 0 && BASS_ChannelIsSliding(channel, 0);
 }
 
-BOOL mixer::is_pan_sliding() {
+BOOL legacy_mixer::is_pan_sliding() {
 	return channel > 0 && BASS_ChannelIsSliding(channel, BASS_ATTRIB_PAN);
 }
 
-BOOL mixer::is_pitch_sliding() {
+BOOL legacy_mixer::is_pitch_sliding() {
 	return channel > 0 && BASS_ChannelIsSliding(channel, BASS_ATTRIB_FREQ);
 }
 
-BOOL mixer::is_volume_sliding() {
+BOOL legacy_mixer::is_volume_sliding() {
 	return channel > 0 && BASS_ChannelIsSliding(channel, BASS_ATTRIB_VOL);
 }
 
-float mixer::get_pan() {
+float legacy_mixer::get_pan() {
 	if (!channel)
 		return 0;
 	float pan = 0;
 	BASS_ChannelGetAttribute(channel, BASS_ATTRIB_PAN, &pan);
 	return pan;
 }
-float mixer::get_pan_alt() {
+float legacy_mixer::get_pan_alt() {
 	return get_pan() * 100;
 }
 
-float mixer::get_pitch() {
+float legacy_mixer::get_pitch() {
 	if (!channel)
 		return 0;
 	float pitch = 0.0;
@@ -1765,84 +1761,84 @@ float mixer::get_pitch() {
 	pitch /= 44100;
 	return pitch;
 }
-float mixer::get_pitch_alt() {
+float legacy_mixer::get_pitch_alt() {
 	return get_pitch() * 100;
 }
 
-float mixer::get_volume() {
+float legacy_mixer::get_volume() {
 	if (!channel)
 		return 0;
 	float volume = 0;
 	BASS_ChannelGetAttribute(channel, BASS_ATTRIB_VOL, &volume);
 	return volume;
 }
-float mixer::get_volume_alt() {
+float legacy_mixer::get_volume_alt() {
 	return (get_volume() * 100) - 100;
 }
 
-BOOL mixer::set_pan(float pan) {
+BOOL legacy_mixer::set_pan(float pan) {
 	if (!channel)
 		return FALSE;
 	if (pan < -1.0 || pan > 1.0)
 		return FALSE;
 	return BASS_ChannelSetAttribute(channel, BASS_ATTRIB_PAN, pan);
 }
-BOOL mixer::set_pan_alt(float pan) {
+BOOL legacy_mixer::set_pan_alt(float pan) {
 	return set_pan(pan / 100);
 }
 
-BOOL mixer::slide_pan(float pan, unsigned int time) {
+BOOL legacy_mixer::slide_pan(float pan, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (pan < -1.0 || pan > 1.0)
 		return FALSE;
 	return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_PAN, pan, time);
 }
-BOOL mixer::slide_pan_alt(float pan, unsigned int time) {
+BOOL legacy_mixer::slide_pan_alt(float pan, unsigned int time) {
 	return slide_pan(pan / 100, time);
 }
 
-BOOL mixer::set_pitch(float pitch) {
+BOOL legacy_mixer::set_pitch(float pitch) {
 	if (!channel)
 		return FALSE;
 	if (pitch < 0.05 || pitch > 5.0)
 		return FALSE;
 	return BASS_ChannelSetAttribute(channel, BASS_ATTRIB_FREQ, 44100 * pitch);
 }
-BOOL mixer::set_pitch_alt(float pitch) {
+BOOL legacy_mixer::set_pitch_alt(float pitch) {
 	return set_pitch(pitch / 100);
 }
 
-BOOL mixer::slide_pitch(float pitch, unsigned int time) {
+BOOL legacy_mixer::slide_pitch(float pitch, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (pitch < 0.05 || pitch > 5.0)
 		return FALSE;
 	return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_FREQ, 44100 * pitch, time);
 }
-BOOL mixer::slide_pitch_alt(float pitch, unsigned int time) {
+BOOL legacy_mixer::slide_pitch_alt(float pitch, unsigned int time) {
 	return slide_pitch(pitch / 100, time);
 }
 
-BOOL mixer::set_volume(float volume) {
+BOOL legacy_mixer::set_volume(float volume) {
 	if (!channel)
 		return FALSE;
 	if (volume < 0) volume = 0.0;
 	if (volume > 1) volume = 1.0;
 	return BASS_ChannelSetAttribute(channel, BASS_ATTRIB_VOL, volume);
 }
-BOOL mixer::set_volume_alt(float volume) {
+BOOL legacy_mixer::set_volume_alt(float volume) {
 	return set_volume((volume + 100) / 100);
 }
 
-BOOL mixer::slide_volume(float volume, unsigned int time) {
+BOOL legacy_mixer::slide_volume(float volume, unsigned int time) {
 	if (!channel)
 		return FALSE;
 	if (volume < 0.0 || volume > 1.0)
 		return FALSE;
 	return BASS_ChannelSlideAttribute(channel, BASS_ATTRIB_VOL, volume, time);
 }
-BOOL mixer::slide_volume_alt(float volume, unsigned int time) {
+BOOL legacy_mixer::slide_volume_alt(float volume, unsigned int time) {
 	return slide_volume((volume + 100) / 100, time);
 }
 
@@ -1994,11 +1990,11 @@ BOOL set_global_hrtf(BOOL enable) {
 	return TRUE;
 }
 
-mixer* ScriptMixer_Factory() {
-	return new mixer();
+legacy_mixer* ScriptMixer_Factory() {
+	return new legacy_mixer();
 }
-sound* ScriptSound_Factory() {
-	return new sound();
+legacy_sound* ScriptSound_Factory() {
+	return new legacy_sound();
 }
 sound_environment* ScriptSound_Environment_Factory() {
 	return new sound_environment();
@@ -2012,67 +2008,67 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterFuncdef(_O("bool sound_seek_callback(uint, string)"));
 	engine->RegisterObjectType("mixer", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("mixer", asBEHAVE_FACTORY, "mixer @m()", asFUNCTION(ScriptMixer_Factory), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("mixer", asBEHAVE_ADDREF, "void f()", asMETHOD(mixer, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("mixer", asBEHAVE_RELEASE, "void f()", asMETHOD(mixer, Release), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("mixer", asBEHAVE_ADDREF, "void f()", asMETHOD(legacy_mixer, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("mixer", asBEHAVE_RELEASE, "void f()", asMETHOD(legacy_mixer, Release), asCALL_THISCALL);
 	engine->RegisterObjectType("sound", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound @s()", asFUNCTION(ScriptSound_Factory), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("sound", asBEHAVE_ADDREF, "void f()", asMETHOD(sound, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("sound", asBEHAVE_RELEASE, "void f()", asMETHOD(sound, Release), asCALL_THISCALL);
-	engine->RegisterObjectProperty("sound", "const string loaded_filename", asOFFSET(sound, loaded_filename));
-	engine->RegisterObjectMethod("sound", "bool close()", asMETHOD(sound, close), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool load(const string &in filename, pack@ pack_file = sound_default_pack, bool allow_preloads = !system_is_mobile)", asMETHOD(sound, load), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool load(sound_close_callback@, sound_length_callback@, sound_read_callback@, sound_seek_callback@, const string &in, const string&in = \"\")", asMETHOD(sound, load_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool load(string& data, uint size, const string&in preload_filename = \"\", bool legacy_encrypt = false)", asMETHOD(sound, load_memstream), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool load_url(const string &in url)", asMETHOD(sound, load_url), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool stream(const string &in filename, pack@ containing_pack = sound_default_pack)", asMETHOD(sound, stream), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool push_memory(const string &in data, bool end_stream = false, int pcm_rate = 0, int pcm_channels = 0)", asMETHOD(sound, push_string), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool set_position(float listener_x, float listener_y, float listener_z, float sound_x, float sound_y, float sound_z, float rotation = 0.0, float pan_step = 1.0, float volume_step = 1.0)", asMETHOD(sound, set_position), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool set_mixer(mixer@ mixer = null)", asMETHOD(sound, set_mixer), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "void set_hrtf(bool enable = true)", asMETHOD(sound, set_hrtf), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "void set_length(float length = 0.0)", asMETHOD(sound, set_length), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool set_fx(const string &in fx, int index = -1)", asMETHOD(sound, set_fx), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool play(bool reset_loop_state = true)", asMETHOD(sound, play), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool play_wait()", asMETHOD(sound, play_wait), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool play_looped()", asMETHOD(sound, play_looped), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool pause()", asMETHOD(sound, pause), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool stop()", asMETHOD(sound, stop), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool seek(float position)", asMETHOD(sound, seek), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool get_active() const property", asMETHOD(sound, is_active), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool get_playing() const property", asMETHOD(sound, is_playing), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool get_paused() const property", asMETHOD(sound, is_paused), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool get_sliding() const property", asMETHOD(sound, is_sliding), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool get_pan_sliding() const property", asMETHOD(sound, is_pan_sliding), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool get_pitch_sliding() const property", asMETHOD(sound, is_pitch_sliding), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool get_volume_sliding() const property", asMETHOD(sound, is_volume_sliding), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "float get_length() const property", asMETHOD(sound, get_length_ms), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "float get_position() const property", asMETHOD(sound, get_position_ms), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "float get_pitch() const property", asMETHOD(sound, get_pitch_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "void set_pitch(float) property", asMETHOD(sound, set_pitch_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool slide_pitch(float, uint)", asMETHOD(sound, slide_pitch_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "float get_pan() const property", asMETHOD(sound, get_pan_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "void set_pan(float) property", asMETHOD(sound, set_pan_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool slide_pan(float, uint)", asMETHOD(sound, slide_pan_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "float get_volume() const property", asMETHOD(sound, get_volume_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "void set_volume(float) property", asMETHOD(sound, set_volume_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool slide_volume(float, uint)", asMETHOD(sound, slide_volume_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "double get_pitch_lower_limit() const property", asMETHOD(sound, pitch_lower_limit), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "bool set_fx(const string &in, int = -1)", asMETHOD(mixer, set_fx), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "bool set_position(float, float, float, float, float, float, float, float, float)", asMETHOD(mixer, set_position), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "bool set_mixer(mixer@ = null)", asMETHOD(mixer, set_mixer), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "void set_hrtf(bool = true)", asMETHOD(mixer, set_hrtf), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "bool get_sliding() const property", asMETHOD(mixer, is_sliding), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "bool get_pan_sliding() const property", asMETHOD(mixer, is_pan_sliding), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "bool get_pitch_sliding() const property", asMETHOD(mixer, is_pitch_sliding), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "bool get_volume_sliding() const property", asMETHOD(mixer, is_volume_sliding), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "float get_pitch() const property", asMETHOD(mixer, get_pitch_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "void set_pitch(float) property", asMETHOD(mixer, set_pitch_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "bool slide_pitch(float, uint)", asMETHOD(mixer, slide_pitch_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "float get_pan() const property", asMETHOD(mixer, get_pan_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "void set_pan(float) property", asMETHOD(mixer, set_pan_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "bool slide_pan(float, uint)", asMETHOD(mixer, slide_pan_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "float get_volume() const property", asMETHOD(mixer, get_volume_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "void set_volume(float) property", asMETHOD(mixer, set_volume_alt), asCALL_THISCALL);
-	engine->RegisterObjectMethod("mixer", "bool slide_volume(float, uint)", asMETHOD(mixer, slide_volume_alt), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("sound", asBEHAVE_ADDREF, "void f()", asMETHOD(legacy_sound, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("sound", asBEHAVE_RELEASE, "void f()", asMETHOD(legacy_sound, Release), asCALL_THISCALL);
+	engine->RegisterObjectProperty("sound", "const string loaded_filename", asOFFSET(legacy_sound, loaded_filename));
+	engine->RegisterObjectMethod("sound", "bool close()", asMETHOD(legacy_sound, close), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load(const string &in filename, pack@ packfile = @legacy::sound_default_pack, bool allow_preloads = !system_is_mobile)", asMETHOD(legacy_sound, load), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load(sound_close_callback@, sound_length_callback@, sound_read_callback@, sound_seek_callback@, const string &in, const string&in = \"\")", asMETHOD(legacy_sound, load_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load(string& data, uint size, const string&in preload_filename = \"\", bool legacy_encrypt = false)", asMETHOD(legacy_sound, load_memstream), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load_url(const string &in url)", asMETHOD(legacy_sound, load_url), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool stream(const string &in filename, pack@ containing_pack = sound_default_pack)", asMETHOD(legacy_sound, stream), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool push_memory(const string &in data, bool end_stream = false, int pcm_rate = 0, int pcm_channels = 0)", asMETHOD(legacy_sound, push_string), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool set_position(float listener_x, float listener_y, float listener_z, float sound_x, float sound_y, float sound_z, float rotation = 0.0, float pan_step = 1.0, float volume_step = 1.0)", asMETHOD(legacy_sound, set_position), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool set_mixer(mixer@ mixer = null)", asMETHOD(legacy_sound, set_mixer), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_hrtf(bool enable = true)", asMETHOD(legacy_sound, set_hrtf), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_length(float length = 0.0)", asMETHOD(legacy_sound, set_length), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool set_fx(const string &in fx, int index = -1)", asMETHOD(legacy_sound, set_fx), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool play(bool reset_loop_state = true)", asMETHOD(legacy_sound, play), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool play_wait()", asMETHOD(legacy_sound, play_wait), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool play_looped()", asMETHOD(legacy_sound, play_looped), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool pause()", asMETHOD(legacy_sound, pause), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool stop()", asMETHOD(legacy_sound, stop), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool seek(float position)", asMETHOD(legacy_sound, seek), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool get_active() const property", asMETHOD(legacy_sound, is_active), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool get_playing() const property", asMETHOD(legacy_sound, is_playing), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool get_paused() const property", asMETHOD(legacy_sound, is_paused), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool get_sliding() const property", asMETHOD(legacy_sound, is_sliding), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool get_pan_sliding() const property", asMETHOD(legacy_sound, is_pan_sliding), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool get_pitch_sliding() const property", asMETHOD(legacy_sound, is_pitch_sliding), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool get_volume_sliding() const property", asMETHOD(legacy_sound, is_volume_sliding), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "float get_length() const property", asMETHOD(legacy_sound, get_length_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "float get_position() const property", asMETHOD(legacy_sound, get_position_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "float get_pitch() const property", asMETHOD(legacy_sound, get_pitch_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_pitch(float) property", asMETHOD(legacy_sound, set_pitch_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool slide_pitch(float, uint)", asMETHOD(legacy_sound, slide_pitch_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "float get_pan() const property", asMETHOD(legacy_sound, get_pan_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_pan(float) property", asMETHOD(legacy_sound, set_pan_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool slide_pan(float, uint)", asMETHOD(legacy_sound, slide_pan_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "float get_volume() const property", asMETHOD(legacy_sound, get_volume_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "void set_volume(float) property", asMETHOD(legacy_sound, set_volume_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool slide_volume(float, uint)", asMETHOD(legacy_sound, slide_volume_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "double get_pitch_lower_limit() const property", asMETHOD(legacy_sound, pitch_lower_limit), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "bool set_fx(const string &in, int = -1)", asMETHOD(legacy_mixer, set_fx), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "bool set_position(float, float, float, float, float, float, float, float, float)", asMETHOD(legacy_mixer, set_position), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "bool set_mixer(mixer@ = null)", asMETHOD(legacy_mixer, set_mixer), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "void set_hrtf(bool = true)", asMETHOD(legacy_mixer, set_hrtf), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "bool get_sliding() const property", asMETHOD(legacy_mixer, is_sliding), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "bool get_pan_sliding() const property", asMETHOD(legacy_mixer, is_pan_sliding), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "bool get_pitch_sliding() const property", asMETHOD(legacy_mixer, is_pitch_sliding), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "bool get_volume_sliding() const property", asMETHOD(legacy_mixer, is_volume_sliding), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "float get_pitch() const property", asMETHOD(legacy_mixer, get_pitch_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "void set_pitch(float) property", asMETHOD(legacy_mixer, set_pitch_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "bool slide_pitch(float, uint)", asMETHOD(legacy_mixer, slide_pitch_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "float get_pan() const property", asMETHOD(legacy_mixer, get_pan_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "void set_pan(float) property", asMETHOD(legacy_mixer, set_pan_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "bool slide_pan(float, uint)", asMETHOD(legacy_mixer, slide_pan_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "float get_volume() const property", asMETHOD(legacy_mixer, get_volume_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "void set_volume(float) property", asMETHOD(legacy_mixer, set_volume_alt), asCALL_THISCALL);
+	engine->RegisterObjectMethod("mixer", "bool slide_volume(float, uint)", asMETHOD(legacy_mixer, slide_volume_alt), asCALL_THISCALL);
 
 	engine->RegisterObjectType("sound_environment", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("sound_environment", asBEHAVE_FACTORY, "sound_environment @s()", asFUNCTION(ScriptSound_Environment_Factory), asCALL_CDECL);
@@ -2100,4 +2096,14 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("void set_sound_global_hrtf(bool) property", asFUNCTION(set_global_hrtf), asCALL_CDECL);
 	engine->RegisterGlobalProperty("mixer@ sound_default_mixer", &g_default_mixer);
 	engine->SetDefaultNamespace("");
+}
+plugin_main(nvgt_plugin_shared* shared) {
+	prepare_plugin(shared);
+	g_ScriptEngine = shared->script_engine;
+	RegisterScriptLegacyPack(shared->script_engine);
+	RegisterScriptSound(shared->script_engine);
+	nvgt_bundle_shared_library("bass");
+	nvgt_bundle_shared_library("bass_fx");
+	nvgt_bundle_shared_library("bassmix");
+	return true;
 }

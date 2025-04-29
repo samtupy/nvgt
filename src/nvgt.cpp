@@ -36,7 +36,6 @@
 #include <SDL3/SDL.h>
 #include "filesystem.h"
 #include "scriptarray.h"
-#define NVGT_LOAD_STATIC_PLUGINS
 #include "nvgt_angelscript.h" // nvgt's angelscript implementation
 #include "bundling.h"
 #include "input.h"
@@ -122,8 +121,7 @@ protected:
 		config().setString("application.gui", "");
 		#endif
 		g_ScriptEngine = asCreateScriptEngine();
-		if (!g_ScriptEngine || ConfigureEngine(g_ScriptEngine) < 0)
-			throw ApplicationException("unable to initialize script engine");
+		if (!g_ScriptEngine || PreconfigureEngine(g_ScriptEngine) < 0) throw ApplicationException("unable to initialize script engine");
 	}
 	void setupCommandLineProperty(const vector<string> &argv, int offset = 0) {
 		// Prepare the COMMAND_LINE property used by scripts by combining all arguments into one string, for bgt backwards compatibility. NVGT also has a new ARGS array which we will also set up here.

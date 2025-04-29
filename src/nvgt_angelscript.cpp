@@ -121,6 +121,7 @@ std::string g_platform = "auto";
 bool g_make_console = false;
 std::unordered_map<std::string, asITypeInfo *> g_TypeInfoCache;
 Timestamp g_script_build_time;
+unordered_map<string, string> g_system_namespaces;
 
 class NVGTBytecodeStream : public asIBinaryStream {
 	unsigned char *content;
@@ -372,8 +373,17 @@ asUINT GetTimeCallback() {
 	return ticks();
 }
 
-// Registrations in the following function are usually done in alphabetical order, with some exceptions involving one subsystem depending on another. For example the internet subsystem registers functions that take timespans, meaning that timestuff gets registered before internet.
-int ConfigureEngine(asIScriptEngine *engine) {
+// A user may want to namespace an enntire NVGT subsystem, for example to replace it with a plugin, for code organization etc.
+std::string get_system_namespace(const std::string& system) {
+	if (g_system_namespaces.find(system) != g_system_namespaces.end()) return g_system_namespaces[system];
+	else return "";
+}
+inline void system_namespace(const string& system = "") {
+	g_ScriptEngine->SetDefaultNamespace(get_system_namespace(system).c_str());
+}
+
+int PreconfigureEngine(asIScriptEngine* engine) {
+	// This part of engine configuration happens right at program launch, where as everything else is deferred until after the script loads so that the script can influence how the engine is configured. Separation needed because for example a CScriptArray is created during command line argument processing at which time the array addon must have been registered.
 	engine->SetMessageCallback(asFUNCTION(MessageCallback), 0, asCALL_CDECL);
 	engine->SetTranslateAppExceptionCallback(asFUNCTION(TranslateException), 0, asCALL_CDECL);
 	engine->SetEngineProperty(asEP_ALLOW_UNSAFE_REFERENCES, true);
@@ -388,6 +398,10 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->BeginConfigGroup("random");
 	RegisterScriptRandom(engine); // Must be done here because functions in this module register array methods and that won't work after array template types are instantiated.
 	engine->EndConfigGroup();
+	return 0;
+}
+// Registrations in the following function are usually done in alphabetical order, with some exceptions involving one subsystem depending on another. For example the internet subsystem registers functions that take timespans, meaning that timestuff gets registered before internet.
+int ConfigureEngine(asIScriptEngine *engine) {
 	engine->BeginConfigGroup("core");
 	RegisterStdStringUtils(engine);
 	RegisterScriptDictionary(engine);
@@ -468,7 +482,9 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_SOUND);
 	engine->BeginConfigGroup("sound");
+	system_namespace("sound");
 	RegisterSoundsystem(engine);
+	system_namespace();
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	engine->BeginConfigGroup("system_fingerprint");
@@ -577,6 +593,7 @@ int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
 			if (builder.AddSectionFromFile(g_IncludeScripts[i].c_str()) < 0)
 				return -1;
 		}
+		if (ConfigureEngine(engine) < 0) return -1;
 		if (builder.BuildModule() < 0) {
 			engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "Script failed to build");
 			return -1;
@@ -707,6 +724,7 @@ int CompileExecutable(asIScriptEngine *engine, const string &scriptFile) {
 }
 #else
 int LoadCompiledScript(asIScriptEngine *engine, unsigned char *code, asUINT size) {
+	if (ConfigureEngine(engine) < 0) return -1;
 	// engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
 	// engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, 10000);
 	asIScriptModule *mod = engine->GetModule("nvgt_game", asGM_ALWAYS_CREATE);
@@ -915,6 +933,11 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void * /*u
 		g_bcCompressionLevel = strtol(cleanText.substr(21).c_str(), NULL, 10);
 		if (g_bcCompressionLevel < 0 || g_bcCompressionLevel > 9)
 			return -1;
+			} else if (cleanText.starts_with("namespace")) {
+				string ns = cleanText.substr(10);
+				int space = ns.rfind(" ");
+				if (space == string::npos) return -1;
+				g_system_namespaces[ns.substr(0, space)] = ns.substr(space + 1);
 	} else if (cleanText == "console")
 		config.setString("build.windowsConsole", "");
 	else

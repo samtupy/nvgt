@@ -66,6 +66,11 @@ typedef void AS_CALL(void*);
 typedef void* t_nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
 typedef std::ios* t_nvgt_datastream_get_ios(void* stream);
 typedef void t_nvgt_bundle_shared_library(const std::string& libname);
+typedef void t_wait(int ms);
+typedef void t_refresh_window();
+typedef uint64_t t_ticks(bool secure);
+typedef uint64_t t_microticks(bool secure);
+typedef bool t_running_on_mobile();
 
 typedef struct {
 	int version;
@@ -85,6 +90,11 @@ typedef struct {
 	t_nvgt_datastream_create* f_nvgt_datastream_create;
 	t_nvgt_datastream_get_ios* f_nvgt_datastream_get_ios;
 	t_nvgt_bundle_shared_library* f_nvgt_bundle_shared_library;
+	t_wait* f_wait;
+	t_refresh_window* f_refresh_window;
+	t_ticks* f_ticks;
+	t_microticks* f_microticks;
+	t_running_on_mobile* f_running_on_mobile;
 	asIScriptEngine* script_engine;
 	asIThreadManager* script_thread_manager;
 	void* user;
@@ -98,22 +108,27 @@ typedef int nvgt_plugin_version_func();
 // If this macro is not defined, this header is being included from within a plugin that will receive pointers to needed functions from the main NVGT application.
 #ifndef NVGT_PLUGIN_STATIC // Code that only executes for dll plugins.
 	#if !defined(NVGT_PLUGIN_INCLUDE)
-		t_asGetLibraryVersion* asGetLibraryVersion = NULL;
-		t_asGetLibraryOptions* asGetLibraryOptions = NULL;
-		t_asGetActiveContext* asGetActiveContext = NULL;
-		t_asPrepareMultithread* asPrepareMultithread = NULL;
-		t_asAcquireExclusiveLock* asAcquireExclusiveLock = NULL;
-		t_asReleaseExclusiveLock* asReleaseExclusiveLock = NULL;
-		t_asAcquireSharedLock* asAcquireSharedLock = NULL;
-		t_asReleaseSharedLock* asReleaseSharedLock = NULL;
-		t_asAtomicInc* asAtomicInc = NULL;
-		t_asAtomicDec* asAtomicDec = NULL;
-		t_asThreadCleanup* asThreadCleanup = NULL;
-		t_asAllocMem* asAllocMem = NULL;
-		t_asFreeMem* asFreeMem = NULL;
-		t_nvgt_datastream_create* nvgt_datastream_create = NULL;
-		t_nvgt_datastream_get_ios* nvgt_datastream_get_ios = NULL;
-		t_nvgt_bundle_shared_library* nvgt_bundle_shared_library = NULL;
+		t_asGetLibraryVersion* asGetLibraryVersion = nullptr;
+		t_asGetLibraryOptions* asGetLibraryOptions = nullptr;
+		t_asGetActiveContext* asGetActiveContext = nullptr;
+		t_asPrepareMultithread* asPrepareMultithread = nullptr;
+		t_asAcquireExclusiveLock* asAcquireExclusiveLock = nullptr;
+		t_asReleaseExclusiveLock* asReleaseExclusiveLock = nullptr;
+		t_asAcquireSharedLock* asAcquireSharedLock = nullptr;
+		t_asReleaseSharedLock* asReleaseSharedLock = nullptr;
+		t_asAtomicInc* asAtomicInc = nullptr;
+		t_asAtomicDec* asAtomicDec = nullptr;
+		t_asThreadCleanup* asThreadCleanup = nullptr;
+		t_asAllocMem* asAllocMem = nullptr;
+		t_asFreeMem* asFreeMem = nullptr;
+		t_nvgt_datastream_create* nvgt_datastream_create = nullptr;
+		t_nvgt_datastream_get_ios* nvgt_datastream_get_ios = nullptr;
+		t_nvgt_bundle_shared_library* nvgt_bundle_shared_library = nullptr;
+		t_wait* wait = nullptr;
+		t_refresh_window* refresh_window = nullptr;
+		t_ticks* ticks = nullptr;
+		t_microticks* microticks = nullptr;
+		t_running_on_mobile* running_on_mobile = nullptr;
 	#else // If an angelscript addon includes nvgt_plugin.h, set NVGT_PLUGIN_INCLUDE to prevent these symbols from being defined multiple times.
 		extern t_asGetLibraryVersion* asGetLibraryVersion;
 		extern t_asGetLibraryOptions* asGetLibraryOptions;
@@ -131,7 +146,22 @@ typedef int nvgt_plugin_version_func();
 		extern t_nvgt_datastream_create* nvgt_datastream_create;
 		extern t_nvgt_datastream_get_ios* nvgt_datastream_get_ios;
 		extern t_nvgt_bundle_shared_library* nvgt_bundle_shared_library;
+		extern t_wait* wait;
+		extern t_refresh_window* refresh_window;
+		extern t_ticks* ticks;
+		extern t_microticks* microticks;
+		extern t_running_on_mobile* running_on_mobile;
 	#endif
+#elif (!defined(NVGT_BUILDING))
+	// Any functions we want to expose from NVGT rather than Angelscript must be forward declared here, we only get to skip the Angelscript ones because we include angelscript.h. NVGT headers might not be available to a plugin developer.
+	void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
+	std::ios* nvgt_datastream_get_ios(void* stream);
+	void nvgt_bundle_shared_library(const std::string& libname);
+	void wait(int ms);
+	void refresh_window();
+	uint64_t ticks(bool secure = true);
+	uint64_t microticks(bool secure = true);
+	bool running_on_mobile();
 #endif
 // Macro to ease the definition of a plugin's entry point. If this plugin is compiled as a static library then the entry point is called nvgt_plugin_%plugname% where as a dll just calls it nvgt_plugin and externs it. We also define nvgt_plugin_version() here.
 #ifndef plugin_main
@@ -175,6 +205,11 @@ inline bool prepare_plugin(nvgt_plugin_shared* shared) {
 	nvgt_datastream_create = shared->f_nvgt_datastream_create;
 	nvgt_datastream_get_ios = shared->f_nvgt_datastream_get_ios;
 	nvgt_bundle_shared_library = shared->f_nvgt_bundle_shared_library;
+	wait = shared->f_wait;
+	refresh_window = shared->f_refresh_window;
+	ticks = shared->f_ticks;
+	microticks = shared->f_microticks;
+	running_on_mobile = shared->f_running_on_mobile;
 	asPrepareMultithread(shared->script_thread_manager);
 	#endif
 	return true;
@@ -183,6 +218,9 @@ inline bool prepare_plugin(nvgt_plugin_shared* shared) {
 #include <ios>
 #include <string>
 #include <stdio.h>
+#include "timestuff.h"
+#include "UI.h"
+#include "xplatform.h"
 void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
 std::ios* nvgt_datastream_get_ios(void* stream);
 void nvgt_bundle_shared_library(const std::string& libname);
@@ -206,6 +244,11 @@ inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* e
 	shared->f_nvgt_datastream_create = nvgt_datastream_create;
 	shared->f_nvgt_datastream_get_ios = nvgt_datastream_get_ios;
 	shared->f_nvgt_bundle_shared_library = nvgt_bundle_shared_library;
+	shared->f_wait = wait;
+	shared->f_refresh_window = refresh_window;
+	shared->f_ticks = ticks;
+	shared->f_microticks = microticks;
+	shared->f_running_on_mobile = running_on_mobile;
 	shared->script_engine = engine;
 	shared->script_thread_manager = asGetThreadManager();
 	shared->user = user;

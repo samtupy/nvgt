@@ -1,4 +1,4 @@
-/* pack.h - pack file implementation header
+/* pack.h - legacy pack file implementation header
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -21,7 +21,6 @@
 #include <Poco/BinaryReader.h>
 #include <Poco/BinaryWriter.h>
 #include <scriptarray.h>
-#include "nvgt.h"
 
 typedef struct {
 	unsigned int filesize; // Size of this file in unsigned chars.
@@ -46,7 +45,7 @@ typedef struct {
 } pack_stream;
 
 typedef enum { PACK_OPEN_MODE_NONE, PACK_OPEN_MODE_APPEND, PACK_OPEN_MODE_CREATE, PACK_OPEN_MODE_READ, PACK_OPEN_MODES_TOTAL } pack_open_mode;
-class pack {
+class legacy_pack {
 	FILE* fptr;
 	unsigned char* mptr;
 	std::unordered_map<std::string, pack_item> pack_items;
@@ -60,7 +59,7 @@ class pack {
 public:
 	unsigned int next_stream_idx;
 	bool delay_close;
-	pack();
+	legacy_pack();
 	void AddRef();
 	void Release();
 	bool set_pack_identifier(const std::string& ident);

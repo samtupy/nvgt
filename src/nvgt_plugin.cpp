@@ -75,7 +75,10 @@ bool load_nvgt_plugin(const std::string& name, std::string* errmsg, void* user) 
 		if (obj) SDL_UnloadObject(obj);
 		return false;
 	}
-	if (obj) loaded_plugins[name] = obj;
+	if (obj) {
+		loaded_plugins[name] = obj;
+		nvgt_bundle_shared_library(name);
+	}
 	else loaded_plugins[name] = NULL;
 	free(shared);
 	return true;
@@ -94,8 +97,9 @@ bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
 	for (int i = 0; i < count; i++) {
 		std::string name;
 		br >> name;
-		if (!load_nvgt_plugin(name)) {
-			message(Poco::format("Unable to load %s, exiting.", name), "error");
+		std::string errmsg = Poco::format("Unable to load %s, exiting.", name);
+		if (!load_nvgt_plugin(name, &errmsg)) {
+			message(errmsg, "error");
 			return false;
 		}
 	}

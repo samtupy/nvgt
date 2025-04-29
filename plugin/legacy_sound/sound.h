@@ -24,14 +24,13 @@
 #include <Poco/Mutex.h>
 #include <thread.h>
 #include <verblib.h>
-#include "misc_functions.h"
 #include "pack.h"
 
 BOOL init_sound(unsigned int dev = -1);
 BOOL shutdown_sound();
 
-class sound;
-class mixer;
+class legacy_sound;
+class legacy_mixer;
 
 typedef struct {
 	unsigned char* data;
@@ -42,9 +41,9 @@ typedef struct {
 } sound_preload;
 
 typedef struct {
-	pack* p;
+	legacy_pack* p;
 	pack_stream* s;
-	sound* snd;
+	legacy_sound* snd;
 } packed_sound;
 
 typedef struct hstream_entry {
@@ -87,8 +86,8 @@ public:
 	void release();
 	bool add_material(const std::string& name, float absorption_low, float absorption_mid, float absorption_high, float scattering, float transmission_low, float transmission_mid, float transmission_high, bool replace_if_existing = false);
 	bool add_box(const std::string& material, float minx, float maxx, float miny, float maxy, float minz, float maxz);
-	mixer* new_mixer();
-	sound* new_sound();
+	legacy_mixer* new_mixer();
+	legacy_sound* new_sound();
 	bool attach(sound_base* s);
 	bool detach(sound_base* s);
 	void _detach_all();
@@ -109,8 +108,8 @@ public:
 	IPLAmbisonicsDecodeEffect reflection_decode_effect;
 	Poco::Event env_detaching;
 	HDSP pos_effect;
-	mixer* output_mixer;
-	mixer* parent_mixer;
+	legacy_mixer* output_mixer;
+	legacy_mixer* parent_mixer;
 	sound_environment* env;
 	BOOL use_hrtf;
 	float x;
@@ -137,7 +136,7 @@ public:
 	BOOL set_position(float listener_x, float listener_y, float listener_z, float sound_x, float sound_y, float sound_z, float rotation, float pan_step, float volume_step);
 };
 
-class sound : public sound_base {
+class legacy_sound : public sound_base {
 	float pitch;
 	float length;
 public:
@@ -156,14 +155,14 @@ public:
 	unsigned int memstream_size;
 	DWORD memstream_pos;
 	bool memstream_legacy_encrypt;
-	sound();
-	~sound();
+	legacy_sound();
+	~legacy_sound();
 	void Release();
-	BOOL load(const std::string& filename, pack* containing_pack = NULL, BOOL allow_preloads = TRUE);
+	BOOL load(const std::string& filename, legacy_pack* containing_pack = NULL, BOOL allow_preloads = TRUE);
 	BOOL load_script(asIScriptFunction* close, asIScriptFunction* len, asIScriptFunction* read, asIScriptFunction* seek, const std::string& data, const std::string& preload_filename = "");
 	BOOL load_memstream(std::string& data, unsigned int size, const std::string& preload_filename = "", bool legacy_encrypt = false);
 	BOOL load_url(const std::string& url);
-	BOOL stream(const std::string& filename, pack* containing_pack = NULL) {
+	BOOL stream(const std::string& filename, legacy_pack* containing_pack = NULL) {
 		return load(filename, containing_pack, FALSE);
 	}
 	BOOL push_memory(unsigned char* buffer, unsigned int length, BOOL stream_end = FALSE, int pcm_rate = 0, int pcm_chans = 0);
@@ -174,7 +173,7 @@ public:
 	void set_length(float len) {
 		if (len >= 0) length = len;
 	}
-	BOOL set_mixer(mixer* m);
+	BOOL set_mixer(legacy_mixer* m);
 	BOOL play(bool reset_loop_state = true);
 	BOOL play_wait();
 	BOOL play_looped();
@@ -213,25 +212,25 @@ public:
 	const double pitch_lower_limit();
 };
 
-class mixer : public sound_base {
-	std::unordered_set<mixer*> mixers;
-	std::unordered_set<sound*> sounds;
+class legacy_mixer : public sound_base {
+	std::unordered_set<legacy_mixer*> mixers;
+	std::unordered_set<legacy_sound*> sounds;
 	std::vector<mixer_effect> effects;
-	mixer* parent_mixer;
+	legacy_mixer* parent_mixer;
 	int get_effect_index(const std::string& id);
 public:
-	mixer(mixer* parent = NULL, BOOL for_single_sound = FALSE, BOOL for_decode = FALSE, BOOL floatingpoint = TRUE);
-	~mixer();
+	legacy_mixer(legacy_mixer* parent = NULL, BOOL for_single_sound = FALSE, BOOL for_decode = FALSE, BOOL floatingpoint = TRUE);
+	~legacy_mixer();
 	void AddRef();
 	void Release();
 	int get_data(const unsigned char* buffer, int bufsize);
-	BOOL add_mixer(mixer* m);
-	BOOL remove_mixer(mixer* m, BOOL internal = FALSE);
-	BOOL add_sound(sound& s, BOOL internal = FALSE);
-	BOOL remove_sound(sound& s, BOOL internal = FALSE);
+	BOOL add_mixer(legacy_mixer* m);
+	BOOL remove_mixer(legacy_mixer* m, BOOL internal = FALSE);
+	BOOL add_sound(legacy_sound& s, BOOL internal = FALSE);
+	BOOL remove_sound(legacy_sound& s, BOOL internal = FALSE);
 	bool set_impulse_response(const std::string& response, float dry, float wet);
 	int set_fx(const std::string& fx, int idx = -1);
-	BOOL set_mixer(mixer* m);
+	BOOL set_mixer(legacy_mixer* m);
 	BOOL is_sliding();
 	BOOL is_pan_sliding();
 	BOOL is_pitch_sliding();

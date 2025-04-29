@@ -1,4 +1,4 @@
-/* pack.cpp - pack file implementation code
+/* pack.cpp - legacy pack file implementation code
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -24,21 +24,40 @@
 	#include <windows.h>
 	#include <io.h>
 #endif
-#include "filesystem.h"
-#ifndef NVGT_USER_CONFIG // pack_char_encrypt/decrypt
-	#include "nvgt_config.h"
-#else
-	#include "../user/nvgt_config.h"
-#endif
+#include "config.h"
+#define NVGT_PLUGIN_INCLUDE
+#include "../../src/nvgt_plugin.h"
 #include "pack.h"
-#include "xplatform.h"
 
 using namespace std;
 
 // A global property that allows a scripter to set the pack identifier for all subsequently created packs.
 static std::string g_pack_ident = "NVPK";
 
-pack::pack() {
+bool NVGTFileExists(const string& path) {
+	#ifdef _WIN32
+	// Windows uses UTF16 so it is necessary to convert the string
+	wchar_t bufUTF16[1024];
+	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
+
+	// Check if the path exists and is a directory
+	DWORD attrib = GetFileAttributesW(bufUTF16);
+	if (attrib == INVALID_FILE_ATTRIBUTES || (attrib & FILE_ATTRIBUTE_DIRECTORY))
+		return false;
+	return true;
+	#else
+	// Check if the path exists and is a file
+	struct stat st;
+	if (stat(path.c_str(), &st) == -1)
+		return false;
+	if ((st.st_mode & S_IFDIR) != 0)
+		return false;
+	return true;
+	#endif
+	return false;
+}
+
+legacy_pack::legacy_pack() {
 	fptr = NULL;
 	mptr = NULL;
 	pack_items.clear();
@@ -52,10 +71,10 @@ pack::pack() {
 	file_offset = 0;
 	RefCount = 1;
 }
-void pack::AddRef() {
+void legacy_pack::AddRef() {
 	asAtomicInc(RefCount);
 }
-void pack::Release() {
+void legacy_pack::Release() {
 	if (asAtomicDec(RefCount) < 1) {
 		close();
 		delete this;
@@ -63,7 +82,7 @@ void pack::Release() {
 }
 
 // Sets the 8 byte header used when loading and saving packs.
-bool pack::set_pack_identifier(const std::string& ident) {
+bool legacy_pack::set_pack_identifier(const std::string& ident) {
 	if (ident == "") return false;
 	pack_ident = ident;
 	if (pack_ident.size() > 8) pack_ident.resize(8);
@@ -71,14 +90,14 @@ bool pack::set_pack_identifier(const std::string& ident) {
 	return true;
 }
 // Loads or creates the given pack file based on mode.
-bool pack::open(const string& filename_in, pack_open_mode mode, bool memload) {
+bool legacy_pack::open(const string& filename_in, pack_open_mode mode, bool memload) {
 	if (fptr || mptr) {
 			if (!close()) return false; // A pack file is already opened and was unable to close, maybe some sounds are actively playing from it.
 		}
 	if (mode <= PACK_OPEN_MODE_NONE || mode >= PACK_OPEN_MODES_TOTAL)
 		return false; // Invalid mode.
 	string filename = filename_in;
-	if (mode == PACK_OPEN_MODE_APPEND && !FileExists(filename))
+	if (mode == PACK_OPEN_MODE_APPEND && !NVGTFileExists(filename))
 		mode = PACK_OPEN_MODE_CREATE;
 	if (mode == PACK_OPEN_MODE_CREATE) {
 		fptr = fopen(filename.c_str(), "wb");
@@ -159,7 +178,7 @@ bool pack::open(const string& filename_in, pack_open_mode mode, bool memload) {
 	return true;
 }
 
-bool pack::close() {
+bool legacy_pack::close() {
 	while (delay_close) Poco::Thread::sleep(5);
 	delay_close = false;
 	bool ret = false;
@@ -189,12 +208,12 @@ bool pack::close() {
 }
 
 // Adds a file from disk to the pack. Returns false if disk filename doesn't exist or can't be read, pack_filename is already an item in the pack and allow_replace is false, or this object is not opened in append/create mode.
-bool pack::add_file(const string& disk_filename, const string& pack_filename, bool allow_replace) {
+bool legacy_pack::add_file(const string& disk_filename, const string& pack_filename, bool allow_replace) {
 	if (!fptr || file_offset > 0)
 		return false;
 	if (open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE)
 		return false;
-	if (!FileExists(disk_filename))
+	if (!NVGTFileExists(disk_filename))
 		return false;
 	if (file_exists(pack_filename)) {
 		if (allow_replace)
@@ -250,7 +269,7 @@ bool pack::add_file(const string& disk_filename, const string& pack_filename, bo
 	return true;
 }
 
-bool pack::add_memory(const string& pack_filename, unsigned char* data, unsigned int size, bool allow_replace) {
+bool legacy_pack::add_memory(const string& pack_filename, unsigned char* data, unsigned int size, bool allow_replace) {
 	if ((open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE) || !fptr || file_offset > 0)
 		return false;
 	if (file_exists(pack_filename)) {
@@ -291,12 +310,12 @@ bool pack::add_memory(const string& pack_filename, unsigned char* data, unsigned
 	return true;
 }
 // Adds memory, but getting data from a C++ string.
-bool pack::add_memory(const string& pack_filename, const string& data, bool allow_replace) {
+bool legacy_pack::add_memory(const string& pack_filename, const string& data, bool allow_replace) {
 	return add_memory(pack_filename, (unsigned char*)data.c_str(), data.size(), allow_replace);
 }
 
 // Deletes a file from the pack if it exists, and returns true on success. This operation is usually highly intensive, and if you must do it over and over again, it's best to just recompile your pack. If this function returns false, and you are sure your arguments are correct, you can consider that your pack file is now probably corrupt. This should only happen if the pack contains invalid headers or incomplete file data in the first place.
-bool pack::delete_file(const string& pack_filename) {
+bool legacy_pack::delete_file(const string& pack_filename) {
 	if (open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE || !fptr || file_offset > 0)
 		return false;
 	unsigned int idx = 0;
@@ -363,11 +382,11 @@ bool pack::delete_file(const string& pack_filename) {
 	return true;
 }
 
-bool pack::file_exists(const string& pack_filename) {
+bool legacy_pack::file_exists(const string& pack_filename) {
 	return pack_items.find(pack_filename) != pack_items.end();
 }
 
-unsigned int pack::get_file_name(int idx, char* buffer, unsigned int size) {
+unsigned int legacy_pack::get_file_name(int idx, char* buffer, unsigned int size) {
 	if (idx < 0 || idx >= pack_filenames.size())
 		return 0;
 	if (!buffer || size <= pack_filenames[idx].size())
@@ -377,12 +396,12 @@ unsigned int pack::get_file_name(int idx, char* buffer, unsigned int size) {
 	buffer[size] = '\0';
 	return size;
 }
-string pack::get_file_name(int idx) {
+string legacy_pack::get_file_name(int idx) {
 	if (idx < 0 || idx >= pack_filenames.size())
 		return "";
 	return pack_filenames[idx];
 }
-CScriptArray* pack::list_files() {
+CScriptArray* legacy_pack::list_files() {
 	unsigned int count = pack_filenames.size();
 	asIScriptContext* ctx = asGetActiveContext();
 	asIScriptEngine* engine = ctx->GetEngine();
@@ -394,21 +413,21 @@ CScriptArray* pack::list_files() {
 	return array;
 }
 
-unsigned int pack::get_file_size(const string& pack_filename) {
+unsigned int legacy_pack::get_file_size(const string& pack_filename) {
 	if (pack_items.find(pack_filename) != pack_items.end())
 		return pack_items[pack_filename].filesize;
 	else
 		return 0;
 }
 
-unsigned int pack::get_file_offset(const string& pack_filename) {
+unsigned int legacy_pack::get_file_offset(const string& pack_filename) {
 	if (pack_items.find(pack_filename) != pack_items.end())
 		return file_offset + pack_items[pack_filename].offset;
 	else
 		return 0;
 }
 
-unsigned int pack::read_file(const string& pack_filename, unsigned int offset, unsigned char* buffer, unsigned int size, FILE* reader) {
+unsigned int legacy_pack::read_file(const string& pack_filename, unsigned int offset, unsigned char* buffer, unsigned int size, FILE* reader) {
 	if (pack_items.find(pack_filename) == pack_items.end()) return 0;
 	unsigned int item_size = pack_items[pack_filename].filesize;
 	if (offset >= item_size)
@@ -434,7 +453,7 @@ unsigned int pack::read_file(const string& pack_filename, unsigned int offset, u
 		buffer[i] = pack_char_decrypt(buffer[i], offset + i, pack_items[pack_filename].namelen);
 	return dataread;
 }
-std::string pack::read_file_string(const string& pack_filename, unsigned int offset, unsigned int size) {
+std::string legacy_pack::read_file_string(const string& pack_filename, unsigned int offset, unsigned int size) {
 	std::string result(size, '\0');
 	int actual_size = read_file(pack_filename, offset, (unsigned char*)&result.front(), size);
 	if (actual_size > -1)
@@ -443,7 +462,7 @@ std::string pack::read_file_string(const string& pack_filename, unsigned int off
 }
 
 // Function to force the file pointer for the open pack to seek by a relative position either from the beginning or the end of the file. This function should only be used if you are absolutely sure you know what you are doing, incorrect usage will lead to corrupt packs. If offset is negative, seek from the end, else from the beginning.
-bool pack::raw_seek(int offset) {
+bool legacy_pack::raw_seek(int offset) {
 	if (!fptr)
 		return false;
 	if (offset < 0)
@@ -453,7 +472,7 @@ bool pack::raw_seek(int offset) {
 }
 
 // Closes an opened stream, basically freeing it's structure of data.
-bool pack::stream_close(pack_stream* stream, bool while_reading) {
+bool legacy_pack::stream_close(pack_stream* stream, bool while_reading) {
 	if (stream->reading) {
 		stream->close = true;
 		pack_streams.find(stream->stridx) != pack_streams.end()&&pack_streams.erase(stream->stridx);
@@ -467,14 +486,14 @@ bool pack::stream_close(pack_stream* stream, bool while_reading) {
 	Release();
 	return ret;
 }
-bool pack::stream_close_script(unsigned int idx) {
+bool legacy_pack::stream_close_script(unsigned int idx) {
 	if (pack_streams.find(idx) == pack_streams.end())
 		return false;
 	return stream_close(pack_streams[idx]);
 }
 
 // Creates a pack_stream structure for the given filename at the given offset. Pack streams are simple structures meant to expidite the process of sequentially reading from a file in the pack. Returns 0xffffffff on failure.
-pack_stream* pack::stream_open(const string& pack_filename, unsigned int offset) {
+pack_stream* legacy_pack::stream_open(const string& pack_filename, unsigned int offset) {
 	if (pack_filename == "")
 		return NULL;
 	if (pack_items.find(pack_filename) == pack_items.end())
@@ -498,14 +517,14 @@ pack_stream* pack::stream_open(const string& pack_filename, unsigned int offset)
 	AddRef();
 	return s;
 }
-unsigned int pack::stream_open_script(const string& pack_filename, unsigned int offset) {
+unsigned int legacy_pack::stream_open_script(const string& pack_filename, unsigned int offset) {
 	pack_stream* stream = stream_open(pack_filename, offset);
 	if (stream) return stream->stridx;
 	else return 0xffffffff;
 }
 
 // Reads bytes from a stream and increments it's offset by the number of bytes read. Returns the number of bytes read on success, 0xffffffff (-1) on failure either do to end of file or invalid stream.
-unsigned int pack::stream_read(pack_stream* stream, unsigned char* buffer, unsigned int size) {
+unsigned int legacy_pack::stream_read(pack_stream* stream, unsigned char* buffer, unsigned int size) {
 	stream->reading = true;
 	unsigned int bytesread = read_file(stream->filename.c_str(), stream->offset, buffer, size, stream->reader);
 	stream->reading = false;
@@ -518,12 +537,12 @@ unsigned int pack::stream_read(pack_stream* stream, unsigned char* buffer, unsig
 		stream->offset += bytesread;
 	return bytesread;
 }
-unsigned int pack::stream_read_script(unsigned int idx, unsigned char* buffer, unsigned int size) {
+unsigned int legacy_pack::stream_read_script(unsigned int idx, unsigned char* buffer, unsigned int size) {
 	if (pack_streams.find(idx) == pack_streams.end())
 		return 0xffffffff;
 	return stream_read(pack_streams[idx], buffer, size);
 }
-std::string pack::stream_read_string(unsigned int idx, unsigned int size) {
+std::string legacy_pack::stream_read_string(unsigned int idx, unsigned int size) {
 	std::string result(size, '\0');
 	int actual_size = stream_read_script(idx, (unsigned char*)&result.front(), size);
 	if (actual_size > -1)
@@ -532,7 +551,7 @@ std::string pack::stream_read_string(unsigned int idx, unsigned int size) {
 }
 
 // Seeks within a stream. We're using the exact same argument convention actually as fseek here, origin means the same thing. In this case though, we return true on success, not 0.
-bool pack::stream_seek(pack_stream* stream, unsigned int offset, int origin) {
+bool legacy_pack::stream_seek(pack_stream* stream, unsigned int offset, int origin) {
 	if (origin == SEEK_SET && offset < stream->filesize)
 		stream->offset = offset;
 	else if (origin == SEEK_CUR && stream->offset + offset >= 0 && stream->offset + offset < stream->filesize)
@@ -545,7 +564,7 @@ bool pack::stream_seek(pack_stream* stream, unsigned int offset, int origin) {
 		fseek(stream->reader, file_offset + stream->offset, SEEK_SET);
 	return true;
 }
-bool pack::stream_seek_script(unsigned int idx, unsigned int offset, int origin) {
+bool legacy_pack::stream_seek_script(unsigned int idx, unsigned int offset, int origin) {
 	if (pack_streams.find(idx) == pack_streams.end())
 		return false;
 	return stream_seek(pack_streams[idx], offset, origin);
@@ -554,11 +573,11 @@ bool pack::stream_seek_script(unsigned int idx, unsigned int offset, int origin)
 bool pack_set_global_identifier(const std::string& identifier) {
 	if (identifier == "") return false;
 	g_pack_ident = identifier;
-	return true; // Further validation will be performed in pack::set_pack_identifier.
+	return true; // Further validation will be performed in legacy_pack::set_pack_identifier.
 }
 
-pack* ScriptPack_Factory() {
-	return new pack();
+legacy_pack* ScriptPack_Factory() {
+	return new legacy_pack();
 }
 
 int packmode1 = PACK_OPEN_MODE_NONE, packmode2 = PACK_OPEN_MODE_APPEND, packmode3 = PACK_OPEN_MODE_CREATE, packmode4 = PACK_OPEN_MODE_READ;
@@ -572,28 +591,28 @@ void RegisterScriptLegacyPack(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool pack_set_global_identifier(const string&in)"), asFUNCTION(pack_set_global_identifier), asCALL_CDECL);
 	engine->RegisterObjectType(_O("pack"), 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(_O("pack"), asBEHAVE_FACTORY, _O("pack @p()"), asFUNCTION(ScriptPack_Factory), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(_O("pack"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(pack, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour(_O("pack"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(pack, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool set_pack_identifier(const string&in)"), asMETHOD(pack, set_pack_identifier), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool open(const string &in, uint = PACK_OPEN_MODE_READ, bool = false)"), asMETHOD(pack, open), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool close()"), asMETHOD(pack, close), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool add_file(const string &in disc_filename, const string& in pack_filename, bool allow_replace = false)"), asMETHOD(pack, add_file), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool add_memory(const string &in pack_filename, const string& in data, bool allow_replace = false)"), asMETHODPR(pack, add_memory, (const string&, const string&, bool), bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool delete_file(const string &in pack_filename)"), asMETHOD(pack, delete_file), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool file_exists(const string &in pack_filename) const"), asMETHOD(pack, file_exists), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("string get_file_name(int index) const"), asMETHODPR(pack, get_file_name, (int), string), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("string[]@ list_files() const"), asMETHODPR(pack, list_files, (), CScriptArray*), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint get_file_size(const string &in pack_filename) const"), asMETHOD(pack, get_file_size), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint get_file_offset(const string &in pack_filename) const"), asMETHOD(pack, get_file_offset), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("string read_file(const string &in pack_filename, uint offset_in_file, uint read_byte_count) const"), asMETHOD(pack, read_file_string), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool raw_seek(int offset)"), asMETHOD(pack, raw_seek), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool stream_close(uint index)"), asMETHOD(pack, stream_close_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_open(const string &in pack_filename, uint offset_in_file) const"), asMETHOD(pack, stream_open_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("string stream_read(uint index, uint read_byte_count) const"), asMETHOD(pack, stream_read), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_pos(uint index) const"), asMETHOD(pack, stream_pos_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_seek(uint index, uint offset, int origin) const"), asMETHOD(pack, stream_seek_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_size(uint index) const"), asMETHOD(pack, stream_size_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool get_active() const property"), asMETHOD(pack, is_active), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint get_size() const property"), asMETHOD(pack, size), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour(_O("pack"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(legacy_pack, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour(_O("pack"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(legacy_pack, Release), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool set_pack_identifier(const string&in)"), asMETHOD(legacy_pack, set_pack_identifier), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool open(const string &in, uint = PACK_OPEN_MODE_READ, bool = false)"), asMETHOD(legacy_pack, open), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool close()"), asMETHOD(legacy_pack, close), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool add_file(const string &in disc_filename, const string& in pack_filename, bool allow_replace = false)"), asMETHOD(legacy_pack, add_file), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool add_memory(const string &in pack_filename, const string& in data, bool allow_replace = false)"), asMETHODPR(legacy_pack, add_memory, (const string&, const string&, bool), bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool delete_file(const string &in pack_filename)"), asMETHOD(legacy_pack, delete_file), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool file_exists(const string &in pack_filename) const"), asMETHOD(legacy_pack, file_exists), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("string get_file_name(int index) const"), asMETHODPR(legacy_pack, get_file_name, (int), string), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("string[]@ list_files() const"), asMETHODPR(legacy_pack, list_files, (), CScriptArray*), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint get_file_size(const string &in pack_filename) const"), asMETHOD(legacy_pack, get_file_size), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint get_file_offset(const string &in pack_filename) const"), asMETHOD(legacy_pack, get_file_offset), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("string read_file(const string &in pack_filename, uint offset_in_file, uint read_byte_count) const"), asMETHOD(legacy_pack, read_file_string), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool raw_seek(int offset)"), asMETHOD(legacy_pack, raw_seek), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool stream_close(uint index)"), asMETHOD(legacy_pack, stream_close_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_open(const string &in pack_filename, uint offset_in_file) const"), asMETHOD(legacy_pack, stream_open_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("string stream_read(uint index, uint read_byte_count) const"), asMETHOD(legacy_pack, stream_read), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_pos(uint index) const"), asMETHOD(legacy_pack, stream_pos_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_seek(uint index, uint offset, int origin) const"), asMETHOD(legacy_pack, stream_seek_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_size(uint index) const"), asMETHOD(legacy_pack, stream_size_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("bool get_active() const property"), asMETHOD(legacy_pack, is_active), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("pack"), _O("uint get_size() const property"), asMETHOD(legacy_pack, size), asCALL_THISCALL);
 	engine->SetDefaultNamespace("");
 }
