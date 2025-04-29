@@ -217,7 +217,7 @@ public:
 
 			cfg.dataCallback = data_callback;
 			cfg.pUserData = &*engine;
-			g_soundsystem_last_error = ma_device_init(0, &cfg, &*device);
+			g_soundsystem_last_error = ma_device_init(&g_sound_context, &cfg, &*device);
 			if (g_soundsystem_last_error != MA_SUCCESS) {
 
 				engine.reset();
@@ -251,7 +251,7 @@ public:
 			}
 		}
 		ma_engine_config cfg = ma_engine_config_init();
-		// cfg.pContext = &g_sound_context; // Miniaudio won't let us quickly uninitilize then reinitialize a device sometimes when using the same context, so we won't manage it until we figure that out.
+		cfg.pContext = &g_sound_context; // Miniaudio won't let us quickly uninitilize then reinitialize a device sometimes when using the same context, so we won't manage it until we figure that out.
 		cfg.pResourceManager = &*resource_manager;
 		cfg.noAutoStart = (flags & NO_AUTO_START) ? MA_TRUE : MA_FALSE;
 		cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE; // Steam Audio requires fixed sized updates. We can make this not be a magic constant if anyone has some reason for wanting to change it.
@@ -313,16 +313,15 @@ public:
 		cfg.playback.channels = old_dev->playback.channels;
 		cfg.sampleRate = old_dev->sampleRate;
 		cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE;
-		cfg.noPreSilencedOutputBuffer = old_dev->noPreSilencedOutputBuffer;
-		cfg.noClip = old_dev->noClip;
-		cfg.noDisableDenormals = old_dev->noDisableDenormals;
-		cfg.noFixedSizedCallback = old_dev->noFixedSizedCallback;
+		cfg.resampling.algorithm = ma_resample_algorithm_custom;
+		cfg.resampling.pBackendVTable = &wdl_resampler_backend_vtable;
+		cfg.wasapi.noAutoConvertSRC = true;
 		cfg.notificationCallback = old_dev->onNotification;
 		cfg.dataCallback = old_dev->onData;
 		cfg.pUserData = old_dev->pUserData;
 		ma_device_stop(old_dev);
 		ma_device_uninit(old_dev);
-		if ((g_soundsystem_last_error = ma_device_init(nullptr, &cfg, old_dev)) != MA_SUCCESS)
+		if ((g_soundsystem_last_error = ma_device_init(&g_sound_context, &cfg, old_dev)) != MA_SUCCESS)
 			return false;
 		return (g_soundsystem_last_error = ma_engine_start(&*engine)) == MA_SUCCESS;
 	}
