@@ -74,6 +74,10 @@ void add_game_asset_to_bundle(const string& path, int flags) {
 	while (semi && semi != string::npos && path[semi -1] == '\\' ) semi = path.find_first_of(';', semi + 1);
 	return add_game_asset_to_bundle(path.substr(0, semi), path.substr(semi +1 ), flags);
 }
+vector<string> g_bundle_libraries = {"nvdaControllerClient64", "phonon", "SAAPI64"};
+void nvgt_bundle_shared_library(const string& libname) {
+	g_bundle_libraries.push_back(libname);
+}
 
 // Helper function to run a shell command that returns true if that command returns 0, false otherwise. Specifically intended for programatic use, this makes no attempt to print output or errors from the given command to the real stdout stream and instead captures all output for use in our program.
 bool system_command(const std::string& command, const Process::Args& args, const std::string& initial_directory, string& std_out, string& std_err) {

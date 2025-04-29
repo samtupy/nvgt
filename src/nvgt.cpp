@@ -10,6 +10,7 @@
  * 3. This notice may not be removed or altered from any source distribution.
  */
 
+#include <exception>
 #include <iostream>
 #include <sstream>
 #define SDL_MAIN_HANDLED // We do actually use SDL_main, but see below near the bottom of the file.
@@ -375,11 +376,18 @@ int main(int argc, char **argv) {
 	AutoPtr<Application> app = new nvgt_application();
 	try {
 		app->init(argc, argv);
-	} catch (Poco::Exception &e) {
+	} catch (Exception &e) {
 		#ifndef NVGT_WIN_APP
 		app->logger().fatal(e.displayText());
 		#else
 		message(e.displayText(), "initialization error");
+		#endif
+		return Application::EXIT_CONFIG;
+	} catch (exception &e) {
+		#ifndef NVGT_WIN_APP
+		app->logger().fatal(e.what());
+		#else
+		message(e.what(), "initialization error");
 		#endif
 		return Application::EXIT_CONFIG;
 	}

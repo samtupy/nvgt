@@ -595,6 +595,9 @@ int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
 	} catch (Exception &e) {
 		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, e.displayText().c_str());
 		return -1;
+	} catch (exception &e) {
+		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, e.what());
+		return -1;
 	}
 	return 0;
 }
@@ -900,8 +903,9 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void * /*u
 	else if (cleanText.starts_with("document"))
 		add_game_asset_to_bundle(cleanText.substr(9), GAME_ASSET_DOCUMENT);
 	else if (cleanText.starts_with("plugin ")) {
-		if (!load_nvgt_plugin(cleanText.substr(7)))
-			engine->WriteMessage(cleanText.substr(7).c_str(), -1, -1, asMSGTYPE_ERROR, "failed to load plugin");
+		string errmsg = "failed to load plugin";
+		if (!load_nvgt_plugin(cleanText.substr(7), &errmsg))
+			engine->WriteMessage(cleanText.substr(7).c_str(), -1, -1, asMSGTYPE_ERROR, errmsg.c_str());
 	} else if (cleanText.starts_with("compiled_basename ")) {
 		string bn = cleanText.substr(18);
 		if (bn == "*")
