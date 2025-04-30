@@ -18,71 +18,63 @@
 #include <Poco/MD5Engine.h>
 #include <Poco/SHA1Engine.h>
 #include <Poco/SHA2Engine.h>
-#include <poco/String.h>
 #include "hash.h"
-std::string md5(const std::string &message, bool binary)
-{
+std::string md5(const std::string &message, bool binary) {
 	Poco::MD5Engine engine;
 	engine.update(message);
 	auto digest = engine.digest();
 	if (binary)
 		return std::string((const char *)&digest[0], digest.size());
 	else
-		return Poco::toUpper(Poco::DigestEngine::digestToHex(digest));
+		return Poco::DigestEngine::digestToHex(digest);
 }
-std::string sha1(const std::string &message, bool binary)
-{
+std::string sha1(const std::string &message, bool binary) {
 	Poco::SHA1Engine engine;
 	engine.update(message);
 	auto digest = engine.digest();
 	if (binary)
 		return std::string((const char *)&digest[0], digest.size());
 	else
-		return Poco::toUpper(Poco::DigestEngine::digestToHex(digest));
+		return Poco::DigestEngine::digestToHex(digest);
 }
-std::string sha224(const std::string &message, bool binary)
-{
+std::string sha224(const std::string &message, bool binary) {
 	Poco::SHA2Engine engine(Poco::SHA2Engine::SHA_224);
 	engine.update(message);
 	auto digest = engine.digest();
 	if (binary)
 		return std::string((const char *)&digest[0], digest.size());
 	else
-		return Poco::toUpper(Poco::DigestEngine::digestToHex(digest));
+		return Poco::DigestEngine::digestToHex(digest);
 }
-std::string sha256(const std::string &message, bool binary)
-{
+std::string sha256(const std::string &message, bool binary) {
 	Poco::SHA2Engine engine(Poco::SHA2Engine::SHA_256);
 	engine.update(message);
 	auto digest = engine.digest();
 	if (binary)
 		return std::string((const char *)&digest[0], digest.size());
 	else
-		return Poco::toUpper(Poco::DigestEngine::digestToHex(digest));
+		return Poco::DigestEngine::digestToHex(digest);
 }
-std::string sha384(const std::string &message, bool binary)
-{
+std::string sha384(const std::string &message, bool binary) {
 	Poco::SHA2Engine engine(Poco::SHA2Engine::SHA_384);
 	engine.update(message);
 	auto digest = engine.digest();
 	if (binary)
 		return std::string((const char *)&digest[0], digest.size());
 	else
-		return Poco::toUpper(Poco::DigestEngine::digestToHex(digest));
+		return Poco::DigestEngine::digestToHex(digest);
 }
-std::string sha512(const std::string &message, bool binary)
-{
+std::string sha512(const std::string &message, bool binary) {
 	Poco::SHA2Engine engine(Poco::SHA2Engine::SHA_512);
 	engine.update(message);
 	auto digest = engine.digest();
 	if (binary)
 		return std::string((const char *)&digest[0], digest.size());
 	else
-		return Poco::toUpper(Poco::DigestEngine::digestToHex(digest));
+		return Poco::DigestEngine::digestToHex(digest);
 }
 
-std::string u32beToByteString(uint32_t num)
-{
+std::string u32beToByteString(uint32_t num) {
 	std::string ret;
 	ret.push_back((num >> 24) & 0xFF);
 	ret.push_back((num >> 16) & 0xFF);
@@ -90,15 +82,13 @@ std::string u32beToByteString(uint32_t num)
 	ret.push_back((num >> 0) & 0xFF);
 	return ret;
 }
-std::string u64beToByteString(uint64_t num)
-{
+std::string u64beToByteString(uint64_t num) {
 	std::string left = u32beToByteString((num >> 32) & 0xFFFFFFFF);
 	std::string right = u32beToByteString((num >> 0) & 0xFFFFFFFF);
 	return left + right;
 }
 
-uint32_t hotp(const std::string &key, uint64_t counter, uint32_t digitCount)
-{
+uint32_t hotp(const std::string &key, uint64_t counter, uint32_t digitCount) {
 	std::string msg = u64beToByteString(counter);
 	Poco::HMACEngine<Poco::SHA1Engine> engine(key);
 	engine.update(msg);
@@ -121,16 +111,14 @@ uint32_t hotp(const std::string &key, uint64_t counter, uint32_t digitCount)
 	return (ret & 0x7fffffff) % digits10;
 }
 
-unsigned int crc32(const std::string &data)
-{
+unsigned int crc32(const std::string &data) {
 	if (data == "")
 		return 0;
 	Poco::Checksum c;
 	c.update(data);
 	return c.checksum();
 }
-unsigned int adler32(const std::string &data)
-{
+unsigned int adler32(const std::string &data) {
 	if (data == "")
 		return 0;
 	Poco::Checksum c(Poco::Checksum::TYPE_ADLER32);
@@ -204,8 +192,7 @@ uint32_t checksum_istream::get_checksum() {
 	return buf->get_checksum();
 }
 
-void RegisterScriptHash(asIScriptEngine *engine)
-{
+void RegisterScriptHash(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction(_O("string string_hash_md5(const string& in data, bool binary = false)"), asFUNCTION(md5), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string string_hash_sha1(const string& in data, bool binary = false)"), asFUNCTION(sha1), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string string_hash_sha224(const string& in data, bool binary = false)"), asFUNCTION(sha224), asCALL_CDECL);
