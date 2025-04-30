@@ -266,6 +266,7 @@ void tts_voice::setup() {
 	#else
 	voice_index = builtin_index;
 	#endif
+	destroyed = false;
 }
 void tts_voice::destroy() {
 	#ifdef _WIN32
@@ -616,7 +617,7 @@ bool tts_voice::refresh() {
 	destroy();
 	setup();
 	set_voice(voice);
-	return inst != nullptr;
+	return !destroyed;
 }
 
 tts_voice *Script_tts_voice_Factory(const std::string &builtin_voice_name) {
