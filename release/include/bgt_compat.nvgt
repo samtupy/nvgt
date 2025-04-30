@@ -259,9 +259,11 @@ bool screen_reader_stop_speech(int reader) {
 
 //hashing
 string string_hash(const string& in data, int algorithm, bool binary) {
-	if (algorithm == 1) return (string_hash_sha256(data, binary));
-	if (algorithm == 2) return (string_hash_sha512(data, binary));
-	return ("");
+	string hash;
+	if (algorithm == 1) hash = string_hash_sha256(data, binary);
+	if (algorithm == 2) hash = string_hash_sha512(data, binary);
+	if (!binary) hash.upper_this();
+	return hash;
 }
 string file_hash(const string& in filename, int algorithm, bool binary) {
 	file f;

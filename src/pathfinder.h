@@ -20,18 +20,20 @@
 #include "scriptarray.h"
 #include "scriptany.h"
 #include "nvgt.h"
+enum callback_modes {
+	CALLBACK_SIMPLE = 0,
+	CALLBACK_ADVANCED, // Same as simple but with parent_x, parent_y, parent_z.
+	CALLBACK_LEGACY = 2, // BGT compatible. Effectively 2D mode with legacy user_data string instead of any.
+};
 
-class hashpoint
-{
+class hashpoint {
 	// https://stackoverflow.com/questions/16792751/hashmap-for-2d3d-coordinates-i-e-vector-of-ints/47928817
 public:
 	hashpoint(int x, int y, int z) : x(x), y(y), z(z) {};
 	int x, y, z;
 };
-struct hashpoint_hash
-{
-	size_t operator()(const hashpoint &p) const
-	{
+struct hashpoint_hash {
+	size_t operator()(const hashpoint &p) const {
 		// Morton code hash function for 3D points with negative coordinate support provided by chat gpt.
 		// Translate the coordinates so that the minimum value is 0
 		const int min_xy = (p.x < p.y ? p.x : p.y);
@@ -62,17 +64,14 @@ struct hashpoint_hash
 		return hash_val + static_cast<size_t>(min_coord);
 	}
 };
-struct hashpoint_equals
-{
-	bool operator()(const hashpoint &lhs, const hashpoint &rhs) const
-	{
+struct hashpoint_equals {
+	bool operator()(const hashpoint &lhs, const hashpoint &rhs) const {
 		return (lhs.x == rhs.x) && (lhs.y == rhs.y) && (lhs.z == rhs.z);
 	}
 };
 typedef std::unordered_map<hashpoint, void *, hashpoint_hash, hashpoint_equals> hashpoint_map;
 typedef std::unordered_map<hashpoint, float, hashpoint_hash, hashpoint_equals> hashpoint_float_map;
-class pathfinder : public micropather::Graph
-{
+class pathfinder : public micropather::Graph {
 	hashpoint_float_map difficulty_cache[11];
 	micropather::MicroPather *pf;
 	int RefCount;
@@ -82,7 +81,7 @@ class pathfinder : public micropather::Graph
 	bool must_reset;
 	bool gc_flag;
 	bool cache; // Because Micropather doesn't expose a method to determine if path caching is enabled, and disabling of cache should disable our local cache too.
-	bool callback_wants_parent;
+	callback_modes callback_mode;
 
 public:
 	bool solving;
@@ -100,18 +99,19 @@ public:
 	int get_ref_count();
 	void set_gc_flag();
 	bool get_gc_flag();
-	void set_callback_function(asIScriptFunction *func);	// Basic callback with only x, y, z, user_data.
+	void set_callback_function(asIScriptFunction *func); // Basic callback with only x, y, z, user_data.
 	void set_callback_function_ex(asIScriptFunction *func); // Advanced callback with x, y, z, parent_x, parent_y, parent_z, user_data.
+	void set_callback_function_legacy(asIScriptFunction *func); // 2D BGT legacy mode with string as user_data.
 
 	float get_difficulty(void *state, void *parent_state);
 	float get_difficulty(int x, int y, int z, int parent_x, int parent_y, int parent_z);
 	void cancel();
 	void reset();
 	CScriptArray *find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny *data);
+	CScriptArray *find_legacy(int start_x, int start_y, int parent_x, int parent_y, std::string user_data);
 	virtual float LeastCostEstimate(void *nodeStart, void *nodeEnd);
 	virtual void AdjacentCost(void *node, micropather::MPVector<micropather::StateCost> *neighbors);
-	virtual void PrintStateInfo(void *state)
-	{
+	virtual void PrintStateInfo(void *state) {
 		return;
 	}
 };
