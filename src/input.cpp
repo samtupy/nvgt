@@ -8,7 +8,7 @@
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
- */
+*/
 
 #if defined(_WIN32)
 	#define VC_EXTRALEAN
@@ -37,7 +37,7 @@ static std::unordered_map<unsigned int, std::string> g_KeyNames;
 static unsigned char g_KeysPressed[SDL_SCANCODE_COUNT];
 static unsigned char g_KeysRepeating[SDL_SCANCODE_COUNT];
 static unsigned char g_KeysForced[SDL_SCANCODE_COUNT];
-static const bool *g_KeysDown = NULL;
+static const bool* g_KeysDown = NULL;
 static int g_KeysDownArrayLen = 0;
 static unsigned char g_KeysReleased[SDL_SCANCODE_COUNT];
 static unsigned char g_MouseButtonsPressed[32];
@@ -48,8 +48,8 @@ float g_MouseAbsX = 0, g_MouseAbsY = 0, g_MouseAbsZ = 0;
 float g_MousePrevX = 0, g_MousePrevY = 0, g_MousePrevZ = 0;
 bool g_KeyboardStateChange = false;
 SDL_TouchID g_TouchLastDevice = 0;
-static asITypeInfo *key_code_array_type = nullptr;
-static asITypeInfo *joystick_mapping_array_type = nullptr;
+static asITypeInfo* key_code_array_type = nullptr;
+static asITypeInfo* joystick_mapping_array_type = nullptr;
 #ifdef _WIN32
 	static HHOOK g_keyhook_hHook = nullptr;
 	bool g_keyhook_active = false;
@@ -57,15 +57,15 @@ static asITypeInfo *joystick_mapping_array_type = nullptr;
 // Wrapper function for sdl
 // This function is useful for getting keyboard, mice and touch devices.
 // Pass the callback with the signature `unsigned int*(int*)`
-CScriptArray *GetDevices(std::function<uint32_t *(int *)> callback) {
-	asITypeInfo *array_type = get_array_type("uint[]");
+CScriptArray* GetDevices(std::function<uint32_t* (int*)> callback) {
+	asITypeInfo* array_type = get_array_type("uint[]");
 	if (!array_type)
 		return nullptr;
 	int device_count = 0;
-	uint32_t *devices = callback(&device_count);
+	uint32_t* devices = callback(&device_count);
 	if (!devices)
 		return nullptr;
-	CScriptArray *array = CScriptArray::Create(array_type);
+	CScriptArray* array = CScriptArray::Create(array_type);
 	if (!array) {
 		SDL_free(devices);
 		return nullptr;
@@ -90,7 +90,7 @@ void InputDestroy() {
 	SDL_Quit();
 	g_KeysDown = NULL;
 }
-bool InputEvent(SDL_Event *evt) {
+bool InputEvent(SDL_Event* evt) {
 	if (evt->type == SDL_EVENT_KEY_DOWN) {
 		if (!evt->key.repeat)
 			g_KeysPressed[evt->key.scancode] = 1;
@@ -142,7 +142,7 @@ void regained_window_focus() {
 bool ScreenKeyboardShown() {
 	return SDL_ScreenKeyboardShown(g_WindowHandle);
 }
-int GetKeyCode(const std::string &name) {
+int GetKeyCode(const std::string& name) {
 	if (name.empty())
 		return SDLK_UNKNOWN;
 	return SDL_GetScancodeFromName(name.c_str());
@@ -150,12 +150,12 @@ int GetKeyCode(const std::string &name) {
 std::string GetKeyName(int key) {
 	if (key < 0 || key >= SDL_SCANCODE_COUNT)
 		return "";
-	const char *result = SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
+	const char* result = SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
 	if (!result)
 		return "";
 	return result;
 }
-bool SetKeyName(int key, const std::string &name) {
+bool SetKeyName(int key, const std::string& name) {
 	if (key < 0 || key >= SDL_SCANCODE_COUNT || name.empty())
 		return false;
 	g_KeyNames[key] = name;
@@ -250,12 +250,12 @@ inline bool post_key_event(int key, SDL_EventType evt_type) {
 }
 bool simulate_key_down(int key) { return post_key_event(key, SDL_EVENT_KEY_DOWN); }
 bool simulate_key_up(int key) { return post_key_event(key, SDL_EVENT_KEY_UP); }
-CScriptArray *keys_pressed() {
-	asIScriptContext *ctx = asGetActiveContext();
-	asIScriptEngine *engine = ctx->GetEngine();
+CScriptArray* keys_pressed() {
+	asIScriptContext* ctx = asGetActiveContext();
+	asIScriptEngine* engine = ctx->GetEngine();
 	if (!key_code_array_type)
 		key_code_array_type = engine->GetTypeInfoByDecl("array<int>");
-	CScriptArray *array = CScriptArray::Create(key_code_array_type);
+	CScriptArray* array = CScriptArray::Create(key_code_array_type);
 	for (int i = 0; i < SDL_SCANCODE_COUNT; i++) {
 		int k = (int)i;
 		if (KeyPressed(k))
@@ -263,12 +263,12 @@ CScriptArray *keys_pressed() {
 	}
 	return array;
 }
-CScriptArray *keys_down() {
-	asIScriptContext *ctx = asGetActiveContext();
-	asIScriptEngine *engine = ctx->GetEngine();
+CScriptArray* keys_down() {
+	asIScriptContext* ctx = asGetActiveContext();
+	asIScriptEngine* engine = ctx->GetEngine();
 	if (!key_code_array_type)
 		key_code_array_type = engine->GetTypeInfoByDecl("array<int>");
-	CScriptArray *array = CScriptArray::Create(key_code_array_type);
+	CScriptArray* array = CScriptArray::Create(key_code_array_type);
 	if (!g_KeysDown)
 		return array;
 	for (int i = 0; i < g_KeysDownArrayLen; i++) {
@@ -292,12 +292,12 @@ int total_keys_down() {
 	g_TotalKeysDownCache = c;
 	return c;
 }
-CScriptArray *keys_released() {
-	asIScriptContext *ctx = asGetActiveContext();
-	asIScriptEngine *engine = ctx->GetEngine();
+CScriptArray* keys_released() {
+	asIScriptContext* ctx = asGetActiveContext();
+	asIScriptEngine* engine = ctx->GetEngine();
 	if (!key_code_array_type)
 		key_code_array_type = engine->GetTypeInfoByDecl("array<int>");
-	CScriptArray *array = CScriptArray::Create(key_code_array_type);
+	CScriptArray* array = CScriptArray::Create(key_code_array_type);
 	for (int i = 0; i < g_KeysDownArrayLen; i++) {
 		if (KeyReleased(i))
 			array->InsertLast(&i);
@@ -350,20 +350,20 @@ bool GetMouseGrab() {
 void SetMouseGrab(bool grabbed) {
 	SDL_SetWindowMouseGrab(g_WindowHandle, grabbed);
 }
-CScriptArray *GetKeyboards() {
+CScriptArray* GetKeyboards() {
 	return GetDevices(SDL_GetKeyboards);
 }
 std::string GetKeyboardName(unsigned int id) {
-	const char *result = SDL_GetKeyboardNameForID((SDL_KeyboardID)id);
+	const char* result = SDL_GetKeyboardNameForID((SDL_KeyboardID)id);
 	if (!result)
 		return "";
 	return result;
 }
-CScriptArray *GetMice() {
+CScriptArray* GetMice() {
 	return GetDevices(SDL_GetMice);
 }
 std::string GetMouseName(unsigned int id) {
-	const char *result = SDL_GetMouseNameForID((SDL_MouseID)id);
+	const char* result = SDL_GetMouseNameForID((SDL_MouseID)id);
 	if (!result)
 		return "";
 	return result;
@@ -454,17 +454,13 @@ bool insertPressed = false;
 LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	if (nCode != HC_ACTION)
 		return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
-
 	PKBDLLHOOKSTRUCT p = reinterpret_cast<PKBDLLHOOKSTRUCT>(lParam);
 	UINT vkCode = p->vkCode;
 	bool altDown = p->flags & LLKHF_ALTDOWN;
 	bool keyDown = (p->flags & LLKHF_UP) == 0;
-
 	altPressed = altDown;
-
 	if (vkCode != VK_CAPITAL && vkCode != VK_INSERT && (capsPressed || insertPressed))
 		return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
-
 	switch (vkCode) {
 		case VK_INSERT:
 			insertPressed = keyDown;
@@ -481,7 +477,6 @@ LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 		default:
 			return 0; // Do nothing for other keys
 	}
-
 	return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 }
 #endif
@@ -516,15 +511,15 @@ void uninstall_keyhook() {
 }
 
 // Low level touch interface
-CScriptArray *get_touch_devices() {
-	asITypeInfo *array_type = get_array_type("uint64[]");
+CScriptArray* get_touch_devices() {
+	asITypeInfo* array_type = get_array_type("uint64[]");
 	if (!array_type)
 		return nullptr;
 	int device_count;
-	SDL_TouchID *devices = SDL_GetTouchDevices(&device_count);
+	SDL_TouchID* devices = SDL_GetTouchDevices(&device_count);
 	if (!devices)
 		return nullptr;
-	CScriptArray *array = CScriptArray::Create(array_type);
+	CScriptArray* array = CScriptArray::Create(array_type);
 	if (!array) {
 		SDL_free(devices);
 		return nullptr;
@@ -537,7 +532,7 @@ CScriptArray *get_touch_devices() {
 	return array;
 }
 std::string get_touch_device_name(uint64_t device_id) {
-	const char *result = SDL_GetTouchDeviceName((SDL_TouchID)device_id);
+	const char* result = SDL_GetTouchDeviceName((SDL_TouchID)device_id);
 	if (!result)
 		return "";
 	return result;
@@ -545,11 +540,11 @@ std::string get_touch_device_name(uint64_t device_id) {
 int get_touch_device_type(uint64_t device_id) {
 	return SDL_GetTouchDeviceType((SDL_TouchID)device_id);
 }
-CScriptArray *query_touch_device(uint64_t device_id) {
-	asITypeInfo *array_type = get_array_type("touch_finger[]");
+CScriptArray* query_touch_device(uint64_t device_id) {
+	asITypeInfo* array_type = get_array_type("touch_finger[]");
 	if (!array_type)
 		return nullptr;
-	CScriptArray *array = CScriptArray::Create(array_type);
+	CScriptArray* array = CScriptArray::Create(array_type);
 	if (!array)
 		return nullptr;
 	if (!device_id && g_TouchLastDevice)
@@ -557,7 +552,7 @@ CScriptArray *query_touch_device(uint64_t device_id) {
 	if (!device_id)
 		return array;
 	int finger_count;
-	SDL_Finger **fingers = SDL_GetTouchFingers(device_id, &finger_count);
+	SDL_Finger** fingers = SDL_GetTouchFingers(device_id, &finger_count);
 	if (!fingers)
 		return array;
 	array->Reserve(finger_count);
@@ -579,7 +574,7 @@ bool TextInputActive() {
 	return SDL_TextInputActive(g_WindowHandle);
 }
 
-void RegisterInput(asIScriptEngine *engine) {
+void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterObjectType("touch_finger", sizeof(SDL_Finger), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<SDL_Finger>());
 	engine->RegisterObjectProperty("touch_finger", "const uint64 id", asOFFSET(SDL_Finger, id));
 	engine->RegisterObjectProperty("touch_finger", "const float x", asOFFSET(SDL_Finger, x));

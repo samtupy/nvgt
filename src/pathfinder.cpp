@@ -8,7 +8,7 @@
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
- */
+*/
 
 #include <cstring>
 #include <algorithm>
@@ -16,10 +16,10 @@
 #include "pathfinder.h"
 #include <cmath>
 using namespace std;
-static asITypeInfo *VectorArrayType = NULL;
-static asITypeInfo *StringType = nullptr;
+static asITypeInfo* VectorArrayType = NULL;
+static asITypeInfo* StringType = nullptr;
 #define NODE_BIT_SIZE 19
-inline void *encode_state(int64_t x, int64_t y, int64_t z, int64_t d) {
+inline void* encode_state(int64_t x, int64_t y, int64_t z, int64_t d) {
 	int mc = (1 << NODE_BIT_SIZE) - 1;
 	x += 10000;
 	y += 10000;
@@ -27,14 +27,14 @@ inline void *encode_state(int64_t x, int64_t y, int64_t z, int64_t d) {
 	if (x < 0 || x > mc || y < 0 || y > mc || z < 0 || z > mc)
 		return NULL;
 	uint64_t s = x + (y << NODE_BIT_SIZE) + (z << (NODE_BIT_SIZE * 2)) + (d << NODE_BIT_SIZE * 3);
-	return (void *)s;
+	return (void*)s;
 }
-inline hashpoint decode_state(void *st) {
+inline hashpoint decode_state(void* st) {
 	int mc = (1 << NODE_BIT_SIZE) - 1;
 	uint64_t s = reinterpret_cast<uint64_t>(st);
 	return hashpoint((s & mc) - 10000, (s >> NODE_BIT_SIZE & mc) - 10000, (s >> NODE_BIT_SIZE * 2 & mc) - 10000);
 }
-inline void decode_state(void *st, int *x, int *y, int *z) {
+inline void decode_state(void* st, int* x, int* y, int* z) {
 	int mc = (1 << NODE_BIT_SIZE) - 1;
 	uint64_t s = reinterpret_cast<uint64_t>(st);
 	*x = (s & mc) - 10000;
@@ -56,7 +56,7 @@ pathfinder::pathfinder(int size, bool cache) : gc_flag(false) {
 	total_cost = 0;
 	automatic_reset = false;
 	this->cache = cache;
-	asIScriptContext *ctx = asGetActiveContext();
+	asIScriptContext* ctx = asGetActiveContext();
 	if (ctx)
 		ctx->GetEngine()->NotifyGarbageCollectorOfNewObject(this, ctx->GetEngine()->GetTypeInfoByName("pathfinder"));
 	callback_mode = CALLBACK_SIMPLE;
@@ -79,13 +79,13 @@ int pathfinder::Release() {
 int pathfinder::get_ref_count() {
 	return RefCount;
 }
-void pathfinder::enum_references(asIScriptEngine *engine) {
+void pathfinder::enum_references(asIScriptEngine* engine) {
 	if (callback)
 		engine->GCEnumCallback(callback);
 	if (callback_data)
 		engine->GCEnumCallback(callback_data);
 }
-void pathfinder::release_all_handles(asIScriptEngine *engine) {
+void pathfinder::release_all_handles(asIScriptEngine* engine) {
 	if (callback)
 		callback->Release();
 	if (callback_data)
@@ -99,14 +99,14 @@ void pathfinder::set_gc_flag() {
 bool pathfinder::get_gc_flag() {
 	return gc_flag;
 }
-void pathfinder::set_callback_function(asIScriptFunction *func) {
+void pathfinder::set_callback_function(asIScriptFunction* func) {
 	if (callback)
 		callback->Release();
 	if (func)
 		callback = func;
 	callback_mode = CALLBACK_SIMPLE;
 }
-void pathfinder::set_callback_function_ex(asIScriptFunction *func) {
+void pathfinder::set_callback_function_ex(asIScriptFunction* func) {
 	// This callback type is fundamentally incompatible with path caching.
 	if (cache) {
 		asGetActiveContext()->SetException("A callback with parent state support cannot be used with path caching enabled.");
@@ -115,7 +115,7 @@ void pathfinder::set_callback_function_ex(asIScriptFunction *func) {
 	set_callback_function(func);
 	callback_mode = CALLBACK_ADVANCED;
 }
-void pathfinder::set_callback_function_legacy(asIScriptFunction *func) {
+void pathfinder::set_callback_function_legacy(asIScriptFunction* func) {
 	// This callback type is also fundamentally incompatible with path caching.
 	if (cache) {
 		asGetActiveContext()->SetException("A legacy callback cannot be used with path caching enabled.");
@@ -125,7 +125,7 @@ void pathfinder::set_callback_function_legacy(asIScriptFunction *func) {
 	callback_mode = CALLBACK_LEGACY;
 }
 
-float pathfinder::get_difficulty(void *state, void *parent_state) {
+float pathfinder::get_difficulty(void* state, void* parent_state) {
 	if (!callback)
 		return FLT_MAX;
 	int x, y, z;
@@ -141,9 +141,9 @@ float pathfinder::get_difficulty(int x, int y, int z, int parent_x, int parent_y
 		return n->second;
 	if (abort)
 		return FLT_MAX;
-	asIScriptContext *ACtx = asGetActiveContext();
+	asIScriptContext* ACtx = asGetActiveContext();
 	bool new_context = ACtx == NULL || ACtx->PushState() < 0;
-	asIScriptContext *ctx = (new_context ? g_ScriptEngine->RequestContext() : ACtx);
+	asIScriptContext* ctx = (new_context ? g_ScriptEngine->RequestContext() : ACtx);
 	if (!ctx)
 		return FLT_MAX;
 	if (ctx->Prepare(callback) < 0) {
@@ -178,8 +178,8 @@ float pathfinder::get_difficulty(int x, int y, int z, int parent_x, int parent_y
 			if (StringType == nullptr)
 				StringType = g_ScriptEngine->GetTypeInfoByDecl("string");
 			if (callback_data != nullptr)
-				callback_data->Retrieve((void *)&ud, StringType->GetTypeId());
-			ctx->SetArgObject(4, (void *)&ud);
+				callback_data->Retrieve((void*)&ud, StringType->GetTypeId());
+			ctx->SetArgObject(4, (void*)&ud);
 	}
 	if (ctx->Execute() != asEXECUTION_FINISHED) {
 		if (new_context)
@@ -217,10 +217,10 @@ void pathfinder::reset() {
 		difficulty_cache[i].clear();
 	pf->Reset();
 }
-CScriptArray *pathfinder::find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny *data) {
+CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny* data) {
 	if (!VectorArrayType)
 		VectorArrayType = g_ScriptEngine->GetTypeInfoByDecl("array<vector>");
-	CScriptArray *array = CScriptArray::Create(VectorArrayType);
+	CScriptArray* array = CScriptArray::Create(VectorArrayType);
 	if (solving)
 		return array;
 	abort = false;
@@ -238,12 +238,12 @@ CScriptArray *pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	// Only perform this fast-fail optimization if callback is "simple", otherwise it will just produce false positives.
 	if (callback_mode == CALLBACK_SIMPLE && (get_difficulty(start_x, start_y, start_z, start_x, start_y, start_z) > 9 || get_difficulty(end_x, end_y, end_z, end_x, end_y, end_z) > 9))
 		return array;
-	void *start = encode_state(start_x, start_y, start_z, desperation_factor);
+	void* start = encode_state(start_x, start_y, start_z, desperation_factor);
 	this->start_x = start_x;
 	this->start_y = start_y;
 	this->start_z = start_z;
-	void *end = encode_state(end_x, end_y, end_z, desperation_factor);
-	micropather::MPVector<void *> path;
+	void* end = encode_state(end_x, end_y, end_z, desperation_factor);
+	micropather::MPVector<void*> path;
 	solving = true;
 	int result = pf->Solve(start, end, &path, &total_cost);
 	solving = false;
@@ -268,18 +268,18 @@ CScriptArray *pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	}
 	return array;
 }
-CScriptArray *pathfinder::find_legacy(int start_x, int start_y, int parent_x, int parent_y, string user_data) {
+CScriptArray* pathfinder::find_legacy(int start_x, int start_y, int parent_x, int parent_y, string user_data) {
 	if (callback_mode != CALLBACK_LEGACY)
 		return nullptr;
 	if (StringType == nullptr)
 		StringType = g_ScriptEngine->GetTypeInfoByDecl("string");
-	CScriptAny *ud = new CScriptAny(g_ScriptEngine);
-	ud->Store((void *)&user_data, StringType->GetTypeId());
-	CScriptArray *result = find(start_x, start_y, 0, parent_x, parent_y, 0, ud);
+	CScriptAny* ud = new CScriptAny(g_ScriptEngine);
+	ud->Store((void*)&user_data, StringType->GetTypeId());
+	CScriptArray* result = find(start_x, start_y, 0, parent_x, parent_y, 0, ud);
 	ud->Release();
 	return result;
 }
-float pathfinder::LeastCostEstimate(void *nodeStart, void *nodeEnd) {
+float pathfinder::LeastCostEstimate(void* nodeStart, void* nodeEnd) {
 	int start_x, start_y, start_z, end_x, end_y, end_z;
 	decode_state(nodeStart, &start_x, &start_y, &start_z);
 	decode_state(nodeEnd, &end_x, &end_y, &end_z);
@@ -294,7 +294,7 @@ float pathfinder::LeastCostEstimate(void *nodeStart, void *nodeEnd) {
 	else
 		return (abs(x) + abs(y) + abs(z));
 }
-void pathfinder::AdjacentCost(void *node, micropather::MPVector<micropather::StateCost> *neighbors) {
+void pathfinder::AdjacentCost(void* node, micropather::MPVector<micropather::StateCost>* neighbors) {
 	int x, y, z;
 	decode_state(node, &x, &y, &z);
 	const int dx[18] = {1, 1, 0, -1, -1, -1, 0, 1, 0, 0, 1, -1, 0, 0, 1, -1, 0, 0};
@@ -304,7 +304,7 @@ void pathfinder::AdjacentCost(void *node, micropather::MPVector<micropather::Sta
 		int nx = x + dx[i];
 		int ny = y + dy[i];
 		int nz = i >= 8 && i != 9 && i < 14 ? z + 1 : (i == 9 || i >= 14 ? z - 1 : z);
-		void *st = encode_state(nx, ny, nz, desperation_factor);
+		void* st = encode_state(nx, ny, nz, desperation_factor);
 		if (search_range > 0 && (nx < start_x - search_range || nx > start_x + search_range || ny < start_y - search_range || ny > start_y + search_range || nz < start_z - search_range || nz > start_z + search_range)) {
 			/*
 			micropather::StateCost cost={st, FLT_MAX};
@@ -319,7 +319,6 @@ void pathfinder::AdjacentCost(void *node, micropather::MPVector<micropather::Sta
 		// If we're in legacy (2D) mode, save some unnecessary calls into script by rejecting nonzero Z right here.
 		if (callback_mode == CALLBACK_LEGACY && (z != 0 || nz != 0))
 			continue;
-
 		float c = get_difficulty(nx, ny, nz, x, y, z);
 		if (c != FLT_MAX)
 			c++;
@@ -334,10 +333,10 @@ void pathfinder::AdjacentCost(void *node, micropather::MPVector<micropather::Sta
 	}
 }
 
-pathfinder *new_pathfinder(int size, bool cache) {
+pathfinder* new_pathfinder(int size, bool cache) {
 	return new pathfinder(size, cache);
 }
-void RegisterScriptPathfinder(asIScriptEngine *engine) {
+void RegisterScriptPathfinder(asIScriptEngine* engine) {
 	engine->RegisterObjectType("pathfinder", 0, asOBJ_REF | asOBJ_GC);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_FACTORY, "pathfinder @p(int = 1024, bool = true)", asFUNCTION(new_pathfinder), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_ADDREF, "void f()", asMETHOD(pathfinder, AddRef), asCALL_THISCALL);

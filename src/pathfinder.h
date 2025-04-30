@@ -33,7 +33,7 @@ public:
 	int x, y, z;
 };
 struct hashpoint_hash {
-	size_t operator()(const hashpoint &p) const {
+	size_t operator()(const hashpoint& p) const {
 		// Morton code hash function for 3D points with negative coordinate support provided by chat gpt.
 		// Translate the coordinates so that the minimum value is 0
 		const int min_xy = (p.x < p.y ? p.x : p.y);
@@ -41,7 +41,6 @@ struct hashpoint_hash {
 		const uint32_t x = static_cast<uint32_t>(p.x - min_coord);
 		const uint32_t y = static_cast<uint32_t>(p.y - min_coord);
 		const uint32_t z = static_cast<uint32_t>(p.z - min_coord);
-
 		// Interleave the bits of each coordinate
 		uint32_t xx = x;
 		uint32_t yy = y;
@@ -58,25 +57,24 @@ struct hashpoint_hash {
 		zz = (zz | (zz << 8)) & 0x0300F00F;
 		zz = (zz | (zz << 4)) & 0x030C30C3;
 		zz = (zz | (zz << 2)) & 0x09249249;
-
 		// Combine the interleaved bits into a single hash value and add back the minimum coordinate value
 		const size_t hash_val = static_cast<size_t>((xx << 2) | (yy << 1) | zz);
 		return hash_val + static_cast<size_t>(min_coord);
 	}
 };
 struct hashpoint_equals {
-	bool operator()(const hashpoint &lhs, const hashpoint &rhs) const {
+	bool operator()(const hashpoint& lhs, const hashpoint& rhs) const {
 		return (lhs.x == rhs.x) && (lhs.y == rhs.y) && (lhs.z == rhs.z);
 	}
 };
-typedef std::unordered_map<hashpoint, void *, hashpoint_hash, hashpoint_equals> hashpoint_map;
+typedef std::unordered_map<hashpoint, void*, hashpoint_hash, hashpoint_equals> hashpoint_map;
 typedef std::unordered_map<hashpoint, float, hashpoint_hash, hashpoint_equals> hashpoint_float_map;
 class pathfinder : public micropather::Graph {
 	hashpoint_float_map difficulty_cache[11];
-	micropather::MicroPather *pf;
+	micropather::MicroPather* pf;
 	int RefCount;
-	asIScriptFunction *callback;
-	CScriptAny *callback_data;
+	asIScriptFunction* callback;
+	CScriptAny* callback_data;
 	bool abort;
 	bool must_reset;
 	bool gc_flag;
@@ -94,26 +92,26 @@ public:
 	pathfinder(int size = 1024, bool cache = true);
 	int AddRef();
 	int Release();
-	void enum_references(asIScriptEngine *engine);
-	void release_all_handles(asIScriptEngine *engine);
+	void enum_references(asIScriptEngine* engine);
+	void release_all_handles(asIScriptEngine* engine);
 	int get_ref_count();
 	void set_gc_flag();
 	bool get_gc_flag();
-	void set_callback_function(asIScriptFunction *func); // Basic callback with only x, y, z, user_data.
-	void set_callback_function_ex(asIScriptFunction *func); // Advanced callback with x, y, z, parent_x, parent_y, parent_z, user_data.
-	void set_callback_function_legacy(asIScriptFunction *func); // 2D BGT legacy mode with string as user_data.
+	void set_callback_function(asIScriptFunction* func); // Basic callback with only x, y, z, user_data.
+	void set_callback_function_ex(asIScriptFunction* func); // Advanced callback with x, y, z, parent_x, parent_y, parent_z, user_data.
+	void set_callback_function_legacy(asIScriptFunction* func); // 2D BGT legacy mode with string as user_data.
 
-	float get_difficulty(void *state, void *parent_state);
+	float get_difficulty(void* state, void* parent_state);
 	float get_difficulty(int x, int y, int z, int parent_x, int parent_y, int parent_z);
 	void cancel();
 	void reset();
-	CScriptArray *find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny *data);
-	CScriptArray *find_legacy(int start_x, int start_y, int parent_x, int parent_y, std::string user_data);
-	virtual float LeastCostEstimate(void *nodeStart, void *nodeEnd);
-	virtual void AdjacentCost(void *node, micropather::MPVector<micropather::StateCost> *neighbors);
-	virtual void PrintStateInfo(void *state) {
+	CScriptArray* find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny* data);
+	CScriptArray* find_legacy(int start_x, int start_y, int parent_x, int parent_y, std::string user_data);
+	virtual float LeastCostEstimate(void* nodeStart, void* nodeEnd);
+	virtual void AdjacentCost(void* node, micropather::MPVector<micropather::StateCost>* neighbors);
+	virtual void PrintStateInfo(void* state) {
 		return;
 	}
 };
 
-void RegisterScriptPathfinder(asIScriptEngine *engine);
+void RegisterScriptPathfinder(asIScriptEngine* engine);
