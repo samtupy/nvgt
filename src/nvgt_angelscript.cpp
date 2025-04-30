@@ -568,6 +568,7 @@ void ConfigureEngineOptions(asIScriptEngine *engine) {
 	engine->SetEngineProperty(asEP_COMPILER_WARNINGS, config.getInt("scripting.compiler_warnings", 0)); // We must disable these by default for the sake of the megabytes of bgt code that exists.
 	engine->SetEngineProperty(asEP_HEREDOC_TRIM_MODE, config.getInt("scripting.heredoc_trim_mode", 1));
 	engine->SetEngineProperty(asEP_ALTER_SYNTAX_NAMED_ARGS, config.getInt("scripting.alter_syntax_named_args", 2));
+	engine->SetEngineProperty(asEP_MEMBER_INIT_MODE, config.getInt("scripting.member_init_mode", 0));
 }
 int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
 	Path global_include(Path(Path::self()).parent().append("include"));
