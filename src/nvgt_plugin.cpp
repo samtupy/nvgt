@@ -89,6 +89,9 @@ bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e, nvgt_
 	static_plugins->insert(std::make_pair(name, static_plugin_vtable {e, v}));
 	return true;
 }
+void list_loaded_nvgt_plugins(std::vector<std::string>& output) {
+	for (auto kv : loaded_plugins) output.push_back(kv.first);
+}
 
 bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
 	unsigned short count;

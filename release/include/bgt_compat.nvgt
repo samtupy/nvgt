@@ -302,7 +302,35 @@ string generate_computer_id(const string& in application_id, bool hardware_only)
 
 
 //dummy sound storage functions
+#if plugin_legacy_sound
+string get_sound_storage() {
+	return sound_storage;
+}
 
+pack@open_pack(const string&in filename) {
+	if (filename.is_empty()) return null;
+	pack p;
+	if (p.open(filename, PACK_OPEN_MODE_READ)) return p;
+	else return null;
+}
+
+bool set_sound_storage(const string&in filename, bool reset = false) {
+	if (reset and filename.is_empty()) {
+		@sound_default_pack = null;
+		sound_storage = "";
+	}
+	pack@p = open_pack(filename);
+	if (@p == null) return false;
+	@sound_default_pack = p;
+	sound_storage = filename;
+	return true;
+}
+
+bool set_sound_decryption_key(const string& in key, bool force_encryption) {
+	return (true);
+}
+#endif
+#if_not plugin_legacy_sound
 pack_file@open_pack(const string&in filename, const string&in key = "", bool force_encryption = false) {
 	if (filename.is_empty()) return null;
 	pack_file p;
@@ -327,6 +355,7 @@ string get_sound_storage() {
 	if(@sound_default_pack == null) return "";
 	return cast<pack_file@>(sound_default_pack).pack_name;
 }
+#endif
 
 // legacy generate_profile
 bool generate_profile(const string& in filename) {

@@ -924,6 +924,7 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void * /*u
 		string errmsg = "failed to load plugin";
 		if (!load_nvgt_plugin(cleanText.substr(7), &errmsg))
 			engine->WriteMessage(cleanText.substr(7).c_str(), -1, -1, asMSGTYPE_ERROR, errmsg.c_str());
+		else builder.DefineWord(Poco::format("plugin_%s", cleanText.substr(7)).c_str());
 	} else if (cleanText.starts_with("compiled_basename ")) {
 		string bn = cleanText.substr(18);
 		if (bn == "*")

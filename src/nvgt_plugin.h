@@ -218,6 +218,7 @@ inline bool prepare_plugin(nvgt_plugin_shared* shared) {
 #else
 #include <ios>
 #include <string>
+#include <vector>
 #include <stdio.h>
 #include "timestuff.h"
 #include "UI.h"
@@ -260,6 +261,7 @@ bool load_nvgt_plugin(const std::string& name, std::string* errmsg = nullptr, vo
 bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e, nvgt_plugin_version_func* v);
 bool load_serialized_nvgt_plugins(Poco::BinaryReader& br);
 void serialize_nvgt_plugins(Poco::BinaryWriter& bw);
+void list_loaded_nvgt_plugins(std::vector<std::string>& output);
 void unload_nvgt_plugins();
 // Boilerplate to make registering a static plugin in the nvgt_config.h file consist of a single pretty looking line.
 #ifndef static_plugin

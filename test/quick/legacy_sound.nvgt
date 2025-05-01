@@ -4,7 +4,7 @@
 
 #pragma namespace sound upcoming
 #pragma plugin legacy_sound
-using namespace legacy;
+//using namespace legacy;
 void main() {
 	sound s;
 	s.load("C:/windows/media/ding.wav");
