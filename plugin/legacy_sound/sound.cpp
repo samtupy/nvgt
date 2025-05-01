@@ -2000,7 +2000,7 @@ sound_environment* ScriptSound_Environment_Factory() {
 	return new sound_environment();
 }
 void RegisterScriptSound(asIScriptEngine* engine) {
-	engine->SetDefaultNamespace("legacy");
+	// engine->SetDefaultNamespace("legacy");
 	engine->RegisterGlobalProperty("pack@ sound_default_pack", &g_sound_default_pack);
 	engine->RegisterFuncdef(_O("void sound_close_callback(string)"));
 	engine->RegisterFuncdef(_O("uint sound_length_callback(string)"));
@@ -2016,7 +2016,7 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_RELEASE, "void f()", asMETHOD(legacy_sound, Release), asCALL_THISCALL);
 	engine->RegisterObjectProperty("sound", "const string loaded_filename", asOFFSET(legacy_sound, loaded_filename));
 	engine->RegisterObjectMethod("sound", "bool close()", asMETHOD(legacy_sound, close), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound", "bool load(const string &in filename, pack@ packfile = @legacy::sound_default_pack, bool allow_preloads = !system_is_mobile)", asMETHOD(legacy_sound, load), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound", "bool load(const string &in filename, pack@ packfile = @sound_default_pack, bool allow_preloads = !system_is_mobile)", asMETHOD(legacy_sound, load), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool load(sound_close_callback@, sound_length_callback@, sound_read_callback@, sound_seek_callback@, const string &in, const string&in = \"\")", asMETHOD(legacy_sound, load_script), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool load(string& data, uint size, const string&in preload_filename = \"\", bool legacy_encrypt = false)", asMETHOD(legacy_sound, load_memstream), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound", "bool load_url(const string &in url)", asMETHOD(legacy_sound, load_url), asCALL_THISCALL);
@@ -2095,7 +2095,7 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool get_sound_global_hrtf() property", asFUNCTION(get_global_hrtf), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_global_hrtf(bool) property", asFUNCTION(set_global_hrtf), asCALL_CDECL);
 	engine->RegisterGlobalProperty("mixer@ sound_default_mixer", &g_default_mixer);
-	engine->SetDefaultNamespace("");
+	// engine->SetDefaultNamespace("");
 }
 plugin_main(nvgt_plugin_shared* shared) {
 	prepare_plugin(shared);

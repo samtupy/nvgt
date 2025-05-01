@@ -582,7 +582,7 @@ legacy_pack* ScriptPack_Factory() {
 
 int packmode1 = PACK_OPEN_MODE_NONE, packmode2 = PACK_OPEN_MODE_APPEND, packmode3 = PACK_OPEN_MODE_CREATE, packmode4 = PACK_OPEN_MODE_READ;
 void RegisterScriptLegacyPack(asIScriptEngine* engine) {
-	engine->SetDefaultNamespace("legacy");
+	// engine->SetDefaultNamespace("legacy");
 	engine->RegisterGlobalProperty(_O("const int PACK_OPEN_MODE_NONE"), &packmode1);
 	engine->RegisterGlobalProperty(_O("const int PACK_OPEN_MODE_APPEND"), &packmode2);
 	engine->RegisterGlobalProperty(_O("const int PACK_OPEN_MODE_CREATE"), &packmode3);
@@ -614,5 +614,5 @@ void RegisterScriptLegacyPack(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_size(uint index) const"), asMETHOD(legacy_pack, stream_size_script), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("pack"), _O("bool get_active() const property"), asMETHOD(legacy_pack, is_active), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("pack"), _O("uint get_size() const property"), asMETHOD(legacy_pack, size), asCALL_THISCALL);
-	engine->SetDefaultNamespace("");
+	// engine->SetDefaultNamespace("");
 }
