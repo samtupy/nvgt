@@ -25,8 +25,8 @@
 // Helper functions that are shared with plugins.
 void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder) { return new datastream(stream, encoding, byteorder); }
 std::ios* nvgt_datastream_get_ios(void* stream) { return reinterpret_cast<datastream*>(stream)->get_iostr(); }
-#ifdef NVGT_STUB
-// We need a no-op wrapper for nvgt_bundle_shared_library which is only needed on script compilation and thus is not included in stubs.
+#if defined(NVGT_STUB) || defined(NVGT_MOBILE)
+// We need a no-op wrapper for nvgt_bundle_shared_library which is only needed on script compilation and thus is not included in stubs or mobile platforms.
 void nvgt_bundle_shared_library(const std::string& libname) {}
 #endif
 typedef struct {
