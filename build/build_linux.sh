@@ -124,7 +124,7 @@ function main {
 	cd deps
 	
 	# Insure required packages are installed for building.
-	sudo apt install build-essential gcc g++ make cmake autoconf libtool python3 python3-pip libssl-dev libsystemd-dev libspeechd-dev libogg-dev libvorbis-dev -y
+	sudo apt install build-essential gcc g++ make cmake autoconf libtool python3 python3-pip libssl-dev libsystemd-dev libspeechd-dev libogg-dev libvorbis-dev python3-venv -y
 	
 	setup_angelscript
 	setup_reactphysics

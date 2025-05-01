@@ -11,6 +11,7 @@
  */
 #pragma once
 #include <istream>
+#include <memory>
 #include <mutex>
 typedef std::shared_ptr<const void> directive_t;
 struct sound_service_vfs;

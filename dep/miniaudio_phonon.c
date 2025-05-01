@@ -1,6 +1,7 @@
 // Initially, much of this code was taken and then modified from the already existing engine_phonon.c file provided with miniaudio.
 
 #include <string.h>
+#include <stdint.h>
 #include "miniaudio_phonon.h"
 
 static ma_result ma_result_from_IPLerror(IPLerror error)
