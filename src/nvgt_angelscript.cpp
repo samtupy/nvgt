@@ -398,14 +398,16 @@ int PreconfigureEngine(asIScriptEngine* engine) {
 	engine->BeginConfigGroup("random");
 	RegisterScriptRandom(engine); // Must be done here because functions in this module register array methods and that won't work after array template types are instantiated.
 	engine->EndConfigGroup();
+	RegisterStdStringUtils(engine);
+	RegisterScriptDictionary(engine);
+	engine->BeginConfigGroup("datastreams");
+	RegisterScriptDatastreams(engine);
+	engine->EndConfigGroup();
 	return 0;
 }
 // Registrations in the following function are usually done in alphabetical order, with some exceptions involving one subsystem depending on another. For example the internet subsystem registers functions that take timespans, meaning that timestuff gets registered before internet.
 int ConfigureEngine(asIScriptEngine *engine) {
 	engine->BeginConfigGroup("core");
-	RegisterStdStringUtils(engine);
-	RegisterScriptDictionary(engine);
-	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	RegisterScriptGrid(engine);
 	RegisterScriptHandle(engine);
@@ -428,9 +430,6 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("crypto");
 	RegisterScriptCrypto(engine);
-	engine->EndConfigGroup();
-	engine->BeginConfigGroup("datastreams");
-	RegisterScriptDatastreams(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
 	engine->BeginConfigGroup("hash");
