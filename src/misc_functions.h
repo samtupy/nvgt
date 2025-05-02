@@ -20,6 +20,7 @@ BOOL ChDir(const std::string& d);
 double range_convert(double old_value, double old_min, double old_max, double new_min, double new_max);
 float parse_float(const std::string& val);
 double parse_double(const std::string& val);
+bool is_valid_utf8(const std::string &text, bool ban_ascii_special = true);
 class refstring {
 public:
 	int RefCount;

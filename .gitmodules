@@ -1,3 +1,4 @@
 [submodule "extra"]
 	path = extra
 	url = https://github.com/samtupy/nvgt_extra
+branch = master

@@ -18,8 +18,9 @@
 #endif
 #include <angelscript.h>
 #include <iostream>
+#include <string>
 
-#define NVGT_PLUGIN_API_VERSION 1
+#define NVGT_PLUGIN_API_VERSION 2
 
 // Subsystem flags, used for controling access to certain functions during development.
 enum NVGT_SUBSYSTEM {
@@ -47,7 +48,7 @@ enum NVGT_SUBSYSTEM {
 	NVGT_SUBSYSTEM_SCRIPTING_SANDBOX = NVGT_SUBSYSTEM_GENERAL | NVGT_SUBSYSTEM_DATA | NVGT_SUBSYSTEM_DATETIME
 };
 
-// Angelscript function prototypes:
+// Function prototypes:
 typedef const char* t_asGetLibraryVersion();
 typedef const char* t_asGetLibraryOptions();
 typedef asIScriptContext* t_asGetActiveContext();
@@ -64,6 +65,12 @@ typedef void t_asFreeMem(void*);
 typedef void AS_CALL(void*);
 typedef void* t_nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
 typedef std::ios* t_nvgt_datastream_get_ios(void* stream);
+typedef void t_nvgt_bundle_shared_library(const std::string& libname);
+typedef void t_wait(int ms);
+typedef void t_refresh_window();
+typedef uint64_t t_ticks(bool secure);
+typedef uint64_t t_microticks(bool secure);
+typedef bool t_running_on_mobile();
 
 typedef struct {
 	int version;
@@ -82,6 +89,12 @@ typedef struct {
 	t_asFreeMem* f_asFreeMem;
 	t_nvgt_datastream_create* f_nvgt_datastream_create;
 	t_nvgt_datastream_get_ios* f_nvgt_datastream_get_ios;
+	t_nvgt_bundle_shared_library* f_nvgt_bundle_shared_library;
+	t_wait* f_wait;
+	t_refresh_window* f_refresh_window;
+	t_ticks* f_ticks;
+	t_microticks* f_microticks;
+	t_running_on_mobile* f_running_on_mobile;
 	asIScriptEngine* script_engine;
 	asIThreadManager* script_thread_manager;
 	void* user;
@@ -89,26 +102,33 @@ typedef struct {
 
 // Function prototype for a plugin's entry point.
 typedef bool nvgt_plugin_entry(nvgt_plugin_shared*);
+typedef int nvgt_plugin_version_func();
 
 #ifndef NVGT_BUILDING
-// If this macro is not defined, this header is being included from within a plugin that will receive pointers to needed angelscript functions from the main NVGT application.
+// If this macro is not defined, this header is being included from within a plugin that will receive pointers to needed functions from the main NVGT application.
 #ifndef NVGT_PLUGIN_STATIC // Code that only executes for dll plugins.
 	#if !defined(NVGT_PLUGIN_INCLUDE)
-		t_asGetLibraryVersion* asGetLibraryVersion = NULL;
-		t_asGetLibraryOptions* asGetLibraryOptions = NULL;
-		t_asGetActiveContext* asGetActiveContext = NULL;
-		t_asPrepareMultithread* asPrepareMultithread = NULL;
-		t_asAcquireExclusiveLock* asAcquireExclusiveLock = NULL;
-		t_asReleaseExclusiveLock* asReleaseExclusiveLock = NULL;
-		t_asAcquireSharedLock* asAcquireSharedLock = NULL;
-		t_asReleaseSharedLock* asReleaseSharedLock = NULL;
-		t_asAtomicInc* asAtomicInc = NULL;
-		t_asAtomicDec* asAtomicDec = NULL;
-		t_asThreadCleanup* asThreadCleanup = NULL;
-		t_asAllocMem* asAllocMem = NULL;
-		t_asFreeMem* asFreeMem = NULL;
-		t_nvgt_datastream_create* nvgt_datastream_create = NULL;
-		t_nvgt_datastream_get_ios* nvgt_datastream_get_ios = NULL;
+		t_asGetLibraryVersion* asGetLibraryVersion = nullptr;
+		t_asGetLibraryOptions* asGetLibraryOptions = nullptr;
+		t_asGetActiveContext* asGetActiveContext = nullptr;
+		t_asPrepareMultithread* asPrepareMultithread = nullptr;
+		t_asAcquireExclusiveLock* asAcquireExclusiveLock = nullptr;
+		t_asReleaseExclusiveLock* asReleaseExclusiveLock = nullptr;
+		t_asAcquireSharedLock* asAcquireSharedLock = nullptr;
+		t_asReleaseSharedLock* asReleaseSharedLock = nullptr;
+		t_asAtomicInc* asAtomicInc = nullptr;
+		t_asAtomicDec* asAtomicDec = nullptr;
+		t_asThreadCleanup* asThreadCleanup = nullptr;
+		t_asAllocMem* asAllocMem = nullptr;
+		t_asFreeMem* asFreeMem = nullptr;
+		t_nvgt_datastream_create* nvgt_datastream_create = nullptr;
+		t_nvgt_datastream_get_ios* nvgt_datastream_get_ios = nullptr;
+		t_nvgt_bundle_shared_library* nvgt_bundle_shared_library = nullptr;
+		t_wait* nvgt_wait = nullptr;
+		t_refresh_window* refresh_window = nullptr;
+		t_ticks* ticks = nullptr;
+		t_microticks* microticks = nullptr;
+		t_running_on_mobile* running_on_mobile = nullptr;
 	#else // If an angelscript addon includes nvgt_plugin.h, set NVGT_PLUGIN_INCLUDE to prevent these symbols from being defined multiple times.
 		extern t_asGetLibraryVersion* asGetLibraryVersion;
 		extern t_asGetLibraryOptions* asGetLibraryOptions;
@@ -125,14 +145,32 @@ typedef bool nvgt_plugin_entry(nvgt_plugin_shared*);
 		extern t_asFreeMem* asFreeMem;
 		extern t_nvgt_datastream_create* nvgt_datastream_create;
 		extern t_nvgt_datastream_get_ios* nvgt_datastream_get_ios;
+		extern t_nvgt_bundle_shared_library* nvgt_bundle_shared_library;
+		extern t_wait* nvgt_wait;
+		extern t_refresh_window* refresh_window;
+		extern t_ticks* ticks;
+		extern t_microticks* microticks;
+		extern t_running_on_mobile* running_on_mobile;
 	#endif
+#elif (!defined(NVGT_BUILDING))
+	// Any functions we want to expose from NVGT rather than Angelscript must be forward declared here, we only get to skip the Angelscript ones because we include angelscript.h. NVGT headers might not be available to a plugin developer.
+	void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
+	std::ios* nvgt_datastream_get_ios(void* stream);
+	void nvgt_bundle_shared_library(const std::string& libname);
+	void wait(int ms);
+	inline void nvgt_wait(int ms) { wait(ms); }
+	void refresh_window();
+	uint64_t ticks(bool secure = true);
+	uint64_t microticks(bool secure = true);
+	bool running_on_mobile();
 #endif
-// Macro to ease the definition of a plugin's entry point. If this plugin is compiled as a static library then the entry point is called nvgt_plugin_%plugname% where as a dll just calls it nvgt_plugin and externs it.
+// Macro to ease the definition of a plugin's entry point. If this plugin is compiled as a static library then the entry point is called nvgt_plugin_%plugname% where as a dll just calls it nvgt_plugin and externs it. We also define nvgt_plugin_version() here.
 #ifndef plugin_main
 	#ifdef NVGT_PLUGIN_STATIC
 		#define CONCAT(x, y) x##y
 		#define XCONCAT(x, y) CONCAT(x, y) // Yes both CONCAT functions are needed for correct macro expansion below.
 		#define plugin_main bool XCONCAT(nvgt_plugin_, NVGT_PLUGIN_STATIC)
+		#define plugin_version int XCONCAT(nvgt_plugin_version_, NVGT_PLUGIN_STATIC)
 	#else
 		#ifdef _WIN32
 			#define plugin_export __declspec(dllexport)
@@ -142,6 +180,10 @@ typedef bool nvgt_plugin_entry(nvgt_plugin_shared*);
 			#define plugin_export
 		#endif
 		#define plugin_main extern "C" plugin_export bool nvgt_plugin
+		#define plugin_version extern "C" plugin_export int nvgt_plugin_version
+	#endif
+	#ifndef NVGT_PLUGIN_INCLUDE
+		plugin_version() { return NVGT_PLUGIN_API_VERSION; }
 	#endif
 #endif
 // Pass a pointer to an nvgt_plugin_shared structure to this function, making Angelscript available for use in any file that includes nvgt_plugin.h after calling this function.
@@ -163,6 +205,12 @@ inline bool prepare_plugin(nvgt_plugin_shared* shared) {
 	asFreeMem = shared->f_asFreeMem;
 	nvgt_datastream_create = shared->f_nvgt_datastream_create;
 	nvgt_datastream_get_ios = shared->f_nvgt_datastream_get_ios;
+	nvgt_bundle_shared_library = shared->f_nvgt_bundle_shared_library;
+	nvgt_wait = shared->f_wait;
+	refresh_window = shared->f_refresh_window;
+	ticks = shared->f_ticks;
+	microticks = shared->f_microticks;
+	running_on_mobile = shared->f_running_on_mobile;
 	asPrepareMultithread(shared->script_thread_manager);
 	#endif
 	return true;
@@ -170,9 +218,14 @@ inline bool prepare_plugin(nvgt_plugin_shared* shared) {
 #else
 #include <ios>
 #include <string>
+#include <vector>
 #include <stdio.h>
+#include "timestuff.h"
+#include "UI.h"
+#include "xplatform.h"
 void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
 std::ios* nvgt_datastream_get_ios(void* stream);
+void nvgt_bundle_shared_library(const std::string& libname);
 
 // This function prepares an nvgt_plugin_shared structure for passing to a plugins entry point. Sane input expected, no error checking.
 inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* engine, void* user = NULL) {
@@ -192,16 +245,23 @@ inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* e
 	shared->f_asFreeMem = asFreeMem;
 	shared->f_nvgt_datastream_create = nvgt_datastream_create;
 	shared->f_nvgt_datastream_get_ios = nvgt_datastream_get_ios;
+	shared->f_nvgt_bundle_shared_library = nvgt_bundle_shared_library;
+	shared->f_wait = wait;
+	shared->f_refresh_window = refresh_window;
+	shared->f_ticks = ticks;
+	shared->f_microticks = microticks;
+	shared->f_running_on_mobile = running_on_mobile;
 	shared->script_engine = engine;
 	shared->script_thread_manager = asGetThreadManager();
 	shared->user = user;
 }
 // Forward declarations only needed when compiling for nvgt and not for a plugin, thus the following functions are in nvgt_plugin.cpp.
 namespace Poco { class BinaryReader; class BinaryWriter; }
-bool load_nvgt_plugin(const std::string& name, void* user = NULL);
-bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e);
+bool load_nvgt_plugin(const std::string& name, std::string* errmsg = nullptr, void* user = NULL);
+bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e, nvgt_plugin_version_func* v);
 bool load_serialized_nvgt_plugins(Poco::BinaryReader& br);
 void serialize_nvgt_plugins(Poco::BinaryWriter& bw);
+void list_loaded_nvgt_plugins(std::vector<std::string>& output);
 void unload_nvgt_plugins();
 // Boilerplate to make registering a static plugin in the nvgt_config.h file consist of a single pretty looking line.
 #ifndef static_plugin
@@ -210,15 +270,35 @@ void unload_nvgt_plugins();
 #else
 class static_plugin_loader {
 public:
-	static_plugin_loader(const std::string& name, nvgt_plugin_entry* e) {
-		register_static_plugin(name, e);
+	static_plugin_loader(const std::string& name, nvgt_plugin_entry* e, nvgt_plugin_version_func* v) {
+		register_static_plugin(name, e, v);
 	}
 };
 #define static_plugin(name) \
 	extern bool nvgt_plugin_##name(nvgt_plugin_shared*); \
-	static_plugin_loader nvgt_plugin_static_##name(#name, &nvgt_plugin_##name);
+	extern int nvgt_plugin_version_##name(); \
+	static_plugin_loader nvgt_plugin_static_##name(#name, &nvgt_plugin_##name, &nvgt_plugin_version_##name);
 #endif
 #endif
 
 #endif // NVGT_BUILDING
 
+// This class must be derived from for any custom pack or vfs objects that wish to integrate with NVGT's sound system.
+class pack_interface {
+	mutable int refcount;
+	public:
+	pack_interface() : refcount(1) {}
+	virtual ~pack_interface() = default;
+	void duplicate() const { asAtomicInc(refcount); }
+	void release() const { if (asAtomicDec(refcount) < 1) delete this; }
+	virtual const pack_interface* make_immutable() const = 0;
+	virtual const pack_interface* get_mutable() const = 0;
+	virtual std::istream* get_file(const std::string& filename) const { return nullptr; }
+	virtual const std::string get_pack_name() const { return ""; }
+	template <class A, class B> static B* op_cast(A* from) {
+		B* casted = dynamic_cast<B*>(from);
+		if (!casted) return nullptr;
+		casted->duplicate();
+		return casted;
+	}
+};

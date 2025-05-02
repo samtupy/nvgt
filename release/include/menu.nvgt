@@ -15,6 +15,7 @@
 
 class menu {
 	funcdef void menu_callback(menu@, string);
+	funcdef void menu_item_selected_callback(menu@, int);
 	audio_form form; // Only access if really needed.
 	// All properties from this point can be freely set while using this class. If a variable is marked as private and begins with an underscore, it only means that public getters and setters with the same name minus the prefixed underscore exist later in the class.
 	string intro_text; // Spoken when the void intro() function is called.
@@ -28,6 +29,7 @@ class menu {
 	string sounds_suffix; // The value set here is appended to any sound filenames that are loaded. A value could be .ogg, for example.
 	menu_callback@ background_callback = null; // A function called every time the monitor() method of this class is called.
 	string background_callback_data;
+	menu_item_selected_callback@ item_selected_callback = null; // If set, this callback will fire as a menu item is being selected. It isn't intended to halt selection, but allows you to react before the menu item is spoken such as if you are coding a voice selection menu.
 	dictionary user_data; // Optional data for this menu that you can do anything you want with, such as storing an extra identifier or piece of information your script wants to use in regards to this menu.
 	bool wrap = false; // If the user moves beyond an edge of the menu, set this to true to jump them to the other edge, or false to play an edge sound and repeat the last item.
 	uint wrap_delay = 10; // How much time should the menu block when wrapping.
@@ -38,7 +40,7 @@ class menu {
 	private bool _allow_escape = true; // If set to false, the user must click on an option manually and will not be able to use escape to exit the menu.
 	private bool _allow_go_to_index = true; // If set to false, the user can no longer press ctrl+g to select a menu item by number.
 	private bool _allow_search = true; // If set to false, the user can no longer press ctrl+f to search for an item in the menu by text.
-	pack@ pack_file; // Optionally set this to a pack containing sounds.
+	pack_file@ pack_file; // Optionally set this to a pack containing sounds.
 	menu() {
 		reset();
 	}
@@ -79,11 +81,11 @@ class menu {
 		if (position == -1) position = form.get_list_count(f_list) -1;
 		return position;
 	}
-	void add_items(string[]@ item_list) {
+	void add_items(const string[]@ item_list) {
 		for (uint i = 0; i < item_list.length(); i++) add_item(item_list[i]);
 	}
 	bool delete_item(int index, bool reset_cursor = true) {
-		return form.delete_list_item(f_list, index, reset_cursor);
+		return form.delete_list_item(f_list, index, reset_cursor, false);
 	}
 	// Call this function to produce the intro sequence for the menu. You don't need to call it at all, if you like.
 	void intro() {
@@ -213,10 +215,13 @@ class menu {
 			play(wrap_sound);
 			stop_speech();
 			wait(wrap_delay);
-			f.set_list_position(f_list, int(args["key"]) == KEY_DOWN? 0 : f.get_list_count(0) -1, true);
+			int pos = int(args["key"]) == KEY_DOWN? 0 : f.get_list_count(0) -1;
+			if (@item_selected_callback != null) item_selected_callback(this, pos);
+			f.set_list_position(f_list, pos, true);
 			return 1;
 		}
 		play(click_sound);
+		if (@item_selected_callback != null) item_selected_callback(this, f.get_list_position(c));
 		return 0;
 	}
 }

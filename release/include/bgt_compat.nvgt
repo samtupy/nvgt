@@ -259,9 +259,11 @@ bool screen_reader_stop_speech(int reader) {
 
 //hashing
 string string_hash(const string& in data, int algorithm, bool binary) {
-	if (algorithm == 1) return (string_hash_sha256(data, binary));
-	if (algorithm == 2) return (string_hash_sha512(data, binary));
-	return ("");
+	string hash;
+	if (algorithm == 1) hash = string_hash_sha256(data, binary);
+	if (algorithm == 2) hash = string_hash_sha512(data, binary);
+	if (!binary) hash.upper_this();
+	return hash;
 }
 string file_hash(const string& in filename, int algorithm, bool binary) {
 	file f;
@@ -300,7 +302,7 @@ string generate_computer_id(const string& in application_id, bool hardware_only)
 
 
 //dummy sound storage functions
-
+#if plugin_legacy_sound
 string get_sound_storage() {
 	return sound_storage;
 }
@@ -327,6 +329,33 @@ bool set_sound_storage(const string&in filename, bool reset = false) {
 bool set_sound_decryption_key(const string& in key, bool force_encryption) {
 	return (true);
 }
+#endif
+#if_not plugin_legacy_sound
+pack_file@open_pack(const string&in filename, const string&in key = "", bool force_encryption = false) {
+	if (filename.is_empty()) return null;
+	pack_file p;
+	if (p.open(filename, key)) return p;
+	else {
+		if(force_encryption) return null;
+		if(p.open(filename, "")) return p;
+	}
+	return null;
+}
+bool set_sound_storage(const string&in filename, const string&in key = "", bool force_encryption = false, bool reset = false) {
+	if (reset and filename.is_empty()) {
+		@sound_default_pack = null;
+		sound_storage = "";
+	}
+	pack_file@p = open_pack(filename, key, force_encryption);
+	if(@p == null) return false;
+	@sound_default_pack = p;
+	return true;
+}
+string get_sound_storage() {
+	if(@sound_default_pack == null) return "";
+	return cast<pack_file@>(sound_default_pack).pack_name;
+}
+#endif
 
 // legacy generate_profile
 bool generate_profile(const string& in filename) {

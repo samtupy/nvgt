@@ -60,9 +60,7 @@ void stop_speech() {
 }
 
 string tts_dump_config(tts_voice@ v, bool save_screen_reader_setting = false) {
-	string o;
-	if (v.voice < 0) return "default";
-	else o = v.get_voice_name(v.voice) + "||";
+	string o = v.get_voice_name(v.voice) + "||";
 	if (o == "||") o = "default||";
 	o += v.rate + "||0||" + v.volume;
 	if (save_screen_reader_setting) o += "||" + (use_sr? "1" : "0");
@@ -70,7 +68,6 @@ string tts_dump_config(tts_voice@ v, bool save_screen_reader_setting = false) {
 }
 bool tts_load_config(string c, tts_voice@ v) {
 	string[] args = c.split("||");
-	if (args[0] == "default") return true;
 	if (args.length() < 4) return false;
 	if (args[0] != "default") {
 		string[]@ V = v.list_voices();

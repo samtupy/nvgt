@@ -4,8 +4,9 @@
 # license: zlib
 
 Import("env")
+#env.Append(CPPDEFINES = ["WDL_ALLOW_UNSIGNED_DEFAULT_CHAR"])
 
-sources = ["aes.c", "cmp.c", "micropather.cpp", "rng_get_bytes.c", "singleheader.cpp", "sonic.c", "tinyexpr.c", "uncompr.c"]
+sources = ["aes.c", "cmp.c", "ma_reverb_node.c", "micropather.cpp", "miniaudio.c", "miniaudio_libvorbis.c", "miniaudio_phonon.c", "miniaudio_wdl_resampler.cpp", "monocypher.c", "resample.cpp", "rng_get_bytes.c", "singleheader.cpp", "sonic.c", "tinyexpr.c", "uncompr.c"]
 if env["PLATFORM"] == "win32":
 	sources += ["blastspeak.c", "InputBox.cpp", "vs_version.cpp"]
 env.StaticLibrary("#build/lib/deps", sources, CPPDEFINES = ["_LIB"])
