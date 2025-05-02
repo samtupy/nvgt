@@ -80,6 +80,18 @@ std::string random_character(const std::string& min, std::string& max) {
 void* random_choice(CScriptArray* array) {
 	return array->At(random(0, array->GetSize() -1));
 }
+void random_shuffle(CScriptArray* array) {
+	if (array->GetSize() < 2) return;
+	// Angelscript doesn't make it easy to copy and manipulate objects from the c++ side, For example it's own array implementation's SetValue method is like 63 lines of code and it does not have a swap method. We instead opt to resize the array to size+1 and use the temporary slot for swapping before removing it after the shuffle.
+	array->Resize(array->GetSize() + 1);
+	for (asUINT i = array->GetSize() -2; i > 0; i--) {
+		int j = random(0, i);
+		array->SetValue(array->GetSize() -1, array->At(i));
+		array->SetValue(i, array->At(j));
+		array->SetValue(j, array->At(array->GetSize() -1));
+	}
+	array->Resize(array->GetSize() -1);
+}
 void rnd_pcg_construct(rnd_pcg_t* r) {
 	rnd_pcg_seed(r, random_seed());
 }
@@ -116,6 +128,7 @@ void RegisterScriptRandom(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool random_bool(int = 50)"), asFUNCTION(random_bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string random_character(const string& in, const string& in)"), asFUNCTION(random_character), asCALL_CDECL);
 	engine->RegisterObjectMethod(_O("array<T>"), _O("const T& random() const"), asFUNCTION(random_choice), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("array<T>"), _O("void shuffle()"), asFUNCTION(random_shuffle), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectType(_O("random_pcg"), sizeof(rnd_pcg_t), asOBJ_VALUE | asOBJ_POD);
 	engine->RegisterObjectBehaviour(_O("random_pcg"), asBEHAVE_CONSTRUCT, _O("void f()"), WRAP_OBJ_FIRST(rnd_pcg_construct), asCALL_GENERIC);
 	engine->RegisterObjectBehaviour(_O("random_pcg"), asBEHAVE_CONSTRUCT, _O("void f(uint)"), WRAP_OBJ_FIRST(rnd_pcg_seed), asCALL_GENERIC);

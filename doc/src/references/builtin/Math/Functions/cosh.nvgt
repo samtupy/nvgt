@@ -4,7 +4,7 @@
 	## Arguments:
 		* double x: The value whose hyperbolic cosine is to be calculated.
 	## Returns:
-		The hyperbolic cosine of the given value.
+		double: the hyperbolic cosine of the given value.
 */
 
 // Example:

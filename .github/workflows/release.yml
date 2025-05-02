@@ -1,36 +1,42 @@
 name: release
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - "*"
 
 jobs:
   mac_build:
     runs-on: macos-14
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: true
     - name: build
       run: |
-        pip3 install scons
         cp build/build_macos.sh .
         sudo chmod +x build_macos.sh
         ./build_macos.sh ci
-        cd release
-        tar -czf ../mac_release.tar.gz *
-        cd ..
-        curl -u "${{secrets.CIFTP}}" -s -T mac_release.tar.gz ftp://nvgt.gg
+    - uses: actions/upload-artifact@v4
+      with:
+        name: mac_release
+        path: 'release'
 
   linux_build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: true
     - name: build
       run: |
         pip3 install scons
         sudo chmod +x build/build_linux.sh
         ./build/build_linux.sh ci
-        cd release
-        tar -czf ../linux_release.tar.gz *
-        cd ..
-        curl -u "${{secrets.CIFTP}}" -s -T linux_release.tar.gz ftp://nvgt.gg
+    - uses: actions/upload-artifact@v4
+      with:
+        name: linux_release
+        path: 'release'
 
   android_build:
     runs-on: ubuntu-latest
@@ -46,9 +52,21 @@ jobs:
         ndk-version: r25c
         link-to-sdk: true
         add-to-path: true
-    - name: set_version
+    - name: keystore_official
+      if: github.event.repository.fork == false
       run: |
-        python3 build/ci_set_version.py
+        cd jni
+        echo "${{secrets.ANDROID_RUNNER_KEYSTORE}}" > android_enc.keystore
+        cat android_enc.keystore | base64 -d > android.keystore
+        echo "ANDROID_RUNNER_KEYSTORE_PW=${{secrets.ANDROID_RUNNER_KEYSTORE_PW}}" >> $GITHUB_ENV
+        cd ..
+    - name: keystore_unofficial
+      if: github.event.repository.fork == true
+      run: |
+        cd jni
+        keytool -genkey -keyalg RSA -keysize 2048 -v -keystore android.keystore -dname cn=NVGT -storepass Android1422207 -validity 10000 -alias app
+        echo "ANDROID_RUNNER_KEYSTORE_PW=Android1422207">>$GITHUB_ENV
+        cd ..
     - name: build
       run: |
         curl -s -O https://nvgt.gg/droidev.zip
@@ -56,18 +74,20 @@ jobs:
         cd droidev
         unzip -q ../droidev.zip
         cd ../jni
-        echo "${{secrets.ANDROID_RUNNER_KEYSTORE}}" > android_enc.keystore
-        cat android_enc.keystore | base64 -d > android.keystore
-        ./gradlew assembleRunnerRelease AssembleStubRelease --no-daemon -Pandroid.injected.signing.store.file=android.keystore -Pandroid.injected.signing.store.password=${{secrets.ANDROID_RUNNER_KEYSTORE_PW}} -Pandroid.injected.signing.key.alias=app -Pandroid.injected.signing.key.password="${{secrets.ANDROID_RUNNER_KEYSTORE_PW}}"
-        mv build/outputs/apk/runner/release/nvgt-runner-release.apk ../nvgt_$nvgt_version.apk
+        ./gradlew assembleRunnerRelease AssembleStubRelease --no-daemon -Pandroid.injected.signing.store.file=android.keystore -Pandroid.injected.signing.store.password=${{env.ANDROID_RUNNER_KEYSTORE_PW}} -Pandroid.injected.signing.key.alias=app -Pandroid.injected.signing.key.password="${{env.ANDROID_RUNNER_KEYSTORE_PW}}"
+        mv build/outputs/apk/runner/release/nvgt-runner-release.apk ../release/nvgt.apk
         cd ..
-        curl -u "${{secrets.CIFTP}}" -s -T nvgt_$nvgt_version.apk ftp://nvgt.gg
-        curl -u "${{secrets.CIFTP}}" -s -T release/stub/nvgt_android.bin ftp://nvgt.gg
+    - uses: actions/upload-artifact@v4
+      with:
+        name: android_release
+        path: 'release'
 
   windows_build:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: true
     - name: build
       run: |
         pip3 install scons
@@ -75,26 +95,24 @@ jobs:
         curl -s -O https://nvgt.gg/windev.zip
         7z x windev.zip -owindev
         scons -s no_upx=0
-        cd release
-        tar -czf ../windows_release.tar.gz *
-        cd ..
-        curl -u "${{secrets.CIFTP}}" -s -T windows_release.tar.gz ftp://nvgt.gg
+    - uses: actions/upload-artifact@v4
+      with:
+        name: windows_release
+        path: 'release'
 
   windows_package:
     runs-on: windows-latest
     needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+    - name: set_version
+      run: |
+        python3 build/ci_set_version.py
     - name: package
       run: |
-        curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/mac_release.tar.gz
-        curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/linux_release.tar.gz
-        curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/windows_release.tar.gz
-        mkdir linux_release
-        tar -xzf linux_release.tar.gz -C linux_release
-        mkdir mac_release
-        tar -xzf mac_release.tar.gz -C mac_release
-        tar -xzf windows_release.tar.gz -C release
+        rm -r release
+        mv windows_release release
         cd doc
         pip3 install -r requirements.txt
         cd OSL
@@ -102,30 +120,32 @@ jobs:
         cd ..
         python3 docgen.py
         cd ..
+        cp android_release/stub/* release/stub
         cp -r linux_release/lib release/lib_linux
         cp linux_release/stub/* release/stub
         cp -r mac_release/lib release/lib_mac
         cp mac_release/stub/* release/stub
-        curl -s -o release/stub/nvgt_android.bin -u "${{secrets.CIFTP}}" ftp://nvgt.gg/nvgt_android.bin
         cd install
         iscc nvgt.iss
-        python3 upload_windows_installer.py ${{secrets.CIFTP}}
+        cd ..
+    - uses: actions/upload-artifact@v4
+      with:
+        name: windows_package
+        path: 'install/nvgt_${{env.nvgt_version}}.exe'
 
   mac_package:
     runs-on: macos-latest
     needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+    - name: set_version
+      run: |
+        python3 build/ci_set_version.py
     - name: package
       run: |
-        curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/mac_release.tar.gz
-        curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/linux_release.tar.gz
-        curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/windows_release.tar.gz
-        mkdir linux_release
-        tar -xzf linux_release.tar.gz -C linux_release
-        mkdir windows_release
-        tar -xzf windows_release.tar.gz -C windows_release
-        tar -xzf mac_release.tar.gz -C release
+        rm -r release
+        mv mac_release release
         cd doc
         pip3 install --user -r requirements.txt --break-system-packages
         cd OSL
@@ -133,32 +153,31 @@ jobs:
         cd ..
         python3 docgen.py
         cd ..
+        cp android_release/stub/* release/stub
         cp -r linux_release/lib release/lib_linux
         cp linux_release/stub/* release/stub
         cp -r windows_release/lib release/lib_windows
         cp windows_release/stub/* release/stub
-        curl -s -o release/stub/nvgt_android.bin -u "${{secrets.CIFTP}}" ftp://nvgt.gg/nvgt_android.bin
         cd install
-        python3 make_dmg.py ../release ${{secrets.CIFTP}}
+        python3 make_dmg.py ../release
+    - uses: actions/upload-artifact@v4
+      with:
+        name: mac_package
+        path: 'install/nvgt_${{env.nvgt_version}}.dmg'
 
   linux_package:
     runs-on: ubuntu-latest
     needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
     - name: set_version
       run: |
         python3 build/ci_set_version.py
     - name: package
       run: |
-        curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/mac_release.tar.gz
-        curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/linux_release.tar.gz
-        curl -s -O -u "${{secrets.CIFTP}}" ftp://nvgt.gg/windows_release.tar.gz
-        mkdir mac_release
-        tar -xzf mac_release.tar.gz -C mac_release
-        mkdir windows_release
-        tar -xzf windows_release.tar.gz -C windows_release
-        tar -xzf linux_release.tar.gz -C release
+        rm -r release
+        mv linux_release release
         python3 -m venv venv --upgrade-deps
         chmod +x venv/bin/activate
         source ./venv/bin/activate
@@ -169,25 +188,48 @@ jobs:
         cd ..
         python3 docgen.py
         cd ..
+        cp android_release/stub/* release/stub
         cp -r mac_release/lib release/lib_mac
         cp mac_release/stub/* release/stub
         cp -r windows_release/lib release/lib_windows
         cp windows_release/stub/* release/stub
-        curl -s -o release/stub/nvgt_android.bin -u "${{secrets.CIFTP}}" ftp://nvgt.gg/nvgt_android.bin
         cd release
         tar -czf "../nvgt_$nvgt_version.tar.gz" *
         cd ..
-        curl -u "${{secrets.CIFTP}}" -s -T "nvgt_$nvgt_version.tar.gz" ftp://nvgt.gg
+    - uses: actions/upload-artifact@v4
+      with:
+        name: linux_package
+        path: 'nvgt_${{env.nvgt_version}}.tar.gz'
 
-  final_package:
+  publish_release:
     runs-on: ubuntu-latest
     needs: ["windows_package", "mac_package", "linux_package"]
-    if: github.ref_name == 'main'
+    if: github.ref_type == 'tag' && github.event.repository.fork == false
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: '*_package'
+    - uses: actions/download-artifact@v4
+      with:
+        name: android_release
+        path: android_release
     - name: set_version
       run: |
         python3 build/ci_set_version.py
     - name: publish
       run: |
+        mkdir android_package
+        mv android_release/nvgt.apk android_package/nvgt_android_$nvgt_version.apk
+        curl -u "${{secrets.CIFTP}}" -s -T "android_package/nvgt_$nvgt_version.apk" ftp://nvgt.gg
+        curl -u "${{secrets.CIFTP}}" -s -T "linux_package/nvgt_$nvgt_version.tar.gz" ftp://nvgt.gg
+        curl -u "${{secrets.CIFTP}}" -s -T "mac_package/nvgt_$nvgt_version.dmg" ftp://nvgt.gg
+        curl -u "${{secrets.CIFTP}}" -s -T "windows_package/nvgt_$nvgt_version.exe" ftp://nvgt.gg
         curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/release_complete.php?ver=$nvgt_version"
+    - uses: ghalactic/github-release-from-tag@v5
+      with:
+        checksumGenerateAssets: "false"
+        assets: |
+          - path: '*_package/nvgt_${{env.nvgt_version}}.*'

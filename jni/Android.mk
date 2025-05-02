@@ -62,22 +62,15 @@ LOCAL_MODULE    := libssl
 LOCAL_SRC_FILES := $(LIBPATH)/libssl.a
 include $(PREBUILT_STATIC_LIBRARY)
 
+LOCAL_MODULE    := libogg
+LOCAL_SRC_FILES := $(LIBPATH)/libogg.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libvorbis
+LOCAL_SRC_FILES := $(LIBPATH)/libvorbis.a
+include $(PREBUILT_STATIC_LIBRARY)
+
 # shared libraries
-include $(CLEAR_VARS)
-LOCAL_MODULE    := bass
-LOCAL_SRC_FILES := $(LIBPATH)/libbass.so
-include $(PREBUILT_SHARED_LIBRARY)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE    := bassmix
-LOCAL_SRC_FILES := $(LIBPATH)/libbassmix.so
-include $(PREBUILT_SHARED_LIBRARY)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE    := bass_fx
-LOCAL_SRC_FILES := $(LIBPATH)/libbass_fx.so
-include $(PREBUILT_SHARED_LIBRARY)
-
 include $(CLEAR_VARS)
 LOCAL_MODULE    := phonon
 LOCAL_SRC_FILES := $(LIBPATH)/libphonon.so
@@ -94,13 +87,13 @@ $(shell python "${LOCAL_PATH}/../build/version_sconscript.py")
 LOCAL_SRC_FILES_COMMON := \
     $(subst $(LOCAL_PATH)/,, \
     $(wildcard $(LOCAL_PATH)/../ASAddon/src/*.cpp)\
-    ../dep/aes.c ../dep/cmp.c ../dep/micropather.cpp ../dep/rng_get_bytes.c ../dep/singleheader.cpp ../dep/sonic.c ../dep/tinyexpr.c ../dep/uncompr.c\
+    ../dep/aes.c ../dep/cmp.c ../dep/ma_reverb_node.c ../dep/micropather.cpp ../dep/miniaudio.c ../dep/miniaudio_libvorbis.c ../dep/miniaudio_phonon.c ../dep/miniaudio_wdl_resampler.cpp ../dep/monocypher.c ../dep/resample.cpp ../dep/rng_get_bytes.c ../dep/singleheader.cpp ../dep/sonic.c ../dep/tinyexpr.c ../dep/uncompr.c\
     $(wildcard $(LOCAL_PATH)/../src/*.cpp))
 LOCAL_C_INCLUDES_COMMON := $(LOCAL_PATH)/../droidev/include $(LOCAL_PATH)/../ASAddon/include $(LOCAL_PATH)/../dep
-LOCAL_CXXFLAGS_COMMON := -DPOCO_STATIC -DNVGT_BUILDING -DAS_USE_STLNAMES=1 -std=c++20 -fms-extensions -ffunction-sections -O2 -fpermissive -O2 -Wno-narrowing -Wno-int-to-pointer-cast -Wno-delete-incomplete -Wno-unused-result -Wno-deprecated-array-compare -Wno-implicit-const-int-float-conversion -Wno-deprecated-enum-enum-conversion
+LOCAL_CXXFLAGS_COMMON := -DPOCO_STATIC -DNVGT_BUILDING -DAS_USE_STLNAMES=1 -std=c++20 -fms-extensions -ffunction-sections -O2 -fpermissive -O2 -Wno-narrowing -Wno-int-to-pointer-cast -Wno-delete-incomplete -Wno-unused-result -Wno-deprecated-array-compare -Wno-implicit-const-int-float-conversion -Wno-deprecated-enum-enum-conversion -Wno-absolute-value
 LOCAL_LDFLAGS_COMMON = -Wl,--no-fatal-warnings -Wl,--no-undefined -Wl,--gc-sections
-LOCAL_SHARED_LIBRARIES_COMMON := SDL3 bass bassmix bass_fx phonon
-LOCAL_STATIC_LIBRARIES_COMMON := libPocoFoundation libPocoCrypto libPocoDataSQLite libPocoJSON libPocoNet libPocoNetSSL libPocoUtil libPocoXML libPocoZip libangelscript libcrypto libenet6 libreactphysics3d libssl
+LOCAL_SHARED_LIBRARIES_COMMON := SDL3 phonon
+LOCAL_STATIC_LIBRARIES_COMMON := libPocoFoundation libPocoCrypto libPocoDataSQLite libPocoJSON libPocoNet libPocoNetSSL libPocoUtil libPocoXML libPocoZip libangelscript libcrypto libenet6 libreactphysics3d libssl libogg libvorbis
 LOCAL_LDLIBS_COMMON := -lGLESv1_CM -lGLESv2 -lOpenSLES -llog -landroid
 LOCAL_CPP_FEATURES_COMMON := rtti exceptions
 

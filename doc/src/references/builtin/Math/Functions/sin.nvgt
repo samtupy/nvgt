@@ -4,7 +4,7 @@
 	## Arguments:
 		* double x: The angle (in radians) to get the sine of.
 	## Returns:
-		The sine of the angle.
+		double: the sine of the angle.
 */
 
 // Example:

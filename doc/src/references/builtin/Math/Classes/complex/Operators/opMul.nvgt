@@ -1,0 +1,21 @@
+/**
+	Multiplies two complex numbers and returns the result.
+	complex complex::opMul(const complex&in other) const;
+	## Arguments:
+		* const complex&in other: the complex number to multiply with.
+	## Returns:
+		complex: a new complex object containing the value of the multiplication.
+*/
+
+// Example:
+// Helper function to print a complex number.
+string to_string(const complex&in c) {
+	return "(" + c.r + ", " + c.i + ")";
+}
+
+void main() {
+	complex a(1, 2);
+	complex b(3, 4);
+	complex c = a * b;
+	alert("a * b =", to_string(c));
+}

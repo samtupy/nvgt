@@ -1,0 +1,51 @@
+#include "basic_character_controller.nvgt"
+#include "speech.nvgt"
+
+class character_controller: basic_character_controller {
+sound step_sound;
+character_controller() {
+// Call the base constructore to initialize all the internal state
+super();
+step_sound.load("../data/audio/step.ogg");
+}
+
+/*
+The basic character controller defines various callbacks which will be called to determine what will happen under certain conditions. Calling other callbacks from within a callback is strongly discouraged, as all callbacks will be called at appropriate places at the next tick. If you do call a callback from within a callback, the behavior is callback-specific. You MUST NOT depend on the behavior of any callback at any given moment.
+The available callbacks are:
+- on_position_changed: called when the position of the character has changed. Returning false will cause the position change to be undone, but other influencing factors such as velocity will be unaffected. By default, this function returns true, and locks the player at the metaphorical "ground" (where y==0) to prevent the character from falling forever.
+- on_rotation_changed: called for each rotation of the character. For the purposes of this callback, a "rotation" is each time the yaw of the character has changed; for example, if the target yaw is 45 degrees, and the character is still in the process of rotating to that yaw and has just rotated 3 degrees, this callback will be called. Returning false from this callback will undo the rotation that just occurred, and will also revert the setting of the orientation vectors (forward, up, right), reset the yaw to it's prior value and will clear the target yaw, and the turning flags will be cleared.
+- on_vertical_movement, on_horizontal_movement: called when vertical or horizontal movement forces have been applied. Returning false from this callback will undo the vertical or horizontal movement. When false is returned from either of these functions, the velocity of the character will be restored to it's prior value, and, in the case of horizontal movement, the movement and strafing flags will be cleared.
+- on_friction_applied: called when friction has been applied. Friction is the resistive force that opposes the relative motion, or the tendency for motion, between two surfaces in contact. For example, when a book slides across a table, friction acts in the opposite direction to its motion. Returning false from this callback will cause the application of friction to be undone, and the character's velocity will be restored to it's prior value.
+- on_step_cycle: called every time a "step" has been taken. The length of a step is determined by the step_distance, run_step_length, walk_step_length, and crouch_step_length member fields. There is currently no way to "undo" this operation without force-setting the position of the character.
+- should_run: called to determine if the player should "run". Returning false will cause the player to walk.
+For the purposes of this example, we will only override the `on_step_cycle` callback.
+*/
+protected void on_step_cycle() override {
+step_sound.play();
+}
+}
+
+void main() {
+show_window("Character controller test");
+character_controller@ cc = character_controller();
+float last_time;
+while (true) {
+// To turn the character, or tell it to move, we just set these flags. The controller will figure out the rest for us automatically.
+// Remember to set them to false when the key is released -- the controller will NOT do this for you!
+if (key_down(KEY_UP)) cc.move_forward = true;
+if (key_down(KEY_DOWN)) cc.move_backward = true;
+if (key_down(KEY_LEFT)) cc.turn_left = true;
+if (key_down(KEY_RIGHT)) cc.turn_right = true;
+if (key_up(KEY_UP)) cc.move_forward = false;
+if (key_up(KEY_DOWN)) cc.move_backward = false;
+if (key_up(KEY_LEFT)) cc.turn_left = false;
+if (key_up(KEY_RIGHT)) cc.turn_right = false;
+if (key_up(KEY_F)) speak(translate_yaw_to_direction(cc.yaw), true);
+if (key_up(KEY_ESCAPE)) exit(0);
+const float current_time = float(ticks());
+const float dt = fmax((current_time - last_time) / 1000.0, 0.001);
+last_time = current_time;
+cc.update(dt);
+wait(1);
+}
+}

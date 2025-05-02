@@ -25,8 +25,6 @@
 
 #define BL_NUMWORDS_IMPLEMENTATION
 #include "bl_number_to_words.h"
-#define VERBLIB_IMPLEMENTATION
-#include "verblib.h"
 #define DBGTOOLS_IMPLEMENTATION
 #include "dbgtools.h"
 #define RND_IMPLEMENTATION

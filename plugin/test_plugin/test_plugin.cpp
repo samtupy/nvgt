@@ -16,9 +16,13 @@
 void do_test() {
 	MessageBoxA(0, "It works, this function is being called from within the context of an NVGT plugin!", "success", 0);
 }
+void do_exception() {
+	asGetActiveContext()->SetException("It's rare when an exception being thrown is a good thing...");
+}
 
 plugin_main(nvgt_plugin_shared* shared) {
 	prepare_plugin(shared);
 	shared->script_engine->RegisterGlobalFunction("void do_test()", asFUNCTION(do_test), asCALL_CDECL);
+	shared->script_engine->RegisterGlobalFunction("void do_exception()", asFUNCTION(do_exception), asCALL_CDECL);
 	return true;
 }

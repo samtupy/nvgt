@@ -1,8 +1,8 @@
 void test_pack() {
 	file_put_contents("tmp/pack.dat", "test overwrite: lets start with bogus data");
 	dictionary cases;
-	pack p;
-	assert(p.open("tmp/pack.dat", PACK_OPEN_MODE_CREATE));
+	pack_file p;
+	assert(p.create("tmp/pack.dat"));
 	string[]@ case_list = find_files("case/*.nvgt");
 	for (uint i = 0; i < case_list.length(); i++) {
 		string case_data = file_get_contents("case/" + case_list[i]);
@@ -17,13 +17,13 @@ void test_pack() {
 		cases.set(case_list[i], case_data);
 	}
 	p.close();
-	assert(p.open("tmp/pack.dat", PACK_OPEN_MODE_READ));
-	assert(p.size == cases.get_size() * 2);
+	assert(p.open("tmp/pack.dat"));
+	assert(p.file_count == cases.get_size() * 2);
 	@case_list = p.list_files();
-	assert(case_list.length() == p.size);
+	assert(case_list.length() == p.file_count);
 	for (uint i = 0; i < case_list.length(); i++) {
 		int size = p.get_file_size(case_list[i]);
-		string pack_content = p.read_file(case_list[i], 0, size);
+		string pack_content = p.get_file(case_list[i]).read();
 		string case_name = case_list[i];
 		if (case_name.starts_with("mem/")) case_name.erase(0, 4);
 		string disc_content;

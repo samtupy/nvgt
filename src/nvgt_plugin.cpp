@@ -25,16 +25,26 @@
 // Helper functions that are shared with plugins.
 void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder) { return new datastream(stream, encoding, byteorder); }
 std::ios* nvgt_datastream_get_ios(void* stream) { return reinterpret_cast<datastream*>(stream)->get_iostr(); }
-
+#if defined(NVGT_STUB) || defined(NVGT_MOBILE)
+// We need a no-op wrapper for nvgt_bundle_shared_library which is only needed on script compilation and thus is not included in stubs or mobile platforms.
+void nvgt_bundle_shared_library(const std::string& libname) {}
+#endif
+typedef struct {
+	nvgt_plugin_entry* e;
+	nvgt_plugin_version_func* v;
+} static_plugin_vtable;
 std::unordered_map<std::string, void*> loaded_plugins; // Contains handles to sdl objects.
-std::unordered_map<std::string, nvgt_plugin_entry*>* static_plugins = NULL; // Contains pointers to static plugin entry points. This doesn't contain entry points for plugins loaded from a dll, rather those that have been linked statically into the executable produced by a custom build of nvgt. This is a pointer because the map is initialized the first time register_static_plugin is called so that we are not trusting in global initialization order.
+std::unordered_map<std::string, static_plugin_vtable>* static_plugins = NULL; // Contains pointers to static plugin entry points. This doesn't contain entry points for plugins loaded from a dll, rather those that have been linked statically into the executable produced by a custom build of nvgt. This is a pointer because the map is initialized the first time register_static_plugin is called so that we are not trusting in global initialization order.
 
-bool load_nvgt_plugin(const std::string& name, void* user) {
+bool load_nvgt_plugin(const std::string& name, std::string* errmsg, void* user) {
 	nvgt_plugin_entry* entry = NULL;
+	nvgt_plugin_version_func* version = NULL;
 	void* obj = NULL;
 	if (loaded_plugins.contains(name)) return true; // plugin already loaded
-	if (static_plugins && static_plugins->contains(name))
-		entry = (nvgt_plugin_entry*)(*static_plugins)[name];
+	if (static_plugins && static_plugins->contains(name)) {
+		entry = (*static_plugins)[name].e;
+		version = (*static_plugins)[name].v;
+	}
 	else {
 		std::string dllname = name;
 		#ifdef _WIN32
@@ -48,6 +58,15 @@ bool load_nvgt_plugin(const std::string& name, void* user) {
 		if (!obj) obj = SDL_LoadObject(Poco::format("lib%s", dllname).c_str());
 		if (!obj) return false;
 		entry = (nvgt_plugin_entry*)SDL_LoadFunction(obj, "nvgt_plugin");
+		version = (nvgt_plugin_version_func*)SDL_LoadFunction(obj, "nvgt_plugin_version");
+	}
+	if (!version) {
+		if (errmsg) *(errmsg) = Poco::format("Failed to determine API version used for plugin %s, the plugin is old or defective.", name);
+		return false;
+	}
+	else if (version() != NVGT_PLUGIN_API_VERSION) {
+		if (errmsg) (*errmsg) = Poco::format("Failed API version check for plugin %s, plugin was compiled with API version %d while NVGT is using version %d. A compatible version of the plugin must be used.", name, version(), NVGT_PLUGIN_API_VERSION);
+		return false;
 	}
 	nvgt_plugin_shared* shared = (nvgt_plugin_shared*)malloc(sizeof(nvgt_plugin_shared));
 	prepare_plugin_shared(shared, g_ScriptEngine, user);
@@ -56,16 +75,22 @@ bool load_nvgt_plugin(const std::string& name, void* user) {
 		if (obj) SDL_UnloadObject(obj);
 		return false;
 	}
-	if (obj) loaded_plugins[name] = obj;
+	if (obj) {
+		loaded_plugins[name] = obj;
+		nvgt_bundle_shared_library(name);
+	}
 	else loaded_plugins[name] = NULL;
 	free(shared);
 	return true;
 }
 
-bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e) {
-	if (!static_plugins) static_plugins = new std::unordered_map<std::string, nvgt_plugin_entry*>;
-	static_plugins->insert(std::make_pair(name, e));
+bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e, nvgt_plugin_version_func* v) {
+	if (!static_plugins) static_plugins = new std::unordered_map<std::string, static_plugin_vtable>;
+	static_plugins->insert(std::make_pair(name, static_plugin_vtable {e, v}));
 	return true;
+}
+void list_loaded_nvgt_plugins(std::vector<std::string>& output) {
+	for (auto kv : loaded_plugins) output.push_back(kv.first);
 }
 
 bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
@@ -75,8 +100,9 @@ bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
 	for (int i = 0; i < count; i++) {
 		std::string name;
 		br >> name;
-		if (!load_nvgt_plugin(name)) {
-			message(Poco::format("Unable to load %s, exiting.", name), "error");
+		std::string errmsg = Poco::format("Unable to load %s, exiting.", name);
+		if (!load_nvgt_plugin(name, &errmsg)) {
+			message(errmsg, "error");
 			return false;
 		}
 	}

@@ -1,0 +1,21 @@
+/**
+	Subtracts a complex number from this one and returns the result.
+	complex complex::opSub(const complex&in other) const;
+	## Arguments:
+		* const complex&in other: the complex number to subtract.
+	## Returns:
+		complex: a new complex object containing the value of the subtraction.
+*/
+
+// Example:
+// Helper function to print a complex number.
+string to_string(const complex&in c) {
+	return "(" + c.r + ", " + c.i + ")";
+}
+
+void main() {
+	complex a(5, 6);
+	complex b(2, 3);
+	complex c = a - b;
+	alert("a - b =", to_string(c));
+}

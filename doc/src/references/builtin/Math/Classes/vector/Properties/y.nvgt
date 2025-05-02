@@ -1,6 +1,6 @@
 /**
 	Represents the y coordinate of the vector.
-	float vector::y;
+	float vector::y const;
 */
 
 // Example:

@@ -52,6 +52,7 @@ public:
 	poco_json_array& operator=(poco_json_array* other);
 	poco_shared<Poco::Dynamic::Var>* get(unsigned int index) const;
 	poco_shared<Poco::Dynamic::Var>* query(const std::string& path) const;
+	poco_json_array& extend(poco_json_array* array);
 	poco_json_array* get_array(unsigned int index) const;
 	poco_json_object* get_object(unsigned int index) const;
 	void set(unsigned int index, poco_shared<Poco::Dynamic::Var>* v);
