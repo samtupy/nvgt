@@ -765,7 +765,6 @@ bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& 
 
 void RegisterScriptPack(asIScriptEngine *engine)
 {
-	engine->RegisterObjectType("pack_interface", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("pack_interface", asBEHAVE_ADDREF, "void b()", asMETHOD(pack_interface, duplicate), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("pack_interface", asBEHAVE_RELEASE, "void c()", asMETHOD(pack_interface, release), asCALL_THISCALL);
 	engine->RegisterObjectType("pack_file", 0, asOBJ_REF);
