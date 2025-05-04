@@ -11,7 +11,7 @@
 void main() {
 	string text = input_box("String", "Enter a string");
 	if (text.is_empty()) {
-		alert("Info", "You didn't enter a string.");
+		alert("Info", "You did not enter a string.");
 		exit();
 	}
 	string result = text.trim_whitespace_left();

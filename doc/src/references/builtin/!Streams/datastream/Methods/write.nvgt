@@ -11,7 +11,7 @@
 
 // Example:
 void main() {
-	// This time we'll use a file which is another type of datastream to show how the functions in this datastream class work on it's children.
+	// This time we will use a file which is another type of datastream to show how the functions in this datastream class work on its children.
 	file f("test.txt", "wb");
 	string data = "This is a test file";
 	bool success = f.write(data) == data.length();

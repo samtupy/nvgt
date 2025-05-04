@@ -8,7 +8,7 @@
 	## Remarks:
 		This method is useful in situations when:
 		1. You want to have multiple formats for messages, such as short and long messages.
-		2. You don't want to use concatenation.
+		2. You do not want to use concatenation.
 		3. You want to use a placeholder more than once in a string.
 */
 

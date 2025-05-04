@@ -1,5 +1,5 @@
 # play_wait
-Starts playing the sound, blocking the calling thread until it's finished.
+Starts playing the sound, blocking the calling thread until it is finished.
 
 `bool sound::play_wait();`
 

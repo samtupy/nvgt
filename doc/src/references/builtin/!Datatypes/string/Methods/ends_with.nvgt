@@ -2,7 +2,7 @@
 	Determines if a string ends with another string.
 	bool string::ends_with(const string&in str);
 	## Arguments:
-		* const string&in str: the string to look for.
+		* const string&in str: the string (simply suffix) to look for.
 	## Returns:
 		bool: true if the string ends with the specified search, false if not.
 */

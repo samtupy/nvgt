@@ -32,7 +32,7 @@ throw("Oh no, this code is broken!");
 my_mutex.unlock();
 ```
 
-In this case, mutex.unlock() will never get called because an exception got thrown meaning that the rest of the code down to whatever handles the exception won't execute! However we can do this:
+In this case, mutex.unlock() will never get called because an exception got thrown meaning that the rest of the code down to whatever handles the exception will not execute! However we can do this:
 
 ```
 mutex_lock exclusive(my_mutex);
@@ -50,5 +50,5 @@ string var2 = "hi";
 {
 	string var3 = "catch me if you can...";
 }
-string var4 = "Hey, where'd var3 go!";
+string var4 = "Hey, where was var3 go!";
 ```

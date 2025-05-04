@@ -33,7 +33,7 @@ void main() {
 	while (!key_pressed(KEY_ESCAPE)) {
 		wait(5);
 		if (key_pressed(KEY_L)) {
-			// This demonstrates that if we lock the mutex on the main thread, the ding sound pauses for a second while it's own ding_mutex.lock() call waits for this thread to unlock the mutex.
+			// This demonstrates that if we lock the mutex on the main thread, the ding sound pauses for a second while its own ding_mutex.lock() call waits for this thread to unlock the mutex.
 			ding_mutex.lock();
 			wait(1000);
 			ding_mutex.unlock();
@@ -47,5 +47,5 @@ void main() {
 			snd.volume -= 1; // We can be sure that these volume changes will not take place while the sound is being accessed on another thread.
 		}
 	}
-	exit_program.set(); // Make sure the dinging_thread knows it's time to shut down.
+	exit_program.set(); // Make sure the dinging_thread knows it is time to shut down.
 }
