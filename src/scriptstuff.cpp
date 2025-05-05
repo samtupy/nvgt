@@ -136,8 +136,7 @@ void reset_profiler() {
 	profiler_last_func = NULL;
 	prepare_profiler();
 }
-void prepare_profiler()
-{
+void prepare_profiler() {
 	if (!is_profiling) return;
 	asIScriptContext* ctx = asGetActiveContext();
 	if (!ctx) return;
@@ -148,7 +147,7 @@ void start_profiling() {
 	if (is_profiling) return;
 	asIScriptContext* ctx = asGetActiveContext();
 	if (!ctx) return;
-		is_profiling = true;
+	is_profiling = true;
 	reset_profiler();
 }
 void stop_profiling() {
