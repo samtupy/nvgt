@@ -87,7 +87,7 @@ $(shell python "${LOCAL_PATH}/../build/version_sconscript.py")
 LOCAL_SRC_FILES_COMMON := \
     $(subst $(LOCAL_PATH)/,, \
     $(wildcard $(LOCAL_PATH)/../ASAddon/src/*.cpp)\
-    ../dep/aes.c ../dep/cmp.c ../dep/ma_reverb_node.c ../dep/micropather.cpp ../dep/miniaudio.c ../dep/miniaudio_libvorbis.c ../dep/miniaudio_phonon.c ../dep/miniaudio_wdl_resampler.cpp ../dep/monocypher.c ../dep/resample.cpp ../dep/rng_get_bytes.c ../dep/singleheader.cpp ../dep/sonic.c ../dep/tinyexpr.c ../dep/uncompr.c\
+    ../dep/aes.c ../dep/cmp.c ../dep/entities.cpp ../dep/ma_reverb_node.c ../dep/micropather.cpp ../dep/miniaudio.c ../dep/miniaudio_libvorbis.c ../dep/miniaudio_phonon.c ../dep/miniaudio_wdl_resampler.cpp ../dep/monocypher.c ../dep/resample.cpp ../dep/rng_get_bytes.c ../dep/singleheader.cpp ../dep/sonic.c ../dep/tinyexpr.c ../dep/uncompr.c\
     $(wildcard $(LOCAL_PATH)/../src/*.cpp))
 LOCAL_C_INCLUDES_COMMON := $(LOCAL_PATH)/../droidev/include $(LOCAL_PATH)/../ASAddon/include $(LOCAL_PATH)/../dep
 LOCAL_CXXFLAGS_COMMON := -DPOCO_STATIC -DNVGT_BUILDING -DAS_USE_STLNAMES=1 -std=c++20 -fms-extensions -ffunction-sections -O2 -fpermissive -O2 -Wno-narrowing -Wno-int-to-pointer-cast -Wno-delete-incomplete -Wno-unused-result -Wno-deprecated-array-compare -Wno-implicit-const-int-float-conversion -Wno-deprecated-enum-enum-conversion -Wno-absolute-value
