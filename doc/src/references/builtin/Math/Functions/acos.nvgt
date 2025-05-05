@@ -4,7 +4,7 @@
 	## Arguments:
 		* double x: The value whose arc cosine is to be calculated.
 	## Returns:
-		double: the arc cosine of the given value.
+		The arc cosine of the given value.
 */
 
 // Example:

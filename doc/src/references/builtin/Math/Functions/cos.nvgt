@@ -4,7 +4,7 @@
 	## Arguments:
 		* double x: The angle (in radians) to get the cosine of.
 	## Returns:
-		double: the cosine of the angle.
+		The cosine of the angle.
 */
 
 // Example:

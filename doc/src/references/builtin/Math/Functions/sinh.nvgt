@@ -4,7 +4,7 @@
 	## Arguments:
 		* double x: The value whose hyperbolic sine is to be calculated.
 	## Returns:
-		double: the hyperbolic sine of the given value.
+		The hyperbolic sine of the given value.
 */
 
 // Example:

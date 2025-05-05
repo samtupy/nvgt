@@ -4,7 +4,7 @@
 	## Arguments:
 		* double x: The value whose floor is to be calculated.
 	## Returns:
-		double: the largest integer less than or equal to x.
+		The largest integer less than or equal to x.
 */
 
 // Example:

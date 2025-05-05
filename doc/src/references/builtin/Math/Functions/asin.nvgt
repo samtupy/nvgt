@@ -4,7 +4,7 @@
 	## Arguments:
 		* double x: The value whose arc sine is to be calculated.
 	## Returns:
-		double: the arc sine of the given value.
+		The arc sine of the given value.
 */
 
 // Example:

@@ -28,9 +28,10 @@ public:
 	float pitch;
 	AVSpeechSynthesizer* synth;
 	AVSpeechSynthesisVoice* currentVoice;
+	AVSpeechUtterance* utterance;
 	Impl() {
 		currentVoice = [AVSpeechSynthesisVoice voiceWithLanguage:@"en-US"]; //choosing english as a default language
-		AVSpeechUtterance* utterance = [[AVSpeechUtterance alloc] initWithString:@""];
+		utterance = [[AVSpeechUtterance alloc] initWithString:@""];
 		rate = utterance.rate;
 		volume = utterance.volume;
 		pitch = utterance.pitchMultiplier;
@@ -41,14 +42,14 @@ public:
 		AVSpeechSynthesisVoice *voice = [AVSpeechSynthesisVoice voiceWithLanguage:nslanguage];
 		if (voice) currentVoice = voice;
 		else currentVoice = [AVSpeechSynthesisVoice voiceWithLanguage:@"en-US"]; //fallback to english then
-		AVSpeechUtterance* utterance = [[AVSpeechUtterance alloc] init];
+		utterance = [[AVSpeechUtterance alloc] init];
 		rate = utterance.rate;
 		volume = utterance.volume;
 		pitch = utterance.pitchMultiplier;
 		synth = [[AVSpeechSynthesizer alloc] init];
 	}
 	bool speak(const std::string& text, bool interrupt) {
-		if ((interrupt || text.empty()) && synth.isSpeaking)[synth stopSpeakingAtBoundary:AVSpeechBoundaryImmediate];
+		if (interrupt && synth.isSpeaking)[synth stopSpeakingAtBoundary:AVSpeechBoundaryImmediate];
 		if (text.empty()) return interrupt;
 		NSString *nstext = [NSString stringWithUTF8String:text.c_str()];
 		AVSpeechUtterance *utterance = [[AVSpeechUtterance alloc] initWithString:nstext];
@@ -56,7 +57,8 @@ public:
 		utterance.volume = volume;
 		utterance.pitchMultiplier = pitch;
 		utterance.voice = currentVoice;
-		[synth speakUtterance:utterance];
+		this->utterance = utterance;
+		[synth speakUtterance:this->utterance];
 		return synth.isSpeaking;
 	}
 	bool speakWait(const std::string& text, bool interrupt) {
@@ -67,7 +69,8 @@ public:
 		return result; //If it executes, it means that the result is true and the utterance could speak
 	}
 	bool stopSpeech() {
-		return [synth stopSpeakingAtBoundary:AVSpeechBoundaryImmediate];
+		if (synth.isSpeaking) return [synth stopSpeakingAtBoundary:AVSpeechBoundaryImmediate];
+		return false;
 	}
 	bool pauseSpeech() {
 		if (!synth.isPaused && synth.isSpeaking) return [synth pauseSpeakingAtBoundary:AVSpeechBoundaryImmediate];
@@ -175,7 +178,7 @@ private:
 };
 
 AVTTSVoice::AVTTSVoice() : impl(new Impl()), RefCount(1) {}
-AVTTSVoice::AVTTSVoice(const std::string& name) : RefCount(1), impl(new Impl(name)) {}
+AVTTSVoice::AVTTSVoice(const std::string& name) : impl(new Impl(name)) {}
 AVTTSVoice::~AVTTSVoice() { delete impl; }
 
 bool AVTTSVoice::speak(const std::string& text, bool interrupt) {
@@ -241,7 +244,12 @@ void AVTTSVoice::init() {
 }
 
 void AVTTSVoice::deinit() {
-	if (asAtomicDec(RefCount) < 1) delete this;
+	if (asAtomicDec(RefCount) < 1) {
+		delete impl;
+		impl = nullptr;
+		delete this;
+
+	}
 }
 
 AVTTSVoice* init() {

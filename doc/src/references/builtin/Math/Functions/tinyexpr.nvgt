@@ -1,8 +1,8 @@
 /**
 	Evaluate a mathematical expression using the tinyexpr library.
-	double tinyexpr(const string&in expression);
+	double tinyexpr(string expression);
 	## Arguments:
-		* const string&in expression: the expression to evaluate.
+		* string expression: the expression to evaluate.
 	## Returns:
 		double: the result of the expression.
 */

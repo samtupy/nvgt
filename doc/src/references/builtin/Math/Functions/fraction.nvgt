@@ -4,7 +4,7 @@
 	## Arguments:
 		* double x: The value whose fractional part is to be extracted.
 	## Returns:
-		double: the fractional part of the given value.
+		The fractional part of the given value.
 */
 
 // Example:
