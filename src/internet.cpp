@@ -37,6 +37,7 @@
 #include <Poco/Net/WebSocket.h>
 #include <scriptarray.h>
 #include <scriptdictionary.h>
+#include <entities.h>
 #include "datastreams.h"
 #include "internet.h"
 #include "nvgt.h"
@@ -47,6 +48,12 @@
 using namespace std;
 using namespace Poco;
 using namespace Poco::Net;
+
+string html_entities_decode(const string& input) {
+	vector<char> buffer(input.size() + 1, '\0');
+	decode_html_entities_utf8(buffer.data(), input.c_str());
+	return string(buffer.data());
+}
 
 string url_encode(const string& url, const string& reserved) {
 	string result;
@@ -799,6 +806,7 @@ void RegisterInternet(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("socket_select_mode", "SOCKET_SELECT_READ", Socket::SELECT_READ);
 	engine->RegisterEnumValue("socket_select_mode", "SOCKET_SELECT_WRITE", Socket::SELECT_WRITE);
 	engine->RegisterEnumValue("socket_select_mode", "SOCKET_SELECT_ERROR", Socket::SELECT_ERROR);
+	engine->RegisterGlobalFunction(_O("string html_entities_decode(const string&in input)"), asFUNCTION(html_entities_decode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string url_encode(const string&in url, const string&in reserved = \"\")"), asFUNCTION(url_encode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string url_decode(const string&in url, bool plus_as_space = true)"), asFUNCTION(url_decode), asCALL_CDECL);
 	RegisterNameValueCollection<NameValueCollection>(engine, "name_value_collection");
