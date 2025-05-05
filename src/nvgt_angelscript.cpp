@@ -10,7 +10,7 @@
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
-*/
+ */
 
 #define NOMINMAX
 #include "UI.h"
@@ -85,31 +85,32 @@
 #include "scriptmathcomplex.h"
 #include "contextmgr.h"
 #include "weakref.h"
+#include "anticheat.h"
 #ifndef NVGT_STUB
-	int PragmaCallback(const std::string& pragmaText, CScriptBuilder& builder, void* /*userParam*/);
+	int PragmaCallback(const std::string &pragmaText, CScriptBuilder &builder, void * /*userParam*/);
 #endif
-asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* /*param*/);
-void ReturnContextCallback(asIScriptEngine* engine, asIScriptContext* ctx, void* /*param*/);
-void ExceptionHandlerCallback(asIScriptContext* ctx, void* obj);
+asIScriptContext *RequestContextCallback(asIScriptEngine *engine, void * /*param*/);
+void ReturnContextCallback(asIScriptEngine *engine, asIScriptContext *ctx, void * /*param*/);
+void ExceptionHandlerCallback(asIScriptContext *ctx, void *obj);
 
 using namespace std;
 using namespace Poco;
 
-CContextMgr* g_ctxMgr = nullptr;
+CContextMgr *g_ctxMgr = nullptr;
 #ifndef NVGT_STUB
-	CDebugger* g_dbg = nullptr;
+	CDebugger *g_dbg = nullptr;
 #endif
 int g_bcCompressionLevel = 9;
 string g_last_exception_callstack;
-vector<asIScriptContext*> g_ctxPool;
+vector<asIScriptContext *> g_ctxPool;
 Mutex g_ctxPoolMutex;
 vector<string> g_IncludeDirs;
 vector<string> g_IncludeScripts;
 std::string g_CommandLine;
-CScriptArray* g_command_line_args = 0;
-bool g_debug = true; // Whether script has been compiled with extra debug information in the bytecode, true by default because source runs contain such information.
+CScriptArray *g_command_line_args = 0;
+bool g_debug = true;         // Whether script has been compiled with extra debug information in the bytecode, true by default because source runs contain such information.
 bool g_ASDebugBreak = false; // If the angelscript debugger is in use, user can ctrl+c to perform a manual break.
-asIScriptEngine* g_ScriptEngine = NULL;
+asIScriptEngine *g_ScriptEngine = NULL;
 std::string g_command_line;
 int g_LastError;
 int g_retcode = 0;
@@ -118,16 +119,18 @@ bool g_shutting_down = false;
 std::string g_stub = "";
 std::string g_platform = "auto";
 bool g_make_console = false;
-std::unordered_map<std::string, asITypeInfo*> g_TypeInfoCache;
+std::unordered_map<std::string, asITypeInfo *> g_TypeInfoCache;
 Timestamp g_script_build_time;
+unordered_map<string, string> g_system_namespaces;
 
 class NVGTBytecodeStream : public asIBinaryStream {
-	unsigned char* content;
+	unsigned char *content;
 	z_stream zstr;
 	int cursor;
 	int written_size;
 	int alloc_size;
 	const int buffer_size = 32 * 1024;
+
 public:
 	NVGTBytecodeStream() {
 		content = NULL;
@@ -138,7 +141,8 @@ public:
 		alloc_size = 0;
 	}
 	~NVGTBytecodeStream() {
-		if (zstr.data_type == -1) return;
+		if (zstr.data_type == -1)
+			return;
 		#ifndef NVGT_STUB
 		deflateEnd(&zstr);
 		#else
@@ -146,12 +150,12 @@ public:
 		#endif
 	}
 	#ifndef NVGT_STUB
-	int Write(const void* ptr, asUINT size) {
+	int Write(const void *ptr, asUINT size) {
 		if (!content) {
-			content = (unsigned char*)malloc(buffer_size);
+			content = (unsigned char *)malloc(buffer_size);
 			zstr.data_type = 0;
 			deflateInit(&zstr, g_bcCompressionLevel);
-			zstr.next_out = (Bytef*)content;
+			zstr.next_out = (Bytef *)content;
 			cursor = 0;
 			written_size = 0;
 			alloc_size = buffer_size;
@@ -160,23 +164,24 @@ public:
 		written_size += size;
 		if (written_size > alloc_size) {
 			alloc_size *= 2;
-			content = (unsigned char*)realloc(content, alloc_size);
-			zstr.next_out = (Bytef*)(content + zstr.total_out);
+			content = (unsigned char *)realloc(content, alloc_size);
+			zstr.next_out = (Bytef *)(content + zstr.total_out);
 			zstr.avail_out = alloc_size - zstr.total_out;
 		}
-		zstr.next_in = (Bytef*)ptr;
+		zstr.next_in = (Bytef *)ptr;
 		zstr.avail_in = size;
-		while (zstr.avail_in > 0) deflate(&zstr, Z_NO_FLUSH);
+		while (zstr.avail_in > 0)
+			deflate(&zstr, Z_NO_FLUSH);
 		cursor += size;
 		return size;
 	}
 	#else
-	int Write(const void* ptr, asUINT size) {
+	int Write(const void *ptr, asUINT size) {
 		return -1;
 	}
 	#endif
-	int Read(void* ptr, asUINT size) {
-		zstr.next_out = (Bytef*)ptr;
+	int Read(void *ptr, asUINT size) {
+		zstr.next_out = (Bytef *)ptr;
 		zstr.avail_out = size;
 		inflate(&zstr, Z_SYNC_FLUSH);
 		cursor += size;
@@ -186,23 +191,23 @@ public:
 		cursor = 0; // This storage area holds more than bytecode, and after extra non-bytecode data is read, we may need to reset the variable keeping track of the number of bytes read encase we need to use that information later for debugging angelscript bytecode load failures which only provide an offset of bytes read in the stream as debug info. We don't store our non-bytecode data at the end of the stream to avoid any imagined edgecase where Angelscript could read a few less bytes than it's written during compilation thus making such data inaccessible.
 	}
 	// Receives raw bytes read from a compiled executable for decryption and decompression.
-	void set(unsigned char* code, int size) {
+	void set(unsigned char *code, int size) {
 		written_size = angelscript_bytecode_decrypt(code, size, alloc_size);
 		content = code;
 		zstr.data_type = 0;
 		inflateInit(&zstr);
-		zstr.next_in = (Bytef*)content;
+		zstr.next_in = (Bytef *)content;
 		zstr.avail_in = written_size;
 	}
 	#ifndef NVGT_STUB
 	// ZLib compress and encrypt the bytecode for saving to a compiled binary. Encryption is handled by function angelscript_bytecode_encrypt in nvgt_config.h. If that function needs to change the size of the data, it should realloc() the data.
-	int get(unsigned char** code) {
+	int get(unsigned char **code) {
 		if (zstr.avail_out < buffer_size) {
 			alloc_size += buffer_size;
 			zstr.avail_out += buffer_size;
-			content = (unsigned char*)realloc(content, alloc_size);
+			content = (unsigned char *)realloc(content, alloc_size);
 		}
-		zstr.next_out = (Bytef*)(content + zstr.total_out);
+		zstr.next_out = (Bytef *)(content + zstr.total_out);
 		deflate(&zstr, Z_FINISH);
 		written_size = zstr.total_out;
 		written_size = angelscript_bytecode_encrypt(content, written_size, alloc_size);
@@ -214,32 +219,34 @@ public:
 // Since we will likely want to store more in this encrypted data section than just bytecode, create a c++ iostream around the above class. If this had been written when I had more experience, the above class would be written around an existing iostream instead and indeed this is likely to happen at some point.
 class nvgt_bytecode_stream_iostream_buf : public UnbufferedStreamBuf {
 public:
-	nvgt_bytecode_stream_iostream_buf(NVGTBytecodeStream* stream) : stream(stream) {}
+	nvgt_bytecode_stream_iostream_buf(NVGTBytecodeStream *stream) : stream(stream) {}
+
 private:
 	int readFromDevice() {
 		char c;
-		if (stream->Read(&c, 1) != 1) return char_traits::eof();
+		if (stream->Read(&c, 1) != 1)
+			return char_traits::eof();
 		return c;
 	}
 	int writeToDevice(char c) { return stream->Write(&c, 1); }
-	NVGTBytecodeStream* stream;
+	NVGTBytecodeStream *stream;
 };
 class nvgt_bytecode_stream_ios : public virtual std::ios {
 public:
-	nvgt_bytecode_stream_ios(NVGTBytecodeStream* stream) : _buf(stream) { poco_ios_init(&_buf); }
-	nvgt_bytecode_stream_iostream_buf* rdbuf() { return &_buf; }
+	nvgt_bytecode_stream_ios(NVGTBytecodeStream *stream) : _buf(stream) { poco_ios_init(&_buf); }
+	nvgt_bytecode_stream_iostream_buf *rdbuf() { return &_buf; }
+
 protected:
 	nvgt_bytecode_stream_iostream_buf _buf;
 };
 class nvgt_bytecode_istream : public nvgt_bytecode_stream_ios, public std::istream {
 public:
-	nvgt_bytecode_istream(NVGTBytecodeStream* stream) : nvgt_bytecode_stream_ios(stream), std::istream(&_buf) {}
+	nvgt_bytecode_istream(NVGTBytecodeStream *stream) : nvgt_bytecode_stream_ios(stream), std::istream(&_buf) {}
 };
 class nvgt_bytecode_ostream : public nvgt_bytecode_stream_ios, public std::ostream {
 public:
-	nvgt_bytecode_ostream(NVGTBytecodeStream* stream) : nvgt_bytecode_stream_ios(stream), std::ostream(&_buf) {}
+	nvgt_bytecode_ostream(NVGTBytecodeStream *stream) : nvgt_bytecode_stream_ios(stream), std::ostream(&_buf) {}
 };
-
 
 string g_scriptMessagesWarn;
 string g_scriptMessagesErr;
@@ -247,26 +254,27 @@ string g_scriptMessagesLine0;
 string g_scriptMessagesInfo;
 int g_scriptMessagesErrNum;
 void ShowAngelscriptMessages() {
-	if (g_scriptMessagesErr == "" && g_scriptMessagesWarn == "" && g_scriptMessagesLine0 == "") return;
+	if (g_scriptMessagesErr == "" && g_scriptMessagesWarn == "" && g_scriptMessagesLine0 == "")
+		return;
 	#ifdef _WIN32
 	if (Util::Application::instance().config().hasOption("application.gui")) {
 		if (g_scriptMessagesErrNum)
-			info_box("Compilation error", "", (g_ScriptEngine->GetEngineProperty(asEP_COMPILER_WARNINGS) == 2? g_scriptMessagesWarn : "") + (g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0));
+			info_box("Compilation error", "", (g_ScriptEngine->GetEngineProperty(asEP_COMPILER_WARNINGS) == 2 ? g_scriptMessagesWarn : "") + (g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0));
 		else
 			info_box("Compilation warnings", "", g_scriptMessagesWarn);
 	} else {
 	#endif
 		if (g_scriptMessagesErrNum)
-			message((g_ScriptEngine->GetEngineProperty(asEP_COMPILER_WARNINGS) == 2? g_scriptMessagesWarn : "") + (g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0), "Compilation error");
+			message((g_ScriptEngine->GetEngineProperty(asEP_COMPILER_WARNINGS) == 2 ? g_scriptMessagesWarn : "") + (g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0), "Compilation error");
 		else
 			message(g_scriptMessagesWarn, "Compilation warnings");
 		#ifdef _WIN32
 	} // endif gui
 		#endif
-		g_scriptMessagesErr = g_scriptMessagesWarn = g_scriptMessagesLine0 = ""; // Clear out the message buffers such that only new messages will be displayed upon a second call to this function.
+	g_scriptMessagesErr = g_scriptMessagesWarn = g_scriptMessagesLine0 = ""; // Clear out the message buffers such that only new messages will be displayed upon a second call to this function.
 }
 
-void MessageCallback(const asSMessageInfo* msg, void* param) {
+void MessageCallback(const asSMessageInfo *msg, void *param) {
 	string type = "ERROR";
 	if (msg->type == asMSGTYPE_WARNING)
 		type = "WARNING";
@@ -285,7 +293,7 @@ void MessageCallback(const asSMessageInfo* msg, void* param) {
 	} else
 		g_scriptMessagesWarn += g_scriptMessagesInfo + buffer;
 }
-void nvgt_line_callback(asIScriptContext* ctx, void* obj) {
+void nvgt_line_callback(asIScriptContext *ctx, void *obj) {
 	#ifndef NVGT_STUB
 	if (g_dbg) {
 		if (g_ASDebugBreak) {
@@ -299,52 +307,62 @@ void nvgt_line_callback(asIScriptContext* ctx, void* obj) {
 	profiler_callback(ctx, obj);
 }
 #ifndef NVGT_STUB
-int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilder* builder, void* param) {
+int IncludeCallback(const char *filename, const char *sectionname, CScriptBuilder *builder, void *param) {
 	// First, because it is the most platform agnostic method of accessing a file, we'll try loading the include manually with file_get_contents.
 	string include_text = file_get_contents(filename);
-	if (!include_text.empty()) return builder->AddSectionFromMemory(Path(filename).makeAbsolute().toString(Path::PATH_UNIX).c_str() + 1, include_text.c_str());
+	if (!include_text.empty())
+		return builder->AddSectionFromMemory(Path(filename).makeAbsolute().toString(Path::PATH_UNIX).c_str() + 1, include_text.c_str());
 	File include_file;
 	try {
 		Path include(Path::expand(filename));
 		include.makeAbsolute();
 		include_file = include;
-		if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str()); // Don't cache locations for scripts that are directly included.
+		if (include_file.exists() && include_file.isFile())
+			return builder->AddSectionFromFile(include.toString().c_str()); // Don't cache locations for scripts that are directly included.
 		include = Path(sectionname).parent().append(filename).makeAbsolute();
 		include_file = include;
-		if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str());
+		if (include_file.exists() && include_file.isFile())
+			return builder->AddSectionFromFile(include.toString().c_str());
 		for (int i = 0; i < g_IncludeDirs.size(); i++) {
 			include = Path(g_IncludeDirs[i]).append(filename).makeAbsolute();
 			include_file = include;
-			if (include_file.exists() && include_file.isFile()) return builder->AddSectionFromFile(include.toString().c_str());
+			if (include_file.exists() && include_file.isFile())
+				return builder->AddSectionFromFile(include.toString().c_str());
 		}
-	} catch (Exception& e) {} // Might be wildcards.
+	} catch (Exception &e) {
+	} // Might be wildcards.
 	try {
 		set<string> includes;
 		Glob::glob(Path(sectionname).parent().append(filename), includes, Glob::GLOB_DOT_SPECIAL | Glob::GLOB_FOLLOW_SYMLINKS | Glob::GLOB_CASELESS);
-		if (includes.size() == 0) Glob::glob(Path(filename).makeAbsolute(), includes, Glob::GLOB_DOT_SPECIAL | Glob::GLOB_FOLLOW_SYMLINKS | Glob::GLOB_CASELESS);
+		if (includes.size() == 0)
+			Glob::glob(Path(filename).makeAbsolute(), includes, Glob::GLOB_DOT_SPECIAL | Glob::GLOB_FOLLOW_SYMLINKS | Glob::GLOB_CASELESS);
 		for (int i = 0; i < g_IncludeDirs.size(); i++) {
-			if (includes.size() == 0) Glob::glob(Path(g_IncludeDirs[i]).append(filename), includes, Glob::GLOB_DOT_SPECIAL | Glob::GLOB_FOLLOW_SYMLINKS | Glob::GLOB_CASELESS);
+			if (includes.size() == 0)
+				Glob::glob(Path(g_IncludeDirs[i]).append(filename), includes, Glob::GLOB_DOT_SPECIAL | Glob::GLOB_FOLLOW_SYMLINKS | Glob::GLOB_CASELESS);
 		}
-		for (const std::string& i : includes) {
+		for (const std::string &i : includes) {
 			include_file = i;
-			if (include_file.exists() && include_file.isFile()) builder->AddSectionFromFile(i.c_str());
+			if (include_file.exists() && include_file.isFile())
+				builder->AddSectionFromFile(i.c_str());
 		}
-		if (includes.size() > 0) return 1; // So that the below failure message won't execute.
-	} catch (Exception& e) {
+		if (includes.size() > 0)
+			return 1; // So that the below failure message won't execute.
+	} catch (Exception &e) {
 		message(e.displayText().c_str(), "exception while finding includes");
 	}
 	builder->GetEngine()->WriteMessage(filename, 0, 0, asMSGTYPE_ERROR, "unable to locate this include");
 	return -1;
 }
 #endif
-void TranslateException(asIScriptContext* ctx, void* /*userParam*/) {
+void TranslateException(asIScriptContext *ctx, void * /*userParam*/) {
 	try {
 		throw;
-	} catch (Exception& e) {
+	} catch (Exception &e) {
 		ctx->SetException(e.displayText().c_str());
-	} catch (std::exception& e) {
+	} catch (std::exception &e) {
 		ctx->SetException(e.what());
-	} catch (...) {}
+	} catch (...) {
+	}
 }
 void Exit(int retcode = 0) {
 	g_shutting_down = true;
@@ -355,12 +373,22 @@ asUINT GetTimeCallback() {
 	return ticks();
 }
 
-// Registrations in the following function are usually done in alphabetical order, with some exceptions involving one subsystem depending on another. For example the internet subsystem registers functions that take timespans, meaning that timestuff gets registered before internet.
-int ConfigureEngine(asIScriptEngine* engine) {
+// A user may want to namespace an enntire NVGT subsystem, for example to replace it with a plugin, for code organization etc.
+std::string get_system_namespace(const std::string& system) {
+	if (g_system_namespaces.find(system) != g_system_namespaces.end()) return g_system_namespaces[system];
+	else return "";
+}
+inline void system_namespace(const string& system = "") {
+	g_ScriptEngine->SetDefaultNamespace(get_system_namespace(system).c_str());
+}
+
+int PreconfigureEngine(asIScriptEngine* engine) {
+	// This part of engine configuration happens right at program launch, where as everything else is deferred until after the script loads so that the script can influence how the engine is configured. Separation needed because for example a CScriptArray is created during command line argument processing at which time the array addon must have been registered.
 	engine->SetMessageCallback(asFUNCTION(MessageCallback), 0, asCALL_CDECL);
 	engine->SetTranslateAppExceptionCallback(asFUNCTION(TranslateException), 0, asCALL_CDECL);
 	engine->SetEngineProperty(asEP_ALLOW_UNSAFE_REFERENCES, true);
 	engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
+	engine->SetEngineProperty(asEP_MEMBER_INIT_MODE, 0);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->BeginConfigGroup("core");
 	RegisterStdString(engine);
@@ -370,10 +398,17 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->BeginConfigGroup("random");
 	RegisterScriptRandom(engine); // Must be done here because functions in this module register array methods and that won't work after array template types are instantiated.
 	engine->EndConfigGroup();
-	engine->BeginConfigGroup("core");
 	RegisterStdStringUtils(engine);
 	RegisterScriptDictionary(engine);
-	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
+	engine->BeginConfigGroup("datastreams");
+	RegisterScriptDatastreams(engine);
+	engine->EndConfigGroup();
+	engine->RegisterObjectType("pack_interface", 0, asOBJ_REF);
+	return 0;
+}
+// Registrations in the following function are usually done in alphabetical order, with some exceptions involving one subsystem depending on another. For example the internet subsystem registers functions that take timespans, meaning that timestuff gets registered before internet.
+int ConfigureEngine(asIScriptEngine *engine) {
+	engine->BeginConfigGroup("core");
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	RegisterScriptGrid(engine);
 	RegisterScriptHandle(engine);
@@ -396,9 +431,6 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("crypto");
 	RegisterScriptCrypto(engine);
-	engine->EndConfigGroup();
-	engine->BeginConfigGroup("datastreams");
-	RegisterScriptDatastreams(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
 	engine->BeginConfigGroup("hash");
@@ -450,7 +482,9 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_SOUND);
 	engine->BeginConfigGroup("sound");
-	RegisterScriptSound(engine);
+	system_namespace("sound");
+	RegisterSoundsystem(engine);
+	system_namespace();
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	engine->BeginConfigGroup("system_fingerprint");
@@ -490,26 +524,41 @@ int ConfigureEngine(asIScriptEngine* engine) {
 	g_ctxMgr->RegisterCoRoutineSupport(engine);
 	engine->SetContextCallbacks(RequestContextCallback, ReturnContextCallback, 0);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
+	register_anticheat(engine);
 	return 0;
 }
 #ifndef NVGT_STUB
 // The following function translates various configuration options into Angelscript engine properties.
-void ConfigureEngineOptions(asIScriptEngine* engine) {
-	Util::LayeredConfiguration& config = Util::Application::instance().config();
-	if (config.hasOption("scripting.allow_multiline_strings")) engine->SetEngineProperty(asEP_ALLOW_MULTILINE_STRINGS, true);
-	if (config.hasOption("scripting.allow_unicode_identifiers")) engine->SetEngineProperty(asEP_ALLOW_UNICODE_IDENTIFIERS, true);
-	if (config.hasOption("scripting.allow_implicit_handle_types")) engine->SetEngineProperty(asEP_ALLOW_IMPLICIT_HANDLE_TYPES, true);
-	if (config.hasOption("scripting.disallow_empty_list_elements")) engine->SetEngineProperty(asEP_DISALLOW_EMPTY_LIST_ELEMENTS, true);
-	if (config.hasOption("scripting.disallow_global_vars")) engine->SetEngineProperty(asEP_DISALLOW_GLOBAL_VARS, true);
-	if (config.hasOption("scripting.disallow_value_assign_for_ref_type")) engine->SetEngineProperty(asEP_DISALLOW_VALUE_ASSIGN_FOR_REF_TYPE, true);
-	if (config.hasOption("scripting.disable_integer_division")) engine->SetEngineProperty(asEP_DISABLE_INTEGER_DIVISION, true);
-	if (config.hasOption("scripting.use_character_literals")) engine->SetEngineProperty(asEP_USE_CHARACTER_LITERALS, true);
-	if (config.hasOption("scripting.ignore_duplicate_shared_interface")) engine->SetEngineProperty(asEP_IGNORE_DUPLICATE_SHARED_INTF, true);
-	if (config.hasOption("scripting.private_prop_as_protected")) engine->SetEngineProperty(asEP_PRIVATE_PROP_AS_PROTECTED, true);
-	if (config.hasOption("scripting.always_impl_default_construct")) engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_CONSTRUCT, true);
-	if (config.hasOption("scripting.expand_default_array_to_template")) engine->SetEngineProperty(asEP_EXPAND_DEF_ARRAY_TO_TMPL, true);
-	if (config.hasOption("scripting.require_enum_scope")) engine->SetEngineProperty(asEP_REQUIRE_ENUM_SCOPE, true);
-	if (config.hasOption("scripting.do_not_optimize_bytecode")) engine->SetEngineProperty(asEP_OPTIMIZE_BYTECODE, false);
+void ConfigureEngineOptions(asIScriptEngine *engine) {
+	Util::LayeredConfiguration &config = Util::Application::instance().config();
+	if (config.hasOption("scripting.allow_multiline_strings"))
+		engine->SetEngineProperty(asEP_ALLOW_MULTILINE_STRINGS, true);
+	if (config.hasOption("scripting.allow_unicode_identifiers"))
+		engine->SetEngineProperty(asEP_ALLOW_UNICODE_IDENTIFIERS, true);
+	if (config.hasOption("scripting.allow_implicit_handle_types"))
+		engine->SetEngineProperty(asEP_ALLOW_IMPLICIT_HANDLE_TYPES, true);
+	if (config.hasOption("scripting.disallow_empty_list_elements"))
+		engine->SetEngineProperty(asEP_DISALLOW_EMPTY_LIST_ELEMENTS, true);
+	if (config.hasOption("scripting.disallow_global_vars"))
+		engine->SetEngineProperty(asEP_DISALLOW_GLOBAL_VARS, true);
+	if (config.hasOption("scripting.disallow_value_assign_for_ref_type"))
+		engine->SetEngineProperty(asEP_DISALLOW_VALUE_ASSIGN_FOR_REF_TYPE, true);
+	if (config.hasOption("scripting.disable_integer_division"))
+		engine->SetEngineProperty(asEP_DISABLE_INTEGER_DIVISION, true);
+	if (config.hasOption("scripting.use_character_literals"))
+		engine->SetEngineProperty(asEP_USE_CHARACTER_LITERALS, true);
+	if (config.hasOption("scripting.ignore_duplicate_shared_interface"))
+		engine->SetEngineProperty(asEP_IGNORE_DUPLICATE_SHARED_INTF, true);
+	if (config.hasOption("scripting.private_prop_as_protected"))
+		engine->SetEngineProperty(asEP_PRIVATE_PROP_AS_PROTECTED, true);
+	if (config.hasOption("scripting.always_impl_default_construct"))
+		engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_CONSTRUCT, true);
+	if (config.hasOption("scripting.expand_default_array_to_template"))
+		engine->SetEngineProperty(asEP_EXPAND_DEF_ARRAY_TO_TMPL, true);
+	if (config.hasOption("scripting.require_enum_scope"))
+		engine->SetEngineProperty(asEP_REQUIRE_ENUM_SCOPE, true);
+	if (config.hasOption("scripting.do_not_optimize_bytecode"))
+		engine->SetEngineProperty(asEP_OPTIMIZE_BYTECODE, false);
 	engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, config.getInt("scripting.max_nested_calls", 10000));
 	engine->SetEngineProperty(asEP_MAX_STACK_SIZE, config.getInt("scripting.max_stack_size", 0));
 	engine->SetEngineProperty(asEP_MAX_CALL_STACK_SIZE, config.getInt("scripting.max_call_stack_size", 0));
@@ -519,19 +568,25 @@ void ConfigureEngineOptions(asIScriptEngine* engine) {
 	engine->SetEngineProperty(asEP_COMPILER_WARNINGS, config.getInt("scripting.compiler_warnings", 0)); // We must disable these by default for the sake of the megabytes of bgt code that exists.
 	engine->SetEngineProperty(asEP_HEREDOC_TRIM_MODE, config.getInt("scripting.heredoc_trim_mode", 1));
 	engine->SetEngineProperty(asEP_ALTER_SYNTAX_NAMED_ARGS, config.getInt("scripting.alter_syntax_named_args", 2));
+	engine->SetEngineProperty(asEP_MEMBER_INIT_MODE, config.getInt("scripting.member_init_mode", 0));
 }
-int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
+int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
 	Path global_include(Path(Path::self()).parent().append("include"));
 	g_IncludeDirs.push_back(global_include.toString());
-	if (!g_debug) engine->SetEngineProperty(asEP_BUILD_WITHOUT_LINE_CUES, true);
-	if (g_platform == "auto") determine_compile_platform(); // Insure that platform defines work whether compiling or executing a script.
+	if (!g_debug)
+		engine->SetEngineProperty(asEP_BUILD_WITHOUT_LINE_CUES, true);
+	if (g_platform == "auto")
+		determine_compile_platform(); // Insure that platform defines work whether compiling or executing a script.
 	CScriptBuilder builder;
 	builder.SetIncludeCallback(IncludeCallback, 0);
 	builder.SetPragmaCallback(PragmaCallback, 0);
-	if (builder.StartNewModule(engine, "nvgt_game") < 0) return -1;
-	if (g_platform != "auto") builder.DefineWord(g_platform.c_str());
-	asIScriptModule* mod = builder.GetModule();
-	if (mod) mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
+	if (builder.StartNewModule(engine, "nvgt_game") < 0)
+		return -1;
+	if (g_platform != "auto")
+		builder.DefineWord(g_platform.c_str());
+	asIScriptModule *mod = builder.GetModule();
+	if (mod)
+		mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
 	try {
 		if (builder.AddSectionFromFile(Path(scriptFile).makeAbsolute().toString().c_str()) < 0)
 			return -1;
@@ -539,13 +594,15 @@ int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
 			if (builder.AddSectionFromFile(g_IncludeScripts[i].c_str()) < 0)
 				return -1;
 		}
+		if (ConfigureEngine(engine) < 0) return -1;
 		if (builder.BuildModule() < 0) {
 			engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "Script failed to build");
 			return -1;
 		}
 		// Do not let the script compile if it contains no entry point.
-		if (!mod) return -1;
-		asIScriptFunction* func = mod->GetFunctionByDecl("int main()");
+		if (!mod)
+			return -1;
+		asIScriptFunction *func = mod->GetFunctionByDecl("int main()");
 		if (!func)
 			func = mod->GetFunctionByDecl("void main()");
 		if (!func) {
@@ -553,21 +610,25 @@ int CompileScript(asIScriptEngine* engine, const string& scriptFile) {
 			engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "No entry point found (either 'int main()' or 'void main()'.)");
 			return -1;
 		}
-	} catch(Exception& e) {
+	} catch (Exception &e) {
 		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, e.displayText().c_str());
+		return -1;
+	} catch (exception &e) {
+		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, e.what());
 		return -1;
 	}
 	return 0;
 }
-int SaveCompiledScript(asIScriptEngine* engine, unsigned char** output) {
-	asIScriptModule* mod = engine->GetModule("nvgt_game", asGM_ONLY_IF_EXISTS);
+int SaveCompiledScript(asIScriptEngine *engine, unsigned char **output) {
+	asIScriptModule *mod = engine->GetModule("nvgt_game", asGM_ONLY_IF_EXISTS);
 	if (mod == 0)
 		return -1;
 	NVGTBytecodeStream codestream;
 	nvgt_bytecode_ostream ostr(&codestream);
 	BinaryWriter bw(ostr);
 	serialize_nvgt_plugins(bw);
-	for(int i = 0; i < asEP_LAST_PROPERTY; i++) bw.write7BitEncoded(UInt64(engine->GetEngineProperty(asEEngineProp(i))));
+	for (int i = 0; i < asEP_LAST_PROPERTY; i++)
+		bw.write7BitEncoded(UInt64(engine->GetEngineProperty(asEEngineProp(i))));
 	bw << Timestamp().raw();
 	if (mod->SaveByteCode(&codestream, !g_debug) < 0)
 		return -1;
@@ -578,13 +639,14 @@ class CompileExecutableTask : public Runnable {
 	// NVGT shows a status window as compilation is proceeding. That window must be pulled for events on the main thread so it won't hang, but compilation requires a lot of I/O (enough that pulling the window during compilation often enough is not viable). Thus we create this task so that the heavy lifting of the compilation can happen on another thread while we pull the status window in the main one.
 	// To further complicate things, sometimes a success message or an extra question might pop up during compilation, and as with most UI stuff, such alert dialogs also must be shown on the main thread. For now we just split the task into 2 segments with the option of showing messages in between, and if we find we need more in the future, we'll create a queue of callables instead.
 	string script_file;
-	asIScriptEngine* engine;
+	asIScriptEngine *engine;
 	int stage;
 	SharedPtr<Thread> worker;
+
 public:
 	SharedPtr<nvgt_compilation_output> output;
 	bool fail, isUI, quiet;
-	CompileExecutableTask(asIScriptEngine* engine, const string& script_file) : stage(0), fail(false), isUI(Util::Application::instance().config().has("application.gui")), quiet(Util::Application::instance().config().has("application.quiet") || Util::Application::instance().config().has("application.QUIET")), engine(engine), script_file(script_file), output(nvgt_init_compilation(script_file, false)) {}
+	CompileExecutableTask(asIScriptEngine *engine, const string &script_file) : stage(0), fail(false), isUI(Util::Application::instance().config().has("application.gui")), quiet(Util::Application::instance().config().has("application.quiet") || Util::Application::instance().config().has("application.QUIET")), engine(engine), script_file(script_file), output(nvgt_init_compilation(script_file, false)) {}
 	void compile() {
 		output->set_status("compiling...");
 		if (CompileScript(g_ScriptEngine, script_file.c_str()) < 0) {
@@ -597,7 +659,7 @@ public:
 			fail = true;
 			return;
 		}
-		unsigned char* code = NULL;
+		unsigned char *code = NULL;
 		UInt32 code_size = SaveCompiledScript(engine, &code);
 		if (code_size < 1) {
 			engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to retrieve bytecode while trying to compile %s", output->get_output_file()).c_str());
@@ -611,12 +673,17 @@ public:
 	void run() {
 		stage++;
 		try {
-			if (stage == 1) compile();
-			else if (stage == 2) output->postbuild();
-		} catch(Exception& e) {
-			if (output && !output->get_error_text().empty()) engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s, %s", output->get_output_file(), output->get_error_text(), e.displayText()).c_str());
-			else if (output) engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s", output->get_output_file(), e.displayText()).c_str());
-			else engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("exception while compiling, %s", e.displayText()).c_str());
+			if (stage == 1)
+				compile();
+			else if (stage == 2)
+				output->postbuild();
+		} catch (Exception &e) {
+			if (output && !output->get_error_text().empty())
+				engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s, %s", output->get_output_file(), output->get_error_text(), e.displayText()).c_str());
+			else if (output)
+				engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to compile %s, %s", output->get_output_file(), e.displayText()).c_str());
+			else
+				engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("exception while compiling, %s", e.displayText()).c_str());
 			fail = true;
 		}
 	}
@@ -627,8 +694,10 @@ public:
 		while (!worker->tryJoin(5)) {
 			string status = output->get_status();
 			if (!quiet && !status.empty()) {
-				if (isUI) ShowNVGTWindow(status);
-				else cout << status << endl;
+				if (isUI)
+					ShowNVGTWindow(status);
+				else
+					cout << status << endl;
 			}
 			refresh_window();
 		}
@@ -636,25 +705,30 @@ public:
 	}
 };
 #endif
-int CompileExecutable(asIScriptEngine* engine, const string& scriptFile) {
+int CompileExecutable(asIScriptEngine *engine, const string &scriptFile) {
 	#ifdef NVGT_MOBILE
 	return -1; // Executable compilation is not supported on this platform, no need to compile this.
 	#else
-	if (g_platform == "auto") determine_compile_platform();
-	if (g_platform == "auto") return -1; // Cannot compile for this platform.
+	if (g_platform == "auto")
+		determine_compile_platform();
+	if (g_platform == "auto")
+		return -1; // Cannot compile for this platform.
 	CompileExecutableTask t(engine, scriptFile);
-	if (!t.next()) return -1; // compile and bundle
+	if (!t.next())
+		return -1;                   // compile and bundle
 	t.output->postbuild_interface(); // First call shows compilation success dialog.
-	if (!t.next()) return -1; // postbuild, such as install
+	if (!t.next())
+		return -1;                   // postbuild, such as install
 	t.output->postbuild_interface(); // Second call shows any potential success dialogs from any postbuild steps.
 	return 0;
 	#endif // !NVGT_MOBILE
 }
 #else
-int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size) {
-	//engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
-	//engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, 10000);
-	asIScriptModule* mod = engine->GetModule("nvgt_game", asGM_ALWAYS_CREATE);
+int LoadCompiledScript(asIScriptEngine *engine, unsigned char *code, asUINT size) {
+	if (ConfigureEngine(engine) < 0) return -1;
+	// engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
+	// engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, 10000);
+	asIScriptModule *mod = engine->GetModule("nvgt_game", asGM_ALWAYS_CREATE);
 	if (mod == 0)
 		return -1;
 	mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
@@ -675,14 +749,14 @@ int LoadCompiledScript(asIScriptEngine* engine, unsigned char* code, asUINT size
 	codestream.reset_cursor(); // Angelscript can produce bytecode load failures as a result of user misconfigurations or bugs, and such failures only include an offset of bytes read maintained by Angelscript internally. The solution in such cases is to breakpoint NVGTBytecodeStream::Read if cursor is greater than the offset given, then one can get more debug info. For that to work, we make sure that the codestream's variable that tracks number of bytes written does not include the count of those written by engine properties, plugins etc. We could theoretically store such data at the end of the stream instead of the beginning and avoid this, but then we are trusting Angelscript to read exactly the number of bytes it's written, and since I don't know how much of a gamble that is, I opted for this instead.
 	if (mod->LoadByteCode(&codestream, &g_debug) < 0)
 		return -1;
-	//engine->SetEngineProperty(asEP_PROPERTY_ACCESSOR_MODE, 2);
+	// engine->SetEngineProperty(asEP_PROPERTY_ACCESSOR_MODE, 2);
 	return 0;
 }
-int LoadCompiledExecutable(asIScriptEngine* engine) {
+int LoadCompiledExecutable(asIScriptEngine *engine) {
 	#ifndef __ANDROID__
-		FileInputStream fs(Util::Application::instance().commandPath());
+	FileInputStream fs(Util::Application::instance().commandPath());
 	#else
-		FileInputStream fs(android_get_main_shared_object());
+	FileInputStream fs(android_get_main_shared_object());
 	#endif
 	BinaryReader br(fs);
 	UInt32 data_location, code_size;
@@ -697,13 +771,13 @@ int LoadCompiledExecutable(asIScriptEngine* engine) {
 	if (sig != IMAGE_NT_SIGNATURE)
 		return -1;
 	IMAGE_FILE_HEADER ih;
-	br.readRaw(reinterpret_cast<char*>(&ih), sizeof(IMAGE_FILE_HEADER));
+	br.readRaw(reinterpret_cast<char *>(&ih), sizeof(IMAGE_FILE_HEADER));
 	// Skip the optional header
 	fs.seekg(ih.SizeOfOptionalHeader, ios::cur);
 	DWORD offset = 0;
 	for (int i = 0; i < ih.NumberOfSections; i++) {
 		IMAGE_SECTION_HEADER sh;
-		br.readRaw(reinterpret_cast<char*>(&sh), sizeof(IMAGE_SECTION_HEADER));
+		br.readRaw(reinterpret_cast<char *>(&sh), sizeof(IMAGE_SECTION_HEADER));
 		if (sh.PointerToRawData + sh.SizeOfRawData > offset)
 			offset = sh.PointerToRawData + sh.SizeOfRawData;
 	}
@@ -713,22 +787,24 @@ int LoadCompiledExecutable(asIScriptEngine* engine) {
 	br >> data_location;
 	#endif
 	fs.seekg(data_location);
-	if (!load_embedded_packs(br)) return -1;
+	if (!load_embedded_packs(br))
+		return -1;
 	br.read7BitEncoded(code_size);
 	code_size ^= NVGT_BYTECODE_NUMBER_XOR;
-	unsigned char* code = (unsigned char*)malloc(code_size);
-	br.readRaw((char*)code, code_size);
+	unsigned char *code = (unsigned char *)malloc(code_size);
+	br.readRaw((char *)code, code_size);
 	fs.close();
 	int r = LoadCompiledScript(engine, code, code_size);
 	free(code);
 	return r;
 }
 #endif
-int ExecuteScript(asIScriptEngine* engine, const string& scriptFile) {
-	asIScriptModule* mod = engine->GetModule("nvgt_game", asGM_ONLY_IF_EXISTS);
-	if (!mod) return -1;
+int ExecuteScript(asIScriptEngine *engine, const string &scriptFile) {
+	asIScriptModule *mod = engine->GetModule("nvgt_game", asGM_ONLY_IF_EXISTS);
+	if (!mod)
+		return -1;
 	mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
-	asIScriptFunction* func = mod->GetFunctionByDecl("int main()");
+	asIScriptFunction *func = mod->GetFunctionByDecl("int main()");
 	if (!func)
 		func = mod->GetFunctionByDecl("void main()");
 	if (!func) {
@@ -736,16 +812,17 @@ int ExecuteScript(asIScriptEngine* engine, const string& scriptFile) {
 		engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "No entry point found (either 'int main()' or 'void main()'.)");
 		return -1;
 	}
-	asIScriptFunction* prefunc = mod->GetFunctionByDecl("bool preglobals()");
-	asIScriptContext* ctx = engine->RequestContext();
-	if (!ctx) return -1;
+	asIScriptFunction *prefunc = mod->GetFunctionByDecl("bool preglobals()");
+	asIScriptContext *ctx = engine->RequestContext();
+	if (!ctx)
+		return -1;
 	if (prefunc) {
 		if (ctx->Prepare(prefunc) < 0 || ctx->Execute() < 0) {
 			engine->ReturnContext(ctx);
 			return -1;
 		}
 		if (!ctx->GetReturnByte()) {
-						engine->ReturnContext(ctx);
+			engine->ReturnContext(ctx);
 			return 0;
 		}
 		engine->ReturnContext(ctx);
@@ -764,8 +841,10 @@ int ExecuteScript(asIScriptEngine* engine, const string& scriptFile) {
 		g_dbg->TakeCommands(ctx);
 	}
 	#endif
-	while (g_ctxMgr->ExecuteScripts());
+	while (g_ctxMgr->ExecuteScripts())
+		;
 	int r = ctx->GetState();
+	int retcode = 0;
 	if (r != asEXECUTION_FINISHED) {
 		if (r == asEXECUTION_EXCEPTION) {
 			string exc = GetExceptionInfo(ctx, true);
@@ -773,22 +852,22 @@ int ExecuteScript(asIScriptEngine* engine, const string& scriptFile) {
 			int c = question("unhandled exception", msg, false, SDL_MESSAGEBOX_ERROR);
 			if (c == 1)
 				ClipboardSetText(exc);
-			r = -1;
+			retcode = -1;
 		} else if (r == asEXECUTION_ABORTED)
-			r = g_retcode;
+			retcode = g_retcode;
 		else {
 			alert("script terminated", "script terminated unexpectedly");
-			r = -1;
+			retcode = -1;
 		}
 		if (r != asEXECUTION_ABORTED)
 			g_ctxMgr->DoneWithContext(ctx);
 	} else {
 		if (func->GetReturnTypeId() == asTYPEID_INT32)
-			r = *(int*)ctx->GetAddressOfReturnValue();
+			retcode = *(int *)ctx->GetAddressOfReturnValue();
 		else
-			r = 0;
+			retcode = 0;
 	}
-	asIScriptFunction* outfunc = mod->GetFunctionByDecl("void on_exit()");
+	asIScriptFunction *outfunc = mod->GetFunctionByDecl("void on_exit()");
 	if (outfunc) {
 		ctx = g_ctxMgr->AddContext(engine, outfunc);
 		if (ctx) {
@@ -803,13 +882,13 @@ int ExecuteScript(asIScriptEngine* engine, const string& scriptFile) {
 	g_ctxPool.clear();
 	mod->Discard();
 	engine->GarbageCollect();
-	return r;
+	return retcode;
 }
 
 #ifndef NVGT_STUB
-int PragmaCallback(const string& pragmaText, CScriptBuilder& builder, void* /*userParam*/) {
-	asIScriptEngine* engine = builder.GetEngine();
-	Util::LayeredConfiguration& config = Util::Application::instance().config();
+int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void * /*userParam*/) {
+	asIScriptEngine *engine = builder.GetEngine();
+	Util::LayeredConfiguration &config = Util::Application::instance().config();
 	asUINT pos = 0;
 	asUINT length = 0;
 	string cleanText;
@@ -817,9 +896,12 @@ int PragmaCallback(const string& pragmaText, CScriptBuilder& builder, void* /*us
 		asETokenClass tokenClass = engine->ParseToken(pragmaText.c_str() + pos, 0, &length);
 		if (tokenClass == asTC_IDENTIFIER || tokenClass == asTC_KEYWORD || tokenClass == asTC_VALUE) {
 			string token = pragmaText.substr(pos, length);
-			if (tokenClass == asTC_VALUE) { // May be a string, trim quotes
-				if (token.starts_with("\"")) token.erase(0, 1);
-				if (token.ends_with("\"")) token.pop_back();
+			if (tokenClass == asTC_VALUE) {
+				// May be a string, trim quotes
+				if (token.starts_with("\""))
+					token.erase(0, 1);
+				if (token.ends_with("\""))
+					token.pop_back();
 			}
 			cleanText += " " + token;
 		}
@@ -835,25 +917,38 @@ int PragmaCallback(const string& pragmaText, CScriptBuilder& builder, void* /*us
 		g_stub = cleanText.substr(5);
 	else if (cleanText.starts_with("embed "))
 		embed_pack(cleanText.substr(6), Path(cleanText.substr(6)).getFileName());
-	else if (cleanText.starts_with("asset")) add_game_asset_to_bundle(cleanText.substr(6));
-	else if (cleanText.starts_with("document")) add_game_asset_to_bundle(cleanText.substr(9), GAME_ASSET_DOCUMENT);
+	else if (cleanText.starts_with("asset"))
+		add_game_asset_to_bundle(cleanText.substr(6));
+	else if (cleanText.starts_with("document"))
+		add_game_asset_to_bundle(cleanText.substr(9), GAME_ASSET_DOCUMENT);
 	else if (cleanText.starts_with("plugin ")) {
-		if (!load_nvgt_plugin(cleanText.substr(7)))
-			engine->WriteMessage(cleanText.substr(7).c_str(), -1, -1, asMSGTYPE_ERROR, "failed to load plugin");
+		string errmsg = "failed to load plugin";
+		if (!load_nvgt_plugin(cleanText.substr(7), &errmsg))
+			engine->WriteMessage(cleanText.substr(7).c_str(), -1, -1, asMSGTYPE_ERROR, errmsg.c_str());
+		else builder.DefineWord(Poco::format("plugin_%s", cleanText.substr(7)).c_str());
 	} else if (cleanText.starts_with("compiled_basename ")) {
 		string bn = cleanText.substr(18);
-		if (bn == "*") bn.clear();
+		if (bn == "*")
+			bn.clear();
 		config.setString("build.output_basename", bn);
 	} else if (cleanText.starts_with("bytecode_compression ")) {
 		g_bcCompressionLevel = strtol(cleanText.substr(21).c_str(), NULL, 10);
-		if (g_bcCompressionLevel < 0 || g_bcCompressionLevel > 9) return -1;
-	} else if (cleanText == "console") config.setString("build.windowsConsole", "");
-	else return -1;
+		if (g_bcCompressionLevel < 0 || g_bcCompressionLevel > 9)
+			return -1;
+			} else if (cleanText.starts_with("namespace")) {
+				string ns = cleanText.substr(10);
+				int space = ns.rfind(" ");
+				if (space == string::npos) return -1;
+				g_system_namespaces[ns.substr(0, space)] = ns.substr(space + 1);
+	} else if (cleanText == "console")
+		config.setString("build.windowsConsole", "");
+	else
+		return -1;
 	return 0;
 }
 // angelscript debugger stuff taken from asrun sample.
-std::string StringToString(void* obj, int /* expandMembers */, CDebugger* /* dbg */) {
-	std::string* val = reinterpret_cast<std::string*>(obj);
+std::string StringToString(void *obj, int /* expandMembers */, CDebugger * /* dbg */) {
+	std::string *val = reinterpret_cast<std::string *>(obj);
 	std::stringstream s;
 	s << "(len=" << val->length() << ") \"";
 	if (val->length() < 240)
@@ -862,8 +957,8 @@ std::string StringToString(void* obj, int /* expandMembers */, CDebugger* /* dbg
 		s << val->substr(0, 240) << "...";
 	return s.str();
 }
-std::string ArrayToString(void* obj, int expandMembers, CDebugger* dbg) {
-	CScriptArray* arr = reinterpret_cast<CScriptArray*>(obj);
+std::string ArrayToString(void *obj, int expandMembers, CDebugger *dbg) {
+	CScriptArray *arr = reinterpret_cast<CScriptArray *>(obj);
 	std::stringstream s;
 	s << "(len=" << arr->GetSize() << ")";
 	if (expandMembers > 0) {
@@ -877,8 +972,8 @@ std::string ArrayToString(void* obj, int expandMembers, CDebugger* dbg) {
 	}
 	return s.str();
 }
-std::string DictionaryToString(void* obj, int expandMembers, CDebugger* dbg) {
-	CScriptDictionary* dic = reinterpret_cast<CScriptDictionary*>(obj);
+std::string DictionaryToString(void *obj, int expandMembers, CDebugger *dbg) {
+	CScriptDictionary *dic = reinterpret_cast<CScriptDictionary *>(obj);
 	std::stringstream s;
 	s << "(len=" << dic->GetSize() << ")";
 	if (expandMembers > 0) {
@@ -886,10 +981,10 @@ std::string DictionaryToString(void* obj, int expandMembers, CDebugger* dbg) {
 		asUINT n = 0;
 		for (CScriptDictionary::CIterator it = dic->begin(); it != dic->end(); it++, n++) {
 			s << "[" << it.GetKey() << "] = ";
-			const void* val = it.GetAddressOfValue();
+			const void *val = it.GetAddressOfValue();
 			int typeId = it.GetTypeId();
-			asIScriptContext* ctx = asGetActiveContext();
-			s << dbg->ToString(const_cast<void*>(val), typeId, expandMembers - 1, ctx ? ctx->GetEngine() : 0);
+			asIScriptContext *ctx = asGetActiveContext();
+			s << dbg->ToString(const_cast<void *>(val), typeId, expandMembers - 1, ctx ? ctx->GetEngine() : 0);
 			if (n < dic->GetSize() - 1)
 				s << ", ";
 		}
@@ -898,27 +993,29 @@ std::string DictionaryToString(void* obj, int expandMembers, CDebugger* dbg) {
 	return s.str();
 }
 std::string DateTimeToString(void *obj, int expandMembers, CDebugger *dbg) {
-	Poco::DateTime*dt = reinterpret_cast<Poco::DateTime*>(obj);
+	Poco::DateTime *dt = reinterpret_cast<Poco::DateTime *>(obj);
 	std::stringstream s;
 	s << "{" << dt->year() << "-" << dt->month() << "-" << dt->day() << " ";
 	s << dt->hour() << ":" << dt->minute() << ":" << dt->second() << "}";
-	return s.str(); 
+	return s.str();
 }
-std::string Vector3ToString(void* obj, int expandMembers, CDebugger* dbg) {
-	reactphysics3d::Vector3* v = reinterpret_cast<reactphysics3d::Vector3*>(obj);
+std::string Vector3ToString(void *obj, int expandMembers, CDebugger *dbg) {
+	reactphysics3d::Vector3 *v = reinterpret_cast<reactphysics3d::Vector3 *>(obj);
 	return v->to_string();
 }
 #ifdef _WIN32
 BOOL WINAPI debugger_ctrlc(DWORD event) {
-	if ((event != CTRL_C_EVENT && event != CTRL_BREAK_EVENT) || !g_dbg || g_dbg->IsTakingCommands()) return FALSE;
+	if ((event != CTRL_C_EVENT && event != CTRL_BREAK_EVENT) || !g_dbg || g_dbg->IsTakingCommands())
+		return FALSE;
 	g_ASDebugBreak = true;
 	return TRUE;
 }
 #endif
-void InitializeDebugger(asIScriptEngine* engine) {
+void InitializeDebugger(asIScriptEngine *engine) {
 	#ifdef _WIN32
 	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
-	SetConsoleCtrlHandler(debugger_ctrlc, TRUE);;
+	SetConsoleCtrlHandler(debugger_ctrlc, TRUE);
+	;
 	#endif
 	g_dbg = new CDebugger();
 	g_dbg->SetEngine(engine);
@@ -929,20 +1026,27 @@ void InitializeDebugger(asIScriptEngine* engine) {
 	g_dbg->RegisterToStringCallback(engine->GetTypeInfoByName("vector"), Vector3ToString);
 }
 void asDebugBreak() {
-	if (!g_dbg) return;
+	if (!g_dbg)
+		return;
 	cout << "script debug break" << endl;
 	g_dbg->TakeCommands(asGetActiveContext());
 }
-void asDebuggerAddFileBreakpoint(const std::string& file, int line) { if (g_dbg) g_dbg->AddFileBreakPoint(file, line); }
-void asDebuggerAddFuncBreakpoint(const std::string& func) { if (g_dbg) g_dbg->AddFuncBreakPoint(func); }
+void asDebuggerAddFileBreakpoint(const std::string &file, int line) {
+	if (g_dbg)
+		g_dbg->AddFileBreakPoint(file, line);
+}
+void asDebuggerAddFuncBreakpoint(const std::string &func) {
+	if (g_dbg)
+		g_dbg->AddFuncBreakPoint(func);
+}
 #else
 void asDebugBreak() {} // Debugger not present for compiled executables.
-void asDebuggerAddFileBreakpoint(const std::string& file, int line) {}
-void asDebuggerAddFuncBreakpoint(const std::string& func) {}
+void asDebuggerAddFileBreakpoint(const std::string &file, int line) {}
+void asDebuggerAddFuncBreakpoint(const std::string &func) {}
 #endif
 
-asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* /*param*/) {
-	asIScriptContext* ctx = 0;
+asIScriptContext *RequestContextCallback(asIScriptEngine *engine, void * /*param*/) {
+	asIScriptContext *ctx = 0;
 	int pool_size = 0;
 	{
 		ScopedLock<Mutex> l(g_ctxPoolMutex);
@@ -959,38 +1063,44 @@ asIScriptContext* RequestContextCallback(asIScriptEngine* engine, void* /*param*
 	}
 	return ctx;
 }
-void ReturnContextCallback(asIScriptEngine* engine, asIScriptContext* ctx, void* /*param*/) {
+void ReturnContextCallback(asIScriptEngine *engine, asIScriptContext *ctx, void * /*param*/) {
 	ctx->Unprepare();
 	ScopedLock<Mutex> l(g_ctxPoolMutex);
 	g_ctxPool.push_back(ctx);
 }
-void ExceptionHandlerCallback(asIScriptContext* ctx, void* obj) {
+void ExceptionHandlerCallback(asIScriptContext *ctx, void *obj) {
 	g_last_exception_callstack = get_call_stack();
 }
 
-asITypeInfo* get_array_type(const std::string& decl) {
+asITypeInfo *get_array_type(const std::string &decl) {
 	if (!g_TypeInfoCache.contains(decl)) {
-		asITypeInfo* t = g_ScriptEngine->GetTypeInfoByDecl(decl.c_str());
-		if (!t) return nullptr;
+		asITypeInfo *t = g_ScriptEngine->GetTypeInfoByDecl(decl.c_str());
+		if (!t)
+			return nullptr;
 		g_TypeInfoCache[decl] = t;
 	}
 	return g_TypeInfoCache[decl];
 }
+// As of Angelscript 2.38.0, we need a custom dictionary method to retrieve strings because our string class has constructors for int and double, causing dictionary::get(string, ?&out) to throw a multiple defined signature error.
+bool script_dictionary_get(CScriptDictionary* dict, const std::string& key, std::string* value) {
+	return dict->Get(key, value, g_ScriptEngine->GetStringFactory());
+}
 
 // Try not to register things here unless absolutely no other place can be found for them.
-void RegisterUnsorted(asIScriptEngine* engine) {
+void RegisterUnsorted(asIScriptEngine *engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
-	engine->RegisterGlobalProperty("const string NVGT_VERSION", (void*)&NVGT_VERSION);
-	engine->RegisterGlobalProperty("const string NVGT_VERSION_COMMIT_HASH", (void*)&NVGT_VERSION_COMMIT_HASH);
-	engine->RegisterGlobalProperty("const string NVGT_VERSION_BUILD_TIME", (void*)&NVGT_VERSION_BUILD_TIME);
-	engine->RegisterGlobalProperty("const uint NVGT_VERSION_BUILD_TIMESTAMP", (void*)&NVGT_VERSION_BUILD_TIMESTAMP);
-	engine->RegisterGlobalProperty("const int NVGT_VERSION_MAJOR", (void*)&NVGT_VERSION_MAJOR);
-	engine->RegisterGlobalProperty("const int NVGT_VERSION_MINOR", (void*)&NVGT_VERSION_MINOR);
-	engine->RegisterGlobalProperty("const int NVGT_VERSION_PATCH", (void*)&NVGT_VERSION_PATCH);
-	engine->RegisterGlobalProperty("const string NVGT_VERSION_TYPE", (void*)&NVGT_VERSION_TYPE);
+	engine->RegisterGlobalProperty("const string NVGT_VERSION", (void *)&NVGT_VERSION);
+	engine->RegisterGlobalProperty("const string NVGT_VERSION_COMMIT_HASH", (void *)&NVGT_VERSION_COMMIT_HASH);
+	engine->RegisterGlobalProperty("const string NVGT_VERSION_BUILD_TIME", (void *)&NVGT_VERSION_BUILD_TIME);
+	engine->RegisterGlobalProperty("const uint NVGT_VERSION_BUILD_TIMESTAMP", (void *)&NVGT_VERSION_BUILD_TIMESTAMP);
+	engine->RegisterGlobalProperty("const int NVGT_VERSION_MAJOR", (void *)&NVGT_VERSION_MAJOR);
+	engine->RegisterGlobalProperty("const int NVGT_VERSION_MINOR", (void *)&NVGT_VERSION_MINOR);
+	engine->RegisterGlobalProperty("const int NVGT_VERSION_PATCH", (void *)&NVGT_VERSION_PATCH);
+	engine->RegisterGlobalProperty("const string NVGT_VERSION_TYPE", (void *)&NVGT_VERSION_TYPE);
 	engine->RegisterGlobalFunction("void debug_break()", asFUNCTION(asDebugBreak), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void debug_add_file_breakpoint(const string&in, int)", asFUNCTION(asDebuggerAddFileBreakpoint), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void debug_add_func_breakpoint(const string&in)", asFUNCTION(asDebuggerAddFuncBreakpoint), asCALL_CDECL);
 	engine->RegisterGlobalProperty("const string[]@ ARGS", &g_command_line_args);
 	engine->RegisterGlobalProperty("const timestamp SCRIPT_BUILD_TIME", &g_script_build_time);
+	engine->RegisterObjectMethod("dictionary", "bool get(const string&in key, string&out value) const", asFUNCTION(script_dictionary_get), asCALL_CDECL_OBJFIRST);
 }

@@ -1,0 +1,10 @@
+/**
+	Returns the absolute value (magnitude) of the complex number.
+	float complex::abs() const;
+*/
+
+// Example:
+void main() {
+	complex c(3, 4);
+	alert("Magnitude =", c.abs());
+}

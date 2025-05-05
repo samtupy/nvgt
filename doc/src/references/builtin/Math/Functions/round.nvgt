@@ -5,7 +5,7 @@
 		* double n: The number to be rounded.
 		* int p: The number of decimal places to round to.
 	## Returns:
-		The value of the number rounded to the nearest integer.
+		double: The value of the number rounded to the nearest integer.
 */
 
 // Example:

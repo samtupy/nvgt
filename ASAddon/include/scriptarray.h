@@ -47,6 +47,7 @@ public:
 	asITypeInfo *GetArrayObjectType() const;
 	int          GetArrayTypeId() const;
 	int          GetElementTypeId() const;
+	int GetElementSize() const;
 
 	// Get the current size
 	asUINT GetSize() const;

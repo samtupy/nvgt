@@ -1,274 +1,256 @@
 /* sound.h - sound system implementation header
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
+ * Copyright (c) 2022-2025 Sam Tupy
  * https://nvgt.gg
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
-*/
+ */
 
-#ifndef sound_h
-#define sound_h
 #pragma once
-#include <atomic>
-#include <unordered_set>
-#include <vector>
-#include <angelscript.h>
-#include <bass.h>
-#include <bass_fx.h>
-#include <phonon.h>
-#include <Poco/Event.h>
-#include <Poco/Mutex.h>
-#include <thread.h>
-#include <verblib.h>
-#include "misc_functions.h"
-#include "pack.h"
 
-BOOL init_sound(unsigned int dev = -1);
-BOOL shutdown_sound();
+#include <miniaudio.h>
+#include <reactphysics3d/mathematics/Vector3.h>
+#include "sound_service.h"
 
+#define SOUNDSYSTEM_FRAMESIZE 128 // We can make this be configureable if enough people want it.
+
+class CScriptArray;
+class asIScriptEngine;
+class pack_interface;
+class audio_engine;
+class mixer;
 class sound;
-class mixer;
 
-typedef struct {
-	unsigned char* data;
-	unsigned int size;
-	int ref;
-	unsigned long long t; // Time since preload was last used, stored using ticks().
-	std::string fn;
-} sound_preload;
+extern audio_engine *g_audio_engine;
+extern std::atomic<ma_result> g_soundsystem_last_error;
+// Add support for a new audio format by plugging in a ma_decoding_backend_vtable.
+bool add_decoder(ma_decoding_backend_vtable *vtable);
+bool init_sound();
+void uninit_sound();
+bool refresh_audio_devices();
 
-typedef struct {
-	pack* p;
-	pack_stream* s;
-	sound* snd;
-} packed_sound;
-
-typedef struct hstream_entry {
-	hstream_entry* p;
-	unsigned int channel;
-	hstream_entry* n;
-} hstream_entry;
-
-typedef struct {
-	HFX hfx;
-	unsigned int type;
-	char id[32];
-} mixer_effect;
-
-typedef struct {
-	verblib v;
-	bool inside;
-} sound_reverb;
-
-class sound_base;
-class sound_environment {
-	IPLScene scene;
-	std::vector<sound_base*> attached;
-	std::vector<sound_base*> detaching;
-	std::unordered_map<std::string, IPLMaterial> materials;
-	bool scene_needs_commit = false;
-	bool _detach(sound_base* s);
+class audio_node {
 public:
-	int ref_count;
-	IPLSimulator sim;
-	IPLSimulationSharedInputs sim_inputs;
-	float listener_x, listener_y, listener_z, listener_rotation;
-	bool listener_modified;
-	Poco::Event listener_modifying;
-	thread_ptr_t env_thread;
-	Poco::Mutex env_thread_sim_running;
-	sound_environment();
-	~sound_environment();
-	void add_ref();
-	void release();
-	bool add_material(const std::string& name, float absorption_low, float absorption_mid, float absorption_high, float scattering, float transmission_low, float transmission_mid, float transmission_high, bool replace_if_existing = false);
-	bool add_box(const std::string& material, float minx, float maxx, float miny, float maxy, float minz, float maxz);
-	mixer* new_mixer();
-	sound* new_sound();
-	bool attach(sound_base* s);
-	bool detach(sound_base* s);
-	void _detach_all();
-	void update();
-	void background_update(); // Runs on an internal thread, where as update is called by the user.
-	void set_listener(float x, float y, float z, float rotation);
+	virtual void duplicate() = 0; // reference counting
+	virtual void release() = 0;
+	virtual ~audio_node() = default;
+	virtual ma_node_base *get_ma_node() = 0;
+	virtual audio_engine *get_engine() const = 0;
+	virtual unsigned int get_input_bus_count() = 0;
+	virtual unsigned int get_output_bus_count() = 0;
+	virtual unsigned int get_input_channels(unsigned int bus) = 0;
+	virtual unsigned int get_output_channels(unsigned int bus) = 0;
+	virtual bool attach_output_bus(unsigned int output_bus, audio_node *destination, unsigned int destination_input_bus) = 0;
+	virtual bool detach_output_bus(unsigned int bus) = 0;
+	virtual bool detach_all_output_buses() = 0;
+	virtual bool set_output_bus_volume(unsigned int bus, float volume) = 0;
+	virtual float get_output_bus_volume(unsigned int bus) = 0;
+	virtual bool set_state(ma_node_state state) = 0;
+	virtual ma_node_state get_state() = 0;
+	virtual bool set_state_time(ma_node_state state, unsigned long long time) = 0;
+	virtual unsigned long long get_state_time(ma_node_state state) = 0;
+	virtual ma_node_state get_state_by_time(unsigned long long global_time) = 0;
+	virtual ma_node_state get_state_by_time_range(unsigned long long global_time_begin, unsigned long long global_time_end) = 0;
+	virtual unsigned long long get_time() = 0;
+	virtual bool set_time(unsigned long long local_time) = 0;
+};
+class audio_engine {
+public:
+	enum engine_flags {
+		DURATIONS_IN_FRAMES = 1,  // If set, all durations possible will expect a value in PCM frames rather than milliseconds unless explicitly specified.
+		NO_AUTO_START = 2,        // if set, audio_engine::start must be called after initialization.
+		NO_DEVICE = 4,            // If set, audio_engine::read() must be used to receive raw audio samples from the engine instead.
+		PERCENTAGE_ATTRIBUTES = 8 // If this is set, attributes for sounds will be in percentages such as 100 instead of decimals such as 1.0, ecentially a multiplication by 100 for backwards compatibility or preference. This also causes sound.volume to work in db.
+	};
+	virtual void duplicate() = 0; // reference counting
+	virtual void release() = 0;
+	virtual ~audio_engine() = default;
+	virtual int get_device() const = 0;
+	virtual bool set_device(int device) = 0;
+	virtual audio_node *get_endpoint() const = 0;
+	virtual ma_engine *get_ma_engine() const = 0;
+	virtual bool read(void *buffer, unsigned long long frame_count, unsigned long long *frames_read) = 0;
+	virtual CScriptArray *read_script(unsigned long long frame_count) = 0;
+	virtual unsigned long long get_time() const = 0;
+	virtual bool set_time(unsigned long long time) = 0; // depends on DURATIONS_IN_FRAMES flag.
+	virtual unsigned long long get_time_in_frames() const = 0;
+	virtual bool set_time_in_frames(unsigned long long time) = 0;
+	virtual unsigned long long get_time_in_milliseconds() const = 0;
+	virtual bool set_time_in_milliseconds(unsigned long long time) = 0;
+	virtual int get_channels() const = 0;
+	virtual int get_sample_rate() const = 0;
+	virtual bool start() = 0;                  // Begins audio playback <ma_engine_start>, only needs to be called if NO_AUTO_START flag is set in engine construction or after stop is called.
+	virtual bool stop() = 0;                   // Stops audio playback.
+	virtual bool set_volume(float volume) = 0; // 0.0 to 1.0.
+	virtual float get_volume() const = 0;
+	virtual bool set_gain(float db) = 0;
+	virtual float get_gain() const = 0;
+	virtual unsigned int get_listener_count() const = 0;
+	virtual int find_closest_listener(float x, float y, float z) const = 0;
+	virtual int find_closest_listener_vector(const reactphysics3d::Vector3 &position) const = 0;
+	virtual void set_listener_position(unsigned int index, float x, float y, float z) = 0;
+	virtual void set_listener_position_vector(unsigned int index, const reactphysics3d::Vector3 &position) = 0;
+	virtual reactphysics3d::Vector3 get_listener_position(unsigned int index) const = 0;
+	virtual void set_listener_direction(unsigned int index, float x, float y, float z) = 0;
+	virtual void set_listener_direction_vector(unsigned int index, const reactphysics3d::Vector3 &direction) = 0;
+	virtual reactphysics3d::Vector3 get_listener_direction(unsigned int index) const = 0;
+	virtual void set_listener_velocity(unsigned int index, float x, float y, float z) = 0;
+	virtual void set_listener_velocity_vector(unsigned int index, const reactphysics3d::Vector3 &velocity) = 0;
+	virtual reactphysics3d::Vector3 get_listener_velocity(unsigned int index) const = 0;
+	virtual void set_listener_cone(unsigned int index, float inner_radians, float outer_radians, float outer_gain) = 0;
+	virtual void get_listener_cone(unsigned int index, float *inner_radians, float *outer_radians, float *outer_gain) const = 0;
+	virtual void set_listener_world_up(unsigned int index, float x, float y, float z) = 0;
+	virtual void set_listener_world_up_vector(unsigned int index, const reactphysics3d::Vector3 &world_up) = 0;
+	virtual reactphysics3d::Vector3 get_listener_world_up(unsigned int index) const = 0;
+	virtual void set_listener_enabled(unsigned int index, bool enabled) = 0;
+	virtual bool get_listener_enabled(unsigned int index) const = 0;
+	virtual bool play_through_node(const std::string &path, audio_node *node, unsigned int input_bus_index) = 0;
+	virtual bool play(const std::string &path, mixer *mixer = nullptr) = 0;
+	virtual mixer *new_mixer() = 0;
+	virtual sound *new_sound() = 0;
+};
+class mixer : public virtual audio_node {
+public:
+	virtual void duplicate() = 0; // reference counting
+	virtual void release() = 0;
+	virtual audio_engine *get_engine() const = 0;
+	virtual ma_sound *get_ma_sound() const = 0;
+	virtual bool set_mixer(mixer *mix) = 0;
+	virtual mixer *get_mixer() const = 0;
+	virtual bool set_hrtf_internal(bool hrtf) = 0;
+	virtual bool set_hrtf(bool hrtf) = 0;      // This is what should be called by the user and is what updates the desired state of hrtf and not just hrtf itself.
+	virtual bool get_hrtf() const = 0;         // whether hrtf is currently enabled
+	virtual bool get_hrtf_desired() const = 0; // whether hrtf is desired by the user even if global hrtf is currently off
+	virtual audio_node *get_hrtf_node() const = 0;
+	virtual bool play(bool reset_loop_state = true) = 0;
+	virtual bool play_looped() = 0;
+	virtual bool stop() = 0;
+	virtual void set_volume(float volume) = 0;
+	virtual float get_volume() const = 0;
+	virtual void set_pan(float pan) = 0;
+	virtual float get_pan() const = 0;
+	virtual void set_pan_mode(ma_pan_mode mode) = 0;
+	virtual ma_pan_mode get_pan_mode() const = 0;
+	virtual void set_pitch(float pitch) = 0;
+	virtual float get_pitch() const = 0;
+	virtual void set_spatialization_enabled(bool enabled) = 0;
+	virtual bool get_spatialization_enabled() const = 0;
+	virtual void set_pinned_listener(unsigned int index) = 0;
+	virtual unsigned int get_pinned_listener() const = 0;
+	virtual unsigned int get_listener() const = 0;
+	virtual reactphysics3d::Vector3 get_direction_to_listener() const = 0;
+	virtual float get_distance_to_listener() const = 0;
+	virtual void set_position_3d(float x, float y, float z) = 0;
+	virtual reactphysics3d::Vector3 get_position_3d() const = 0;
+	virtual void set_direction(float x, float y, float z) = 0;
+	virtual reactphysics3d::Vector3 get_direction() const = 0;
+	virtual void set_velocity(float x, float y, float z) = 0;
+	virtual reactphysics3d::Vector3 get_velocity() const = 0;
+	virtual void set_attenuation_model(ma_attenuation_model model) = 0;
+	virtual ma_attenuation_model get_attenuation_model() const = 0;
+	virtual void set_positioning(ma_positioning positioning) = 0;
+	virtual ma_positioning get_positioning() const = 0;
+	virtual void set_rolloff(float rolloff) = 0;
+	virtual float get_rolloff() const = 0;
+	virtual void set_min_gain(float gain) = 0;
+	virtual float get_min_gain() const = 0;
+	virtual void set_max_gain(float gain) = 0;
+	virtual float get_max_gain() const = 0;
+	virtual void set_min_distance(float distance) = 0;
+	virtual float get_min_distance() const = 0;
+	virtual void set_max_distance(float distance) = 0;
+	virtual float get_max_distance() const = 0;
+	virtual void set_cone(float inner_radians, float outer_radians, float outer_gain) = 0;
+	virtual void get_cone(float *inner_radians, float *outer_radians, float *outer_gain) const = 0;
+	virtual void set_doppler_factor(float factor) = 0;
+	virtual float get_doppler_factor() const = 0;
+	virtual void set_directional_attenuation_factor(float factor) = 0;
+	virtual float get_directional_attenuation_factor() const = 0;
+	virtual void set_fade(float start_volume, float end_volume, ma_uint64 length) = 0; // depends on DURATIONS_IN_FRAMES flag in parent engine
+	virtual void set_fade_in_frames(float start_volume, float end_volume, ma_uint64 frames) = 0;
+	virtual void set_fade_in_milliseconds(float start_volume, float end_volume, ma_uint64 milliseconds) = 0;
+	virtual float get_current_fade_volume() const = 0;
+	virtual void set_start_time(ma_uint64 absolute_time) = 0; // DURATIONS_IN_FRAMES
+	virtual void set_start_time_in_frames(ma_uint64 absolute_time) = 0;
+	virtual void set_start_time_in_milliseconds(ma_uint64 absolute_time) = 0;
+	virtual void set_stop_time(ma_uint64 absolute_time) = 0; // DURATIONS_IN_FRAMES
+	virtual void set_stop_time_in_frames(ma_uint64 absolute_time) = 0;
+	virtual void set_stop_time_in_milliseconds(ma_uint64 absolute_time) = 0;
+	virtual ma_uint64 get_time() const = 0; // DURATIONS_IN_FRAMES
+	virtual ma_uint64 get_time_in_frames() const = 0;
+	virtual ma_uint64 get_time_in_milliseconds() const = 0;
+	virtual bool get_playing() const = 0;
+};
+class sound : public virtual mixer {
+public:
+	/**
+	 * The lowest level method to load from the sound service; everything uses this.
+	 * Arguments:
+	 * const std::string &filename: the name of an asset on disk, in your archive, etc.
+	 * const size_t protocol_slot = 0: A slot number previously returned from sound_service::register_protocol.
+	 * directive_t protocol_directive = nullptr: an arbitrary piece of data for your protocol to use while fetching the asset (such as which packed archive to fetch from).
+	 * size_t filter_slot = 0: a slot number previously returned from sound_service::register_filter.
+	 * directive_t filter_directive = nullptr: an arbitrary piece of data for your filter to use (such as a decryption key).
+	 * ma_uint32 flags = 0: MiniAudio specific flags that govern how MiniAudio will load the data.
+	 * Remarks:
+	 * Directive_t is simply short for std::shared_ptr <void>
+	 * The sound service does not retain your directives after this method returns, so it's okay to allocate them on the stack.
+	 * A warning to protocol and filter developers: never store directive_t handles.
+	 * Also to those implementing custom sound methods: review the MiniAudio documentation to be sure you understand what the flags passed to ma_sound_init_from_file do. Some data sources, by their nature, only make sense in combination with certain flags. For example, MA_SOUND_FLAG_STREAM would be inappropriate for a string source unless you can guarantee it won't go away or be modified by script during playback.
+	 */
+	virtual bool load_special(const std::string &filename, const size_t protocol_slot = 0, directive_t protocol_directive = nullptr, const size_t filter_slot = 0, directive_t filter_directive = nullptr, ma_uint32 ma_flags = MA_SOUND_FLAG_DECODE) = 0;
+	virtual bool load(const std::string &filename, const pack_interface *pack_file = nullptr) = 0;
+	virtual bool stream(const std::string &filename, const pack_interface *pack_file = nullptr) = 0;
+	virtual bool load_string(const std::string &data) = 0;
+	virtual bool load_string_async(const std::string &data) = 0; // Makes an extra copy. Good for short sounds that need to start immediately. Used by speak_to_sound.
+	virtual bool load_memory(const void *buffer, unsigned int size) = 0;
+	virtual bool is_load_completed() const = 0;
+	/**
+	 * Create a wav file in memory from a raw PCM buffer.
+	 * Used internally by TTS.
+	 * Format is the format of the input data; it will not be converted.
+	 * Output must be preallocated and must be at least 44 bytes larger than the input buffer.
+	 */
+	static bool pcm_to_wav(const void *buffer, unsigned int size, ma_format format, int samplerate, int channels, void *output);
+	virtual bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) = 0;
+	virtual bool load_pcm_script(CScriptArray *buffer, int samplerate, int channels) = 0;
+	virtual bool close() = 0;
+	virtual const std::string &get_loaded_filename() const = 0;
+	virtual bool get_active() = 0;
+	virtual bool get_paused() = 0;
+	virtual bool play_wait() = 0;
+	virtual bool pause() = 0;
+	virtual bool pause_fade(unsigned long long length) = 0; // depends on the DURATIONS_IN_FRAMES engine flag.
+	virtual bool pause_fade_in_frames(unsigned long long frames) = 0;
+	virtual bool pause_fade_in_milliseconds(unsigned long long milliseconds) = 0;
+	virtual void set_timed_fade(float start_volume, float end_volume, unsigned long long length, unsigned long long absolute_time) = 0; // depends on DURATIONS_IN_FRAMES flag in parent engine
+	virtual void set_timed_fade_in_frames(float start_volume, float end_volume, unsigned long long frames, unsigned long long absolute_time_in_frames) = 0;
+	virtual void set_timed_fade_in_milliseconds(float start_volume, float end_volume, unsigned long long milliseconds, unsigned long long absolute_time_in_milliseconds) = 0;
+	virtual void set_stop_time_with_fade(unsigned long long absolute_time, unsigned long long fade_length) = 0; // DURATIONS_IN_FRAMES
+	virtual void set_stop_time_with_fade_in_frames(unsigned long long absolute_time, unsigned long long fade_length) = 0;
+	virtual void set_stop_time_with_fade_in_milliseconds(unsigned long long absolute_time, unsigned long long fade_length) = 0;
+	virtual void set_looping(bool looping) = 0;
+	virtual bool get_looping() = 0;
+	virtual bool get_at_end() = 0;
+	virtual bool seek(unsigned long long position) = 0; // DURATIONS_IN_FRAMES
+	virtual bool seek_in_frames(unsigned long long position) = 0;
+	virtual bool seek_in_milliseconds(unsigned long long position) = 0;
+	virtual unsigned long long get_position() = 0; // DURATIONS_IN_FRAMES
+	virtual unsigned long long get_position_in_frames() = 0;
+	virtual unsigned long long get_position_in_milliseconds() = 0;
+	virtual unsigned long long get_length() = 0; // DURATIONS_IN_FRAMES
+	virtual unsigned long long get_length_in_frames() = 0;
+	virtual unsigned long long get_length_in_milliseconds() = 0;
+	virtual bool get_data_format(ma_format *format, unsigned int *channels, unsigned int *sample_rate) = 0;
+	// A completely pointless API here, but needed for code that relies on legacy BGT includes. Always returns 0.
+	virtual double get_pitch_lower_limit() = 0;
 };
 
-class mixer;
-class sound_base {
-protected:
-	int RefCount;
-public:
-	IPLBinauralEffect hrtf_effect;
-	IPLSource source;
-	IPLDirectEffect direct_effect;
-	IPLReflectionEffect reflection_effect;
-	IPLAmbisonicsDecodeEffect reflection_decode_effect;
-	Poco::Event env_detaching;
-	HDSP pos_effect;
-	mixer* output_mixer;
-	mixer* parent_mixer;
-	sound_environment* env;
-	BOOL use_hrtf;
-	float x;
-	float y;
-	float z;
-	float listener_x;
-	float listener_y;
-	float listener_z;
-	float last_x;
-	float last_y;
-	float last_z;
-	float last_rotation;
-	float rotation;
-	float pan_step;
-	float volume_step;
-	unsigned int channel;
-	hstream_entry* store_channel;
-	sound_base() : env(NULL), source(NULL), direct_effect(NULL), reflection_effect(NULL), reflection_decode_effect(NULL), use_hrtf(false) {}
-	virtual void AddRef();
-	virtual void Release();
-	void set_hrtf(BOOL enable) {
-		use_hrtf = enable;
-	}
-	BOOL set_position(float listener_x, float listener_y, float listener_z, float sound_x, float sound_y, float sound_z, float rotation, float pan_step, float volume_step);
-};
-
-class sound : public sound_base {
-	float pitch;
-	float length;
-public:
-	std::string loaded_filename;
-	BASS_CHANNELINFO channel_info;
-	sound_preload* preload_ref;
-	asIScriptFunction* len_callback;
-	asIScriptFunction* read_callback;
-	asIScriptFunction* seek_callback;
-	asIScriptFunction* close_callback;
-	std::string callback_data;
-	BOOL script_loading;
-	thread_mutex_t close_mutex;
-	std::vector<BYTE> push_prebuff;
-	std::string* memstream;
-	unsigned int memstream_size;
-	DWORD memstream_pos;
-	bool memstream_legacy_encrypt;
-	sound();
-	~sound();
-	void Release();
-	BOOL load(const std::string& filename, pack* containing_pack = NULL, BOOL allow_preloads = TRUE);
-	BOOL load_script(asIScriptFunction* close, asIScriptFunction* len, asIScriptFunction* read, asIScriptFunction* seek, const std::string& data, const std::string& preload_filename = "");
-	BOOL load_memstream(std::string& data, unsigned int size, const std::string& preload_filename = "", bool legacy_encrypt = false);
-	BOOL load_url(const std::string& url);
-	BOOL stream(const std::string& filename, pack* containing_pack = NULL) {
-		return load(filename, containing_pack, FALSE);
-	}
-	BOOL push_memory(unsigned char* buffer, unsigned int length, BOOL stream_end = FALSE, int pcm_rate = 0, int pcm_chans = 0);
-	BOOL push_string(const std::string& buffer, BOOL stream_end = FALSE, int pcm_rate = 0, int pcm_chans = 0);
-	BOOL postload(const std::string& filename = std::string(""));
-	BOOL close();
-	int set_fx(const std::string& fx, int idx = -1);
-	void set_length(float len) {
-		if (len >= 0) length = len;
-	}
-	BOOL set_mixer(mixer* m);
-	BOOL play(bool reset_loop_state = true);
-	BOOL play_wait();
-	BOOL play_looped();
-	BOOL pause();
-	BOOL seek(float offset);
-	BOOL stop();
-	BOOL is_active();
-	BOOL is_paused();
-	BOOL is_playing();
-	BOOL is_sliding();
-	BOOL is_pan_sliding();
-	BOOL is_pitch_sliding();
-	BOOL is_volume_sliding();
-	float get_length();
-	float get_length_ms();
-	float get_position();
-	float get_position_ms();
-	float get_pan();
-	float get_pitch();
-	float get_volume();
-	float get_pan_alt();
-	float get_pitch_alt();
-	float get_volume_alt();
-	BOOL set_pan(float pan);
-	BOOL slide_pan(float pan, unsigned int time);
-	BOOL set_pitch(float pitch);
-	BOOL slide_pitch(float pitch, unsigned int time);
-	BOOL set_volume(float volume);
-	BOOL slide_volume(float volume, unsigned int time);
-	BOOL set_pan_alt(float pan);
-	BOOL slide_pan_alt(float pan, unsigned int time);
-	BOOL set_pitch_alt(float pitch);
-	BOOL slide_pitch_alt(float pitch, unsigned int time);
-	BOOL set_volume_alt(float volume);
-	BOOL slide_volume_alt(float volume, unsigned int time);
-	const double pitch_lower_limit();
-};
-
-class mixer : public sound_base {
-	std::unordered_set<mixer*> mixers;
-	std::unordered_set<sound*> sounds;
-	std::vector<mixer_effect> effects;
-	mixer* parent_mixer;
-	int get_effect_index(const std::string& id);
-public:
-	mixer(mixer* parent = NULL, BOOL for_single_sound = FALSE, BOOL for_decode = FALSE, BOOL floatingpoint = TRUE);
-	~mixer();
-	void AddRef();
-	void Release();
-	int get_data(const unsigned char* buffer, int bufsize);
-	BOOL add_mixer(mixer* m);
-	BOOL remove_mixer(mixer* m, BOOL internal = FALSE);
-	BOOL add_sound(sound& s, BOOL internal = FALSE);
-	BOOL remove_sound(sound& s, BOOL internal = FALSE);
-	bool set_impulse_response(const std::string& response, float dry, float wet);
-	int set_fx(const std::string& fx, int idx = -1);
-	BOOL set_mixer(mixer* m);
-	BOOL is_sliding();
-	BOOL is_pan_sliding();
-	BOOL is_pitch_sliding();
-	BOOL is_volume_sliding();
-	float get_pan();
-	float get_pitch();
-	float get_volume();
-	float get_pan_alt();
-	float get_pitch_alt();
-	float get_volume_alt();
-	BOOL set_pan(float pan);
-	BOOL slide_pan(float pan, unsigned int time);
-	BOOL set_pitch(float pitch);
-	BOOL slide_pitch(float pitch, unsigned int time);
-	BOOL set_volume(float volume);
-	BOOL slide_volume(float volume, unsigned int time);
-	BOOL set_pan_alt(float pan);
-	BOOL slide_pan_alt(float pan, unsigned int time);
-	BOOL set_pitch_alt(float pitch);
-	BOOL slide_pitch_alt(float pitch, unsigned int time);
-	BOOL set_volume_alt(float volume);
-	BOOL slide_volume_alt(float volume, unsigned int time);
-};
-
-
-float get_master_volume();
-BOOL set_master_volume(float volume);
-unsigned int get_input_device();
-unsigned int get_input_device_count();
-unsigned int get_input_device_name(unsigned int device, char* buffer, unsigned int bufsize);
-BOOL set_input_device(unsigned int device);
-unsigned int get_output_device();
-unsigned int get_output_device_count();
-unsigned int get_output_device_name(unsigned int device, char* buffer, unsigned int bufsize);
-BOOL set_output_device(unsigned int device);
-BOOL get_global_hrtf();
-BOOL set_global_hrtf(BOOL enable);
-
-void RegisterScriptSound(asIScriptEngine* engine);
-#endif //sound_h
+audio_engine *new_audio_engine(int flags);
+mixer *new_mixer(audio_engine *engine);
+sound *new_sound(audio_engine *engine);
+void RegisterSoundsystem(asIScriptEngine *engine);

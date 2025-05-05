@@ -17,13 +17,15 @@
 #include <cmath>
 using namespace std;
 static asITypeInfo* VectorArrayType = NULL;
+static asITypeInfo* StringType = nullptr;
 #define NODE_BIT_SIZE 19
 inline void* encode_state(int64_t x, int64_t y, int64_t z, int64_t d) {
 	int mc = (1 << NODE_BIT_SIZE) - 1;
 	x += 10000;
 	y += 10000;
 	z += 10000;
-	if (x < 0 || x > mc || y < 0 || y > mc || z < 0 || z > mc) return NULL;
+	if (x < 0 || x > mc || y < 0 || y > mc || z < 0 || z > mc)
+		return NULL;
 	uint64_t s = x + (y << NODE_BIT_SIZE) + (z << (NODE_BIT_SIZE * 2)) + (d << NODE_BIT_SIZE * 3);
 	return (void*)s;
 }
@@ -46,15 +48,18 @@ pathfinder::pathfinder(int size, bool cache) : gc_flag(false) {
 	callback_data = NULL;
 	RefCount = 1;
 	desperation_factor = 0;
-	allow_diagonals = true;
+	allow_diagonals = false;
 	must_reset = false;
 	search_range = 0;
 	abort = false;
 	solving = false;
 	total_cost = 0;
 	automatic_reset = false;
+	this->cache = cache;
 	asIScriptContext* ctx = asGetActiveContext();
-	if (ctx) ctx->GetEngine()->NotifyGarbageCollectorOfNewObject(this, ctx->GetEngine()->GetTypeInfoByName("pathfinder"));
+	if (ctx)
+		ctx->GetEngine()->NotifyGarbageCollectorOfNewObject(this, ctx->GetEngine()->GetTypeInfoByName("pathfinder"));
+	callback_mode = CALLBACK_SIMPLE;
 }
 int pathfinder::AddRef() {
 	gc_flag = false;
@@ -75,12 +80,16 @@ int pathfinder::get_ref_count() {
 	return RefCount;
 }
 void pathfinder::enum_references(asIScriptEngine* engine) {
-	if (callback) engine->GCEnumCallback(callback);
-	if (callback_data) engine->GCEnumCallback(callback_data);
+	if (callback)
+		engine->GCEnumCallback(callback);
+	if (callback_data)
+		engine->GCEnumCallback(callback_data);
 }
 void pathfinder::release_all_handles(asIScriptEngine* engine) {
-	if (callback) callback->Release();
-	if (callback_data) callback_data->Release();
+	if (callback)
+		callback->Release();
+	if (callback_data)
+		callback_data->Release();
 	callback = nullptr;
 	callback_data = nullptr;
 }
@@ -91,47 +100,105 @@ bool pathfinder::get_gc_flag() {
 	return gc_flag;
 }
 void pathfinder::set_callback_function(asIScriptFunction* func) {
-	if (callback) callback->Release();
+	if (callback)
+		callback->Release();
 	if (func)
 		callback = func;
+	callback_mode = CALLBACK_SIMPLE;
 }
-float pathfinder::get_difficulty(void* state) {
-	if (!callback) return FLT_MAX;
+void pathfinder::set_callback_function_ex(asIScriptFunction* func) {
+	// This callback type is fundamentally incompatible with path caching.
+	if (cache) {
+		asGetActiveContext()->SetException("A callback with parent state support cannot be used with path caching enabled.");
+		return;
+	}
+	set_callback_function(func);
+	callback_mode = CALLBACK_ADVANCED;
+}
+void pathfinder::set_callback_function_legacy(asIScriptFunction* func) {
+	// This callback type is also fundamentally incompatible with path caching.
+	if (cache) {
+		asGetActiveContext()->SetException("A legacy callback cannot be used with path caching enabled.");
+		return;
+	}
+	set_callback_function(func);
+	callback_mode = CALLBACK_LEGACY;
+}
+
+float pathfinder::get_difficulty(void* state, void* parent_state) {
+	if (!callback)
+		return FLT_MAX;
 	int x, y, z;
+	int parent_x, parent_y, parent_z;
 	decode_state(state, &x, &y, &z);
-	return get_difficulty(x, y, z);
+	decode_state(parent_state, &parent_x, &parent_y, &parent_z);
+	return get_difficulty(x, y, z, parent_x, parent_y, parent_z);
 }
-float pathfinder::get_difficulty(int x, int y, int z) {
+float pathfinder::get_difficulty(int x, int y, int z, int parent_x, int parent_y, int parent_z) {
 	hashpoint pt(x, y, z);
 	hashpoint_float_map::iterator n = difficulty_cache[desperation_factor].find(pt);
 	if (n != difficulty_cache[desperation_factor].end())
 		return n->second;
-	if (abort) return FLT_MAX;
+	if (abort)
+		return FLT_MAX;
 	asIScriptContext* ACtx = asGetActiveContext();
 	bool new_context = ACtx == NULL || ACtx->PushState() < 0;
 	asIScriptContext* ctx = (new_context ? g_ScriptEngine->RequestContext() : ACtx);
-	if (!ctx) return FLT_MAX;
+	if (!ctx)
+		return FLT_MAX;
 	if (ctx->Prepare(callback) < 0) {
-		if (new_context) g_ScriptEngine->ReturnContext(ctx);
-		else ctx->PopState();
+		if (new_context)
+			g_ScriptEngine->ReturnContext(ctx);
+		else
+			ctx->PopState();
 		return FLT_MAX;
 	}
-	ctx->SetArgDWord(0, x);
-	ctx->SetArgDWord(1, y);
-	ctx->SetArgDWord(2, z);
-	ctx->SetArgObject(3, callback_data);
+	switch (callback_mode) {
+		case CALLBACK_SIMPLE:
+			ctx->SetArgDWord(0, x);
+			ctx->SetArgDWord(1, y);
+			ctx->SetArgDWord(2, z);
+			ctx->SetArgObject(3, callback_data);
+			break;
+		case CALLBACK_ADVANCED:
+			ctx->SetArgDWord(0, x);
+			ctx->SetArgDWord(1, y);
+			ctx->SetArgDWord(2, z);
+			ctx->SetArgDWord(3, parent_x);
+			ctx->SetArgDWord(4, parent_y);
+			ctx->SetArgDWord(5, parent_z);
+			ctx->SetArgObject(6, callback_data);
+			break;
+		case CALLBACK_LEGACY:
+			ctx->SetArgDWord(0, x);
+			ctx->SetArgDWord(1, y);
+			ctx->SetArgDWord(2, parent_x);
+			ctx->SetArgDWord(3, parent_y);
+			string ud;
+			if (StringType == nullptr)
+				StringType = g_ScriptEngine->GetTypeInfoByDecl("string");
+			if (callback_data != nullptr)
+				callback_data->Retrieve((void*)&ud, StringType->GetTypeId());
+			ctx->SetArgObject(4, (void*)&ud);
+	}
 	if (ctx->Execute() != asEXECUTION_FINISHED) {
-		if (new_context) g_ScriptEngine->ReturnContext(ctx);
-		else ctx->PopState();
+		if (new_context)
+			g_ScriptEngine->ReturnContext(ctx);
+		else
+			ctx->PopState();
 		return FLT_MAX;
 	}
 	int v = ctx->GetReturnDWord();
-	if (v < 10) v -= desperation_factor;
-	if (v < 0) v = 0;
+	if (v < 10)
+		v -= desperation_factor;
+	if (v < 0)
+		v = 0;
 	float val = (v < 10 ? v : FLT_MAX);
 	difficulty_cache[desperation_factor][pt] = val;
-	if (new_context) g_ScriptEngine->ReturnContext(ctx);
-	else ctx->PopState();
+	if (new_context)
+		g_ScriptEngine->ReturnContext(ctx);
+	else
+		ctx->PopState();
 	return val;
 }
 void pathfinder::cancel() {
@@ -154,18 +221,23 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	if (!VectorArrayType)
 		VectorArrayType = g_ScriptEngine->GetTypeInfoByDecl("array<vector>");
 	CScriptArray* array = CScriptArray::Create(VectorArrayType);
-	if (solving) return array;
+	if (solving)
+		return array;
 	abort = false;
 	must_reset = false;
 	total_cost = 0;
 	if (!callback)
 		return array;
-	if (search_range > 0 && allow_diagonals && hypot(end_x - start_x, end_y - start_y, end_z - start_z) > search_range || search_range > 0 && !allow_diagonals && (abs(end_x - start_x) + abs(end_y - start_y) + abs(end_z - start_z)) > search_range) return array;
-	if (automatic_reset) reset();
+	if (search_range > 0 && allow_diagonals && hypot(end_x - start_x, end_y - start_y, end_z - start_z) > search_range || search_range > 0 && !allow_diagonals && (abs(end_x - start_x) + abs(end_y - start_y) + abs(end_z - start_z)) > search_range)
+		return array;
+	if (automatic_reset || !cache)
+		reset();
 	callback_data = data;
 	if (data)
 		data->AddRef();
-	if (get_difficulty(start_x, start_y, start_z) > 9 || get_difficulty(end_x, end_y, end_z) > 9) return array;
+	// Only perform this fast-fail optimization if callback is "simple", otherwise it will just produce false positives.
+	if (callback_mode == CALLBACK_SIMPLE && (get_difficulty(start_x, start_y, start_z, start_x, start_y, start_z) > 9 || get_difficulty(end_x, end_y, end_z, end_x, end_y, end_z) > 9))
+		return array;
 	void* start = encode_state(start_x, start_y, start_z, desperation_factor);
 	this->start_x = start_x;
 	this->start_y = start_y;
@@ -181,18 +253,31 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	if (abort || must_reset || result != micropather::MicroPather::SOLVED) {
 		abort = false;
 		total_cost = 0;
-		if (must_reset) reset();
+		if (must_reset)
+			reset();
 		return array;
 	}
-	array->Reserve(path.size());
+	array->Reserve(path.size() - 1);
 	reactphysics3d::Vector3 v;
 	int x, y, z;
-	for (int i = 0; i < path.size(); i++) {
+	// BGT did not include the starting location here. Changing to match for now; discussion welcome.
+	for (int i = 1; i < path.size(); i++) {
 		decode_state(path[i], &x, &y, &z);
 		v.setAllValues(x, y, z);
 		array->InsertLast(&v);
 	}
 	return array;
+}
+CScriptArray* pathfinder::find_legacy(int start_x, int start_y, int parent_x, int parent_y, string user_data) {
+	if (callback_mode != CALLBACK_LEGACY)
+		return nullptr;
+	if (StringType == nullptr)
+		StringType = g_ScriptEngine->GetTypeInfoByDecl("string");
+	CScriptAny* ud = new CScriptAny(g_ScriptEngine);
+	ud->Store((void*)&user_data, StringType->GetTypeId());
+	CScriptArray* result = find(start_x, start_y, 0, parent_x, parent_y, 0, ud);
+	ud->Release();
+	return result;
 }
 float pathfinder::LeastCostEstimate(void* nodeStart, void* nodeEnd) {
 	int start_x, start_y, start_z, end_x, end_y, end_z;
@@ -201,8 +286,9 @@ float pathfinder::LeastCostEstimate(void* nodeStart, void* nodeEnd) {
 	float x = end_x - start_x;
 	float y = end_y - start_y;
 	float z = end_z - start_z;
-	float d = get_difficulty(end_x, end_y, end_z);
-	if (d > 9) return FLT_MAX;
+	float d = get_difficulty(end_x, end_y, end_z, end_x, end_y, end_z);
+	if (d > 9)
+		return FLT_MAX;
 	if (allow_diagonals)
 		return hypot(x, y, z);
 	else
@@ -213,7 +299,7 @@ void pathfinder::AdjacentCost(void* node, micropather::MPVector<micropather::Sta
 	decode_state(node, &x, &y, &z);
 	const int dx[18] = {1, 1, 0, -1, -1, -1, 0, 1, 0, 0, 1, -1, 0, 0, 1, -1, 0, 0};
 	const int dy[18] = {0, 1, 1, 1, 0, -1, -1, -1, 0, 0, 0, 0, 1, -1, 0, 0, 1, -1};
-	const float cost[18] = { 1.0f, 1.41f, 1.0f, 1.41f, 1.0f, 1.41f, 1.0f, 1.41f, 1.0f, 1.0f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f};
+	const float cost[18] = {1.0f, 1.41f, 1.0f, 1.41f, 1.0f, 1.41f, 1.0f, 1.41f, 1.0f, 1.0f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f};
 	for (int i = 0; i < 18; ++i) {
 		int nx = x + dx[i];
 		int ny = y + dy[i];
@@ -227,9 +313,17 @@ void pathfinder::AdjacentCost(void* node, micropather::MPVector<micropather::Sta
 			must_reset = true;
 			continue;
 		}
-		float c = get_difficulty(nx, ny, nz);
-		if (c != FLT_MAX) c++;
-		if (c > 10) c = FLT_MAX;
+		// If we're not allowing diagonals, then diagonals are not neighbours.
+		if (!allow_diagonals && abs(((abs(nx) + abs(ny) + abs(nz)) - (abs(x) + abs(y) + abs(z)))) != 1)
+			continue;
+		// If we're in legacy (2D) mode, save some unnecessary calls into script by rejecting nonzero Z right here.
+		if (callback_mode == CALLBACK_LEGACY && (z != 0 || nz != 0))
+			continue;
+		float c = get_difficulty(nx, ny, nz, x, y, z);
+		if (c != FLT_MAX)
+			c++;
+		if (c > 10)
+			c = FLT_MAX;
 		else
 			c *= cost[i];
 		if (c != FLT_MAX) {
@@ -248,7 +342,7 @@ void RegisterScriptPathfinder(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_ADDREF, "void f()", asMETHOD(pathfinder, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_RELEASE, "void f()", asMETHOD(pathfinder, Release), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_GETREFCOUNT, "int f()", asMETHOD(pathfinder, get_ref_count), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_SETGCFLAG, "void f()", asMETHOD(pathfinder,set_gc_flag), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_SETGCFLAG, "void f()", asMETHOD(pathfinder, set_gc_flag), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_GETGCFLAG, "bool f()", asMETHOD(pathfinder, get_gc_flag), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_ENUMREFS, "void f(int&in)", asMETHOD(pathfinder, enum_references), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_RELEASEREFS, "void f(int&in)", asMETHOD(pathfinder, release_all_handles), asCALL_THISCALL);
@@ -259,8 +353,13 @@ void RegisterScriptPathfinder(asIScriptEngine* engine) {
 	engine->RegisterObjectProperty("pathfinder", "bool automatic_reset", asOFFSET(pathfinder, automatic_reset));
 	engine->RegisterObjectProperty("pathfinder", "int search_range", asOFFSET(pathfinder, search_range));
 	engine->RegisterFuncdef("int pathfinder_callback(int, int, int, any@ = null)");
+	engine->RegisterFuncdef("int pathfinder_callback_ex(int, int, int, int, int, int, any@ = null)");
+	engine->RegisterFuncdef("int pathfinder_callback_legacy(int, int, int, int, string)");
 	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback@)", asMETHOD(pathfinder, set_callback_function), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_ex@)", asMETHOD(pathfinder, set_callback_function_ex), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void cancel()", asMETHOD(pathfinder, cancel), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_legacy@)", asMETHOD(pathfinder, set_callback_function_legacy), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void reset()", asMETHOD(pathfinder, reset), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int, int, int, int, int, int, any@+ = null)", asMETHOD(pathfinder, find), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int, int, int, int, string = \"\")", asMETHOD(pathfinder, find_legacy), asCALL_THISCALL);
 }

@@ -1,0 +1,12 @@
+Import("env")
+scriptarray = env.SharedObject("scriptarray", "#ASAddon/plugin/scriptarray.cpp")
+if ARGUMENTS.get("no_shared_plugins", "0") == "0":
+	libs = []
+	if env["PLATFORM"] == "win32": libs += ["user32"]
+	else: libs += ["PocoFoundation"]
+	env.SharedLibrary("#release/lib/legacy_sound", ["pack.cpp", "sound.cpp", scriptarray], LIBS = libs + ["bass", "bass_fx", "bassmix", "phonon"])
+static_pack = env.Object("pack_static", "pack.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "legacy_sound")])
+static_sound = env.Object("sound_static", "sound.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "legacy_sound")])
+static = env.StaticLibrary("#build/lib/legacy_sound", [static_pack, static_sound])
+static = [static, "bass", "bass_fx", "bassmix"]
+Return("static")

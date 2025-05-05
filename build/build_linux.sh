@@ -4,7 +4,7 @@ function setup_angelscript {
 	echo Installing Angelscript...
 	git clone https://github.com/codecat/angelscript-mirror||true
 	cd "angelscript-mirror/sdk/angelscript/projects/gnuc"
-	git checkout 270b98a332faa57a747c9265086c7bce49c041d9
+	git checkout 7c6695c4e9e2a69bb7d12af3fce93ba6d1c8dcb6
 	make -j$(nproc)
 	sudo make install
 	cd ../../../../..
@@ -124,7 +124,7 @@ function main {
 	cd deps
 	
 	# Insure required packages are installed for building.
-	sudo apt install build-essential gcc g++ make cmake autoconf libtool python3 python3-pip libssl-dev libsystemd-dev libspeechd-dev -y
+	sudo apt install build-essential gcc g++ make cmake autoconf libtool python3 python3-pip libssl-dev libsystemd-dev libspeechd-dev libogg-dev libvorbis-dev python3-venv -y
 	
 	setup_angelscript
 	setup_reactphysics

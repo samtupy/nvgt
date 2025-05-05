@@ -26,7 +26,10 @@
 	#include <sys/wait.h>
 #endif
 #include <Poco/Exception.h>
+#include <Poco/TextConverter.h>
+#include <Poco/TextIterator.h>
 #include <Poco/UnicodeConverter.h>
+#include <Poco/UTF8Encoding.h>
 #include <ctime>
 #include <sstream>
 #include <angelscript.h>
@@ -148,7 +151,7 @@ std::string number_to_words(asINT64 number, bool include_and) {
 		output.resize(size);
 		size = bl_number_to_words(number, &output[0], size, include_and);
 	}
-	output.resize(size -1); // It appears bl_number_to_words includes a trailing null byte in it's size calculation.
+	output.resize(size - 1); // It appears bl_number_to_words includes a trailing null byte in it's size calculation.
 	return output;
 }
 int get_last_error() {
@@ -273,6 +276,27 @@ int utf8next(const std::string& text, int offset = 0) {
 	return offset + utf8size(text.substr(offset, 1));
 }
 
+/**
+ * Checks whether a string is valid UTF-8.
+ * Can also prohibit strings containing ASCII special characters.
+ * Used internally by pack file, sound service.
+ * written by Caturria.
+ */
+bool is_valid_utf8(const std::string &text, bool ban_ascii_special) {
+	Poco::UTF8Encoding encoding;
+	Poco::TextIterator i(text, encoding);
+	Poco::TextIterator end(text);
+	while (i != end) {
+		// Reject entirely invalid characters:
+		if (*i == -1)
+			return false;
+		// Also reject ASCII 0 - 31 and 127 as these are not printable characters:
+		if ((*i < 32 || *i == 127) && ban_ascii_special)
+			return false;
+		i++;
+	}
+	return true;
+}
 CScriptArray* get_preferred_locales() {
 	asITypeInfo* arrayType = get_array_type("array<string>");
 	CScriptArray* array = CScriptArray::Create(arrayType);
@@ -291,13 +315,13 @@ CScriptArray* get_preferred_locales() {
 
 float parse_float(const std::string& val) {
 	float res = 0.0;
-	const auto [valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
+	const auto[valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
 	if (valEc != std::errc()) return 0.0;
 	return res;
 }
 double parse_double(const std::string& val) {
 	double res = 0.0;
-	const auto [valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
+	const auto[valPtr, valEc] = fast_float::from_chars(val.data(), val.data() + val.size(), res);
 	if (valEc != std::errc()) return 0.0;
 	return res;
 }
@@ -331,6 +355,7 @@ void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("int utf8prev(const string&in text, int cursor)"), asFUNCTION(utf8prev), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int utf8next(const string&in text, int cursor)"), asFUNCTION(utf8next), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int utf8size(const string&in character)"), asFUNCTION(utf8size), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool utf8valid(const string&in text, bool ban_ascii_special = true)"), asFUNCTION(is_valid_utf8), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->RegisterObjectType(_O("refstring"), 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(_O("refstring"), asBEHAVE_FACTORY, _O("refstring @s()"), asFUNCTION(new_refstring), asCALL_CDECL);

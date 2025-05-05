@@ -4,7 +4,7 @@
 	## Arguments:
 		* double x: The value whose square root is to be calculated.
 	## Returns:
-		The square root of the given value.
+		double: the square root of the given value.
 */
 
 // Example:

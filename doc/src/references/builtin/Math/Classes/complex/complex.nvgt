@@ -1,0 +1,19 @@
+/**
+	A class representing a complex number, composed of a real part `r` and an imaginary part `i`.
+	1. complex();
+	2. complex(const complex&in other);
+	3. complex(float r, float i = 0.0);
+	## Arguments (3):
+		* float r: The real part of the complex number.
+		* float i = 0.0: The imaginary part of the complex number. Defaults to 0 if not specified.
+	## Remarks:
+		The complex class supports basic arithmetic operations (add, subtract, multiply, divide) and can be compared for equality. It also provides access to magnitude (`abs()`), and utilities for working with real/imaginary order via `ri` and `ir` properties.
+*/
+
+// Example:
+void main() {
+	complex a(2, 3); // 2 + 3i
+	complex b(1, -1); // 1 - i
+	complex c = a + b; // (2+1, 3-1) = (3, 2)
+	alert("result", "real: " + c.r + ", imag: " + c.i);
+}

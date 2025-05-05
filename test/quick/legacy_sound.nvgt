@@ -1,0 +1,12 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#pragma namespace sound upcoming
+#pragma plugin legacy_sound
+//using namespace legacy;
+void main() {
+	sound s;
+	s.load("C:/windows/media/ding.wav");
+	s.play_wait();
+}

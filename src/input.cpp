@@ -32,7 +32,7 @@
 /*
  * @literary: Since SDL requires pointer to the key name stay till the program life span,
  * following map variable makes this possible.
-*/
+ */
 static std::unordered_map<unsigned int, std::string> g_KeyNames;
 static unsigned char g_KeysPressed[SDL_SCANCODE_COUNT];
 static unsigned char g_KeysRepeating[SDL_SCANCODE_COUNT];
@@ -51,30 +51,34 @@ SDL_TouchID g_TouchLastDevice = 0;
 static asITypeInfo* key_code_array_type = nullptr;
 static asITypeInfo* joystick_mapping_array_type = nullptr;
 #ifdef _WIN32
-static HHOOK g_keyhook_hHook = nullptr;
-bool g_keyhook_active = false;
+	static HHOOK g_keyhook_hHook = nullptr;
+	bool g_keyhook_active = false;
 #endif
 // Wrapper function for sdl
-//  This function is useful for getting keyboard, mice and touch devices.
+// This function is useful for getting keyboard, mice and touch devices.
 // Pass the callback with the signature `unsigned int*(int*)`
-CScriptArray* GetDevices(std::function<uint32_t*(int*)> callback) {
+CScriptArray* GetDevices(std::function<uint32_t* (int*)> callback) {
 	asITypeInfo* array_type = get_array_type("uint[]");
-	if (!array_type) return nullptr;
+	if (!array_type)
+		return nullptr;
 	int device_count = 0;
 	uint32_t* devices = callback(&device_count);
-	if (!devices) return nullptr;
+	if (!devices)
+		return nullptr;
 	CScriptArray* array = CScriptArray::Create(array_type);
 	if (!array) {
 		SDL_free(devices);
 		return nullptr;
 	}
 	array->Reserve(device_count);
-	for (int i = 0; i < device_count; i++) array->InsertLast(devices + i);
+	for (int i = 0; i < device_count; i++)
+		array->InsertLast(devices + i);
 	SDL_free(devices);
 	return array;
 }
 void InputInit() {
-	if (SDL_WasInit(0)&SDL_INIT_VIDEO) return;
+	if (SDL_WasInit(0) & SDL_INIT_VIDEO)
+		return;
 	memset(g_KeysPressed, 0, SDL_SCANCODE_COUNT);
 	memset(g_KeysRepeating, 0, SDL_SCANCODE_COUNT);
 	memset(g_KeysForced, 0, SDL_SCANCODE_COUNT);
@@ -113,8 +117,10 @@ bool InputEvent(SDL_Event* evt) {
 		g_MouseButtonsReleased[evt->button.button] = 1;
 	} else if (evt->type == SDL_EVENT_MOUSE_WHEEL)
 		g_MouseAbsZ += evt->wheel.y;
-	else if (evt->type == SDL_EVENT_FINGER_DOWN) g_TouchLastDevice = evt->tfinger.touchID;
-	else return false;
+	else if (evt->type == SDL_EVENT_FINGER_DOWN)
+		g_TouchLastDevice = evt->tfinger.touchID;
+	else
+		return false;
 	return true;
 }
 
@@ -123,61 +129,73 @@ bool install_keyhook(bool allow_reinstall = true);
 void lost_window_focus() {
 	SDL_ResetKeyboard();
 	#ifdef _WIN32
-	if (g_keyhook_active) remove_keyhook();
+	if (g_keyhook_active)
+		remove_keyhook();
 	#endif
 }
 void regained_window_focus() {
 	#ifdef _WIN32
-	if (g_keyhook_active) install_keyhook();
+	if (g_keyhook_active)
+		install_keyhook();
 	#endif
 }
 bool ScreenKeyboardShown() {
 	return SDL_ScreenKeyboardShown(g_WindowHandle);
 }
-unsigned int GetKeyCode(const std::string& name) {
-	if (name.empty()) return SDLK_UNKNOWN;
+int GetKeyCode(const std::string& name) {
+	if (name.empty())
+		return SDLK_UNKNOWN;
 	return SDL_GetScancodeFromName(name.c_str());
 }
-std::string GetKeyName(unsigned int key) {
-	if (key >= SDL_SCANCODE_COUNT) return "";
+std::string GetKeyName(int key) {
+	if (key < 0 || key >= SDL_SCANCODE_COUNT)
+		return "";
 	const char* result = SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
-	if (!result) return "";
+	if (!result)
+		return "";
 	return result;
 }
-bool SetKeyName(unsigned int key, const std::string& name) {
-	if (key >= SDL_SCANCODE_COUNT || name.empty()) return false;
+bool SetKeyName(int key, const std::string& name) {
+	if (key < 0 || key >= SDL_SCANCODE_COUNT || name.empty())
+		return false;
 	g_KeyNames[key] = name;
 	return SDL_SetScancodeName(static_cast<SDL_Scancode>(key), g_KeyNames[key].c_str());
 }
-bool KeyPressed(unsigned int key) {
-	if (key >= SDL_SCANCODE_COUNT) return false;
+bool KeyPressed(int key) {
+	if (key < 0 || key >= SDL_SCANCODE_COUNT)
+		return false;
 	bool r = g_KeysPressed[key] == 1;
 	g_KeysPressed[key] = 0;
 	return r;
 }
-bool KeyRepeating(unsigned int key) {
-	if (key >= SDL_SCANCODE_COUNT) return false;
+bool KeyRepeating(int key) {
+	if (key < 0 || key >= SDL_SCANCODE_COUNT)
+		return false;
 	bool r = g_KeysPressed[key] == 1 || g_KeysRepeating[key] == 1;
 	g_KeysPressed[key] = 0;
 	g_KeysRepeating[key] = 0;
 	return r;
 }
-bool key_down(unsigned int key) {
-	if (key >= SDL_SCANCODE_COUNT || !g_KeysDown) return false;
+bool key_down(int key) {
+	if (key < 0 || key >= SDL_SCANCODE_COUNT || !g_KeysDown)
+		return false;
 	return g_KeysReleased[key] == 0 && (g_KeysDown[key] == 1 || g_KeysForced[key]);
 }
-bool KeyReleased(unsigned int key) {
-	if (key >= SDL_SCANCODE_COUNT || !g_KeysDown) return false;
+bool KeyReleased(int key) {
+	if (key < 0 || key >= SDL_SCANCODE_COUNT || !g_KeysDown)
+		return false;
 	bool r = g_KeysReleased[key] == 1;
-	if (r && g_KeysDown[key] == 1) return false;
+	if (r && g_KeysDown[key] == 1)
+		return false;
 	g_KeysReleased[key] = 0;
 	return r;
 }
-bool key_up(unsigned int key) {
+bool key_up(int key) {
 	return !key_down(key);
 }
-bool insure_key_up(unsigned short key) {
-	if (key >= SDL_SCANCODE_COUNT || !g_KeysDown) return false;
+bool insure_key_up(int key) {
+	if (key < 0 || key >= SDL_SCANCODE_COUNT || !g_KeysDown)
+		return false;
 	if (g_KeysDown[key] == 1)
 		g_KeysReleased[key] = 1;
 	else
@@ -185,8 +203,9 @@ bool insure_key_up(unsigned short key) {
 	g_KeysForced[key] = false;
 	return true;
 }
-inline bool post_key_event(unsigned int key, SDL_EventType evt_type) {
-	if (key >= SDL_SCANCODE_COUNT || !g_KeysDown) return false;
+inline bool post_key_event(int key, SDL_EventType evt_type) {
+	if (key < 0 || key >= SDL_SCANCODE_COUNT || !g_KeysDown)
+		return false;
 	SDL_Event e{};
 	e.type = evt_type;
 	e.common.timestamp = SDL_GetTicksNS();
@@ -225,20 +244,20 @@ inline bool post_key_event(unsigned int key, SDL_EventType evt_type) {
 			mods = SDL_KMOD_NONE;
 			break;
 	}
-	evt_type == SDL_EVENT_KEY_DOWN? SDL_SetModState(SDL_GetModState() | mods) : SDL_SetModState(SDL_GetModState() & ~mods);
+	evt_type == SDL_EVENT_KEY_DOWN ? SDL_SetModState(SDL_GetModState() | mods) : SDL_SetModState(SDL_GetModState() & ~mods);
 	e.key.key = SDL_GetKeyFromScancode(e.key.scancode, SDL_GetModState(), true);
 	return SDL_PushEvent(&e);
 }
-bool simulate_key_down(unsigned int key) { return post_key_event(key, SDL_EVENT_KEY_DOWN); }
-bool simulate_key_up(unsigned int key) { return post_key_event(key, SDL_EVENT_KEY_UP); }
+bool simulate_key_down(int key) { return post_key_event(key, SDL_EVENT_KEY_DOWN); }
+bool simulate_key_up(int key) { return post_key_event(key, SDL_EVENT_KEY_UP); }
 CScriptArray* keys_pressed() {
 	asIScriptContext* ctx = asGetActiveContext();
 	asIScriptEngine* engine = ctx->GetEngine();
 	if (!key_code_array_type)
-		key_code_array_type = engine->GetTypeInfoByDecl("array<key_code>");
+		key_code_array_type = engine->GetTypeInfoByDecl("array<int>");
 	CScriptArray* array = CScriptArray::Create(key_code_array_type);
 	for (int i = 0; i < SDL_SCANCODE_COUNT; i++) {
-		unsigned int k = (unsigned int)i;
+		int k = (int)i;
 		if (KeyPressed(k))
 			array->InsertLast(&k);
 	}
@@ -248,9 +267,10 @@ CScriptArray* keys_down() {
 	asIScriptContext* ctx = asGetActiveContext();
 	asIScriptEngine* engine = ctx->GetEngine();
 	if (!key_code_array_type)
-		key_code_array_type = engine->GetTypeInfoByDecl("array<key_code>");
+		key_code_array_type = engine->GetTypeInfoByDecl("array<int>");
 	CScriptArray* array = CScriptArray::Create(key_code_array_type);
-	if (!g_KeysDown) return array;
+	if (!g_KeysDown)
+		return array;
 	for (int i = 0; i < g_KeysDownArrayLen; i++) {
 		if (g_KeysDown[i] == 1 || g_KeysForced[i])
 			array->InsertLast(&i);
@@ -259,8 +279,10 @@ CScriptArray* keys_down() {
 }
 int g_TotalKeysDownCache = -1;
 int total_keys_down() {
-	if (!g_KeysDown) return 0;
-	if (!g_KeyboardStateChange && g_TotalKeysDownCache > 0) return g_TotalKeysDownCache;
+	if (!g_KeysDown)
+		return 0;
+	if (!g_KeyboardStateChange && g_TotalKeysDownCache > 0)
+		return g_TotalKeysDownCache;
 	int c = 0;
 	for (int i = 0; i < g_KeysDownArrayLen; i++) {
 		if (g_KeysDown[i] || g_KeysReleased[i])
@@ -274,7 +296,7 @@ CScriptArray* keys_released() {
 	asIScriptContext* ctx = asGetActiveContext();
 	asIScriptEngine* engine = ctx->GetEngine();
 	if (!key_code_array_type)
-		key_code_array_type = engine->GetTypeInfoByDecl("array<key_code>");
+		key_code_array_type = engine->GetTypeInfoByDecl("array<int>");
 	CScriptArray* array = CScriptArray::Create(key_code_array_type);
 	for (int i = 0; i < g_KeysDownArrayLen; i++) {
 		if (KeyReleased(i))
@@ -288,18 +310,22 @@ std::string get_characters() {
 	return tmp;
 }
 bool MousePressed(unsigned char button) {
-	if (button > 31) return false;
+	if (button > 31)
+		return false;
 	bool r = g_MouseButtonsPressed[button] == 1;
 	g_MouseButtonsPressed[button] = 0;
 	return r;
 }
 bool mouse_down(unsigned char button) {
-	if (button > 31) return false;
-	if (!g_KeysDown) return false;
-	return (SDL_GetMouseState(&g_MouseAbsX, &g_MouseAbsY)&SDL_BUTTON(button)) != 0;
+	if (button > 31)
+		return false;
+	if (!g_KeysDown)
+		return false;
+	return (SDL_GetMouseState(&g_MouseAbsX, &g_MouseAbsY) & SDL_BUTTON(button)) != 0;
 }
 bool MouseReleased(unsigned char button) {
-	if (button > 31) return false;
+	if (button > 31)
+		return false;
 	bool r = g_MouseButtonsReleased[button] == 1;
 	g_MouseButtonsReleased[button] = 0;
 	return r;
@@ -316,7 +342,7 @@ void mouse_update() {
 	g_MousePrevZ = g_MouseAbsZ;
 }
 void SetCursorVisible(bool state) {
-	state? SDL_ShowCursor() : SDL_HideCursor();
+	state ? SDL_ShowCursor() : SDL_HideCursor();
 }
 bool GetMouseGrab() {
 	return SDL_GetWindowMouseGrab(g_WindowHandle);
@@ -329,7 +355,8 @@ CScriptArray* GetKeyboards() {
 }
 std::string GetKeyboardName(unsigned int id) {
 	const char* result = SDL_GetKeyboardNameForID((SDL_KeyboardID)id);
-	if (!result) return "";
+	if (!result)
+		return "";
 	return result;
 }
 CScriptArray* GetMice() {
@@ -337,85 +364,84 @@ CScriptArray* GetMice() {
 }
 std::string GetMouseName(unsigned int id) {
 	const char* result = SDL_GetMouseNameForID((SDL_MouseID)id);
-	if (!result) return "";
+	if (!result)
+		return "";
 	return result;
 }
 
-
-
 /* unfinished joystick stuff - to be converted to SDL3
 int joystick_count(bool only_active = true) {
-	int total_joysticks;
-	SDL_JoystickID* sticks = SDL_GetJoysticks(&total_joysticks);
-	SDL_free(sticks);
-	if (!only_active) return total_joysticks;
-	int ret = 0;
-	for (int i = 0; i < total_joysticks; i++) {
-		if (SDL_IsGamepad(i))
-			ret++;
-	}
-	return ret;
+    int total_joysticks;
+    SDL_JoystickID* sticks = SDL_GetJoysticks(&total_joysticks);
+    SDL_free(sticks);
+    if (!only_active) return total_joysticks;
+    int ret = 0;
+    for (int i = 0; i < total_joysticks; i++) {
+        if (SDL_IsGamepad(i))
+            ret++;
+    }
+    return ret;
 }
 CScriptArray* joystick_mappings() {
-	asIScriptContext* ctx = asGetActiveContext();
-	asIScriptEngine* engine = ctx->GetEngine();
-	if (!joystick_mapping_array_type)
-		joystick_mapping_array_type = engine->GetTypeInfoByDecl("array<string>@");
-	CScriptArray* array = CScriptArray::Create(joystick_mapping_array_type);
-	int num_mappings = SDL_GameControllerNumMappings();
-	for (int i = 0; i < num_mappings; i++) {
-		std::string mapping = SDL_GameControllerMappingForIndex(i);
-		array->InsertLast(&mapping);
-	}
-	return array;
+    asIScriptContext* ctx = asGetActiveContext();
+    asIScriptEngine* engine = ctx->GetEngine();
+    if (!joystick_mapping_array_type)
+        joystick_mapping_array_type = engine->GetTypeInfoByDecl("array<string>@");
+    CScriptArray* array = CScriptArray::Create(joystick_mapping_array_type);
+    int num_mappings = SDL_GameControllerNumMappings();
+    for (int i = 0; i < num_mappings; i++) {
+        std::string mapping = SDL_GameControllerMappingForIndex(i);
+        array->InsertLast(&mapping);
+    }
+    return array;
 }
 
 joystick::joystick() {
-	if (joystick_count() > 0)
-		stick = SDL_OpenGamepad(0);
+    if (joystick_count() > 0)
+        stick = SDL_OpenGamepad(0);
 }
 joystick::~joystick() {
-	SDL_CloseGamepad(stick);
+    SDL_CloseGamepad(stick);
 }
 
 unsigned int joystick::type() const {
-	return SDL_GetGamepadType(stick);
+    return SDL_GetGamepadType(stick);
 }
 unsigned int joystick::power_level() const {
-	return SDL_JoystickCurrentPowerLevel(SDL_GetGamepadJoystick(stick));
+    return SDL_JoystickCurrentPowerLevel(SDL_GetGamepadJoystick(stick));
 }
 std::string joystick::name() const {
-	return SDL_GetGamepadName(stick);
+    return SDL_GetGamepadName(stick);
 }
 bool joystick::active() const {
-	return SDL_GamepadConnected(stick);
+    return SDL_GamepadConnected(stick);
 }
 std::string joystick::serial() const {
-	const char* serial = SDL_GetGamepadSerial(stick);
-	if (serial == nullptr) return "";
-	return std::string(serial);
+    const char* serial = SDL_GetGamepadSerial(stick);
+    if (serial == nullptr) return "";
+    return std::string(serial);
 }
 bool joystick::has_led() const {
-	return SDL_GameControllerHasLED(stick);
+    return SDL_GameControllerHasLED(stick);
 }
 bool joystick::can_vibrate() const {
-	return SDL_GameControllerHasRumble(stick);
+    return SDL_GameControllerHasRumble(stick);
 }
 bool joystick::can_vibrate_triggers() const {
-	return SDL_GameControllerHasRumbleTriggers(stick);
+    return SDL_GameControllerHasRumbleTriggers(stick);
 }
 int joystick::touchpads() const {
-	return SDL_GetNumGamepadTouchpads(stick);
+    return SDL_GetNumGamepadTouchpads(stick);
 }
 
 bool joystick::set_led(unsigned char red, unsigned char green, unsigned char blue) {
-	return SDL_SetGamepadLED(stick, red, green, blue);
+    return SDL_SetGamepadLED(stick, red, green, blue);
 }
 bool joystick::vibrate(unsigned short low_frequency, unsigned short high_frequency, int duration) {
-	return SDL_RumbleGamepad(stick, low_frequency, high_frequency, duration);
+    return SDL_RumbleGamepad(stick, low_frequency, high_frequency, duration);
 }
 bool joystick::vibrate_triggers(unsigned short left, unsigned short right, int duration) {
-	return SDL_RumbleGamepadTriggers(stick, left, right, duration);
+    return SDL_RumbleGamepadTriggers(stick, left, right, duration);
 }
 */
 
@@ -428,17 +454,13 @@ bool insertPressed = false;
 LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	if (nCode != HC_ACTION)
 		return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
-
 	PKBDLLHOOKSTRUCT p = reinterpret_cast<PKBDLLHOOKSTRUCT>(lParam);
 	UINT vkCode = p->vkCode;
 	bool altDown = p->flags & LLKHF_ALTDOWN;
 	bool keyDown = (p->flags & LLKHF_UP) == 0;
-
 	altPressed = altDown;
-
 	if (vkCode != VK_CAPITAL && vkCode != VK_INSERT && (capsPressed || insertPressed))
 		return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
-
 	switch (vkCode) {
 		case VK_INSERT:
 			insertPressed = keyDown;
@@ -455,7 +477,6 @@ LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 		default:
 			return 0; // Do nothing for other keys
 	}
-
 	return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 }
 #endif
@@ -463,8 +484,10 @@ LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 void uninstall_keyhook();
 bool install_keyhook(bool allow_reinstall) {
 	#ifdef _WIN32
-	if (g_keyhook_hHook && !allow_reinstall) return false;
-	if (g_keyhook_hHook) uninstall_keyhook();
+	if (g_keyhook_hHook && !allow_reinstall)
+		return false;
+	if (g_keyhook_hHook)
+		uninstall_keyhook();
 	g_keyhook_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, HookKeyboardProc, GetModuleHandle(NULL), NULL);
 	g_keyhook_active = true;
 	return g_keyhook_hHook ? true : false;
@@ -474,7 +497,8 @@ bool install_keyhook(bool allow_reinstall) {
 }
 void remove_keyhook() {
 	#ifdef _WIN32
-	if (!g_keyhook_hHook) return;
+	if (!g_keyhook_hHook)
+		return;
 	UnhookWindowsHookEx(g_keyhook_hHook);
 	g_keyhook_hHook = NULL;
 	#endif
@@ -489,23 +513,28 @@ void uninstall_keyhook() {
 // Low level touch interface
 CScriptArray* get_touch_devices() {
 	asITypeInfo* array_type = get_array_type("uint64[]");
-	if (!array_type) return nullptr;
+	if (!array_type)
+		return nullptr;
 	int device_count;
 	SDL_TouchID* devices = SDL_GetTouchDevices(&device_count);
-	if (!devices) return nullptr;
+	if (!devices)
+		return nullptr;
 	CScriptArray* array = CScriptArray::Create(array_type);
 	if (!array) {
 		SDL_free(devices);
-		return nullptr;;
+		return nullptr;
+		;
 	}
 	array->Reserve(device_count);
-	for (int i = 0; i < device_count; i++) array->InsertLast(devices + i);
+	for (int i = 0; i < device_count; i++)
+		array->InsertLast(devices + i);
 	SDL_free(devices);
 	return array;
 }
 std::string get_touch_device_name(uint64_t device_id) {
 	const char* result = SDL_GetTouchDeviceName((SDL_TouchID)device_id);
-	if (!result) return "";
+	if (!result)
+		return "";
 	return result;
 }
 int get_touch_device_type(uint64_t device_id) {
@@ -513,16 +542,22 @@ int get_touch_device_type(uint64_t device_id) {
 }
 CScriptArray* query_touch_device(uint64_t device_id) {
 	asITypeInfo* array_type = get_array_type("touch_finger[]");
-	if (!array_type) return nullptr;
+	if (!array_type)
+		return nullptr;
 	CScriptArray* array = CScriptArray::Create(array_type);
-	if (!array) return nullptr;
-	if (!device_id && g_TouchLastDevice) device_id = g_TouchLastDevice;
-	if (!device_id) return array;
+	if (!array)
+		return nullptr;
+	if (!device_id && g_TouchLastDevice)
+		device_id = g_TouchLastDevice;
+	if (!device_id)
+		return array;
 	int finger_count;
 	SDL_Finger** fingers = SDL_GetTouchFingers(device_id, &finger_count);
-	if (!fingers) return array;
+	if (!fingers)
+		return array;
 	array->Reserve(finger_count);
-	for (int i = 0; i < finger_count; i++) array->InsertLast(*(fingers + i));
+	for (int i = 0; i < finger_count; i++)
+		array->InsertLast(*(fingers + i));
 	SDL_free(fingers);
 	return array;
 }
@@ -556,21 +591,21 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool stop_text_input()"), asFUNCTION(StopTextInput), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool text_input_active()"), asFUNCTION(TextInputActive), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_KEYBOARD_AVAILABLE() property"), asFUNCTION(SDL_HasKeyboard), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("uint get_key_code(const string&in name)"), asFUNCTION(GetKeyCode), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string get_key_name(uint key)"), asFUNCTION(GetKeyName), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool set_key_name(uint key, const string&in name)"), asFUNCTION(SetKeyName), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool key_pressed(uint key)"), asFUNCTION(KeyPressed), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool key_repeating(uint key)"), asFUNCTION(KeyRepeating), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool key_down(uint key)"), asFUNCTION(key_down), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool key_released(uint key)"), asFUNCTION(KeyReleased), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool key_up(uint key)"), asFUNCTION(key_up), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool insure_key_up(uint key)"), asFUNCTION(insure_key_up), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool simulate_key_down(uint key)"), asFUNCTION(simulate_key_down), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool simulate_key_up(uint key)"), asFUNCTION(simulate_key_up), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("key_code[]@ keys_pressed()"), asFUNCTION(keys_pressed), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("key_code[]@ keys_down()"), asFUNCTION(keys_down), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("uint total_keys_down()"), asFUNCTION(total_keys_down), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("key_code[]@ keys_released()"), asFUNCTION(keys_released), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int get_key_code(const string&in name)"), asFUNCTION(GetKeyCode), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string get_key_name(int key)"), asFUNCTION(GetKeyName), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool set_key_name(int key, const string&in name)"), asFUNCTION(SetKeyName), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool key_pressed(int key)"), asFUNCTION(KeyPressed), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool key_repeating(int key)"), asFUNCTION(KeyRepeating), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool key_down(int key)"), asFUNCTION(key_down), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool key_released(int key)"), asFUNCTION(KeyReleased), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool key_up(int key)"), asFUNCTION(key_up), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool insure_key_up(int key)"), asFUNCTION(insure_key_up), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool simulate_key_down(int key)"), asFUNCTION(simulate_key_down), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool simulate_key_up(int key)"), asFUNCTION(simulate_key_up), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int[]@ keys_pressed()"), asFUNCTION(keys_pressed), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int[]@ keys_down()"), asFUNCTION(keys_down), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int total_keys_down()"), asFUNCTION(total_keys_down), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int[]@ keys_released()"), asFUNCTION(keys_released), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("key_modifier get_keyboard_modifiers() property"), asFUNCTION(SDL_GetModState), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void set_keyboard_modifiers(key_modifier modifier) property"), asFUNCTION(SDL_SetModState), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void reset_keyboard()"), asFUNCTION(SDL_ResetKeyboard), asCALL_CDECL);

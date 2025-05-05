@@ -1,0 +1,8 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	json_array r = {1, "2", 3.4};
+	alert("test", r.extend({5,6,7}).stringify());
+}
