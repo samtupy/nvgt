@@ -74,6 +74,10 @@ void add_game_asset_to_bundle(const string& path, int flags) {
 	while (semi && semi != string::npos && path[semi -1] == '\\' ) semi = path.find_first_of(';', semi + 1);
 	return add_game_asset_to_bundle(path.substr(0, semi), path.substr(semi +1 ), flags);
 }
+set<string> g_bundle_libraries = {"nvdaControllerClient64", "phonon", "SAAPI64"};
+void nvgt_bundle_shared_library(const string& libname) {
+	g_bundle_libraries.insert(libname);
+}
 
 // Helper function to run a shell command that returns true if that command returns 0, false otherwise. Specifically intended for programatic use, this makes no attempt to print output or errors from the given command to the real stdout stream and instead captures all output for use in our program.
 bool system_command(const std::string& command, const Process::Args& args, const std::string& initial_directory, string& std_out, string& std_err) {
@@ -229,19 +233,18 @@ protected:
 		// Determine whether to create, replace, or update shared libraries.
 		if (!libpathF.exists()) libpathF.createDirectories();
 		else if(config.hasOption("build.shared_library_recopy")) libpathF.remove(true);
-		StringTokenizer excludes(config.getString("build.shared_library_excludes", "plist TrueAudioNext GPUUtilities systemd_notify sqlite git2 curl"), " "); // Todo: Make this a whitelist once plugins have a way to communicate about extra libraries they load.
 		string source = get_nvgt_lib_directory(g_platform);
 		set<string> libs;
 		Glob::glob(Path(source).append("*").toString(), libs, Glob::GLOB_DOT_SPECIAL | Glob::GLOB_FOLLOW_SYMLINKS | Glob::GLOB_CASELESS);
 		for (const string& library : libs) {
-			// First check if we wish to exclude this library.
-			bool excluded = false;
-			for (const string& e : excludes) {
-				if (library.find(e) == string::npos) continue;
-				excluded = true;
+			// First check if we wish to include this library.
+			bool included = false;
+			for (const string& l : g_bundle_libraries) {
+				if (Path(library).getBaseName().find(l) == string::npos) continue;
+				included = true;
 				break;
 			}
-			if (excluded) continue;
+			if (!included) continue;
 			// Now check if the same or a newer version of this library has already been copied and skip it if so, in order to save time.
 			File lib = library;
 			File destF = Path(libpath).append(Path(library).getFileName()).toString();

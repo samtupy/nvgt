@@ -16,7 +16,7 @@ class music_track {
 	int repeat_point;
 	int predelay;
 	int switch_predelay = 300;
-	int switch_fade = 2000;
+	int switch_fade = 500;
 	sound@ track = null;
 	sound@ next_track = null;
 	uint64 intro_end = 0;
@@ -108,7 +108,7 @@ class music_track {
 		}
 	}
 	bool get_playing() property {
-		return @track != null and track.playing and track.volume > -60 or @next_track != null and next_track.playing and next_track.volume > -60 or !paused and @next_track != null and prerepeat;
+		return @track != null and track.playing and track.current_fade_volume > -100 or @next_track != null and next_track.playing and next_track.current_fade_volume > -100 or !paused and @next_track != null and prerepeat;
 	}
 	int get_position() property {
 		if (@track == null and @next_track == null) return -1;
@@ -117,12 +117,11 @@ class music_track {
 	}
 	void play_obj(sound@ handle, int fade_ms) {
 		if (!handle.playing) {
-			if (fade_ms > 0) handle.volume = -60;
-			else handle.volume = track_volume;
+			handle.volume = track_volume;
 			if (intro_end > 0 or repeat_point != 0) handle.play();
 			else handle.play_looped();
 		}
-		if (fade_ms > 0) handle.slide_volume(track_volume, fade_ms);
+		handle.set_fade(-100, 0, fade_ms);
 	}
 	void play(int fade_ms = 0) {
 		start_playing = -1;
@@ -143,9 +142,9 @@ class music_track {
 		if (paused or !playing) return;
 		paused = true;
 		if (@track != null)
-			track.slide_volume(-60, fade_ms);
+			track.set_fade(0, -100, fade_ms);
 		if (@next_track != null and !prerepeat)
-			next_track.slide_volume(-60, fade_ms);
+			next_track.set_fade(0, -100, fade_ms);
 		was_next_track_playing = @next_track != null and next_track.playing;
 	}
 	void stop(int fade_ms = 0) {
@@ -167,10 +166,9 @@ class music_track {
 			if (track.length - cur_ms < intro_end + 300) {
 				@next_track = sound();
 				load_sound(next_track, main_filename);
+				next_track.volume = track_volume;
 				if (paused)
-					next_track.volume = -60;
-				else
-					next_track.volume = track_volume;
+					next_track.set_fade(0, -100, 0);
 				next_track.pitch = track_pitch;
 			}
 			if (track.playing and track.length - cur_ms < intro_end + 5 and @next_track != null) {
@@ -182,8 +180,8 @@ class music_track {
 				intro_end = 0;
 			}
 		}
-		if (paused and @track != null and track.volume == -60) track.pause();
-		if (paused and @next_track != null and next_track.volume == -60) next_track.pause();
+		if (paused and @track != null and track.volume == -100) track.pause();
+		if (paused and @next_track != null and next_track.volume == -100) next_track.pause();
 		if (!prerepeat and @track != null and @next_track != null and !track.playing and next_track.playing) {
 			track.close();
 			@track = next_track;
@@ -231,14 +229,12 @@ class music_manager {
 	void set_volume(float volume) property {
 		music_mixer.volume = volume;
 	}
-	bool set_fx(string fx, int index = -1) {
-		return music_mixer.set_fx(fx, index);
-	}
 	bool play(string track, bool blocking = false) {
 		stopping = false;
 		music_track@ trk = music_track(track, this);
 		if (@main_track == null) {
 			@main_track = trk;
+			next_play = 0;
 			return true;
 		}
 		@next_track = trk;
@@ -254,6 +250,7 @@ class music_manager {
 	void stop(int fade_ms = 0, bool blocking = false) {
 		if (!playing) return;
 		stopping = true;
+		next_play = 0;
 		if (@main_track != null) main_track.stop(fade_ms);
 		if (@next_track != null) next_track.stop(fade_ms);
 		while (blocking and playing) {

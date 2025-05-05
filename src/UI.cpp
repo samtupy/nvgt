@@ -53,6 +53,7 @@
 #include <unistd.h>
 #include <cstdio>
 #endif
+#include "anticheat.h"
 
 int message_box(const std::string& title, const std::string& text, const std::vector<std::string>& buttons, unsigned int mb_flags) {
 	// Start with the buttons.
@@ -322,6 +323,7 @@ void handle_sdl_event(SDL_Event* evt) {
 		regained_window_focus();
 }
 void refresh_window() {
+	anticheat_check();
 	SDL_PumpEvents();
 	SDL_Event evt;
 	std::unordered_set<int> keys_pressed_this_frame;
@@ -342,6 +344,7 @@ void refresh_window() {
 	}
 }
 void wait(int ms) {
+	anticheat_check();
 	if (!g_WindowHandle || g_WindowThreadId != thread_current_thread_id()) {
 		Poco::Thread::sleep(ms);
 		return;

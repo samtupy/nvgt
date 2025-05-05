@@ -410,6 +410,11 @@ poco_shared<Dynamic::Var>* poco_json_array::query(const std::string& path) const
 	JSON::Query q(shared);
 	return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(q.find(path))));
 }
+poco_json_array& poco_json_array::extend(poco_json_array* array) {
+	if (!array) return *this;
+	for (const auto i : *array->ptr) ptr->add(i);
+	return *this;
+}
 poco_json_array* poco_json_array::get_array(unsigned int index) const {
 	JSON::Array::Ptr obj = ptr->getArray(index);
 	if (!obj) return nullptr;
@@ -683,8 +688,9 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("json_array", "json_array& opAssign(json_array@ other)", asMETHODPR(poco_json_array, operator=, (poco_json_array*), poco_json_array&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "var@ get_opIndex(uint index) property", asMETHOD(poco_json_array, get), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "void set_opIndex(uint index, const var&in value) property", asMETHOD(poco_json_array, set), asCALL_THISCALL);
-	engine->RegisterObjectMethod("json_array", "void add(var@ value)", asMETHOD(poco_json_array, add), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "void add(const var&in value)", asMETHOD(poco_json_array, add), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "var@ opCall(const string&in path) const", asMETHOD(poco_json_array, query), asCALL_THISCALL);
+	engine->RegisterObjectMethod("json_array", "json_array& extend(const json_array@ array)", asMETHOD(poco_json_array, extend), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "json_array@ get_array(uint index) const", asMETHOD(poco_json_array, get_array), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "json_object@ get_object(uint index) const", asMETHOD(poco_json_array, get_object), asCALL_THISCALL);
 	engine->RegisterObjectMethod("json_array", "string stringify(uint indent = 0, int step = -1)", asMETHODPR(poco_json_array, stringify, (unsigned int, int) const, std::string), asCALL_THISCALL);

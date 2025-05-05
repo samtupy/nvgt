@@ -3,7 +3,7 @@
 # Copyright (c) 2022-2024 Sam Tupy
 # license: zlib
 
-import os, multiprocessing
+import os, multiprocessing, tempfile
 
 Help("""
 	Available custom build switches for NVGT:
@@ -15,7 +15,10 @@ Help("""
 		no_stubs=0 or 1 (default 0): Disable compilation of all stubs?
 		no_user=0 or 1 (default 0): Pretend that the user directory doesn't exist?
 		no_<plugname>_plugin=1: Disable a plugin by name.
+		static_<plugname>_plugin=1: Cause the given plugin to be linked statically if possible.
 		stub_obfuscation=0 or 1 (default 0): Obfuscate some Angelscript function registration strings in the resulting stubs? Could make them bigger.
+		warnings (0 or 1, default 0): enable compiler warnings?
+		warnings_as_errors (0 or 1, default 0): treat compiler warnings as errors?
 	You can also run scons install (for now only on windows) to install the build into C:/nvgt. STILL WIP!
 	Note that custom switches or targets may be added by any plugin SConscript and may not be documented here.
 """)
@@ -37,34 +40,52 @@ if ARGUMENTS.get("debug", "0") == "1":
 	cdb = env.CompilationDatabase()
 	Alias('cdb', cdb)
 if env["PLATFORM"] == "win32":
-	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT" if not "windev_debug" in env else "/MTd", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/O2", "/bigobj", "/permissive-"])
+	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT" if not "windev_debug" in env else "/MTd", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/O2" if ARGUMENTS.get("debug", "0") == "0" else "/Od", "/bigobj", "/permissive-", "/W3" if ARGUMENTS.get("warnings", "0") == "1" else "", "/WX" if ARGUMENTS.get("warnings_as_errors", "0") == "1" else ""])
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
-	env.Append(LIBS = ["UniversalSpeechStatic", "angelscript64", "SDL3"])
-	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32"])
+	env.Append(LIBS = ["UniversalSpeechStatic", "angelscript64", "SDL3", "vorbis", "vorbisfile", "ogg"])
+	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32", "ntdll"])
 else:
-	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-O0" if ARGUMENTS.get("debug", 0) == "1" else "-O3", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result", "-g" if ARGUMENTS.get("debug", 0) == "1" else ""], LIBS = ["m"])
+	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-O0" if ARGUMENTS.get("debug", 0) == "1" else "-O3", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result", "-g" if ARGUMENTS.get("debug", 0) == "1" else "", "-Wall" if ARGUMENTS.get("warnings", "0") == "1" else "", "-Wextra" if ARGUMENTS.get("warnings", "0") == "1" else "", "-Werror" if ARGUMENTS.get("warnings_as_errors", "0") == "1" else ""], LIBS = ["m"])
 if env["PLATFORM"] == "darwin":
 	# homebrew paths and other libraries/flags for MacOS
 	env.Append(CCFLAGS = ["-mmacosx-version-min=14.0", "-arch", "arm64", "-arch", "x86_64"], LINKFLAGS = ["-arch", "arm64", "-arch", "x86_64"])
 	# The following, to say the least, is absolutely not ideal. In some cases we have both static and dynamic libraries on the system and must explicitly choose the static one. The normal :libname.a trick doesn't seem to work on clang, we're just informed that libs couldn't be found. If anybody knows a better way to force static library linkage on MacOS particularly without the absolute paths, please let me know!
-	env.Append(LIBS = ["angelscript", "SDL3", "crypto", "ssl", "iconv"])
+	env.Append(LIBS = ["angelscript", "SDL3", "crypto", "ssl", "iconv", "ogg", "vorbis", "vorbisfile"])
 elif env["PLATFORM"] == "posix":
-	# enable the gold linker to silence seemingly pointless warnings about symbols in the bass libraries, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
-	env.Append(CPPPATH = ["/usr/local/include"], LIBPATH = ["/usr/local/lib"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
+	# enable the gold linker, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
+	env.Append(CPPPATH = ["/usr/local/include"], LIBPATH = ["/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
 	env.Append(LIBS = [":libangelscript.a", ":libenet6.a", ":libSDL3.a", "crypto", "ssl"])
 env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
 # plugins
-plugin_env = env.Clone()
 static_plugins = []
+try:
+	# First, read the list of static plugins we wish to link if available.
+	with open(os.path.join("user", "static_plugins"), "r") as f:
+		lines = f.readlines()
+		for l in lines:
+			if not l or l.startswith("#"): continue
+			static_plugins.append(l.strip())
+except FileNotFoundError: pass
+plugin_env = env.Clone()
+# Then loop through all known plugins and build them.
 for s in Glob("plugin/*/_SConscript") + Glob("plugin/*/SConscript") + Glob("extra/plugin/integrated/*/_SConscript") + Glob("extra/plugin/integrated/*/SConscript"):
 	plugname = str(s).split(os.path.sep)[-2]
 	if ARGUMENTS.get(f"no_{plugname}_plugin", "0") == "1": continue
+	if ARGUMENTS.get(f"static_{plugname}_plugin", "0") == "1" and not plugname in static_plugins: static_plugins.append(plugname)
+	# Build the plugin. A list of static libraries NVGT should link with is returned if the plugin generates any.
 	plug = SConscript(s, variant_dir = f"build/obj_plugin/{plugname}", duplicate = 0, exports = {"env": plugin_env, "nvgt_env": env})
-	if plug: static_plugins.append(plug)
-env.Append(LIBS = static_plugins)
+	if plug and plugname in static_plugins: env.Append(LIBS = plug)
+# Finally generate nvgt_plugins.cpp
+static_plugins_object = None
+static_plugins_path = os.path.join(tempfile.gettempdir(), "nvgt_plugins")
+if len(static_plugins) > 0:
+	with open(static_plugins_path + ".cpp", "w") as f:
+		f.write("#define NVGT_LOAD_STATIC_PLUGINS\n#include <nvgt_plugin.h>\n")
+		for plugin in static_plugins: f.write(f"static_plugin({plugin})" + "\n")
+		static_plugins_object = env.Object(static_plugins_path, static_plugins_path + ".cpp", CPPPATH = env["CPPPATH"] + ["#src"])
 
 # nvgt itself
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
@@ -73,10 +94,10 @@ if "version.cpp" in sources: sources.remove("version.cpp")
 env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
 version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.
 VariantDir("build/obj_src", "src", duplicate = 0)
-env.Append(LIBS = [["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoZip", "PocoFoundation"] if env["PLATFORM"] != "win32" else [], "phonon", "bass", "bass_fx", "bassmix", "enet6", "reactphysics3d"])
+env.Append(LIBS = [["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoZip", "PocoFoundation"] if env["PLATFORM"] != "win32" else [], "phonon", "enet6", "reactphysics3d"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
-	env.Append(LINKFLAGS = ["/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:bass.dll", "/delayload:bass_fx.dll", "/delayload:bassmix.dll", "/delayload:phonon.dll"])
+	env.Append(CPPDEFINES = ["_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING"], LINKFLAGS = ["/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:phonon.dll"])
 elif env["PLATFORM"] == "darwin":
 	sources.append("apple.mm")
 	sources.append("macos.mm")
@@ -86,6 +107,8 @@ elif env["PLATFORM"] == "darwin":
 	env.Append(LINKFLAGS = ["-Wl,-rpath,'@loader_path',-rpath,'@loader_path/lib',-rpath,'@loader_path/../Frameworks',-dead_strip_dylibs", "-mmacosx-version-min=14.0"])
 elif env["PLATFORM"] == "posix":
 	env.Append(LINKFLAGS = ["-Wl,-rpath,'$$ORIGIN/.',-rpath,'$$ORIGIN/lib'"])
+	# Libvorbis must appear in the library link order after deps on Linux.
+	env.Append(LIBS = [":libvorbisfile.a", ":libvorbis.a", ":libogg.a"])
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
 		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
@@ -99,17 +122,22 @@ SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, expo
 stub_env = env.Clone(PROGSUFFIX = ".bin")
 if env["PLATFORM"] == "win32": env.Append(LINKFLAGS = ["/delayload:plist.dll"])
 env.Append(LIBS = ["plist-2.0" if env["PLATFORM"] != "win32" else "plist"])
-nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [version_object], PDB = "#build/debug/nvgt.pdb")
+extra_objects = [version_object]
+if static_plugins_object: extra_objects.append(static_plugins_object)
+nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + extra_objects, PDB = "#build/debug/nvgt.pdb")
 if env["PLATFORM"] == "darwin":
 	# On Mac OS, we need to run install_name_tool to modify the paths of any dynamic libraries we link.
 	env.AddPostAction(nvgt, lambda target, source, env: env.Execute("install_name_tool -change /usr/local/lib/libplist-2.0.4.dylib @rpath/libplist-2.0.4.dylib " + str(target[0])))
 if env["PLATFORM"] == "win32":
 	# Only on windows we must go through the frustrating hastle of compiling a version of nvgt with no console E. the windows subsystem. It is at least set up so that we only need to recompile one object
 	if "nvgt.cpp" in sources: sources.remove("nvgt.cpp")
-	nvgtw = env.Program("release/nvgtw", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [env.Object("build/obj_src/nvgtw", "build/obj_src/nvgt.cpp", CPPDEFINES = ["$CPPDEFINES", "NVGT_WIN_APP"]), version_object], LINKFLAGS = ["$LINKFLAGS", "/subsystem:windows"], PDB = "#build/debug/nvgtw.pdb")
+	nvgtw = env.Program("release/nvgtw", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [env.Object("build/obj_src/nvgtw", "build/obj_src/nvgt.cpp", CPPDEFINES = ["$CPPDEFINES", "NVGT_WIN_APP"]), extra_objects], LINKFLAGS = ["$LINKFLAGS", "/subsystem:windows"], PDB = "#build/debug/nvgtw.pdb")
 	sources.append("nvgt.cpp")
+	# Todo: Properly implement the install target on other platforms
 	env.Install("c:/nvgt", nvgt)
 	env.Install("c:/nvgt", nvgtw)
+	env.Install("c:/nvgt/include", Glob("#release/include/*"))
+	env.Install("c:/nvgt/lib", Glob("#release/lib/*"))
 
 # stubs
 def fix_windows_stub(target, source, env):
@@ -131,7 +159,7 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
 	if env["PLATFORM"] == "win32": stub_env.Append(LINKFLAGS = ["/subsystem:windows"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
-	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + [version_object]
+	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + extra_objects
 	stub = stub_env.Program(f"release/stub/nvgt_{stub_platform}", stub_objects, PDB = "#build/debug/nvgt_windows.pdb")
 	if env["PLATFORM"] == "win32": env.Install("c:/nvgt/stub", stub)
 	if "upx" in env:

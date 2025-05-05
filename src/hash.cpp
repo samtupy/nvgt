@@ -18,7 +18,7 @@
 #include <Poco/MD5Engine.h>
 #include <Poco/SHA1Engine.h>
 #include <Poco/SHA2Engine.h>
-
+#include "hash.h"
 std::string md5(const std::string& message, bool binary) {
 	Poco::MD5Engine engine;
 	engine.update(message);
@@ -93,35 +93,98 @@ uint32_t hotp(const std::string& key, uint64_t counter, uint32_t digitCount) {
 	Poco::HMACEngine<Poco::SHA1Engine> engine(key);
 	engine.update(msg);
 	auto hmac = engine.digest();
-
 	uint32_t digits10 = 1;
 	for (size_t i = 0; i < digitCount; ++i)
 		digits10 *= 10;
-
 	// fetch the offset (from the last nibble)
 	uint8_t offset = hmac[hmac.size() - 1] & 0x0F;
-
 	// fetch the four bytes from the offset
 	Poco::DigestEngine::Digest fourWord(hmac.begin() + offset, hmac.begin() + offset + 4);
-
 	// turn them into a 32-bit integer
 	uint32_t ret = (fourWord[0] << 24) | (fourWord[1] << 16) | (fourWord[2] << 8) | (fourWord[3] << 0);
-
 	// snip off the MSB (to alleviate signed/unsigned troubles) and calculate modulo digit count
 	return (ret & 0x7fffffff) % digits10;
 }
 
 unsigned int crc32(const std::string& data) {
-	if (data == "") return 0;
+	if (data == "")
+		return 0;
 	Poco::Checksum c;
 	c.update(data);
 	return c.checksum();
 }
 unsigned int adler32(const std::string& data) {
-	if (data == "") return 0;
+	if (data == "")
+		return 0;
 	Poco::Checksum c(Poco::Checksum::TYPE_ADLER32);
 	c.update(data);
 	return c.checksum();
+}
+
+// the following checksum_stream code written by caturria:
+checksum_ostreambuf::checksum_ostreambuf(std::ostream& sink)
+	: BasicBufferedStreamBuf(4096, std::ios_base::out),
+	  check(Poco::Checksum::TYPE_CRC32) {
+	this->sink = &sink;
+}
+checksum_ostreambuf::~checksum_ostreambuf() {
+}
+int checksum_ostreambuf::writeToDevice(const char* buffer, std::streamsize length) {
+	check.update(buffer, (uint32_t)length);
+	sink->write(buffer, length);
+	return (int)length;
+}
+uint32_t checksum_ostreambuf::get_checksum() {
+	return check.checksum();
+}
+checksum_ostream::checksum_ostream(std::ostream& sink)
+	: basic_ostream(new checksum_ostreambuf(sink)) {
+}
+checksum_ostream::~checksum_ostream() {
+	delete rdbuf();
+}
+uint32_t checksum_ostream ::get_checksum() {
+	checksum_ostreambuf* buf = static_cast<checksum_ostreambuf*>(rdbuf());
+	if (buf == NULL)
+		return 0;
+	return buf->get_checksum();
+}
+checksum_istreambuf::checksum_istreambuf(std::istream& source)
+	: BasicBufferedStreamBuf(4096, std::ios_base::in),
+	  check(Poco::Checksum::TYPE_CRC32) {
+	this->source = &source;
+}
+checksum_istreambuf::~checksum_istreambuf() {
+}
+int checksum_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
+	if (!source->good())
+		return -1;
+	source->read(buffer, length);
+	int result = (int)source->gcount();
+	check.update(buffer, result);
+	return result;
+}
+uint32_t checksum_istreambuf::get_checksum() {
+	return check.checksum();
+}
+checksum_istream::checksum_istream(std::istream& source)
+	: basic_istream(new checksum_istreambuf(source)) {
+	this->source = &source;
+}
+checksum_istream::~checksum_istream() {
+	delete rdbuf();
+}
+std::streampos checksum_istream::tellg() {
+	if (!good())
+		return -1;
+	source->clear();
+	return source->tellg() - std::streampos(rdbuf()->in_avail());
+}
+uint32_t checksum_istream::get_checksum() {
+	checksum_istreambuf* buf = static_cast<checksum_istreambuf*>(rdbuf());
+	if (buf == NULL)
+		return 0;
+	return buf->get_checksum();
 }
 
 void RegisterScriptHash(asIScriptEngine* engine) {

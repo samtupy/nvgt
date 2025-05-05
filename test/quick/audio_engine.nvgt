@@ -1,0 +1,19 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE);
+	sound@ s1 = e.sound();
+	if (!s1.load("c:\\windows\\media\\ding.wav")) alert("oops", "can't load ding");
+	sound@ s2 = e.sound();
+	if (!s2.load("c:\\windows\\media\\chord.wav")) alert("oops", "can't load chord");
+	wait(200); // Sounds load async and engine.read() doesn't wait for them.
+	s1.play();
+	s2.play();
+	float[]@ pcm = e.read(e.sample_rate);
+	sound player;
+	if (!player.load_pcm(pcm, e.sample_rate, e.channels)) alert("oops", "can't load pcm");
+	player.play();
+	wait(1000);
+}

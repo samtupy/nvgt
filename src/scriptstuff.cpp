@@ -134,16 +134,21 @@ void reset_profiler() {
 	profiler_ticks = std::chrono::high_resolution_clock::now();
 	profiler_start = std::chrono::high_resolution_clock::now();
 	profiler_last_func = NULL;
+	prepare_profiler();
+}
+void prepare_profiler() {
+	if (!is_profiling) return;
+	asIScriptContext* ctx = asGetActiveContext();
+	if (!ctx) return;
+	profiler_last_func = ctx->GetFunction();
+	profiler_cache[profiler_last_func] = profiler_start;
 }
 void start_profiling() {
-	asIScriptContext* ctx = asGetActiveContext();
 	if (is_profiling) return;
+	asIScriptContext* ctx = asGetActiveContext();
+	if (!ctx) return;
+	is_profiling = true;
 	reset_profiler();
-	if (ctx) {
-		is_profiling = true;
-		profiler_last_func = ctx->GetFunction();
-		profiler_cache[profiler_last_func] = profiler_start;
-	}
 }
 void stop_profiling() {
 	asIScriptContext* ctx = asGetActiveContext();
@@ -433,8 +438,10 @@ std::string script_function_get_name(asIScriptFunction* func) {
 std::string script_function_get_namespace(asIScriptFunction* func) {
 	return std::string(func->GetNamespace());
 }
-std::string script_function_get_script(asIScriptFunction* func) {
-	return std::string(func->GetScriptSectionName());
+std::string script_function_get_script(asIScriptFunction* func, int* row, int* col) {
+	const char* script;
+	if (func->GetDeclaredAt(&script, row, col) < 0) return "";
+	return std::string(script);
 }
 void script_function_line_callback(asIScriptContext* ctx, script_function_call_data* data) {
 	profiler_callback(ctx, NULL);
@@ -760,8 +767,8 @@ void RegisterScriptstuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("void reset_profiler()", asFUNCTION(reset_profiler), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string generate_profile(bool = true)", asFUNCTION(generate_profile), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
-	engine->RegisterGlobalFunction("string get_call_stack()", asFUNCTION(get_call_stack), asCALL_CDECL);
-	engine->RegisterGlobalFunction("int get_call_stack_size()", asFUNCTION(get_call_stack_size), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string get_call_stack() property", asFUNCTION(get_call_stack), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int get_call_stack_size() property", asFUNCTION(get_call_stack_size), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_SCRIPT_CURRENT_FUNCTION() property", asFUNCTION(get_script_current_function), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_SCRIPT_CURRENT_FILE() property", asFUNCTION(get_script_current_file), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_SCRIPT_CURRENT_LINE() property", asFUNCTION(get_script_current_line), asCALL_CDECL);

@@ -1,0 +1,10 @@
+/**
+	Represents the imaginary component of the complex number.
+	float complex::i;
+*/
+
+// Example:
+void main() {
+	complex c(0, 1);
+	alert("The imaginary part is", c.i);
+}

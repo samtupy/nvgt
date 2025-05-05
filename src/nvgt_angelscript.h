@@ -23,8 +23,10 @@ extern CScriptArray* g_command_line_args;
 extern std::string g_CommandLine;
 extern std::vector<std::string> g_IncludeDirs;
 extern std::vector<std::string> g_IncludeScripts;
+std::string get_system_namespace(const std::string& system);
 
 void ShowAngelscriptMessages();
+int PreconfigureEngine(asIScriptEngine* engine);
 int ConfigureEngine(asIScriptEngine* engine);
 void ConfigureEngineOptions(asIScriptEngine* engine);
 int ExecuteScript(asIScriptEngine* engine, const std::string& scriptFile);

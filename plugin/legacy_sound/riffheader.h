@@ -15,6 +15,7 @@
 */
 
 #pragma once
+#include <cstring>
 
 // The below structure has been slightly modified from https://gist.github.com/Jon-Schneider/8b7c53d27a7a13346a643dac9c19d34f
 // This structure should not be used to examine existing wav files, but instead just to write new ones. This is because many existing wav files will contain metadata chunks or other information that this structure cannot handle.
@@ -46,13 +47,13 @@ extern "C" {
 		const char* wavefmt = "WAVEfmt ";
 		const char* data = "data";
 		wav_header h;
-		memset(&h, 0, sizeof(wav_header));
-		strncpy(h.riff_header, riff, 4);
+		std::memset(&h, 0, sizeof(wav_header));
+		std::strncpy(h.riff_header, riff, 4);
 		if (filesize > 0)
 			h.wav_size = filesize - 8;
 		else
 			h.wav_size = 0;
-		memcpy(h.wave_header, wavefmt, 8);
+		std::memcpy(h.wave_header, wavefmt, 8);
 		h.fmt_chunk_size = 16;
 		h.audio_format = format;
 		h.num_channels = channels;
@@ -60,7 +61,7 @@ extern "C" {
 		h.byte_rate = samprate * channels * (bitrate / 8);
 		h.sample_alignment = channels * (bitrate / 8);
 		h.bit_depth = bitrate;
-		strncpy(h.data_header, data, 4);
+		std::strncpy(h.data_header, data, 4);
 		if (filesize > 0)
 			h.data_bytes = filesize - sizeof(wav_header);
 		else

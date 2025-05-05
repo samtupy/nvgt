@@ -8,7 +8,7 @@
     license: zlib
 */
 
-class ini {
+shared class ini {
 	// class variables
 	private ini_section@[] sections;
 	private dictionary sections_dict;
@@ -569,7 +569,7 @@ class ini {
 
 
 // ini_section: This is a very simple class that stores a section of an ini file including it's keys in memory for manipulation.
-class ini_section {
+shared class ini_section {
 	// class variables
 	string name; // If this is blank the section is to be written to the top of the file with no section header indicating all keys that don't reside in a section.
 	string[] key_names; // Used so that the section stays ordered when being rewritten to the file.
@@ -627,7 +627,7 @@ class ini_section {
 // The following are functions meant for internal use by the classes above.
 
 // Internal function used to check whether a character is a valid ini identifier char.
-bool INI_IS_VALID_IDENT_CHAR(const string& in char) {
+shared bool INI_IS_VALID_IDENT_CHAR(const string& in char) {
 	if (char.length() != 1)
 		return false;
 	uint c = character_to_ascii(char);
@@ -635,7 +635,7 @@ bool INI_IS_VALID_IDENT_CHAR(const string& in char) {
 }
 
 // Escape backslash, cama, colon and semicolon
-string INI_ESCAPE_STRING(const string&in value) {
+shared string INI_ESCAPE_STRING(const string&in value) {
 	string result = value.replace("\\", "\\\\", true);
 	result.replace_this(",", "\\,", true);
 	result.replace_this(":", "\\:", true);
@@ -644,7 +644,7 @@ string INI_ESCAPE_STRING(const string&in value) {
 }
 
 // Unescape backslash, cama, colon and semicolon
-string INI_UNESCAPE_STRING(const string&in value) {
+shared string INI_UNESCAPE_STRING(const string&in value) {
 	string result = value.replace("\\\\", "\\", true);
 	result.replace_this("\\,", ",", true);
 	result.replace_this("\\:", ":", true);
@@ -653,7 +653,7 @@ string INI_UNESCAPE_STRING(const string&in value) {
 }
 
 // Verify an identifier to make sure keys and section names with invalid characters aren't permitted. A blank string returned means that the identifier is OK, anything else is error text.
-string INI_VERIFY_IDENT(const string& in identifier) {
+shared string INI_VERIFY_IDENT(const string& in identifier) {
 	if (identifier.length() == 0)
 		return "";
 	if (identifier.find("  ") > -1)
@@ -667,7 +667,7 @@ string INI_VERIFY_IDENT(const string& in identifier) {
 }
 
 // This function splits a string by lines. We don't use string_split for this because string_split doesn't include blank lines, entirely throwing off any needed line number reporting.
-string[]@ get_lines(const string& in the_string) {
+shared string[]@ get_lines(const string& in the_string) {
 	string[] result;
 	int line_start_pos = 0;
 	for (uint i = 0; i < the_string.length(); i++) {

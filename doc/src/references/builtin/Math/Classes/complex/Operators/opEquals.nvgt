@@ -1,0 +1,15 @@
+/**
+	Checks if two complex numbers are equal.
+	bool complex::opEquals(const complex&in other) const;
+	## Arguments:
+		* const complex&in other: the complex number to compare to.
+	## Returns:
+		bool: true if the two complex numbers are equal, false otherwise.
+*/
+
+// Example:
+void main() {
+	complex a(1, 2);
+	complex b(1, 2);
+	alert("a equals b?", a == b);
+}

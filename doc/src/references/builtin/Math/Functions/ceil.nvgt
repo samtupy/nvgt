@@ -4,7 +4,7 @@
 	## Arguments:
 		* double x: The value whose ceiling is to be calculated.
 	## Returns:
-		The smallest integer greater than or equal to x.
+		double: the smallest integer greater than or equal to x.
 */
 
 // Example:

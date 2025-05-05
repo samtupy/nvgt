@@ -244,6 +244,29 @@ static bool ScriptArrayTemplateCallback(asITypeInfo *ti, bool &dontGarbageCollec
 	return true;
 }
 
+asINT64 CScriptArray_opForBegin(const CScriptArray*)
+{
+	return 0;
+}
+
+bool CScriptArray_opForEnd(asINT64 iter, const CScriptArray*arr)
+{
+	if (arr == 0 || arr->GetSize() <= iter)
+		return true;
+
+	return false;
+}
+
+asINT64 CScriptArray_opForNext(asINT64 iter, const CScriptArray*)
+{
+	return iter + 1;
+}
+
+asINT64 CScriptArray_opForValue1(asINT64 iter, const CScriptArray*)
+{
+	return iter;
+}
+
 // Registers the template array type
 void RegisterScriptArray(asIScriptEngine *engine, bool defaultArray)
 {
@@ -288,6 +311,13 @@ static void RegisterScriptArray_Native(asIScriptEngine *engine)
 	// The index operator returns the template subtype
 	r = engine->RegisterObjectMethod("array<T>", "T &opIndex(int64 index)", asMETHODPR(CScriptArray, At, (asINT64), void*), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "const T &opIndex(int64 index) const", asMETHODPR(CScriptArray, At, (asINT64) const, const void*), asCALL_THISCALL); assert( r >= 0 );
+
+	// Support for foreach
+	r = engine->RegisterObjectMethod("array<T>", "int64 opForBegin() const", asFUNCTIONPR(CScriptArray_opForBegin, (const CScriptArray *), asINT64), asCALL_CDECL_OBJLAST); assert(r >= 0);
+	r = engine->RegisterObjectMethod("array<T>", "bool opForEnd(int64) const", asFUNCTIONPR(CScriptArray_opForEnd, (asINT64, const CScriptArray*), bool), asCALL_CDECL_OBJLAST); assert(r >= 0);
+	r = engine->RegisterObjectMethod("array<T>", "int64 opForNext(int64) const", asFUNCTIONPR(CScriptArray_opForNext, (asINT64, const CScriptArray*), asINT64), asCALL_CDECL_OBJLAST); assert(r >= 0);
+	r = engine->RegisterObjectMethod("array<T>", "const T &opForValue0(int64 index) const", asMETHODPR(CScriptArray, At, (asINT64) const, const void*), asCALL_THISCALL); assert(r >= 0);
+	r = engine->RegisterObjectMethod("array<T>", "int64 opForValue1(int64 index) const", asFUNCTIONPR(CScriptArray_opForValue1, (asINT64, const CScriptArray*), asINT64), asCALL_CDECL_OBJLAST); assert(r >= 0);
 
 	// The assignment operator
 	r = engine->RegisterObjectMethod("array<T>", "array<T> &opAssign(const array<T>&in)", asMETHOD(CScriptArray, operator=), asCALL_THISCALL); assert( r >= 0 );
@@ -820,6 +850,11 @@ int CScriptArray::GetArrayTypeId() const
 int CScriptArray::GetElementTypeId() const
 {
 	return subTypeId;
+}
+
+int CScriptArray::GetElementSize() const
+{
+	return elementSize;
 }
 
 void CScriptArray::InsertAt(asUINT index, void *value)

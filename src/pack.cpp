@@ -1,572 +1,716 @@
 /* pack.cpp - pack file implementation code
+ * Class wsritten for NVGT by Caturria.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
+ * Copyright (c) 2022-2025 Sam Tupy
  * https://nvgt.gg
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
-*/
-
-#include <errno.h>
-#include <obfuscate.h>
-#include <Poco/FileStream.h>
-#include <Poco/Format.h>
-#include <Poco/StreamCopier.h>
-#include <Poco/Thread.h>
-#include <Poco/Util/Application.h>
-#ifndef _WIN32
-	#include <sys/stat.h>
-	#include <unistd.h>
-#else
-	#include <windows.h>
-	#include <io.h>
-#endif
-#include "filesystem.h"
-#ifndef NVGT_USER_CONFIG // pack_char_encrypt/decrypt
-	#include "nvgt_config.h"
-#else
-	#include "../user/nvgt_config.h"
-#endif
+ */
 #include "pack.h"
-#include "xplatform.h"
+#include <Poco/FileStream.h>
+#include <Poco/StreamCopier.h>
+#include <Poco/Util/Application.h> // config
+#include <unordered_map> //For TOC in read mode.
+#include <list>			 //For TOC in write mode. Linearity is a hard requirement because it saves having to store an offset field in every TOC entry.
+#include "hash.h"
+#include <Poco/BinaryWriter.h>
+#include <Poco/BinaryReader.h>
+#include "misc_functions.h" // is_valid_utf8
+#include <angelscript.h>
+#include <Poco/Path.h>
+#include <iostream>
+#include "crypto.h" // chacha_stream
+#include "datastreams.h"
+#include <scriptarray.h>
+bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& file_size);
+static const int header_size = 64;
+static const uint32_t magic = 0xDadFaded;
+struct pack::toc_entry
+{
+	std::string filename; // Must be UTF-8.
+	uint64_t offset;	  // We don't save this. In write mode, these are stored in a std::list, so we can take advantage of linearity to save space.
+	uint64_t size;
+};
+typedef std::unordered_map<std::string, pack::toc_entry> toc_map;
+typedef std::list<pack::toc_entry *> toc_list;
+class pack::read_mode_internals
+{
+	toc_map toc;
+	std::istream *file;
+	uint64_t pack_offset; // Used for packs that are part of a larger file.
+	uint64_t pack_size;	  // Used for packs that are part of a larger file.
+	bool load();
 
-using namespace std;
+public:
+	read_mode_internals(std::istream &file, const std::string &key = "", uint64_t pack_offset = 0, uint64_t pack_size = 0);
+	~read_mode_internals();
+	const toc_entry *get(const std::string &filename) const;
+	bool exists(const std::string &filename);
+	toc_map &get_toc_map(); // Used to implement at least get_file_count and list_files.
+};
+class pack::write_mode_internals
+{
+	std::ostream *file;
+	toc_map toc;
+	toc_list ordered_toc; // Because we need to write the TOC entries in the same order as they were inserted.
+	uint64_t data_size;	  // Tracked manually instead of relying on tellp(), which is needlessly hard to implement for custom ostreams.
+	// Writes a block of zeros to the head of the file. Called once when a file is created. This header is updated when the file is finalized.
+	bool put_blank_header();
 
-// A global property that allows a scripter to set the pack identifier for all subsequently created packs.
-static std::string g_pack_ident = "NVPK";
+public:
+	// Writes the TOC and updates the header.
+	bool finalize();
 
-bool find_embedded_pack(string& filename, unsigned int& file_offset);
+	// Pack itself is responsible for composing the stream it wants and passing it in. Internals take ownership though.
+	write_mode_internals(std::ostream &file, const std::string &key = "");
+	~write_mode_internals();
+	const toc_entry* get(const std::string& filename) const;
+	bool put(std::istream &in_file, const std::string &internal_name);
+	bool exists(const std::string &filename);
+	toc_map &get_toc_map(); // Used to implement at least get_file_count and list_files.
+};
+bool pack::read_mode_internals::load()
+{
+	file->seekg(0, file->end);
+	size_t file_size = file->tellg();
 
-pack::pack() {
-	fptr = NULL;
-	mptr = NULL;
-	pack_items.clear();
-	pack_filenames.clear();
-	pack_streams.clear();
-	current_filename = "";
-	set_pack_identifier(g_pack_ident);
-	next_stream_idx = 0;
-	open_mode = PACK_OPEN_MODE_NONE;
-	delay_close = false;
-	file_offset = 0;
-	RefCount = 1;
-}
-void pack::AddRef() {
-	asAtomicInc(RefCount);
-}
-void pack::Release() {
-	if (asAtomicDec(RefCount) < 1) {
-		close();
-		delete this;
+	file->seekg(0);
+	if (!file->good())
+	{
+		return false; // Unseekable stream presumably.
 	}
-}
 
-// Sets the 8 byte header used when loading and saving packs.
-bool pack::set_pack_identifier(const std::string& ident) {
-	if (ident == "") return false;
-	pack_ident = ident;
-	if (pack_ident.size() > 8) pack_ident.resize(8);
-	while (pack_ident.size() < 8) pack_ident += '\0';
-	return true;
-}
-// Loads or creates the given pack file based on mode.
-bool pack::open(const string& filename_in, pack_open_mode mode, bool memload) {
-	if (fptr || mptr) {
-			if (!close()) return false; // A pack file is already opened and was unable to close, maybe some sounds are actively playing from it.
-		}
-	if (mode <= PACK_OPEN_MODE_NONE || mode >= PACK_OPEN_MODES_TOTAL)
-		return false; // Invalid mode.
-	string filename = filename_in;
-	if (mode == PACK_OPEN_MODE_READ) find_embedded_pack(filename, file_offset);
-	if (mode == PACK_OPEN_MODE_APPEND && !FileExists(filename))
-		mode = PACK_OPEN_MODE_CREATE;
-	if (mode == PACK_OPEN_MODE_CREATE) {
-		fptr = fopen(filename.c_str(), "wb");
-		if (fptr == NULL)
-			return false;
-		pack_header h;
-		memset(&h, 0, sizeof(pack_header));
-		memcpy(&h, &pack_ident[0], 8);
-		h.filecount = 0;
-		fwrite(&h, sizeof(pack_header), 1, fptr);
-		current_filename = filename;
-		open_mode = mode;
-		return true;
-	} else if (mode == PACK_OPEN_MODE_APPEND || mode == PACK_OPEN_MODE_READ) {
-		fptr = fopen(filename.c_str(), mode == PACK_OPEN_MODE_APPEND ? "rb+" : "rb");
-		if (!fptr)
-			return false;
-		unsigned int total_size = 0;
-		#ifdef _WIN32
-		total_size = filelength(fileno(fptr));
-		#else
-		struct stat st;
-		if (fstat(fileno(fptr), &st) == 0)
-			total_size = st.st_size;
-		#endif
-		fseek(fptr, file_offset, SEEK_SET);
-		if (file_offset > 0) { // Embedded pack, read the size.
-			fread(&total_size, sizeof(unsigned int), 1, fptr);
-			file_offset += sizeof(unsigned int);
-		}
-		pack_header h;
-		if (!fread(&h, sizeof(pack_header), 1, fptr)) {
-			fclose(fptr);
-			return false;
-		}
-		if (memcmp(h.ident, &pack_ident[0], 8) != 0) {
-			fclose(fptr);
-			return false;
-		}
-		for (unsigned int c = 0; c < h.filecount; c++) {
-			pack_item i;
-			memset(&i, 0, sizeof(pack_item));
-			if (fread(&i, sizeof(unsigned int), 3, fptr) < 3) {
-				pack_items.clear();
-				pack_filenames.clear();
-				fclose(fptr);
-				return false;
-			}
-			string fn(i.namelen, '\0');
-			if ((i.filesize * i.namelen * 2) != i.magic || i.namelen > total_size || i.filesize > total_size || fread(&fn[0], 1, i.namelen, fptr) < i.namelen) {
-				pack_items.clear();
-				pack_filenames.clear();
-				fclose(fptr);
-				return false;
-			}
-			i.offset = ftell(fptr) - file_offset;
-			pack_items[fn] = i;
-			pack_filenames.push_back(fn);
-			fseek(fptr, i.filesize, SEEK_CUR);
-		}
-		// Perform any extra read/append initialization
-		if (mode == PACK_OPEN_MODE_READ && memload) {
-			mptr = (unsigned char*)malloc(total_size);
-			FILE* mtmp;
-			mtmp = fopen(filename.c_str(), "rb+");
-			if (mtmp && mptr) {
-				fseek(mtmp, file_offset, SEEK_SET);
-				fread(mptr, 1, total_size, mtmp);
-				fclose(mtmp);
-			} else {
-				free(mptr);
-				mptr = NULL;
-			}
-		}
-	}
-	current_filename = filename;
-	open_mode = mode;
-	return true;
-}
-
-bool pack::close() {
-	while (delay_close) Poco::Thread::sleep(5);
-	delay_close = false;
-	bool ret = false;
-	if (fptr && (open_mode == PACK_OPEN_MODE_APPEND || open_mode == PACK_OPEN_MODE_CREATE)) {
-		pack_header h;
-		memset(&h, 0, sizeof(pack_header));
-		memcpy(h.ident, &pack_ident[0], 8);
-		h.filecount = pack_items.size();
-		fseek(fptr, 0, SEEK_SET);
-		ret = fwrite(&h, sizeof(pack_header), 1, fptr) == 1;
-	} else
-		ret = true;
-	if (fptr)
-		fclose(fptr);
-	pack_items.clear();
-	pack_filenames.clear();
-	pack_streams.clear();
-	current_filename = "";
-	file_offset = 0;
-	//next_stream_idx=0;
-	open_mode = PACK_OPEN_MODE_NONE;
-	fptr = NULL;
-	if (mptr)
-		free(mptr);
-	mptr = NULL;
-	return ret;
-}
-
-// Adds a file from disk to the pack. Returns false if disk filename doesn't exist or can't be read, pack_filename is already an item in the pack and allow_replace is false, or this object is not opened in append/create mode.
-bool pack::add_file(const string& disk_filename, const string& pack_filename, bool allow_replace) {
-	if (!fptr || file_offset > 0)
-		return false;
-	if (open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE)
-		return false;
-	if (!FileExists(disk_filename))
-		return false;
-	if (file_exists(pack_filename)) {
-		if (allow_replace)
-			delete_file(pack_filename);
-		else
-			return false;
-	}
-	#ifdef _UNICODE
-	FILE* dptr = _wfopen(disk_filename.c_str(), L"rb");
-	#else
-	FILE* dptr = fopen(disk_filename.c_str(), "rb");
-	#endif
-	if (!dptr)
-		return false;
-	unsigned int cur_pos = ftell(fptr);
-	pack_item i;
-	memset(&i, 0, sizeof(pack_item));
-	i.namelen = pack_filename.size();
-	i.offset = cur_pos + i.namelen + (sizeof(unsigned int) * 3);
-	if (fwrite(&i, sizeof(unsigned int), 3, fptr) < 3) {
-		fseek(fptr, cur_pos, SEEK_SET);
-		fclose(dptr);
+	Poco::BinaryReader direct_reader(*file, Poco::BinaryReader::LITTLE_ENDIAN_BYTE_ORDER);
+	Poco::BinaryReader *reader = &direct_reader; // Because BinaryReader deletes the assignment operator and we're going to swap underlying streams later.
+	// File should begin with magic constant.
+	uint32_t read_magic = 0;
+	reader->readRaw((char *)&read_magic, 4);
+	if (read_magic != magic)
+	{
 		return false;
 	}
-	if (fwrite(pack_filename.c_str(), sizeof(char), i.namelen, fptr) < i.namelen) {
-		fseek(fptr, cur_pos, SEEK_SET);
-		fclose(dptr);
+
+	uint64_t toc_offset;
+	*reader >> toc_offset;
+
+	if (toc_offset >= file_size || toc_offset < 64)
+	{
 		return false;
 	}
-	unsigned char read_buffer[4096];
-	while (true) {
-		unsigned int dataread = fread(read_buffer, 1, 4096, dptr);
-		if (dataread < 1)
+
+	uint32_t checksum;
+	*reader >> checksum;
+
+	file->seekg(toc_offset);
+	if (!file->good())
+	{
+		return false;
+	}
+	// We need to be computing the checksum while processing the TOC, so the binary reader is reconstructed to include the checksum node.
+
+	checksum_istream check(*file);
+
+	Poco::BinaryReader check_reader(check, Poco::BinaryReader::LITTLE_ENDIAN_BYTE_ORDER);
+	reader = &check_reader;
+	uint64_t current_offset = 64; // Just past the header.
+	while (true)
+	{
+
+		toc_entry entry;
+		uint64_t name_length = 0;
+		reader->read7BitEncoded(name_length);
+
+		// Don't get tricked into allocating a ridiculous amount of memory:
+		if (name_length > 65535)
+		{
+			return false;
+		}
+		entry.filename.resize(name_length);
+		reader->readRaw(&entry.filename[0], name_length);
+		// Enforce the rules: file names must be UTF8 and may not contain characters in the non-printable ASCII ranges.
+		if (!is_valid_utf8(entry.filename))
+		{
+			return false;
+		}
+		// And lastly, check that we aren't loading a duplicate:
+		if (toc.find(entry.filename) != toc.end())
+		{
+			return false;
+		}
+		entry.offset = current_offset + pack_offset;
+		// Because the checksum stream is in-between the source file and binary reader, we must perform goodness checks on the checksum stream, not directly on the file.
+		if (!check.good())
+		{
+			return false;
+		}
+		reader->read7BitEncoded(entry.size);
+		current_offset += entry.size;
+		toc[entry.filename] = entry;
+		// We may now be EOF, which indicates successful parsing of TOC.
+
+		if (check.tellg() == file_size)
+		{
 			break;
-		for (unsigned int j = 0; j < dataread; j++)
-			read_buffer[j] = pack_char_encrypt(read_buffer[j], i.filesize + j, i.namelen);
-		fwrite(read_buffer, 1, dataread, fptr);
-		i.filesize += dataread;
-		if (dataread < 4096)
-			break;
-	}
-	fclose(dptr);
-	fseek(fptr, cur_pos, SEEK_SET);
-	i.magic = i.filesize * i.namelen * 2;
-	if (fwrite(&i, sizeof(unsigned int), 3, fptr) < 3) {
-		fseek(fptr, cur_pos, SEEK_SET);
-		fclose(dptr);
-		return false;
-	}
-	fseek(fptr, 0, SEEK_END);
-	pack_items[pack_filename] = i;
-	pack_filenames.push_back(pack_filename);
-	return true;
-}
-
-bool pack::add_memory(const string& pack_filename, unsigned char* data, unsigned int size, bool allow_replace) {
-	if ((open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE) || !fptr || file_offset > 0)
-		return false;
-	if (file_exists(pack_filename)) {
-		if (allow_replace)
-			delete_file(pack_filename);
-		else
-			return false;
-	}
-	unsigned int cur_pos = ftell(fptr);
-	pack_item i;
-	memset(&i, 0, sizeof(pack_item));
-	i.filesize = size;
-	i.namelen = pack_filename.size();
-	i.magic = i.filesize * i.namelen * 2;
-	i.offset = cur_pos + i.namelen + (sizeof(unsigned int) * 3);
-	if (fwrite(&i, sizeof(unsigned int), 3, fptr) < 3) {
-		fseek(fptr, cur_pos, SEEK_SET);
-		return false;
-	}
-	if (fwrite(pack_filename.c_str(), sizeof(char), i.namelen, fptr) < i.namelen) {
-		fseek(fptr, cur_pos, SEEK_SET);
-		return false;
-	}
-	char tmp[1024];
-	int bufsize = 1024; // Keep at multiple of 16 for encryption.
-	for (uint64_t p = 0; p < size; p += bufsize) {
-		if (p + bufsize >= size) bufsize = size - p;
-		for (unsigned int j = 0; j < bufsize; j++)
-			tmp[j] = pack_char_encrypt(data[p + j], p + j, i.namelen);
-		if (fwrite(tmp, 1, bufsize, fptr) != bufsize) {
-			fseek(fptr, cur_pos, SEEK_SET);
-			return false;
 		}
 	}
-	fseek(fptr, 0, SEEK_END);
-	pack_items[pack_filename] = i;
-	pack_filenames.push_back(pack_filename);
+	// Getting here means we ingested the TOC successfully. The last steps are to verify the checksum and to make sure the file offsets add up to the entire data block.
+	if (check.get_checksum() != checksum)
+	{
+		return false;
+	}
+	if (current_offset != toc_offset)
+	{
+		return false;
+	}
 	return true;
 }
-// Adds memory, but getting data from a C++ string.
-bool pack::add_memory(const string& pack_filename, const string& data, bool allow_replace) {
-	return add_memory(pack_filename, (unsigned char*)data.c_str(), data.size(), allow_replace);
-}
-
-// Deletes a file from the pack if it exists, and returns true on success. This operation is usually highly intensive, and if you must do it over and over again, it's best to just recompile your pack. If this function returns false, and you are sure your arguments are correct, you can consider that your pack file is now probably corrupt. This should only happen if the pack contains invalid headers or incomplete file data in the first place.
-bool pack::delete_file(const string& pack_filename) {
-	if (open_mode != PACK_OPEN_MODE_APPEND && open_mode != PACK_OPEN_MODE_CREATE || !fptr || file_offset > 0)
-		return false;
-	unsigned int idx = 0;
-	for (idx = 0; idx < pack_filenames.size(); idx++) {
-		if (pack_filenames[idx] == pack_filename)
-			break;
-	}
-	if (idx >= pack_filenames.size())
-		return false;
-	unsigned int oldblock = pack_items[pack_filename].namelen + pack_items[pack_filename].filesize + (sizeof(unsigned int) * 3);
-	unsigned int oldnlen = pack_items[pack_filename].namelen;
-	unsigned int oldoff = pack_items[pack_filename].offset;
-	pack_items.erase(pack_filename);
-	pack_filenames.erase(pack_filenames.begin() + idx);
-	unsigned char tmp[4096];
-	unsigned int new_eof = oldoff - oldnlen - (sizeof(unsigned int) * 3);
-	for (unsigned int i = idx; i < pack_filenames.size(); i++) {
-		pack_item item = pack_items[pack_filenames[i]];
-		unsigned int total_bytesread = 0;
-		while (total_bytesread < item.filesize) {
-			fseek(fptr, item.offset + total_bytesread, SEEK_SET);
-			unsigned int bytes_to_read = 4096;
-			if (item.filesize - total_bytesread < 4096)
-				bytes_to_read = item.filesize - total_bytesread;
-			unsigned int bytesread = fread(tmp, sizeof(unsigned char), bytes_to_read, fptr);
-			if (bytesread < bytes_to_read)
-				return false; // something went really wrong!
-			fseek(fptr, item.offset + total_bytesread - oldblock, SEEK_SET);
-			fwrite(tmp, sizeof(unsigned char), bytesread, fptr);
-			total_bytesread += bytesread;
+pack::read_mode_internals::read_mode_internals(std::istream &file, const std::string &key, uint64_t pack_offset, uint64_t pack_size)
+	: toc()
+{
+	try
+	{
+		this->file = &file;
+		if (pack_offset != 0 || pack_size != 0)
+		{
+			this->file = new section_istream(*this->file, pack_offset, pack_size);
 		}
-		new_eof = ftell(fptr);
-		pack_items[pack_filenames[i]].offset -= oldblock;
-		item.offset -= oldblock;
-		fseek(fptr, item.offset - item.namelen - (sizeof(unsigned int) * 3), SEEK_SET);
-		fwrite(&item, sizeof(unsigned int), 3, fptr);
-		fwrite(pack_filenames[i].c_str(), 1, item.namelen, fptr);
-		char tmp_idx[3];
-		//new_eof+=total_bytesread+item.namelen+(sizeof(unsigned int)*3);
+		if (!key.empty())
+		{
+			chacha_istream *chacha = new chacha_istream(*this->file, key);
+			chacha->own_source(true);
+			this->file = chacha;
+		}
+		this->pack_offset = pack_offset;
+		this->pack_size = pack_size;
+		if (!load())
+		{
+			throw std::runtime_error("Unable to load this pack file.");
+		}
 	}
-	// This sucks...
-	//new_eof-=oldblock-oldsize;
-	#ifdef _WIN32
-	HANDLE hFile = CreateFileA(current_filename.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (!hFile)
-		return true; // At this point the operation has completed, but we couldn't set the new eof. Hopefully a new file being added to the pack gets a chance to overwrite the new existing deleted data...
-	SetFilePointer(hFile, new_eof, NULL, FILE_BEGIN);
-	SetEndOfFile(hFile);
-	CloseHandle(hFile);
-	fclose(fptr);
-	#ifndef _UNICODE
-	fptr = fopen(current_filename.c_str(), "rb+");
-	#else
-	fptr = _wfopen(current_filename.c_str(), L"rb+");
-	#endif
-	if (!fptr) {
-		close(); // We couldn't reopen the file after delete, and so we must entirely close the pack in this unfortunate case.
+	catch (std::exception &e)
+	{
+
+		delete this->file;
+		this->file = nullptr;
+		throw e;
+	}
+}
+pack::read_mode_internals::~read_mode_internals()
+{
+	delete file;
+}
+const pack::toc_entry *pack::read_mode_internals::get(const std::string &filename) const
+{
+	toc_map::const_iterator i = toc.find(filename);
+	if (i == toc.end())
+	{
+		return NULL;
+	}
+	return &(i->second);
+}
+bool pack::read_mode_internals::exists(const std::string &filename)
+{
+	return toc.find(filename) != toc.end();
+}
+toc_map &pack::read_mode_internals::get_toc_map()
+{
+	return toc;
+}
+bool pack::write_mode_internals::put_blank_header()
+{
+	if (!file->good())
+	{
 		return false;
 	}
-	#else
-	ftruncate(fileno(fptr), new_eof);
-	#endif
-	fseek(fptr, 0, SEEK_END);
+	char header[header_size];
+	memset(header, 0, header_size);
+	file->write(header, header_size);
+	data_size = header_size;
 	return true;
 }
+bool pack::write_mode_internals::finalize()
+{
+	std::streampos toc_offset = data_size;
+	if (!file->good())
+	{
+		return false;
+	}
 
-bool pack::file_exists(const string& pack_filename) {
-	return pack_items.find(pack_filename) != pack_items.end();
-}
+	// This ostream computes a checksum on incoming data and then passes it through to the attached sink.
+	checksum_ostream check(*file);
+	Poco::BinaryWriter writer(check, Poco::BinaryWriter::LITTLE_ENDIAN_BYTE_ORDER);
 
-unsigned int pack::get_file_name(int idx, char* buffer, unsigned int size) {
-	if (idx < 0 || idx >= pack_filenames.size())
-		return 0;
-	if (!buffer || size <= pack_filenames[idx].size())
-		return pack_filenames[idx].size() + 1;
-	size = pack_filenames[idx].size();
-	strncpy(buffer, pack_filenames[idx].c_str(), size);
-	buffer[size] = '\0';
-	return size;
+	for (toc_list::iterator i = ordered_toc.begin(); i != ordered_toc.end(); i++)
+	{
+		toc_entry &entry = **i;
+		writer.write7BitEncoded(Poco::UInt32(entry.filename.length()));
+		writer.writeRaw(entry.filename);
+		writer.write7BitEncoded(entry.size);
+	}
+	writer.flush();
+	// Capture the checksum at this point because we don't want to include the header in it.
+	uint32_t checksum = check.get_checksum();
+	// Now go back and update the header:
+	file->seekp(0);
+	writer.writeRaw((const char *)&magic, 4);
+	writer << toc_offset;
+	writer << checksum;
+	writer.flush();
+
+	return file->tellp() != -1;
 }
-string pack::get_file_name(int idx) {
-	if (idx < 0 || idx >= pack_filenames.size())
-		return "";
-	return pack_filenames[idx];
+pack::write_mode_internals::write_mode_internals(std::ostream &file, const std::string &key)
+	: toc()
+{
+	try
+	{
+		this->file = &file;
+		if (!key.empty())
+		{
+
+			chacha_ostream *chacha = new chacha_ostream(*this->file, key);
+			chacha->own_sink(true);
+			this->file = chacha;
+		}
+		if (!put_blank_header())
+		{
+			throw std::runtime_error("Unable to write header to the file.");
+		}
+	}
+	catch (std::exception &e)
+	{
+		delete this->file;
+		this->file = nullptr;
+		throw e;
+	}
 }
-CScriptArray* pack::list_files() {
-	unsigned int count = pack_filenames.size();
-	asIScriptContext* ctx = asGetActiveContext();
-	asIScriptEngine* engine = ctx->GetEngine();
-	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
-	CScriptArray* array = CScriptArray::Create(arrayType);
-	array->Reserve(count);
-	for (int i = 0; i < count; i++)
-		array->InsertLast(&pack_filenames[i]);
+pack::write_mode_internals::~write_mode_internals()
+{
+
+	delete file;
+}
+const pack::toc_entry *pack::write_mode_internals::get(const std::string &filename) const
+{
+	toc_map::const_iterator i = toc.find(filename);
+	if (i == toc.end())
+	{
+		return NULL;
+	}
+	return &(i->second);
+}
+bool pack::write_mode_internals::put(std::istream &in_file, const std::string &internal_name)
+{
+	try
+	{
+		if (toc.find(internal_name) != toc.end())
+		{
+			return false; // Duplicate.
+		}
+		if (!is_valid_utf8(internal_name))
+		{
+			return false;
+		}
+		if (internal_name.length() > 65535)
+		{
+			return false;
+		}
+		toc_entry entry;
+		entry.filename = internal_name;
+		// We need to insert a copy of the TOC entry into the map, then insert a pointer to that into the list.
+		toc_entry *inserted = &toc[internal_name];
+		*inserted = entry;
+		ordered_toc.push_back(inserted);
+		std::streampos size = Poco::StreamCopier::copyStream(in_file, *file);
+		inserted->size = size;
+		data_size += size;
+	}
+	catch (std::exception &)
+	{
+		// Was the TOC entry already added?
+		toc_map::iterator i = toc.find(internal_name);
+		if (i != toc.end())
+		{
+			// This is a file system error, out of disk space, etc. Throw here and don't bother trying to fix bookkeeping, because your pack is almost certainly corrupt at this point anyway.
+			throw std::runtime_error("Critical error while writing data to pack.");
+		}
+		return false;
+	}
+	return true;
+}
+bool pack::write_mode_internals::exists(const std::string &filename)
+{
+	return toc.find(filename) != toc.end();
+}
+toc_map &pack::write_mode_internals::get_toc_map()
+{
+	return toc;
+}
+void pack::set_pack_name(const std::string &name)
+{
+	pack_name = Poco::Path(name).absolute().toString();
+}
+pack::pack() : mutable_ptr(nullptr)
+{
+	open_mode = OPEN_NOT;
+}
+pack::pack(const pack &other) : mutable_ptr(&other)
+{
+	if (other.open_mode != OPEN_READ)
+	{
+		throw std::invalid_argument("Only packs that are opened in read mode can be copy constructed. If you're trying to load sounds from a pack, please check the return value from your open call as your pack was not opened successfully.");
+	}
+
+	open_mode = OPEN_READ;
+	read = other.read;
+	pack_name = other.pack_name;
+	key = other.key;
+	other.duplicate(); // We have no choice but to hold on to a reference to the pack we're cloning so that the user can safely query the pack in use.
+}
+pack::~pack()
+{
+	if (mutable_ptr) mutable_ptr->release();
+	close();
+}
+bool pack::create(const std::string &filename, const std::string &key)
+{
+	close();
+	Poco::FileOutputStream *file = NULL;
+	try
+	{
+		file = new Poco::FileOutputStream(filename);
+		write = std::make_shared<write_mode_internals>(*file, key);
+	}
+	catch (std::exception &)
+	{
+		// Don't delete here; internals may have chained several mutations onto the stream before it failed, so trust that it cleaned up.
+		return false;
+	}
+	set_pack_name(filename);
+	open_mode = OPEN_WRITE;
+	return true;
+}
+bool pack::open(const std::string &filename, const std::string &key, uint64_t pack_offset, uint64_t pack_size)
+{
+	close();
+	std::string pack_filename = filename;
+	if (!pack_size) find_embedded_pack(pack_filename, pack_offset, pack_size);
+	Poco::FileInputStream *file = NULL;
+	try
+	{
+		file = new Poco::FileInputStream(pack_filename);
+		read = std::make_shared<read_mode_internals>(*file, key, pack_offset, pack_size);
+	}
+	catch (std::exception &)
+	{
+		// Don't delete here; internals may have chained several mutations onto the stream before it failed, so trust that it cleaned up.
+		return false;
+	}
+	set_pack_name(pack_filename);
+	this->key = key;
+	open_mode = OPEN_READ;
+	return true;
+}
+bool pack::close()
+{
+	switch (open_mode)
+	{
+	case OPEN_NOT:
+		return false;
+	case OPEN_WRITE:
+		write->finalize();
+		write = nullptr;
+		break;
+	case OPEN_READ:
+		read = nullptr;
+		break;
+	}
+	open_mode = OPEN_NOT;
+	return true;
+}
+bool pack::add_file(const std::string &filename, const std::string &internal_name)
+{
+	if (open_mode != OPEN_WRITE)
+	{
+		return false;
+	}
+	try {
+		Poco::FileInputStream fs(filename);
+		return write->put(fs, internal_name);
+	} catch (std::exception& e) { return false; }
+}
+bool pack::add_stream(const std::string &internal_name, datastream* ds)
+{
+	if (open_mode != OPEN_WRITE || !ds || !ds->get_istr())
+	{
+		return false;
+	}
+	return write->put(*ds->get_istr(), internal_name);
+}
+bool pack::add_memory(const std::string &internal_name, const std::string& data)
+{
+	if (open_mode != OPEN_WRITE)
+	{
+		return false;
+	}
+	Poco::MemoryInputStream ms(&data[0], data.size());
+	return write->put(ms, internal_name);
+}
+bool pack::file_exists(const std::string &filename)
+{
+	if (open_mode == OPEN_READ)
+	{
+		return read->exists(filename);
+	}
+	if (open_mode == OPEN_WRITE)
+	{
+		return write->exists(filename);
+	}
+	return false;
+}
+int64_t pack::get_file_size(const std::string& filename) {
+	const toc_entry* e = open_mode == OPEN_READ? read->get(filename) : write->get(filename);
+	if (!e) return -1;
+	return e->size;
+}
+std::istream *pack::get_file(const std::string &filename) const
+{
+	if (open_mode != OPEN_READ)
+	{
+		return nullptr;
+	}
+	const toc_entry *entry = read->get(filename);
+	if (entry == nullptr)
+	{
+		return nullptr;
+	}
+
+	std::istream *fis = nullptr;
+	try
+	{
+		fis = new Poco::FileInputStream(pack_name, std::ios_base::in);
+		if (!key.empty())
+		{
+			fis = new chacha_istream(*fis, key);
+		}
+		return new section_istream(*fis, entry->offset, entry->size);
+	}
+	catch (std::exception &)
+	{
+		delete fis;
+		return nullptr;
+	}
+	return nullptr;
+}
+// Gets a file from the pack as a script compatible datastream. BGT-compatible interface that returns an inactive datastream if the file doesn't exist. To avoid header blote, this doesn't have its default arguments on the C++ side.
+datastream *pack::get_file_script(const std::string &filename, const std::string &encoding, int byteorder)
+{
+	std::istream *str = get_file(filename);
+	if (str == nullptr)
+	{
+		return new datastream();
+	}
+	try
+	{
+		return new datastream(str, encoding, byteorder);
+	}
+	catch (const std::exception &)
+	{
+		// Expect this if script supplies bogus encoding or byteorder.
+		delete str;
+		return nullptr;
+	}
+}
+bool pack::get_active()
+{
+	return open_mode != OPEN_NOT;
+}
+int64_t pack::get_file_count()
+{
+	if (open_mode == OPEN_NOT)
+	{
+		return -1;
+	}
+	return (open_mode == OPEN_READ ? read->get_toc_map() : write->get_toc_map()).size();
+}
+CScriptArray *pack::list_files()
+{
+	asIScriptContext *context = asGetActiveContext();
+	if (context == nullptr)
+	{
+		return nullptr;
+	}
+	asIScriptEngine *engine = context->GetEngine();
+	if (engine == nullptr)
+	{
+		return nullptr;
+	}
+	asITypeInfo *string_array = engine->GetTypeInfoByDecl("string[]");
+	if (string_array == nullptr)
+	{
+		return nullptr;
+	}
+	CScriptArray *array = CScriptArray::Create(string_array);
+	if (array == nullptr)
+	{
+		return nullptr;
+	}
+	if (open_mode == OPEN_NOT)
+	{
+		return array;
+	}
+	toc_map &toc = (open_mode == OPEN_READ ? read->get_toc_map() : write->get_toc_map());
+	array->Reserve(toc.size());
+	for (toc_map::iterator i = toc.begin(); i != toc.end(); i++)
+	{
+		array->InsertLast((void *)&i->first);
+	}
 	return array;
 }
-
-unsigned int pack::get_file_size(const string& pack_filename) {
-	if (pack_items.find(pack_filename) != pack_items.end())
-		return pack_items[pack_filename].filesize;
-	else
-		return 0;
-}
-
-unsigned int pack::get_file_offset(const string& pack_filename) {
-	if (pack_items.find(pack_filename) != pack_items.end())
-		return file_offset + pack_items[pack_filename].offset;
-	else
-		return 0;
-}
-
-unsigned int pack::read_file(const string& pack_filename, unsigned int offset, unsigned char* buffer, unsigned int size, FILE* reader) {
-	if (pack_items.find(pack_filename) == pack_items.end()) return 0;
-	unsigned int item_size = pack_items[pack_filename].filesize;
-	if (offset >= item_size)
-		return 0;
-	unsigned int bytes_to_read = size;
-	if (offset + size > item_size)
-		bytes_to_read = item_size - offset;
-	if (!buffer)
-		return bytes_to_read;
-	if (open_mode == PACK_OPEN_MODE_READ && mptr) {
-		memcpy(buffer, mptr + pack_items[pack_filename].offset + offset, bytes_to_read);
-		for (unsigned int i = 0; i < bytes_to_read; i++)
-			buffer[i] = pack_char_decrypt(buffer[i], offset + i, pack_items[pack_filename].namelen);
-		return bytes_to_read;
+bool pack::extract_file(const std::string &internal_name, const std::string &file_on_disk)
+{
+	std::istream *fis = get_file(internal_name);
+	if (fis == nullptr)
+	{
+		return false;
 	}
-	if (!reader)
-		reader = fptr;
-	if (open_mode != PACK_OPEN_MODE_READ || !reader || pack_items.find(pack_filename) == pack_items.end())
-		return 0;
-	fseek(reader, file_offset + pack_items[pack_filename].offset + offset, SEEK_SET);
-	unsigned int dataread = fread(buffer, 1, bytes_to_read, reader);
-	for (unsigned int i = 0; i < dataread; i++)
-		buffer[i] = pack_char_decrypt(buffer[i], offset + i, pack_items[pack_filename].namelen);
-	return dataread;
-}
-std::string pack::read_file_string(const string& pack_filename, unsigned int offset, unsigned int size) {
-	std::string result(size, '\0');
-	int actual_size = read_file(pack_filename, offset, (unsigned char*)&result.front(), size);
-	if (actual_size > -1)
-		result.resize(actual_size);
+	bool result = false;
+	try
+	{
+		Poco::FileOutputStream fos(file_on_disk, std::ios_base::out);
+		Poco::StreamCopier::copyStream(*fis, fos);
+		result = true;
+	}
+	catch (std::exception &)
+	{
+		result = false;
+	}
+	delete fis;
 	return result;
 }
 
-// Function to force the file pointer for the open pack to seek by a relative position either from the beginning or the end of the file. This function should only be used if you are absolutely sure you know what you are doing, incorrect usage will lead to corrupt packs. If offset is negative, seek from the end, else from the beginning.
-bool pack::raw_seek(int offset) {
-	if (!fptr)
-		return false;
-	if (offset < 0)
-		return fseek(fptr, offset, SEEK_END) == 0;
-	else
-		return fseek(fptr, offset, SEEK_SET);
+const std::string pack::get_pack_name() const
+{
+	return pack_name;
 }
-
-// Closes an opened stream, basically freeing it's structure of data.
-bool pack::stream_close(pack_stream* stream, bool while_reading) {
-	if (stream->reading) {
-		stream->close = true;
-		pack_streams.find(stream->stridx) != pack_streams.end()&&pack_streams.erase(stream->stridx);
-		return true;
-	}
-	bool ret = !while_reading & pack_streams.find(stream->stridx) != pack_streams.end() && pack_streams.erase(stream->stridx);
-	stream->stridx = 0;
-	if (stream->reader)
-		fclose(stream->reader);
-	delete stream;
-	Release();
-	return ret;
+void pack::release_pack(pack *obj)
+{
+	obj->release();
 }
-bool pack::stream_close_script(unsigned int idx) {
-	if (pack_streams.find(idx) == pack_streams.end())
-		return false;
-	return stream_close(pack_streams[idx]);
+std::shared_ptr<pack> pack::to_shared()
+{
+	return std::make_shared<pack>(*this);
 }
-
-// Creates a pack_stream structure for the given filename at the given offset. Pack streams are simple structures meant to expidite the process of sequentially reading from a file in the pack. Returns 0xffffffff on failure.
-pack_stream* pack::stream_open(const string& pack_filename, unsigned int offset) {
-	if (pack_filename == "")
-		return NULL;
-	if (pack_items.find(pack_filename) == pack_items.end())
-		return NULL;
-	unsigned int size = pack_items[pack_filename].filesize;
-	pack_stream* s = new pack_stream();
-	s->filename = pack_filename;
-	s->offset = offset;
-	s->filesize = size;
-	s->reading = false;
-	s->close = false;
-	if (!mptr) {
-		s->reader = fopen(current_filename.c_str(), "rb");
-		if (!s->reader)
-			return NULL;
-	} else
-		s->reader = NULL;
-	pack_streams[next_stream_idx] = s;
-	s->stridx = next_stream_idx;
-	next_stream_idx += 1;
-	AddRef();
-	return s;
-}
-unsigned int pack::stream_open_script(const string& pack_filename, unsigned int offset) {
-	pack_stream* stream = stream_open(pack_filename, offset);
-	if (stream) return stream->stridx;
-	else return 0xffffffff;
-}
-
-// Reads bytes from a stream and increments it's offset by the number of bytes read. Returns the number of bytes read on success, 0xffffffff (-1) on failure either do to end of file or invalid stream.
-unsigned int pack::stream_read(pack_stream* stream, unsigned char* buffer, unsigned int size) {
-	stream->reading = true;
-	unsigned int bytesread = read_file(stream->filename.c_str(), stream->offset, buffer, size, stream->reader);
-	stream->reading = false;
-	bool close = stream->close;
-	if (stream->close)
-		stream_close(stream);
-	if (bytesread == 0xffffffff)
-		return 0xffffffff;
-	if (!close)
-		stream->offset += bytesread;
-	return bytesread;
-}
-unsigned int pack::stream_read_script(unsigned int idx, unsigned char* buffer, unsigned int size) {
-	if (pack_streams.find(idx) == pack_streams.end())
-		return 0xffffffff;
-	return stream_read(pack_streams[idx], buffer, size);
-}
-std::string pack::stream_read_string(unsigned int idx, unsigned int size) {
-	std::string result(size, '\0');
-	int actual_size = stream_read_script(idx, (unsigned char*)&result.front(), size);
-	if (actual_size > -1)
-		result.resize(size);
-	return result;
-}
-
-// Seeks within a stream. We're using the exact same argument convention actually as fseek here, origin means the same thing. In this case though, we return true on success, not 0.
-bool pack::stream_seek(pack_stream* stream, unsigned int offset, int origin) {
-	if (origin == SEEK_SET && offset < stream->filesize)
-		stream->offset = offset;
-	else if (origin == SEEK_CUR && stream->offset + offset >= 0 && stream->offset + offset < stream->filesize)
-		stream->offset += offset;
-	else if (origin == SEEK_END && offset < 0 && offset >= -stream->filesize)
-		stream->offset = stream->filesize + offset;
-	else
-		return false;
-	if (!mptr && stream->reader)
-		fseek(stream->reader, file_offset + stream->offset, SEEK_SET);
-	return true;
-}
-bool pack::stream_seek_script(unsigned int idx, unsigned int offset, int origin) {
-	if (pack_streams.find(idx) == pack_streams.end())
-		return false;
-	return stream_seek(pack_streams[idx], offset, origin);
-}
-
-bool pack_set_global_identifier(const std::string& identifier) {
-	if (identifier == "") return false;
-	g_pack_ident = identifier;
-	return true; // Further validation will be performed in pack::set_pack_identifier.
-}
-
-pack* ScriptPack_Factory() {
+pack *pack::make()
+{
 	return new pack();
 }
 
-unordered_map<string, string> embedding_packs; // embed_filename:disc_filename
-unordered_map<string, unsigned int> embedded_packs; // embed_filename:embed_offset
-void embed_pack(const std::string& disc_filename, const string& embed_filename) {
+/**
+ * Section input stream.
+ * This is an implementation of an istream that reads from a designated section of a source stream.
+ * Stream positions and seek offsets are all relative to the beginning of the section.
+ * This class is used by the pack class to return handles to individual files within the pack.
+ * This stream takes ownership of its source stream and will delete it automatically.
+*/
+section_istreambuf::section_istreambuf(std::istream &source, std::streamoff start, std::streamsize size)
+	: BasicBufferedStreamBuf(4096, std::ios_base::in)
+{
+	this->source = &source;
+	if (!source.good())
+	{
+		throw std::invalid_argument("Stream is invalid.");
+	}
+	source.seekg(start + size);
+	if (source.tellg() != start + size)
+	{
+		throw std::range_error("End is beyond end of file.");
+	}
+	source.seekg(start);
+	if (source.tellg() != start)
+	{
+		throw std::runtime_error("Failed to seek to start offset.");
+	}
+	this->start = start;
+	this->size = size;
+}
+section_istreambuf::~section_istreambuf()
+{
+	delete source;
+}
+int section_istreambuf::readFromDevice(char *buffer, std::streamsize length)
+{
+
+	std::streampos pos = source->tellg();
+	if (pos < start || pos >= start + size)
+	{
+		return -1;
+	}
+	length = std::min(length, std::streamsize(start + size - pos));
+
+	source->read(buffer, length);
+
+	return (int)length;
+}
+std::streampos section_istreambuf::seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which)
+{
+	source->clear();
+	if (!source->good())
+	{
+		return -1;
+	}
+
+	switch (dir)
+	{
+	case std::ios_base::beg:
+		return seekpos(off);
+	case std::ios_base::end:
+		return seekpos(size + off);
+	case std::ios_base::cur:
+		// Istream uses 0 cur to implement tell, so just report the current position without moving anything.
+		if (off == 0)
+		{
+			return source->tellg() - (std::streampos) start - (std::streampos) in_avail();
+		}
+		return seekpos(source->tellg() - std::streampos(start - in_avail() + off));
+	}
+	return -1; // Can't get here.
+}
+std::streampos section_istreambuf::seekpos(std::streampos pos, std::ios_base::openmode which)
+{
+	source->clear();
+
+	if (!source->good())
+	{
+		return -1;
+	}
+	std::streampos true_pos = pos + start;
+	if (true_pos > start + size)
+	{
+		return -1;
+	}
+
+	source->seekg(true_pos);
+	this->setg(nullptr, nullptr, nullptr);
+	return pos;
+}
+
+section_istream::section_istream(std::istream &source, std::streamoff start, std::streamsize size)
+	: basic_istream(new section_istreambuf(source, start, size))
+{
+}
+section_istream::~section_istream()
+{
+	delete rdbuf();
+}
+
+struct embedded_pack { uint64_t offset; uint64_t size; };
+std::unordered_map<std::string, std::string> embedding_packs; // embed_filename:disc_filename
+std::unordered_map<std::string, embedded_pack> embedded_packs; // embed_filename:embed_offset/size
+void embed_pack(const std::string& disc_filename, const std::string& embed_filename) {
 	if (embedding_packs.find(embed_filename) != embedding_packs.end()) return;
 	// Try opening the file to insure it exists and is readable, exception will be thrown if not.
 	Poco::FileInputStream tmp(disc_filename);
@@ -577,11 +721,11 @@ bool load_embedded_packs(Poco::BinaryReader& br) {
 	unsigned int total;
 	br.read7BitEncoded(total);
 	for (unsigned int i = 0; i < total; i++) {
-		string name;
+		std::string name;
 		br >> name;
-		embedded_packs[name] = br.stream().tellg();
 		unsigned int size;
 		br >> size;
+		embedded_packs[name] = embedded_pack {uint64_t(br.stream().tellg()), size};
 		br.stream().seekg(size, std::ios::cur);
 	}
 	return true;
@@ -596,7 +740,7 @@ void write_embedded_packs(Poco::BinaryWriter& bw) {
 		fs.close();
 	}
 }
-bool find_embedded_pack(string& filename, unsigned int& file_offset) {
+bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& file_size) {
 	// Translate values that exist as part of a pack::open call so that an embedded pack will be loaded if required.
 	if (filename.empty() || filename[0] != '*') return false;
 	#ifndef NVGT_STUB
@@ -612,43 +756,35 @@ bool find_embedded_pack(string& filename, unsigned int& file_offset) {
 	#else
 		filename = android_get_main_shared_object();
 	#endif
-	file_offset = it->second;
+	file_offset = it->second.offset;
+	file_size = it->second.size;
 	return true;
 	#endif
 	return false;
 }
 
-int packmode1 = PACK_OPEN_MODE_NONE, packmode2 = PACK_OPEN_MODE_APPEND, packmode3 = PACK_OPEN_MODE_CREATE, packmode4 = PACK_OPEN_MODE_READ;
-void RegisterScriptPack(asIScriptEngine* engine) {
-	engine->RegisterGlobalProperty(_O("const int PACK_OPEN_MODE_NONE"), &packmode1);
-	engine->RegisterGlobalProperty(_O("const int PACK_OPEN_MODE_APPEND"), &packmode2);
-	engine->RegisterGlobalProperty(_O("const int PACK_OPEN_MODE_CREATE"), &packmode3);
-	engine->RegisterGlobalProperty(_O("const int PACK_OPEN_MODE_READ"), &packmode4);
-	engine->RegisterGlobalProperty(_O("const string pack_global_identifier"), &g_pack_ident);
-	engine->RegisterGlobalFunction(_O("bool pack_set_global_identifier(const string&in)"), asFUNCTION(pack_set_global_identifier), asCALL_CDECL);
-	engine->RegisterObjectType(_O("pack"), 0, asOBJ_REF);
-	engine->RegisterObjectBehaviour(_O("pack"), asBEHAVE_FACTORY, _O("pack @p()"), asFUNCTION(ScriptPack_Factory), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(_O("pack"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(pack, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour(_O("pack"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(pack, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool set_pack_identifier(const string&in)"), asMETHOD(pack, set_pack_identifier), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool open(const string &in, uint = PACK_OPEN_MODE_READ, bool = false)"), asMETHOD(pack, open), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool close()"), asMETHOD(pack, close), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool add_file(const string &in disc_filename, const string& in pack_filename, bool allow_replace = false)"), asMETHOD(pack, add_file), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool add_memory(const string &in pack_filename, const string& in data, bool allow_replace = false)"), asMETHODPR(pack, add_memory, (const string&, const string&, bool), bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool delete_file(const string &in pack_filename)"), asMETHOD(pack, delete_file), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool file_exists(const string &in pack_filename) const"), asMETHOD(pack, file_exists), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("string get_file_name(int index) const"), asMETHODPR(pack, get_file_name, (int), string), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("string[]@ list_files() const"), asMETHODPR(pack, list_files, (), CScriptArray*), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint get_file_size(const string &in pack_filename) const"), asMETHOD(pack, get_file_size), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint get_file_offset(const string &in pack_filename) const"), asMETHOD(pack, get_file_offset), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("string read_file(const string &in pack_filename, uint offset_in_file, uint read_byte_count) const"), asMETHOD(pack, read_file_string), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool raw_seek(int offset)"), asMETHOD(pack, raw_seek), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool stream_close(uint index)"), asMETHOD(pack, stream_close_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_open(const string &in pack_filename, uint offset_in_file) const"), asMETHOD(pack, stream_open_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("string stream_read(uint index, uint read_byte_count) const"), asMETHOD(pack, stream_read), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_pos(uint index) const"), asMETHOD(pack, stream_pos_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_seek(uint index, uint offset, int origin) const"), asMETHOD(pack, stream_seek_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint stream_size(uint index) const"), asMETHOD(pack, stream_size_script), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("bool get_active() const property"), asMETHOD(pack, is_active), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("pack"), _O("uint get_size() const property"), asMETHOD(pack, size), asCALL_THISCALL);
+void RegisterScriptPack(asIScriptEngine *engine)
+{
+	engine->RegisterObjectBehaviour("pack_interface", asBEHAVE_ADDREF, "void b()", asMETHOD(pack_interface, duplicate), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("pack_interface", asBEHAVE_RELEASE, "void c()", asMETHOD(pack_interface, release), asCALL_THISCALL);
+	engine->RegisterObjectType("pack_file", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("pack_file", asBEHAVE_FACTORY, "pack_file@ a()", asFUNCTION(pack::make), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("pack_file", asBEHAVE_ADDREF, "void b()", asMETHODPR(pack, duplicate, () const, void), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("pack_file", asBEHAVE_RELEASE, "void c()", asMETHODPR(pack, release, () const, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "pack_interface@ opImplCast()", asFUNCTION((pack_interface::op_cast<pack, pack_interface>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("pack_interface", "pack_file@ opCast()", asFUNCTION((pack_interface::op_cast<pack_interface, pack>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("pack_file", "bool create(const string &in filename, const string&in key = \"\")", asMETHOD(pack, create), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "bool open(const string &in filename, const string &in key = \"\", uint64 pack_offset = 0, uint64 pack_size = 0)", asMETHOD(pack, open), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "bool close()", asMETHOD(pack, close), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "bool add_file(const string &in filename, const string &in internal_name)", asMETHOD(pack, add_file), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "bool add_stream(const string &in internal_name, datastream@ ds)", asMETHOD(pack, add_stream), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "bool add_memory(const string &in internal_name, const string&in data)", asMETHOD(pack, add_memory), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "bool file_exists(const string &in filename)", asMETHOD(pack, file_exists), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "int64 get_file_size(const string &in filename)", asMETHOD(pack, get_file_size), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "datastream @get_file(const string &in filename, const string &in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asMETHOD(pack, get_file_script), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "string get_pack_name() const property", asMETHOD(pack, get_pack_name), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "bool get_active() const property", asMETHOD(pack, get_active), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "int64 get_file_count() const property", asMETHOD(pack, get_file_count), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "string[]@ list_files() const", asMETHOD(pack, list_files), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "bool extract_file(const string &in internal_name, const string &in file_on_disk)", asMETHOD(pack, extract_file), asCALL_THISCALL);
 }
