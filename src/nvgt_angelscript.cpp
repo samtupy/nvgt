@@ -1102,5 +1102,4 @@ void RegisterUnsorted(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("void debug_add_func_breakpoint(const string&in)", asFUNCTION(asDebuggerAddFuncBreakpoint), asCALL_CDECL);
 	engine->RegisterGlobalProperty("const string[]@ ARGS", &g_command_line_args);
 	engine->RegisterGlobalProperty("const timestamp SCRIPT_BUILD_TIME", &g_script_build_time);
-	engine->RegisterObjectMethod("dictionary", "bool get(const string&in key, string&out value) const", asFUNCTION(script_dictionary_get), asCALL_CDECL_OBJFIRST);
 }
