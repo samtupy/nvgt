@@ -6,7 +6,7 @@
 #include "db_props.nvgt"
 #include "sqlite3constants.nvgt"
 
-sqlite3 db("db_list.db");
+sqlite3 db("../tmp/db_list.db");
 class table : database_object {
 	database_int id("rowid", "auto");
 	database_list list("list");
