@@ -172,7 +172,7 @@ class toml_section {
 	}
 	bool set(string key, any@ value) {
 		if (!this.add(key, value)) return false;
-		this.knames.insert_last(key);
+		if (this.knames.find(key) < 0) this.knames.insert_last(key);
 		return true;
 	}
 	string[] get_keys() property {
