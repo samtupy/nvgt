@@ -105,7 +105,7 @@ class toml {
 		if (this.sections.length() < 1) return {};
 		string[] k;
 		for (uint a = 0; a < this.sections.length(); a++) {
-			if ((!all && this.sections[a].name == name) || (all)) k.insert_last(this.sections[a].keys);
+			if ((!all && this.sections[a].name == name) || (all)) k.extend(this.sections[a].keys);
 		}
 		return {};
 	}
