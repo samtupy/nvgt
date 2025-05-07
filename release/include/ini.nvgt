@@ -274,8 +274,7 @@ shared class ini {
 		if (name.length() == 0)
 			return this.sections[0];
 		ini_section@ tmp = null;
-		if (!this.sections_dict.get(name, @tmp))
-			return null;
+		@tmp = cast<ini_section@>(this.sections_dict[name]);
 		return tmp;
 	}
 
@@ -594,8 +593,8 @@ shared class ini_section {
 	string get_string(const string& in key_name, bool raw = false) {
 		if (!this.keys.exists(key_name))
 			return "";
-		string result;
-		if (!this.keys.get(key_name, result))
+		string result = string(this.keys[key_name]);;
+		if (result.empty())
 			return "";
 		if (!raw)
 			result = INI_UNESCAPE_STRING(result);
