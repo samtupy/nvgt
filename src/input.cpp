@@ -638,7 +638,7 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty(_O("const float MOUSE_ABSOLUTE_X"), &g_MouseAbsX);
 	engine->RegisterGlobalProperty(_O("const float MOUSE_ABSOLUTE_Y"), &g_MouseAbsY);
 	engine->RegisterGlobalProperty(_O("const float MOUSE_ABSOLUTE_Z"), &g_MouseAbsZ);
-	engine->RegisterEnumValue("touch_device_type", "TOUCH_DEVICE_TYPE_INVLAID", SDL_TOUCH_DEVICE_INVALID);
+	engine->RegisterEnumValue("touch_device_type", "TOUCH_DEVICE_TYPE_INVALID", SDL_TOUCH_DEVICE_INVALID);
 	engine->RegisterEnumValue("touch_device_type", "TOUCH_DEVICE_DIRECT", SDL_TOUCH_DEVICE_DIRECT);
 	engine->RegisterEnumValue("touch_device_type", "TOUCH_DEVICE_INDIRECT_ABSOLUTE", SDL_TOUCH_DEVICE_INDIRECT_ABSOLUTE);
 	engine->RegisterEnumValue("touch_device_type", "TOUCH_DEVICE_INDIRECT_RELATIVE", SDL_TOUCH_DEVICE_INDIRECT_RELATIVE);
