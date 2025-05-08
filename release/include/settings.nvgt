@@ -346,8 +346,7 @@ class nvgt_settings_helper: settings_helper {
 	}
 	string read_string(const string&in key) {
 		if (!this.active) return "";
-		string ret;
-		this.config.get(key, ret);
+		string ret = string(this.config[key]);
 		return ret;
 	}
 	double read_number(const string&in key) {
