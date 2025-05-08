@@ -824,7 +824,7 @@ void RegisterStdString_Native(asIScriptEngine *engine)
 	r = engine->RegisterObjectBehaviour("string", asBEHAVE_CONSTRUCT,  "void f(int64)",                    asFUNCTION(ConstructStringInt64), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 	r = engine->RegisterObjectBehaviour("string", asBEHAVE_CONSTRUCT,  "void f(uint)",                    asFUNCTION(ConstructStringUInt), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 	r = engine->RegisterObjectBehaviour("string", asBEHAVE_CONSTRUCT,  "void f(int)",                    asFUNCTION(ConstructStringInt), asCALL_CDECL_OBJLAST); assert( r >= 0 );
-	//r = engine->RegisterObjectBehaviour("string", asBEHAVE_CONSTRUCT,  "void f(double)",                    asFUNCTION(ConstructStringDouble), asCALL_CDECL_OBJLAST); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("string", asBEHAVE_CONSTRUCT,  "void f(double)",                    asFUNCTION(ConstructStringDouble), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 	r = engine->RegisterObjectBehaviour("string", asBEHAVE_CONSTRUCT,  "void f(float)",                    asFUNCTION(ConstructStringFloat), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 	r = engine->RegisterObjectBehaviour("string", asBEHAVE_CONSTRUCT,  "void f(bool)",                    asFUNCTION(ConstructStringBool), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 	r = engine->RegisterObjectBehaviour("string", asBEHAVE_DESTRUCT,   "void f()",                    asFUNCTION(DestructString),  asCALL_CDECL_OBJLAST); assert( r >= 0 );

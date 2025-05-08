@@ -80,7 +80,7 @@ void uninit_sound() {
 	if (!g_soundsystem_initialized.test())
 		return;
 	if (g_audio_engine != nullptr) {
-		delete g_audio_engine;
+		g_audio_engine->release();
 		g_audio_engine = nullptr;
 	}
 }
@@ -116,7 +116,7 @@ bool refresh_audio_devices() {
 }
 CScriptArray *get_sound_input_devices() {
 	if (!init_sound())
-		return CScriptArray::Create(get_array_type("array<string>")); // Better to return an emptry array instead of null for now.
+		return CScriptArray::Create(get_array_type("array<string>")); // Better to return an empty array instead of null for now.
 	return g_sound_script_input_devices;
 }
 CScriptArray *get_sound_output_devices() {
@@ -1235,6 +1235,7 @@ void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "bool get_listener_enabled(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_enabled, bool, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "bool play(const string&in path, audio_node@ node, uint input_bus_index)", asFUNCTION((virtual_call < audio_engine, &audio_engine::play_through_node, bool, const string &, audio_node *, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	// the other play overload and the new_mixer/sound functions are registered later after the definitions of mixer and sound.
+	engine->RegisterGlobalProperty("audio_engine@ sound_default_engine", (void*)&g_audio_engine);
 }
 template < class T >
 inline void RegisterSoundsystemAudioNode(asIScriptEngine *engine, const std::string &type) {

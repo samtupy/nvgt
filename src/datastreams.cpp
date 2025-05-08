@@ -839,7 +839,7 @@ void RegisterScriptDatastreams(asIScriptEngine *engine)
 	RegisterOutputDatastreamType<OutputLineEndingConverter, const std::string &>(engine, "line_converting_writer", "const string&in line_ending = spec::NEWLINE_DEFAULT");
 	RegisterOutputDatastreamType<chacha_ostream, const std::string &>(engine, "asset_encryptor", "string& in key");
 	RegisterInputDatastreamType<chacha_istream, const std::string &>(engine, "asset_decryptor", "const string& in key");
-	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
+	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_RAW_MEMORY);
 	RegisterDatastreamType<MemoryInputStream, datastream_factory_closed>(engine, "memory_reader");
 	engine->RegisterObjectBehaviour("memory_reader", asBEHAVE_FACTORY, "memory_reader@ d(uint64, uint64, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_factory<MemoryInputStream, const char *, size_t>)), asCALL_CDECL);
 	engine->RegisterObjectMethod("memory_reader", "bool open(uint64, uint64, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_open<MemoryInputStream, const char *, size_t>)), asCALL_CDECL_OBJFIRST);
