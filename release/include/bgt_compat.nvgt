@@ -355,6 +355,10 @@ string get_sound_storage() {
 	if(@sound_default_pack == null) return "";
 	return cast<pack_file@>(sound_default_pack).pack_name;
 }
+bool set_sound_decryption_key(const string& in key, bool force_encryption) {
+	sound_default_decryption_key = key;
+	return (true);
+}
 #endif
 
 // legacy generate_profile
