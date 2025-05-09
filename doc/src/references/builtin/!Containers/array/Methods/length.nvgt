@@ -5,7 +5,7 @@
 	## Returns:
 		uint: the number of items in the array.
 	## Remarks:
-		This method returns the absolute number of elements in the array, that is, without taking 0-based indexing into account. For example an array containing {1, 2, 3} will have a length of 3, but you must access the last element with the index 2 and the first element with index 0, rather than using 3 for the last item and 1 for the first.
+		This method returns the absolute number of elements in the array, that is, without taking 0-based indexing into account. For example an array containing {1, 2, 3} will have a length of 3, but you must access the last element with the index 2 and the first element with index 0, rather than using 3 for the last item and 1 for the first. This also means that you can access the last element with the shortcut `array.length() - 1`.
 */
 
 // Example:
