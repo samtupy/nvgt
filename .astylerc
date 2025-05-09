@@ -27,7 +27,7 @@ unpad-brackets
 --align-pointer=type
 squeeze-lines=4
 squeeze-ws
---delete-empty-lines
+delete-empty-lines
 keep-one-line-blocks
 keep-one-line-statements
 remove-braces
