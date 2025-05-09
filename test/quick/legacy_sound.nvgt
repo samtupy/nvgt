@@ -9,4 +9,5 @@ void main() {
 	sound s;
 	s.load("C:/windows/media/ding.wav");
 	s.play_wait();
+	alert("test", string(sound_output_devices));
 }

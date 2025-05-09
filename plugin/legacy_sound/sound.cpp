@@ -2100,6 +2100,7 @@ void RegisterScriptSound(asIScriptEngine* engine) {
 plugin_main(nvgt_plugin_shared* shared) {
 	prepare_plugin(shared);
 	g_ScriptEngine = shared->script_engine;
+	CScriptArray::SetMemoryFunctions(std::malloc, std::free);
 	RegisterScriptLegacyPack(shared->script_engine);
 	RegisterScriptSound(shared->script_engine);
 	nvgt_bundle_shared_library("bass");
