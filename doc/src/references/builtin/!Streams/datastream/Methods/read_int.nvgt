@@ -1,0 +1,14 @@
+/**
+	Read raw bytes from a stream into a 32-bit integer.
+	int read_int();
+	## Arguments:
+		None.
+	## Returns:
+		int: The data that was read from the stream or 0 on failure.
+*/
+
+// Example:
+void main() {
+	datastream ds("Hello there, I am a string wrapped in a sstream!");
+	alert("example", ds.read_int()); // Will display the first 4 bytes of the string as an integer.
+}
