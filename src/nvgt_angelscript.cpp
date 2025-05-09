@@ -449,6 +449,9 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->BeginConfigGroup("misc");
 	RegisterMiscFunctions(engine);
 	engine->EndConfigGroup();
+	engine->BeginConfigGroup("process");
+	RegisterProcess(engine);
+	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_NET);
 	engine->BeginConfigGroup("network");
 	RegisterScriptNetwork(engine);
