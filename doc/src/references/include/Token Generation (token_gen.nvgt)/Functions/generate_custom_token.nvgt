@@ -1,19 +1,23 @@
 /**
-	Generates a random string of characters (a token) while allowing you to directly specify the characters you wish to use in the generation.
-	string generate_custom_token(int token_length, string characters);
-	## Arguments:
+	Generates a random string of characters (a token) while optionally allowing you to directly specify the characters you wish to use in the generation.
+	1. string generate_custom_token(int token_length, string[] values);
+	2. string generate_custom_token(int token_length, string characters);
+	## Arguments (1):
+		* int token_length: the length of the token to generate.
+		* string[] values: an array of possible choices (a list of characters or even words) to generate from.
+	## Arguments (2):
 		* int token_length: the length of the token to generate.
 		* string characters: a list of characters to generate.
 	## returns:
 		String: a random token.
 	## Remarks:
-		If the `characters` string is empty or `token_length` is set to 0 or less, an empty string is returned.
+		If the `values` array or `characters` string is empty or `token_length` is set to 0 or less, an empty string is returned.
 */
 
 // Example:
 #include "token_gen.nvgt"
 
 void main() {
-	alert("Info", "Your A to C token is: " + generate_custom_token(10, "abc"));
-	alert("Info", "A to C with capitals included token is: " + generate_custom_token(10, "abcABC"));
+	alert("Info", "Your A to C token is: " + generate_custom_token(10, {"a", "b", "c"}));
+	alert("Info", "A to C with capitals included token is: " + generate_custom_token(10, {"a", "b", "c", "A", "B", "C"}));
 }
