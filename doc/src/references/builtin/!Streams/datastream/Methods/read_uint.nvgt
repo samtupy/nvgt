@@ -1,0 +1,14 @@
+/**
+	Read raw bytes from a stream into a 32-bit unsigned integer.
+	uint read_uint();
+	## Arguments:
+		None.
+	## Returns:
+		uint: The data that was read from the stream or 0 on failure.
+*/
+
+// Example:
+void main() {
+	datastream ds("Hello there, I am a string wrapped in a sstream!");
+	alert("example", ds.read_uint()); // Will display the first four bytes of the string as an unsigned integer.
+}
