@@ -8,4 +8,4 @@ Returns a TOML section with the given name, creating if necessary.
 - `bool create = false`: Should this section be created if it does not exist?
 
 ## Returns:
-`toml_section@`: The `toml_section` class on success, null otherwise.
+`toml_section@`: A handle to the `toml_section` class on success, null otherwise.

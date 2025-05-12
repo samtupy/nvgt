@@ -2,7 +2,7 @@
 This is a class designed to read and write TOML configuration files.
 
 ## Notes:
-- Some features of TOML (such as inline tables, lists) are not implemented yet.
+- Some features of TOML (such as inline tables, lists, backslash escape) are not implemented yet.
 
 ## Supported TOML value types
 - Strings.

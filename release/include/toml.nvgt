@@ -3,7 +3,7 @@
  * Copyright (c) 2025 [Harry Min Khant](https://github.com/harrymkt), under the same license as the NVGT:
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
+ * Copyright (c) 2022-2025 Sam Tupy
  * https://nvgt.gg
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
@@ -88,8 +88,7 @@ class toml {
 			else if (oneval.find(".") > -1) {
 				double f = parse_double(oneval);
 				t.set(key, f);
-			}
-			else if (oneval.is_digits())
+			} else if (oneval.is_digits())
 				t.set(key, parse_int(oneval));
 			else if (value.lower() == "true" || value.lower() == "false")
 				t.set(key, ((value.lower() == "true" ? true : false)));
@@ -109,7 +108,7 @@ class toml {
 		}
 		return {};
 	}
-	string dump(bool indent = true) {
+	string dump(bool indent = true, bool empty_sections = true) {
 		if (this.sections.length() < 1) return "";
 		string final = "";
 		for (uint a = 0; a < this.sections.length(); a++) {
@@ -119,7 +118,7 @@ class toml {
 				string[] parse = (s.name).split(".");
 				if (parse.length() > 0) indentsize = parse.length();
 			}
-			final += this.sections[a].dump(true, indentsize, indentsize - 1);
+			final += this.sections[a].dump(true, indentsize, indentsize - 1, empty_sections);
 		}
 		return final;
 	}
@@ -196,8 +195,8 @@ class toml_section {
 		if (!this.data.exists(key)) return false;
 		return this.data.delete(key);
 	}
-	string dump(bool head, int indent_size = 0, int indent_head_size = 0) {
-		if (this.keys.length() < 1) return "";
+	string dump(bool head, int indent_size = 0, int indent_head_size = 0, bool empty_sections = true) {
+		if (this.keys.length() < 1 && !empty_sections) return "";
 		string final = "";
 		string indent, indenthead;
 		int ind = indent_size, indhead = indent_head_size;
@@ -216,6 +215,7 @@ class toml_section {
 			if (@v is null) continue;
 			string[] vals = {string(v)};
 			if (v.is_string) vals = {'"', v, '"'};
+			else if (v.is_boolean) vals = {(v == true ? "true" : "false")};
 			final += (this.name != "" && head ? indent : "") + k[a] + " = " + join(vals, "") + "\n";
 		}
 		return final;
