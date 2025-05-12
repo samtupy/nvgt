@@ -1,10 +1,10 @@
 /**
-	Generates a random string of characters (a token) while allowing you to directly specify the characters you wish to use in the generation.
+	Generates a random string of characters (a token) while optionally allowing you to directly specify the characters you wish to use in the generation.
 	1. string generate_custom_token(int token_length, string[] values);
 	2. string generate_custom_token(int token_length, string characters);
 	## Arguments (1):
 		* int token_length: the length of the token to generate.
-		* string[] values: an array of values – a list of characters or even words – to generate.
+		* string[] values: an array of possible choices (a list of characters or even words) to generate from.
 	## Arguments (2):
 		* int token_length: the length of the token to generate.
 		* string characters: a list of characters to generate.
