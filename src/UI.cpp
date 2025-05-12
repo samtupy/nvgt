@@ -26,9 +26,10 @@
 #elif defined(__ANDROID__)
 	#include <android/native_window.h>
 #else
-// Following commented includes are for determining user idle time using x11 screensaver extension. Disabled for now until viability of linking with this library is established or until we fix the idle_ticks() function to use dlopen/dlsym and friends.
-//#include <X11/Xlib.h>
-//#include <X11/extensions/scrnsaver.h>
+#include <X11/Xlib.h>
+#include <X11/extensions/scrnsaver.h>
+#include "posix.h"
+#include <dbus/dbus.h>
 #endif
 #ifndef _WIN32
 #include <sys/time.h>
@@ -214,6 +215,8 @@ std::string input_box(const std::string& title, const std::string& text, const s
 		return "";
 	}
 	return r;
+	#elif !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
+	return posix_input_box(nullptr, title, text, default_value, false);
 	#else
 	return "";
 	#endif
@@ -228,6 +231,8 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 	#elif defined(__APPLE__)
 	apple_input_box(title, text, value, false, false);
 	return true;
+	#elif !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
+	return posix_info_box(nullptr, title, text, value);
 	#else
 	return false;
 	#endif
@@ -363,6 +368,7 @@ void wait(int ms) {
 
 
 // The following function contributed to NVGT by silak
+// Extra bits contributed by ethindp
 uint64_t idle_ticks() {
 	#ifdef _WIN32
 		LASTINPUTINFO lii = { sizeof(LASTINPUTINFO) };
@@ -389,16 +395,51 @@ uint64_t idle_ticks() {
 			IOObjectRelease(entry);
 		}
 		return -1;
+	#elif !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
+		const char *disp = getenv("DISPLAY");
+		if (disp && !getenv("WAYLAND_DISPLAY")) {
+			Display* dpy = XOpenDisplay(NULL);
+			if (!dpy) return -1;
+			XScreenSaverInfo info;
+			XScreenSaverQueryInfo(dpy, DefaultRootWindow(dpy), &info);
+			uint64_t idleTime = info.idle;
+			XCloseDisplay(dpy);
+			return idleTime;
+		} else if ((disp && getenv("WAYLAND_DISPLAY")) || (!disp && !getenv("WAYLAND_DISPLAY"))) {
+			DBusError err;
+			dbus_error_init(&err);
+			DBusConnection *conn = dbus_bus_get(DBUS_BUS_SESSION, &err);
+    if (dbus_error_is_set(&err) || !conn) {
+        dbus_error_free(&err);
+        return -1;
+    }
+    DBusMessage *msg = dbus_message_new_method_call("org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver", "org.freedesktop.ScreenSaver", "GetSessionIdleTime");
+    if (!msg) {
+        dbus_connection_unref(conn);
+        return (uint64_t)-1;
+    }
+    DBusMessage *reply = dbus_connection_send_with_reply_and_block(conn, msg, 2000, &err);
+    dbus_message_unref(msg);
+    if (dbus_error_is_set(&err) || !reply) {
+        dbus_error_free(&err);
+        if (reply) dbus_message_unref(reply);
+        dbus_connection_unref(conn);
+        return (uint64_t)-1;
+    }
+    uint32_t idle_ms = 0;
+    if (!dbus_message_get_args(reply, &err, DBUS_TYPE_UINT32, &idle_ms, DBUS_TYPE_INVALID)) {
+        dbus_error_free(&err);
+        dbus_message_unref(reply);
+        dbus_connection_unref(conn);
+        return (uint64_t)-1;
+    }
+    dbus_error_free(&err);
+    dbus_message_unref(reply);
+    dbus_connection_unref(conn);
+    return (uint64_t)idle_ms;
+    }
+    return (uint64_t)-1;
 	#else
-		/* Probably switch this to use dlopen instead of direct linkage at least until we can verify that it safely does not compromise portability.
-		Display* dpy = XOpenDisplay(NULL);
-		if (!dpy) return -1;
-		XScreenSaverInfo info;
-		XScreenSaverQueryInfo(dpy, DefaultRootWindow(dpy), &info);
-		uint64_t idleTime = info.idle;
-		XCloseDisplay(dpy);
-		return idleTime;
-		*/
 		return 0; // currently unsupported
 	#endif
 }

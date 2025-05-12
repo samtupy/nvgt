@@ -3,7 +3,24 @@
 # Copyright (c) 2022-2024 Sam Tupy
 # license: zlib
 
-import os, multiprocessing, tempfile
+import os, multiprocessing, tempfile, subprocess, re
+
+def raw_triplet_from_cc(cc):
+	name = os.path.basename(cc)
+	flag = '-print-target-triple' if 'clang' in name else '-dumpmachine'
+	try:
+		out = subprocess.check_output([cc, flag], stderr=subprocess.DEVNULL, universal_newlines=True)
+		return out.strip()
+	except (OSError, subprocess.CalledProcessError):
+		return None
+
+def raw_triplet_from_name(cc):
+	# This method differs from the above one by looking at the basename of the compiler
+	# Cross-compilers, or specific targeting compilers, usually start with `target_triple-gcc`, for example
+	# This function is a bit brittle, hence it's use as a fallback
+	name = os.path.basename(cc)
+	m = re.match(r'(.+?)-(?:g(pp?|cc))$', name)
+	return m.group(1) if m else None
 
 Help("""
 	Available custom build switches for NVGT:
@@ -55,7 +72,11 @@ elif env["PLATFORM"] == "posix":
 	# enable the gold linker, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
 	env.Append(CPPPATH = ["/usr/local/include"], LIBPATH = ["/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
-	env.Append(LIBS = [":libangelscript.a", ":libenet6.a", ":libSDL3.a", "crypto", "ssl"])
+	env.Append(LIBS = [":libangelscript.a", ":libenet6.a", ":libSDL3.a", "crypto", "ssl", "dl"])
+	env.ParseConfig('pkg-config --cflags gtk4')
+	env.ParseConfig('pkg-config --cflags glib-2.0')
+	env.ParseConfig('pkg-config --cflags dbus-1')
+	env.ParseConfig('pkg-config --cflags x11')
 env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
@@ -91,6 +112,7 @@ if len(static_plugins) > 0:
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
 if "android.cpp" in sources: sources.remove("android.cpp")
 if "version.cpp" in sources: sources.remove("version.cpp")
+if "posix.cpp" in sources: sources.remove("posix.cpp")
 env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
 version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.
 VariantDir("build/obj_src", "src", duplicate = 0)
@@ -109,6 +131,27 @@ elif env["PLATFORM"] == "posix":
 	env.Append(LINKFLAGS = ["-Wl,-rpath,'$$ORIGIN/.',-rpath,'$$ORIGIN/lib'"])
 	# Libvorbis must appear in the library link order after deps on Linux.
 	env.Append(LIBS = [":libvorbisfile.a", ":libvorbis.a", ":libogg.a"])
+	detected = (raw_triplet_from_cc(env['CC']) or raw_triplet_from_name(env['CC']) or env.Exit(1, f"Can't detect target triple from CC={env['CC']}"))
+	mappings = [
+		(r'^aarch64-.*-linux-gnu$',            'aarch64-linux-gnu'),
+		(r'^aarch64-.*-linux-android$',        'aarch64-none-linux-android'),
+		(r'^arm-linux-gnueabi$',               'arm-linux-gnueabi'),
+		(r'^arm-linux-gnueabihf$',             'arm-linux-gnueabihf'),
+		(r'^armel-linux-gnueabi$',             'armel-linux-gnueabi'),
+		(r'^armv7-.*-linux-androideabi$',      'armv7-none-linux-androideabi'),
+		(r'^x86_64-.*-linux-gnu$',             'x86_64-linux-gnu'),
+		(r'^x86_64-.*-linux-android$',         'x86_64-none-linux-android'),
+	]
+	for pattern, canon in mappings:
+		if re.match(pattern, detected):
+			env['target_triplet'] = canon
+			break
+	if ('target_triplet' in env and env['target_triplet'] is None) or ('target_triplet' not in env):
+		env.Exit(1, f"Unsupported target triple '{detected}'; must be one of: " + ", ".join([t for _, t in mappings]))
+	sources.extend([str(f) for f in Glob(f"arch/{env['target_triplet']}/**.c")])
+	sources.extend([str(f) for f in Glob(f"arch/{env['target_triplet']}/**.S")])
+	VariantDir("build/obj_src/arch", "arch", duplicate=0)
+	sources.append("posix.cpp")
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
 		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
@@ -156,6 +199,7 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	elif env["PLATFORM"] == "posix": stub_platform = "linux"
 	else: stub_platform = env["PLATFORM"]
 	VariantDir("build/obj_stub", "src", duplicate = 0)
+	VariantDir("build/obj_stub/arch", "arch", duplicate = 0)
 	stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
 	if env["PLATFORM"] == "win32": stub_env.Append(LINKFLAGS = ["/subsystem:windows"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
