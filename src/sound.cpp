@@ -20,6 +20,8 @@
 #include <Poco/MemoryStream.h>
 #include <angelscript.h>
 #include <scriptarray.h>
+#include "misc_functions.h" // script_memory_buffer
+#include "nvgt.h" // g_ScriptEngine
 #include "nvgt_angelscript.h" // get_array_type
 #include "nvgt_plugin.h"      // pack_interface
 #include "sound.h"
@@ -181,12 +183,29 @@ class audio_engine_impl final : public audio_engine {
 	std::unique_ptr<ma_engine> engine;
 	std::unique_ptr<ma_resource_manager> resource_manager;
 	std::unique_ptr<ma_device> device;
+	std::atomic<asIScriptFunction*> script_data_callback;
 	audio_node *engine_endpoint; // Upon engine creation we'll call ma_engine_get_endpoint once so as to avoid creating more than one of our wrapper objects when our engine->get_endpoint() function is called.
 	int refcount;
 	static void data_callback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 frameCount) {
-		ma_engine *engine = (ma_engine *)pDevice->pUserData;
+		audio_engine_impl* engine = reinterpret_cast<audio_engine_impl*>(pDevice->pUserData);
+		engine->duplicate();
 		ma_uint64 frames_read;
-		ma_engine_read_pcm_frames(engine, pOutput, frameCount, &frames_read);
+		engine->read(pOutput, frameCount, &frames_read);
+		if (engine->script_data_callback) {
+			asIScriptContext* ctx = g_ScriptEngine->RequestContext();
+			if (!ctx || ctx->Prepare(engine->script_data_callback) < 0) {
+				engine->release();
+				return; // Todo: Maybe find a way to log error state here?
+			}
+			script_memory_buffer buf(g_ScriptEngine->GetTypeInfoByDecl("memory_buffer<float>"), pOutput, pDevice->playback.channels * frames_read); // Todo: Support all data formats.
+			if (ctx->SetArgObject(0, engine) < 0 || ctx->SetArgObject(1, &buf) < 0 || ctx->SetArgQWord(2, frames_read) < 0) {
+				engine->release();
+				return;
+			}
+			ctx->Execute(); // Really not sure what to do about exceptions and errors taking place in the audio thread yet as we don't have a fully established logging facility set up.
+			g_ScriptEngine->ReturnContext(ctx);
+			engine->release();
+		}
 	}
 
 public:
@@ -195,6 +214,7 @@ public:
 		: audio_engine(),
 		  engine(nullptr),
 		  resource_manager(nullptr),
+		  script_data_callback(nullptr),
 		  engine_endpoint(nullptr),
 		  flags(static_cast<engine_flags>(flags)),
 		  refcount(1) {
@@ -216,7 +236,7 @@ public:
 			cfg.wasapi.noAutoConvertSRC = true;
 
 			cfg.dataCallback = data_callback;
-			cfg.pUserData = &*engine;
+			cfg.pUserData = this;
 			g_soundsystem_last_error = ma_device_init(&g_sound_context, &cfg, &*device);
 			if (g_soundsystem_last_error != MA_SUCCESS) {
 
@@ -267,6 +287,10 @@ public:
 		engine_endpoint = new audio_node_impl(reinterpret_cast<ma_node_base *>(ma_engine_get_endpoint(&*engine)), this);
 	}
 	~audio_engine_impl() {
+		if (script_data_callback) {
+			script_data_callback.load()->Release();
+			script_data_callback = nullptr;
+		}
 		if (device) {
 			ma_device_stop(&*device);
 			ma_device_uninit(&*device);
@@ -338,6 +362,11 @@ public:
 		result->Resize(frames_read * ma_engine_get_channels(&*engine));
 		return result;
 	}
+	void set_processing_callback(asIScriptFunction* cb) override {
+		if (script_data_callback) script_data_callback.load()->Release();
+		script_data_callback = cb;
+	}
+	asIScriptFunction* get_processing_callback() const override { return script_data_callback; }
 	unsigned long long get_time() const override { return engine ? (flags & DURATIONS_IN_FRAMES ? get_time_in_frames() : get_time_in_milliseconds()) : 0; }
 	bool set_time(unsigned long long time) override { return engine ? (flags & DURATIONS_IN_FRAMES) ? set_time_in_frames(time) : set_time_in_milliseconds(time) : false; }
 	unsigned long long get_time_in_frames() const override { return engine ? ma_engine_get_time_in_pcm_frames(&*engine) : 0; }
@@ -1193,6 +1222,7 @@ ReturnType virtual_call(T *object, Args... args) {
 }
 void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectType("audio_engine", 0, asOBJ_REF);
+	engine->RegisterFuncdef("void audio_engine_processing_callback(audio_engine@ engine, memory_buffer<float>& data, uint64 frames)");
 	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_FACTORY, "audio_engine@ e(int flags)", asFUNCTION(new_audio_engine), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call < audio_engine, &audio_engine::duplicate, void >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call < audio_engine, &audio_engine::release, void >)), asCALL_CDECL_OBJFIRST);
@@ -1200,6 +1230,8 @@ void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "bool set_device(int device)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_device, bool, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "audio_node@+ get_endpoint() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_endpoint, audio_node * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "float[]@ read(uint64 frame_count)", asFUNCTION((virtual_call < audio_engine, &audio_engine::read_script, CScriptArray *, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_processing_callback(audio_engine_processing_callback@ cb) property", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_processing_callback, void, asIScriptFunction*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "audio_engine_processing_callback@+ get_processing_callback() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_processing_callback, asIScriptFunction* >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "uint64 get_time() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_time, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "bool set_time(uint64 time)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_time, bool, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "uint64 get_time_in_frames() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_time_in_frames, unsigned long long >)), asCALL_CDECL_OBJFIRST);

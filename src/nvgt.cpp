@@ -357,11 +357,11 @@ protected:
 		#endif
 		ScreenReaderUnload();
 		InputDestroy();
+		uninit_sound();
+		anticheat_deinit();
 		if (g_ScriptEngine)
 			g_ScriptEngine->ShutDownAndRelease();
 		g_ScriptEngine = nullptr;
-		uninit_sound();
-		anticheat_deinit();
 	}
 };
 

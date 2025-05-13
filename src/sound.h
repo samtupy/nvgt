@@ -75,6 +75,8 @@ public:
 	virtual ma_engine *get_ma_engine() const = 0;
 	virtual bool read(void *buffer, unsigned long long frame_count, unsigned long long *frames_read) = 0;
 	virtual CScriptArray *read_script(unsigned long long frame_count) = 0;
+	virtual void set_processing_callback(asIScriptFunction* cb) = 0;
+	virtual asIScriptFunction* get_processing_callback() const = 0;
 	virtual unsigned long long get_time() const = 0;
 	virtual bool set_time(unsigned long long time) = 0; // depends on DURATIONS_IN_FRAMES flag.
 	virtual unsigned long long get_time_in_frames() const = 0;
