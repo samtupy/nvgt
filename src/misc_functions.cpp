@@ -326,6 +326,41 @@ double parse_double(const std::string& val) {
 	return res;
 }
 
+// Small wrapper which allows statically typed read-write access to an arbitrary memory buffer from scripts.
+// It should be implicitly understood by the scripter that this interface is low level, contains minimal handholding and is not subject to sandboxing!
+struct script_memory_buffer {
+	void* ptr;
+	size_t size;
+	asITypeInfo* subtype;
+	int subtypeid;
+	script_memory_buffer(asITypeInfo* subtype, void* ptr, size_t size) : ptr(ptr), size(size), subtype(subtype), subtypeid(subtype->GetSubTypeId()) {}
+	const void* at(size_t index) const {
+		if (!ptr) throw std::invalid_argument("memory buffer null pointer access");
+		int typesize = g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid);
+		if (size && index >= size) throw std::out_of_range("index out of bounds");
+		return (void*)(((char*)ptr) + (index * typesize));
+	}
+	void* at(size_t index) { return const_cast<void*>(const_cast<const script_memory_buffer*>(this)->at(index)); }
+	static void make(script_memory_buffer* mem, asITypeInfo* subtype, void* ptr, int size) { new(mem) script_memory_buffer(subtype, ptr, size); }
+	static void copy(script_memory_buffer* mem, asITypeInfo* subtype, const script_memory_buffer& other) { new(mem) script_memory_buffer(other); }
+	static void destroy(script_memory_buffer* mem) { mem->~script_memory_buffer(); }
+	static bool verify(asITypeInfo *subtype, bool& no_gc) {
+		if (subtype->GetSubTypeId() & asTYPEID_MASK_OBJECT ) return false;
+		return no_gc = true;
+	}
+	static void angelscript_register(asIScriptEngine* engine) {
+		engine->RegisterObjectType("memory_buffer<class T>", sizeof(script_memory_buffer), asOBJ_VALUE | asOBJ_TEMPLATE | asGetTypeTraits<script_memory_buffer>());
+		engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_CONSTRUCT, "void f(int&in subtype, uint64 ptr, uint64 size)", asFUNCTION(make), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_CONSTRUCT, "void f(int&in subtype, const memory_buffer<T>&in other)", asFUNCTION(copy), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_TEMPLATE_CALLBACK, "bool f(int&in subtype, bool&out no_gc)", asFUNCTION(verify), asCALL_CDECL);
+		engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(destroy), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectProperty("memory_buffer<T>", "uint64 address", asOFFSET(script_memory_buffer, ptr));
+		engine->RegisterObjectProperty("memory_buffer<T>", "uint64 size", asOFFSET(script_memory_buffer, size));
+		engine->RegisterObjectMethod("memory_buffer<T>", "T& opIndex(uint64 index)", asMETHODPR(script_memory_buffer, at, (size_t), void*), asCALL_THISCALL);
+		engine->RegisterObjectMethod("memory_buffer<T>", "const T& opIndex(uint64 index) const", asMETHODPR(script_memory_buffer, at, (size_t) const, const void*), asCALL_THISCALL);
+	}
+};
+
 void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction(_O("bool chdir(const string& in directory)"), asFUNCTION(ChDir), asCALL_CDECL);
@@ -376,4 +411,6 @@ void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("system_power_state", "POWER_STATE_CHARGING", SDL_POWERSTATE_CHARGING);
 	engine->RegisterEnumValue("system_power_state", "POWER_STATE_CHARGED", SDL_POWERSTATE_CHARGED);
 	engine->RegisterGlobalFunction("system_power_state system_power_info(int&out seconds = void, int&out percent = void)", asFUNCTION(SDL_GetPowerInfo), asCALL_CDECL);
+	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_RAW_MEMORY);
+	script_memory_buffer::angelscript_register(engine);
 }
