@@ -373,6 +373,10 @@ struct script_memory_buffer {
 		engine->RegisterObjectMethod("memory_buffer<T>", "memory_buffer<T>& opAssign(array<T>@ array)", asMETHOD(script_memory_buffer, from_array), asCALL_THISCALL);
 	}
 };
+void* string_get_address(std::string& str) {
+	if (str.size() < 1) return nullptr;
+	return &str[0];
+}
 
 void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
@@ -426,4 +430,5 @@ void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("system_power_state system_power_info(int&out seconds = void, int&out percent = void)", asFUNCTION(SDL_GetPowerInfo), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_RAW_MEMORY);
 	script_memory_buffer::angelscript_register(engine);
+	engine->RegisterObjectMethod("string", "uint64 get_address() const property", asFUNCTION(string_get_address), asCALL_CDECL_OBJFIRST);
 }
