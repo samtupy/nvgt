@@ -384,7 +384,7 @@ class database_list : database_property {
 	int find(const string& in v) { return value.find(v); }
 	int find(int start, const string& in v) { return value.find(start, v); }
 	string get_opIndex(int idx) property { return value[idx]; }
-	void set_opIndex(int idx, const string& in v) { modified = true; val[idx] = v; }
+	void set_opIndex(int idx, const string& in v) property { modified = true; val[idx] = v; }
 	string[]@ opImplCast() {
 		if (!retrieved and !modified and !retrieve()) return {};
 		return @val;
