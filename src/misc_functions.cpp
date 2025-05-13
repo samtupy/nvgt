@@ -341,6 +341,17 @@ struct script_memory_buffer {
 		return (void*)(((char*)ptr) + (index * typesize));
 	}
 	void* at(size_t index) { return const_cast<void*>(const_cast<const script_memory_buffer*>(this)->at(index)); }
+	CScriptArray* to_array() const {
+		CScriptArray* array = CScriptArray::Create(g_ScriptEngine->GetTypeInfoByDecl(Poco::format("array<%s>", std::string(g_ScriptEngine->GetTypeDeclaration(subtypeid, false))).c_str()), size);
+		if (!array) return nullptr;
+		std::memcpy(array->GetBuffer(), ptr, size * g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid));
+		return array;
+	}
+	script_memory_buffer& from_array(CScriptArray* array) {
+		if (!array) std::memset(ptr, 0, size * g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid));
+		else std::memcpy(ptr, array->GetBuffer(), (array->GetSize() < size? array->GetSize() : size) * g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid));
+		return *this;
+	}
 	static void make(script_memory_buffer* mem, asITypeInfo* subtype, void* ptr, int size) { new(mem) script_memory_buffer(subtype, ptr, size); }
 	static void copy(script_memory_buffer* mem, asITypeInfo* subtype, const script_memory_buffer& other) { new(mem) script_memory_buffer(other); }
 	static void destroy(script_memory_buffer* mem) { mem->~script_memory_buffer(); }
@@ -358,6 +369,8 @@ struct script_memory_buffer {
 		engine->RegisterObjectProperty("memory_buffer<T>", "uint64 size", asOFFSET(script_memory_buffer, size));
 		engine->RegisterObjectMethod("memory_buffer<T>", "T& opIndex(uint64 index)", asMETHODPR(script_memory_buffer, at, (size_t), void*), asCALL_THISCALL);
 		engine->RegisterObjectMethod("memory_buffer<T>", "const T& opIndex(uint64 index) const", asMETHODPR(script_memory_buffer, at, (size_t) const, const void*), asCALL_THISCALL);
+		engine->RegisterObjectMethod("memory_buffer<T>", "array<T>@ opImplConv() const", asMETHOD(script_memory_buffer, to_array), asCALL_THISCALL);
+		engine->RegisterObjectMethod("memory_buffer<T>", "memory_buffer<T>& opAssign(array<T>@ array)", asMETHOD(script_memory_buffer, from_array), asCALL_THISCALL);
 	}
 };
 
