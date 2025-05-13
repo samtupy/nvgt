@@ -28,8 +28,12 @@ extern bool g_make_console;
 #ifndef _WIN32
 	#ifndef BOOL
 		typedef int BOOL;
-		#define FALSE 0
-		#define TRUE 1
+		#ifndef FALSE
+			#define FALSE 0
+		#endif
+		#ifndef TRUE
+			#define TRUE 1
+		#endif
 	#endif
 	typedef unsigned int DWORD;
 #endif
