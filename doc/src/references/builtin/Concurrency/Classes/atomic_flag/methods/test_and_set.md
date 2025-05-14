@@ -1,5 +1,5 @@
 # test_and_set
-Atomically changes the value of this `atomic_flag` to set (`true`) and returns it's prior value.
+Atomically changes the value of this `atomic_flag` to set (`true`) and returns its prior value.
 
 ```nvgt
 bool test_and_set(memory_order order = MEMORY_ORDER_SEQ_CST);

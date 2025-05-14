@@ -1,0 +1,14 @@
+/**
+	Returns a random element from the array.
+	T array::random();
+	## Returns:
+		A random element of an array.
+	## Remarks:
+		This method is functionally equivalent to `array[random(0, array.length() - 1)]`.
+*/
+
+// Example:
+void main() {
+	string[] items = {"C", "C++", "C#"};
+	alert("Random element", items.random());
+}
