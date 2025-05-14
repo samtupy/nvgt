@@ -389,6 +389,7 @@ int PreconfigureEngine(asIScriptEngine* engine) {
 	engine->SetEngineProperty(asEP_ALLOW_UNSAFE_REFERENCES, true);
 	engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
 	engine->SetEngineProperty(asEP_MEMBER_INIT_MODE, 0);
+	engine->SetEngineProperty(asEP_BOOL_CONVERSION_MODE, true);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->BeginConfigGroup("core");
 	RegisterStdString(engine);
@@ -559,6 +560,8 @@ void ConfigureEngineOptions(asIScriptEngine *engine) {
 		engine->SetEngineProperty(asEP_REQUIRE_ENUM_SCOPE, true);
 	if (config.hasOption("scripting.do_not_optimize_bytecode"))
 		engine->SetEngineProperty(asEP_OPTIMIZE_BYTECODE, false);
+	if (config.hasOption("scripting.disable_bool_conversion_mode"))
+		engine->SetEngineProperty(asEP_BOOL_CONVERSION_MODE, false);
 	engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, config.getInt("scripting.max_nested_calls", 10000));
 	engine->SetEngineProperty(asEP_MAX_STACK_SIZE, config.getInt("scripting.max_stack_size", 0));
 	engine->SetEngineProperty(asEP_MAX_CALL_STACK_SIZE, config.getInt("scripting.max_call_stack_size", 0));

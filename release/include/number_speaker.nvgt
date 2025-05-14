@@ -22,7 +22,12 @@ To have a number spoken, call either the "speak" or the "speak_wait" method in t
 class number_speaker {
 	string prepend;
 	string append;
+	#if plugin_legacy_sound
+	pack@ pack = null;
+	#endif
+	#if_not plugin_legacy_sound
 	pack_file@ pack = null;
+	#endif
 	bool include_and;
 
 	// We set everything to default values in the constructor.

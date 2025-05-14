@@ -1,0 +1,19 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	uint64 addr = memory_allocate_units(4, 32);
+	memory_buffer<float> buf(addr, 32);
+	for (uint i = 0; i < 32; i++) buf[i] = i * 2;
+	alert("test", string(cast<float[]@>(buf)));
+	buf = {9, 1, 2, 7};
+	string output;
+	for (uint i = 0; i < 32; i++) output += buf[i] + ". ";
+	memory_free(addr);
+	alert("test", output);
+	string s = "testing";
+	memory_buffer<uint8> sb(s.address, s.size());
+	sb[0] = 0x66;
+	alert(s, string(cast<uint8[]@>(sb)));
+}

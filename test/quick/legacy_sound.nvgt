@@ -5,6 +5,7 @@
 #pragma namespace sound upcoming
 #pragma plugin legacy_sound
 //using namespace legacy;
+#include "number_speaker.nvgt"
 void main() {
 	sound s;
 	s.load("C:/windows/media/ding.wav");
