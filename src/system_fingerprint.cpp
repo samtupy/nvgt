@@ -21,6 +21,7 @@
 	#include <iphlpapi.h>
 #endif
 #include <SDL3/SDL.h>
+#include <cstring>
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 unsigned short hashMacAddress(PIP_ADAPTER_INFO info) {
 	unsigned short hash = 0;
@@ -152,7 +153,7 @@ void getMacHash(unsigned short& mac1, unsigned short& mac2) {
 	bool foundMac1 = false;
 	struct ifreq* ifr;
 	for (ifr = conf.ifc_req; (char*)ifr < (char*)conf.ifc_req + conf.ifc_len; ifr++) {
-		if (ifr->ifr_addr.sa_data == (ifr + 1)->ifr_addr.sa_data)
+		if (std::memcmp(ifr->ifr_addr.sa_data, (ifr + 1)->ifr_addr.sa_data, sizeof(ifr->ifr_addr.sa_data)) == 0)
 			continue; // duplicate, skip it
 		if (ioctl(sock, SIOCGIFFLAGS, ifr))
 			continue; // failed to get flags, skip it

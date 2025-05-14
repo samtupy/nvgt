@@ -74,7 +74,7 @@ static void on_close(GtkButton*, gpointer ud) {
 	auto hints = static_cast<GtkInputHints>(GTK_INPUT_HINT_SPELLCHECK | GTK_INPUT_HINT_WORD_COMPLETION | GTK_INPUT_HINT_EMOJI);
 	if (secure) {
 		gtk_entry_set_input_purpose(ent, GTK_INPUT_PURPOSE_PASSWORD);
-		hints |= static_cast<GtkInputHints>(GTK_INPUT_HINT_PRIVATE);
+		hints = static_cast<GtkInputHints>(static_cast<int>(hints) | GTK_INPUT_HINT_PRIVATE);
 	}
 	gtk_entry_set_input_hints(ent, hints);
 	gtk_entry_set_activates_default(ent, TRUE);

@@ -294,7 +294,7 @@ class pack_interface {
 	void release() const { if (asAtomicDec(refcount) < 1) delete this; }
 	virtual const pack_interface* make_immutable() const = 0;
 	virtual const pack_interface* get_mutable() const = 0;
-	virtual std::istream* get_file(const std::string& filename) const { return nullptr; }
+	virtual std::istream* get_file([[maybe_unused]] const std::string& filename) const { return nullptr; }
 	virtual const std::string get_pack_name() const { return ""; }
 	template <class A, class B> static B* op_cast(A* from) {
 		B* casted = dynamic_cast<B*>(from);

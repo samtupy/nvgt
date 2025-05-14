@@ -213,7 +213,7 @@ class nvgt_file_dialog_info : public Poco::SynchronizedObject {
 public:
 	std::string data;
 };
-void nvgt_file_dialog_callback(void* user, const char* const * files, int filter) {
+void nvgt_file_dialog_callback(void* user, const char* const * files, [[maybe_unused]] int filter) {
 	if (!files) alert("Open file error", SDL_GetError()); // This will probably change to silently setting an error string or something.
 	nvgt_file_dialog_info* fdi = reinterpret_cast<nvgt_file_dialog_info*>(user);
 	if (files && *files) fdi->data = *files;

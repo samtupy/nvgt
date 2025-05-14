@@ -32,7 +32,7 @@ using namespace Poco;
 bool FileHardLink(const std::string& source, const std::string& target) {
 	try {
 		Poco::File(source).linkTo(target, Poco::File::LINK_HARD);
-	} catch (Poco::Exception) {
+	} catch (Poco::Exception&) {
 		return false;
 	}
 	return false;

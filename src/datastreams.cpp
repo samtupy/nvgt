@@ -84,7 +84,7 @@ bool datastream::close(bool close_all) {
 	r = nullptr;
 	w = nullptr;
 	// Sometimes _istr and _ostr could be set to the same object when dealing with an iostream, thus insure we don't call delete twice on the same stream. Mainly only allow _ostr to be deleted if either _istr isn't present or we are not dealing with an iostream.
-	bool is_iostr = _istr && dynamic_cast<std::iostream*>(_istr) != nullptr || _ostr && dynamic_cast<std::iostream*>(_ostr) != nullptr;
+	bool is_iostr = (_istr && dynamic_cast<std::iostream*>(_istr) != nullptr) || (_ostr && dynamic_cast<std::iostream*>(_ostr) != nullptr);
 	if (_istr)
 		delete _istr;
 	if (_ostr && (!_istr || !is_iostr))
@@ -117,7 +117,7 @@ bool datastream::seek(unsigned long long offset) {
 	}
 	if (_ostr)
 		_ostr->seekp(offset, std::ios::beg);
-	return r && r->good() || w && w->good();
+	return (r && r->good()) || (w && w->good());
 }
 bool datastream::seek_end(unsigned long long offset) {
 	if (!r && !w)
@@ -129,7 +129,7 @@ bool datastream::seek_end(unsigned long long offset) {
 	}
 	if (_ostr)
 		_ostr->seekp(offset, std::ios::end);
-	return r && r->good() || w && w->good();
+	return (r && r->good()) || (w && w->good());
 }
 bool datastream::seek_relative(long long offset) {
 	if (!r && !w)
@@ -141,7 +141,7 @@ bool datastream::seek_relative(long long offset) {
 	}
 	if (_ostr)
 		_ostr->seekp(offset, std::ios::cur);
-	return r && r->good() || w && w->good();
+	return (r && r->good()) || (w && w->good());
 }
 bool datastream::rseek(unsigned long long offset) {
 	if (_istr) {
@@ -215,7 +215,7 @@ std::string datastream::read(unsigned int size) {
 			output.resize(r->stream().gcount());
 		} else
 			StreamCopier::copyToString(*_istr, output);
-	} catch (std::exception) {
+	} catch (std::exception&) {
 		return "";
 	}
 	return output;
@@ -259,7 +259,7 @@ unsigned int datastream::write(const std::string& data) {
 		w->writeRaw(data);
 		if (r && w && sync_rw_cursors)
 			_istr->seekg(_ostr->tellp()); // Make sure that read and write pointers are in sync.
-	} catch (std::exception) {
+	} catch (std::exception&) {
 		return long(_ostr->tellp()) - pos;
 	}
 	return long(_ostr->tellp()) - pos; // This is the only function with the extra tellp operations, for bgt backwards compatibility.

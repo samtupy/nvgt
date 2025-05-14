@@ -55,7 +55,7 @@ public:
 	virtual unsigned long long get_state_time(ma_node_state state) = 0;
 	virtual ma_node_state get_state_by_time(unsigned long long global_time) = 0;
 	virtual ma_node_state get_state_by_time_range(unsigned long long global_time_begin, unsigned long long global_time_end) = 0;
-	virtual unsigned long long get_time() = 0;
+	virtual ma_uint64 get_time() const = 0;
 	virtual bool set_time(unsigned long long local_time) = 0;
 };
 class audio_engine {

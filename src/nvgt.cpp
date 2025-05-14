@@ -330,7 +330,7 @@ protected:
 			}
 		}
 		int retcode = Application::EXIT_OK;
-		if (mode == NVGT_RUN && (retcode = ExecuteScript(g_ScriptEngine, scriptfile.c_str())) < 0 || mode == NVGT_COMPILE && CompileExecutable(g_ScriptEngine, scriptfile)) {
+		if ((mode == NVGT_RUN && (retcode = ExecuteScript(g_ScriptEngine, scriptfile.c_str())) < 0) || (mode == NVGT_COMPILE && CompileExecutable(g_ScriptEngine, scriptfile))) {
 			ShowAngelscriptMessages();
 			return Application::EXIT_SOFTWARE;
 		}

@@ -35,12 +35,12 @@ Vector3 rotate(const Vector3& p, const Vector3& o, double theta, bool maintain_z
 	return r;
 }
 Vector3 get_center(Vector3 _min, Vector3 _max) {
-	if (_min == _max || _max.x - _min.x < 2 && _max.y - _min.y < 2 && _max.z - _min.z < 2)
+	if (_min == _max || (_max.x - _min.x < 2 && _max.y - _min.y < 2 && _max.z - _min.z < 2))
 		return _min;
 	return Vector3(_min.x + (_max.x - _min.x) / 2.0, _min.y + (_max.y - _min.y) / 2.0, _min.z + (_max.z - _min.z) / 2.0);
 }
 Vector3 get_center(double minx, double maxx, double miny, double maxy, double minz, double maxz) {
-	if (minx == maxx && miny == maxy && minz == maxz || maxx - minx < 2 && maxy - miny < 2 && maxz - minz < 2)
+	if ((minx == maxx && miny == maxy && minz == maxz) || (maxx - minx < 2 && maxy - miny < 2 && maxz - minz < 2))
 		return Vector3(minx, miny, minz);
 	return Vector3(minx + (maxx - minx) / 2.0, miny + (maxy - miny) / 2.0, minz + (maxz - minz) / 2.0);
 }

@@ -98,7 +98,7 @@ template <class T1, class T2> T2* angelscript_refcounted_refcast(T1* obj) {
 	angelscript_refcounted_duplicate<T2>(obj);
 	return obj_casted;
 }
-template <class T> inline void angelscript_refcounted_register(asIScriptEngine* engine, const char* type, const char* parent = NULL) {
+template <class T> inline void angelscript_refcounted_register(asIScriptEngine* engine, const char* type, [[maybe_unused]] const char* parent = NULL) {
 	engine->RegisterObjectType(type, 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(type, asBEHAVE_ADDREF, "void f()", asFUNCTION(angelscript_refcounted_duplicate<T>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour(type, asBEHAVE_RELEASE, "void f()", asFUNCTION(angelscript_refcounted_release<T>), asCALL_CDECL_OBJFIRST);

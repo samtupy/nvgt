@@ -103,7 +103,7 @@ bool user_command(const std::string& command) {
 	vector<string> args;
 	bool in_quotes = false;
 	for (size_t i = 0; i <= command.length(); i++) {
-		if (i == command.length() || command[i] == ' ' && !in_quotes) {
+		if (i == command.length() || (command[i] == ' ' && !in_quotes)) {
 			if (appname.empty()) appname = current_arg;
 			else args.push_back(current_arg);
 			current_arg = "";
@@ -213,7 +213,7 @@ protected:
 		string bn = Path(get_input_file()).getBaseName();
 		for (char i : bn) {
 			if (i == '-' || i == '_') continue;
-			if (i >= 'A' && i <= 'Z' || i >= 'a' && i <= 'z' || i >= '0' && i <= '9') output += i;
+			if ((i >= 'A' && i <= 'Z') || (i >= 'a' && i <= 'z') || (i >= '0' && i <= '9')) output += i;
 			else output += (output.empty()? "g" : format("%d", int(i)));
 		}
 		return format("%s.%s", config.getString("build.product_identifier_domain", "com.NVGTUser"), output);
@@ -450,7 +450,12 @@ class nvgt_compilation_output_android : public nvgt_compilation_output_impl {
 	bool android_sdk_tools_exist(const std::string& path) {
 		// This will also set the path to android.jar and apksigner.jar if build tools are found.
 		Path located;
-		bool found = Path::find(path, exe("zipalign"), located) && (sign_cert.empty() && sign_password.empty() || Path::find(path, exe("java"), located)) && (!do_install || Path::find(path, exe("adb"), located)) && Path::find(path, exe("aapt2"), located);
+		bool has_zipalign = Path::find(path, exe("zipalign"), located);
+		bool needs_signing = !sign_cert.empty() && !sign_password.empty();
+		bool has_java    = Path::find(path, exe("java"),    located);
+		bool can_install = !do_install || Path::find(path, exe("adb"),   located);
+		bool has_aapt2   = Path::find(path, exe("aapt2"),    located);
+		bool found = has_zipalign && (!needs_signing || has_java) &&  can_install &&  has_aapt2;
 		if (!found) return false;
 		// Since this particular search was last in the Path::find calls above, located now contains a path to aapt2.exe, hopefully we can locate android.jar from it.
 		located.setFileName("");
@@ -591,7 +596,7 @@ protected:
 	void postbuild_interface(bool after_postbuild) override {
 		bool quiet = config.hasOption("application.quiet") || config.hasOption("application.QUIET");
 		if (!after_postbuild) {
-			do_install = do_install > 0 && system_command(exe("adb"), {"shell", "-n"}) && (do_install == 2 || !quiet && question("install app", "An android device is connected to this computer in debug mode, do you want to install the generated APK onto it?") == 1)? 2 : 0;
+			do_install = (do_install > 0 && system_command(exe("adb"), {"shell", "-n"})) && (do_install == 2 || (!quiet && question("install app", "An android device is connected to this computer in debug mode. Do you want to install the generated APK onto it?") == 1))? 2 : 0;
 		} else {
 			if (do_install == 2 && !quiet) message(format("The application %s (%s) was installed on all connected devices in %ums.", config.getString("build.product_name"), config.getString("build.product_identifier"), uint32_t(install_timer.elapsed() / 1000)), "Success!");
 		}
