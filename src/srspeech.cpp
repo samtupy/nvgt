@@ -18,6 +18,7 @@
 	#include "apple.h"
 #elif !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
 	#define using_speechd
+	#include <libspeechd.h>
 #elif defined(__ANDROID__)
 	#include "android.h"
 #endif
@@ -31,22 +32,7 @@ Poco::AtomicFlag g_SRSpeechLoaded;
 Poco::AtomicFlag g_SRSpeechAvailable;
 
 #ifdef using_speechd
-	// Define the functions we want to use from speech-dispatcher with some temporary macro replacements that allow the libspeechd header to still be usable while turning the function definitions into pointers. Not perfectly ideal, but still the cleanest I can find at this time.
-	#define spd_get_default_address (*spd_get_default_address)
-	#define spd_open2 (*spd_open2)
-	#define spd_close (*spd_close)
-	#define spd_say (*spd_say)
-	#define spd_stop (*spd_stop)
-	#define spd_cancel (*spd_cancel)
-	#include <speech-dispatcher/libspeechd.h>
-	#undef spd_get_default_address
-	#undef spd_open2
-	#undef spd_close
-	#undef spd_say
-	#undef spd_stop
-	#undef spd_cancel
 	SPDConnection*  g_SpeechdConn = nullptr;
-	Poco::SharedLibrary g_SpeechdLib;
 #endif
 
 bool ScreenReaderLoad() {
@@ -61,18 +47,6 @@ bool ScreenReaderLoad() {
 	return true; // Voice over or libraries to access it don't need loading, same with Android accessibility manager.
 	#elif defined(using_speechd)
 	if (g_SRSpeechLoaded) return true;
-	try {
-		g_SpeechdLib.load("libspeechd.so");
-		*(void**)&spd_get_default_address = g_SpeechdLib.getSymbol("spd_get_default_address");
-		*(void**)&spd_open2 = g_SpeechdLib.getSymbol("spd_open2");
-		*(void**)&spd_close = g_SpeechdLib.getSymbol("spd_close");
-		*(void**)&spd_say = g_SpeechdLib.getSymbol("spd_say");
-		*(void**)&spd_stop = g_SpeechdLib.getSymbol("spd_stop");
-		*(void**)&spd_cancel = g_SpeechdLib.getSymbol("spd_cancel");
-	} catch (Poco::Exception&) {
-		g_SRSpeechAvailable.reset();
-		return false;
-	}
 	const auto *addr = spd_get_default_address(nullptr);
 	if (!addr) {
 		g_SRSpeechAvailable.reset();
@@ -99,7 +73,6 @@ void ScreenReaderUnload() {
 	#elif defined(using_speechd)
 	spd_close(g_SpeechdConn);
 	g_SpeechdConn = nullptr;
-	g_SpeechdLib.unload();
 	#endif
 }
 
@@ -217,8 +190,8 @@ bool ScreenReaderSilence() {
 	#elif defined(__APPLE__)
 	return voice_over_speak("", true);
 	#elif defined(using_speechd)
-	spd_cancel(g_SpeechdConn);
 	spd_stop(g_SpeechdConn);
+	spd_cancel(g_SpeechdConn);
 	return true;
 	#elif defined(__ANDROID__)
 	return android_screen_reader_silence();
