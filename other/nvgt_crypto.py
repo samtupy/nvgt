@@ -1,8 +1,10 @@
-# This script was created by me with the assistance of GPT-4.
-# While GPT-4 handled much of the heavy lifting, I contributed my own knowledge and understanding to refine it.
-#
 # The purpose of this script is to encrypt and decrypt data in a way that is compatible with NVGT's encryption system.
 # This means you can encrypt data in Python, pass it to NVGT for decryption, and vice versa, especially if you wish to use a bridge between the two.
+# Written by Tunmi for
+# NVGT - NonVisual Gaming Toolkit (https://nvgt.gg)
+# Copyright (c) 2022-2025 Sam Tupy
+# license: zlib
+
 
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
