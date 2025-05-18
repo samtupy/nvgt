@@ -215,6 +215,7 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: android_release
+        path: android_release
     - name: set_version
       run: python3 build/ci_set_version.py
     - name: preprocess
