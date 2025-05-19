@@ -273,6 +273,7 @@ shared class ini {
 	private ini_section@ get_section(const string& in name) {
 		if (name.length() == 0)
 			return this.sections[0];
+		if (!sections_dict.exists(name)) return null;
 		ini_section@ tmp = null;
 		@tmp = cast<ini_section@>(this.sections_dict[name]);
 		return tmp;
