@@ -1,7 +1,7 @@
 # building nvgt on windows
 
 ## Building with the `build_windows.ps1` script
-There is a [script for building NVGT for Windows](https://github.com/samtupy/nvgt/blob/main/build/build_windows.ps1)
+There is a [script for building NVGT for Windows](https://github.com/samtupy/nvgt/blob/main/build/build_windows.ps1). It requires [Winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/) to be installed.
 
 This script allows for multiple parameters to alter it's behaviour:
 * `-it`: This parameter instructs the script to download the relevant tooling that will be used; this includes a compiler, Python, and Git.
