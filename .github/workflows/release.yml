@@ -225,7 +225,7 @@ jobs:
     - name: preprocess
       run: |
         mkdir android_package
-        mv android_release/nvgt.apk android_package/nvgt_android_$nvgt_version.apk
+        mv android_release/nvgt.apk android_package/nvgt_$nvgt_version.apk
     - name: publish
       uses: "marvinpinto/action-automatic-releases@v1.2.1"
       with:
