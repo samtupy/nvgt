@@ -19,6 +19,7 @@ if ($args -contains "-ci") {
 	git clone --head 1 https://github.com/samtupy/nvgt
 	Set-Location -Path "nvgt"
 }
+
 $windevPath = "windev"
 if (-not (Test-Path $windevPath) -or (Get-ChildItem $windevPath -Recurse | Measure-Object).Count -eq 0) {
 	$windevZipUrl = "https://nvgt.gg/windev.zip"
