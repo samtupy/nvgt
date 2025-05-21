@@ -630,6 +630,8 @@ int SaveCompiledScript(asIScriptEngine *engine, unsigned char **output) {
 	nvgt_bytecode_ostream ostr(&codestream);
 	BinaryWriter bw(ostr);
 	serialize_nvgt_plugins(bw);
+	bw << int(g_system_namespaces.size());
+	for (const auto& ns : g_system_namespaces) bw << ns.first << ns.second;
 	for (int i = 0; i < asEP_LAST_PROPERTY; i++)
 		bw.write7BitEncoded(UInt64(engine->GetEngineProperty(asEEngineProp(i))));
 	bw << Timestamp().raw();
@@ -728,9 +730,6 @@ int CompileExecutable(asIScriptEngine *engine, const string &scriptFile) {
 }
 #else
 int LoadCompiledScript(asIScriptEngine *engine, unsigned char *code, asUINT size) {
-	if (ConfigureEngine(engine) < 0) return -1;
-	// engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
-	// engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, 10000);
 	asIScriptModule *mod = engine->GetModule("nvgt_game", asGM_ALWAYS_CREATE);
 	if (mod == 0)
 		return -1;
@@ -739,8 +738,15 @@ int LoadCompiledScript(asIScriptEngine *engine, unsigned char *code, asUINT size
 	codestream.set(code, size);
 	nvgt_bytecode_istream istr(&codestream);
 	BinaryReader br(istr);
-	if (!load_serialized_nvgt_plugins(br))
-		return -1;
+	if (!load_serialized_nvgt_plugins(br)) return -1;
+	int ns_count;
+	br >> ns_count;
+	for (int i = 0; i < ns_count; i++) {
+		string k, v;
+		br >> k >> v;
+		g_system_namespaces[k] = v;
+	}
+	if (ConfigureEngine(engine) < 0) return -1;
 	for (int i = 0; i < asEP_LAST_PROPERTY; i++) {
 		UInt64 val;
 		br.read7BitEncoded(val);
