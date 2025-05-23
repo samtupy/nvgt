@@ -77,6 +77,7 @@ elif env["PLATFORM"] == "posix":
 	env.ParseConfig('pkg-config --cflags glib-2.0')
 	env.ParseConfig('pkg-config --cflags dbus-1')
 	env.ParseConfig('pkg-config --cflags x11')
+	env.ParseConfig('pkg-config --cflags speech-dispatcher')
 env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
