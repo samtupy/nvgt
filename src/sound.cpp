@@ -478,6 +478,7 @@ public:
 	}
 	~mixer_impl() {
 		std::unique_lock<mutex> lock(hrtf_toggle_mtx); // Insure hrtf isn't getting toggled at the time we begin detaching nodes.
+		stop();
 		if (monitor)
 			monitor->release();
 		if (parent_mixer)
@@ -618,6 +619,7 @@ public:
 		set_spatialization_enabled(true);
 		return ma_sound_set_position(&*snd, x, y, z);
 	}
+	void set_position_3d_vector(const reactphysics3d::Vector3& position) { set_position_3d(position.x, position.y, position.z); }
 	reactphysics3d::Vector3 get_position_3d() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
@@ -633,6 +635,7 @@ public:
 			monitor->set_position_changed();
 		return ma_sound_set_direction(&*snd, x, y, z);
 	}
+	void set_direction_vector(const reactphysics3d::Vector3& direction) { set_direction(direction.x, direction.y, direction.z); }
 	reactphysics3d::Vector3 get_direction() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
@@ -646,6 +649,7 @@ public:
 			return;
 		return ma_sound_set_velocity(&*snd, x, y, z);
 	}
+	void set_velocity_vector(const reactphysics3d::Vector3& velocity) { set_velocity(velocity.x, velocity.y, velocity.z); }
 	reactphysics3d::Vector3 get_velocity() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
@@ -1323,10 +1327,13 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	engine->RegisterObjectMethod(type.c_str(), "vector get_direction_to_listener() const", asFUNCTION((virtual_call < T, &T::get_direction_to_listener, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "float get_distance_to_listener() const", asFUNCTION((virtual_call < T, &T::get_distance_to_listener, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_position_3d(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_position_3d, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_position_3d(const vector&in position)", asFUNCTION((virtual_call < T, &T::set_position_3d_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "vector get_position_3d() const", asFUNCTION((virtual_call < T, &T::get_position_3d, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_direction(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_direction, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_direction(const vector&in direction)", asFUNCTION((virtual_call < T, &T::set_direction_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "vector get_direction() const", asFUNCTION((virtual_call < T, &T::get_direction, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_velocity, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(const vector&in velocity)", asFUNCTION((virtual_call < T, &T::set_velocity_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "vector get_velocity() const", asFUNCTION((virtual_call < T, &T::get_velocity, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_attenuation_model(audio_attenuation_model model) property", asFUNCTION((virtual_call < T, &T::set_attenuation_model, void, ma_attenuation_model >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_attenuation_model get_attenuation_model() const property", asFUNCTION((virtual_call < T, &T::get_attenuation_model, ma_attenuation_model >)), asCALL_CDECL_OBJFIRST);

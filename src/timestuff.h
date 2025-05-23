@@ -20,6 +20,7 @@
 #include <unordered_set>
 #include <string>
 
+class CScriptArray;
 uint64_t ticks(bool secure = true);
 uint64_t microticks(bool secure = true);
 
@@ -62,6 +63,7 @@ public:
 	bool set_timeout(const std::string& id, uint64_t timeout, bool repeating);
 	bool erase(const std::string& id);
 	void flush();
+	CScriptArray* list_timers();
 	void reset();
 	void schedule(timer_queue_item* t, Tick delta) {
 		return timers.schedule(t, delta);
