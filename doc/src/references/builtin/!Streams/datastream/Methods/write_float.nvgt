@@ -1,0 +1,14 @@
+/**
+	Write the value of a float into a stream.
+	uint write_float(float content);
+	## Arguments:
+		* content: The content that is to be written.
+	## Returns:
+		uint: the number of bytes written.
+*/
+
+// Example:
+void main() {
+	datastream ds;
+	ds.write_float(5.5);
+}

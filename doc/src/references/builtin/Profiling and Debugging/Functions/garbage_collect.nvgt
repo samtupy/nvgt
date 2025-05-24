@@ -1,0 +1,16 @@
+/**
+	Manually triggers the garbage collector.
+	void garbage_collect(bool full = true);
+	# Arguments
+		full: True for a full cycle, false for a small increment.
+	# Remarks
+		If full is set to false, the garbage collector only runs a small increment. If you have set the garbage collect mode to manual, you will need to regularly call this function yourself throughout the game. Otherwise this will be done automatically every 5-25 milliseconds, either in a dedicated thread, or during a wait() operation.
+		If full is set to true, this will do a full cleanout. This could take considerably longer, especially in larger games, so the automatic system never does this. It is up to you to perform a full cycle at a time that is appropriate for your game.
+
+*/
+
+// Example:
+void main() {
+	
+	garbage_collect();
+}

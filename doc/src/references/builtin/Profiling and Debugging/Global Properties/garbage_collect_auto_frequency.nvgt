@@ -1,0 +1,11 @@
+/**
+	Controls how often extra garbage collection is performed in automatic modes. Default is 300000 milliseconds (5 minutes). Valid values are from 2000 (2 seconds) to 86400000 (24 hours).
+	int garbage_collect_auto_frequency;
+	# Remarks
+		When this interval has passed, the system will lightly perform extra garbage cleanup.
+*/
+
+// Example:
+void main() {
+	alert("GC frequency", garbage_collect_auto_frequency);
+}

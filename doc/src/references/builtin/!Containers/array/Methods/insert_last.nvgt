@@ -1,7 +1,7 @@
 /**
 	Appends an element to an array.
 	1. void array::insert_last(const T&in element);
-	2. void array::extend(const T&in element);
+		2. void array::push_back(const T&in element);
 	## Arguments
 		* const T&in element: the element to be inserted.
 	## Remarks
