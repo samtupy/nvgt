@@ -8,11 +8,11 @@ There are many things that need to be considered carefully in the development of
 
 As you learn, you will begin to "speak" programming more intuitively. You will eventually realize that programming languages are nothing more than a readable abstraction over common paradigms: variables, functions, conditions, loops, data structures, and many more. Start thinking of programming as a new way to think and construct new ideas, rather than a way of expressing already-imagined thoughts and ideas.
 
-And if you don't understand these paradigms yet, don't worry - reading this manual, my hope is that you will learn to make games with nvgt, but I have a secondary goal: by the end of this text, I hope that you will also be confident with programming in general, as well!
+And if you do not understand these paradigms yet, do not worry - reading this manual, my hope is that you will learn to make games with nvgt, but I have a secondary goal: by the end of this text, I hope that you will also be confident with programming in general, as well!
 
 Especially in the world of audiogames, whose developers are often small teams at most, skill in game design is correlated with skill in programming; this manual will attempt to teach you both. However, game designing itself can also be made into a career!
 
-When making games, you must first consider what your game will be: what are the rules of the game? What is the lore, if it has a story? Plan out your project in detail, so that it's easier to turn it into code later on. This is especially true of projects that have a plot, or at least backstory.
+When making games, you must first consider what your game will be: what are the rules of the game? What is the lore, if it has a story? Plan out your project in detail, so that it is easier to turn it into code later on. This is especially true of projects that have a plot, or at least backstory.
 
 As well as coding and designing the game, sounds must also be found or created; many high-quality resources can be found for this, be they free or paid.
 
@@ -22,7 +22,7 @@ A script can also be considered one "unit" of code. You have probably seen many 
 
 Usually, one game will consist of not just one, but many scripts, each of which has some specific function or purpose. For now, though, a single script will be sufficient for our needs.
 
-A common tradition among programmers is to write a program that outputs "hello, world!" to the screen, to make sure whichever language they're using is working properly.
+A common tradition among programmers is to write a program that outputs "hello, world!" to the screen, to make sure whichever language they are using is working properly.
 
 Let's do that now and say hello to NVGT!
 Open a file in your text editor of choice (I recommend notepad++) and paste the following code inside:
@@ -35,13 +35,13 @@ Now, save this file as hello.nvgt, and head over to it in your file explorer.
 
 Press enter on it, and you should see a dialog box appear, with our message inside!
 
-Congratulations - you've just written your first nvgt script!
+Congratulations - you have just written your first nvgt script!
 
-This script might look simple, but there's actually quite a bit going on here. Let's analyze our various lines:
+This script might look simple, but there is actually quite a bit going on here. Let's analyze our various lines:
 
-void main(){ - this is the beginning of a function (more on those later) which doesn't return anything, and takes no arguments, or parameters.
+void main(){ - this is the beginning of a function (more on those later) which does not return anything, and takes no arguments, or parameters.
 
-The { afterwards opens a code block. It's customary in many codebases to put the { on the line which opens the block, and to put the closing brace on a new blank line after the block ends.
+The { afterwards opens a code block. It is customary in many codebases to put the { on the line which opens the block, and to put the closing brace on a new blank line after the block ends.
 
 Inside our block, we have one line: alert("hello", "Hello, world!");
 
@@ -49,41 +49,41 @@ Let's break it down:
 
 alert() is a function in nvgt that opens a dialog box containing a message. It supports many arguments, but most are optional. Here, we have used the two that are not: title, and text.
 
-We've separated our parameters by a comma and a space, similar to what we do when listing items in English, although we don't need to use "and" like we do in English, and there is only one rule to remember: a comma after every item, except the last.
+We have separated our parameters by a comma and a space, similar to what we do when listing items in English, although we do not need to use "and" like we do in English, and there is only one rule to remember: a comma after every item, except the last.
 
-Our parameters are enclosed in parentheses () but why? This tells NVGT what we'd like to do with the alert function: we would like to call it (calling meaning running the code inside based on some values). Finally, we end the line with a semicolon ; that tells NVGT this piece of code is finished.
+Our parameters are enclosed in parentheses () but why? This tells NVGT what we would like to do with the alert function: we would like to call it (calling meaning running the code inside based on some values). Finally, we end the line with a semicolon ; that tells NVGT this piece of code is finished.
 
 Together, alert("hello", "Hello, world!"); is known as one statement, the smallest unit of code that can be executed.
-As you can see, functions aren't so daunting after all!
+As you can see, functions are not so daunting after all!
 
-However, there's one missing piece of this puzzle: what's the deal with the main() function?
+However, there is one missing piece of this puzzle: what is the deal with the main() function?
 
-Actually, it's arbitrary, although extremely common. Many programming languages (rust, c, c++, java, and NVGT, to name a few) require you to use the main() function as what's called the "entry point": in other words, NVGT will call the main function, just as we called the alert function. If it doesn't find the main function, it won't know where to start, and will simply give you an error stating as much.
+Actually, it is arbitrary, although extremely common. Many programming languages (rust, c, c++, java, and NVGT, to name a few) require you to use the main() function as what is called the "entry point": in other words, NVGT will call the main function, just as we called the alert function. If it does not find the main function, it will not know where to start, and will simply give you an error stating as much.
 
-It's very possible to write scripts without a main function. These are sometimes called modules, and sometimes called include scripts, helper scripts, or any number of other names. In NVGT, since a module is quite a different (and advanced) concept, we call them include scripts.
+It is very possible to write scripts without a main function. These are sometimes called modules, and sometimes called include scripts, helper scripts, or any number of other names. In NVGT, since a module is quite a different (and advanced) concept, we call them include scripts.
 
-There's something interesting which nvgt can do with this script: not only can you run it, but you can also pack it into an exe file, ready to be shared with whoever you wish to have it. The advantage is that the exe will obfuscate your code and protect it from bad actors, which is especially useful for multiplayer projects!
+There is something interesting which nvgt can do with this script: not only can you run it, but you can also pack it into an exe file, ready to be shared with whoever you wish to have it. The advantage is that the exe will obfuscate your code and protect it from bad actors, which is especially useful for multiplayer projects!
 
 Not just that, but anyone can run your game if you compile it, whether or not they have nvgt installed on their computers.
 
-It's easy to do: when you've selected your script in windows explorer, don't run it. Instead, press the applications key (alternatively shift+f10 if you don't have one of those) and a "compile script (release)" option should appear.
+It is easy to do: when you have selected your script in windows explorer, do not run it. Instead, press the applications key (alternatively shift+f10 if you do not have one of those) and a "compile script (release)" option should appear.
 
 Click it, and a new file should appear next to the script: hello.exe.
 
 Running this file, you should get a similar effect to just running the script, but the code is now protected and can no longer be accessed.
 
-Now that we've learned the basics of nvgt scripts, let's move on and create a simple program!
+Now that we have learned the basics of nvgt scripts, let's move on and create a simple program!
 ## Learning Project: Calculator
 
-Let's make a calculator program with nvgt. We should be able to type mathematical expressions into it, and then get results out. We'll then build on our program by adding more features, and hopefully learn lots along the way!
+Let's make a calculator program with nvgt. We should be able to type mathematical expressions into it, and then get results out. We will then build on our program by adding more features, and hopefully learn lots along the way!
 
-You'll encounter many new programming concepts at once, so don't feel discouraged if you are lost. All will be explained!
+You will encounter many new programming concepts at once, so do not feel discouraged if you are lost. All will be explained!
 
-In this chapter, we'll learn about many of the fundamental concepts of nvgt, and of programming as well! I will try to make this interesting, but learning the basics can admittedly be boring. It is not shameful if you need a coffee or two reading through this.
+In this chapter, we will learn about many of the fundamental concepts of nvgt, and of programming as well! I will try to make this interesting, but learning the basics can admittedly be boring. It is not shameful if you need a coffee or two reading through this.
 
-And once we've learned the basics, we'll create several versions of our project, each one better than the last!
+And once we have learned the basics, we will create several versions of our project, each one better than the last!
 
-I will first explain the nvgt and programming concepts we'll need to understand it, using some short examples. They are called snippets, and won't all actually run. They are just to demonstrate.
+I will first explain the nvgt and programming concepts we will need to understand it, using some short examples. They are called snippets, and will not all actually run. They are just to demonstrate.
 ### comments
 Sometimes, you might want to document what a particularly complex bit of code does, or perhaps remind yourself to make it better later.
 
@@ -109,7 +109,7 @@ Lastly, the end-of-line comment is sort of like a single-line comment, but goes 
 int drink_price=5; // should this be able to store fractional values?
 ```
 
-As well as documenting your code, comments (especially multi-line ones) can be used to surround code which temporarily doesn't need to be run, or is broken for some reason.
+As well as documenting your code, comments (especially multi-line ones) can be used to surround code which temporarily does not need to be run, or is broken for some reason.
 
 This is called "commenting out" code. Code which is commented out will be ignored by the compiler, just like regular textual comments.
 
@@ -131,7 +131,7 @@ Imagine you are a version of yourself, with similar programming experience. Howe
 
 Another thing experienced programmers like to have is modularity. This philosophy dictates that as little of your code as possible should depend on other code.
 
-I'll explain more about this later, but an include script is how one achieves modularity in nvgt: by using the #include directive at the top of your program, you can load in another file of code, adding its code to your own in doing so.
+I will explain more about this later, but an include script is how one achieves modularity in nvgt: by using the #include directive at the top of your program, you can load in another file of code, adding its code to your own in doing so.
 
 NVGT ships with a host of include scripts (or includes for short), which you are free to use to speed up the process of game development.
 
@@ -142,9 +142,9 @@ If you wanted to use the speech.nvgt include, you would put it at the very top o
 #include "speech.nvgt"
 ```
 
-Why the #? In nvgt, # signifies what's called a preprocessor directive: usually one line of code, these are used before your program is run to change something about it.
+Why the #? In nvgt, # signifies what is called a preprocessor directive: usually one line of code, these are used before your program is run to change something about it.
 
-NVGT has what's called an include path. It searches multiple folders for your include scripts, and if it can't find them, it will give you an error. It works a bit like this:
+NVGT has what is called an include path. It searches multiple folders for your include scripts, and if it cannot find them, it will give you an error. It works a bit like this:
 1. Search the directory of the script from which another script was included
 2. Search the include folder in nvgt, in which all the built-in includes are stored.
 [add more later here maybe]
@@ -166,7 +166,7 @@ In this section we will learn about how to make some simple variables, and how t
 #### integers (ints) and unsigned integers (uints)
 In NVGT, there are two main types of numbers, integers and floating-point numbers.
 
-The easiest to understand is an integer, otherwise known as a discrete number. We'll learn about those first, then move on to floats, the type we will make the most use of in our calculator project.
+The easiest to understand is an integer, otherwise known as a discrete number. We will learn about those first, then move on to floats, the type we will make the most use of in our calculator project.
 
 Here are some examples of declaring the two kinds of integers:
 ```
@@ -175,9 +175,9 @@ x = -3;
 uint y = 3;
 y=-3; // Oh no!
 ```
-As you can see, we used both kinds of integers. One is called an int, as we'd expect, but the other is called a uint. What does the u mean? You might have already guessed!
+As you can see, we used both kinds of integers. One is called an int, as we would expect, but the other is called a uint. What does the u mean? You might have already guessed!
 
-We'll talk about that in a second. And if you don't want to learn about binary now, it's enough to know that unsigned ints sacrifice the ability to store negative values for double+1 the positive number range.
+We will talk about that in a second. And if you do not want to learn about binary now, it is enough to know that unsigned ints sacrifice the ability to store negative values for double+1 the positive number range.
 
 First, let's break down our int declaration statement
 
@@ -189,16 +189,16 @@ First, let's break down our int declaration statement
 
 After the =, a value is assigned to the variable. Then, the ; is used to end our statement, making it complete and ending the line.
 
-You'll notice that only the first reference of a variable needs its type; this is because this is the declaration of the variable, whereas the second line is a reassignment of the same variable and does not need to be re-declared.
+You will notice that only the first reference of a variable needs its type; this is because this is the declaration of the variable, whereas the second line is a reassignment of the same variable and does not need to be re-declared.
 
-You can also declare what are called global variables. I'll give a full example to demonstrate this.
+You can also declare what are called global variables. I will give a full example to demonstrate this.
 ```
 int unread_emails = 20;
 void main(){
     alert("important", "You have " +unread_emails + " unread emails!");
 }
 ```
-As you can see, despite the fact that the global variable was not declared within the function (or its scope), we can still use it. This is because it's not declared in any function, and can thus be used from all functions in your program.
+As you can see, despite the fact that the global variable was not declared within the function (or its scope), we can still use it. This is because it is not declared in any function, and can thus be used from all functions in your program.
 
 This author personally does not recommend much usage of globals. A more elegant way to use variables in lots of different functions at once will be demonstrated shortly. The exception is consts, which will also be discussed later.
 
@@ -211,7 +211,7 @@ level = level + 1;
 ```
 But there is a simpler, more readable way of doing this, which saves lots of time (and cuts down on typos!). 
 
-If you want to change a variable in relation to itself like this, you use what's called compound assignment.
+If you want to change a variable in relation to itself like this, you use what is called compound assignment.
 
 This combines an operator, like an arithmetic operation or string concatenation, with the assignment operator.
 
@@ -220,9 +220,9 @@ For example, we could rewrite our previous code using compound assignment:
 int level = 2;
 level +=1;
 ```
-As you can see, it's much cleaner!
+As you can see, it is much cleaner!
 
-Here's a full example to consolidate what we've learned. You can copy and paste it into an nvgt script and run it. We'll also demonstrate includes and comments again!
+Here is a full example to consolidate what we have learned. You can copy and paste it into an nvgt script and run it. We will also demonstrate includes and comments again!
 ```
 #include "speech.nvgt"
 int g = 3; // a global variable
@@ -231,7 +231,7 @@ void main(){
     This program demonstrates integers in NVGT, by declaring one (a) and performing a variety of arithmetic operations.
     After each operation, the value of a will be spoken.
     */
-    int a = 0; // This is the variable we'll use. 
+    int a = 0; // This is the variable we will use. 
     speak("a is now " + a);
     a+=2;
     speak("After adding 2, a is now " + a);
@@ -246,9 +246,9 @@ void main(){
 ```
 
 #### bonus: binary 1100101 (or 101)
-To understand signed and unsigned integers (and to understand integers) we must first understand binary. Otherwise known as base 2, it is a system based on 0s and 1s. It's most well known for appearing on terminals in poorly written movies about hackers, but it is integral to understand it as a programmer, so let's talk about it.
+To understand signed and unsigned integers (and to understand integers) we must first understand binary. Otherwise known as base 2, it is a system based on 0s and 1s. It is most well known for appearing on terminals in poorly written movies about hackers, but it is integral to understand it as a programmer, so let's talk about it.
 
-The unsigned integer version of binary is actually easier to explain, so we'll start with that one.
+The unsigned integer version of binary is actually easier to explain, so we will start with that one.
 
 Consider a row of bits. In base 2, we can already surmise that the maximum possible value is 2^bits-1. NVGT's ints are 32-bit, although it does also support int64 and uint64 types if you want them.
 
@@ -256,15 +256,15 @@ The unsigned integer (uint) type in nvgt, thus, can store a maximum value of 4.2
 
 The first bit on the left is worth 2 raised to the n-1th power, where n is the number of bits.
 
-If the bit is set to 0, it means no value is added to the total in base 10. If it's set to 1, you add its worth.
+If the bit is set to 0, it means no value is added to the total in base 10. If it is set to 1, you add its worth.
 
-From left to right, each bit is worth half the bit before it. Let's give examples with 8 bits, since that's much easier to think about than 32 bits.
+From left to right, each bit is worth half the bit before it. Let's give examples with 8 bits, since that is much easier to think about than 32 bits.
 
 Consider this set of bits: 01100101
 
-The leftmost bit in this group would be worth 128, since that's the value of 2^(8-1).
+The leftmost bit in this group would be worth 128, since that is the value of 2^(8-1).
 
-But it's set to 0, so we don't do anything
+But it is set to 0, so we do not do anything
 
 Right another bit, and we get a bit of worth 64, set to 1. So, we add 64.
 
@@ -288,13 +288,13 @@ Float is a 32-bit (or single-precision) variable, and double is a 64-bit variant
 
 In most cases, you should be okay to use a double, but this is not always required and is often not a good choice anyway.
 
-The inner workings of floats are beyond the scope of this tutorial, but it's enough to know that computers don't think about fractional values like we do: the concept of decimal does not exist to them.
+The inner workings of floats are beyond the scope of this tutorial, but it is enough to know that computers do not think about fractional values like we do: the concept of decimal does not exist to them.
 
 Instead, they use a binary representation, called the IEEE754 standard.
 
 You cannot rely on floats storing a number perfectly. Sometimes, the IEEE754 standard has no exact representation for a number, and its closest equivalent must be used instead.
 
-To demonstrate this, run this script. The result should be 1.21, but it isn't.
+To demonstrate this, run this script. The result should be 1.21, but it is not.
 ```
 #include "speech.nvgt"
 void main(){
@@ -302,9 +302,9 @@ void main(){
     screen_reader_speak(result, false); // implicit cast from double to string
 }
 ```
-As you  can see, the value is very close, but not quite right. We even used the double type, with 64 bits of precision, but it wasn't enough.
+As you  can see, the value is very close, but not quite right. We even used the double type, with 64 bits of precision, but it was not enough.
 
-There are several ways to get around this, but we don't need to worry about them for this project, so let's learn about another very useful type of variable: strings!
+There are several ways to get around this, but we do not need to worry about them for this project, so let's learn about another very useful type of variable: strings!
 
 #### string variables
 The easiest and most reliable way to think about string variables is that they are text. "hello" is a string, "this is a test" is a string, and "1" is a string (this last one is confusing but will be explained shortly).
@@ -313,13 +313,13 @@ We have actually seen string variables before. When we were making our hello wor
 
 Now knowing about variables and their identifiers, you can probably see why we used quotes (") around them, and why that is necessary.
 
-If we hadn't, "hello, world!" would've ended up being interpreted as two function parameters, the variable identifiers hello and world, neither of which existed in the program.
+If we had not, "hello, world!" would have ended up being interpreted as two function parameters, the variable identifiers hello and world, neither of which existed in the program.
 
-NVGT would not have liked this at all; in fact, it would've thrown numerous errors our  way in response.
+NVGT would not have liked this at all; in fact, it would have thrown numerous errors our  way in response.
 
-So, quotes must enclose strings to let NVGT know that it should ignore the text inside - the computer doesn't need to know that it's text, only that it's data like text, which it can then show to the user for them to interpret.
+So, quotes must enclose strings to let NVGT know that it should ignore the text inside - the computer does not need to know that it is text, only that it is data like text, which it can then show to the user for them to interpret.
 
-It's almost, if not quite,  like delivering letters: you don't know or care about the information in a letter (and if you did, then your manager probably needs to talk to you!) but the letter's recipient does.
+It is almost, if not quite,  like delivering letters: you do not know or care about the information in a letter (and if you did, then your manager probably needs to talk to you!) but the letter's recipient does.
 
 In the same way, NVGT will happily place text in quotes in strings, which can then be passed to functions, put into variables, or concatenated onto other variables or strings.
 
@@ -368,7 +368,7 @@ c + d is 12
 
 Is that what you expected?
 
-What's happening here is called casting, specifically implicit or automatic casting. In programming, casting means converting some value of one type (int) to another type (string).
+What is happening here is called casting, specifically implicit or automatic casting. In programming, casting means converting some value of one type (int) to another type (string).
 
 When we calculate result1, we perform addition on a + b (1 + 2) and get 3, which makes sense.
 
@@ -383,7 +383,7 @@ Leading up to a powerful idea called conditionals, boolean variables are another
 
 Named in honour of the mathematician and logician George Boole, the variables can store only two possible values: true or false - or 1 or 0, on or off, yes or no.
 
-They are extremely powerful and there are quite a few things you can do with them, but most of them don't really make sense without conditionals. Still, we can give a basic example, using not (!), a logical operator:
+They are extremely powerful and there are quite a few things you can do with them, but most of them do not really make sense without conditionals. Still, we can give a basic example, using not (!), a logical operator:
 ```
 void main(){
     bool state = true;
@@ -392,9 +392,9 @@ void main(){
     speak("Flipped, state is: " + state);
 }
 ```
-This shows how to declare a bool: it's fairly similar to other variables. Unlike strings, the values true or false do not need to be put in quotes, despite the fact that they are not variables in the traditional sense. These variables are actually consts, which means you can never accidentally overwrite their values; trying will yield an error.
+This shows how to declare a bool: it is fairly similar to other variables. Unlike strings, the values true or false do not need to be put in quotes, despite the fact that they are not variables in the traditional sense. These variables are actually consts, which means you can never accidentally overwrite their values; trying will yield an error.
 
-That's all we'll learn about variables for now. We'll come back to them later on, but for our calculator project, this is all that we'll need to know.
+That is all we will learn about variables for now. We will come back to them later on, but for our calculator project, this is all that we will need to know.
 
 #### Const Keyword
 For this project, the last thing we will explore regarding variables is consts.
@@ -411,7 +411,7 @@ void main(){
 }
 ```
 
-This looks fine, but we're using this value in only one area of our code (mostly because there is only one place in which to use it, but that's beside the point).
+This looks fine, but we are using this value in only one area of our code (mostly because there is only one place in which to use it, but that is beside the point).
 
 Suppose, now, that we use the value 30 in many areas: not just telling the user how much it is to buy a chair, but also for the logic of buying and selling them itself.
 
@@ -419,7 +419,7 @@ This is also valid in that it works, but it is frowned upon.
 
 Consider this: inflation is making everything more expensive these days, so what if we need to raise this price to 35 dollars next year?
 
-The answer to that question is that it would be a coding nightmare! We would have to go through our code, painstakingly changing every reference of the value 30 to 35. But we could get it wrong: we might accidentally make one of the values 53, or change the number of centimeters in a foot from 30 to 35 in our frantic search - wouldn't it be much better if we only had to change the value once?
+The answer to that question is that it would be a coding nightmare! We would have to go through our code, painstakingly changing every reference of the value 30 to 35. But we could get it wrong: we might accidentally make one of the values 53, or change the number of centimeters in a foot from 30 to 35 in our frantic search - would it not be much better if we only had to change the value once?
 
 This is where consts will save the day!
 
@@ -441,9 +441,9 @@ Say you want to run some code, but only if a specific thing is true - the if sta
 void main(){
     int dice = random(1, 6);
     if(dice == 1)
-        speak("Wow, you got " + dice + "! That's super lucky!");
+        speak("Wow, you got " + dice + "! That is super lucky!");
     else if(dice < 4 )
-        speak("You got " + dice + " - that's still pretty lucky, but aim for a 1 next time!");
+        speak("You got " + dice + " - that is still pretty lucky, but aim for a 1 next time!");
     else
         speak("Ah, better luck next time. You got a " + dice + ".");
 }
@@ -492,7 +492,7 @@ There are also four logical operators which work on bools, one of which we explo
 
 Using these comparison operators and logical operators is how one creates conditionals to use in if statements, though remember that bools themselves can already be used directly.
 
-This is all a lot of information at once, so here's a full example to demonstrate:
+This is all a lot of information at once, so here is a full example to demonstrate:
 ```
 #include "speech.nvgt"
 void main(){
@@ -543,7 +543,7 @@ void main(){
     }
 }
 ```
-This should speak out the numbers 1 through 5, with a second's delay between each.
+This should speak out the numbers 1 through 5, with a second delay between each.
 
 Just like if statements (as well as other types of loops), a while loop can also be written with only one line of code inside. If so, it does not need to be surrounded by braces.
 
@@ -560,7 +560,7 @@ In while loops, the condition is checked before the code is run. This means that
 
 On the other hand, in do-while loops, the condition is checked after the code has run. As a result, code will always run at least one time.
 
-It's often up to the programmer which type they think is best, and there is no real standard. Whichever is more convenient and maps best to the situation can be used, and neither has a performance advantage over the other.
+It is often up to the programmer which type they think is best, and there is no real standard. Whichever is more convenient and maps best to the situation can be used, and neither has a performance advantage over the other.
 
 Let's rewrite our counter example using a do-while loop:
 ```
@@ -589,7 +589,7 @@ There are a lot of lines here which for loops can compress into just one line; t
 
 For loops also have an additional unique property, which is extremely useful, but will be discussed in a moment after some background.
 
-However, they are  admittedly difficult to grasp at first, because they're very different than both the while and do-while loops.
+However, they are  admittedly difficult to grasp at first, because they are very different than both the while and do-while loops.
 
 Consisting of four parts, a for loop might look like this:
 ```
@@ -623,7 +623,7 @@ void main(){
 This example will yield the same results as the previous one, but it does it in a way which is more concise. Pretty code is very important for your sanity!
 
 #### Break And Continue Statements
-There are times when you might want to get out of loops completely. This is called "breaking out", and it's very easy to do:
+There are times when you might want to get out of loops completely. This is called "breaking out", and it is very easy to do:
 
 ```
 break;
@@ -651,7 +651,7 @@ The return value is so named because it gives some critical piece of information
 
 Let's use baking a cake as an example: in the process of baking a cake (simplifying greatly) you put the batter in the oven. The oven cooks the cake, and then you open it up and take a cooked cake out.
 
-You can't do something else related to baking a cake while the oven is baking, because you don't have the cake: the oven does. In the same vein, only one function can be running at once, and we say that function is currently executing.
+You cannot do something else related to baking a cake while the oven is baking, because you do not have the cake: the oven does. In the same vein, only one function can be running at once, and we say that function is currently executing.
 
 When a function ends, execution returns to the function from which it was called, just like taking the cake back out of the oven. It returns, along with execution, whatever is specified using a return statement (discussed shortly).
 
@@ -661,7 +661,7 @@ int add(int a, int b){
     return a + b;
 }
 ```
-Frankly, this code is a needless abstraction over an already-simple task (the addition operator) and you should almost never do it like this in production. Nonetheless, it's a good example of what a function can do. It takes data in, and then outputs some other data.
+Frankly, this code is a needless abstraction over an already-simple task (the addition operator) and you should almost never do it like this in production. Nonetheless, it is a good example of what a function can do. It takes data in, and then outputs some other data.
 
 The way we declare functions is a little bit strange, and this example is packed with new ideas, so let's break it down piece by piece:
 
@@ -693,11 +693,11 @@ This is the only line in our function, and returns an expression evaluating to a
 
 }
 
-The end of our function, which lets the compiler know that we're back in the outer scope (probably global)
+The end of our function, which lets the compiler know that we are back in the outer scope (probably global)
 
 #### Bonus: Some notes About References (Advanced)
 
-If you are new, you can skip this brief section for now, as it's discussed in another article in great depth for easier understanding.
+If you are new, you can skip this brief section for now, as it is discussed in another article in great depth for easier understanding.
 
 There are a couple of  common misconceptions and mistakes made by even experienced coders when it comes to function parameters.
 
@@ -710,7 +710,7 @@ If you have programmed prior to reading this manual, you may have seen them befo
 
 Via this powerful data structure, we can store lots of the same type of variable in one neat package.
 
-In NVGT, arrays are dynamic. This means that you can add and remove from them at any time you'd like, as opposed to arrays in c or rust, which are trickier to expand or remove from.
+In NVGT, arrays are dynamic. This means that you can add and remove from them at any time you would like, as opposed to arrays in c or rust, which are trickier to expand or remove from.
 
 Before we move on, here is a quick example:
 ```

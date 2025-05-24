@@ -18,7 +18,7 @@ void main() {
 	sound s;
 	s.load("c:/windows/media/ding.wav");
 	s.play_looped();
-	while (!call.try_wait(40)) { // We'll use the blocking provided by try_wait for our timer.
+	while (!call.try_wait(40)) { // We will use the blocking provided by try_wait for our timer.
 		s.pan += random(-3, 3);
 	}
 }

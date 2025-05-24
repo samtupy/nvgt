@@ -14,24 +14,24 @@ While NVGT does not support parallelism as one might use it in other programming
 
 By far, the easiest way to program is by sticking to synchronous execution, which is what happens by default unless any concurrency is specifically introduced by the programmer. Synchronous execution means that each statement in your code runs to completion before the next is executed. However as your game grows, you may find that it begins to execute slowly, which may temmpt you to quickly implement concurrency into your application.
 
-This however poses a significant issue because NVGT supports three types of concurrency, and not knowing what method to use or when to use it can often result in slower or more buggy code than if either a different method of concurrency had been used, or if concurrency had not been used at all. People most often jump strait to threads to solve a problem of performance, when, 99 percent of the time, the performance degradation comes from an easily solvable issue in the person's code and not NVGT or a true need for threads or the lowest levels of concurrency. It can be not only bad practice but also detrimental to your program's development to use more advanced concurrency methods when a simple loop would have sufficed, but knowing when and how to spin up a thread when synchronous execution just won't cut it can also save the day in such cases. As such, this article attempts to explain:
+This however poses a significant issue because NVGT supports three types of concurrency, and not knowing what method to use or when to use it can often result in slower or more buggy code than if either a different method of concurrency had been used, or if concurrency had not been used at all. People most often jump strait to threads to solve a problem of performance, when, 99 percent of the time, the performance degradation comes from an easily solvable issue in the person's code and not NVGT or a true need for threads or the lowest levels of concurrency. It can be not only bad practice but also detrimental to your program's development to use more advanced concurrency methods when a simple loop would have sufficed, but knowing when and how to spin up a thread when synchronous execution just will not cut it can also save the day in such cases. As such, this article attempts to explain:
 
 * What exactly concurrency is;
 * How to use concurrency correctly; and
 * The golden rules of concurrency.
 
-The above explainers are important because concurrency is easy to use improperly. Users of it who don't understand it are bound to make critical mistakes that can cause any number of things, such as:
+The above explainers are important because concurrency is easy to use improperly. Users of it who do not understand it are bound to make critical mistakes that can cause any number of things, such as:
 
 * Sequential execution, i.e., absolutely no actual gain and a waste of resources
 * Data races
 * Deadlocks
 * And worse
 
-They'll also notice their code suffering very strange bugs or exhibiting very odd behaviors, all of which is very, very difficult to debug, let alone track down in the first place, especially on larger projects, and it's best that you be aware of these issues before ever considering threads.
+They will also notice their code suffering very strange bugs or exhibiting very odd behaviors, all of which is very, very difficult to debug, let alone track down in the first place, especially on larger projects, and it is best that you be aware of these issues before ever considering threads.
 
 ## Three types of concurrency?
 
-There are three types of concurrency that NVGT supports: async, coroutines, and threads. We'll discuss all of them in this article.
+There are three types of concurrency that NVGT supports: async, coroutines, and threads. We will discuss all of them in this article.
 
 ### Note
 
@@ -39,7 +39,7 @@ Any plugins you load may add even more methods of concurrency or even parallelis
 
 ## Async
 
-Async is the first type of concurrency, and one of the easiest to use. It's also one of the simplest to understand. Although async (may) use a thread (or even multiple) under the hood, it is entirely possible that it may not, and you, as the programmer, needn't care how it works as long as your able to do what needs to be done. In the majority of cases, this is probably the furthest you will ever need concurrency in your game.
+Async is the first type of concurrency, and one of the easiest to use. It is also one of the simplest to understand. Although async (may) use a thread (or even multiple) under the hood, it is entirely possible that it may not, and you, as the programmer, need not care how it works as long as your able to do what needs to be done. In the majority of cases, this is probably the furthest you will ever need concurrency in your game.
 
 Unlike the other two forms of concurrency, the engine insulates you (mostly) from the problems and mistakes of concurrency that you may make. This is particularly true for functions like `url_get` and `url_post` where the engine can complete the request while you do other things, or in any case that involves writing an asyncronous function that does not share any state with the rest of your program. Take, for example, this code:
 
@@ -47,9 +47,9 @@ Unlike the other two forms of concurrency, the engine insulates you (mostly) fro
 async<string> result(url_get, "https://nvgt.gg");
 ```
 
-This class is known as a templated class. Though it is beyond the scope of this article, the `string` part is the most important, besides the arguments of the constructor, which specify both the function to be executed and it's arguments. When you create (or instantiate) a class that's templated, NVGT generates the code for that specific class automatically for you, using the types you specify in the angle brackets. This is done on the fly and doesn't harm performance in any manner.
+This class is known as a templated class. Though it is beyond the scope of this article, the `string` part is the most important, besides the arguments of the constructor, which specify both the function to be executed and its arguments. When you create (or instantiate) a class that is templated, NVGT generates the code for that specific class automatically for you, using the types you specify in the angle brackets. This is done on the fly and does not harm performance in any manner.
 
-You may not realize it, but this constructor can take up to 16 parameters. (Woohoo, that's a lot!) When the constructor completes, `result` has some things of interest:
+You may not realize it, but this constructor can take up to 16 parameters. (Woohoo, that is a lot!) When the constructor completes, `result` has some things of interest:
 
 * The `value` property, which is (in this case) of type `string`, and contains the return result of the function invoked. If you change `string` above to, say, `int`, then this will be of type `int`, not `string`.
 * A `complete` and `failed` property, which tells you if the task has finished executing, or failed in some manner, respectively.
@@ -57,28 +57,28 @@ You may not realize it, but this constructor can take up to 16 parameters. (Wooh
 * A `wait()` method which pauses, or blocks, your code from continuing until the function completes or fails.
 * a `try_wait` function, returning type `bool`, which takes a timeout and will block until either the timeout( also known as the deadline) expires or the task completes.
 
-As stated previously, this is, for the majority of cases, the only thing you will need to reach for in your toolbox, and it's the highest level of concurrency available. The next two are much lower level, and give you more control, at the cost of raising the steaks by quite a bit. Even then, we strongly recommend reading the sections below about what can go wrong when 2 bits of code running at the same time try accessing the same global variable or bit of memory if you intend to write your own functions that are to be called with this async construct.
+As stated previously, this is, for the majority of cases, the only thing you will need to reach for in your toolbox, and it is the highest level of concurrency available. The next two are much lower level, and give you more control, at the cost of raising the steaks by quite a bit. Even then, we strongly recommend reading the sections below about what can go wrong when 2 bits of code running at the same time try accessing the same global variable or bit of memory if you intend to write your own functions that are to be called with this async construct.
 
 ## Coroutines
 
 A coroutine is a function that suspends itself at certain points. This suspension is called yielding, and using coroutines is known as cooperative multitasking.
 
-In computer architecture and operating systems, there are generally two types of multitasking approaches. Multitasking, for those who are unsure of the definition (and no, we don't mean multitasking in normal human language), is the concurrent execution or handling of multiple computational processes by a CPU or other processing units within a computer system, such that multiple tasks are performed during overlapping time periods. The key definition is "overlapping time periods." The two types that are generally accepted are known as cooperative multitasking and preemptive multitasking.
+In computer architecture and operating systems, there are generally two types of multitasking approaches. Multitasking, for those who are unsure of the definition (and no, we do not mean multitasking in normal human language), is the concurrent execution or handling of multiple computational processes by a CPU or other processing units within a computer system, such that multiple tasks are performed during overlapping time periods. The key definition is "overlapping time periods." The two types that are generally accepted are known as cooperative multitasking and preemptive multitasking.
 
 Cooperative multitasking is the first type and works by requiring that a task executes until it reaches a point where it can allow another task to run; this is known as a yield point. When the task reaches this point, it makes a call to a function provided by the operating system, runtime environment, or whatever is running each task, telling it that it is ready to step aside and allow something else to run. In NVGT, this is done through the `yield()` function. Cooperative multitasking relies on each task being well-behaved and voluntarily yielding control, ensuring that all tasks get a chance to execute. This approach is simpler and can be more efficient in environments where tasks can be trusted to yield regularly. However, if a task fails to yield, it can cause the entire system to become unresponsive.
 
-Preemptive multitasking, on the other hand, is used in all well-known operating systems. Preemptive multitasking works by allocating a task a certain amount of time to run, known as a time slice, and allowing it to run until that time slice ends. When the time slice has elapsed, the operating system forcefully suspends (or "preempts") the execution of the task and replaces it with another task, and the cycle repeats forever. Usually, time slices are very short (perhaps only a few microseconds) and so this gives the illusion that the computer is able to do many things simultaneously. In multicore and multiprocessor systems, this is actually true: the computer can and does do many things all at the same time since the multitasking can occur on all the processors at the same time. However, all that's really happening is that the system is constantly performing this song and dance on all the processors in your computer, all at the same time!
+Preemptive multitasking, on the other hand, is used in all well-known operating systems. Preemptive multitasking works by allocating a task a certain amount of time to run, known as a time slice, and allowing it to run until that time slice ends. When the time slice has elapsed, the operating system forcefully suspends (or "preempts") the execution of the task and replaces it with another task, and the cycle repeats forever. Usually, time slices are very short (perhaps only a few microseconds) and so this gives the illusion that the computer is able to do many things simultaneously. In multicore and multiprocessor systems, this is actually true: the computer can and does do many things all at the same time since the multitasking can occur on all the processors at the same time. However, all that is really happening is that the system is constantly performing this song and dance on all the processors in your computer, all at the same time!
 
-You may have noticed that we used the word "task" instead of "process" or "thread." This is because, in a computer, there are a few different types of "tasks," and they're all the same to the computer:
+You may have noticed that we used the word "task" instead of "process" or "thread." This is because, in a computer, there are a few different types of "tasks," and they are all the same to the computer:
 
 * Process: A fully loaded program that runs. It has code, data, assets, etc.
 * Thread: A task within a process. It shares the code and data of its parent program and is able to access all the state within. More on this later.
 
-So, how does this have anything to do with coroutines? Well, when you create a coroutine, you are engaging in cooperative multitasking. The coroutine will begin execution as soon as you call `create_coroutine` and will pause the execution of all your other code until you call `yield()`. So, you must remember to yield at some point! The best places to do this are in loops or when your function is about to do something that could take a while, for example, some network-based IO. If you don't, none of your other code can run!
+So, how does this have anything to do with coroutines? Well, when you create a coroutine, you are engaging in cooperative multitasking. The coroutine will begin execution as soon as you call `create_coroutine` and will pause the execution of all your other code until you call `yield()`. So, you must remember to yield at some point! The best places to do this are in loops or when your function is about to do something that could take a while, for example, some network-based IO. If you do not, none of your other code can run!
 
 However, the same applies to the rest of your code: it, too, must yield; otherwise, your coroutine will never be able to proceed!
 
-Unlike threading, which involves preemptive multitasking, it is (theoretically) impossible for a coroutine that executes in this manner to cause data races or other concurrency problems. This is because only one flow of execution is allowed at any given moment. You can definitely make it appear that multiple things are happening at once if you yield enough, but you'll never be able to duplicate the kind of problems that threading has, so you usually don't need to worry about those. This does not, however, mean that coroutines are the go-to option for all scenarios.
+Unlike threading, which involves preemptive multitasking, it is (theoretically) impossible for a coroutine that executes in this manner to cause data races or other concurrency problems. This is because only one flow of execution is allowed at any given moment. You can definitely make it appear that multiple things are happening at once if you yield enough, but you will never be able to duplicate the kind of problems that threading has, so you usually do not need to worry about those. This does not, however, mean that coroutines are the go-to option for all scenarios.
 
 Coroutines are particularly useful for scenarios where tasks need to perform lengthy operations without blocking the entire program. For instance, they are excellent for handling asynchronous I/O operations, long-running computations that need to provide intermediate results, and any situation where tasks need to cooperate smoothly without complex synchronization mechanisms.
 
@@ -160,17 +160,17 @@ Before you consider using threads, understand that they are the most complex and
 
 ### Note
 
-This section is extremely technical in places. This is because multi-threading can be difficult. Even after doing it for a few years you will begin to learn that there are subtle mistakes you can make without realizing it. After we get through the different methods of protecting your code, we'll get into how to use threads and the rules on using them properly. If you want to know how to use any of the synchronization primitives discussed here, the documentation is your friend, as well as the NVGT community.
+This section is extremely technical in places. This is because multi-threading can be difficult. Even after doing it for a few years you will begin to learn that there are subtle mistakes you can make without realizing it. After we get through the different methods of protecting your code, we will get into how to use threads and the rules on using them properly. If you want to know how to use any of the synchronization primitives discussed here, the documentation is your friend, as well as the NVGT community.
 
 ### Introduction
 
-A thread is much different than a coroutine. A thread runs alongside your code, and could even run on other processors in the system. A thread introduces many other problems that coroutines don't: they share state with the rest of your game, meaning they have access to all the global variables the rest of your code does.
+A thread is much different than a coroutine. A thread runs alongside your code, and could even run on other processors in the system. A thread introduces many other problems that coroutines do not: they share state with the rest of your game, meaning they have access to all the global variables the rest of your code does.
 
 One of the most critical rules of threads is to avoid global or shared state. Global or shared state means any global variables that you have in your code, as well as any state that your thread may access that other threads (also) might access.
 
-If two or more threads access shared state without any kind of protection, this is known as a data race. A data race occurs when two threads want to perform different operations on a variable, and it just so happens that they do it the same time, or close enough that it doesn't matter. For example, if thread 1 wants to read a sound handle and another thread wants to initialize it, it may just so happen that both operations overlap, causing the handle that thread 1 gets to be in some weird undefined state. Data races can have all kinds of dangerous consequences that could make your program crash, cause unpredictable behavior, and so on. It's even known to cause a write to a variable to mysteriously vanish!
+If two or more threads access shared state without any kind of protection, this is known as a data race. A data race occurs when two threads want to perform different operations on a variable, and it just so happens that they do it the same time, or close enough that it does not matter. For example, if thread 1 wants to read a sound handle and another thread wants to initialize it, it may just so happen that both operations overlap, causing the handle that thread 1 gets to be in some weird undefined state. Data races can have all kinds of dangerous consequences that could make your program crash, cause unpredictable behavior, and so on. It is even known to cause a write to a variable to mysteriously vanish!
 
-Data races are also one of the hardest things for a programmer to debug. This is because it can't be predicted when they'll even occur. One run of your code might be fine, but the next run might cause the race, or it might only occur every 200 runs of your code. This is why protection is so important.
+Data races are also one of the hardest things for a programmer to debug. This is because it cannot be predicted when they will even occur. One run of your code might be fine, but the next run might cause the race, or it might only occur every 200 runs of your code. This is why protection is so important.
 
 ### Protecting against data races
 
@@ -179,7 +179,7 @@ There are several ways of protecting your code against data races if you do shar
 * Locks or semaphores
 * Atomic variables
 * Events/condition variables
-* Just don't share any state
+* Just do not share any state
 * Message passing (which will be explained here after it is added to NVGT)
 
 #### Locks and semaphores
@@ -230,7 +230,7 @@ However, with an atomic variable, the increment operation is indivisible. This m
 
 Modern processors support atomic operations through special hardware instructions that ensure these operations are performed without interruption. These instructions include atomic read-modify-write operations, such as compare-and-swap (CAS) and fetch-and-add, which are used to implement atomic variables.
 
-For example, consider the compare-and-swap (CAS) operation. It works by checking if the value of the variable is equal to an expected value. If it is, the value is replaced with a new value. If it isn't, the operation fails. This all happens in one atomic step, ensuring that no other thread can interfere between the check and the update.
+For example, consider the compare-and-swap (CAS) operation. It works by checking if the value of the variable is equal to an expected value. If it is, the value is replaced with a new value. If it is not, the operation fails. This all happens in one atomic step, ensuring that no other thread can interfere between the check and the update.
 
 #### Events/condition variables
 
@@ -254,7 +254,7 @@ Condition variables are more suitable for scenarios requiring complex synchroniz
 
 #### Not sharing any state
 
-If all of the above has left you utterly confused and wondering what you've just read, that's okay; you have lots of other options. The simplest would be to just ignore this section entirely and to just not use threads at all. If you really, really, really do need threads, though, the best method would be to figure out how you don't need to share state. This might be quite difficult in some cases, but the less state you share, the less likely it is you'll need to worry about any of this stuff. If you do need to share state, all of the above is important to understand to do things properly.
+If all of the above has left you utterly confused and wondering what you have just read, that is okay; you have lots of other options. The simplest would be to just ignore this section entirely and to just not use threads at all. If you really, really, really do need threads, though, the best method would be to figure out how you do not need to share state. This might be quite difficult in some cases, but the less state you share, the less likely it is you will need to worry about any of this stuff. If you do need to share state, all of the above is important to understand to do things properly.
 
 ### Creating and managing threads
 
@@ -277,22 +277,22 @@ Do not change the priority of a thread unless you absolutely have to. Messing ar
 When using threads, always remember:
 
 * Only use threads when you need to. Do not just use them because you feel they would make your code faster. More often than not, this will just cause your code to run slower.
-* When using locks, hold the lock for the shortest time possible. The area in which a lock is acquired is known as a critical section, and you should do only what you neeed to do in these and then immediately release the lock. If you don't do this, you could cause resource leaks, sequential execution, deadlocks and all kinds of other problems.
+* When using locks, hold the lock for the shortest time possible. The area in which a lock is acquired is known as a critical section, and you should do only what you neeed to do in these and then immediately release the lock. If you do not do this, you could cause resource leaks, sequential execution, deadlocks and all kinds of other problems.
 * Do not acquire a lock at the start of a function. This may seem tempting, but it is wrong, and will cause your code to be far slower, if not eliminate the benefit of using threads entirely.
 * Avoid recursive mutexes unless you know what you are doing.
 * When acquiring a lock, there are two ways of doing so: `lock` and `try_lock`. If your able to, use `try_lock` which will return false if the lock cannot be acquired. If this does return false, go do something else and try acquiring the lock later.
 * If your code consists of many threads that mostly perform reads of shared state and only a few cases where shared state is modified, use a reader-writer lock and not a mutually exclusive one.
 * Do not mess with thread priorities.
-* The less shared state your threads have to manage, the fewer synchronization issues you'll encounter. Where possible, avoid global variables or shared objects.
+* The less shared state your threads have to manage, the fewer synchronization issues you will encounter. Where possible, avoid global variables or shared objects.
 * For simple counters or flags, use atomic operations instead of locks to avoid the overhead and complexity of mutexes.
 * Do not use busy-waiting (spinning) to wait for a lock or condition. This wastes CPU resources and can lead to performance issues. If you need to wait for a lock to be available for acquisition, call `lock` on it and allow the underlying operating system to do the waiting for you.
 * Creating and destroying threads can be expensive. Reuse threads with thread pools or similar techniques to manage resources efficiently.
 * Where possible, use higher-level concurrency constructs like `async<T>`. These abstractions often handle the complex details of synchronization for you.
-* When using condition variables, always protect the condition check with a lock and use a loop to recheck the condition after waking up, as spurious wakeups can occur. That is, it is possible for your thread to be awoken when the condition variable hasn't actually been signaled.
+* When using condition variables, always protect the condition check with a lock and use a loop to recheck the condition after waking up, as spurious wakeups can occur. That is, it is possible for your thread to be awoken when the condition variable has not actually been signaled.
 * While using timeouts can prevent deadlocks, ensure that your program can handle the scenario where a timeout occurs gracefully.
 * Clearly document the synchronization strategy in your code, including which locks protect which data. This helps maintainers understand the concurrency model and avoid introducing bugs.
 * Concurrency bugs can be rare and hard to reproduce. Test your application under load to increase the chances of exposing synchronization issues early in development.
 
 ## Conclusion
 
-This article provided a deep dive into the various concurrency mechanisms provided by NVGT. Though parts may have been terse, we still hope it helped. If you have any questions, don't hesitate to ask!
+This article provided a deep dive into the various concurrency mechanisms provided by NVGT. Though parts may have been terse, we still hope it helped. If you have any questions, do not hesitate to ask!

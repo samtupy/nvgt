@@ -14,7 +14,7 @@ Particularly when considering reader and writer streams that manipulate data, yo
 
 There are a few readers and writers that, instead of manipulating data in any way as they pass through, give you details about that data. You can see counting_reader and counting_writer as examples of this, these streams count the number of lines and characters that are read or written through them.
 
-Lets put this together with a little demonstration. Say you have a compressed and hex encoded file with many lines in it, and you'd like to read the file while determining the line count as the file is read. You could execute the following, for example:
+Lets put this together with a little demonstration. Say you have a compressed and hex encoded file with many lines in it, and you would like to read the file while determining the line count as the file is read. You could execute the following, for example:
 ```
 counting_reader f(inflating_reader(hex_decoder(file("test.txt", "rb"))));
 string result;
