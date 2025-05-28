@@ -282,6 +282,29 @@ string string_decrypt(const string& in the_string, const string& in encryption_k
 	return (string_aes_decrypt(the_string, encryption_key));
 }
 
+// file_encrypt/decrypt
+bool file_encrypt(const string&in input_file, const string&in output_file, string key) {
+	file input;
+	if (!input.open(input_file, "rb")) return false;
+	file output;
+	if (!output.open(output_file, "wb")) return false;
+	asset_encryptor encryptor(output, key);
+	encryptor.write(input.read());
+	input.close();
+	encryptor.close();
+	return true;
+}
+bool file_decrypt(const string&in input_file, const string&in output_file, string key) {
+	file input;
+	if (!input.open(input_file, "rb")) return false;
+	file output;
+	if (!output.open(output_file, "wb")) return false;
+	output.write(asset_decryptor(input, key).read());
+	input.close();
+	output.close();
+	return true;
+}
+
 //clipboard functions
 bool clipboard_copy_text(const string& in text) {
 	return (clipboard_set_text(text));
