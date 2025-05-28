@@ -1,0 +1,14 @@
+/**
+	Read raw bytes from a stream into a 64-bit unsigned integer.
+	uint64 read_uint64();
+	## Arguments:
+		None.
+	## Returns:
+		uint64: The data that was read from the stream or 0 on failure.
+*/
+
+// Example:
+void main() {
+	datastream ds("Hello there, I am a string wrapped in a sstream!");
+	alert("example", ds.read_uint64()); // Will display the first eight bytes of the string as an unsigned integer.
+}

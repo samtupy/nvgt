@@ -1,0 +1,14 @@
+/**
+	Write the value of a 64-bit unsigned integer into a stream.
+	uint write_uint64(uint64 content);
+	## Arguments:
+		None.
+	## Returns:
+		uint64: The data that was read from the stream or 0 on failure.
+*/
+
+// Example:
+void main() {
+	datastream ds;
+	ds.write_uint64(50);
+}

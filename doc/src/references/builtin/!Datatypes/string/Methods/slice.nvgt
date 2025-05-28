@@ -6,6 +6,13 @@
 		* int end = 0: The index where the substring ends (exclusive).
 	## Returns:
 		string: A new string with the characters modified.
+	## Remarks
+		This can be a tripping point due to two factors: Strings are zero-based indexing, and slicing is end-exclusive. Therefore, to retrieve characters 4 to 6, your parameters would be 3, 6.
+		Negative indexes count backwards from the end of a string. Thus, "hello".slice(-4, 4) is the same as "hello".slice(1, 4): Both would return "ell".
+		If start is greater than the string's length, or negative beyond the start of the string, the result is an empty string.
+		If end is 0 or otherwise beyond the string's bounds, it is treated as string.length().
+		Any situation where start >= end after resolving indexes returns an empty string. An example of this would be "hello".slice(-3, 1), which would be equivalent to "hello".slice(2, 1).
+		This method is useful for extracting a string between two points (for instance when parsing HTML or XML, as in slice(tag_start, tag_end)). For length-based extraction, prefer substr.
 */
 
 // Example:

@@ -1,0 +1,14 @@
+/**
+	Overloads the + operator, allowing you to add a vector to another.
+	vector& opAdd(const vector &in other);
+	## Arguments:
+		* const vector&in other: the vector to add.
+*/
+
+// Example:
+void main() {
+	vector v1(2, 3, 5);
+	vector v2(5, 4, 2);
+	vector v3 = v1 + v2;
+	alert("The third vector =", "(" + v3.x + ", " + v3.y + ", " + v3.z + ")");
+}
