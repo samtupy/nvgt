@@ -621,6 +621,7 @@ public:
 	void run() {
 		bool authorize = false;
 		int tries = _max_retries;
+		string download_buffer(1024 * 32, '\0'); // Should the user be able to configure this, larger buffer = faster download?
 		while (tries && !tryWait(_retry_delay)) {
 			tries--;
 			try {
@@ -659,12 +660,11 @@ public:
 					continue;
 				}
 				unlock();
-				string buffer(512, '\0');
 				while (istr.good() && !tryWait(0)) {
-					istr.read(buffer.data(), 512);
+					istr.read(download_buffer.data(), download_buffer.size());
 					streamsize count = istr.gcount();
 					ScopedLock lock(*this);
-					_response_body.append(buffer.begin(), buffer.begin() + count);
+					_response_body.append(download_buffer.begin(), download_buffer.begin() + count); // Todo: avoid extra copy, and in get_response_body, return a blank string if mutex is locked.
 					_bytes_downloaded += count;
 				}
 				break;
