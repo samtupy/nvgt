@@ -6,11 +6,14 @@
 		* const T&in element: the element to be inserted.
 	## Remarks
 		This method will add the specified element to the end of the array.
+		The differents between the `insert_last` and `extend` method is that the extend method is used to insert another array element.
 */
 
 // Example
 void main() {
 	string[] names = {"HTML", "CSS"};
 	names.insert_last("Java Script");
+	string[] names2 = {"C", "C++", "C#"};
+	names.extend(names2);
 	alert("Languages", join(names, ", "));
 }

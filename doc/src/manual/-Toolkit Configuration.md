@@ -1,10 +1,10 @@
 # Toolkit Configuration
-One highly useful aspect of NVGT is it's ever growing list of ways that an end user can configure the engine. Whether trying to add an extra include directory, tweak an Angelscript configuration property, choose how warnings and errors are printed, deciding whether to print output on successful compilation or any number of other changes, NVGT provides various options and directives that should help you to get it functioning much closer to the way you desire.
+One highly useful aspect of NVGT is its ever growing list of ways that an end user can configure the engine. Whether trying to add an extra include directory, tweak an Angelscript configuration property, choose how warnings and errors are printed, deciding whether to print output on successful compilation or any number of other changes, NVGT provides various options and directives that should help you to get it functioning much closer to the way you desire.
 
 From `#pragma` directives to command line argument syntax to configuration files, this document attempts to keep track of all such available configuration options NVGT has to offer.
 
 ## Command line arguments
-NVGT's compiler program has a variety of command line arguments you can pass to it which can alter it's behavior. Some of these options can also be set in configuration files, however an explicit command line option is very likely to override any contradictory options that are in a configuration file.
+NVGT's compiler program has a variety of command line arguments you can pass to it which can alter its behavior. Some of these options can also be set in configuration files, however an explicit command line option is very likely to override any contradictory options that are in a configuration file.
 
 Generally, these command line options are self-documenting. If you open a command prompt or terminal and just run the nvgt application directly with no arguments, you will be informed that you should either provide an input file or run `nvgt --help` for usage instructions. You can also actually just run nvgt -h
 
@@ -12,7 +12,7 @@ In almost all cases, command line arguments have 2 methods of invocation, both a
 
 The short form of an argument always begins with a single hyphen character (-) followed by one or 2 letters. For example, `-C` would tell NVGT to compile your script with debug information. Some arguments take values, in which case the value shall follow directly after the argument when using short form invocations. For example you could set the platform to compile with using the `-pwindows` argument.
 
-On the other hand, the long form of an argument begins with two hyphens followed by what usually amounts to a few words separated by hyphens. Usually it's just one or 2 words, but could be more in rare cases. For example, `--compile-debug` would tell NVGT to compile the given script with debug information. If an option takes an argument, you use an equals (=) character to define such a value. For example `--platform=windows` would tell NVGT to compile a script for the windows platform.
+On the other hand, the long form of an argument begins with two hyphens followed by what usually amounts to a few words separated by hyphens. Usually it is just one or 2 words, but could be more in rare cases. For example, `--compile-debug` would tell NVGT to compile the given script with debug information. If an option takes an argument, you use an equals (=) character to define such a value. For example `--platform=windows` would tell NVGT to compile a script for the windows platform.
 
 Finally, a special argument, two hyphens without any following text, indicates that any further arguments should be passed onto the nvgt script that is about to run.
 
@@ -33,7 +33,7 @@ The following is a list of all available command line arguments, though note tha
 ## Configuration files
 Both because command line arguments can become exhausting to type for every script execution for a while and because NVGT contains far too many configuration options to make command line arguments out of, NVGT also supports configuration files which can be used either on a global or a project level to further direct NVGT.
 
-Configuration files can either be in ini, json or properties formats and are loaded from multiple locations. Values in these configuration files are usually separated into sections in some form, for example settings controlling the user interface typically go in the application subsection while directives that provide control over Angelscript's engine properties are in a subsection called scripting. The way these directives in various subsections are defined depends on the configuration format you choose, however you can use any combination of configuration formats at once to suit your needs. Though all supported configuration formats are more or less standard, you can find examples of and notes on each format below.
+Configuration files can either be in ini, json or properties formats and are loaded from multiple locations. Values in these configuration files are usually separated into sections in some form, for example settings controlling the user interface typically go in the application subsection while directives that provide control over AngelScript's engine properties are in a subsection called scripting. The way these directives in various subsections are defined depends on the configuration format you choose, however you can use any combination of configuration formats at once to suit your needs. Though all supported configuration formats are more or less standard, you can find examples of and notes on each format below.
 
 Configuration files at any given location have a priority attached to them to resolve directive conflicts. For example if a global configuration file and a project configuration file both contain the same option, the project file takes priority.
 
@@ -64,7 +64,7 @@ This format receives the most points for standardization. Included directly with
 
 Furthermore if NVGT ever includes an interface to set some of these options in a manner where they save, .json files would be the format written out by the engine.
 
-The disadvantage to JSON though is that even though it is the most modern and widely recognised of nvgt's options, it's relatively the least human friendly of the formats. For example if a configuration option takes a path on the filesystem and one wants to manually set this option in NVGT, they would need to escape either the slash or backslash characters in the path if they go with the JSON option. Furthermore NVGT contains many boolean options that are just enabled by being present, where an option key has no needed value. While JSON of course supports setting a value to an empty string, it is certainly extra characters to type in order to just quickly tweak an NVGT option.
+The disadvantage to JSON though is that even though it is the most modern and widely recognised of nvgt's options, it is relatively the least human friendly of the formats. For example if a configuration option takes a path on the filesystem and one wants to manually set this option in NVGT, they would need to escape either the slash or backslash characters in the path if they go with the JSON option. Furthermore NVGT contains many boolean options that are just enabled by being present, where an option key has no needed value. While JSON of course supports setting a value to an empty string, it is certainly extra characters to type in order to just quickly tweak an NVGT option.
 
 #### ini
 ```
@@ -77,7 +77,7 @@ quiet
 ```
 NVGT can also load configuration data from good old ini formatted text files.
 
-This format is probably the least standardized of the ones NVGT supports, likely due to it's origin from closed source windows. While on the surface it is a very simple format, there are a few deviations that exist in various parsers as the syntax is not as set in stone as other formats. For example whether subsections can be nested, whether strings should be quoted, whether escaping characters is supported or whether a value is required with a key name are all up to an individual ini parser rather than a mandated standard. In this case, the ini parser that handles these configuration files does not require that a value be provided with a key name for simple boolean options, escaping characters is not supported and strings do not need to be quoted.
+This format is probably the least standardized of the ones NVGT supports, likely due to its origin from closed source windows. While on the surface it is a very simple format, there are a few deviations that exist in various parsers as the syntax is not as set in stone as other formats. For example whether subsections can be nested, whether strings should be quoted, whether escaping characters is supported or whether a value is required with a key name are all up to an individual ini parser rather than a mandated standard. In this case, the ini parser that handles these configuration files does not require that a value be provided with a key name for simple boolean options, escaping characters is not supported and strings do not need to be quoted.
 
 The biggest advantage to this format as it pertains to NVGT is the simplicity of setting several options in the same section without constantly redeclaring the sections name. One can just declare that they are setting options in the scripting section and can then begin setting various engine properties without typing the name "scripting" over and over again for each option.
 
@@ -91,7 +91,7 @@ scripting.allow_multiline_strings
 ```
 Finally, NVGT is able to load configuration options from java style .properties files.
 
-The biggest advantage to this format is it's easy simplicity. The format just consists of a linear list of key=value pairs, though the =value is not required for simple boolean options that just need to be present to exist. Unlike ini, it also supports character escaping, causing \n to turn into a line feed character.
+The biggest advantage to this format is its easy simplicity. The format just consists of a linear list of key=value pairs, though the =value is not required for simple boolean options that just need to be present to exist. Unlike ini, it also supports character escaping, causing \n to turn into a line feed character.
 
 The only real disadvantage to this format over ini is the need to keep constantly redeclaring the parent section names whenever defining keys, for example you need to type scripting.this, scripting.that where as with ini and JSON you can specify that you are working within a section called scripting before adding keys called this and that.
 
@@ -101,7 +101,7 @@ Many options listed here do not require a value, simply defining them is enough 
 The available options have been split into sections for easier browsing. While the method for defining options changes somewhat based on configuration format, a line in a .properties file that contains one of these options might look like application.quiet or scripting.allow_multiline_strings, for example.
 
 #### application
-This section contains options that typically control some aspect of the user interface, as well as a few other miscellaneous options that don't really fit anywhere else.
+This section contains options that typically control some aspect of the user interface, as well as a few other miscellaneous options that do not really fit anywhere else.
 
 * as_debug: enables the angelscript debugger (same as -d argument)
 * compilation_message_template = string: allows the user to change the formatting of errors and warnings (see remarks at the bottom of this article)
@@ -110,7 +110,7 @@ This section contains options that typically control some aspect of the user int
 * QUIET: attempts to print as little to stdout and stderr as possible (though this option is still a work in progress)
 
 #### build
-This section contains options that are directly related to the compiling/bundling of an NVGT game into it's final package. It contains everything from options that help NVGT find extra build tools for certain platforms to those that define the name and version of your product.
+This section contains options that are directly related to the compiling/bundling of an NVGT game into its final package. It contains everything from options that help NVGT find extra build tools for certain platforms to those that define the name and version of your product.
 
 * android_home string defaults to %ANDROID_HOME%: path to the root directory of the Android sdk
 * android_install = integer default 1: should Android apks be installed onto connected devices if signing was successful, 0 no, 1 ask, 2 always
@@ -136,7 +136,7 @@ This section contains options that are directly related to the compiling/bundlin
 * product_version_code = integer default (UnixEpoch / 60): an increasing 32 bit integer that programatically denotes the version of your application (default is usually ok)
 * product_version_semantic = string default 1.0.0: a numeric version string in the form major.minor.patch used by some platforms
 * shared_library_excludes = string default "plist TrueAudioNext GPUUtilities systemd_notify sqlite git2 curl": Partial names of shared libraries that should not be copied from NVGT's source lib directory into the bundled product.
-* shared_library_recopy: If this is set, any shared libraries will be copied from scratch instead of only if they're newer than already copied.
+* shared_library_recopy: If this is set, any shared libraries will be copied from scratch instead of only if they are newer than already copied.
 * windows_bundle = integer default 2: 0 no bundle, 1 folder, 2 .zip, 3 both folder and .zip
 * windows_console: when compiling for windows, build with the console subsystem instead of GUI
 
@@ -174,7 +174,7 @@ For more information on these properties, the [Angelscript custom options docume
 ## `#pragma` directives
 In a few cases, it is also possible to configure some aspects of NVGT's behavior directly from within nvgt scripts themselves using the `#pragma` preprocessor directive.
 
-This directive is used to safely tell the engine about anything that doesn't directly have to do with your script code but also without causing some sort of compilation error due to bad syntax. A pragma directive could do anything, from embedding a file to selecting assets to choosing  to adding include directories and more.
+This directive is used to safely tell the engine about anything that does not directly have to do with your script code but also without causing some sort of compilation error due to bad syntax. A pragma directive could do anything, from embedding a file to selecting assets to choosing  to adding include directories and more.
 
 The syntax for a pragma directive looks like `#pragma name value` or sometimes just `#pragma name` if the option does not require a value. In some cases when a value is to contain a long or complex enough string such as a path, you may need to surround the value in quotes such as `#pragma name "value."`
 
@@ -184,7 +184,7 @@ The syntax for a pragma directive looks like `#pragma name value` or sometimes j
 * `#pragma embed <packname>`: embed the given pack into the compiled executable file itself
 * `#pragma asset <pathname>`: copy the given asset/assets into the bundled product as resources
 * `#pragma document <pathname>`: copy the given asset/assets into the bundled product as documents intended for the user to access rather than the programmer
-* `#pragma plugin <plugname>`: load and activate a plugin given it's dll basename
+* `#pragma plugin <plugname>`: load and activate a plugin given its dll basename
 * `#pragma compiled_basename <basename>`: the output filename of the compiled executable without the extension
 * `#pragma bytecode_compression <level from 0 to 9>`: controls the compression level for bytecode saved in the compiled executable (0 disabled 9 maximum)
 * `#pragma console`: produce the compiled executable on windows using the console subsystem for CLI based programs
@@ -216,4 +216,4 @@ Internally, you can see this at play by looking in the stub directory of NVGT's 
 NVGT includes several directives particularly in the build configuration section that allow you to control how your product is identified to end users and to the systems the app is running on. While some are purely for display, others are manditory in certain situations especially when you plan to distribute your app on networks like the app store, google play and similar. For more info on these directives, you should read the "configuring bundling facility" section of the compiling for distribution topic.
 
 ## Conclusion
-Hopefully this tutorial has given you a good idea of how you can get NVGT to perform closer to how you would like in various areas from the user interface to the syntax handling. If you have any ideas as to configuration options you'd like to see added, please don't hesitate to reach out on github either with a discussion or pull request!
+Hopefully this tutorial has given you a good idea of how you can get NVGT to perform closer to how you would like in various areas from the user interface to the syntax handling. If you have any ideas as to configuration options you would like to see added, please do not hesitate to reach out on github either with a discussion or pull request!
