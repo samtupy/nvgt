@@ -522,9 +522,6 @@ std::unordered_map<std::string, std::string> embedding_packs; // embed_filename:
 std::unordered_map<std::string, embedded_pack> embedded_packs; // embed_filename:embed_offset/size
 void embed_pack(const std::string& disc_filename, const std::string& embed_filename) {
 	if (embedding_packs.find(embed_filename) != embedding_packs.end()) return;
-	// Try opening the file to insure it exists and is readable, exception will be thrown if not.
-	Poco::FileInputStream tmp(disc_filename);
-	tmp.close();
 	embedding_packs[embed_filename] = disc_filename;
 }
 bool load_embedded_packs(Poco::BinaryReader& br) {
