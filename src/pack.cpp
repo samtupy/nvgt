@@ -42,11 +42,11 @@ typedef std::list<pack::toc_entry*> toc_list;
 class pack::read_mode_internals {
 	toc_map toc;
 	std::istream* file;
-	uint64_t pack_offset; // Used for packs that are part of a larger file.
-	uint64_t pack_size; // Used for packs that are part of a larger file.
 	bool load();
 
 public:
+	uint64_t pack_offset; // Used for packs that are part of a larger file, needs to be accessed from the pack containing these internals when retrieving a file.
+	uint64_t pack_size; // Used for packs that are part of a larger file.
 	read_mode_internals(std::istream& file, const std::string& key = "", uint64_t pack_offset = 0, uint64_t pack_size = 0);
 	~read_mode_internals();
 	const toc_entry* get(const std::string& filename) const;
@@ -116,7 +116,7 @@ bool pack::read_mode_internals::load() {
 		// And lastly, check that we aren't loading a duplicate:
 		if (toc.find(entry.filename) != toc.end())
 			return false;
-		entry.offset = current_offset + pack_offset;
+		entry.offset = current_offset;
 		// Because the checksum stream is in-between the source file and binary reader, we must perform goodness checks on the checksum stream, not directly on the file.
 		if (!check.good())
 			return false;
@@ -369,6 +369,8 @@ std::istream* pack::get_file(const std::string& filename) const {
 	std::istream* fis = nullptr;
 	try {
 		fis = new Poco::FileInputStream(pack_name, std::ios_base::in);
+		if (read->pack_offset != 0 || read->pack_size != 0)
+			fis = new section_istream(*fis, read->pack_offset, read->pack_size);
 		if (!key.empty())
 			fis = new chacha_istream(*fis, key);
 		return new section_istream(*fis, entry->offset, entry->size);
@@ -553,7 +555,7 @@ bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& 
 	#ifndef NVGT_STUB
 	// If running from nvgt's compiler the packs are not actually embedded, translate the user input back to a valid filename.
 	if (filename == "*" && embedding_packs.size() > 0) filename = embedding_packs.begin()->second; // BGT compatibility
-	else filename = embedding_packs[filename];
+	else filename = embedding_packs[filename.substr(1)];
 	return true;
 	#else
 	const auto& it = filename == "*" ? embedded_packs.begin() : embedded_packs.find(filename.substr(1));
