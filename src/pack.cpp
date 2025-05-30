@@ -522,9 +522,6 @@ std::unordered_map<std::string, std::string> embedding_packs; // embed_filename:
 std::unordered_map<std::string, embedded_pack> embedded_packs; // embed_filename:embed_offset/size
 void embed_pack(const std::string& disc_filename, const std::string& embed_filename) {
 	if (embedding_packs.find(embed_filename) != embedding_packs.end()) return;
-	// Try opening the file to insure it exists and is readable, exception will be thrown if not.
-	Poco::FileInputStream tmp(disc_filename);
-	tmp.close();
 	embedding_packs[embed_filename] = disc_filename;
 }
 bool load_embedded_packs(Poco::BinaryReader& br) {
@@ -556,7 +553,7 @@ bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& 
 	#ifndef NVGT_STUB
 	// If running from nvgt's compiler the packs are not actually embedded, translate the user input back to a valid filename.
 	if (filename == "*" && embedding_packs.size() > 0) filename = embedding_packs.begin()->second; // BGT compatibility
-	else filename = filename.substr(1);
+	else filename = embedding_packs[filename];
 	return true;
 	#else
 	const auto& it = filename == "*" ? embedded_packs.begin() : embedded_packs.find(filename.substr(1));
