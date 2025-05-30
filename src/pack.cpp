@@ -553,7 +553,7 @@ bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& 
 	#ifndef NVGT_STUB
 	// If running from nvgt's compiler the packs are not actually embedded, translate the user input back to a valid filename.
 	if (filename == "*" && embedding_packs.size() > 0) filename = embedding_packs.begin()->second; // BGT compatibility
-	else filename = filename.substr(1);
+	else filename = embedding_packs[filename];
 	return true;
 	#else
 	const auto& it = filename == "*" ? embedded_packs.begin() : embedded_packs.find(filename.substr(1));
