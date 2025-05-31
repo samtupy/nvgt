@@ -1,0 +1,76 @@
+void main() {
+    physics_world_settings settings;
+    settings.gravity = vector(0, -9.81f, 0);  // Standard gravity
+    settings.world_name = "My Physics World";
+
+    physics_world@ world = physics_world(settings);
+
+    // Create collision shapes
+    physics_sphere_shape@ sphereShape = physics_sphere_shape(1.0f);  // radius = 1
+    physics_box_shape@ groundShape = physics_box_shape(vector(10, 0.5f, 10));  // 20x1x20 ground
+
+    // Create a dynamic sphere that will fall
+    transform sphereTransform(vector(0, 10, 0), IDENTITY_QUATERNION);  // 10 units above ground
+    physics_rigid_body@ sphere = world.create_rigid_body(sphereTransform);
+    sphere.set_type(PHYSICS_BODY_DYNAMIC);  // Make it dynamic so it falls
+    sphere.set_mass(1.0f);
+
+    // Add collider to sphere
+    transform localTransform = IDENTITY_TRANSFORM;
+    physics_collider@ sphereCollider = sphere.add_collider(sphereShape, localTransform);
+
+    // Create a static ground
+    transform groundTransform(vector(0, -0.5f, 0), IDENTITY_QUATERNION);  // Ground at y = -0.5
+    physics_rigid_body@ ground = world.create_rigid_body(groundTransform);
+    ground.set_type(PHYSICS_BODY_STATIC);  // Static so it doesn't move
+
+    // Add collider to ground
+    physics_collider@ groundCollider = ground.add_collider(groundShape, localTransform);
+
+    world.set_callbacks(@on_collision, @on_overlap);
+
+    float timeStep = 1.0f / 60.0f;  // 60 FPS
+
+    // We will only get up to 4 seconds of output
+    // Change to <= 300 to see t=5s
+    for (int i = 0; i < 300; i++) {  // Run for 5 seconds
+        // Update physics world
+        world.update(timeStep);
+
+        transform spherePos = sphere.get_transform();
+        vector pos = spherePos.get_position();
+
+        if (i % 60 == 0) {  // Print every second
+            println("Time: " + (i * timeStep) + "s, Sphere Y: " + pos.y);
+        }
+    }
+
+    world.destroy_rigid_body(sphere);
+    world.destroy_rigid_body(ground);
+
+    physics_sphere_shape_destroy(sphereShape);
+    physics_box_shape_destroy(groundShape);
+    physics_world_destroy(world);
+}
+
+// Collision callback function
+void on_collision(const physics_collision_callback_data& data) {
+    uint numPairs = data.get_nb_contact_pairs();
+    for (uint i = 0; i < numPairs; i++) {
+        physics_contact_pair pair = data.get_contact_pair(i);
+        if (pair.get_event_type() == PHYSICS_CONTACT_START) {
+            println("Collision started!");
+        }
+    }
+}
+
+// Overlap callback function  
+void on_overlap(const physics_overlap_callback_data& data) {
+    uint numPairs = data.get_nb_overlap_pairs();
+    for (uint i = 0; i < numPairs; i++) {
+        physics_overlap_pair pair = data.get_overlapping_pair(i);
+        if (pair.get_event_type() == PHYSICS_OVERLAP_START) {
+            println("Overlap started!");
+        }
+    }
+}
