@@ -75,6 +75,8 @@ public:
 	virtual ma_engine *get_ma_engine() const = 0;
 	virtual bool read(void *buffer, unsigned long long frame_count, unsigned long long *frames_read) = 0;
 	virtual CScriptArray *read_script(unsigned long long frame_count) = 0;
+	virtual void set_processing_callback(asIScriptFunction* cb) = 0;
+	virtual asIScriptFunction* get_processing_callback() const = 0;
 	virtual unsigned long long get_time() const = 0;
 	virtual bool set_time(unsigned long long time) = 0; // depends on DURATIONS_IN_FRAMES flag.
 	virtual unsigned long long get_time_in_frames() const = 0;
@@ -145,10 +147,13 @@ public:
 	virtual reactphysics3d::Vector3 get_direction_to_listener() const = 0;
 	virtual float get_distance_to_listener() const = 0;
 	virtual void set_position_3d(float x, float y, float z) = 0;
+	virtual void set_position_3d_vector(const reactphysics3d::Vector3& position) = 0;
 	virtual reactphysics3d::Vector3 get_position_3d() const = 0;
 	virtual void set_direction(float x, float y, float z) = 0;
+	virtual void set_direction_vector(const reactphysics3d::Vector3& direction) = 0;
 	virtual reactphysics3d::Vector3 get_direction() const = 0;
 	virtual void set_velocity(float x, float y, float z) = 0;
+	virtual void set_velocity_vector(const reactphysics3d::Vector3& velocity) = 0;
 	virtual reactphysics3d::Vector3 get_velocity() const = 0;
 	virtual void set_attenuation_model(ma_attenuation_model model) = 0;
 	virtual ma_attenuation_model get_attenuation_model() const = 0;

@@ -14,6 +14,7 @@
 #include <string>
 #include <angelscript.h>
 #include "nvgt.h"
+class CScriptArray;
 
 asINT64 GetFileSize(const std::string& path);
 BOOL ChDir(const std::string& d);
@@ -32,5 +33,22 @@ public:
 	void Release() {
 		if (asAtomicDec(RefCount) < 1) delete this;
 	}
+};
+struct script_memory_buffer {
+	void* ptr;
+	size_t size;
+	asITypeInfo* subtype;
+	int subtypeid;
+	script_memory_buffer(asITypeInfo* subtype, void* ptr, size_t size) : ptr(ptr), size(size), subtype(subtype), subtypeid(subtype->GetSubTypeId()) {}
+	const void* at(size_t index) const;
+	void* at(size_t index);
+	CScriptArray* to_array() const;
+	script_memory_buffer& from_array(CScriptArray* array);
+	static void make(script_memory_buffer* mem, asITypeInfo* subtype, void* ptr, int size);
+	static void copy(script_memory_buffer* mem, asITypeInfo* subtype, const script_memory_buffer& other);
+	static void destroy(script_memory_buffer* mem);
+	static bool verify(asITypeInfo *subtype, bool& no_gc);
+	static script_memory_buffer* create(asITypeInfo* subtype, void* ptr, uint64_t size);
+	static void angelscript_register(asIScriptEngine* engine);
 };
 void RegisterMiscFunctions(asIScriptEngine* engine);

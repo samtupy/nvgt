@@ -112,6 +112,7 @@ funcdef void prespeech_callback(audio_form@ f);
 funcdef bool form_background_callback(audio_form@ f);
 //control event callback
 funcdef int on_control_event_callback(audio_form@ f, int c, control_event_type event, dictionary@ args);
+funcdef bool kb_echo_update_callback(audio_form@ f, int echo);
 
 //can make this a member of the audio form class as soon as even one person suggests seriously wanting to change on a form by form basis I guess
 bool audioform_input_disable_ralt = true;
@@ -123,6 +124,7 @@ class audio_form {
 	bool speak_control_attributes_separately;
 	int subform_control_index = -1;
 	on_control_event_callback@ event_callback = null;
+	kb_echo_update_callback@kb_echo_update_callback = null;
 	form_background_callback@ background_callback = @audioform_default_background_callback;
 	utility_form@ utility_form = null;
 	dictionary utility_form_data;
@@ -2223,12 +2225,18 @@ class audio_form {
 		c_form[control_index].echo_flag = keyboard_echo;
 		return true;
 	}
+	bool set_keyboard_echo_update_callback(kb_echo_update_callback@callback) {
+		if(@callback == null) return false;
+		@kb_echo_update_callback = callback;
+		return true;
+	}
 	bool set_default_keyboard_echo(int keyboard_echo, bool update_controls = true) {
 		form_error = 0;
 		if (!active) {
 			form_error = form_error_no_window;
 			return false;
 		}
+		if(@kb_echo_update_callback != null and kb_echo_update_callback(this, keyboard_echo) == false) return false;
 		if (update_controls) {
 			for (int counter = 0; counter < c_form.length(); counter++)
 				c_form[counter].echo_flag = keyboard_echo;
@@ -2256,6 +2264,7 @@ class audio_form {
 		c_form.resize(0);
 		@ui_speech = null;
 		@event_callback = null;
+		@kb_echo_update_callback = null;
 		@utility_form = null;
 	}
 	//internal methods:

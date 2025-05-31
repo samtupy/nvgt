@@ -308,18 +308,15 @@ void nvgt_line_callback(asIScriptContext *ctx, void *obj) {
 }
 #ifndef NVGT_STUB
 int IncludeCallback(const char *filename, const char *sectionname, CScriptBuilder *builder, void *param) {
-	// First, because it is the most platform agnostic method of accessing a file, we'll try loading the include manually with file_get_contents.
+	#ifdef NVGT_MOBILE
+	// Including scripts on mobile platforms that use content URIs and sandboxing is far from ideal, we're currently restricted to assets bundled with the NVGT runner which must be accessed via file_get_contents at this time.
 	string include_text = file_get_contents(filename);
 	if (!include_text.empty())
 		return builder->AddSectionFromMemory(Path(filename).makeAbsolute().toString(Path::PATH_UNIX).c_str() + 1, include_text.c_str());
+	#endif
 	File include_file;
 	try {
-		Path include(Path::expand(filename));
-		include.makeAbsolute();
-		include_file = include;
-		if (include_file.exists() && include_file.isFile())
-			return builder->AddSectionFromFile(include.toString().c_str()); // Don't cache locations for scripts that are directly included.
-		include = Path(sectionname).parent().append(filename).makeAbsolute();
+		Path include = Path(sectionname).parent().append(filename).makeAbsolute();
 		include_file = include;
 		if (include_file.exists() && include_file.isFile())
 			return builder->AddSectionFromFile(include.toString().c_str());
@@ -389,6 +386,7 @@ int PreconfigureEngine(asIScriptEngine* engine) {
 	engine->SetEngineProperty(asEP_ALLOW_UNSAFE_REFERENCES, true);
 	engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
 	engine->SetEngineProperty(asEP_MEMBER_INIT_MODE, 0);
+	engine->SetEngineProperty(asEP_BOOL_CONVERSION_MODE, true);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->BeginConfigGroup("core");
 	RegisterStdString(engine);
@@ -403,6 +401,7 @@ int PreconfigureEngine(asIScriptEngine* engine) {
 	engine->BeginConfigGroup("datastreams");
 	RegisterScriptDatastreams(engine);
 	engine->EndConfigGroup();
+	engine->RegisterObjectType("pack_interface", 0, asOBJ_REF);
 	return 0;
 }
 // Registrations in the following function are usually done in alphabetical order, with some exceptions involving one subsystem depending on another. For example the internet subsystem registers functions that take timespans, meaning that timestuff gets registered before internet.
@@ -558,6 +557,8 @@ void ConfigureEngineOptions(asIScriptEngine *engine) {
 		engine->SetEngineProperty(asEP_REQUIRE_ENUM_SCOPE, true);
 	if (config.hasOption("scripting.do_not_optimize_bytecode"))
 		engine->SetEngineProperty(asEP_OPTIMIZE_BYTECODE, false);
+	if (config.hasOption("scripting.disable_bool_conversion_mode"))
+		engine->SetEngineProperty(asEP_BOOL_CONVERSION_MODE, false);
 	engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, config.getInt("scripting.max_nested_calls", 10000));
 	engine->SetEngineProperty(asEP_MAX_STACK_SIZE, config.getInt("scripting.max_stack_size", 0));
 	engine->SetEngineProperty(asEP_MAX_CALL_STACK_SIZE, config.getInt("scripting.max_call_stack_size", 0));
@@ -626,6 +627,8 @@ int SaveCompiledScript(asIScriptEngine *engine, unsigned char **output) {
 	nvgt_bytecode_ostream ostr(&codestream);
 	BinaryWriter bw(ostr);
 	serialize_nvgt_plugins(bw);
+	bw << int(g_system_namespaces.size());
+	for (const auto& ns : g_system_namespaces) bw << ns.first << ns.second;
 	for (int i = 0; i < asEP_LAST_PROPERTY; i++)
 		bw.write7BitEncoded(UInt64(engine->GetEngineProperty(asEEngineProp(i))));
 	bw << Timestamp().raw();
@@ -724,9 +727,6 @@ int CompileExecutable(asIScriptEngine *engine, const string &scriptFile) {
 }
 #else
 int LoadCompiledScript(asIScriptEngine *engine, unsigned char *code, asUINT size) {
-	if (ConfigureEngine(engine) < 0) return -1;
-	// engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
-	// engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, 10000);
 	asIScriptModule *mod = engine->GetModule("nvgt_game", asGM_ALWAYS_CREATE);
 	if (mod == 0)
 		return -1;
@@ -735,8 +735,15 @@ int LoadCompiledScript(asIScriptEngine *engine, unsigned char *code, asUINT size
 	codestream.set(code, size);
 	nvgt_bytecode_istream istr(&codestream);
 	BinaryReader br(istr);
-	if (!load_serialized_nvgt_plugins(br))
-		return -1;
+	if (!load_serialized_nvgt_plugins(br)) return -1;
+	int ns_count;
+	br >> ns_count;
+	for (int i = 0; i < ns_count; i++) {
+		string k, v;
+		br >> k >> v;
+		g_system_namespaces[k] = v;
+	}
+	if (ConfigureEngine(engine) < 0) return -1;
 	for (int i = 0; i < asEP_LAST_PROPERTY; i++) {
 		UInt64 val;
 		br.read7BitEncoded(val);
@@ -1081,7 +1088,7 @@ asITypeInfo *get_array_type(const std::string &decl) {
 	return g_TypeInfoCache[decl];
 }
 // As of Angelscript 2.38.0, we need a custom dictionary method to retrieve strings because our string class has constructors for int and double, causing dictionary::get(string, ?&out) to throw a multiple defined signature error.
-bool script_dictionary_get(CScriptDictionary* dict, const std::string& key, std::string* value) {
+bool script_dictionary_get_string(CScriptDictionary* dict, const std::string& key, std::string* value) {
 	return dict->Get(key, value, g_ScriptEngine->GetStringFactory());
 }
 
@@ -1101,5 +1108,5 @@ void RegisterUnsorted(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("void debug_add_func_breakpoint(const string&in)", asFUNCTION(asDebuggerAddFuncBreakpoint), asCALL_CDECL);
 	engine->RegisterGlobalProperty("const string[]@ ARGS", &g_command_line_args);
 	engine->RegisterGlobalProperty("const timestamp SCRIPT_BUILD_TIME", &g_script_build_time);
-	engine->RegisterObjectMethod("dictionary", "bool get(const string&in key, string&out value) const", asFUNCTION(script_dictionary_get), asCALL_CDECL_OBJFIRST);
+	//engine->RegisterObjectMethod("dictionary", "bool get(const string&in key, string&out value) const", asFUNCTION(script_dictionary_get_string), asCALL_CDECL_OBJFIRST);
 }

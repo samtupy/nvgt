@@ -2,9 +2,13 @@ name: release
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "*"
-
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   mac_build:
     runs-on: macos-14
@@ -200,6 +204,36 @@ jobs:
       with:
         name: linux_package
         path: 'nvgt_${{env.nvgt_version}}.tar.gz'
+
+  publish_latest:
+    runs-on: ubuntu-latest
+    needs: ["windows_package", "mac_package", "linux_package"]
+    if: github.ref == 'refs/heads/main' && github.event.repository.fork == false
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: '*_package'
+    - uses: actions/download-artifact@v4
+      with:
+        name: android_release
+        path: android_release
+    - name: set_version
+      run: python3 build/ci_set_version.py
+    - name: preprocess
+      run: |
+        mkdir android_package
+        mv android_release/nvgt.apk android_package/nvgt_$nvgt_version.apk
+    - name: publish
+      uses: "marvinpinto/action-automatic-releases@v1.2.1"
+      with:
+        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+        prerelease: true
+        title: "Latest Development Version"
+        automatic_release_tag: "latest"
+        files: '*_package/nvgt_${{env.nvgt_version}}.*'
 
   publish_release:
     runs-on: ubuntu-latest

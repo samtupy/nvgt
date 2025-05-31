@@ -20,6 +20,8 @@
 #include <Poco/MemoryStream.h>
 #include <angelscript.h>
 #include <scriptarray.h>
+#include "misc_functions.h" // script_memory_buffer
+#include "nvgt.h" // g_ScriptEngine
 #include "nvgt_angelscript.h" // get_array_type
 #include "nvgt_plugin.h"      // pack_interface
 #include "sound.h"
@@ -80,7 +82,7 @@ void uninit_sound() {
 	if (!g_soundsystem_initialized.test())
 		return;
 	if (g_audio_engine != nullptr) {
-		delete g_audio_engine;
+		g_audio_engine->release();
 		g_audio_engine = nullptr;
 	}
 }
@@ -116,7 +118,7 @@ bool refresh_audio_devices() {
 }
 CScriptArray *get_sound_input_devices() {
 	if (!init_sound())
-		return CScriptArray::Create(get_array_type("array<string>")); // Better to return an emptry array instead of null for now.
+		return CScriptArray::Create(get_array_type("array<string>")); // Better to return an empty array instead of null for now.
 	return g_sound_script_input_devices;
 }
 CScriptArray *get_sound_output_devices() {
@@ -181,12 +183,29 @@ class audio_engine_impl final : public audio_engine {
 	std::unique_ptr<ma_engine> engine;
 	std::unique_ptr<ma_resource_manager> resource_manager;
 	std::unique_ptr<ma_device> device;
+	std::atomic<asIScriptFunction*> script_data_callback;
 	audio_node *engine_endpoint; // Upon engine creation we'll call ma_engine_get_endpoint once so as to avoid creating more than one of our wrapper objects when our engine->get_endpoint() function is called.
 	int refcount;
 	static void data_callback(ma_device *pDevice, void *pOutput, const void *pInput, ma_uint32 frameCount) {
-		ma_engine *engine = (ma_engine *)pDevice->pUserData;
+		audio_engine_impl* engine = reinterpret_cast<audio_engine_impl*>(pDevice->pUserData);
+		engine->duplicate();
 		ma_uint64 frames_read;
-		ma_engine_read_pcm_frames(engine, pOutput, frameCount, &frames_read);
+		engine->read(pOutput, frameCount, &frames_read);
+		if (engine->script_data_callback) {
+			asIScriptContext* ctx = g_ScriptEngine->RequestContext();
+			if (!ctx || ctx->Prepare(engine->script_data_callback) < 0) {
+				engine->release();
+				return; // Todo: Maybe find a way to log error state here?
+			}
+			script_memory_buffer buf(g_ScriptEngine->GetTypeInfoByDecl("memory_buffer<float>"), pOutput, pDevice->playback.channels * frames_read); // Todo: Support all data formats.
+			if (ctx->SetArgObject(0, engine) < 0 || ctx->SetArgObject(1, &buf) < 0 || ctx->SetArgQWord(2, frames_read) < 0) {
+				engine->release();
+				return;
+			}
+			ctx->Execute(); // Really not sure what to do about exceptions and errors taking place in the audio thread yet as we don't have a fully established logging facility set up.
+			g_ScriptEngine->ReturnContext(ctx);
+			engine->release();
+		}
 	}
 
 public:
@@ -195,6 +214,7 @@ public:
 		: audio_engine(),
 		  engine(nullptr),
 		  resource_manager(nullptr),
+		  script_data_callback(nullptr),
 		  engine_endpoint(nullptr),
 		  flags(static_cast<engine_flags>(flags)),
 		  refcount(1) {
@@ -216,7 +236,7 @@ public:
 			cfg.wasapi.noAutoConvertSRC = true;
 
 			cfg.dataCallback = data_callback;
-			cfg.pUserData = &*engine;
+			cfg.pUserData = this;
 			g_soundsystem_last_error = ma_device_init(&g_sound_context, &cfg, &*device);
 			if (g_soundsystem_last_error != MA_SUCCESS) {
 
@@ -267,6 +287,10 @@ public:
 		engine_endpoint = new audio_node_impl(reinterpret_cast<ma_node_base *>(ma_engine_get_endpoint(&*engine)), this);
 	}
 	~audio_engine_impl() {
+		if (script_data_callback) {
+			script_data_callback.load()->Release();
+			script_data_callback = nullptr;
+		}
 		if (device) {
 			ma_device_stop(&*device);
 			ma_device_uninit(&*device);
@@ -338,6 +362,11 @@ public:
 		result->Resize(frames_read * ma_engine_get_channels(&*engine));
 		return result;
 	}
+	void set_processing_callback(asIScriptFunction* cb) override {
+		if (script_data_callback) script_data_callback.load()->Release();
+		script_data_callback = cb;
+	}
+	asIScriptFunction* get_processing_callback() const override { return script_data_callback; }
 	unsigned long long get_time() const override { return engine ? (flags & DURATIONS_IN_FRAMES ? get_time_in_frames() : get_time_in_milliseconds()) : 0; }
 	bool set_time(unsigned long long time) override { return engine ? (flags & DURATIONS_IN_FRAMES) ? set_time_in_frames(time) : set_time_in_milliseconds(time) : false; }
 	unsigned long long get_time_in_frames() const override { return engine ? ma_engine_get_time_in_pcm_frames(&*engine) : 0; }
@@ -449,6 +478,7 @@ public:
 	}
 	~mixer_impl() {
 		std::unique_lock<mutex> lock(hrtf_toggle_mtx); // Insure hrtf isn't getting toggled at the time we begin detaching nodes.
+		stop();
 		if (monitor)
 			monitor->release();
 		if (parent_mixer)
@@ -589,6 +619,7 @@ public:
 		set_spatialization_enabled(true);
 		return ma_sound_set_position(&*snd, x, y, z);
 	}
+	void set_position_3d_vector(const reactphysics3d::Vector3& position) { set_position_3d(position.x, position.y, position.z); }
 	reactphysics3d::Vector3 get_position_3d() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
@@ -604,6 +635,7 @@ public:
 			monitor->set_position_changed();
 		return ma_sound_set_direction(&*snd, x, y, z);
 	}
+	void set_direction_vector(const reactphysics3d::Vector3& direction) { set_direction(direction.x, direction.y, direction.z); }
 	reactphysics3d::Vector3 get_direction() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
@@ -617,6 +649,7 @@ public:
 			return;
 		return ma_sound_set_velocity(&*snd, x, y, z);
 	}
+	void set_velocity_vector(const reactphysics3d::Vector3& velocity) { set_velocity(velocity.x, velocity.y, velocity.z); }
 	reactphysics3d::Vector3 get_velocity() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
@@ -1121,9 +1154,6 @@ void set_sound_default_storage(pack_interface *obj) {
 		g_sound_service->set_default_protocol(sound_service::fs_protocol_slot);
 		return;
 	}
-	std::shared_ptr < const pack_interface > old_storage = std::static_pointer_cast < const pack_interface>(g_sound_service->get_protocol_directive(g_pack_protocol_slot));
-	if (old_storage)
-		old_storage->release();
 	g_sound_service->set_protocol_directive(g_pack_protocol_slot, std::shared_ptr < const pack_interface > (obj->make_immutable()));
 	g_sound_service->set_default_protocol(g_pack_protocol_slot);
 }
@@ -1131,11 +1161,8 @@ const pack_interface *get_sound_default_storage() {
 	if (!init_sound() || !g_sound_service->is_default_protocol(g_pack_protocol_slot))
 		return nullptr;
 	std::shared_ptr < const pack_interface > obj = std::static_pointer_cast < const pack_interface>(g_sound_service->get_protocol_directive(g_pack_protocol_slot));
-	if (!obj)
-		return nullptr;
-	const pack_interface *m = obj->get_mutable();
-	m->duplicate();
-	return m;
+	if (!obj) return nullptr;
+	return obj->get_mutable();
 }
 int get_soundsystem_last_error() { return g_soundsystem_last_error; }
 void set_sound_master_volume(float db) {
@@ -1193,6 +1220,7 @@ ReturnType virtual_call(T *object, Args... args) {
 }
 void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectType("audio_engine", 0, asOBJ_REF);
+	engine->RegisterFuncdef("void audio_engine_processing_callback(audio_engine@ engine, memory_buffer<float>& data, uint64 frames)");
 	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_FACTORY, "audio_engine@ e(int flags)", asFUNCTION(new_audio_engine), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call < audio_engine, &audio_engine::duplicate, void >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call < audio_engine, &audio_engine::release, void >)), asCALL_CDECL_OBJFIRST);
@@ -1200,6 +1228,8 @@ void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "bool set_device(int device)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_device, bool, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "audio_node@+ get_endpoint() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_endpoint, audio_node * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "float[]@ read(uint64 frame_count)", asFUNCTION((virtual_call < audio_engine, &audio_engine::read_script, CScriptArray *, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_processing_callback(audio_engine_processing_callback@ cb) property", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_processing_callback, void, asIScriptFunction*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "audio_engine_processing_callback@+ get_processing_callback() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_processing_callback, asIScriptFunction* >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "uint64 get_time() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_time, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "bool set_time(uint64 time)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_time, bool, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "uint64 get_time_in_frames() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_time_in_frames, unsigned long long >)), asCALL_CDECL_OBJFIRST);
@@ -1235,6 +1265,7 @@ void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "bool get_listener_enabled(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_enabled, bool, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "bool play(const string&in path, audio_node@ node, uint input_bus_index)", asFUNCTION((virtual_call < audio_engine, &audio_engine::play_through_node, bool, const string &, audio_node *, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	// the other play overload and the new_mixer/sound functions are registered later after the definitions of mixer and sound.
+	engine->RegisterGlobalProperty("audio_engine@ sound_default_engine", (void*)&g_audio_engine);
 }
 template < class T >
 inline void RegisterSoundsystemAudioNode(asIScriptEngine *engine, const std::string &type) {
@@ -1290,10 +1321,13 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	engine->RegisterObjectMethod(type.c_str(), "vector get_direction_to_listener() const", asFUNCTION((virtual_call < T, &T::get_direction_to_listener, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "float get_distance_to_listener() const", asFUNCTION((virtual_call < T, &T::get_distance_to_listener, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_position_3d(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_position_3d, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_position_3d(const vector&in position)", asFUNCTION((virtual_call < T, &T::set_position_3d_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "vector get_position_3d() const", asFUNCTION((virtual_call < T, &T::get_position_3d, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_direction(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_direction, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_direction(const vector&in direction)", asFUNCTION((virtual_call < T, &T::set_direction_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "vector get_direction() const", asFUNCTION((virtual_call < T, &T::get_direction, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_velocity, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(const vector&in velocity)", asFUNCTION((virtual_call < T, &T::set_velocity_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "vector get_velocity() const", asFUNCTION((virtual_call < T, &T::get_velocity, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_attenuation_model(audio_attenuation_model model) property", asFUNCTION((virtual_call < T, &T::set_attenuation_model, void, ma_attenuation_model >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_attenuation_model get_attenuation_model() const property", asFUNCTION((virtual_call < T, &T::get_attenuation_model, ma_attenuation_model >)), asCALL_CDECL_OBJFIRST);

@@ -3,6 +3,6 @@
 // License: zlib (see license.md in the root of the NVGT distribution)
 
 void main() {
-	alert("test", round(23.9517412, 3));
-	alert("test", round(-1.1, 0));
+	string result = html_entities_decode("ol&aacute;, como voc&ecirc; est&aacute;?");
+	alert(result, "");
 }

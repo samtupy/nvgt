@@ -118,6 +118,25 @@ void timer_queue::reset() {
 	}
 	deleting_timers.clear();
 }
+CScriptArray* timer_queue::list_timers() {
+	asIScriptContext* context = asGetActiveContext();
+	if (context == nullptr)
+		return nullptr;
+	asIScriptEngine* engine = context->GetEngine();
+	if (engine == nullptr)
+		return nullptr;
+	asITypeInfo* string_array = engine->GetTypeInfoByDecl("string[]");
+	if (string_array == nullptr)
+		return nullptr;
+	CScriptArray* array = CScriptArray::Create(string_array);
+	if (array == nullptr)
+		return nullptr;
+	for (auto it = timer_objects.begin(); it != timer_objects.end(); ++it) {
+		std::string id = it->first;
+		array->InsertLast(&id);
+	}
+	return array;
+}
 void timer_queue::set(const std::string &id, asIScriptFunction *callback, const std::string &callback_data, uint64_t timeout, bool repeating) {
 	auto it = timer_objects.find(id);
 	if (it != timer_objects.end()) {
@@ -607,6 +626,7 @@ void RegisterScriptTimestuff(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool delete(const string&in timer_id)"), asMETHOD(timer_queue, erase), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("void flush()"), asMETHOD(timer_queue, flush), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("void reset()"), asMETHOD(timer_queue, reset), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("string[]@ list_timers()"), asMETHOD(timer_queue, list_timers), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint size() const"), asMETHOD(timer_queue, size), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool loop(int max_timers = 0, int max_catchup_milliseconds = 100)"), asMETHOD(timer_queue, loop), asCALL_THISCALL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);

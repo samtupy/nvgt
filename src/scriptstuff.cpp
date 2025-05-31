@@ -134,16 +134,21 @@ void reset_profiler() {
 	profiler_ticks = std::chrono::high_resolution_clock::now();
 	profiler_start = std::chrono::high_resolution_clock::now();
 	profiler_last_func = NULL;
+	prepare_profiler();
+}
+void prepare_profiler() {
+	if (!is_profiling) return;
+	asIScriptContext* ctx = asGetActiveContext();
+	if (!ctx) return;
+	profiler_last_func = ctx->GetFunction();
+	profiler_cache[profiler_last_func] = profiler_start;
 }
 void start_profiling() {
-	asIScriptContext* ctx = asGetActiveContext();
 	if (is_profiling) return;
+	asIScriptContext* ctx = asGetActiveContext();
+	if (!ctx) return;
+	is_profiling = true;
 	reset_profiler();
-	if (ctx) {
-		is_profiling = true;
-		profiler_last_func = ctx->GetFunction();
-		profiler_cache[profiler_last_func] = profiler_start;
-	}
 }
 void stop_profiling() {
 	asIScriptContext* ctx = asGetActiveContext();
