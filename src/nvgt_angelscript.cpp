@@ -55,6 +55,7 @@
 #include "nvgt_plugin.h"
 #include "pack.h"
 #include "pathfinder.h"
+#include "combination_api.h"
 #include "pocostuff.h"
 #include "random.h"
 #include "reactphysics.h"
@@ -412,6 +413,7 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	RegisterScriptHandle(engine);
 	RegisterScriptMath(engine);
 	RegisterScriptMathComplex(engine);
+	RegisterScriptCombination(engine);
 	RegisterScriptWeakRef(engine);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_TERMINAL);
 	Print::asRegister(engine);
