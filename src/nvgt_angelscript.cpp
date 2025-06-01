@@ -308,18 +308,15 @@ void nvgt_line_callback(asIScriptContext *ctx, void *obj) {
 }
 #ifndef NVGT_STUB
 int IncludeCallback(const char *filename, const char *sectionname, CScriptBuilder *builder, void *param) {
-	// First, because it is the most platform agnostic method of accessing a file, we'll try loading the include manually with file_get_contents.
+	#ifdef NVGT_MOBILE
+	// Including scripts on mobile platforms that use content URIs and sandboxing is far from ideal, we're currently restricted to assets bundled with the NVGT runner which must be accessed via file_get_contents at this time.
 	string include_text = file_get_contents(filename);
 	if (!include_text.empty())
 		return builder->AddSectionFromMemory(Path(filename).makeAbsolute().toString(Path::PATH_UNIX).c_str() + 1, include_text.c_str());
+	#endif
 	File include_file;
 	try {
-		Path include(Path::expand(filename));
-		include.makeAbsolute();
-		include_file = include;
-		if (include_file.exists() && include_file.isFile())
-			return builder->AddSectionFromFile(include.toString().c_str()); // Don't cache locations for scripts that are directly included.
-		include = Path(sectionname).parent().append(filename).makeAbsolute();
+		Path include = Path(sectionname).parent().append(filename).makeAbsolute();
 		include_file = include;
 		if (include_file.exists() && include_file.isFile())
 			return builder->AddSectionFromFile(include.toString().c_str());
