@@ -26,7 +26,7 @@ using namespace reactphysics3d;
 class event_listener;
 
 PhysicsCommon g_physics;
-unordered_map<PhysicsWorld*, event_listener*> g_physics_event_listeners; // These need to be kept alive while the world exists, and the PhysicsWorld class has no user data.
+unordered_map<PhysicsWorld*, event_listener*> g_physics_event_listeners;  // These need to be kept alive while the world exists, and the PhysicsWorld class has no user data.
 
 // Angelscript factories.
 template <class T, typename... A>
