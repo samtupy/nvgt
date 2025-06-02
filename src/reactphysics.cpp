@@ -602,7 +602,7 @@ void RegisterCollisionShape(asIScriptEngine* engine, const string& type) {
 	engine->RegisterObjectMethod(type.c_str(), "int get_id() const property", asMETHOD(T, getId), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "vector get_local_inertia_tensor(float mass) const", asMETHOD(T, getLocalInertiaTensor), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "float get_volume() const property", asMETHOD(T, getVolume), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "aabb compute_transformed_aabb(const transform&in transform) const", asMETHOD(T, computeTransformedAABB), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "aabb compute_transformed_aabb(const physics_transform&in transform) const", asMETHOD(T, computeTransformedAABB), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "string opImplConv() const", asMETHOD(T, to_string), asCALL_THISCALL);
 }
 
@@ -613,11 +613,11 @@ void RegisterPhysicsBody(asIScriptEngine* engine, const string& type) {
 	engine->RegisterObjectMethod(type.c_str(), "physics_entity get_entity() const property", asMETHOD(T, getEntity), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_is_active() const property", asMETHOD(T, isActive), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_is_active(bool is_active) property", asMETHOD(T, setIsActive), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "const transform& get_transform() const property", asMETHOD(T, getTransform), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_transform(const transform&in transform) property", asMETHOD(T, setTransform), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const physics_transform& get_transform() const property", asMETHOD(T, getTransform), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_transform(const physics_transform&in transform) property", asMETHOD(T, setTransform), asCALL_THISCALL);
 	engine->RegisterObjectMethod(
 	    type.c_str(),
-	    "physics_collider@ add_collider(physics_collision_shape@ shape, const transform&in transform)",
+	    "physics_collider@ add_collider(physics_collision_shape@ shape, const physics_transform&in transform)",
 	    asMETHOD(T, addCollider),
 	    asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void remove_collider(physics_collider&in collider)", asMETHOD(T, removeCollider), asCALL_THISCALL);
@@ -812,26 +812,26 @@ void RegisterMathTypes(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("quaternion quaternion_slerp(const quaternion& q1, const quaternion& q2, float t)", asFUNCTION(Quaternion::slerp), asCALL_CDECL);
 	engine->RegisterGlobalFunction("quaternion quaternion_from_euler_angles(float angle_x, float angle_y, float angle_z)", asFUNCTIONPR(Quaternion::fromEulerAngles, (decimal, decimal, decimal), Quaternion), asCALL_CDECL);
 	engine->RegisterGlobalFunction("quaternion quaternion_from_euler_angles(const vector& angles)", asFUNCTIONPR(Quaternion::fromEulerAngles, (const Vector3&), Quaternion), asCALL_CDECL);
-	engine->RegisterObjectType("transform", sizeof(Transform), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Transform>() | asOBJ_APP_CLASS_ALLFLOATS);
-	engine->RegisterObjectBehaviour("transform", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<Transform>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("transform", asBEHAVE_CONSTRUCT, "void f(const vector&in position, const matrix3x3&in orientation)", asFUNCTION((rp_construct<Transform, const Vector3&, const Matrix3x3&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("transform", asBEHAVE_CONSTRUCT, "void f(const vector&in position, const quaternion&in orientation)", asFUNCTION((rp_construct<Transform, const Vector3&, const Quaternion&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("transform", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<Transform>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("transform", "const vector& get_position() const property", asMETHOD(Transform, getPosition), asCALL_THISCALL);
-	engine->RegisterObjectMethod("transform", "const quaternion& get_orientation() const property", asMETHOD(Transform, getOrientation), asCALL_THISCALL);
-	engine->RegisterObjectMethod("transform", "void set_position(const vector&in position) property", asMETHOD(Transform, setPosition), asCALL_THISCALL);
-	engine->RegisterObjectMethod("transform", "void set_orientation(const quaternion&in orientation) property", asMETHOD(Transform, setOrientation), asCALL_THISCALL);
-	engine->RegisterObjectMethod("transform", "void set_to_identity()", asMETHOD(Transform, setToIdentity), asCALL_THISCALL);
-	engine->RegisterObjectMethod("transform", "transform get_inverse() const property", asMETHOD(Transform, getInverse), asCALL_THISCALL);
-	engine->RegisterObjectMethod("transform", "bool get_is_valid() const property", asMETHOD(Transform, isValid), asCALL_THISCALL);
-	engine->RegisterObjectMethod("transform", "void set_from_opengl_matrix(float[]@ matrix)", asFUNCTION(transform_set_from_opengl_matrix), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("transform", "float[]@ get_opengl_matrix() const", asFUNCTION(transform_get_opengl_matrix), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("transform", "bool opEquals(const transform&in) const", asMETHOD(Transform, operator==), asCALL_THISCALL);
-	engine->RegisterObjectMethod("transform", "transform opMul(const transform&in) const", asMETHODPR(Transform, operator*, (const Transform&) const, Transform), asCALL_THISCALL);
-	engine->RegisterObjectMethod("transform", "vector opMul(const vector&in) const", asMETHODPR(Transform, operator*, (const Vector3&) const, Vector3), asCALL_THISCALL);
-	engine->RegisterObjectMethod("transform", "string opImplConv()", asMETHOD(Transform, to_string), asCALL_THISCALL);
-	engine->RegisterGlobalFunction("transform get_IDENTITY_TRANSFORM() property", asFUNCTION(Transform::identity), asCALL_CDECL);
-	engine->RegisterGlobalFunction("transform transforms_interpolate()", asFUNCTION(Transform::interpolateTransforms), asCALL_CDECL);
+	engine->RegisterObjectType("physics_transform", sizeof(Transform), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Transform>() | asOBJ_APP_CLASS_ALLFLOATS);
+	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<Transform>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_CONSTRUCT, "void f(const vector&in position, const matrix3x3&in orientation)", asFUNCTION((rp_construct<Transform, const Vector3&, const Matrix3x3&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_CONSTRUCT, "void f(const vector&in position, const quaternion&in orientation)", asFUNCTION((rp_construct<Transform, const Vector3&, const Quaternion&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<Transform>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_transform", "const vector& get_position() const property", asMETHOD(Transform, getPosition), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_transform", "const quaternion& get_orientation() const property", asMETHOD(Transform, getOrientation), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_transform", "void set_position(const vector&in position) property", asMETHOD(Transform, setPosition), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_transform", "void set_orientation(const quaternion&in orientation) property", asMETHOD(Transform, setOrientation), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_transform", "void set_to_identity()", asMETHOD(Transform, setToIdentity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_transform", "physics_transform get_inverse() const property", asMETHOD(Transform, getInverse), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_transform", "bool get_is_valid() const property", asMETHOD(Transform, isValid), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_transform", "void set_from_opengl_matrix(float[]@ matrix)", asFUNCTION(transform_set_from_opengl_matrix), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_transform", "float[]@ get_opengl_matrix() const", asFUNCTION(transform_get_opengl_matrix), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_transform", "bool opEquals(const physics_transform&in) const", asMETHOD(Transform, operator==), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_transform", "physics_transform opMul(const physics_transform&in) const", asMETHODPR(Transform, operator*, (const Transform&) const, Transform), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_transform", "vector opMul(const vector&in) const", asMETHODPR(Transform, operator*, (const Vector3&) const, Vector3), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_transform", "string opImplConv()", asMETHOD(Transform, to_string), asCALL_THISCALL);
+	engine->RegisterGlobalFunction("physics_transform get_IDENTITY_TRANSFORM() property", asFUNCTION(Transform::identity), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_transform transforms_interpolate()", asFUNCTION(Transform::interpolateTransforms), asCALL_CDECL);
 }
 
 void RegisterCorePhysicsTypes(asIScriptEngine* engine) {
@@ -918,9 +918,9 @@ void RegisterPhysicsEntities(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_collider", "physics_collision_shape@ get_collision_shape() property", asMETHODPR(Collider, getCollisionShape, (), CollisionShape*), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_collider", "const physics_collision_shape@ get_collision_shape() const property", asMETHODPR(Collider, getCollisionShape, () const, const CollisionShape*), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_collider", "physics_body@ get_body() const property", asMETHOD(Collider, getBody), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_collider", "const transform& get_local_to_body_transform() const property", asMETHOD(Collider, getLocalToBodyTransform), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_collider", "void set_local_to_body_transform(const transform&in transform) property", asMETHOD(Collider, setLocalToBodyTransform), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_collider", "const transform get_local_to_world_transform() const", asMETHOD(Collider, getLocalToWorldTransform), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "const physics_transform& get_local_to_body_transform() const property", asMETHOD(Collider, getLocalToBodyTransform), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "void set_local_to_body_transform(const physics_transform&in transform) property", asMETHOD(Collider, setLocalToBodyTransform), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_collider", "const physics_transform get_local_to_world_transform() const", asMETHOD(Collider, getLocalToWorldTransform), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_collider", "const aabb get_world_aabb() const property", asMETHOD(Collider, getWorldAABB), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_collider", "bool test_aabb_overlap(const aabb&in world_aabb) const", asMETHOD(Collider, testAABBOverlap), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_collider", "bool test_point_inside(const vector&in world_point)", asMETHOD(Collider, testPointInside), asCALL_THISCALL);
@@ -994,7 +994,7 @@ void RegisterCollisionShapes(asIScriptEngine* engine) {
 	RegisterConvexPolyhedronShape<TriangleShape>(engine, "physics_triangle_shape");
 	engine->RegisterObjectMethod("physics_triangle_shape", "physics_triangle_raycast_side get_raycast_test_type() const property", asMETHOD(TriangleShape, getRaycastTestType), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_triangle_shape", "void set_raycast_test_type(physics_triangle_raycast_side test_type) property", asMETHOD(TriangleShape, setRaycastTestType), asCALL_THISCALL);
-	engine->RegisterGlobalFunction("void physics_triangle_shape_compute_smooth_triangle_mesh_contact(const physics_collision_shape &in shape1, const physics_collision_shape &in shape2, vector & local_contact_point_shape1, vector & local_contact_point_shape2, const transform &in shape1_to_world, const transform &in shape2_to_world, float penitration_depth, vector & out_smooth_vertex_normal)", asFUNCTION(TriangleShape::computeSmoothTriangleMeshContact), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void physics_triangle_shape_compute_smooth_triangle_mesh_contact(const physics_collision_shape &in shape1, const physics_collision_shape &in shape2, vector & local_contact_point_shape1, vector & local_contact_point_shape2, const physics_transform &in shape1_to_world, const physics_transform &in shape2_to_world, float penitration_depth, vector & out_smooth_vertex_normal)", asFUNCTION(TriangleShape::computeSmoothTriangleMeshContact), asCALL_CDECL);
 	RegisterConvexPolyhedronShape<ConvexMeshShape>(engine, "physics_convex_mesh_shape");
 	engine->RegisterObjectMethod("physics_convex_mesh_shape", "vector& get_scale() const property", asMETHOD(ConvexMeshShape, getScale), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_convex_mesh_shape", "void set_scale(vector& scale) const property", asMETHOD(ConvexMeshShape, setScale), asCALL_THISCALL);
@@ -1193,7 +1193,7 @@ void RegisterPhysicsWorldAndCallbacks(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_world", "uint16 get_nb_iterations_position_solver() const property", asMETHOD(PhysicsWorld, getNbIterationsPositionSolver), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_world", "void set_nb_iterations_position_solver(uint16 iterations) property", asMETHOD(PhysicsWorld, setNbIterationsPositionSolver), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_world", "void set_contacts_position_correction_technique(physics_contact_position_correction_technique technique) property", asMETHOD(PhysicsWorld, setContactsPositionCorrectionTechnique), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_world", "physics_rigid_body@ create_rigid_body(const transform&in transform)", asMETHOD(PhysicsWorld, createRigidBody), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "physics_rigid_body@ create_rigid_body(const physics_transform&in transform)", asMETHOD(PhysicsWorld, createRigidBody), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_world", "void destroy_rigid_body(physics_rigid_body& body)", asMETHOD(PhysicsWorld, destroyRigidBody), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_world", "physics_joint@ create_joint(const physics_joint_info&in joint_info)", asMETHOD(PhysicsWorld, createJoint), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_world", "void destroy_joint(physics_joint& joint)", asMETHOD(PhysicsWorld, destroyJoint), asCALL_THISCALL);

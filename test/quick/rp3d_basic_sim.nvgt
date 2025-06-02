@@ -10,17 +10,17 @@ void main() {
     physics_box_shape@ groundShape = physics_box_shape(vector(10, 0.5f, 10));  // 20x1x20 ground
 
     // Create a dynamic sphere that will fall
-    transform sphereTransform(vector(0, 10, 0), IDENTITY_QUATERNION);  // 10 units above ground
+    physics_transform sphereTransform(vector(0, 10, 0), IDENTITY_QUATERNION);  // 10 units above ground
     physics_rigid_body@ sphere = world.create_rigid_body(sphereTransform);
     sphere.set_type(PHYSICS_BODY_DYNAMIC);  // Make it dynamic so it falls
     sphere.set_mass(1.0f);
 
     // Add collider to sphere
-    transform localTransform = IDENTITY_TRANSFORM;
+    physics_transform localTransform = IDENTITY_TRANSFORM;
     physics_collider@ sphereCollider = sphere.add_collider(sphereShape, localTransform);
 
     // Create a static ground
-    transform groundTransform(vector(0, -0.5f, 0), IDENTITY_QUATERNION);  // Ground at y = -0.5
+    physics_transform groundTransform(vector(0, -0.5f, 0), IDENTITY_QUATERNION);  // Ground at y = -0.5
     physics_rigid_body@ ground = world.create_rigid_body(groundTransform);
     ground.set_type(PHYSICS_BODY_STATIC);  // Static so it doesn't move
 
@@ -35,7 +35,7 @@ void main() {
         // Update physics world
         world.update(timeStep);
 
-        transform spherePos = sphere.get_transform();
+        physics_transform spherePos = sphere.get_transform();
         vector pos = spherePos.get_position();
 
         if (i % 60 == 0) {  // Print every second

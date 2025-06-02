@@ -10,7 +10,7 @@ void main() {
     physics_box_shape@ groundShape = physics_box_shape(vector(20, 0.5f, 20));
 
     // Create static ground
-    transform groundTransform(vector(0, -0.5f, 0), IDENTITY_QUATERNION);
+    physics_transform groundTransform(vector(0, -0.5f, 0), IDENTITY_QUATERNION);
     physics_rigid_body@ ground = world.create_rigid_body(groundTransform);
     ground.set_type(PHYSICS_BODY_STATIC);
     ground.add_collider(groundShape, IDENTITY_TRANSFORM);
@@ -20,7 +20,7 @@ void main() {
 
     for (int i = 0; i < 5; i++) {
         vector pos(i * 2.0f - 4.0f, 10 + i, 0);  // Spread them out
-        transform objTransform(pos, IDENTITY_QUATERNION);
+        physics_transform objTransform(pos, IDENTITY_QUATERNION);
 
         physics_rigid_body@ obj = world.create_rigid_body(objTransform);
         obj.set_type(PHYSICS_BODY_DYNAMIC);

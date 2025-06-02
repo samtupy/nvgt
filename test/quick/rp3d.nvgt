@@ -7,7 +7,7 @@ void main() {
 	aabb box(vector(0, 0, 0), vector(10, 10, 10));
 	alert(EPSILON, box.extent);
 	float[]@ matrix = IDENTITY_TRANSFORM.get_opengl_matrix();
-	transform tr;
+	physics_transform tr;
 	tr.set_from_opengl_matrix(matrix);
 	alert(tr == IDENTITY_TRANSFORM, string(matrix));
 }
