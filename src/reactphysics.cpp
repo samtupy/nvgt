@@ -248,6 +248,233 @@ void face_set_vertices(HalfEdgeStructure::Face& f, CScriptArray* array) {
 	memcpy(&f.faceVertices[0], array->GetBuffer(), array->GetSize() * sizeof(uint32));
 }
 
+struct ManagedTriangleData {
+	std::vector<float> vertices;
+	std::vector<uint32> indices;
+	std::vector<float> normals;
+	TriangleVertexArray* array;
+	bool hasNormals;
+
+	ManagedTriangleData() : array(nullptr), hasNormals(false) {}
+	~ManagedTriangleData() { delete array; }
+};
+
+struct ManagedPolygonData {
+	std::vector<float> vertices;
+	std::vector<uint32> indices;
+	std::vector<PolygonVertexArray::PolygonFace> faces;
+	PolygonVertexArray* array;
+
+	ManagedPolygonData() : array(nullptr) {}
+	~ManagedPolygonData() { delete array; }
+};
+
+struct ManagedVertexData {
+	std::vector<float> vertices;
+	VertexArray* array;
+
+	ManagedVertexData() : array(nullptr) {}
+	~ManagedVertexData() { delete array; }
+};
+
+ManagedTriangleData* create_triangle_data(CScriptArray* verticesArray, CScriptArray* indicesArray) {
+	if (verticesArray->GetSize() % 3 != 0)
+		throw std::runtime_error("Vertices array size must be multiple of 3 (x,y,z components)");
+	if (indicesArray->GetSize() % 3 != 0)
+		throw std::runtime_error("Indices array size must be multiple of 3 (triangle indices)");
+	auto* managed = new ManagedTriangleData();
+	managed->vertices.resize(verticesArray->GetSize());
+	for (uint32 i = 0; i < verticesArray->GetSize(); i++)
+		managed->vertices[i] = *(float*)verticesArray->At(i);
+	managed->indices.resize(indicesArray->GetSize());
+	for (uint32 i = 0; i < indicesArray->GetSize(); i++)
+		managed->indices[i] = *(uint32*)indicesArray->At(i);
+	uint32 nbVertices = managed->vertices.size() / 3;
+	uint32 nbTriangles = managed->indices.size() / 3;
+	managed->array = new TriangleVertexArray(
+	    nbVertices,
+	    managed->vertices.data(),
+	    3 * sizeof(float),  // stride for 3 floats (x,y,z)
+	    nbTriangles,
+	    managed->indices.data(),
+	    3 * sizeof(uint32),  // stride for 3 indices
+	    TriangleVertexArray::VertexDataType::VERTEX_FLOAT_TYPE,
+	    TriangleVertexArray::IndexDataType::INDEX_INTEGER_TYPE);
+	return managed;
+}
+
+ManagedTriangleData* create_triangle_data_with_normals(CScriptArray* verticesArray, CScriptArray* normalsArray, CScriptArray* indicesArray) {
+	if (verticesArray->GetSize() % 3 != 0 || normalsArray->GetSize() % 3 != 0)
+		throw std::runtime_error("Vertices and normals arrays size must be multiple of 3 (x,y,z components)");
+	if (verticesArray->GetSize() != normalsArray->GetSize())
+		throw std::runtime_error("Vertices and normals arrays must have same size");
+	if (indicesArray->GetSize() % 3 != 0)
+		throw std::runtime_error("Indices array size must be multiple of 3 (triangle indices)");
+	auto* managed = new ManagedTriangleData();
+	managed->hasNormals = true;
+	managed->vertices.resize(verticesArray->GetSize());
+	for (uint32 i = 0; i < verticesArray->GetSize(); i++)
+		managed->vertices[i] = *(float*)verticesArray->At(i);
+	managed->normals.resize(normalsArray->GetSize());
+	for (uint32 i = 0; i < normalsArray->GetSize(); i++)
+		managed->normals[i] = *(float*)normalsArray->At(i);
+	managed->indices.resize(indicesArray->GetSize());
+	for (uint32 i = 0; i < indicesArray->GetSize(); i++)
+		managed->indices[i] = *(uint32*)indicesArray->At(i);
+	uint32 nbVertices = managed->vertices.size() / 3;
+	uint32 nbTriangles = managed->indices.size() / 3;
+	managed->array = new TriangleVertexArray(
+	    nbVertices,
+	    managed->vertices.data(),
+	    3 * sizeof(float),  // stride for 3 floats (x,y,z)
+	    managed->normals.data(),
+	    3 * sizeof(float),  // normals stride
+	    nbTriangles,
+	    managed->indices.data(),
+	    3 * sizeof(uint32),  // stride for 3 indices
+	    TriangleVertexArray::VertexDataType::VERTEX_FLOAT_TYPE,
+	    TriangleVertexArray::NormalDataType::NORMAL_FLOAT_TYPE,
+	    TriangleVertexArray::IndexDataType::INDEX_INTEGER_TYPE);
+	return managed;
+}
+
+ManagedVertexData* create_vertex_data(CScriptArray* verticesArray) {
+	if (verticesArray->GetSize() % 3 != 0)
+		throw std::runtime_error("Vertices array size must be multiple of 3 (x,y,z components)");
+	auto* managed = new ManagedVertexData();
+	managed->vertices.resize(verticesArray->GetSize());
+	for (uint32 i = 0; i < verticesArray->GetSize(); i++)
+		managed->vertices[i] = *(float*)verticesArray->At(i);
+	uint32 nbVertices = managed->vertices.size() / 3;
+	managed->array = new VertexArray(
+	    managed->vertices.data(),
+	    3 * sizeof(float),  // stride for 3 floats (x,y,z)
+	    nbVertices,
+	    VertexArray::DataType::VERTEX_FLOAT_TYPE);
+	return managed;
+}
+
+ManagedPolygonData* create_polygon_data(CScriptArray* verticesArray, CScriptArray* facesArray) {
+	if (verticesArray->GetSize() % 3 != 0)
+		throw std::runtime_error("Vertices array size must be multiple of 3 (x,y,z components)");
+	auto* managed = new ManagedPolygonData();
+	managed->vertices.resize(verticesArray->GetSize());
+	for (uint32 i = 0; i < verticesArray->GetSize(); i++)
+		managed->vertices[i] = *(float*)verticesArray->At(i);
+	// Process faces array (array of arrays)
+	uint32 totalIndices = 0;
+	// First pass: count total indices needed
+	for (uint32 faceIdx = 0; faceIdx < facesArray->GetSize(); faceIdx++) {
+		CScriptArray* faceIndices = (CScriptArray*)facesArray->At(faceIdx);
+		if (!faceIndices)
+			throw std::runtime_error("Face array contains null face at index " + std::to_string(faceIdx));
+		if (faceIndices->GetSize() < 3)
+			throw std::runtime_error("Face " + std::to_string(faceIdx) + " must have at least 3 vertices");
+		totalIndices += faceIndices->GetSize();
+	}
+	// Reserve space
+	managed->indices.reserve(totalIndices);
+	managed->faces.reserve(facesArray->GetSize());
+	// Second pass: build indices array and face descriptors
+	uint32 currentIndexBase = 0;
+	for (uint32 faceIdx = 0; faceIdx < facesArray->GetSize(); faceIdx++) {
+		CScriptArray* faceIndices = (CScriptArray*)facesArray->At(faceIdx);
+		PolygonVertexArray::PolygonFace face;
+		face.nbVertices = faceIndices->GetSize();
+		face.indexBase = currentIndexBase;
+		managed->faces.push_back(face);
+		for (uint32 vertIdx = 0; vertIdx < faceIndices->GetSize(); vertIdx++) {
+			uint32 vertexIndex = *(uint32*)faceIndices->At(vertIdx);
+			managed->indices.push_back(vertexIndex);
+		}
+		currentIndexBase += faceIndices->GetSize();
+	}
+	uint32 nbVertices = managed->vertices.size() / 3;
+	uint32 nbFaces = managed->faces.size();
+	managed->array = new PolygonVertexArray(
+	    nbVertices,
+	    managed->vertices.data(),
+	    3 * sizeof(float),  // stride for 3 floats (x,y,z)
+	    managed->indices.data(),
+	    sizeof(uint32),  // stride for indices
+	    nbFaces,
+	    managed->faces.data(),
+	    PolygonVertexArray::VertexDataType::VERTEX_FLOAT_TYPE,
+	    PolygonVertexArray::IndexDataType::INDEX_INTEGER_TYPE);
+	return managed;
+}
+
+void triangle_vertex_array_get_triangle_vertices_indices(const TriangleVertexArray& array, uint32 triangleIndex, uint32& outV1Index, uint32& outV2Index, uint32& outV3Index) {
+	array.getTriangleVerticesIndices(triangleIndex, outV1Index, outV2Index, outV3Index);
+}
+
+void triangle_mesh_get_triangle_vertices_indices(const TriangleMesh& mesh, uint32 triangleIndex, uint32& outV1Index, uint32& outV2Index, uint32& outV3Index) {
+	mesh.getTriangleVerticesIndices(triangleIndex, outV1Index, outV2Index, outV3Index);
+}
+
+void triangle_mesh_get_triangle_vertices(const TriangleMesh& mesh, uint32 triangleIndex, Vector3& outV1, Vector3& outV2, Vector3& outV3) {
+	mesh.getTriangleVertices(triangleIndex, outV1, outV2, outV3);
+}
+
+void triangle_mesh_get_triangle_vertices_normals(const TriangleMesh& mesh, uint32 triangleIndex, Vector3& outN1, Vector3& outN2, Vector3& outN3) {
+	mesh.getTriangleVerticesNormals(triangleIndex, outN1, outN2, outN3);
+}
+
+void concave_mesh_shape_get_triangle_vertices_indices(const ConcaveMeshShape& shape, uint32 triangleIndex, uint32& outV1Index, uint32& outV2Index, uint32& outV3Index) {
+	shape.getTriangleVerticesIndices(triangleIndex, outV1Index, outV2Index, outV3Index);
+}
+
+void concave_mesh_shape_get_triangle_vertices(const ConcaveMeshShape& shape, uint32 triangleIndex, Vector3& outV1, Vector3& outV2, Vector3& outV3) {
+	shape.getTriangleVertices(triangleIndex, outV1, outV2, outV3);
+}
+
+void concave_mesh_shape_get_triangle_vertices_normals(const ConcaveMeshShape& shape, uint32 triangleIndex, Vector3& outN1, Vector3& outN2, Vector3& outN3) {
+	shape.getTriangleVerticesNormals(triangleIndex, outN1, outN2, outN3);
+}
+
+TriangleMesh* create_triangle_mesh_from_managed(ManagedTriangleData* managedArray) {
+	if (!managedArray || !managedArray->array)
+		throw std::runtime_error("Invalid managed triangle data");
+	std::vector<Message> messages;
+	TriangleMesh* mesh = g_physics.createTriangleMesh(*managedArray->array, messages);
+	// TODO: Handle messages (warnings/errors)
+	// Expose them to user?
+	return mesh;
+}
+
+ConvexMesh* create_convex_mesh_from_managed_vertex_array(ManagedVertexData* managedArray) {
+	if (!managedArray || !managedArray->array)
+		throw std::runtime_error("Invalid managed vertex data");
+	std::vector<Message> messages;
+	ConvexMesh* mesh = g_physics.createConvexMesh(*managedArray->array, messages);
+	// TODO: Handle messages (warnings/errors)
+	// Expose them to user?
+	return mesh;
+}
+
+ConvexMesh* create_convex_mesh_from_polygon_data(ManagedPolygonData* managedArray) {
+	if (!managedArray || !managedArray->array)
+		throw std::runtime_error("Invalid managed polygon data");
+	std::vector<Message> messages;
+	ConvexMesh* mesh = g_physics.createConvexMesh(*managedArray->array, messages);
+	// TODO: Handle messages (warnings/errors)
+	// Expose them to user?
+	return mesh;
+}
+
+uint32 polygon_vertex_array_get_vertex_index_in_face(const PolygonVertexArray& array, uint32 faceIndex, uint32 vertexInFace) {
+	return array.getVertexIndexInFace(faceIndex, vertexInFace);
+}
+
+// Since a polygon face is a struct with 2 ints, we need this wrapper to return it by value
+// Doesn't seem worthwhile figuring out handles for this
+PolygonVertexArray::PolygonFace polygon_vertex_array_get_polygon_face(const PolygonVertexArray& array, uint32 faceIndex) {
+	PolygonVertexArray::PolygonFace* facePtr = array.getPolygonFace(faceIndex);
+	if (!facePtr)
+		throw std::runtime_error("Invalid face index");
+	return *facePtr;
+}
+
 // Registration templates
 template <class T>
 void RegisterCollisionShape(asIScriptEngine* engine, const string& type) {
@@ -681,6 +908,99 @@ void RegisterHalfEdgeStructure(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_half_edge_structure", "const physics_half_edge_structure_face& get_face(uint index) const property", asMETHOD(HalfEdgeStructure, getFace), asCALL_THISCALL);
 }
 
+void RegisterVertexArrays(asIScriptEngine* engine) {
+	engine->RegisterEnum("physics_triangle_vertex_data_type");
+	engine->RegisterEnumValue("physics_triangle_vertex_data_type", "TRIANGLE_VERTEX_FLOAT_TYPE", int(TriangleVertexArray::VertexDataType::VERTEX_FLOAT_TYPE));
+	engine->RegisterEnumValue("physics_triangle_vertex_data_type", "TRIANGLE_VERTEX_DOUBLE_TYPE", int(TriangleVertexArray::VertexDataType::VERTEX_DOUBLE_TYPE));
+	engine->RegisterEnum("physics_triangle_normal_data_type");
+	engine->RegisterEnumValue("physics_triangle_normal_data_type", "TRIANGLE_NORMAL_FLOAT_TYPE", int(TriangleVertexArray::NormalDataType::NORMAL_FLOAT_TYPE));
+	engine->RegisterEnumValue("physics_triangle_normal_data_type", "TRIANGLE_NORMAL_DOUBLE_TYPE", int(TriangleVertexArray::NormalDataType::NORMAL_DOUBLE_TYPE));
+	engine->RegisterEnum("physics_triangle_index_data_type");
+	engine->RegisterEnumValue("physics_triangle_index_data_type", "TRIANGLE_INDEX_INTEGER_TYPE", int(TriangleVertexArray::IndexDataType::INDEX_INTEGER_TYPE));
+	engine->RegisterEnumValue("physics_triangle_index_data_type", "TRIANGLE_INDEX_SHORT_TYPE", int(TriangleVertexArray::IndexDataType::INDEX_SHORT_TYPE));
+	engine->RegisterEnum("physics_vertex_data_type");
+	engine->RegisterEnumValue("physics_vertex_data_type", "VERTEX_FLOAT_TYPE", int(VertexArray::DataType::VERTEX_FLOAT_TYPE));
+	engine->RegisterEnumValue("physics_vertex_data_type", "VERTEX_DOUBLE_TYPE", int(VertexArray::DataType::VERTEX_DOUBLE_TYPE));
+	engine->RegisterObjectType("physics_triangle_data", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("physics_triangle_data", asBEHAVE_FACTORY, "physics_triangle_data@ f(float[]@ vertices, uint[]@ indices)", asFUNCTION(create_triangle_data), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("physics_triangle_data", asBEHAVE_FACTORY, "physics_triangle_data@ f(float[]@ vertices, float[]@ normals, uint[]@ indices)", asFUNCTION(create_triangle_data_with_normals), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("physics_triangle_data", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_triangle_data", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectType("physics_vertex_data", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("physics_vertex_data", asBEHAVE_FACTORY, "physics_vertex_data@ f(float[]@ vertices)", asFUNCTION(create_vertex_data), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("physics_vertex_data", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_vertex_data", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	// Register the actual TriangleVertexArray (read-only, created by managed wrapper)
+	engine->RegisterObjectType("physics_triangle_vertex_array", 0, asOBJ_REF | asOBJ_NOHANDLE);
+	engine->RegisterObjectMethod("physics_triangle_vertex_array", "physics_triangle_vertex_data_type get_vertex_data_type() const property", asMETHOD(TriangleVertexArray, getVertexDataType), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_vertex_array", "physics_triangle_normal_data_type get_vertex_normal_data_type() const property", asMETHOD(TriangleVertexArray, getVertexNormalDataType), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_vertex_array", "bool get_has_normals() const property", asMETHOD(TriangleVertexArray, getHasNormals), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_vertex_array", "physics_triangle_index_data_type get_index_data_type() const property", asMETHOD(TriangleVertexArray, getIndexDataType), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_vertex_array", "uint get_nb_vertices() const property", asMETHOD(TriangleVertexArray, getNbVertices), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_vertex_array", "uint get_nb_triangles() const property", asMETHOD(TriangleVertexArray, getNbTriangles), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_vertex_array", "uint get_vertices_stride() const property", asMETHOD(TriangleVertexArray, getVerticesStride), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_vertex_array", "uint get_vertices_normals_stride() const property", asMETHOD(TriangleVertexArray, getVerticesNormalsStride), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_vertex_array", "uint get_indices_stride() const property", asMETHOD(TriangleVertexArray, getIndicesStride), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_vertex_array", "void get_triangle_vertices_indices(uint triangle_index, uint&out v1_index, uint&out v2_index, uint&out v3_index) const", asFUNCTION(triangle_vertex_array_get_triangle_vertices_indices), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_triangle_vertex_array", "vector get_vertex(uint vertex_index) const", asMETHOD(TriangleVertexArray, getVertex), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_vertex_array", "vector get_vertex_normal(uint vertex_index) const", asMETHOD(TriangleVertexArray, getVertexNormal), asCALL_THISCALL);
+	// Register the actual VertexArray (read-only, created by managed wrapper)
+	engine->RegisterObjectType("physics_vertex_array", 0, asOBJ_REF | asOBJ_NOHANDLE);
+	engine->RegisterObjectMethod("physics_vertex_array", "physics_vertex_data_type get_data_type() const property", asMETHOD(VertexArray, getDataType), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_vertex_array", "uint get_nb_vertices() const property", asMETHOD(VertexArray, getNbVertices), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_vertex_array", "uint get_stride() const property", asMETHOD(VertexArray, getStride), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_vertex_array", "vector get_vertex(uint index) const", asMETHOD(VertexArray, getVertex), asCALL_THISCALL);
+	engine->RegisterEnum("physics_polygon_vertex_data_type");
+	engine->RegisterEnumValue("physics_polygon_vertex_data_type", "POLYGON_VERTEX_FLOAT_TYPE", int(PolygonVertexArray::VertexDataType::VERTEX_FLOAT_TYPE));
+	engine->RegisterEnumValue("physics_polygon_vertex_data_type", "POLYGON_VERTEX_DOUBLE_TYPE", int(PolygonVertexArray::VertexDataType::VERTEX_DOUBLE_TYPE));
+	engine->RegisterEnum("physics_polygon_index_data_type");
+	engine->RegisterEnumValue("physics_polygon_index_data_type", "POLYGON_INDEX_INTEGER_TYPE", int(PolygonVertexArray::IndexDataType::INDEX_INTEGER_TYPE));
+	engine->RegisterEnumValue("physics_polygon_index_data_type", "POLYGON_INDEX_SHORT_TYPE", int(PolygonVertexArray::IndexDataType::INDEX_SHORT_TYPE));
+	engine->RegisterObjectType("physics_polygon_face", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("physics_polygon_face", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_polygon_face", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectProperty("physics_polygon_face", "uint nb_vertices", asOFFSET(PolygonVertexArray::PolygonFace, nbVertices));
+	engine->RegisterObjectProperty("physics_polygon_face", "uint index_base", asOFFSET(PolygonVertexArray::PolygonFace, indexBase));
+	// Register managed polygon data wrapper
+	engine->RegisterObjectType("physics_polygon_data", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("physics_polygon_data", asBEHAVE_FACTORY, "physics_polygon_data@ f(float[]@ vertices, array<array<uint>>@ faces)", asFUNCTION(create_polygon_data), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("physics_polygon_data", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_polygon_data", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	// Register the actual PolygonVertexArray (read-only, created by managed wrapper)
+	engine->RegisterObjectType("physics_polygon_vertex_array", 0, asOBJ_REF | asOBJ_NOHANDLE);
+	engine->RegisterObjectMethod("physics_polygon_vertex_array", "physics_polygon_vertex_data_type get_vertex_data_type() const property", asMETHOD(PolygonVertexArray, getVertexDataType), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_polygon_vertex_array", "physics_polygon_index_data_type get_index_data_type() const property", asMETHOD(PolygonVertexArray, getIndexDataType), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_polygon_vertex_array", "uint get_nb_vertices() const property", asMETHOD(PolygonVertexArray, getNbVertices), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_polygon_vertex_array", "uint get_nb_faces() const property", asMETHOD(PolygonVertexArray, getNbFaces), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_polygon_vertex_array", "uint get_vertices_stride() const property", asMETHOD(PolygonVertexArray, getVerticesStride), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_polygon_vertex_array", "uint get_indices_stride() const property", asMETHOD(PolygonVertexArray, getIndicesStride), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_polygon_vertex_array", "uint get_vertex_index_in_face(uint face_index, uint vertex_in_face) const", asFUNCTION(polygon_vertex_array_get_vertex_index_in_face), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_polygon_vertex_array", "vector get_vertex(uint vertex_index) const", asMETHOD(PolygonVertexArray, getVertex), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_polygon_vertex_array", "physics_polygon_face@ get_polygon_face(uint face_index) const", asMETHOD(PolygonVertexArray, getPolygonFace), asCALL_THISCALL);
+}
+
+void RegisterTriangleMeshAndConcaveShape(asIScriptEngine* engine) {
+	engine->RegisterObjectType("physics_triangle_mesh", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("physics_triangle_mesh", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_triangle_mesh", asBEHAVE_RELEASE, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_triangle_mesh", "uint get_nb_vertices() const property", asMETHOD(TriangleMesh, getNbVertices), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_mesh", "uint get_nb_triangles() const property", asMETHOD(TriangleMesh, getNbTriangles), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_mesh", "const aabb& get_bounds() const property", asMETHOD(TriangleMesh, getBounds), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_mesh", "void get_triangle_vertices_indices(uint triangle_index, uint&out v1_index, uint&out v2_index, uint&out v3_index) const", asFUNCTION(triangle_mesh_get_triangle_vertices_indices), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_triangle_mesh", "void get_triangle_vertices(uint triangle_index, vector&out v1, vector&out v2, vector&out v3) const", asFUNCTION(triangle_mesh_get_triangle_vertices), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_triangle_mesh", "void get_triangle_vertices_normals(uint triangle_index, vector&out n1, vector&out n2, vector&out n3) const", asFUNCTION(triangle_mesh_get_triangle_vertices_normals), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_triangle_mesh", "const vector& get_vertex(uint vertex_index) const", asMETHOD(TriangleMesh, getVertex), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_triangle_mesh", "const vector& get_vertex_normal(uint vertex_index) const", asMETHOD(TriangleMesh, getVertexNormal), asCALL_THISCALL);
+	RegisterConcaveShape<ConcaveMeshShape>(engine, "physics_concave_mesh_shape");
+	engine->RegisterObjectMethod("physics_concave_mesh_shape", "uint get_nb_vertices() const property", asMETHOD(ConcaveMeshShape, getNbVertices), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_concave_mesh_shape", "uint get_nb_triangles() const property", asMETHOD(ConcaveMeshShape, getNbTriangles), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_concave_mesh_shape", "void get_triangle_vertices_indices(uint triangle_index, uint&out v1_index, uint&out v2_index, uint&out v3_index) const", asFUNCTION(concave_mesh_shape_get_triangle_vertices_indices), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_concave_mesh_shape", "void get_triangle_vertices(uint triangle_index, vector&out v1, vector&out v2, vector&out v3) const", asFUNCTION(concave_mesh_shape_get_triangle_vertices), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_concave_mesh_shape", "void get_triangle_vertices_normals(uint triangle_index, vector&out n1, vector&out n2, vector&out n3) const", asFUNCTION(concave_mesh_shape_get_triangle_vertices_normals), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_concave_mesh_shape", "vector get_vertex(uint vertex_index) const", asMETHOD(ConcaveMeshShape, getVertex), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_concave_mesh_shape", "const vector& get_vertex_normal(uint vertex_index) const", asMETHOD(ConcaveMeshShape, getVertexNormal), asCALL_THISCALL);
+}
+
 void RegisterPhysicsWorldAndCallbacks(asIScriptEngine* engine) {
 	engine->RegisterObjectType("physics_contact_point", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("physics_contact_point", asBEHAVE_ADDREF, "void f()", asFUNCTION(no_refcount), asCALL_CDECL_OBJFIRST);
@@ -857,19 +1177,30 @@ CollisionShape* height_field_to_collision_shape(HeightFieldShape* shape) {
 	return static_cast<CollisionShape*>(shape);
 }
 
+CollisionShape* concave_mesh_to_collision_shape(ConcaveMeshShape* shape) {
+	return static_cast<CollisionShape*>(shape);
+}
+
 void RegisterPhysicsCommonFactories(asIScriptEngine* engine) {
 	// Collision Shape Factories
+	engine->RegisterObjectBehaviour("physics_concave_mesh_shape", asBEHAVE_FACTORY, "physics_concave_mesh_shape@ f(physics_triangle_mesh@ triangle_mesh, const vector&in scaling = vector(1,1,1))", asMETHOD(PhysicsCommon, createConcaveMeshShape), asCALL_THISCALL_ASGLOBAL, &g_physics);
 	engine->RegisterObjectBehaviour("physics_sphere_shape", asBEHAVE_FACTORY, "physics_sphere_shape@ f(float radius)", asMETHOD(PhysicsCommon, createSphereShape), asCALL_THISCALL_ASGLOBAL, &g_physics);
 	engine->RegisterObjectBehaviour("physics_box_shape", asBEHAVE_FACTORY, "physics_box_shape@ f(const vector&in half_extents)", asMETHOD(PhysicsCommon, createBoxShape), asCALL_THISCALL_ASGLOBAL, &g_physics);
 	engine->RegisterObjectBehaviour("physics_capsule_shape", asBEHAVE_FACTORY, "physics_capsule_shape@ f(float radius, float height)", asMETHOD(PhysicsCommon, createCapsuleShape), asCALL_THISCALL_ASGLOBAL, &g_physics);
 	engine->RegisterObjectBehaviour("physics_convex_mesh_shape", asBEHAVE_FACTORY, "physics_convex_mesh_shape@ f(physics_convex_mesh@ convex_mesh, const vector&in scaling = vector(1,1,1))", asMETHOD(PhysicsCommon, createConvexMeshShape), asCALL_THISCALL_ASGLOBAL, &g_physics);
 	engine->RegisterObjectBehaviour("physics_height_field_shape", asBEHAVE_FACTORY, "physics_height_field_shape@ f(physics_height_field@ height_field, const vector&in scaling = vector(1,1,1))", asMETHOD(PhysicsCommon, createHeightFieldShape), asCALL_THISCALL_ASGLOBAL, &g_physics);
+	engine->RegisterGlobalFunction("physics_triangle_mesh@ physics_triangle_mesh_create(physics_triangle_data@ triangle_data)", asFUNCTION(create_triangle_mesh_from_managed), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_convex_mesh@ physics_convex_mesh_create(physics_vertex_data@ vertex_data)", asFUNCTION(create_convex_mesh_from_managed_vertex_array), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_convex_mesh@ physics_convex_mesh_create_from_polygon(physics_polygon_data@ polygon_data)", asFUNCTION(create_convex_mesh_from_polygon_data), asCALL_CDECL);
 	// Shape destruction functions
 	engine->RegisterGlobalFunction("void physics_sphere_shape_destroy(physics_sphere_shape@ shape)", asFUNCTION(sphere_shape_destroy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void physics_box_shape_destroy(physics_box_shape@ shape)", asFUNCTION(box_shape_destroy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void physics_capsule_shape_destroy(physics_capsule_shape@ shape)", asFUNCTION(capsule_shape_destroy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void physics_convex_mesh_shape_destroy(physics_convex_mesh_shape@ shape)", asFUNCTION(convex_mesh_shape_destroy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void physics_height_field_shape_destroy(physics_height_field_shape@ shape)", asFUNCTION(height_field_shape_destroy), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void physics_triangle_mesh_destroy(physics_triangle_mesh@ mesh)", asFUNCTION(triangle_mesh_destroy), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void physics_concave_mesh_shape_destroy(physics_concave_mesh_shape@ shape)", asFUNCTION(concave_mesh_shape_destroy), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void physics_convex_mesh_destroy(physics_convex_mesh@ mesh)", asFUNCTION(convex_mesh_destroy), asCALL_CDECL);
 }
 
 void RegisterShapeConversions(asIScriptEngine* engine) {
@@ -879,6 +1210,7 @@ void RegisterShapeConversions(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_triangle_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(triangle_to_collision_shape), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_convex_mesh_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(convex_mesh_to_collision_shape), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_height_field_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(height_field_to_collision_shape), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_concave_mesh_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(concave_mesh_to_collision_shape), asCALL_CDECL_OBJFIRST);
 }
 
 void RegisterReactphysics(asIScriptEngine* engine) {
@@ -891,6 +1223,8 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	RegisterPhysicsBodies(engine);
 	RegisterJointTypes(engine);
 	RegisterHeightFieldAndMeshTypes(engine);
+	RegisterVertexArrays(engine);
+	RegisterTriangleMeshAndConcaveShape(engine);
 	RegisterPhysicsWorldAndCallbacks(engine);
 	RegisterPhysicsCommonFactories(engine);
 	RegisterShapeConversions(engine);

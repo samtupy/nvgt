@@ -1,0 +1,304 @@
+void main() {
+    // Create a simple triangle
+    float[] triangleVertices = {
+        -1.0f, 0.0f, 0.0f,  // vertex 0: left
+         1.0f, 0.0f, 0.0f,  // vertex 1: right
+         0.0f, 1.0f, 0.0f   // vertex 2: top
+    };
+
+    uint[] triangleIndices = {
+        0, 1, 2  // single triangle
+    };
+
+    physics_triangle_data@ simpleTriangleData = physics_triangle_data(triangleVertices, triangleIndices);
+    physics_triangle_mesh@ simpleTriangleMesh = physics_triangle_mesh_create(simpleTriangleData);
+
+    println("Simple triangle mesh created:");
+    println("  Vertices: ", simpleTriangleMesh.nb_vertices);
+    println("  Triangles: ", simpleTriangleMesh.nb_triangles);
+
+    uint v1, v2, v3;
+    simpleTriangleMesh.get_triangle_vertices_indices(0, v1, v2, v3);
+    println("  Triangle 0 indices: " + v1 + " " + v2 + " " + v3);
+
+    vector vert0 = simpleTriangleMesh.get_vertex(0);
+    vector vert1 = simpleTriangleMesh.get_vertex(1);
+    vector vert2 = simpleTriangleMesh.get_vertex(2);
+    println("  Vertex 0: " + vert0.x + " " + vert0.y + " " + vert0.z);
+    println("  Vertex 1: " + vert1.x + " " + vert1.y + " " + vert1.z);
+    println("  Vertex 2: " + vert2.x + " " + vert2.y + " " + vert2.z);
+
+    vector tv1, tv2, tv3;
+    simpleTriangleMesh.get_triangle_vertices(0, tv1, tv2, tv3);
+    println("  Triangle vertices:");
+    println("    V1: " + tv1.x + " " + tv1.y + " " + tv1.z);
+    println("    V2: " + tv2.x + " " + tv2.y + " " + tv2.z);
+    println("    V3: " + tv3.x + " " + tv3.y + " " + tv3.z);
+
+    // Create a quad (2 triangles) with custom normals
+    float[] quadVertices = {
+        -1.0f, 0.0f, -1.0f,  // 0: back-left
+         1.0f, 0.0f, -1.0f,  // 1: back-right
+         1.0f, 0.0f,  1.0f,  // 2: front-right
+        -1.0f, 0.0f,  1.0f   // 3: front-left
+    };
+
+    // Custom normals (all pointing up)
+    float[] quadNormals = {
+        0.0f, 1.0f, 0.0f,    // normal for vertex 0
+        0.0f, 1.0f, 0.0f,    // normal for vertex 1
+        0.0f, 1.0f, 0.0f,    // normal for vertex 2
+        0.0f, 1.0f, 0.0f     // normal for vertex 3
+    };
+
+    uint[] quadIndices = {
+        0, 1, 2,    // first triangle
+        0, 2, 3     // second triangle
+    };
+
+    physics_triangle_data@ quadData = physics_triangle_data(quadVertices, quadNormals, quadIndices);
+    physics_triangle_mesh@ quadMesh = physics_triangle_mesh_create(quadData);
+
+    println("Quad mesh with normals created:");
+    println("  Vertices: ", quadMesh.nb_vertices);
+    println("  Triangles: ", quadMesh.nb_triangles);
+
+    vector norm0 = quadMesh.get_vertex_normal(0);
+    vector norm1 = quadMesh.get_vertex_normal(1);
+    println("  Vertex 0 normal: " + norm0.x + " " + norm0.y + " " + norm0.z);
+    println("  Vertex 1 normal: " + norm1.x + " " + norm1.y + " " + norm1.z);
+
+    vector tn1, tn2, tn3;
+    quadMesh.get_triangle_vertices_normals(0, tn1, tn2, tn3);
+    println("  Triangle 0 normals:");
+    println("    N1: " + tn1.x + " " + tn1.y + " " + tn1.z);
+    println("    N2: " + tn2.x + " " + tn2.y + " " + tn2.z);
+    println("    N3: " + tn3.x + " " + tn3.y + " " + tn3.z);
+
+    // Pyramid
+    float[] pyramidVertices = {
+        // Base vertices (square)
+        -2.0f, 0.0f, -2.0f,  // 0: back-left
+         2.0f, 0.0f, -2.0f,  // 1: back-right
+         2.0f, 0.0f,  2.0f,  // 2: front-right
+        -2.0f, 0.0f,  2.0f,  // 3: front-left
+        // Apex vertex
+         0.0f, 3.0f,  0.0f   // 4: top
+    };
+
+    uint[] pyramidIndices = {
+        // Base (2 triangles)
+        0, 2, 1,    // base triangle 1
+        0, 3, 2,    // base triangle 2
+        // Side faces
+        0, 1, 4,    // back face
+        1, 2, 4,    // right face
+        2, 3, 4,    // front face
+        3, 0, 4     // left face
+    };
+
+    physics_triangle_data@ pyramidData = physics_triangle_data(pyramidVertices, pyramidIndices);
+    physics_triangle_mesh@ pyramidMesh = physics_triangle_mesh_create(pyramidData);
+
+    println("Pyramid mesh created:");
+    println("  Vertices: ", pyramidMesh.nb_vertices);
+    println("  Triangles: ", pyramidMesh.nb_triangles);
+
+    aabb bounds = pyramidMesh.bounds;
+    println("  Bounds min: " + bounds.min.x + " " + bounds.min.y + " " + bounds.min.z);
+    println("  Bounds max: " + bounds.max.x + " " + bounds.max.y + " " + bounds.max.z);
+    println("  Bounds center: " + bounds.center.x + " " + bounds.center.y + " " + bounds.center.z);
+
+    println("  All triangle indices:");
+    for (uint i = 0; i < pyramidMesh.nb_triangles; i++) {
+        uint i1, i2, i3;
+        pyramidMesh.get_triangle_vertices_indices(i, i1, i2, i3);
+        println("    Triangle " + i + ": " + i1 + " " + i2 + " " + i3);
+    }
+
+    // Create concave mesh shapes from our triangle meshes
+    physics_concave_mesh_shape@ triangleShape = physics_concave_mesh_shape(simpleTriangleMesh);
+    physics_concave_mesh_shape@ quadShape = physics_concave_mesh_shape(quadMesh);
+    physics_concave_mesh_shape@ pyramidShape = physics_concave_mesh_shape(pyramidMesh);
+
+    println("Created concave mesh shapes:");
+
+    println("Triangle shape:");
+    println("  Vertices: ", triangleShape.nb_vertices);
+    println("  Triangles: ", triangleShape.nb_triangles);
+    println("  Volume: ", triangleShape.volume);
+
+    println("Quad shape:");
+    println("  Vertices: ", quadShape.nb_vertices);
+    println("  Triangles: ", quadShape.nb_triangles);
+    println("  Volume: ", quadShape.volume);
+
+    println("Pyramid shape:");
+    println("  Vertices: ", pyramidShape.nb_vertices);
+    println("  Triangles: ", pyramidShape.nb_triangles);
+
+    // This is a bit funky
+    // The rp3d docs say as follows:
+    // Compute and return the volume of the collision shape.
+    // Note that we approximate the volume of a concave shape with the volume of its AABB.
+    // So for us our AABB is 4 * 4 and since we're 3 units tall we need 4 * 4 * 3 = 48 units to enclose our pyramid
+    println("  Volume: ", pyramidShape.volume);
+
+    vector shapeVert = pyramidShape.get_vertex(4); // apex vertex
+    println("  Pyramid apex vertex: " + shapeVert.x + " " + shapeVert.y + " " + shapeVert.z);
+
+    uint si1, si2, si3;
+    pyramidShape.get_triangle_vertices_indices(0, si1, si2, si3);
+    println("  Pyramid triangle 0 indices: " + si1 + " " + si2 + " " + si3);
+
+    println("Scaling the pyramid");
+    vector scaling = vector(2.0f, 0.5f, 1.5f);
+    physics_concave_mesh_shape@ scaledPyramidShape = physics_concave_mesh_shape(pyramidMesh, scaling);
+
+    println("  Volume: ", scaledPyramidShape.volume);
+
+    vector scaledApex = scaledPyramidShape.get_vertex(4);
+    println("  Scaled apex vertex:"  + " " + scaledApex.x + " " + scaledApex.y + " " + scaledApex.z);
+
+    // Create a simple tetrahedron for convex mesh
+    float[] tetraVertices = {
+         1.0f,  1.0f,  1.0f,   // vertex 0
+        -1.0f, -1.0f,  1.0f,   // vertex 1
+        -1.0f,  1.0f, -1.0f,   // vertex 2
+         1.0f, -1.0f, -1.0f    // vertex 3
+    };
+
+    physics_vertex_data@ vertexData = physics_vertex_data(tetraVertices);
+    physics_convex_mesh@ convexMesh = physics_convex_mesh_create(vertexData);
+
+    if (convexMesh !is null) {
+        println("Convex mesh created:");
+        println("  Vertices: ", convexMesh.nb_vertices);
+        println("  Faces: ", convexMesh.nb_faces);
+        println("  Volume: ", convexMesh.volume);
+
+        aabb convexBounds = convexMesh.bounds;
+        println("  Bounds min: " + convexBounds.min.x + " " + convexBounds.min.y + " " + convexBounds.min.z);
+        println("  Bounds max: " + convexBounds.max.x + " " + convexBounds.max.y + " " + convexBounds.max.z);
+
+        vector centroid = convexMesh.centroid;
+        println("  Centroid: " + centroid.x + " " + centroid.y + " " + centroid.z);
+
+        physics_convex_mesh_shape@ convexShape = physics_convex_mesh_shape(convexMesh);
+        println("  Convex mesh shape volume: ", convexShape.volume);
+        println("  Convex mesh shape margin: ", convexShape.margin);
+
+        physics_convex_mesh_shape_destroy(convexShape);
+        physics_convex_mesh_destroy(convexMesh);
+    } else {
+        // Shouldn't happen!
+        println("Failed to create convex mesh (might need more vertices or better distribution)");
+    }
+
+    // Create a cube with explicit face definitions
+    float[] cubeVertices = {
+        // Bottom face
+        -1.0f, -1.0f, -1.0f,  // 0: back-left-bottom
+         1.0f, -1.0f, -1.0f,  // 1: back-right-bottom
+         1.0f, -1.0f,  1.0f,  // 2: front-right-bottom
+        -1.0f, -1.0f,  1.0f,  // 3: front-left-bottom
+        // Top face  
+        -1.0f,  1.0f, -1.0f,  // 4: back-left-top
+         1.0f,  1.0f, -1.0f,  // 5: back-right-top
+         1.0f,  1.0f,  1.0f,  // 6: front-right-top
+        -1.0f,  1.0f,  1.0f   // 7: front-left-top
+    };
+
+    // Define faces explicitly (each face is a quad)
+    array<array<uint>> cubeFaces = {
+        {0, 1, 2, 3},  // bottom face
+        {4, 7, 6, 5},  // top face
+        {0, 4, 5, 1},  // back face
+        {2, 6, 7, 3},  // front face
+        {0, 3, 7, 4},  // left face
+        {1, 5, 6, 2}   // right face
+    };
+
+    physics_polygon_data@ cubePolygonData = physics_polygon_data(cubeVertices, cubeFaces);
+    physics_convex_mesh@ explicitCubeMesh = physics_convex_mesh_create_from_polygon(cubePolygonData);
+
+    if (explicitCubeMesh !is null) {
+        println("Explicit cube mesh created:");
+        println("  Vertices: ", explicitCubeMesh.nb_vertices);
+        println("  Faces: ", explicitCubeMesh.nb_faces);
+
+        println("  Volume: ", explicitCubeMesh.volume);
+        vector explicitCentroid = explicitCubeMesh.centroid;
+        println("  Centroid: " + explicitCentroid.x + " " + explicitCentroid.y + " " + explicitCentroid.z);
+
+        // Compare with auto convex hull of same vertices
+        println("Comparing with auto convex hull:");
+        physics_vertex_data@ autoCubeData = physics_vertex_data(cubeVertices);
+        physics_convex_mesh@ autoCubeMesh = physics_convex_mesh_create(autoCubeData);
+
+        if (autoCubeMesh !is null) {
+            println("Auto cube mesh created:");
+            println("  Vertices: ", autoCubeMesh.nb_vertices);
+            println("  Faces: ", autoCubeMesh.nb_faces);
+            println("  Volume: ", autoCubeMesh.volume);
+
+            float volumeDiff = explicitCubeMesh.volume - autoCubeMesh.volume;
+            println("  Volume difference: " + volumeDiff + " (should be close to 0)");
+
+            physics_convex_mesh_destroy(autoCubeMesh);
+        } else {
+            // Shouldn't happen!
+            println("Failed to create autoCube mesh");
+        }
+
+        float[] mixedVertices = {
+            0.0f,  1.5f,  0.0f,   // 0: top vertex
+            -1.0f, -1.0f, -1.0f,   // 1: base corner 1
+            1.0f, -1.0f, -1.0f,   // 2: base corner 2  
+            1.0f, -1.0f,  1.0f,   // 3: base corner 3
+            -1.0f, -1.0f,  1.0f    // 4: base corner 4
+        };
+
+        array<array<uint>> mixedFaces = {
+            {0, 1, 2},        // triangle face (side)
+            {0, 2, 3},        // triangle face (side)
+            {0, 3, 4},        // triangle face (side)  
+            {0, 4, 1},        // triangle face (side)
+            {1, 2, 3, 4}      // quad face (base - 4 vertices)
+        };        
+
+        physics_polygon_data@ mixedPolygonData = physics_polygon_data(mixedVertices, mixedFaces);
+        physics_convex_mesh@ mixedMesh = physics_convex_mesh_create_from_polygon(mixedPolygonData);
+
+        if (mixedMesh !is null) {
+            println("Mixed face types mesh created:");
+            println("  Vertices: ", mixedMesh.nb_vertices);
+            println("  Faces: ", mixedMesh.nb_faces);
+            println("  Volume: ", mixedMesh.volume);
+
+            for (uint i = 0; i < mixedMesh.nb_faces; i++) {
+                vector faceNormal = mixedMesh.get_face_normal(i);
+                println("  Face " + i + " normal: " + faceNormal.x + " " + faceNormal.y + " " + faceNormal.z);
+            }
+
+            physics_convex_mesh_destroy(mixedMesh);
+        } else {
+            // Shouldn't happen!
+            println("Failed to create mixed face mesh");
+        }
+
+        physics_convex_mesh_destroy(explicitCubeMesh);
+    } else {
+        // Shouldn't happen!
+        println("Failed to create explicit cube mesh");
+    }
+
+    physics_concave_mesh_shape_destroy(triangleShape);
+    physics_concave_mesh_shape_destroy(quadShape);
+    physics_concave_mesh_shape_destroy(pyramidShape);
+    physics_concave_mesh_shape_destroy(scaledPyramidShape);
+
+    physics_triangle_mesh_destroy(simpleTriangleMesh);
+    physics_triangle_mesh_destroy(quadMesh);
+    physics_triangle_mesh_destroy(pyramidMesh);
+}
