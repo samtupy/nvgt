@@ -310,6 +310,7 @@ protected:
 			return Application::EXIT_CONFIG;
 		}
 		#endif
+		g_scriptpath = Path(scriptfile).makeParent().toString();
 		setupCommandLineProperty(args, 1);
 		g_command_line_args->InsertAt(0, (void *)&scriptfile);
 		ConfigureEngineOptions(g_ScriptEngine);
