@@ -614,6 +614,70 @@ void world_destroy_rigid_body(PhysicsWorld* world, RigidBody* body) {
 	world->destroyRigidBody(body);
 }
 
+HeightField* create_height_field_float(int nbGridColumns, int nbGridRows, CScriptArray* heightData, decimal integerHeightScale) {
+	if (!heightData) throw std::runtime_error("Height data array cannot be null");
+	uint32 expectedSize = nbGridColumns * nbGridRows;
+	if (heightData->GetSize() != expectedSize) {
+		throw std::runtime_error("Height data array size (" + std::to_string(heightData->GetSize()) +
+		                         ") must match grid dimensions (" + std::to_string(expectedSize) + ")");
+	}
+	std::vector<float> heightBuffer(expectedSize);
+	for (uint32 i = 0; i < expectedSize; i++)
+		heightBuffer[i] = *(float*)heightData->At(i);
+	std::vector<Message> messages;
+	HeightField* heightField = g_physics.createHeightField(
+	                               nbGridColumns,
+	                               nbGridRows,
+	                               heightBuffer.data(),
+	                               HeightField::HeightDataType::HEIGHT_FLOAT_TYPE,
+	                               messages,
+	                               integerHeightScale);
+	// TODO: Handle messages - could expose them to script or log them
+	return heightField;
+}
+
+HeightField* create_height_field_int(int nbGridColumns, int nbGridRows, CScriptArray* heightData, decimal integerHeightScale) {
+	if (!heightData) throw std::runtime_error("Height data array cannot be null");
+	uint32 expectedSize = nbGridColumns * nbGridRows;
+	if (heightData->GetSize() != expectedSize) {
+		throw std::runtime_error("Height data array size (" + std::to_string(heightData->GetSize()) +
+		                         ") must match grid dimensions (" + std::to_string(expectedSize) + ")");
+	}
+	std::vector<int> heightBuffer(expectedSize);
+	for (uint32 i = 0; i < expectedSize; i++)
+		heightBuffer[i] = *(int*)heightData->At(i);
+	std::vector<Message> messages;
+	HeightField* heightField = g_physics.createHeightField(
+	                               nbGridColumns,
+	                               nbGridRows,
+	                               heightBuffer.data(),
+	                               HeightField::HeightDataType::HEIGHT_INT_TYPE,
+	                               messages,
+	                               integerHeightScale);
+	return heightField;
+}
+
+HeightField* create_height_field_double(int nbGridColumns, int nbGridRows, CScriptArray* heightData, decimal integerHeightScale) {
+	if (!heightData) throw std::runtime_error("Height data array cannot be null");
+	uint32 expectedSize = nbGridColumns * nbGridRows;
+	if (heightData->GetSize() != expectedSize) {
+		throw std::runtime_error("Height data array size (" + std::to_string(heightData->GetSize()) +
+		                         ") must match grid dimensions (" + std::to_string(expectedSize) + ")");
+	}
+	std::vector<double> heightBuffer(expectedSize);
+	for (uint32 i = 0; i < expectedSize; i++)
+		heightBuffer[i] = *(double*)heightData->At(i);
+	std::vector<Message> messages;
+	HeightField* heightField = g_physics.createHeightField(
+	                               nbGridColumns,
+	                               nbGridRows,
+	                               heightBuffer.data(),
+	                               HeightField::HeightDataType::HEIGHT_DOUBLE_TYPE,
+	                               messages,
+	                               integerHeightScale);
+	return heightField;
+}
+
 // Registration templates
 template <class T>
 void RegisterCollisionShape(asIScriptEngine* engine, const string& type) {
@@ -1310,6 +1374,9 @@ void RegisterPhysicsCommonFactories(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("physics_triangle_mesh@ physics_triangle_mesh_create(physics_triangle_data@ triangle_data)", asFUNCTION(create_triangle_mesh_from_managed), asCALL_CDECL);
 	engine->RegisterGlobalFunction("physics_convex_mesh@ physics_convex_mesh_create(physics_vertex_data@ vertex_data)", asFUNCTION(create_convex_mesh_from_managed_vertex_array), asCALL_CDECL);
 	engine->RegisterGlobalFunction("physics_convex_mesh@ physics_convex_mesh_create_from_polygon(physics_polygon_data@ polygon_data)", asFUNCTION(create_convex_mesh_from_polygon_data), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_height_field@ physics_height_field_create(int nb_columns, int nb_rows, float[]@ height_data, float integer_height_scale = 1.0f)", asFUNCTION(create_height_field_float), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_height_field@ physics_height_field_create(int nb_columns, int nb_rows, int[]@ height_data, float integer_height_scale = 1.0f)", asFUNCTION(create_height_field_int), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_height_field@ physics_height_field_create(int nb_columns, int nb_rows, double[]@ height_data, float integer_height_scale = 1.0f)", asFUNCTION(create_height_field_double), asCALL_CDECL);
 	// Shape destruction functions
 	engine->RegisterGlobalFunction("void physics_sphere_shape_destroy(physics_sphere_shape@ shape)", asFUNCTION(sphere_shape_destroy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void physics_box_shape_destroy(physics_box_shape@ shape)", asFUNCTION(box_shape_destroy), asCALL_CDECL);
@@ -1322,6 +1389,7 @@ void RegisterPhysicsCommonFactories(asIScriptEngine* engine) {
 	// Generic global destroy
 	engine->RegisterGlobalFunction("void physics_shape_destroy(physics_collision_shape@ shape)",
 	                               asFUNCTION(physics_shape_destroy), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void physics_height_field_destroy(physics_height_field@ height_field)", asFUNCTION(height_field_destroy), asCALL_CDECL);
 }
 
 void RegisterShapeConversions(asIScriptEngine* engine) {
