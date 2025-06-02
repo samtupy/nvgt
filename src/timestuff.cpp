@@ -158,7 +158,7 @@ uint64_t timer_queue::elapsed(const std::string &id) {
 	auto it = timer_objects.find(id);
 	if (it == timer_objects.end())
 		return 0;
-	return it->second->scheduled_at() - timers.now();
+	return timers.now() - it->second->scheduled_at();
 }
 uint64_t timer_queue::timeout(const std::string &id) {
 	auto it = timer_objects.find(id);
