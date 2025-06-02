@@ -235,6 +235,81 @@ void default_logger_destroy(DefaultLogger* logger) {
 	g_physics.destroyDefaultLogger(logger);
 }
 
+/**
+ * Unified collision shape destroyer that automatically dispatches to the
+ * correct destroy function based on the shape's runtime type information.
+ * This eliminates the need for users to know the specific shape type when
+ * destroying shapes.
+ */
+void physics_shape_destroy(CollisionShape* shape) {
+	if (!shape)
+		throw std::runtime_error("Cannot destroy null collision shape");
+	// First dispatch on the broad shape type
+	CollisionShapeType shapeType = shape->getType();
+	switch (shapeType) {
+		case CollisionShapeType::SPHERE: {
+			SphereShape* sphereShape = static_cast<SphereShape*>(shape);
+			sphere_shape_destroy(sphereShape);
+			break;
+		}
+		case CollisionShapeType::CONVEX_POLYHEDRON: {
+			// Convex polyhedrons need further disambiguation by name
+			// We do not include triangle here; mainly because rp3d does not offer the function to destroy them
+			CollisionShapeName shapeName = shape->getName();
+			switch (shapeName) {
+				case CollisionShapeName::BOX: {
+					BoxShape* boxShape = static_cast<BoxShape*>(shape);
+					box_shape_destroy(boxShape);
+					break;
+				}
+				case CollisionShapeName::CAPSULE: {
+					CapsuleShape* capsuleShape = static_cast<CapsuleShape*>(shape);
+					capsule_shape_destroy(capsuleShape);
+					break;
+				}
+				case CollisionShapeName::CONVEX_MESH: {
+					ConvexMeshShape* convexMeshShape = static_cast<ConvexMeshShape*>(shape);
+					convex_mesh_shape_destroy(convexMeshShape);
+					break;
+				}
+				default: {
+					std::string errorMsg = "Unknown convex polyhedron shape name: " +
+					                       std::to_string(static_cast<int>(shapeName));
+					throw std::runtime_error(errorMsg);
+				}
+			}
+			break;
+		}
+		case CollisionShapeType::CONCAVE_SHAPE: {
+			// Concave shapes also need disambiguation by name
+			CollisionShapeName shapeName = shape->getName();
+			switch (shapeName) {
+				case CollisionShapeName::TRIANGLE_MESH: {
+					ConcaveMeshShape* concaveShape = static_cast<ConcaveMeshShape*>(shape);
+					concave_mesh_shape_destroy(concaveShape);
+					break;
+				}
+				case CollisionShapeName::HEIGHTFIELD: {
+					HeightFieldShape* heightFieldShape = static_cast<HeightFieldShape*>(shape);
+					height_field_shape_destroy(heightFieldShape);
+					break;
+				}
+				default: {
+					std::string errorMsg = "Unknown concave shape name: " +
+					                       std::to_string(static_cast<int>(shapeName));
+					throw std::runtime_error(errorMsg);
+				}
+			}
+			break;
+		}
+		default: {
+			std::string errorMsg = "Unknown collision shape type: " +
+			                       std::to_string(static_cast<int>(shapeType));
+			throw std::runtime_error(errorMsg);
+		}
+	}
+}
+
 // Half-edge structure helper functions
 CScriptArray* face_get_vertices(const HalfEdgeStructure::Face& f) {
 	CScriptArray* array = CScriptArray::Create(get_array_type("array<uint>"), f.faceVertices.size());
@@ -473,6 +548,44 @@ PolygonVertexArray::PolygonFace polygon_vertex_array_get_polygon_face(const Poly
 	if (!facePtr)
 		throw std::runtime_error("Invalid face index");
 	return *facePtr;
+}
+
+// Shape conversion functions
+CollisionShape* sphere_to_collision_shape(SphereShape* shape) {
+	return static_cast<CollisionShape*>(shape);
+}
+
+CollisionShape* box_to_collision_shape(BoxShape* shape) {
+	return static_cast<CollisionShape*>(shape);
+}
+
+CollisionShape* capsule_to_collision_shape(CapsuleShape* shape) {
+	return static_cast<CollisionShape*>(shape);
+}
+
+CollisionShape* triangle_to_collision_shape(TriangleShape* shape) {
+	return static_cast<CollisionShape*>(shape);
+}
+
+CollisionShape* convex_mesh_to_collision_shape(ConvexMeshShape* shape) {
+	return static_cast<CollisionShape*>(shape);
+}
+
+CollisionShape* height_field_to_collision_shape(HeightFieldShape* shape) {
+	return static_cast<CollisionShape*>(shape);
+}
+
+CollisionShape* concave_mesh_to_collision_shape(ConcaveMeshShape* shape) {
+	return static_cast<CollisionShape*>(shape);
+}
+
+CollisionShape* collision_shape_dummy_construct() {
+	return nullptr;
+}
+
+CollisionShape* collision_shape_assign(CollisionShape* self, CollisionShape* other) {
+	// For reference types, assignment is just copying the handle
+	return other;
 }
 
 // Registration templates
@@ -857,6 +970,8 @@ void RegisterPhysicsBodies(asIScriptEngine* engine) {
 
 void RegisterCollisionShapes(asIScriptEngine* engine) {
 	RegisterCollisionShape<CollisionShape>(engine, "physics_collision_shape");
+	// engine->RegisterObjectBehaviour("physics_collision_shape", asBEHAVE_FACTORY, "physics_collision_shape@ f()", asFUNCTION(collision_shape_dummy_construct), asCALL_CDECL);
+	engine->RegisterObjectMethod("physics_collision_shape", "physics_collision_shape@ opAssign(const physics_collision_shape@)", asFUNCTION(collision_shape_assign), asCALL_CDECL_OBJFIRST);
 	// Forward declare types to be registered later
 	engine->RegisterObjectType("physics_height_field", 0, asOBJ_REF);
 	RegisterConvexShape<SphereShape>(engine, "physics_sphere_shape");
@@ -882,6 +997,7 @@ void RegisterCollisionShapes(asIScriptEngine* engine) {
 	RegisterConcaveShape<HeightFieldShape>(engine, "physics_height_field_shape");
 	engine->RegisterObjectMethod("physics_height_field_shape", "physics_height_field@ get_height_field() const property", asMETHOD(HeightFieldShape, getHeightField), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_height_field_shape", "vector get_vertex_at(uint x, uint y) const", asMETHOD(HeightFieldShape, getVertexAt), asCALL_THISCALL);
+	// engine->RegisterObjectBehaviour("physics_collision_shape", asBEHAVE_FACTORY, "physics_collision_shape@ f(physics_sphere_shape@ sphere)", asFUNCTION(sphere_to_collision_shape), asCALL_CDECL);
 }
 
 void RegisterHalfEdgeStructure(asIScriptEngine* engine) {
@@ -1037,6 +1153,8 @@ void RegisterPhysicsWorldAndCallbacks(asIScriptEngine* engine) {
 	engine->RegisterObjectType("physics_world_settings", sizeof(PhysicsWorld::WorldSettings), asOBJ_VALUE | asGetTypeTraits<PhysicsWorld::WorldSettings>());
 	engine->RegisterObjectBehaviour("physics_world_settings", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(rp_construct<PhysicsWorld::WorldSettings>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("physics_world_settings", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(rp_destruct<PhysicsWorld::WorldSettings>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_world_settings", asBEHAVE_CONSTRUCT, "void f(const physics_world_settings &in)", asFUNCTION((rp_copy_construct<PhysicsWorld::WorldSettings>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world_settings", "physics_world_settings &opAssign(const physics_world_settings &in)", asMETHODPR(PhysicsWorld::WorldSettings, operator=, (const PhysicsWorld::WorldSettings&), PhysicsWorld::WorldSettings&), asCALL_THISCALL);
 	engine->RegisterObjectProperty("physics_world_settings", "string world_name", asOFFSET(PhysicsWorld::WorldSettings, worldName));
 	engine->RegisterObjectProperty("physics_world_settings", "vector gravity", asOFFSET(PhysicsWorld::WorldSettings, gravity));
 	engine->RegisterObjectProperty("physics_world_settings", "float persistent_contact_distance_threshold", asOFFSET(PhysicsWorld::WorldSettings, persistentContactDistanceThreshold));
@@ -1152,35 +1270,6 @@ void RegisterHeightFieldAndMeshTypes(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_convex_mesh", "vector get_local_inertia_tensor(float mass, vector scale) const", asMETHOD(ConvexMesh, getLocalInertiaTensor), asCALL_THISCALL);
 }
 
-// Shape conversion functions
-CollisionShape* sphere_to_collision_shape(SphereShape* shape) {
-	return static_cast<CollisionShape*>(shape);
-}
-
-CollisionShape* box_to_collision_shape(BoxShape* shape) {
-	return static_cast<CollisionShape*>(shape);
-}
-
-CollisionShape* capsule_to_collision_shape(CapsuleShape* shape) {
-	return static_cast<CollisionShape*>(shape);
-}
-
-CollisionShape* triangle_to_collision_shape(TriangleShape* shape) {
-	return static_cast<CollisionShape*>(shape);
-}
-
-CollisionShape* convex_mesh_to_collision_shape(ConvexMeshShape* shape) {
-	return static_cast<CollisionShape*>(shape);
-}
-
-CollisionShape* height_field_to_collision_shape(HeightFieldShape* shape) {
-	return static_cast<CollisionShape*>(shape);
-}
-
-CollisionShape* concave_mesh_to_collision_shape(ConcaveMeshShape* shape) {
-	return static_cast<CollisionShape*>(shape);
-}
-
 void RegisterPhysicsCommonFactories(asIScriptEngine* engine) {
 	// Collision Shape Factories
 	engine->RegisterObjectBehaviour("physics_concave_mesh_shape", asBEHAVE_FACTORY, "physics_concave_mesh_shape@ f(physics_triangle_mesh@ triangle_mesh, const vector&in scaling = vector(1,1,1))", asMETHOD(PhysicsCommon, createConcaveMeshShape), asCALL_THISCALL_ASGLOBAL, &g_physics);
@@ -1201,16 +1290,26 @@ void RegisterPhysicsCommonFactories(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("void physics_triangle_mesh_destroy(physics_triangle_mesh@ mesh)", asFUNCTION(triangle_mesh_destroy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void physics_concave_mesh_shape_destroy(physics_concave_mesh_shape@ shape)", asFUNCTION(concave_mesh_shape_destroy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void physics_convex_mesh_destroy(physics_convex_mesh@ mesh)", asFUNCTION(convex_mesh_destroy), asCALL_CDECL);
+	// Generic global destroy
+	engine->RegisterGlobalFunction("void physics_shape_destroy(physics_collision_shape@ shape)",
+	                               asFUNCTION(physics_shape_destroy), asCALL_CDECL);
 }
 
 void RegisterShapeConversions(asIScriptEngine* engine) {
-	engine->RegisterObjectMethod("physics_sphere_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(sphere_to_collision_shape), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_box_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(box_to_collision_shape), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_capsule_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(capsule_to_collision_shape), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_triangle_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(triangle_to_collision_shape), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_convex_mesh_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(convex_mesh_to_collision_shape), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_height_field_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(height_field_to_collision_shape), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_concave_mesh_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(concave_mesh_to_collision_shape), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_sphere_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(sphere_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_sphere_shape", "const physics_collision_shape@ opImplCast() const", asFUNCTION(sphere_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_box_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(box_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_box_shape", "const physics_collision_shape@ opImplCast() const", asFUNCTION(box_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_capsule_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(capsule_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_capsule_shape", "const physics_collision_shape@ opImplCast() const", asFUNCTION(capsule_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_triangle_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(triangle_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_triangle_shape", "const physics_collision_shape@ opImplCast() const", asFUNCTION(triangle_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_convex_mesh_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(convex_mesh_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_convex_mesh_shape", "const physics_collision_shape@ opImplCast() const", asFUNCTION(convex_mesh_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_height_field_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(height_field_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_height_field_shape", "const physics_collision_shape@ opImplCast() const", asFUNCTION(height_field_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_concave_mesh_shape", "physics_collision_shape@ opImplCast()", asFUNCTION(concave_mesh_to_collision_shape), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_concave_mesh_shape", "const physics_collision_shape@ opImplCast() const", asFUNCTION(concave_mesh_to_collision_shape), asCALL_CDECL_OBJLAST);
 }
 
 void RegisterReactphysics(asIScriptEngine* engine) {
