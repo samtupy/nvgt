@@ -615,7 +615,11 @@ void RegisterPhysicsBody(asIScriptEngine* engine, const string& type) {
 	engine->RegisterObjectMethod(type.c_str(), "void set_is_active(bool is_active) property", asMETHOD(T, setIsActive), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const transform& get_transform() const property", asMETHOD(T, getTransform), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_transform(const transform&in transform) property", asMETHOD(T, setTransform), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "physics_collider@ add_collider(physics_collision_shape&in shape, const transform&in transform)", asMETHOD(T, addCollider), asCALL_THISCALL);
+	engine->RegisterObjectMethod(
+	    type.c_str(),
+	    "physics_collider@ add_collider(physics_collision_shape@ shape, const transform&in transform)",
+	    asMETHOD(T, addCollider),
+	    asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void remove_collider(physics_collider&in collider)", asMETHOD(T, removeCollider), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool test_point_inside(const vector&in point) const", asMETHOD(T, testPointInside), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool raycast(const ray& point, raycast_info& raycast_info) const", asMETHOD(T, raycast), asCALL_THISCALL);
