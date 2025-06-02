@@ -243,7 +243,7 @@ void default_logger_destroy(DefaultLogger* logger) {
  */
 void physics_shape_destroy(CollisionShape* shape) {
 	if (!shape)
-		throw std::runtime_error("Cannot destroy null collision shape");
+		return;
 	// First dispatch on the broad shape type
 	CollisionShapeType shapeType = shape->getType();
 	switch (shapeType) {
@@ -579,13 +579,39 @@ CollisionShape* concave_mesh_to_collision_shape(ConcaveMeshShape* shape) {
 	return static_cast<CollisionShape*>(shape);
 }
 
-CollisionShape* collision_shape_dummy_construct() {
-	return nullptr;
+Body* rigid_body_to_body(RigidBody* rigidBody) {
+	return static_cast<Body*>(rigidBody);
 }
 
-CollisionShape* collision_shape_assign(CollisionShape* self, CollisionShape* other) {
-	// For reference types, assignment is just copying the handle
-	return other;
+void body_cleanup_user_data(Body* body) {
+	CScriptAny* userData = static_cast<CScriptAny*>(body->getUserData());
+	if (userData) {
+		userData->Release();
+		body->setUserData(nullptr);
+	}
+}
+
+void body_set_user_data(Body* body, CScriptAny* userData) {
+	body_cleanup_user_data(body);
+	if (userData) {
+		userData->AddRef();
+		body->setUserData(userData);
+	} else
+		body->setUserData(nullptr);
+}
+
+CScriptAny* body_get_user_data(Body* body) {
+	CScriptAny* userData = static_cast<CScriptAny*>(body->getUserData());
+	if (userData) {
+		userData->AddRef();  // Caller gets a reference
+	}
+	return userData;
+}
+
+// Must have this, otherwise we leak memory
+void world_destroy_rigid_body(PhysicsWorld* world, RigidBody* body) {
+	body_cleanup_user_data(body);
+	world->destroyRigidBody(body);
 }
 
 // Registration templates
@@ -634,6 +660,8 @@ void RegisterPhysicsBody(asIScriptEngine* engine, const string& type) {
 	engine->RegisterObjectMethod(type.c_str(), "vector get_local_vector(const vector&in world_vector) const", asMETHOD(T, getLocalVector), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_is_debug_enabled() const property", asMETHOD(T, isDebugEnabled), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_debug_enabled(bool enabled) property", asMETHOD(T, setIsDebugEnabled), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_user_data(any@ userData)", asFUNCTION(body_set_user_data), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "any@ get_user_data() const", asFUNCTION(body_get_user_data), asCALL_CDECL_OBJFIRST);
 }
 
 template <class T>
@@ -974,8 +1002,6 @@ void RegisterPhysicsBodies(asIScriptEngine* engine) {
 
 void RegisterCollisionShapes(asIScriptEngine* engine) {
 	RegisterCollisionShape<CollisionShape>(engine, "physics_collision_shape");
-	// engine->RegisterObjectBehaviour("physics_collision_shape", asBEHAVE_FACTORY, "physics_collision_shape@ f()", asFUNCTION(collision_shape_dummy_construct), asCALL_CDECL);
-	engine->RegisterObjectMethod("physics_collision_shape", "physics_collision_shape@ opAssign(const physics_collision_shape@)", asFUNCTION(collision_shape_assign), asCALL_CDECL_OBJFIRST);
 	// Forward declare types to be registered later
 	engine->RegisterObjectType("physics_height_field", 0, asOBJ_REF);
 	RegisterConvexShape<SphereShape>(engine, "physics_sphere_shape");
@@ -1001,7 +1027,6 @@ void RegisterCollisionShapes(asIScriptEngine* engine) {
 	RegisterConcaveShape<HeightFieldShape>(engine, "physics_height_field_shape");
 	engine->RegisterObjectMethod("physics_height_field_shape", "physics_height_field@ get_height_field() const property", asMETHOD(HeightFieldShape, getHeightField), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_height_field_shape", "vector get_vertex_at(uint x, uint y) const", asMETHOD(HeightFieldShape, getVertexAt), asCALL_THISCALL);
-	// engine->RegisterObjectBehaviour("physics_collision_shape", asBEHAVE_FACTORY, "physics_collision_shape@ f(physics_sphere_shape@ sphere)", asFUNCTION(sphere_to_collision_shape), asCALL_CDECL);
 }
 
 void RegisterHalfEdgeStructure(asIScriptEngine* engine) {
@@ -1194,7 +1219,7 @@ void RegisterPhysicsWorldAndCallbacks(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_world", "void set_nb_iterations_position_solver(uint16 iterations) property", asMETHOD(PhysicsWorld, setNbIterationsPositionSolver), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_world", "void set_contacts_position_correction_technique(physics_contact_position_correction_technique technique) property", asMETHOD(PhysicsWorld, setContactsPositionCorrectionTechnique), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_world", "physics_rigid_body@ create_rigid_body(const physics_transform&in transform)", asMETHOD(PhysicsWorld, createRigidBody), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_world", "void destroy_rigid_body(physics_rigid_body& body)", asMETHOD(PhysicsWorld, destroyRigidBody), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_world", "void destroy_rigid_body(physics_rigid_body& body)", asFUNCTION(world_destroy_rigid_body), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "physics_joint@ create_joint(const physics_joint_info&in joint_info)", asMETHOD(PhysicsWorld, createJoint), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_world", "void destroy_joint(physics_joint& joint)", asMETHOD(PhysicsWorld, destroyJoint), asCALL_THISCALL);
 	engine->RegisterObjectMethod("physics_world", "vector get_gravity() const property", asMETHOD(PhysicsWorld, getGravity), asCALL_THISCALL);
@@ -1316,6 +1341,11 @@ void RegisterShapeConversions(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_concave_mesh_shape", "const physics_collision_shape@ opImplCast() const", asFUNCTION(concave_mesh_to_collision_shape), asCALL_CDECL_OBJLAST);
 }
 
+void RegisterBodyConversions(asIScriptEngine* engine) {
+	engine->RegisterObjectMethod("physics_rigid_body", "physics_body@ opImplCast()", asFUNCTION(rigid_body_to_body), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_rigid_body", "const physics_body@ opImplCast() const", asFUNCTION(rigid_body_to_body), asCALL_CDECL_OBJLAST);
+}
+
 void RegisterReactphysics(asIScriptEngine* engine) {
 	RegisterMathTypes(engine);
 	RegisterEnumsAndConstants(engine);
@@ -1331,4 +1361,5 @@ void RegisterReactphysics(asIScriptEngine* engine) {
 	RegisterPhysicsWorldAndCallbacks(engine);
 	RegisterPhysicsCommonFactories(engine);
 	RegisterShapeConversions(engine);
+	RegisterBodyConversions(engine);
 }
