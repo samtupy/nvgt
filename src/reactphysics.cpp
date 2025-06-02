@@ -541,15 +541,6 @@ uint32 polygon_vertex_array_get_vertex_index_in_face(const PolygonVertexArray& a
 	return array.getVertexIndexInFace(faceIndex, vertexInFace);
 }
 
-// Since a polygon face is a struct with 2 ints, we need this wrapper to return it by value
-// Doesn't seem worthwhile figuring out handles for this
-PolygonVertexArray::PolygonFace polygon_vertex_array_get_polygon_face(const PolygonVertexArray& array, uint32 faceIndex) {
-	PolygonVertexArray::PolygonFace* facePtr = array.getPolygonFace(faceIndex);
-	if (!facePtr)
-		throw std::runtime_error("Invalid face index");
-	return *facePtr;
-}
-
 // Shape conversion functions
 CollisionShape* sphere_to_collision_shape(SphereShape* shape) {
 	return static_cast<CollisionShape*>(shape);
@@ -678,6 +669,54 @@ HeightField* create_height_field_double(int nbGridColumns, int nbGridRows, CScri
 	return heightField;
 }
 
+DefaultLogger* create_default_logger() {
+	return g_physics.createDefaultLogger();
+}
+
+void destroy_default_logger(DefaultLogger* logger) {
+	if (logger)
+		g_physics.destroyDefaultLogger(logger);
+}
+
+Logger* default_logger_to_logger(DefaultLogger* defaultLogger) {
+	return static_cast<Logger*>(defaultLogger);
+}
+
+// Logger get/set wrappers (static methods)
+Logger* get_current_logger() {
+	return PhysicsCommon::getLogger();
+}
+
+void set_current_logger(Logger* logger) {
+	PhysicsCommon::setLogger(logger);
+}
+
+// Logger convenience methods
+void logger_log_simple(Logger* logger, int level, const std::string& worldName, int category, const std::string& message) {
+	if (logger)
+		logger->log(static_cast<Logger::Level>(level), worldName, static_cast<Logger::Category>(category), message, "", 0);
+}
+
+// Static helper methods wrappers
+std::string logger_get_category_name(int category) {
+	return Logger::getCategoryName(static_cast<Logger::Category>(category));
+}
+
+std::string logger_get_level_name(int level) {
+	return Logger::getLevelName(static_cast<Logger::Level>(level));
+}
+
+// DefaultLogger destination wrappers
+void default_logger_add_file_destination(DefaultLogger* logger, const std::string& filePath, uint32_t logLevelFlag, int format) {
+	if (logger)
+		logger->addFileDestination(filePath, logLevelFlag, static_cast<DefaultLogger::Format>(format));
+}
+
+void default_logger_remove_all_destinations(DefaultLogger* logger) {
+	if (logger)
+		logger->removeAllDestinations();
+}
+
 // Registration templates
 template <class T>
 void RegisterCollisionShape(asIScriptEngine* engine, const string& type) {
@@ -797,6 +836,19 @@ void RegisterEnumsAndConstants(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("physics_triangle_raycast_side", "TRIANGLE_RAYCAST_SIDE_BACK", int(TriangleRaycastSide::BACK));
 	engine->RegisterEnumValue("physics_triangle_raycast_side", "TRIANGLE_RAYCAST_SIDE_FRONT_AND_BACK", int(TriangleRaycastSide::FRONT_AND_BACK));
 	engine->RegisterGlobalProperty("const float EPSILON", (void*)&MACHINE_EPSILON);
+	engine->RegisterEnum("physics_logger_level");
+	engine->RegisterEnumValue("physics_logger_level", "LOGGER_LEVEL_ERROR", static_cast<int>(Logger::Level::Error));
+	engine->RegisterEnumValue("physics_logger_level", "LOGGER_LEVEL_WARNING", static_cast<int>(Logger::Level::Warning));
+	engine->RegisterEnumValue("physics_logger_level", "LOGGER_LEVEL_INFORMATION", static_cast<int>(Logger::Level::Information));
+	engine->RegisterEnum("physics_logger_category");
+	engine->RegisterEnumValue("physics_logger_category", "LOGGER_CATEGORY_PHYSICS_COMMON", static_cast<int>(Logger::Category::PhysicCommon));
+	engine->RegisterEnumValue("physics_logger_category", "LOGGER_CATEGORY_WORLD", static_cast<int>(Logger::Category::World));
+	engine->RegisterEnumValue("physics_logger_category", "LOGGER_CATEGORY_BODY", static_cast<int>(Logger::Category::Body));
+	engine->RegisterEnumValue("physics_logger_category", "LOGGER_CATEGORY_JOINT", static_cast<int>(Logger::Category::Joint));
+	engine->RegisterEnumValue("physics_logger_category", "LOGGER_CATEGORY_COLLIDER", static_cast<int>(Logger::Category::Collider));
+	engine->RegisterEnum("physics_logger_format");
+	engine->RegisterEnumValue("physics_logger_format", "LOGGER_FORMAT_TEXT", static_cast<int>(DefaultLogger::Format::Text));
+	engine->RegisterEnumValue("physics_logger_format", "LOGGER_FORMAT_HTML", static_cast<int>(DefaultLogger::Format::HTML));
 }
 
 void RegisterMathTypes(asIScriptEngine* engine) {
@@ -1414,9 +1466,26 @@ void RegisterBodyConversions(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_rigid_body", "const physics_body@ opImplCast() const", asFUNCTION(rigid_body_to_body), asCALL_CDECL_OBJLAST);
 }
 
+void RegisterLoggerClasses(asIScriptEngine* engine) {
+	engine->RegisterObjectType("physics_logger", 0, asOBJ_REF | asOBJ_NOCOUNT);
+	engine->RegisterObjectMethod("physics_logger", "void log(physics_logger_level level, const string&in worldName, physics_logger_category category, const string&in message)", asFUNCTION(logger_log_simple), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectType("physics_default_logger", 0, asOBJ_REF | asOBJ_NOCOUNT);
+	engine->RegisterObjectMethod("physics_default_logger", "void add_file_destination(const string&in filePath, uint logLevelFlag, physics_logger_format format)", asFUNCTION(default_logger_add_file_destination), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_default_logger", "void remove_all_destinations()", asFUNCTION(default_logger_remove_all_destinations), asCALL_CDECL_OBJFIRST);
+	engine->RegisterGlobalFunction("physics_default_logger@ physics_default_logger_create()", asFUNCTION(create_default_logger), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void physics_default_logger_destroy(physics_default_logger@ logger)", asFUNCTION(destroy_default_logger), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_logger@ physics_logger_get_current()", asFUNCTION(get_current_logger), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void physics_logger_set_current(physics_logger@ logger)", asFUNCTION(set_current_logger), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string physics_logger_get_category_name(physics_logger_category category)", asFUNCTION(logger_get_category_name), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string physics_logger_get_level_name(physics_logger_level level)", asFUNCTION(logger_get_level_name), asCALL_CDECL);
+	engine->RegisterObjectMethod("physics_default_logger", "physics_logger@ opImplCast()", asFUNCTION(default_logger_to_logger), asCALL_CDECL_OBJLAST);
+	engine->RegisterObjectMethod("physics_default_logger", "const physics_logger@ opImplCast() const", asFUNCTION(default_logger_to_logger), asCALL_CDECL_OBJLAST);
+}
+
 void RegisterReactphysics(asIScriptEngine* engine) {
 	RegisterMathTypes(engine);
 	RegisterEnumsAndConstants(engine);
+	RegisterLoggerClasses(engine);
 	RegisterCorePhysicsTypes(engine);
 	RegisterHalfEdgeStructure(engine);
 	RegisterPhysicsEntities(engine);
