@@ -1,8 +1,8 @@
-/* combination_api.cpp - Add combination generators to AngelScript.
- * Written by Day Garwood, 1st June 2025
+/* combination.cpp - Add combination generators to AngelScript.
+ * Written by Day Garwood, 31st May - 1st June 2025
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
+ * Copyright (c) 2022-2025 Sam Tupy
  * https://nvgt.gg
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
@@ -11,16 +11,142 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include <algorithm>
+#include <numeric>
 #include <angelscript.h>
 #include <scriptarray.h>
+#include "combination.h"
 
-#include "combination_api.h"
+// Common implementations for combination_generator class.
+combination_generator::combination_generator() {
+	reset();
+}
+combination_generator::~combination_generator() {
+	reset();
+}
+void combination_generator::reset() {
+	current.clear();
+	generating = false;
+	items = 0;
+	size = 0;
+	min_size = 0;
+	max_size = 0;
+}
+bool combination_generator::initialize(int items, int min_size, int max_size) {
+	if (!validate(items, min_size, max_size)) return false;
+	reset();
+	this->items = items;
+	this->min_size = min_size;
+	this->max_size = max_size;
+	size = min_size;
+	generating = true;
+	return true;
+}
+std::vector<int>& combination_generator::data() {
+	return current;
+}
+bool combination_generator::active() {
+	return generating;
+}
 
+bool combination_generator::validate(int items, int min_size, int max_size) {
+	if (items < 2) return false;
+	if (min_size < 1) return false;
+	if (max_size < min_size) return false;
+	return true;
+}
+
+// Algorithm for returning all combinations in a set.
+bool combination_all::advance() {
+	if (!generating) return false;
+	if (current.empty()) return build_first();
+	if (increase_counter()) return true;
+	if (next_size()) return true;
+	reset();
+	return false;
+}
+
+bool combination_all::build_first() {
+	current.resize(size);
+	current.assign(size, 0);
+	return true;
+}
+bool combination_all::increase_counter() {
+	for (int pos = size - 1; pos >= 0; pos--) {
+		current[pos]++;
+		if (current[pos] < items) return true;
+		current[pos] = 0;
+		if (pos == 0) return false;
+	}
+	return false;
+}
+bool combination_all::next_size() {
+	size++;
+	if (size > max_size) return false;
+	return build_first();
+}
+
+// Algorithm for returning all permutations in a set.
+bool combination_permutation::validate(int items, int min_size, int max_size) {
+	// This generator ignores size.
+	if (items < 1) return false;
+	return true;
+}
+bool combination_permutation::advance() {
+	if (!generating) return false;
+	if (current.empty()) return build_first();
+	if (std::next_permutation(current.begin(), current.end())) return true;
+	reset();
+	return false;
+}
+bool combination_permutation::build_first() {
+	current.resize(items);
+	std::iota(current.begin(), current.end(), 0);
+	return true;
+}
+
+// Algorithm for returning unique combinations in a set.
+bool combination_unique::validate(int items, int min_size, int max_size) {
+	if (!combination_generator::validate(items, min_size, max_size)) return false;
+	if (items < 3) return false;
+	if (max_size >= items) return false;
+	return true;
+}
+bool combination_unique::advance() {
+	if (!generating) return false;
+	if (current.empty()) return build_first();
+	if (increase_counter()) return true;
+	if (next_size()) return true;
+	reset();
+	return false;
+}
+bool combination_unique::build_first() {
+	current.resize(size);
+	std::iota(current.begin(), current.end(), 0);
+	return true;
+}
+bool combination_unique::increase_counter() {
+	int i = size - 1;
+	while (i >= 0 && current[i] >= items - size + i)
+		i--;
+	if (i < 0) return false;
+	current[i]++;
+	for (int j = i + 1; j < size; ++j)
+		current[j] = current[j - 1] + 1;
+	return true;
+}
+bool combination_unique::next_size() {
+	size++;
+	if (size > max_size) return false;
+	return build_first();
+}
+
+// API
 combination_api::combination_api() {
-reset();
+	reset();
 }
 combination_api::~combination_api() {
-reset();
+	reset();
 }
 void combination_api::reset() {
 	gen.reset();
@@ -52,11 +178,11 @@ bool combination_api::generate_permutations(int items) {
 bool combination_api::next(CScriptArray* list) {
 	if (!list) return false;
 	if (!is_active()) return false;
-	if(!gen->advance()) return false;
+	if (!gen->advance()) return false;
 	std::vector<int>& temp = gen->data();
 	list->Resize(temp.size());
 	for (int i = 0; i < temp.size(); i++)
-	list->SetValue(i, &temp[i]);
+		list->SetValue(i, &temp[i]);
 	return true;
 }
 bool combination_api::is_active() {
@@ -67,11 +193,10 @@ void combination_api::add_ref() {
 	asAtomicInc(refcount);
 }
 void combination_api::release() {
-	if (asAtomicDec(refcount) < 1) {
+	if (asAtomicDec(refcount) < 1)
 		delete this;
-	}
 }
-combination_api *combination_factory() {
+combination_api* combination_factory() {
 	return new combination_api();
 }
 void RegisterScriptCombination(asIScriptEngine* engine) {

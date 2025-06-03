@@ -1,8 +1,8 @@
-/* combination_api.h - Header for combination_api interface.
- * Written by Day Garwood, 1st June 2025
+/* combination.h - Header for combination algorithms and interface.
+ * Written by Day Garwood, 31st May - 1st June 2025
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
+ * Copyright (c) 2022-2025 Sam Tupy
  * https://nvgt.gg
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
@@ -13,15 +13,61 @@
 
 #pragma once
 
-#include "combination_all.h"
-#include "combination_unique.h"
-#include "combination_permutation.h"
-
 #include <memory>
+#include <vector>
 
 class CScriptArray;
 class asIScriptEngine;
 
+// Abstract class for plugging in various combinatorics algorithms.
+class combination_generator {
+public:
+	combination_generator();
+	virtual ~combination_generator();
+	virtual void reset();
+	virtual bool initialize(int items, int min_size, int max_size);
+	virtual bool validate(int items, int min_size, int max_size);
+	virtual bool advance() = 0;
+	std::vector<int>& data();
+	bool active();
+
+protected:
+	std::vector<int> current;
+	bool generating;
+	int items;
+	int min_size;
+	int max_size;
+	int size;
+};
+
+// algorithms
+class combination_all: public combination_generator {
+public:
+	bool advance() override;
+private:
+	bool build_first();
+	bool increase_counter();
+	bool next_size();
+};
+class combination_permutation: public combination_generator {
+public:
+	bool validate(int items, int min_size, int max_size) override;
+	bool advance() override;
+private:
+	bool build_first();
+};
+class combination_unique: public combination_generator {
+public:
+	bool validate(int items, int min_size, int max_size) override;
+	bool advance() override;
+private:
+	bool build_first();
+	bool increase_counter();
+	bool next_size();
+	void get_combo(std::vector<int>& out);
+};
+
+// API
 class combination_api {
 public:
 	combination_api();
@@ -34,15 +80,13 @@ public:
 	bool generate_permutations(int items);
 	bool next(CScriptArray* list);
 	bool is_active();
-
-	// AS stuff
+	// Angelscript stuff
 	void add_ref();
 	void release();
-
 private:
 	std::unique_ptr<combination_generator> gen;
 	int refcount = 1;
 };
 
-combination_api *combination_factory();
+combination_api* combination_factory();
 void RegisterScriptCombination(asIScriptEngine* engine);

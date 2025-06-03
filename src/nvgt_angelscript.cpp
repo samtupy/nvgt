@@ -55,7 +55,7 @@
 #include "nvgt_plugin.h"
 #include "pack.h"
 #include "pathfinder.h"
-#include "combination_api.h"
+#include "combination.h"
 #include "pocostuff.h"
 #include "random.h"
 #include "reactphysics.h"
