@@ -108,7 +108,7 @@ elif env["PLATFORM"] == "darwin":
 elif env["PLATFORM"] == "posix":
 	env.Append(LINKFLAGS = ["-Wl,-rpath,'$$ORIGIN/.',-rpath,'$$ORIGIN/lib'"])
 	# Libvorbis must appear in the library link order after deps on Linux.
-	env.Append(LIBS = [":libvorbisfile.a", ":libvorbis.a", ":libogg.a"])
+	env.Append(LIBS = [":libvorbisfile.a", ":libvorbis.a", ":libogg.a", ":libopusfile.a", ":libopus.a"])
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
 		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
