@@ -1,8 +1,9 @@
 /* nvgt_plugin.h - public header for nvgt plugins
  * This header is used both by nvgt to load plugins as well as by plugins themselves.
+ * To export new functions from NVGT, increment NVGT_PLUGIN_API_VERSION and add to the NVGT_PLUGIN_FUNCTIONS macro before rebuilding the engine.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
+ * Copyright (c) 2022-2025 Sam Tupy
  * https://nvgt.gg
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
@@ -20,7 +21,7 @@
 #include <iostream>
 #include <string>
 
-#define NVGT_PLUGIN_API_VERSION 3
+#define NVGT_PLUGIN_API_VERSION 4
 
 // Subsystem flags, used for controling access to certain functions during development.
 enum NVGT_SUBSYSTEM {
@@ -49,55 +50,48 @@ enum NVGT_SUBSYSTEM {
 	NVGT_SUBSYSTEM_SCRIPTING_SANDBOX = NVGT_SUBSYSTEM_GENERAL | NVGT_SUBSYSTEM_DATA | NVGT_SUBSYSTEM_DATETIME
 };
 
-// Function prototypes:
-typedef const char* t_asGetLibraryVersion();
-typedef const char* t_asGetLibraryOptions();
-typedef asIScriptContext* t_asGetActiveContext();
-typedef int t_asPrepareMultithread(asIThreadManager*);
-typedef void t_asAcquireExclusiveLock();
-typedef void t_asReleaseExclusiveLock();
-typedef void t_asAcquireSharedLock();
-typedef void t_asReleaseSharedLock();
-typedef int t_asAtomicInc(int&);
-typedef int t_asAtomicDec(int&);
-typedef int t_asThreadCleanup();
-typedef void* t_asAllocMem(size_t);
-typedef void t_asFreeMem(void*);
-typedef void AS_CALL(void*);
-typedef void* t_nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
-typedef std::ios* t_nvgt_datastream_get_ios(void* stream);
-typedef void t_nvgt_bundle_shared_library(const std::string& libname);
-typedef bool t_find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& file_size);
-typedef void t_wait(int ms);
-typedef void t_refresh_window();
-typedef uint64_t t_ticks(bool secure);
-typedef uint64_t t_microticks(bool secure);
-typedef bool t_running_on_mobile();
+// Exported external functions usually from Angelscript.h:
+#define NVGT_PLUGIN_EXTERNAL_FUNCTIONS \
+	X(const char*, asGetLibraryVersion, ()) \
+	X(const char*, asGetLibraryOptions, ()) \
+	X(asIScriptContext*, asGetActiveContext, ()) \
+	X(int, asPrepareMultithread, (asIThreadManager*)) \
+	X(void, asAcquireExclusiveLock, ()) \
+	X(void, asReleaseExclusiveLock, ()) \
+	X(void, asAcquireSharedLock, ()) \
+	X(void, asReleaseSharedLock, ()) \
+	X(int, asAtomicInc, (int&)) \
+	X(int, asAtomicDec, (int&)) \
+	X(int, asThreadCleanup, ()) \
+	X(void*, asAllocMem, (size_t)) \
+	X(void, asFreeMem, (void*))
+// To export new functions from NVGT, add to this macro:
+#define NVGT_PLUGIN_FUNCTIONS \
+	X(void*, nvgt_datastream_create, (std::ios* stream, const std::string& encoding, int byteorder)) \
+	X(std::ios*, nvgt_datastream_get_ios, (void* stream)) \
+	X(void, nvgt_bundle_shared_library, (const std::string& libname)) \
+	X(bool, find_embedded_pack, (std::string& filename, uint64_t& file_offset, uint64_t& file_size)) \
+	X(void, nvgt_wait, (int ms)) \
+	X(void, refresh_window, ()) \
+	X(uint64_t, ticks, (bool secure)) \
+	X(uint64_t, microticks, (bool secure)) \
+	X(std::string, string_aes_encrypt, (const std::string& plaintext, std::string key)) \
+	X(std::string, string_aes_decrypt, (const std::string& ciphertext, std::string key)) \
+	X(bool, running_on_mobile, ())
+// Add more functions here...
+
+// Function typedefs:
+#define X(ret, name, args) typedef ret t_##name args;
+NVGT_PLUGIN_EXTERNAL_FUNCTIONS
+NVGT_PLUGIN_FUNCTIONS
+#undef X
 
 typedef struct {
 	int version;
-	t_asGetLibraryVersion* f_asGetLibraryVersion;
-	t_asGetLibraryOptions* f_asGetLibraryOptions;
-	t_asGetActiveContext* f_asGetActiveContext;
-	t_asPrepareMultithread* f_asPrepareMultithread;
-	t_asAcquireExclusiveLock* f_asAcquireExclusiveLock;
-	t_asReleaseExclusiveLock* f_asReleaseExclusiveLock;
-	t_asAcquireSharedLock* f_asAcquireSharedLock;
-	t_asReleaseSharedLock* f_asReleaseSharedLock;
-	t_asAtomicInc* f_asAtomicInc;
-	t_asAtomicDec* f_asAtomicDec;
-	t_asThreadCleanup* f_asThreadCleanup;
-	t_asAllocMem* f_asAllocMem;
-	t_asFreeMem* f_asFreeMem;
-	t_nvgt_datastream_create* f_nvgt_datastream_create;
-	t_nvgt_datastream_get_ios* f_nvgt_datastream_get_ios;
-	t_nvgt_bundle_shared_library* f_nvgt_bundle_shared_library;
-	t_find_embedded_pack* f_find_embedded_pack;
-	t_wait* f_wait;
-	t_refresh_window* f_refresh_window;
-	t_ticks* f_ticks;
-	t_microticks* f_microticks;
-	t_running_on_mobile* f_running_on_mobile;
+	#define X(ret, name, args) t_##name* f_##name;
+	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
+	NVGT_PLUGIN_FUNCTIONS
+	#undef X
 	asIScriptEngine* script_engine;
 	asIThreadManager* script_thread_manager;
 	void* user;
@@ -111,64 +105,24 @@ typedef int nvgt_plugin_version_func();
 // If this macro is not defined, this header is being included from within a plugin that will receive pointers to needed functions from the main NVGT application.
 #ifndef NVGT_PLUGIN_STATIC // Code that only executes for dll plugins.
 	#if !defined(NVGT_PLUGIN_INCLUDE)
-		t_asGetLibraryVersion* asGetLibraryVersion = nullptr;
-		t_asGetLibraryOptions* asGetLibraryOptions = nullptr;
-		t_asGetActiveContext* asGetActiveContext = nullptr;
-		t_asPrepareMultithread* asPrepareMultithread = nullptr;
-		t_asAcquireExclusiveLock* asAcquireExclusiveLock = nullptr;
-		t_asReleaseExclusiveLock* asReleaseExclusiveLock = nullptr;
-		t_asAcquireSharedLock* asAcquireSharedLock = nullptr;
-		t_asReleaseSharedLock* asReleaseSharedLock = nullptr;
-		t_asAtomicInc* asAtomicInc = nullptr;
-		t_asAtomicDec* asAtomicDec = nullptr;
-		t_asThreadCleanup* asThreadCleanup = nullptr;
-		t_asAllocMem* asAllocMem = nullptr;
-		t_asFreeMem* asFreeMem = nullptr;
-		t_nvgt_datastream_create* nvgt_datastream_create = nullptr;
-		t_nvgt_datastream_get_ios* nvgt_datastream_get_ios = nullptr;
-		t_nvgt_bundle_shared_library* nvgt_bundle_shared_library = nullptr;
-		t_find_embedded_pack* find_embedded_pack = nullptr;
-		t_wait* nvgt_wait = nullptr;
-		t_refresh_window* refresh_window = nullptr;
-		t_ticks* ticks = nullptr;
-		t_microticks* microticks = nullptr;
-		t_running_on_mobile* running_on_mobile = nullptr;
+		#define X(ret, name, args) t_##name* name = nullptr;
+		NVGT_PLUGIN_EXTERNAL_FUNCTIONS
+		NVGT_PLUGIN_FUNCTIONS
+		#undef X
 	#else // If an angelscript addon includes nvgt_plugin.h, set NVGT_PLUGIN_INCLUDE to prevent these symbols from being defined multiple times.
-		extern t_asGetLibraryVersion* asGetLibraryVersion;
-		extern t_asGetLibraryOptions* asGetLibraryOptions;
-		extern t_asGetActiveContext* asGetActiveContext;
-		extern t_asPrepareMultithread* asPrepareMultithread;
-		extern t_asAcquireExclusiveLock* asAcquireExclusiveLock;
-		extern t_asReleaseExclusiveLock* asReleaseExclusiveLock;
-		extern t_asAcquireSharedLock* asAcquireSharedLock;
-		extern t_asReleaseSharedLock* asReleaseSharedLock;
-		extern t_asAtomicInc* asAtomicInc;
-		extern t_asAtomicDec* asAtomicDec;
-		extern t_asThreadCleanup* asThreadCleanup;
-		extern t_asAllocMem* asAllocMem;
-		extern t_asFreeMem* asFreeMem;
-		extern t_nvgt_datastream_create* nvgt_datastream_create;
-		extern t_nvgt_datastream_get_ios* nvgt_datastream_get_ios;
-		extern t_nvgt_bundle_shared_library* nvgt_bundle_shared_library;
-		extern t_find_embedded_pack* find_embedded_pack;
-		extern t_wait* nvgt_wait;
-		extern t_refresh_window* refresh_window;
-		extern t_ticks* ticks;
-		extern t_microticks* microticks;
-		extern t_running_on_mobile* running_on_mobile;
+		#define X(ret, name, args) extern t_##name* name;
+		NVGT_PLUGIN_EXTERNAL_FUNCTIONS
+		NVGT_PLUGIN_FUNCTIONS
+		#undef X
 	#endif
 #elif (!defined(NVGT_BUILDING))
 	// Any functions we want to expose from NVGT rather than Angelscript must be forward declared here, we only get to skip the Angelscript ones because we include angelscript.h. NVGT headers might not be available to a plugin developer.
-	void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
-	std::ios* nvgt_datastream_get_ios(void* stream);
-	void nvgt_bundle_shared_library(const std::string& libname);
-	bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& file_size);
+	// Any functions we wish to export with a different name from NVGT's core must be inlined like this:
 	void wait(int ms);
 	inline void nvgt_wait(int ms) { wait(ms); }
-	void refresh_window();
-	uint64_t ticks(bool secure = true);
-	uint64_t microticks(bool secure = true);
-	bool running_on_mobile();
+	#define X(ret, name, args) ret name args;
+	NVGT_PLUGIN_FUNCTIONS
+	#undef X
 #endif
 // Macro to ease the definition of a plugin's entry point. If this plugin is compiled as a static library then the entry point is called nvgt_plugin_%plugname% where as a dll just calls it nvgt_plugin and externs it. We also define nvgt_plugin_version() here.
 #ifndef plugin_main
@@ -196,70 +150,34 @@ typedef int nvgt_plugin_version_func();
 inline bool prepare_plugin(nvgt_plugin_shared* shared) {
 	if (shared->version != NVGT_PLUGIN_API_VERSION) return false;
 	#ifndef NVGT_PLUGIN_STATIC // If a static plugin, the following symbols are available by default as well as the thread manager.
-	asGetLibraryVersion = shared->f_asGetLibraryVersion;
-	asGetLibraryOptions = shared->f_asGetLibraryOptions;
-	asGetActiveContext = shared->f_asGetActiveContext;
-	asPrepareMultithread = shared->f_asPrepareMultithread;
-	asAcquireExclusiveLock = shared->f_asAcquireExclusiveLock;
-	asReleaseExclusiveLock = shared->f_asReleaseExclusiveLock;
-	asAcquireSharedLock = shared->f_asAcquireSharedLock;
-	asReleaseSharedLock = shared->f_asReleaseSharedLock;
-	asAtomicInc = shared->f_asAtomicInc;
-	asAtomicDec = shared->f_asAtomicDec;
-	asThreadCleanup = shared->f_asThreadCleanup;
-	asAllocMem = shared->f_asAllocMem;
-	asFreeMem = shared->f_asFreeMem;
-	nvgt_datastream_create = shared->f_nvgt_datastream_create;
-	nvgt_datastream_get_ios = shared->f_nvgt_datastream_get_ios;
-	nvgt_bundle_shared_library = shared->f_nvgt_bundle_shared_library;
-	find_embedded_pack = shared->f_find_embedded_pack;
-	nvgt_wait = shared->f_wait;
-	refresh_window = shared->f_refresh_window;
-	ticks = shared->f_ticks;
-	microticks = shared->f_microticks;
-	running_on_mobile = shared->f_running_on_mobile;
+	#define X(ret, name, args) name = shared->f_##name;
+	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
+	NVGT_PLUGIN_FUNCTIONS
+	#undef X
 	asPrepareMultithread(shared->script_thread_manager);
 	#endif
 	return true;
 }
 #else
+// We safely have access to NVGT headers here and can include function declarations we wish to export from any part of the project, functions existing in nvgt_plugin.cpp are directly forward declared here as well as inlines for any functions we wish to export with a different name than the internal such as nvgt_wait.
 #include <ios>
 #include <string>
 #include <vector>
 #include <stdio.h>
-#include "timestuff.h"
-#include "UI.h"
-#include "xplatform.h"
-void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
-std::ios* nvgt_datastream_get_ios(void* stream);
-void nvgt_bundle_shared_library(const std::string& libname);
-bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& file_size);
+// Export wait with a different name because is risks clashing with unix symbols.
+void wait(int ms);
+inline void nvgt_wait(int ms) { wait(ms); }
+#define X(ret, name, args) ret name args;
+NVGT_PLUGIN_FUNCTIONS
+#undef X
 
 // This function prepares an nvgt_plugin_shared structure for passing to a plugins entry point. Sane input expected, no error checking.
 inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* engine, void* user = NULL) {
 	shared->version = NVGT_PLUGIN_API_VERSION;
-	shared->f_asGetLibraryVersion = asGetLibraryVersion;
-	shared->f_asGetLibraryOptions = asGetLibraryOptions;
-	shared->f_asGetActiveContext = asGetActiveContext;
-	shared->f_asPrepareMultithread = asPrepareMultithread;
-	shared->f_asAcquireExclusiveLock = asAcquireExclusiveLock;
-	shared->f_asReleaseExclusiveLock = asReleaseExclusiveLock;
-	shared->f_asAcquireSharedLock = asAcquireSharedLock;
-	shared->f_asReleaseSharedLock = asReleaseSharedLock;
-	shared->f_asAtomicInc = asAtomicInc;
-	shared->f_asAtomicDec = asAtomicDec;
-	shared->f_asThreadCleanup = asThreadCleanup;
-	shared->f_asAllocMem = asAllocMem;
-	shared->f_asFreeMem = asFreeMem;
-	shared->f_nvgt_datastream_create = nvgt_datastream_create;
-	shared->f_nvgt_datastream_get_ios = nvgt_datastream_get_ios;
-	shared->f_nvgt_bundle_shared_library = nvgt_bundle_shared_library;
-	shared->f_find_embedded_pack = find_embedded_pack;
-	shared->f_wait = wait;
-	shared->f_refresh_window = refresh_window;
-	shared->f_ticks = ticks;
-	shared->f_microticks = microticks;
-	shared->f_running_on_mobile = running_on_mobile;
+	#define X(ret, name, args) shared->f_##name = name;
+	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
+	NVGT_PLUGIN_FUNCTIONS
+	#undef X
 	shared->script_engine = engine;
 	shared->script_thread_manager = asGetThreadManager();
 	shared->user = user;
