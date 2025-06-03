@@ -619,7 +619,7 @@ public:
 		set_spatialization_enabled(true);
 		return ma_sound_set_position(&*snd, x, y, z);
 	}
-	void set_position_3d_vector(const reactphysics3d::Vector3& position) { set_position_3d(position.x, position.y, position.z); }
+	void set_position_3d_vector(const reactphysics3d::Vector3& position) override { set_position_3d(position.x, position.y, position.z); }
 	reactphysics3d::Vector3 get_position_3d() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
@@ -635,7 +635,7 @@ public:
 			monitor->set_position_changed();
 		return ma_sound_set_direction(&*snd, x, y, z);
 	}
-	void set_direction_vector(const reactphysics3d::Vector3& direction) { set_direction(direction.x, direction.y, direction.z); }
+	void set_direction_vector(const reactphysics3d::Vector3& direction) override { set_direction(direction.x, direction.y, direction.z); }
 	reactphysics3d::Vector3 get_direction() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
@@ -649,7 +649,7 @@ public:
 			return;
 		return ma_sound_set_velocity(&*snd, x, y, z);
 	}
-	void set_velocity_vector(const reactphysics3d::Vector3& velocity) { set_velocity(velocity.x, velocity.y, velocity.z); }
+	void set_velocity_vector(const reactphysics3d::Vector3& velocity) override { set_velocity(velocity.x, velocity.y, velocity.z); }
 	reactphysics3d::Vector3 get_velocity() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
