@@ -10,15 +10,16 @@
  * 3. This notice may not be removed or altered from any source distribution.
  */
 
-#include "reactphysics.h"
-
+#include <string>
+#include <unordered_map>
+#include <vector>
 #include <angelscript.h>
 #include <reactphysics3d/reactphysics3d.h>
 #include <scriptany.h>
 #include <scriptarray.h>
-
 #include "nvgt.h"
 #include "nvgt_angelscript.h"
+#include "reactphysics.h"
 
 using namespace std;
 using namespace reactphysics3d;
