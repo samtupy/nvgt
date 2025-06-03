@@ -20,7 +20,7 @@
 #include <iostream>
 #include <string>
 
-#define NVGT_PLUGIN_API_VERSION 2
+#define NVGT_PLUGIN_API_VERSION 3
 
 // Subsystem flags, used for controling access to certain functions during development.
 enum NVGT_SUBSYSTEM {
@@ -67,6 +67,7 @@ typedef void AS_CALL(void*);
 typedef void* t_nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
 typedef std::ios* t_nvgt_datastream_get_ios(void* stream);
 typedef void t_nvgt_bundle_shared_library(const std::string& libname);
+typedef bool t_find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& file_size);
 typedef void t_wait(int ms);
 typedef void t_refresh_window();
 typedef uint64_t t_ticks(bool secure);
@@ -91,6 +92,7 @@ typedef struct {
 	t_nvgt_datastream_create* f_nvgt_datastream_create;
 	t_nvgt_datastream_get_ios* f_nvgt_datastream_get_ios;
 	t_nvgt_bundle_shared_library* f_nvgt_bundle_shared_library;
+	t_find_embedded_pack* f_find_embedded_pack;
 	t_wait* f_wait;
 	t_refresh_window* f_refresh_window;
 	t_ticks* f_ticks;
@@ -125,6 +127,7 @@ typedef int nvgt_plugin_version_func();
 		t_nvgt_datastream_create* nvgt_datastream_create = nullptr;
 		t_nvgt_datastream_get_ios* nvgt_datastream_get_ios = nullptr;
 		t_nvgt_bundle_shared_library* nvgt_bundle_shared_library = nullptr;
+		t_find_embedded_pack* find_embedded_pack = nullptr;
 		t_wait* nvgt_wait = nullptr;
 		t_refresh_window* refresh_window = nullptr;
 		t_ticks* ticks = nullptr;
@@ -147,6 +150,7 @@ typedef int nvgt_plugin_version_func();
 		extern t_nvgt_datastream_create* nvgt_datastream_create;
 		extern t_nvgt_datastream_get_ios* nvgt_datastream_get_ios;
 		extern t_nvgt_bundle_shared_library* nvgt_bundle_shared_library;
+		extern t_find_embedded_pack* find_embedded_pack;
 		extern t_wait* nvgt_wait;
 		extern t_refresh_window* refresh_window;
 		extern t_ticks* ticks;
@@ -158,6 +162,7 @@ typedef int nvgt_plugin_version_func();
 	void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
 	std::ios* nvgt_datastream_get_ios(void* stream);
 	void nvgt_bundle_shared_library(const std::string& libname);
+	bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& file_size);
 	void wait(int ms);
 	inline void nvgt_wait(int ms) { wait(ms); }
 	void refresh_window();
@@ -207,6 +212,7 @@ inline bool prepare_plugin(nvgt_plugin_shared* shared) {
 	nvgt_datastream_create = shared->f_nvgt_datastream_create;
 	nvgt_datastream_get_ios = shared->f_nvgt_datastream_get_ios;
 	nvgt_bundle_shared_library = shared->f_nvgt_bundle_shared_library;
+	find_embedded_pack = shared->f_find_embedded_pack;
 	nvgt_wait = shared->f_wait;
 	refresh_window = shared->f_refresh_window;
 	ticks = shared->f_ticks;
@@ -227,6 +233,7 @@ inline bool prepare_plugin(nvgt_plugin_shared* shared) {
 void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder);
 std::ios* nvgt_datastream_get_ios(void* stream);
 void nvgt_bundle_shared_library(const std::string& libname);
+bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& file_size);
 
 // This function prepares an nvgt_plugin_shared structure for passing to a plugins entry point. Sane input expected, no error checking.
 inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* engine, void* user = NULL) {
@@ -247,6 +254,7 @@ inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* e
 	shared->f_nvgt_datastream_create = nvgt_datastream_create;
 	shared->f_nvgt_datastream_get_ios = nvgt_datastream_get_ios;
 	shared->f_nvgt_bundle_shared_library = nvgt_bundle_shared_library;
+	shared->f_find_embedded_pack = find_embedded_pack;
 	shared->f_wait = wait;
 	shared->f_refresh_window = refresh_window;
 	shared->f_ticks = ticks;

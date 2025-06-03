@@ -97,6 +97,8 @@ bool legacy_pack::open(const string& filename_in, pack_open_mode mode, bool meml
 	if (mode <= PACK_OPEN_MODE_NONE || mode >= PACK_OPEN_MODES_TOTAL)
 		return false; // Invalid mode.
 	string filename = filename_in;
+	uint64_t pack_size;
+	find_embedded_pack(filename, file_offset, pack_size);
 	if (mode == PACK_OPEN_MODE_APPEND && !NVGTFileExists(filename))
 		mode = PACK_OPEN_MODE_CREATE;
 	if (mode == PACK_OPEN_MODE_CREATE) {
@@ -124,9 +126,8 @@ bool legacy_pack::open(const string& filename_in, pack_open_mode mode, bool meml
 			total_size = st.st_size;
 		#endif
 		fseek(fptr, file_offset, SEEK_SET);
-		if (file_offset > 0) { // Embedded pack, read the size.
-			fread(&total_size, sizeof(unsigned int), 1, fptr);
-			file_offset += sizeof(unsigned int);
+		if (file_offset > 0) { // Embedded pack, size provided.
+			total_size = pack_size;
 		}
 		pack_header h;
 		if (!fread(&h, sizeof(pack_header), 1, fptr)) {
