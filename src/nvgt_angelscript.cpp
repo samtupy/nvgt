@@ -118,6 +118,7 @@ int g_retcode = 0;
 bool g_initialising_globals = true;
 bool g_shutting_down = false;
 std::string g_stub = "";
+std::string g_scriptpath = "";
 std::string g_platform = "auto";
 bool g_make_console = false;
 std::unordered_map<std::string, asITypeInfo *> g_TypeInfoCache;
