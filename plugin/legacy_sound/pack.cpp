@@ -98,7 +98,7 @@ bool legacy_pack::open(const string& filename_in, pack_open_mode mode, bool meml
 		return false; // Invalid mode.
 	string filename = filename_in;
 	uint64_t pack_size;
-	find_embedded_pack(filename, file_offset, pack_size);
+	if (find_embedded_pack(filename, file_offset, pack_size) && mode != PACK_OPEN_MODE_READ) return false;
 	if (mode == PACK_OPEN_MODE_APPEND && !NVGTFileExists(filename))
 		mode = PACK_OPEN_MODE_CREATE;
 	if (mode == PACK_OPEN_MODE_CREATE) {
