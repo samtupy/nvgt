@@ -1,9 +1,10 @@
 ---
 title: 1 year after launch, Update for June 2025
-published_date: 2025-06-02 20:00:00 -0500
+published_date: 2025-06-02 20:30:00 -0500
 layout: post.liquid
 is_draft: false
 ---
+
 Written by Sam Tupy
 
 ## So where in the world have we been?
@@ -36,7 +37,7 @@ There have been so many changes since the last official release of the engine th
 * New methods to enumerate keyboards and mice as well as functions to convert key names into key codes and back.
 * A method to query the system power state - useful for automatically saving games before battery death, determining if a cheater is lying on an online game when they tell you that the reason they disconnected at an opportune moment is because their battery didn't actually die etc.
 * Several improvements to the Android support including the ability to use builtin includes in the runner and the ability to read app assets, much more.
-* Improvements to json, most particularly list repeating factories that allow construction of JSON objects and arrays using the {{}} syntax.
+* Improvements to json, most particularly list repeating factories that allow construction of JSON objects and arrays using the \{\{\}\} syntax.
 * Various improvements to plugins including integrating the nvgt_extra repository, version checks, and updates to the plugin interface which allow plugins to register things like datastreams and custom pack_file formats.
 * Our enet now supports IPV6, but this is still a work in progress - because the detection of which protocol to use is not yet automatic.
 * Adds many math functions from the c++ standard template library.
