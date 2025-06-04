@@ -404,6 +404,9 @@ int PreconfigureEngine(asIScriptEngine* engine) {
 	RegisterScriptDatastreams(engine);
 	engine->EndConfigGroup();
 	engine->RegisterObjectType("pack_interface", 0, asOBJ_REF);
+	engine->RegisterObjectType("json_object", 0, asOBJ_REF);
+	engine->RegisterObjectType("json_array", 0, asOBJ_REF);
+	engine->RegisterObjectType("var", 0, asOBJ_REF);
 	return 0;
 }
 // Registrations in the following function are usually done in alphabetical order, with some exceptions involving one subsystem depending on another. For example the internet subsystem registers functions that take timespans, meaning that timestuff gets registered before internet.
