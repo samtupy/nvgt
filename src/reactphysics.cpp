@@ -240,7 +240,7 @@ void default_logger_destroy(DefaultLogger* logger) {
  * correct destroy function based on the shape's runtime type information.
  * This eliminates the need for users to know the specific shape type when
  * destroying shapes.
- */
+*/
 void physics_shape_destroy(CollisionShape* shape) {
 	if (!shape)
 		return;
@@ -609,20 +609,13 @@ HeightField* create_height_field_float(int nbGridColumns, int nbGridRows, CScrip
 	if (!heightData) throw std::runtime_error("Height data array cannot be null");
 	uint32 expectedSize = nbGridColumns * nbGridRows;
 	if (heightData->GetSize() != expectedSize) {
-		throw std::runtime_error("Height data array size (" + std::to_string(heightData->GetSize()) +
-		                         ") must match grid dimensions (" + std::to_string(expectedSize) + ")");
+		throw std::runtime_error("Height data array size (" + std::to_string(heightData->GetSize()) + ") must match grid dimensions (" + std::to_string(expectedSize) + ")");
 	}
 	std::vector<float> heightBuffer(expectedSize);
 	for (uint32 i = 0; i < expectedSize; i++)
 		heightBuffer[i] = *(float*)heightData->At(i);
 	std::vector<Message> messages;
-	HeightField* heightField = g_physics.createHeightField(
-	                               nbGridColumns,
-	                               nbGridRows,
-	                               heightBuffer.data(),
-	                               HeightField::HeightDataType::HEIGHT_FLOAT_TYPE,
-	                               messages,
-	                               integerHeightScale);
+	HeightField* heightField = g_physics.createHeightField(nbGridColumns, nbGridRows, heightBuffer.data(), HeightField::HeightDataType::HEIGHT_FLOAT_TYPE, messages, integerHeightScale);
 	// TODO: Handle messages - could expose them to script or log them
 	return heightField;
 }
@@ -631,20 +624,13 @@ HeightField* create_height_field_int(int nbGridColumns, int nbGridRows, CScriptA
 	if (!heightData) throw std::runtime_error("Height data array cannot be null");
 	uint32 expectedSize = nbGridColumns * nbGridRows;
 	if (heightData->GetSize() != expectedSize) {
-		throw std::runtime_error("Height data array size (" + std::to_string(heightData->GetSize()) +
-		                         ") must match grid dimensions (" + std::to_string(expectedSize) + ")");
+		throw std::runtime_error("Height data array size (" + std::to_string(heightData->GetSize()) + ") must match grid dimensions (" + std::to_string(expectedSize) + ")");
 	}
 	std::vector<int> heightBuffer(expectedSize);
 	for (uint32 i = 0; i < expectedSize; i++)
 		heightBuffer[i] = *(int*)heightData->At(i);
 	std::vector<Message> messages;
-	HeightField* heightField = g_physics.createHeightField(
-	                               nbGridColumns,
-	                               nbGridRows,
-	                               heightBuffer.data(),
-	                               HeightField::HeightDataType::HEIGHT_INT_TYPE,
-	                               messages,
-	                               integerHeightScale);
+	HeightField* heightField = g_physics.createHeightField(nbGridColumns, nbGridRows, heightBuffer.data(), HeightField::HeightDataType::HEIGHT_INT_TYPE, messages, integerHeightScale);
 	return heightField;
 }
 
@@ -652,20 +638,13 @@ HeightField* create_height_field_double(int nbGridColumns, int nbGridRows, CScri
 	if (!heightData) throw std::runtime_error("Height data array cannot be null");
 	uint32 expectedSize = nbGridColumns * nbGridRows;
 	if (heightData->GetSize() != expectedSize) {
-		throw std::runtime_error("Height data array size (" + std::to_string(heightData->GetSize()) +
-		                         ") must match grid dimensions (" + std::to_string(expectedSize) + ")");
+		throw std::runtime_error("Height data array size (" + std::to_string(heightData->GetSize()) + ") must match grid dimensions (" + std::to_string(expectedSize) + ")");
 	}
 	std::vector<double> heightBuffer(expectedSize);
 	for (uint32 i = 0; i < expectedSize; i++)
 		heightBuffer[i] = *(double*)heightData->At(i);
 	std::vector<Message> messages;
-	HeightField* heightField = g_physics.createHeightField(
-	                               nbGridColumns,
-	                               nbGridRows,
-	                               heightBuffer.data(),
-	                               HeightField::HeightDataType::HEIGHT_DOUBLE_TYPE,
-	                               messages,
-	                               integerHeightScale);
+	HeightField* heightField = g_physics.createHeightField(nbGridColumns, nbGridRows, heightBuffer.data(), HeightField::HeightDataType::HEIGHT_DOUBLE_TYPE, messages, integerHeightScale);
 	return heightField;
 }
 
@@ -1439,8 +1418,7 @@ void RegisterPhysicsCommonFactories(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("void physics_concave_mesh_shape_destroy(physics_concave_mesh_shape@ shape)", asFUNCTION(concave_mesh_shape_destroy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void physics_convex_mesh_destroy(physics_convex_mesh@ mesh)", asFUNCTION(convex_mesh_destroy), asCALL_CDECL);
 	// Generic global destroy
-	engine->RegisterGlobalFunction("void physics_shape_destroy(physics_collision_shape@ shape)",
-	                               asFUNCTION(physics_shape_destroy), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void physics_shape_destroy(physics_collision_shape@ shape)", asFUNCTION(physics_shape_destroy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void physics_height_field_destroy(physics_height_field@ height_field)", asFUNCTION(height_field_destroy), asCALL_CDECL);
 }
 
