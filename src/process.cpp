@@ -3,9 +3,16 @@
 #include <cctype>
 #include <algorithm>
 #include <Poco/Thread.h>
+#include <Poco/PipeStream.h>
+#include <iostream>
+#include <cassert>
 
 #ifdef _WIN32
 	#include <windows.h>
+#endif
+
+#ifndef p_streamargs_default
+	#define p_streamargs_default "", Poco::BinaryReader::NATIVE_BYTE_ORDER
 #endif
 
 std::vector<std::string> process::split_args(const std::string& command_line) {
@@ -13,7 +20,6 @@ std::vector<std::string> process::split_args(const std::string& command_line) {
 	std::string current_arg;
 	bool inside_quotes = false;
 	char current_quote = '\0';
-
 	for (char c : command_line) {
 		if (!inside_quotes && (c == '"' || c == '\'')) {
 			inside_quotes = true;
@@ -28,10 +34,8 @@ std::vector<std::string> process::split_args(const std::string& command_line) {
 		} else
 			current_arg += c;
 	}
-
 	if (!current_arg.empty())
 		arguments.push_back(current_arg);
-
 	return arguments;
 }
 
@@ -49,104 +53,185 @@ static std::string from_code_page(const std::string& in, UINT cp) {
 }
 #endif
 
-process::process(const std::string& command, const std::string& args)
-	: _out_stream(_out_pipe)
-	, _in_stream(_in_pipe)
-	, _ph(Poco::Process::launch(command, process::split_args(args), &_in_pipe, &_out_pipe, nullptr))
-	, _running(true)
-	, _finished(false) {
-	_reader = std::thread(&process::read_loop, this);
+process::InGuard::InGuard(process* p, datastream*& d, Poco::Pipe& pp)
+	: owner(p), dsMember(d), pipe(pp)
+{}
+
+process::InGuard::~InGuard() {
+	if (dsMember)
+		owner->close_one_datastream(dsMember);
+	else {
+		try {
+			pipe.close(Poco::Pipe::CLOSE_WRITE);
+		} catch (...) {
+		}
+	}
+}
+
+process::process(const std::string& command, const std::string& args_line) {
+	cleanup_datastreams_and_pipes();
+	_exit_code_val.store(-1);
+	_launched.store(false);
+	_waited_for_exit.store(false);
+	_closed_or_killed.store(false);
+	std::vector<std::string> args_vec = process::split_args(args_line);
+	_in_pipe = Poco::Pipe();
+	_out_pipe = Poco::Pipe();
+	_err_pipe = Poco::Pipe();
+	Poco::PipeOutputStream* raw_stdin_pstr = nullptr;
+	Poco::PipeInputStream* raw_stdout_pstr = nullptr;
+	Poco::PipeInputStream* raw_stderr_pstr = nullptr;
+	try {
+		auto handle = Poco::Process::launch(command, args_vec, &_in_pipe, &_out_pipe, &_err_pipe);
+		_ph = std::make_unique<Poco::ProcessHandle>(std::move(handle));
+		_launched.store(true);
+		raw_stdin_pstr = new Poco::PipeOutputStream(_in_pipe);
+		raw_stdout_pstr = new Poco::PipeInputStream(_out_pipe);
+		raw_stderr_pstr = new Poco::PipeInputStream(_err_pipe);
+		ds_stdin_ = new datastream(nullptr, raw_stdin_pstr, p_streamargs_default, nullptr);
+		ds_stdout_ = new datastream(raw_stdout_pstr, nullptr, p_streamargs_default, nullptr);
+		ds_stderr_ = new datastream(raw_stderr_pstr, nullptr, p_streamargs_default, nullptr);
+		ds_stdin_->binary = true;
+		ds_stdout_->binary = true;
+		ds_stderr_->binary = true;
+	} catch (const Poco::Exception& e) {
+		std::cerr << "Process: Failed to launch '" << command << "': " << e.displayText() << std::endl;
+		delete raw_stdin_pstr;
+		delete raw_stdout_pstr;
+		delete raw_stderr_pstr;
+		cleanup_datastreams_and_pipes();
+		_launched.store(false);
+		throw;
+	}
 }
 
 process::~process() {
-	close();
+	if (_launched.load() && !_waited_for_exit.load() && !_closed_or_killed.load()) {
+		if (_ph && _ph->id()) {
+			std::cerr << "Process: WARNING: Process " << (_ph->id())
+			          << " being destroyed without explicit close() or kill(). Attempting cleanup." << std::endl;
+		} else
+			std::cerr << "Process: WARNING: objeto destruído sem close()/kill(), sem PID válido." << std::endl;
+		close();
+	}
+	cleanup_datastreams_and_pipes();
 }
 
-void process::set_conversion_mode(conversion_mode mode) {
-	_conv_mode = mode;
+void process::close_one_datastream(datastream*& ds) {
+	if (ds) {
+		ds->close();
+		ds->release();
+		ds = nullptr;
+	}
+}
+
+void process::cleanup_datastreams_and_pipes() {
+	try {
+		close_one_datastream(ds_stdin_);
+	} catch (...) {}
+	try {
+		close_one_datastream(ds_stdout_);
+	} catch (...) {}
+	try {
+		close_one_datastream(ds_stderr_);
+	} catch (...) {}
+	_in_pipe.close(Poco::Pipe::CLOSE_BOTH);
+	_out_pipe.close(Poco::Pipe::CLOSE_BOTH);
+	_err_pipe.close(Poco::Pipe::CLOSE_BOTH);
 }
 
 int process::exit_code() const {
-	return _exit_code;
+	if (!_waited_for_exit.load() && _ph && _ph->id() && !Poco::Process::isRunning(*_ph)) {
+		try {
+			int code = Poco::Process::wait(*_ph);
+			const_cast<process*>(this)->_exit_code_val.store(code);
+		} catch (...) {
+			const_cast<process*>(this)->_exit_code_val.store(-1);
+		}
+		const_cast<process*>(this)->_waited_for_exit.store(true);
+	}
+	return _exit_code_val.load();
 }
+
 int process::pid() const {
-	return _ph.id();
+	if (!_launched.load() || !_ph) return 0;
+	return static_cast<int>(_ph->id());
 }
 
 void process::write(const std::string& data) {
-	_in_stream.write(data.data(), data.size());
-	_in_stream.flush();
-}
-
-std::string process::convert(const std::string& text) {
-#ifdef _WIN32
-	switch (_conv_mode) {
-		case conversion_mode::oem:
-			return from_code_page(text, CP_OEMCP);
-		case conversion_mode::acp:
-			return from_code_page(text, CP_ACP);
-		default:
-			return text;
-	}
-#else
-	return text;
-#endif
-}
-
-void process::read_loop() {
-	std::string line;
-
-	while (std::getline(_out_stream, line)) {
-		std::string converted = convert(line + "\n");
-		std::lock_guard<std::mutex> lock(_mutex);
-		_buffer.append(converted);
-	}
-
-	try {
-		_exit_code = Poco::Process::wait(_ph);
-	} catch (...) {
-		_exit_code = -1;
-	}
-	_running.store(false);
-	_finished.store(true);
+	if (ds_stdin_ && ds_stdin_->active())
+		ds_stdin_->write(data);
+	else
+		std::cerr << "Process: Cannot write, stdin stream is not available." << std::endl;
 }
 
 bool process::is_running() const {
-	return Poco::Process::isRunning(_ph.id()) || !_finished.load();
+	if (!_launched.load() || _waited_for_exit.load() || _closed_or_killed.load())
+		return false;
+	if (!_ph || !_ph->id()) return false;
+	return Poco::Process::isRunning(*_ph);
 }
 
-std::string process::peek_output() const {
-	std::lock_guard<std::mutex> lock(_mutex);
-	return _buffer;
-}
-
-std::string process::consume_output() {
-	std::lock_guard<std::mutex> lock(_mutex);
-	std::string tmp = _buffer;
-	_buffer.clear();
-	return tmp;
-}
 
 void process::close() {
+	cleanup_datastreams_and_pipes();
+	InGuard guard(this, ds_stdin_, _in_pipe);
 	try {
-		_in_stream.close();
-	} catch (...) { }
-	for (int i = 0; i < 5; ++i) {
-		if (!Poco::Process::isRunning(_ph.id())) break;
-		Poco::Thread::sleep(200);
+		if (ds_stdin_)
+			close_one_datastream(ds_stdin_);
+		else
+			_in_pipe.close(Poco::Pipe::CLOSE_WRITE);
+	} catch (...) {}
+	try {
+		if (ds_stdout_)
+			close_one_datastream(ds_stdout_);
+	} catch (...) {}
+	try {
+		if (ds_stderr_)
+			close_one_datastream(ds_stderr_);
+	} catch (...) {}
+	if (_ph && _ph->id()) {
+		for (int i = 0; i < 5; ++i) {
+			if (!Poco::Process::isRunning(_ph->id())) break;
+			Poco::Thread::sleep(200);
+		}
 	}
-	if (Poco::Process::isRunning(_ph.id())) {
+	if (_ph && _ph->id() && Poco::Process::isRunning(_ph->id())) {
 		try {
-			Poco::Process::kill(_ph.id());
-		} catch (...) { }
+			Poco::Process::kill(_ph->id());
+		} catch (...) {}
 	}
 	try {
-		_exit_code = Poco::Process::wait(_ph);
+		if (_ph && _ph->id()) {
+			int code = Poco::Process::wait(*_ph);
+			_exit_code_val.store(code);
+		} else
+			_exit_code_val.store(-1);
 	} catch (...) {
-		_exit_code = -1;
+		_exit_code_val.store(-1);
 	}
-		_running.store(false);
-	if (_reader.joinable()) _reader.join();
+	_waited_for_exit.store(true);
+	_closed_or_killed.store(true);
+}
+
+void process::kill_process() {
+	if (!_launched.load() || _waited_for_exit.load() || _closed_or_killed.load() || !_ph || !_ph->id())
+		return;
+	try {
+		Poco::Process::kill(*_ph);
+		try {
+			_exit_code_val.store(Poco::Process::wait(*_ph));
+		} catch (...) {
+			_exit_code_val.store(-9);
+		}
+		_waited_for_exit.store(true);
+	} catch (const Poco::Exception& e) {
+		std::cerr << "Process: Exception killing process " << pid()
+		          << ": " << e.displayText() << std::endl;
+		_exit_code_val.store(-1);
+		_waited_for_exit.store(true);
+	}
+	_closed_or_killed.store(true);
 }
 
 void process::add_ref() {
@@ -158,27 +243,84 @@ void process::release() {
 		delete this;
 }
 
+datastream* process::get_stdin_stream() {
+	if (!ds_stdin_) return nullptr;
+	ds_stdin_->duplicate();
+	return ds_stdin_;
+}
+
+datastream* process::get_stdout_stream() {
+	if (!ds_stdout_) return nullptr;
+	ds_stdout_->duplicate();
+	return ds_stdout_;
+}
+
+datastream* process::get_stderr_stream() {
+	if (!ds_stderr_) return nullptr;
+	ds_stderr_->duplicate();
+	return ds_stderr_;
+}
+
 process* process_factory(const std::string& command, const std::string& args) {
-	return new process(command, args);
+	try {
+		return new process(command, args);
+	} catch (const Poco::Exception&) {
+		return nullptr;
+	} catch (const std::exception& e) {
+		std::cerr << "Process Factory: Failed to create process for command '"
+		          << command << "' (std exc): " << e.what() << std::endl;
+		return nullptr;
+	}
 }
 
 void RegisterProcess(asIScriptEngine* e) {
-	e->RegisterEnum("conversion_mode");
-	e->RegisterEnumValue("conversion_mode", "conversion_mode_none", static_cast<int>(process::conversion_mode::none));
-	e->RegisterEnumValue("conversion_mode", "conversion_mode_oem", static_cast<int>(process::conversion_mode::oem));
-	e->RegisterEnumValue("conversion_mode", "conversion_mode_acp", static_cast<int>(process::conversion_mode::acp));
-
-	e->RegisterObjectType("process", 0, asOBJ_REF);
-	e->RegisterObjectBehaviour("process", asBEHAVE_FACTORY, "process@ f(const string &in, const string &in)", asFUNCTION(process_factory), asCALL_CDECL);
-	e->RegisterObjectBehaviour("process", asBEHAVE_ADDREF, "void f()", asMETHOD(process, add_ref), asCALL_THISCALL);
-	e->RegisterObjectBehaviour("process", asBEHAVE_RELEASE, "void f()", asMETHOD(process, release), asCALL_THISCALL);
-
-	e->RegisterObjectMethod("process", "int get_exit_code() const property", asMETHOD(process, exit_code), asCALL_THISCALL);
-	e->RegisterObjectMethod("process", "int get_pid() const property", asMETHOD(process, pid), asCALL_THISCALL);
-	e->RegisterObjectMethod("process", "bool is_running() const", asMETHOD(process, is_running), asCALL_THISCALL);
-	e->RegisterObjectMethod("process", "string peek_output() const", asMETHOD(process, peek_output), asCALL_THISCALL);
-	e->RegisterObjectMethod("process", "string consume_output()", asMETHOD(process, consume_output), asCALL_THISCALL);
-	e->RegisterObjectMethod("process", "void close()", asMETHOD(process, close), asCALL_THISCALL);
-	e->RegisterObjectMethod("process", "void write(const string &in)", asMETHOD(process, write), asCALL_THISCALL);
-	e->RegisterObjectMethod("process", "void set_conversion_mode(conversion_mode)", asMETHOD(process, set_conversion_mode), asCALL_THISCALL);
+	int r;
+	r = e->RegisterObjectType("process", 0, asOBJ_REF);
+	assert(r >= 0);
+	r = e->RegisterObjectBehaviour("process", asBEHAVE_FACTORY,
+	                               "process@ f(const string &in command, const string &in args = \"\")",
+	                               asFUNCTION(process_factory), asCALL_CDECL);
+	assert(r >= 0);
+	r = e->RegisterObjectBehaviour("process", asBEHAVE_ADDREF,
+	                               "void f()", asMETHOD(process, add_ref), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectBehaviour("process", asBEHAVE_RELEASE,
+	                               "void f()", asMETHOD(process, release), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectMethod("process", "int get_exit_code() const property",
+	                            asMETHOD(process, exit_code), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectMethod("process", "int get_pid() const property",
+	                            asMETHOD(process, pid), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectMethod("process", "bool is_running() const",
+	                            asMETHOD(process, is_running), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectMethod("process", "void close()",
+	                            asMETHOD(process, close), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectMethod("process", "void kill()",
+	                            asMETHOD(process, kill_process), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectMethod("process", "void write(const string &in)",
+	                            asMETHOD(process, write), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectMethod("process", "datastream@ get_stdin_stream()",
+	                            asMETHOD(process, get_stdin_stream), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectMethod("process", "datastream@ get_stdout_stream()",
+	                            asMETHOD(process, get_stdout_stream), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectMethod("process", "datastream@ get_stderr_stream()",
+	                            asMETHOD(process, get_stderr_stream), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectMethod("process", "datastream@ get_stdout() property",
+	                            asMETHOD(process, get_stdout_stream), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectMethod("process", "datastream@ get_stdin() property",
+	                            asMETHOD(process, get_stdin_stream), asCALL_THISCALL);
+	assert(r >= 0);
+	r = e->RegisterObjectMethod("process", "datastream@ get_stderr() property",
+	                            asMETHOD(process, get_stderr_stream), asCALL_THISCALL);
+	assert(r >= 0);
 }

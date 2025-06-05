@@ -59,6 +59,7 @@
 #include "pocostuff.h"
 #include "uuid.h"
 #include "mail.h"
+#include "process.h"
 #include "random.h"
 #include "reactphysics.h"
 #include "scriptstuff.h"

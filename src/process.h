@@ -1,53 +1,65 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <atomic>
-#include <mutex>
-#include <thread>
-
+#include <memory>
 #include <Poco/Pipe.h>
-#include <Poco/PipeStream.h>
 #include <Poco/Process.h>
 #include <angelscript.h>
 
+#include "datastreams.h"
+
+class CScriptArray;
+class CScriptDictionary;
+
 class process {
 public:
-	enum class conversion_mode { none = 0, oem, acp };
-
-	process(const std::string& command, const std::string& args);
+	process(const std::string& command, const std::string& args_line);
 	~process();
 
 	void add_ref();
 	void release();
 
-	void set_conversion_mode(conversion_mode mode);
 	bool is_running() const;
-	std::string peek_output() const;
-	std::string consume_output();
 	void close();
 	void write(const std::string& data);
 	int exit_code() const;
 	int pid() const;
+	void kill_process();
+
+	datastream* get_stdin_stream();
+	datastream* get_stdout_stream();
+	datastream* get_stderr_stream();
 
 private:
-	void read_loop();
 	static std::vector<std::string> split_args(const std::string& command_line);
-	std::string convert(const std::string& text);
+	void cleanup_datastreams_and_pipes();
+	void close_one_datastream(datastream*& ds);
 
-	conversion_mode _conv_mode = conversion_mode::none;
+	struct InGuard {
+		process* owner;
+		datastream*& dsMember;
+		Poco::Pipe& pipe;
+
+		InGuard(process* p, datastream*& d, Poco::Pipe& pp);
+		~InGuard();
+	};
 
 	Poco::Pipe _in_pipe;
 	Poco::Pipe _out_pipe;
-	Poco::PipeInputStream _out_stream;
-	Poco::PipeOutputStream _in_stream;
-	Poco::ProcessHandle _ph;
-	std::thread _reader;
+	Poco::Pipe _err_pipe;
 
-	int _exit_code = -1;
-	std::atomic<bool> _running{false};
-	std::atomic<bool> _finished{false};
-	mutable std::mutex _mutex;
-	std::string _buffer;
+	datastream* ds_stdin_ = nullptr;
+	datastream* ds_stdout_ = nullptr;
+	datastream* ds_stderr_ = nullptr;
+
+	std::unique_ptr<Poco::ProcessHandle> _ph;
+
+	std::atomic<int> _exit_code_val{-1};
+	std::atomic<bool> _launched{false};
+	std::atomic<bool> _waited_for_exit{false};
+	std::atomic<bool> _closed_or_killed{false};
 	std::atomic<int> _ref_count{1};
 
 	process(const process&) = delete;
