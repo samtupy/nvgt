@@ -32,6 +32,7 @@
 #include <utility>
 #include <cstdint>
 #include <miniaudio_libvorbis.h>
+#include <miniaudio_libopus.h>
 #include <iostream>
 using namespace std;
 
@@ -73,6 +74,7 @@ bool init_sound() {
 	g_sound_service->register_protocol(memory_protocol::get_instance(), g_memory_protocol_slot);
 	// Install default decoders into miniaudio.
 	add_decoder(ma_decoding_backend_libvorbis);
+	add_decoder(ma_decoding_backend_libopus);
 	g_soundsystem_initialized.test_and_set();
 	refresh_audio_devices();
 	g_audio_engine = new_audio_engine(audio_engine::PERCENTAGE_ATTRIBUTES);
