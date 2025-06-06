@@ -18,12 +18,10 @@ class toml {
 	}
 	bool load(string filename) {
 		file f;
-		if (f.open(filename, "r")) {
-			string t = f.read();
-			f.close();
-			return this.loads(t);
-		}
-		return false;
+		if (!f.open(filename, "r")) return false;
+		bool result = this.load(f);
+		f.close();
+		return result;
 	}
 	bool load(file@ f) {
 		if (@f != null && f.active) return this.loads(f.read());
@@ -82,7 +80,6 @@ class toml {
 				@t = this.initialize_section(name, true);
 				continue;
 			}
-			//if (value == "") continue;
 			if (value.starts_with('"') && value.ends_with('"'))
 				t.set(key, value.slice(1, value.length() - 1));
 			else if (oneval.find(".") > -1) {
@@ -150,7 +147,7 @@ class toml {
 class toml_section {
 	dictionary data;
 	string name;
-	private string[] knames;
+	private string[] knames; // To maintain key order.
 	toml_section(string name, dictionary data = dictionary()) {
 		this.name = name;
 		this.data = data;
