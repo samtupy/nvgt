@@ -51,7 +51,7 @@ class settings_helper {
 		this.company_name = company;
 		this.product = product;
 		this.local_path = local_path;
-		bool ensure = ensure_data_path(this.get_data_path(), (this.local_path?false:true));
+		bool ensure = ensure_data_path(this.get_data_path(), true);
 		if (ensure) return this.open();
 		else return false;
 	}
@@ -61,7 +61,7 @@ class settings_helper {
 	string get_data_path() {
 		string temppath;
 		if (this.local_path) temppath = join({this.company_name, this.product, this.parent.filename + this.get_file_extension()}, "/");
-		else temppath = join({DIRECTORY_APPDATA, this.company_name, this.product, this.parent.filename + this.get_file_extension()}, "/");
+		else temppath = join({get_preferences_path(this.company_name, this.product), this.parent.filename + this.get_file_extension()}, "/");
 		string ret = spec::path(temppath).to_string();
 		return ret;
 	}
