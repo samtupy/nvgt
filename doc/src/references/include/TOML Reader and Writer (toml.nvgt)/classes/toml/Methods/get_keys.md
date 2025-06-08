@@ -8,4 +8,4 @@ List all key names in a given section.
 - `bool all = false`: Should the function fetch all keys of all sections? Note that this currently does not work if you have multiple keys with the same name.
 
 ## Returns:
-`string[]`: An array containing all the keys.  An empty array means that the section is either blank or doesn't exist.
+`string[]`: An array containing all the keys.  An empty array means that the section is either blank or does not exist.

@@ -10,3 +10,6 @@ Set a value in the TOML data given a section name, a key and a value.
 
 ## Returns:
 `bool`: `true` if the value was successfully written, `false` otherwise.
+
+## Remarks:
+If you specified a section that does not exist, it will automatically be created.
