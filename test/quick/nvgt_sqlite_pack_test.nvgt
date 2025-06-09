@@ -1,0 +1,32 @@
+#pragma plugin nvgt_sqlite
+void main() {
+sqlite_pack@ p = sqlite_pack();
+assert(@p != null);
+assert(p.open("../data/sqlite_pack_test.pack", SQLITE_PACK_OPEN_MODE_READ_WRITE | SQLITE_PACK_OPEN_MODE_CREATE));
+if (!p.file_exists("ding.wav")) {
+assert(p.add_file("c:/windows/media/ding.wav", "ding.wav"));
+}
+auto@ stream = p.open_file("ding.wav", false);
+assert(@stream != null);
+assert(stream.seek(0));
+assert(stream.pos == 0, stream.pos);
+assert(stream.seek(1));
+assert(stream.pos == 1);
+assert(stream.seek(2));
+assert(stream.pos == 2);
+assert(stream.seek(3));
+assert(stream.pos == 3);
+assert(stream.seek(4));
+assert(stream.pos == 4);
+assert(stream.seek(5));
+assert(stream.pos == 5);
+assert(stream.seek_relative(5));
+assert(stream.pos == 10);
+
+@sound_default_pack = p;
+sound s;
+assert(s.load("ding.wav"));
+assert(s.play());
+wait(5000);
+alert("test", "test");
+}
