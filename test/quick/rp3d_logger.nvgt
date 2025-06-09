@@ -1,0 +1,153 @@
+void main() {
+    
+    physics_default_logger@ defaultLogger = physics_default_logger_create();
+    if (defaultLogger !is null) {
+        println("Default logger created successfully");
+    } else {
+        println("Failed to create default logger");
+        return;
+    }
+
+    uint allLevels = LOGGER_LEVEL_ERROR | LOGGER_LEVEL_WARNING | LOGGER_LEVEL_INFORMATION;
+    defaultLogger.add_file_destination("physics_full.log", allLevels, LOGGER_FORMAT_TEXT);
+    println("Added text file destination for all log levels");
+
+    uint errorsAndWarnings = LOGGER_LEVEL_ERROR | LOGGER_LEVEL_WARNING;
+    defaultLogger.add_file_destination("physics_errors.html", errorsAndWarnings, LOGGER_FORMAT_HTML);
+    println("Added HTML file destination for errors and warnings");
+
+    defaultLogger.add_file_destination("physics_info.log", LOGGER_LEVEL_INFORMATION, LOGGER_FORMAT_TEXT);
+    println("Added text file destination for information only");
+
+    physics_logger@ baseLogger = defaultLogger; // Uses opImplCast
+
+    physics_logger@ currentBefore = physics_logger_get_current();
+    if (currentBefore is null) {
+        println("No current logger set initially");
+    } else {
+        println("Current logger was already set");
+    }
+
+    physics_logger_set_current(baseLogger);
+    println("Set logger as global logger");
+
+    physics_logger@ currentAfter = physics_logger_get_current();
+    if (currentAfter !is null) {
+        println("Global logger is now set");
+    } else {
+        println("✗ Failed to set global logger");
+    }
+
+    string categoryPhysics = physics_logger_get_category_name(LOGGER_CATEGORY_PHYSICS_COMMON);
+    string categoryWorld = physics_logger_get_category_name(LOGGER_CATEGORY_WORLD);
+    string categoryBody = physics_logger_get_category_name(LOGGER_CATEGORY_BODY);
+    string categoryJoint = physics_logger_get_category_name(LOGGER_CATEGORY_JOINT);
+    string categoryCollider = physics_logger_get_category_name(LOGGER_CATEGORY_COLLIDER);
+
+    println("Category names:");
+    println("  PHYSICS_COMMON: '" + categoryPhysics + "'");
+    println("  WORLD: '" + categoryWorld + "'");
+    println("  BODY: '" + categoryBody + "'");
+    println("  JOINT: '" + categoryJoint + "'");
+    println("  COLLIDER: '" + categoryCollider + "'");
+
+    string levelError = physics_logger_get_level_name(LOGGER_LEVEL_ERROR);
+    string levelWarning = physics_logger_get_level_name(LOGGER_LEVEL_WARNING);
+    string levelInfo = physics_logger_get_level_name(LOGGER_LEVEL_INFORMATION);
+
+    println("Level names:");
+    println("  ERROR: '" + levelError + "'");
+    println("  WARNING: '" + levelWarning + "'");
+    println("  INFORMATION: '" + levelInfo + "'");
+
+    string worldName = "DemoWorld";
+
+    println("Logging information messages...");
+    baseLogger.log(LOGGER_LEVEL_INFORMATION, worldName, LOGGER_CATEGORY_PHYSICS_COMMON, "Physics system initialized successfully");
+    baseLogger.log(LOGGER_LEVEL_INFORMATION, worldName, LOGGER_CATEGORY_WORLD, "Physics world created with default settings");
+    baseLogger.log(LOGGER_LEVEL_INFORMATION, worldName, LOGGER_CATEGORY_BODY, "Rigid body added to simulation");
+    baseLogger.log(LOGGER_LEVEL_INFORMATION, worldName, LOGGER_CATEGORY_JOINT, "Joint constraint applied between bodies");
+    baseLogger.log(LOGGER_LEVEL_INFORMATION, worldName, LOGGER_CATEGORY_COLLIDER, "Collider shape created and attached");
+
+    println("Logging warning messages...");
+    baseLogger.log(LOGGER_LEVEL_WARNING, worldName, LOGGER_CATEGORY_WORLD, "Simulation timestep is very large, may cause instability");
+    baseLogger.log(LOGGER_LEVEL_WARNING, worldName, LOGGER_CATEGORY_BODY, "Body mass is extremely small, physics may be unstable");
+    baseLogger.log(LOGGER_LEVEL_WARNING, worldName, LOGGER_CATEGORY_JOINT, "Joint limits are very restrictive");
+    baseLogger.log(LOGGER_LEVEL_WARNING, worldName, LOGGER_CATEGORY_COLLIDER, "Collider scale factor is very small");
+
+    println("Logging error messages...");
+    baseLogger.log(LOGGER_LEVEL_ERROR, worldName, LOGGER_CATEGORY_PHYSICS_COMMON, "Failed to allocate memory for physics simulation");
+    baseLogger.log(LOGGER_LEVEL_ERROR, worldName, LOGGER_CATEGORY_WORLD, "World step failed due to invalid configuration");
+    baseLogger.log(LOGGER_LEVEL_ERROR, worldName, LOGGER_CATEGORY_BODY, "Invalid body type specified during creation");
+    baseLogger.log(LOGGER_LEVEL_ERROR, worldName, LOGGER_CATEGORY_JOINT, "Joint creation failed - invalid anchor points");
+    baseLogger.log(LOGGER_LEVEL_ERROR, worldName, LOGGER_CATEGORY_COLLIDER, "Collider shape is null or invalid");
+
+    physics_default_logger@ secondLogger = physics_default_logger_create();
+    if (secondLogger !is null) {
+        println("Created second logger");
+
+        secondLogger.add_file_destination("physics_second.log", LOGGER_LEVEL_ERROR, LOGGER_FORMAT_TEXT);
+        println("Added error-only destination to second logger");
+
+        physics_logger@ secondBase = secondLogger;
+        secondBase.log(LOGGER_LEVEL_ERROR, "SecondWorld", LOGGER_CATEGORY_WORLD, "Error from second logger");
+        println("Logged message with second logger");
+
+        physics_default_logger_destroy(secondLogger);
+        println("Destroyed second logger");
+    }
+
+    defaultLogger.add_file_destination("physics_temp1.log", LOGGER_LEVEL_WARNING, LOGGER_FORMAT_TEXT);
+    defaultLogger.add_file_destination("physics_temp2.html", LOGGER_LEVEL_INFORMATION, LOGGER_FORMAT_HTML);
+    println("Added temporary destinations");
+
+    baseLogger.log(LOGGER_LEVEL_WARNING, worldName, LOGGER_CATEGORY_WORLD, "Warning message for temp destinations");
+    baseLogger.log(LOGGER_LEVEL_INFORMATION, worldName, LOGGER_CATEGORY_BODY, "Info message for temp destinations");
+
+    defaultLogger.remove_all_destinations();
+    println("Removed all destinations");
+
+    baseLogger.log(LOGGER_LEVEL_INFORMATION, worldName, LOGGER_CATEGORY_WORLD, "Message with no destinations");
+    println("Logged message with no destinations (silent)");
+
+    physics_logger@ finalLogger = physics_logger_get_current();
+    if (finalLogger !is null) {
+        println("Global logger is still set");
+
+        if (finalLogger is baseLogger) {
+            println("Global logger is the same as our base logger");
+        } else {
+            println("Global logger is different from our base logger");
+        }
+    } else {
+        println("Global logger was unexpectedly cleared");
+    }
+
+    defaultLogger.add_file_destination("physics_final.log", allLevels, LOGGER_FORMAT_TEXT);
+
+    baseLogger.log(LOGGER_LEVEL_ERROR, "TestWorld", LOGGER_CATEGORY_WORLD, "Individual ERROR level test");
+    baseLogger.log(LOGGER_LEVEL_WARNING, "TestWorld", LOGGER_CATEGORY_WORLD, "Individual WARNING level test");
+    baseLogger.log(LOGGER_LEVEL_INFORMATION, "TestWorld", LOGGER_CATEGORY_WORLD, "Individual INFORMATION level test");    
+
+    uint errorAndInfo = LOGGER_LEVEL_ERROR | LOGGER_LEVEL_INFORMATION;
+    defaultLogger.add_file_destination("physics_error_info.log", errorAndInfo, LOGGER_FORMAT_TEXT);
+
+    baseLogger.log(LOGGER_LEVEL_ERROR, "TestWorld", LOGGER_CATEGORY_COLLIDER, "Error that should appear in error+info log");
+    baseLogger.log(LOGGER_LEVEL_WARNING, "TestWorld", LOGGER_CATEGORY_COLLIDER, "Warning that should NOT appear in error+info log");
+    baseLogger.log(LOGGER_LEVEL_INFORMATION, "TestWorld", LOGGER_CATEGORY_COLLIDER, "Info that should appear in error+info log");
+
+    println("Tested log level combinations");
+
+    physics_logger_set_current(null);
+    physics_logger@ clearedLogger = physics_logger_get_current();
+    if (clearedLogger is null) {
+        println("Successfully cleared global logger");
+    } else {
+        println("Failed to clear global logger");
+    }
+
+    defaultLogger.remove_all_destinations();
+    println("Removed all destinations");
+
+    physics_default_logger_destroy(defaultLogger);
+}

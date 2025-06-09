@@ -116,9 +116,8 @@ static void ma_mixer_monitor_node_process_pcm_frames(ma_node* pNode, const float
 static ma_node_vtable ma_mixer_monitor_node_vtable = { ma_mixer_monitor_node_process_pcm_frames, nullptr, 1, 1, MA_NODE_FLAG_PASSTHROUGH | MA_NODE_FLAG_CONTINUOUS_PROCESSING | MA_NODE_FLAG_ALLOW_NULL_INPUT };
 class mixer_monitor_node_impl : public audio_node_impl, public virtual mixer_monitor_node {
 	unique_ptr<ma_mixer_monitor_node> mn;
-	int position_changed;
 	public:
-	mixer_monitor_node_impl(mixer* m) : mn(make_unique<ma_mixer_monitor_node>()), position_changed(0) {
+	mixer_monitor_node_impl(mixer* m) : mn(make_unique<ma_mixer_monitor_node>()) {
 		if (!g_mixer_monitor_thread.isRunning()) g_mixer_monitor_thread.start(mixer_monitor_thread, nullptr);
 		ma_node_config cfg = ma_node_config_init();
 		ma_uint32 channels = m->get_engine()->get_channels();
@@ -134,7 +133,7 @@ class mixer_monitor_node_impl : public audio_node_impl, public virtual mixer_mon
 	~mixer_monitor_node_impl() {
 		if (node) ma_node_uninit(node, nullptr);
 	}
-	void set_position_changed() override { position_changed = -1; }
+	void set_position_changed() override { if (mn) mn->position_changed = -1; }
 };
 mixer_monitor_node* mixer_monitor_node::create(mixer* m) { return new mixer_monitor_node_impl(m); }
 

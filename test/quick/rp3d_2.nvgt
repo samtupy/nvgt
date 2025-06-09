@@ -19,11 +19,11 @@ void main() {
     println("Identity quaternion: ", string(q1));
 
     // Transforms
-    transform t1;
+    physics_transform t1;
     t1.set_to_identity();
     println("Identity transform position: ", string(t1.get_position()));
 
-    transform t2(vector(1, 2, 3), q1);
+    physics_transform t2(vector(1, 2, 3), q1);
     println("Transform with position (1,2,3): ", string(t2.get_position()));
 
     // AABB
@@ -51,7 +51,7 @@ void main() {
     println("Gravity enabled: ", world.get_is_gravity_enabled());
 
     // Create a simple rigid body (without shapes for now)
-    transform bodyTransform(vector(0, 5, 0), get_IDENTITY_QUATERNION());
+    physics_transform bodyTransform(vector(0, 5, 0), get_IDENTITY_QUATERNION());
     physics_rigid_body@ body = world.create_rigid_body(bodyTransform);
     body.set_type(PHYSICS_BODY_DYNAMIC);
     body.set_mass(1.0);

@@ -14,6 +14,7 @@
 
 #include <string>
 #include <angelscript.h>
+#include "nvgt.h"
 
 bool script_compiled();
 void profiler_callback(asIScriptContext* ctx, void* obj);

@@ -55,6 +55,7 @@
 #include "nvgt_plugin.h"
 #include "pack.h"
 #include "pathfinder.h"
+#include "combination.h"
 #include "pocostuff.h"
 #include "random.h"
 #include "reactphysics.h"
@@ -117,6 +118,7 @@ int g_retcode = 0;
 bool g_initialising_globals = true;
 bool g_shutting_down = false;
 std::string g_stub = "";
+std::string g_scriptpath = "";
 std::string g_platform = "auto";
 bool g_make_console = false;
 std::unordered_map<std::string, asITypeInfo *> g_TypeInfoCache;
@@ -402,6 +404,9 @@ int PreconfigureEngine(asIScriptEngine* engine) {
 	RegisterScriptDatastreams(engine);
 	engine->EndConfigGroup();
 	engine->RegisterObjectType("pack_interface", 0, asOBJ_REF);
+	engine->RegisterObjectType("json_object", 0, asOBJ_REF);
+	engine->RegisterObjectType("json_array", 0, asOBJ_REF);
+	engine->RegisterObjectType("var", 0, asOBJ_REF);
 	return 0;
 }
 // Registrations in the following function are usually done in alphabetical order, with some exceptions involving one subsystem depending on another. For example the internet subsystem registers functions that take timespans, meaning that timestuff gets registered before internet.
@@ -412,6 +417,7 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	RegisterScriptHandle(engine);
 	RegisterScriptMath(engine);
 	RegisterScriptMathComplex(engine);
+	RegisterScriptCombination(engine);
 	RegisterScriptWeakRef(engine);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_TERMINAL);
 	Print::asRegister(engine);

@@ -84,7 +84,7 @@ bool datastream::close(bool close_all) {
 	r = nullptr;
 	w = nullptr;
 	// Sometimes _istr and _ostr could be set to the same object when dealing with an iostream, thus insure we don't call delete twice on the same stream. Mainly only allow _ostr to be deleted if either _istr isn't present or we are not dealing with an iostream.
-	bool is_iostr = (_istr && dynamic_cast<std::iostream*>(_istr) != nullptr) || (_ostr && dynamic_cast<std::iostream*>(_ostr) != nullptr);
+	bool is_iostr = _istr && dynamic_cast<std::iostream*>(_istr) != nullptr || _ostr && dynamic_cast<std::iostream*>(_ostr) != nullptr;
 	if (_istr)
 		delete _istr;
 	if (_ostr && (!_istr || !is_iostr))

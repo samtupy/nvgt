@@ -1,0 +1,29 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#pragma plugin legacy_sound
+#pragma namespace sound upcoming
+void main() {
+	pack_set_global_identifier("testpack");
+	pack p;
+	if (!p.open("packsound.dat", PACK_OPEN_MODE_CREATE)) {
+		alert("Oh no!", "Couldn't create pack");
+		return;
+	}
+	if (!p.add_file("C:\\windows\\media\\ding.wav", "ding")) {
+		alert("An unfortunate error indeed", "Can't add file to pack");
+		exit();
+	}
+	alert("test", p.size + " files now in pack!");
+	p.close();
+	if (!p.open("packsound.dat", PACK_OPEN_MODE_READ)) {
+		alert("Oh no!", "Couldn't open pack");
+		return;
+	}
+	sound s;
+	s.load("ding", p);
+	s.play_wait();
+	s.close();
+	p.close();
+}

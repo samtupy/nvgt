@@ -27,6 +27,7 @@
 #include "crypto.h" // chacha_stream
 #include "datastreams.h"
 #include <scriptarray.h>
+#include "xplatform.h"
 
 bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& file_size);
 static const int header_size = 64;

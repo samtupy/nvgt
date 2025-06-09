@@ -22,6 +22,7 @@ extern int g_retcode;
 extern bool g_initialising_globals;
 extern bool g_shutting_down;
 extern std::string g_stub;
+extern std::string g_scriptpath;
 extern std::string g_platform;
 extern bool g_make_console;
 

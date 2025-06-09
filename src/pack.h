@@ -102,5 +102,6 @@ public:
 void embed_pack(const std::string& disc_filename, const std::string& embed_filename);
 bool load_embedded_packs(Poco::BinaryReader& br);
 void write_embedded_packs(Poco::BinaryWriter& bw);
+bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& file_size);
 // Engine registration
 void RegisterScriptPack(asIScriptEngine* engine);

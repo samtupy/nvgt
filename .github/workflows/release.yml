@@ -6,6 +6,8 @@ on:
       - main
     tags:
       - "*"
+    paths-ignore:
+      - "web/**"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

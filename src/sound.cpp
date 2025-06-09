@@ -464,17 +464,15 @@ public:
 	mixer_impl() : audio_node_impl(), snd(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {}
 	mixer_impl(audio_engine *e, bool sound_group = true) : engine(static_cast<audio_engine_impl *>(e)), audio_node_impl(), snd(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {
 		init_sound();
-		if (sound_group) {
-			snd = make_unique<ma_sound>();
-			ma_sound_group_init(e->get_ma_engine(), 0, nullptr, &*snd);
-			node = (ma_node_base *)&*snd;
-			audio_node_impl::attach_output_bus(0, monitor, 0);
-		}
+		if (!sound_group) return;
+		snd = make_unique<ma_sound>();
+		ma_sound_group_init(e->get_ma_engine(), 0, nullptr, &*snd);
+		node = (ma_node_base *)&*snd;
+		audio_node_impl::attach_output_bus(0, monitor, 0);
 		// set_attenuation_model(ma_attenuation_model_linear); // Investigate why this doesn't seem to work even though ma_attenuation_linear returns a correctly attenuated gain.
 		set_rolloff(0.75);
 		set_directional_attenuation_factor(1);
-		if (sound_group)
-			play();
+		play();
 	}
 	~mixer_impl() {
 		std::unique_lock<mutex> lock(hrtf_toggle_mtx); // Insure hrtf isn't getting toggled at the time we begin detaching nodes.
@@ -614,12 +612,12 @@ public:
 	void set_position_3d(float x, float y, float z) override {
 		if (!snd)
 			return;
+		set_spatialization_enabled(true);
+		ma_sound_set_position(&*snd, x, y, z);
 		if (monitor)
 			monitor->set_position_changed();
-		set_spatialization_enabled(true);
-		return ma_sound_set_position(&*snd, x, y, z);
 	}
-	void set_position_3d_vector(const reactphysics3d::Vector3& position) { set_position_3d(position.x, position.y, position.z); }
+	void set_position_3d_vector(const reactphysics3d::Vector3& position) override { set_position_3d(position.x, position.y, position.z); }
 	reactphysics3d::Vector3 get_position_3d() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
@@ -635,7 +633,7 @@ public:
 			monitor->set_position_changed();
 		return ma_sound_set_direction(&*snd, x, y, z);
 	}
-	void set_direction_vector(const reactphysics3d::Vector3& direction) { set_direction(direction.x, direction.y, direction.z); }
+	void set_direction_vector(const reactphysics3d::Vector3& direction) override { set_direction(direction.x, direction.y, direction.z); }
 	reactphysics3d::Vector3 get_direction() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
@@ -649,7 +647,7 @@ public:
 			return;
 		return ma_sound_set_velocity(&*snd, x, y, z);
 	}
-	void set_velocity_vector(const reactphysics3d::Vector3& velocity) { set_velocity(velocity.x, velocity.y, velocity.z); }
+	void set_velocity_vector(const reactphysics3d::Vector3& velocity) override { set_velocity(velocity.x, velocity.y, velocity.z); }
 	reactphysics3d::Vector3 get_velocity() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
@@ -886,7 +884,9 @@ public:
 			loaded_filename = filename;
 			node = (ma_node_base *)&*snd;
 			set_spatialization_enabled(false);                  // The user must call set_position_3d or manually enable spatialization or else their ambience and UI sounds will be spatialized.
-			set_attenuation_model(ma_attenuation_model_linear); // If spatialization is enabled however lets use linear attenuation by default so that we focus more on hearing objects from further out in audio games as opposed to complete but hard to hear realism.
+			// set_attenuation_model(ma_attenuation_model_linear); // If spatialization is enabled however lets use linear attenuation by default so that we focus more on hearing objects from further out in audio games as opposed to complete but hard to hear realism. At least lets do it once ma_attenuation_model_linear actually works.
+			set_rolloff(0.75);
+			set_directional_attenuation_factor(1);
 			audio_node_impl::attach_output_bus(0, monitor, 0);  // Connect the sound up to the node that monitors hrtf position changes etc.
 			// If we didn't load our sound asynchronously or if we streamed it, then we simply mark it as load_completed or we'll end up with a deadlock at destruction time.
 			if (!(cfg.flags & MA_SOUND_FLAG_ASYNC))

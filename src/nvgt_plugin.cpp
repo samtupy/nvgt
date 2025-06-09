@@ -21,6 +21,7 @@
 #include "nvgt.h"
 #include "nvgt_plugin.h"
 #include "UI.h"
+#include "xplatform.h"
 
 // Helper functions that are shared with plugins.
 void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder) { return new datastream(stream, encoding, byteorder); }
