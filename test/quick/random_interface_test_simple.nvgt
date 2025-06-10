@@ -1,0 +1,17 @@
+// Simple test without setting default random
+void main() {
+	println("Testing basic random interface...");
+	
+	// Test basic functionality
+	random_pcg@ pcg = random_pcg();
+	println("PCG range(1,10): " + pcg.range(1, 10));
+	
+	// Test interface casting
+	random_interface@ pcg_interface = pcg;
+	if (pcg_interface !is null) {
+		println("Interface casting works");
+		println("Interface range(1,10): " + pcg_interface.range(1, 10));
+	}
+	
+	println("Test completed!");
+}
