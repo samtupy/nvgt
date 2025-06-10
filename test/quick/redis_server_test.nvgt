@@ -1,0 +1,99 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+    redis_client@ client = redis_client();
+
+    if (!client.connect()) {
+        println("Failed to connect: " + client.last_error);
+        return;
+    }
+
+    println("\n--- Server Info ---");
+
+    string info = client.info();
+    if (!info.empty()) {
+        array<string> lines = info.split("\n");
+        println("Server info (selected fields):");
+        for (uint i = 0; i < lines.length(); i++) {
+            string line = lines[i];
+            if (line.starts_with("redis_version:") ||
+                line.starts_with("redis_mode:") ||
+                line.starts_with("tcp_port:") ||
+                line.starts_with("uptime_in_seconds:") ||
+                line.starts_with("connected_clients:") ||
+                line.starts_with("used_memory_human:") ||
+                line.starts_with("total_commands_processed:")) {
+                println("  " + line);
+            }
+        }
+    } else {
+        println("Empty?");
+    }
+
+    println("\n--- Keyspace Info ---");
+    string keyspace_info = client.info("keyspace");
+    if (!keyspace_info.empty()) {
+        println(keyspace_info);
+    } else {
+        println("Empty?");
+    }
+
+    int64 db_size = client.dbsize();
+    println("\nDBSIZE = " + db_size + " keys");
+    
+    println("\n--- Database Selection ---");
+    
+    client.set("test:db_test", "value in db 0");
+    println("SET test:db_test in database 0");
+    
+    if (client.select(1)) {
+        println("SELECT 1 - Switched to database 1");
+    }
+    
+    bool exists_db1 = client.exists("test:db_test");
+    println("EXISTS test:db_test in database 1 = " + (exists_db1 ? "true" : "false"));
+    
+    client.set("test:db_test", "value in db 1");
+    
+    if (client.select(0)) {
+        println("SELECT 0 - Switched back to database 0");
+    }
+    
+    string value_db0 = client.get("test:db_test");
+    println("GET test:db_test in database 0 = '" + value_db0 + "'");
+    
+    println("\n--- Authentication Test ---");
+    println("Note: AUTH test skipped (would fail if no password is set)");
+    
+    println("\n--- Pub/Sub Test ---");
+    int64 receivers = client.publish("test:channel", "Hello subscribers!");
+    println("PUBLISH test:channel 'Hello subscribers!' = " + receivers + " receivers");
+    
+    println("Note: SUBSCRIBE/UNSUBSCRIBE require async handling not implemented in this wrapper");
+    
+    println("\n--- Connection Properties ---");
+    redis_client@ client2 = redis_client();
+    client2.host = "localhost";
+    client2.port = 6379;
+    client2.timeout = 3000;
+    client2.database = 2;
+    
+    println("New client configuration:");
+    println("  host = " + client2.host);
+    println("  port = " + client2.port);
+    println("  timeout = " + client2.timeout + "ms");
+    println("  database = " + client2.database);
+    
+    if (client2.connect()) {
+        println("Connected with custom settings to database " + client2.database);
+        client2.set("test:db2_key", "in database 2");
+        client2.del("test:db2_key");
+        client2.disconnect();
+    }
+
+    client.del("test:db_test");
+
+    println("\nRedis Server Operations Test Complete!");
+}

@@ -1,0 +1,117 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+    blocking_redis_subscriber@ subscriber = blocking_redis_subscriber();
+
+    array<string> channels;
+    channels.insert_last("test:pubsub:channel1");
+    channels.insert_last("test:pubsub:channel2");
+
+    if (!subscriber.subscribe(channels)) {
+        println("Failed to subscribe: " + subscriber.last_error);
+        return;
+    }
+
+    println("Subscriber started, waiting for it to fully connect...");
+    wait(500);
+
+    redis_client@ checker = redis_client();
+    if (!checker.connect()) {
+        println("Failed to connect checker client");
+        subscriber.stop();
+        return;
+    }
+
+    array<string> check_cmd;
+    check_cmd.insert_last("PUBSUB");
+    check_cmd.insert_last("NUMSUB");
+    check_cmd.insert_last("test:pubsub:channel1");
+
+    redis_value@ check_result = checker.execute(check_cmd);
+    if (check_result !is null && check_result.is_array) {
+        array<redis_value@>@ arr = check_result.get_array();
+        println("PUBSUB NUMSUB result: " + arr.length() + " elements");
+    }
+
+    redis_client@ publisher = redis_client();
+    if (!publisher.connect()) {
+        println("Failed to connect publisher");
+        subscriber.stop();
+        checker.disconnect();
+        return;
+    }
+
+    println("\nPublishing messages...");
+
+    for (int i = 1; i <= 3; i++) {
+        int64 count = publisher.publish("test:pubsub:channel1", "Channel1 Message " + i);
+        println("Published to channel1: " + count + " subscribers");
+        wait(50);
+    }
+
+    for (int i = 1; i <= 2; i++) {
+        int64 count = publisher.publish("test:pubsub:channel2", "Channel2 Message " + i);
+        println("Published to channel2: " + count + " subscribers");
+        wait(50);
+    }
+
+    wait(300);
+
+    println("\nRetrieving messages...");
+
+    if (subscriber.has_messages("test:pubsub:channel1")) {
+        array<string>@ msgs = subscriber.get_messages("test:pubsub:channel1");
+        println("\nChannel 1 (" + msgs.length() + " messages):");
+        for (uint i = 0; i < msgs.length(); i++) {
+            println("  " + msgs[i]);
+        }
+    } else {
+        println("\nChannel 1: No messages");
+    }
+
+    if (subscriber.has_messages("test:pubsub:channel2")) {
+        array<string>@ msgs = subscriber.get_messages("test:pubsub:channel2");
+        println("\nChannel 2 (" + msgs.length() + " messages):");
+        for (uint i = 0; i < msgs.length(); i++) {
+            println("  " + msgs[i]);
+        }
+    } else {
+        println("\nChannel 2: No messages");
+    }
+
+    println("\n--- Testing multiple stop/start cycles ---");
+
+    for (int cycle = 1; cycle <= 3; cycle++) {
+        println("\nCycle " + cycle + ":");
+
+        uint64 start = TIME_SYSTEM_RUNNING_MILLISECONDS;
+        subscriber.stop();
+        uint64 stop = TIME_SYSTEM_RUNNING_MILLISECONDS;
+
+        println("  Stop time: " + (stop - start) + " ms");
+
+        if (subscriber.subscribe(channels)) {
+            println("  Re-subscribed successfully");
+            wait(300);
+
+            publisher.publish("test:pubsub:channel1", "Cycle " + cycle + " test");
+            wait(100);
+
+            if (subscriber.has_messages("test:pubsub:channel1")) {
+                array<string>@ msgs = subscriber.get_messages("test:pubsub:channel1");
+                println("  Received: " + msgs[0]);
+            }
+        } else {
+            println("  Failed to re-subscribe");
+        }
+    }
+
+    println("\nFinal cleanup...");
+    subscriber.stop();
+    publisher.disconnect();
+    checker.disconnect();
+
+    println("\nRedis pub/sub Test Complete!");
+}

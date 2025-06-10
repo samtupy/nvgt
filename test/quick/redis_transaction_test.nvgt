@@ -1,0 +1,112 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+    redis_client@ client = redis_client();
+
+    if (!client.connect()) {
+        println("Failed to connect: " + client.last_error);
+        return;
+    }
+
+    client.del("test:account1");
+    client.del("test:account2");
+    client.del("test:counter");
+
+    client.set("test:account1", "1000");
+    client.set("test:account2", "500");
+    client.set("test:counter", "0");
+
+    println("Initial state:");
+    println("  test:account1 = " + client.get("test:account1"));
+    println("  test:account2 = " + client.get("test:account2"));
+    println("  test:counter = " + client.get("test:counter"));
+
+    if (client.multi()) {
+        println("\nMULTI - Transaction started");
+    }
+
+    client.decrby("test:account1", 100);
+    println("Queued: DECRBY test:account1 100");
+
+    client.incrby("test:account2", 100);
+    println("Queued: INCRBY test:account2 100");
+
+    client.incr("test:counter");
+    println("Queued: INCR test:counter");
+
+    client.set("test:transaction", "completed");
+    println("Queued: SET test:transaction 'completed'");
+
+    println("\nExecuting transaction...");
+    redis_value@ result = client.exec();
+
+    if (result !is null && result.is_array) {
+        array<redis_value@>@ results = result.get_array();
+        println("EXEC results (" + results.length() + " commands):");
+        for (uint i = 0; i < results.length(); i++) {
+            redis_value@ val = results[i];
+            if (val.is_integer) {
+                println("  [" + i + "] = " + val.get_integer() + " (integer)");
+            } else if (val.is_string) {
+                println("  [" + i + "] = '" + val.get_string() + "' (string/status)");
+            } else if (val.is_error) {
+                println("  [" + i + "] = ERROR: " + val.get_string());
+            } else if (val.is_nil) {
+                println("  [" + i + "] = (nil)");
+            }
+        }
+    }
+
+    println("\nFinal state after transaction:");
+    println("  test:account1 = " + client.get("test:account1"));
+    println("  test:account2 = " + client.get("test:account2"));
+    println("  test:counter = " + client.get("test:counter"));
+    println("  test:transaction = " + client.get("test:transaction"));
+
+    println("\n--- Testing DISCARD ---");
+
+    if (client.multi()) {
+        println("MULTI - New transaction started");
+    }
+
+    client.set("test:should_not_exist", "value");
+    println("Queued: SET test:should_not_exist 'value'");
+
+    client.incr("test:counter");
+    println("Queued: INCR test:counter");
+
+    if (client.discard()) {
+        println("DISCARD - Transaction cancelled");
+    }
+
+    bool exists = client.exists("test:should_not_exist");
+    println("\nAfter DISCARD:");
+    println("  test:should_not_exist exists = " + (exists ? "true" : "false"));
+    println("  test:counter = " + client.get("test:counter") + " (unchanged)");
+
+    println("\n--- Testing Generic Execute ---");
+
+    array<string> cmd = {"ECHO", "Hello from Redis!"};
+    redis_value@ echo_result = client.execute(cmd);
+    if (echo_result !is null) {
+        println("ECHO result: '" + echo_result.get_string() + "'");
+    }
+
+    array<string> time_cmd = {"TIME"};
+    redis_value@ time_result = client.execute(time_cmd);
+    if (time_result !is null && time_result.is_array) {
+        array<redis_value@>@ time_array = time_result.get_array();
+        if (time_array.length() >= 2) {
+            println("Server TIME: " + time_array[0].get_string() + "." + time_array[1].get_string());
+        }
+    }
+
+    client.del("test:account1");
+    client.del("test:account2");
+    client.del("test:counter");
+    client.del("test:transaction");
+
+    println("\nRedis Transaction Test Complete!");
+}

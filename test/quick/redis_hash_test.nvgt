@@ -1,0 +1,101 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+    redis_client@ client = redis_client();
+
+    if (!client.connect()) {
+        println("Failed to connect: " + client.last_error);
+        return;
+    }
+
+    client.del("test:hash");
+
+    if (client.hset("test:hash", "field1", "value1")) {
+        println("HSET test:hash 'field1' 'value1' - OK");
+    }
+
+    if (client.hset("test:hash", "field2", "value2")) {
+        println("HSET test:hash 'field2' 'value2' - OK");
+    }
+
+    if (client.hset("test:hash", "counter", "0")) {
+        println("HSET test:hash 'counter' '0' - OK");
+    }
+
+    if (client.hset("test:hash", "price", "9.99")) {
+        println("HSET test:hash 'price' '9.99' - OK");
+    }
+
+    string value = client.hget("test:hash", "field1");
+    println("HGET test:hash 'field1' = '" + value + "'");
+
+    bool exists = client.hexists("test:hash", "field2");
+    println("HEXISTS test:hash 'field2' = " + (exists ? "true" : "false"));
+
+    exists = client.hexists("test:hash", "nonexistent");
+    println("HEXISTS test:hash 'nonexistent' = " + (exists ? "true" : "false"));
+
+    int64 len = client.hlen("test:hash");
+    println("HLEN test:hash = " + len);
+
+    array<string>@ keys = client.hkeys("test:hash");
+    println("HKEYS test:hash:");
+    for (uint i = 0; i < keys.length(); i++) {
+        println("  '" + keys[i] + "'");
+    }
+
+    array<string>@ values = client.hvals("test:hash");
+    println("HVALS test:hash:");
+    for (uint i = 0; i < values.length(); i++) {
+        println("  '" + values[i] + "'");
+    }
+
+    dictionary@ all = client.hgetall("test:hash");
+    println("HGETALL test:hash:");
+    array<string>@ dict_keys = all.get_keys();
+    for (uint i = 0; i < dict_keys.length(); i++) {
+        string key = dict_keys[i];
+        string val;
+        all.get(key, val);
+        println("  '" + key + "' => '" + val + "'");
+    }
+
+    int64 new_counter = client.hincrby("test:hash", "counter", 5);
+    println("HINCRBY test:hash 'counter' 5 = " + new_counter);
+
+    new_counter = client.hincrby("test:hash", "counter", -2);
+    println("HINCRBY test:hash 'counter' -2 = " + new_counter);
+
+    double new_price = client.hincrbyfloat("test:hash", "price", 0.51);
+    println("HINCRBYFLOAT test:hash 'price' 0.51 = " + new_price);
+
+    bool set_nx = client.hsetnx("test:hash", "field1", "should_not_set");
+    println("HSETNX test:hash 'field1' (exists) = " + (set_nx ? "true" : "false"));
+
+    set_nx = client.hsetnx("test:hash", "new_field", "new_value");
+    println("HSETNX test:hash 'new_field' (new) = " + (set_nx ? "true" : "false"));
+
+    int64 deleted = client.hdel("test:hash", "field2");
+    if (deleted > 0) {
+        println("HDEL test:hash 'field2' - OK (deleted " + deleted + " field)");
+    }
+
+    exists = client.hexists("test:hash", "field2");
+    println("HEXISTS test:hash 'field2' after HDEL = " + (exists ? "true" : "false"));
+
+    println("\nFinal hash contents:");
+    @all = client.hgetall("test:hash");
+    @dict_keys = all.get_keys();
+    for (uint i = 0; i < dict_keys.length(); i++) {
+        string key = dict_keys[i];
+        string val;
+        all.get(key, val);
+        println("  '" + key + "' => '" + val + "'");
+    }
+
+    client.del("test:hash");
+
+    println("\nRedis Hash Test Complete!");
+}

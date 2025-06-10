@@ -1,0 +1,150 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+    redis_client@ client = redis_client();
+
+    if (!client.connect()) {
+        println("Failed to connect");
+        return;
+    }
+
+    for (int i = 0; i < 25; i++) {
+        client.set("test:adv:scan" + i, "value" + i);
+    }
+    println("Created 25 test keys");
+
+    int64 cursor = 0;
+    array<string> all_keys;
+    int iterations = 0;
+
+    do {
+        array<string>@ scan_result = client.scan(cursor, "test:adv:scan*", 5);
+        if (scan_result.length() > 0) {
+            // First element is the new cursor
+            string next_cursor = scan_result[0];
+            cursor = parse_int(next_cursor);
+            iterations++;
+
+            // Rest are keys
+            int keys_in_batch = scan_result.length() - 1;
+            println("  Iteration " + iterations + ": cursor=" + next_cursor + ", found " + keys_in_batch + " keys");
+            for (uint i = 1; i < scan_result.length(); i++) {
+                all_keys.insert_last(scan_result[i]);
+            }
+        } else {
+            break;
+        }
+    } while (cursor != 0);
+
+    println("SCAN complete: found " + all_keys.length() + " keys in " + iterations + " iterations");
+
+    client.set("test:adv:source", "important data");
+    client.expire("test:adv:source", 3600);
+
+    string serialized = client.dump("test:adv:source");
+    println("Dumped key, serialized length: " + serialized.length() + " bytes");
+
+    client.del("test:adv:source");
+    println("Deleted original key");
+
+    bool restored = client.restore("test:adv:restored", 0, serialized);
+    println("Restore to new key: " + (restored ? "success" : "failed"));
+
+    string value = client.get("test:adv:restored");
+    println("Restored value: '" + value + "'");
+
+    client.set("test:adv:existing", "old data");
+    restored = client.restore("test:adv:existing", 0, serialized, true);
+    println("Restore with REPLACE: " + (restored ? "success" : "failed"));
+
+    value = client.get("test:adv:existing");
+    println("Replaced value: '" + value + "' (was 'old data')");
+
+    client.set("test:adv:object", "test value");
+
+    dictionary@ obj_info = client.object("encoding", "test:adv:object");
+    if (obj_info !is null && obj_info.exists("encoding")) {
+        println("Encoding: " + string(obj_info["encoding"]));
+    }
+
+    @obj_info = client.object("idletime", "test:adv:object");
+    if (obj_info !is null && obj_info.exists("idletime")) {
+        int64 idletime = int64(obj_info["idletime"]);
+        println("Idle time: " + idletime + " seconds");
+    }
+
+    @obj_info = client.object("refcount", "test:adv:object");
+    if (obj_info !is null && obj_info.exists("refcount")) {
+        int64 refcount = int64(obj_info["refcount"]);
+        println("Reference count: " + refcount);
+    }
+
+    client.get("test:adv:object");
+    println("Accessed key, checking idle time again...");
+
+    @obj_info = client.object("idletime", "test:adv:object");
+    if (obj_info !is null && obj_info.exists("idletime")) {
+        int64 idletime = int64(obj_info["idletime"]);
+        println("Idle time after access: " + idletime + " seconds (should be ~0)");
+    }
+
+    client.set("test:adv:small", "tiny");
+    int64 mem_small = client.memory_usage("test:adv:small");
+    println("Small string ('tiny') uses: " + mem_small + " bytes");
+
+    string large_value = "";
+    for (int i = 0; i < 1000; i++) {
+        large_value += "Redis memory test ";
+    }
+    println("Created large string, length: " + large_value.length() + " characters");
+    client.set("test:adv:large", large_value);
+
+    int64 mem_large = client.memory_usage("test:adv:large");
+    println("Large string uses: " + mem_large + " bytes (" + (mem_large / mem_small) + "x more than smaller string)");
+
+    client.lpush("test:adv:list", "item1");
+    client.lpush("test:adv:list", "item2");
+    int64 mem_list = client.memory_usage("test:adv:list", 5);
+    println("List with 2 items uses: " + mem_list + " bytes (sampled)");
+
+    client.set("test:adv:user:1:name", "Alice");
+    client.set("test:adv:user:1:email", "alice@example.com");
+    client.set("test:adv:user:2:name", "Bob");
+    client.set("test:adv:user:2:email", "bob@example.com");
+    client.set("test:adv:post:1:title", "First Post");
+    client.set("test:adv:post:1:content", "Content here");
+    println("Created 6 keys (4 user, 2 post)");
+
+    cursor = 0;
+    array<string> user_keys;
+
+    do {
+        array<string>@ scan_result = client.scan(cursor, "test:adv:user:*", 10);
+        if (scan_result.length() > 0) {
+            cursor = int64(parse_double(scan_result[0]));
+            for (uint i = 1; i < scan_result.length(); i++) {
+                user_keys.insert_last(scan_result[i]);
+            }
+        } else {
+            break;
+        }
+    } while (cursor != 0);
+
+    println("SCAN with pattern 'test:adv:user:*' found " + user_keys.length() + " user keys:");
+    for (uint i = 0; i < user_keys.length(); i++) {
+        println("  - " + user_keys[i]);
+    }
+
+    println("Calling into client keys");
+    array<string>@ keys = client.keys("test:adv:*");
+    println("Cleaning up " + keys.length() + " existing test keys");
+    for (uint i = 0; i < keys.length(); i++) {
+        client.del(keys[i]);
+    }
+
+    client.disconnect();
+    println("\nRedis Advanced Key Operations Test completed!");
+}
+

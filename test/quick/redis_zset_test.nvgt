@@ -1,0 +1,82 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+    redis_client@ client = redis_client();
+
+    if (!client.connect()) {
+        println("Failed to connect: " + client.last_error);
+        return;
+    }
+
+    client.del("test:zset");
+
+    int64 added = client.zadd("test:zset", 100, "player1");
+    println("ZADD test:zset 100 'player1' = " + added + " (added)");
+
+    added = client.zadd("test:zset", 250, "player2");
+    println("ZADD test:zset 250 'player2' = " + added + " (added)");
+
+    added = client.zadd("test:zset", 150, "player3");
+    println("ZADD test:zset 150 'player3' = " + added + " (added)");
+
+    added = client.zadd("test:zset", 300, "player4");
+    println("ZADD test:zset 300 'player4' = " + added + " (added)");
+
+    added = client.zadd("test:zset", 200, "player5");
+    println("ZADD test:zset 200 'player5' = " + added + " (added)");
+
+    added = client.zadd("test:zset", 175, "player3");
+    println("ZADD test:zset 175 'player3' (update) = " + added + " (added)");
+
+    int64 count = client.zcard("test:zset");
+    println("ZCARD test:zset = " + count);
+
+    double score = client.zscore("test:zset", "player3");
+    println("ZSCORE test:zset 'player3' = " + score);
+
+    array<string>@ members = client.zrange("test:zset", 0, -1);
+    println("ZRANGE test:zset 0 -1 (ascending by score):");
+    for (uint i = 0; i < members.length(); i++) {
+        println("  [" + i + "] = '" + members[i] + "'");
+    }
+
+    array<string>@ rev_members = client.zrevrange("test:zset", 0, 2);
+    println("ZREVRANGE test:zset 0 2 (top 3, descending):");
+    for (uint i = 0; i < rev_members.length(); i++) {
+        println("  [" + i + "] = '" + rev_members[i] + "'");
+    }
+
+    int64 rank = client.zrank("test:zset", "player3");
+    println("ZRANK test:zset 'player3' = " + rank + " (0-based)");
+
+    int64 rev_rank = client.zrevrank("test:zset", "player3");
+    println("ZREVRANK test:zset 'player3' = " + rev_rank + " (0-based from highest)");
+
+    double new_score = client.zincrby("test:zset", 25, "player1");
+    println("ZINCRBY test:zset 25 'player1' = " + new_score + " (new score)");
+
+    int64 count_range = client.zcount("test:zset", 150, 250);
+    println("ZCOUNT test:zset 150 250 = " + count_range + " (members in score range)");
+
+    count_range = client.zcount("test:zset", -999999, 200);
+    println("ZCOUNT test:zset -999999 200 = " + count_range);
+
+    count_range = client.zcount("test:zset", 200, 999999);
+    println("ZCOUNT test:zset 200 999999 = " + count_range);
+
+    int64 removed = client.zrem("test:zset", "player2");
+    println("ZREM test:zset 'player2' = " + removed + " (removed)");
+
+    println("\nFinal sorted set:");
+    array<string>@ final_members = client.zrange("test:zset", 0, -1);
+    for (uint i = 0; i < final_members.length(); i++) {
+        double member_score = client.zscore("test:zset", final_members[i]);
+        println("  '" + final_members[i] + "' => " + member_score);
+    }
+
+    client.del("test:zset");
+
+    println("\nRedis Sorted Set Test Completed!");
+}

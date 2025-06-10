@@ -1,0 +1,109 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+    redis_client@ client = redis_client();
+
+    if (!client.connect()) {
+        println("Failed to connect: " + client.last_error);
+        return;
+    }
+
+    client.del("test:set1");
+    client.del("test:set2");
+    client.del("test:set3");
+
+    int64 added = client.sadd("test:set1", "member1");
+    println("SADD test:set1 'member1' = " + added + " (added)");
+
+    added = client.sadd("test:set1", "member2");
+    println("SADD test:set1 'member2' = " + added + " (added)");
+
+    added = client.sadd("test:set1", "member3");
+    println("SADD test:set1 'member3' = " + added + " (added)");    
+    added = client.sadd("test:set1", "member1");
+    println("SADD test:set1 'member1' (duplicate) = " + added + " (added)");
+
+    int64 count = client.scard("test:set1");
+    println("SCARD test:set1 = " + count);
+
+    bool is_member = client.sismember("test:set1", "member2");
+    println("SISMEMBER test:set1 'member2' = " + (is_member ? "true" : "false"));
+
+    is_member = client.sismember("test:set1", "not_a_member");
+    println("SISMEMBER test:set1 'not_a_member' = " + (is_member ? "true" : "false"));
+
+    array<string>@ members = client.smembers("test:set1");
+    println("SMEMBERS test:set1:");
+    for (uint i = 0; i < members.length(); i++) {
+        println("  '" + members[i] + "'");
+    }
+
+    int64 removed = client.srem("test:set1", "member2");
+    println("SREM test:set1 'member2' = " + removed + " (removed)");
+
+    string popped = client.spop("test:set1");
+    println("SPOP test:set1 = '" + popped + "'");
+
+    client.sadd("test:set1", "a");
+    client.sadd("test:set1", "b");
+    client.sadd("test:set1", "c");
+    client.sadd("test:set1", "d");
+
+    string random = client.srandmember("test:set1");
+    println("SRANDMEMBER test:set1 = '" + random + "'");
+
+    array<string>@ randoms = client.srandmember_count("test:set1", 3);
+    println("SRANDMEMBER test:set1 3:");
+    for (uint i = 0; i < randoms.length(); i++) {
+        println("  '" + randoms[i] + "'");
+    }
+
+    println("\n--- Set Operations (Multiple Sets) ---");
+
+    client.sadd("test:set2", "b");
+    client.sadd("test:set2", "c");
+    client.sadd("test:set2", "e");
+    client.sadd("test:set2", "f");
+
+    client.sadd("test:set3", "c");
+    client.sadd("test:set3", "d");
+    client.sadd("test:set3", "g");
+
+    println("test:set1 members: " + join(client.smembers("test:set1"), ", "));
+    println("test:set2 members: " + join(client.smembers("test:set2"), ", "));
+    println("test:set3 members: " + join(client.smembers("test:set3"), ", "));
+
+    array<string> set_keys = {"test:set1", "test:set2", "test:set3"};
+    array<string>@ union_result = client.sunion(set_keys);
+    println("SUNION test:set1 test:set2 test:set3:");
+    for (uint i = 0; i < union_result.length(); i++) {
+        println("  '" + union_result[i] + "'");
+    }
+
+    array<string>@ inter_result = client.sinter(set_keys);
+    println("SINTER test:set1 test:set2 test:set3:");
+    for (uint i = 0; i < inter_result.length(); i++) {
+        println("  '" + inter_result[i] + "'");
+    }
+
+    array<string> diff_keys = {"test:set1", "test:set2"};
+    array<string>@ diff_result = client.sdiff(diff_keys);
+    println("SDIFF test:set1 test:set2:");
+    for (uint i = 0; i < diff_result.length(); i++) {
+        println("  '" + diff_result[i] + "'");
+    }
+
+    bool moved = client.smove("test:set1", "test:set2", "a");
+    println("SMOVE test:set1 test:set2 'a' = " + (moved ? "1" : "0") + " (moved)");
+
+    println("test:set1 after SMOVE: " + join(client.smembers("test:set1"), ", "));
+    println("test:set2 after SMOVE: " + join(client.smembers("test:set2"), ", "));
+
+    client.del("test:set1");
+    client.del("test:set2");
+    client.del("test:set3");
+    
+    println("\nRedis Set Test Completed!");
+}

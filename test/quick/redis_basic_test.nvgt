@@ -1,0 +1,132 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+    redis_client@ client = redis_client();
+
+    println("Default host: " + client.host);
+    println("Default port: " + client.port);
+    println("Default database: " + client.database);
+    println("Default timeout: " + client.timeout + "ms");
+
+    println("\nConnecting to Redis...");
+    if (!client.connect()) {
+        println("Failed to connect: " + client.last_error);
+        println("Make sure Redis server is running on localhost:6379");
+        return;
+    }
+
+    string pong = client.ping();
+    println("PING response: " + pong);
+
+    string pong_msg = client.ping("Hello Redis!");
+    println("PING with message response: " + pong_msg);
+
+    println("\n--- String Operations ---");
+
+    if (client.set("test:key1", "Hello NVGT!")) {
+        println("SET test:key1 = 'Hello NVGT!' - OK");
+    }
+
+    string value = client.get("test:key1");
+    println("GET test:key1 = '" + value + "'");
+
+    if (client.set("test:temp", "Temporary value", 5)) {
+        println("SET test:temp with 5 second expiry - OK");
+    }
+
+    int64 ttl = client.ttl("test:temp");
+    println("TTL test:temp = " + ttl + " seconds");
+
+    bool exists = client.exists("test:key1");
+    println("EXISTS test:key1 = " + (exists ? "true" : "false"));
+
+    bool not_exists = client.exists("test:nonexistent");
+    println("EXISTS test:nonexistent = " + (not_exists ? "true" : "false"));
+
+    int64 counter = client.incr("test:counter");
+    println("INCR test:counter = " + counter);
+
+    counter = client.incr("test:counter");
+    println("INCR test:counter = " + counter);
+
+    counter = client.decr("test:counter");
+    println("DECR test:counter = " + counter);
+
+    counter = client.incrby("test:counter", 10);
+    println("INCRBY test:counter 10 = " + counter);
+
+    counter = client.decrby("test:counter", 5);
+    println("DECRBY test:counter 5 = " + counter);
+
+    int64 len = client.append("test:key1", " World!");
+    println("APPEND to test:key1 = " + len + " (new length)");
+    println("GET test:key1 = '" + client.get("test:key1") + "'");
+
+    len = client.strlen("test:key1");
+    println("STRLEN test:key1 = " + len);
+
+    string substr = client.getrange("test:key1", 0, 4);
+    println("GETRANGE test:key1 0 4 = '" + substr + "'");
+
+    len = client.setrange("test:key1", 6, "Redis");
+    println("SETRANGE test:key1 6 'Redis' = " + len + " (new length)");
+    println("GET test:key1 = '" + client.get("test:key1") + "'");
+
+    bool set_nx = client.setnx("test:key1", "Should not set");
+    println("SETNX test:key1 (exists) = " + (set_nx ? "true" : "false"));
+
+    set_nx = client.setnx("test:new_key", "New value");
+    println("SETNX test:new_key (new) = " + (set_nx ? "true" : "false"));
+
+    if (client.setex("test:expire", 3, "Expires in 3 seconds")) {
+        println("SETEX test:expire 3 seconds - OK");
+    }
+
+    if (client.psetex("test:expire_ms", 2500, "Expires in 2.5 seconds")) {
+        println("PSETEX test:expire_ms 2500ms - OK");
+    }
+
+    println("\n--- Batch Operations ---");
+
+    client.set("test:batch1", "value1");
+    client.set("test:batch2", "value2");
+    client.set("test:batch3", "value3");
+
+    array<string> keys = {"test:batch1", "test:batch2", "test:batch3", "test:nonexistent"};
+    array<string>@ values = client.mget(keys);
+    println("MGET results:");
+    for (uint i = 0; i < values.length(); i++) {
+        println("  " + keys[i] + " = '" + values[i] + "'");
+    }
+
+    dictionary kv_pairs;
+    kv_pairs["test:mset1"] = "mvalue1";
+    kv_pairs["test:mset2"] = "mvalue2";
+    kv_pairs["test:mset3"] = "mvalue3";
+
+    if (client.mset(kv_pairs)) {
+        println("MSET multiple keys - OK");
+        println("GET test:mset1 = '" + client.get("test:mset1") + "'");
+        println("GET test:mset2 = '" + client.get("test:mset2") + "'");
+        println("GET test:mset3 = '" + client.get("test:mset3") + "'");
+    }
+
+    println("\n--- Cleanup ---");
+    if (client.del("test:key1")) {
+        println("DEL test:key1 - OK");
+    }
+
+    println("\n--- Error Handling ---");
+    client.disconnect();
+    println("Disconnected from Redis");
+
+    string error_result = client.get("test:key");
+    if (error_result.empty()) {
+        println("Operation while disconnected returned empty (expected)");
+        println("Last error: " + client.last_error);
+    }
+
+    println("\nBasic Redis Test Complete");
+}

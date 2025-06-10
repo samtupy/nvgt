@@ -1,0 +1,118 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+    redis_client@ client = redis_client();
+    client.host = "localhost";
+    client.port = 6379;
+    client.timeout = 5000;
+    
+    if (!client.connect()) {
+        println("Failed to connect: " + client.last_error);
+        return;
+    }
+
+    client.del("mybitmap");
+
+    bool result = client.setbit("mybitmap", 0, true);
+    println("Set bit 0 to 1, previous value: " + (result ? "1" : "0"));
+
+    result = client.setbit("mybitmap", 5, true);
+    println("Set bit 5 to 1, previous value: " + (result ? "1" : "0"));
+
+    result = client.setbit("mybitmap", 10, true);
+    println("Set bit 10 to 1, previous value: " + (result ? "1" : "0"));
+
+    bool bit0 = client.getbit("mybitmap", 0);
+    bool bit1 = client.getbit("mybitmap", 1);
+    bool bit5 = client.getbit("mybitmap", 5);
+    bool bit10 = client.getbit("mybitmap", 10);
+
+    println("Bit 0: " + (bit0 ? "1" : "0"));
+    println("Bit 1: " + (bit1 ? "1" : "0"));
+    println("Bit 5: " + (bit5 ? "1" : "0"));
+    println("Bit 10: " + (bit10 ? "1" : "0"));
+
+    int64 count = client.bitcount("mybitmap");
+    println("Total bits set: " + count);
+
+    client.setbit("mybitmap", 16, true);
+    client.setbit("mybitmap", 24, true);
+
+    count = client.bitcount("mybitmap", 0, 0); // First byte
+    println("Bits set in first byte: " + count);
+
+    count = client.bitcount("mybitmap", 1, 2); // Second and third bytes
+    println("Bits set in bytes 1-2: " + count);
+
+    println("\n--- BITOP Test ---");
+    client.del("bitmap1");
+    client.del("bitmap2");
+    client.del("bitmap_result");
+
+    client.setbit("bitmap1", 0, true);
+    client.setbit("bitmap1", 2, true);
+    client.setbit("bitmap1", 4, true);
+
+    client.setbit("bitmap2", 1, true);
+    client.setbit("bitmap2", 2, true);
+    client.setbit("bitmap2", 3, true);
+
+    array<string> keys;
+    keys.insert_last("bitmap1");
+    keys.insert_last("bitmap2");
+
+    int64 len = client.bitop("AND", "bitmap_result", keys);
+    println("AND operation result length: " + len);
+
+    println("Result bits 0-4:");
+    for (int i = 0; i < 5; i++) {
+        bool bit = client.getbit("bitmap_result", i);
+        println("  Bit " + i + ": " + (bit ? "1" : "0"));
+    }
+
+    len = client.bitop("OR", "bitmap_result", keys);
+    println("\nOR operation result length: " + len);
+
+    println("Result bits 0-4:");
+    for (int i = 0; i < 5; i++) {
+        bool bit = client.getbit("bitmap_result", i);
+        println("  Bit " + i + ": " + (bit ? "1" : "0"));
+    }
+
+    len = client.bitop("XOR", "bitmap_result", keys);
+    println("\nXOR operation result length: " + len);
+
+    println("Result bits 0-4:");
+    for (int i = 0; i < 5; i++) {
+        bool bit = client.getbit("bitmap_result", i);
+        println("  Bit " + i + ": " + (bit ? "1" : "0"));
+    }
+
+    client.del("mybitmap2");
+
+    client.setbit("mybitmap2", 2, true);
+    client.setbit("mybitmap2", 3, true);
+    client.setbit("mybitmap2", 5, true);
+    client.setbit("mybitmap2", 10, true);
+    client.setbit("mybitmap2", 11, true);
+
+    int64 pos = client.bitpos("mybitmap2", true);
+    println("First bit set to 1: " + pos);
+    
+    pos = client.bitpos("mybitmap2", false);
+    println("First bit set to 0: " + pos);
+    
+    pos = client.bitpos("mybitmap2", true, 1, 2);
+    println("First bit set to 1 in bytes 1-2: " + pos);
+
+    client.del("mybitmap");
+    client.del("mybitmap2");
+    client.del("bitmap1");
+    client.del("bitmap2");
+    client.del("bitmap_result");
+
+    client.disconnect();
+    println("\nTest completed!");
+}
