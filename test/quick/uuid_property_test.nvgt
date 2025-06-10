@@ -1,0 +1,18 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+    uuid@ u = uuid_create_random();
+
+    println("UUID via property: " + u.str);
+    println("UUID via method: " + u.to_string());
+    println("Are they equal? " + (u.str == u.to_string()));
+    
+    println("Version: " + u.version);
+    println("Variant: " + u.variant);
+    println("Is null: " + u.is_null);
+
+    string s = u; // This should work due to opImplConv
+    println("Implicit conversion: " + s);
+}
