@@ -325,8 +325,21 @@ void handle_sdl_event(SDL_Event* evt) {
 }
 void refresh_window() {
 	SDL_Event evt;
+	std::unordered_set<int> keys_pressed_this_frame;
 	while (SDL_PollEvent(&evt)) {
-		handle_sdl_event(&evt);
+		bool evt_handled = false;
+		// If a key_down and then a key_up from the same key gets received in one frame, we need to move the key_up to the next frame to make sure that nvgt code can detect the keydown between calls to wait.
+		if (evt.type == SDL_EVENT_KEY_DOWN) keys_pressed_this_frame.insert(evt.key.scancode);
+		else if (evt.type == SDL_EVENT_KEY_UP && keys_pressed_this_frame.find(evt.key.scancode) != keys_pressed_this_frame.end()) {
+			evt_handled = true;
+			post_events.push_back(evt);
+		}
+		if (!evt_handled) handle_sdl_event(&evt);
+	}
+	if (post_events.size() > 0) {
+		for (SDL_Event& e : post_events)
+			SDL_PushEvent(&e);
+		post_events.clear();
 	}
 }
 void wait(int ms) {

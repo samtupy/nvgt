@@ -35,6 +35,7 @@
  * following map variable makes this possible.
  */
 static std::unordered_map<unsigned int, std::string> g_KeyNames;
+bool g_LegacyInputMode = true;
 static unsigned char g_KeysPressed[SDL_SCANCODE_COUNT];
 static unsigned char g_KeysRepeating[SDL_SCANCODE_COUNT];
 static unsigned char g_KeysForced[SDL_SCANCODE_COUNT];
@@ -170,7 +171,10 @@ bool SetKeyName(int key, const std::string& name) {
 bool KeyPressed(int key) {
 	if (key < 0 || key >= SDL_SCANCODE_COUNT)
 		return false;
-	return g_KeysPressed[key] == 1;
+	bool r = g_KeysPressed[key] == 1;
+	if (g_LegacyInputMode)
+		g_KeysPressed[key] = 0;
+	return r;
 }
 bool KeyRepeating(int key) {
 	if (key < 0 || key >= SDL_SCANCODE_COUNT)
@@ -313,7 +317,8 @@ bool MousePressed(unsigned char button) {
 	if (button > 31)
 		return false;
 	bool r = g_MouseButtonsPressed[button] == 1;
-	g_MouseButtonsPressed[button] = 0;
+	if (g_LegacyInputMode)
+		g_MouseButtonsPressed[button] = 0;
 	return r;
 }
 bool mouse_down(unsigned char button) {
@@ -575,6 +580,7 @@ bool TextInputActive() {
 }
 
 void RegisterInput(asIScriptEngine* engine) {
+	engine->RegisterGlobalProperty("bool legacy_input_mode", &g_LegacyInputMode);
 	engine->RegisterObjectType("touch_finger", sizeof(SDL_Finger), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<SDL_Finger>());
 	engine->RegisterObjectProperty("touch_finger", "const uint64 id", asOFFSET(SDL_Finger, id));
 	engine->RegisterObjectProperty("touch_finger", "const float x", asOFFSET(SDL_Finger, x));
