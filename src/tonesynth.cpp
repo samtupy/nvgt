@@ -72,16 +72,15 @@ sound* tone_synth::generate_sound() {
 		delete[] buffer;
 		return nullptr;
 	}
-	// Todo: Review rest of this function. I have no idea how the sound system operates internally so am working off logical guesses here.
 	sound *s = new_global_sound();
 	if (!s) {
 		delete[] buffer;
 		return nullptr;
 	}
 	bool loaded = s->load_pcm(buffer, static_cast<unsigned int>(size), ma_format_s16, gen->sample_rate, gen->channels);
-	delete[] buffer; // I'm assuming this is now safely copied into the sound object.
+	delete[] buffer;
 	if (!loaded) {
-		// Todo: Fix potential leak here. How would I free/release s?
+		s->release();
 		return nullptr;
 	}
 	return s;
