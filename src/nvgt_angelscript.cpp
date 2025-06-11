@@ -66,6 +66,7 @@
 #include "system_fingerprint.h"
 #include "threading.h"
 #include "timestuff.h"
+#include "tonesynth.h"
 #include "tts.h"
 #include "version.h"
 #include "xplatform.h"
@@ -489,6 +490,9 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	system_namespace("sound");
 	RegisterSoundsystem(engine);
 	system_namespace();
+	engine->EndConfigGroup();
+	engine->BeginConfigGroup("tonesynth");
+	RegisterScriptTonesynth(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	engine->BeginConfigGroup("system_fingerprint");
