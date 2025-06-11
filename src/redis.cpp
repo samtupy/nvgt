@@ -2366,6 +2366,15 @@ public:
 		stop();
 	}
 
+	// Reference counting methods needed for AngelScript
+	void duplicate() const {
+		const_cast<blocking_redis_subscriber*>(this)->Poco::RefCountedObject::duplicate();
+	}
+
+	void release() const {
+		const_cast<blocking_redis_subscriber*>(this)->Poco::RefCountedObject::release();
+	}
+
 	std::string get_host() const { return m_host; }
 	void set_host(const std::string& host) { m_host = host; }
 
