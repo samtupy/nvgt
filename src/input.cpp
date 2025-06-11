@@ -22,6 +22,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <cstdlib>
 #include <functional>
 #include "nvgt_angelscript.h"
 #include "input.h"
@@ -100,7 +101,6 @@ bool InputEvent(SDL_Event* evt) {
 		if (!evt->key.repeat)
 			g_KeyboardStateChange = true;
 	} else if (evt->type == SDL_EVENT_KEY_UP) {
-		g_KeysPressed[evt->key.scancode] = 0;
 		g_KeysRepeating[evt->key.scancode] = 0;
 		g_KeysReleased[evt->key.scancode] = 1;
 		g_KeyboardStateChange = true;
@@ -113,7 +113,6 @@ bool InputEvent(SDL_Event* evt) {
 		g_MouseButtonsPressed[evt->button.button] = 1;
 		g_MouseButtonsReleased[evt->button.button] = 0;
 	} else if (evt->type == SDL_EVENT_MOUSE_BUTTON_UP) {
-		g_MouseButtonsPressed[evt->button.button] = 0;
 		g_MouseButtonsReleased[evt->button.button] = 1;
 	} else if (evt->type == SDL_EVENT_MOUSE_WHEEL)
 		g_MouseAbsZ += evt->wheel.y;
@@ -122,6 +121,13 @@ bool InputEvent(SDL_Event* evt) {
 	else
 		return false;
 	return true;
+}
+
+void InputClearFrame() {
+	memset(g_KeysPressed, 0, sizeof(g_KeysPressed));
+	memset(g_KeysReleased, 0, sizeof(g_KeysReleased));
+	memset(g_MouseButtonsPressed, 0, sizeof(g_MouseButtonsPressed));
+	memset(g_MouseButtonsReleased, 0, sizeof(g_MouseButtonsReleased));
 }
 
 void remove_keyhook();
@@ -164,9 +170,7 @@ bool SetKeyName(int key, const std::string& name) {
 bool KeyPressed(int key) {
 	if (key < 0 || key >= SDL_SCANCODE_COUNT)
 		return false;
-	bool r = g_KeysPressed[key] == 1;
-	g_KeysPressed[key] = 0;
-	return r;
+	return g_KeysPressed[key] == 1;
 }
 bool KeyRepeating(int key) {
 	if (key < 0 || key >= SDL_SCANCODE_COUNT)
@@ -184,11 +188,7 @@ bool key_down(int key) {
 bool KeyReleased(int key) {
 	if (key < 0 || key >= SDL_SCANCODE_COUNT || !g_KeysDown)
 		return false;
-	bool r = g_KeysReleased[key] == 1;
-	if (r && g_KeysDown[key] == 1)
-		return false;
-	g_KeysReleased[key] = 0;
-	return r;
+	return g_KeysReleased[key] == 1;
 }
 bool key_up(int key) {
 	return !key_down(key);
