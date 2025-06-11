@@ -344,6 +344,7 @@ void wait(int ms) {
 			break;
 		if (g_GCMode == 2)
 			garbage_collect_action();
+		refresh_window();
 		double diff = ms - elapsed_ms;
 		if (diff < 1)
 			break;
