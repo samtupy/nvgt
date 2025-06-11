@@ -36,6 +36,10 @@ int el_tonar_set_pan(el_tonar* gen, double pan);
 int el_tonar_set_edge_fades(el_tonar* gen, int start, int end);
 int el_tonar_freq(el_tonar* gen, double freq, int ms);
 int el_tonar_rest(el_tonar* gen, int ms);
+int el_tonar_get_length(el_tonar* gen);
+int el_tonar_get_position(el_tonar* gen);
+int el_tonar_seek(el_tonar* gen, int position);
+int el_tonar_rewind(el_tonar* gen, int amount);
 int el_tonar_output_buffer_size(el_tonar* gen);
 int el_tonar_output_buffer(el_tonar* gen, char* buffer, int size);
 int el_tonar_output_file(el_tonar* gen, char* fn);
@@ -85,5 +89,6 @@ double elz_tonar_apply_fade_in(int frame, int fade_in_frames, double sample);
 double elz_tonar_apply_fade_out(int frame, int total_frames, int fade_out_frames, double sample);
 int elz_tonar_adjust_length(el_tonar* gen, int samples);
 double elz_tonar_poly_blep(double t, double dt);
-
+int elz_tonar_sample_to_ms(el_tonar* gen, int sample);
+int elz_tonar_ms_to_sample(el_tonar* gen, int ms);
 #endif

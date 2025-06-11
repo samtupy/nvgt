@@ -91,6 +91,32 @@ gen->cursor+=samples;
 if(gen->cursor>gen->length) gen->length=gen->cursor;
 return 1;
 }
+int el_tonar_get_length(el_tonar* gen)
+{
+if(!elz_tonar_is_init(gen)) return 0;
+double t=((double) gen->length)/(gen->sample_rate*gen->channels)*1000;
+return t;
+}
+int el_tonar_get_position(el_tonar* gen)
+{
+if(!elz_tonar_is_init(gen)) return 0;
+double t=((double) gen->cursor)/(gen->sample_rate*gen->channels)*1000;
+return t;
+}
+int el_tonar_seek(el_tonar* gen, int position)
+{
+if(position<0) return 0;
+int l=el_tonar_get_length(gen);
+if(position>=l) return 0;
+int frame=elz_tonar_ms_to_frames(gen, position);
+int sample=frame*gen->channels;
+gen->cursor=sample;
+return 1;
+}
+int el_tonar_rewind(el_tonar* gen, int amount)
+{
+return el_tonar_seek(gen, el_tonar_get_position(gen)-amount);
+}
 int el_tonar_output_buffer_size(el_tonar* gen)
 {
 if(elz_tonar_is_silent(gen)) return 0;
@@ -183,7 +209,7 @@ if(samples<gen->size) return 1;
 samples*=2;
 double* data=realloc(gen->data, samples*sizeof(double));
 if(!data) return 0;
-memset(data+gen->size, 0, samples-gen->size);
+memset(data+gen->size, 0, (samples-gen->size)*sizeof(double));
 gen->data=data;
 gen->size=samples;
 return 1;
@@ -378,7 +404,7 @@ return sample*fade_factor;
 int elz_tonar_adjust_length(el_tonar* gen, int samples)
 {
 if(!elz_tonar_is_init(gen)) return 0;
-int length=gen->cursor;
+int length=gen->cursor+samples;
 if(length>gen->length) gen->length=length;
 return 1;
 }
