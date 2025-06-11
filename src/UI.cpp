@@ -39,6 +39,7 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include <Poco/clock.h>
 #include <Poco/StringTokenizer.h>
 #include <Poco/SynchronizedObject.h>
 #include <Poco/Thread.h>
@@ -335,13 +336,19 @@ void wait(int ms) {
 		return;
 	}
 	InputClearFrame();
-	while (ms >= 0) {
-		int MS = (ms > 25 ? 25 : ms);
+
+	Poco::Clock clock;
+	while (true) {
+		double elapsed_ms = static_cast<double>(clock.elapsed()) / Poco::Timespan::MILLISECONDS;
+		if (elapsed_ms >= ms)
+			break;
 		if (g_GCMode == 2)
 			garbage_collect_action();
+		double diff = ms - elapsed_ms;
+		if (diff < 1)
+			break;
+		int MS = (diff > 25 ? 25 : diff);
 		Poco::Thread::sleep(MS);
-		ms -= MS;
-		if (ms < 1) break;
 	}
 	refresh_window();
 }
