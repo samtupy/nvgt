@@ -175,6 +175,7 @@ public:
     void update();
 };
 
+void JoystickInit();
 void InputInit();
 void InputDestroy();
 bool InputEvent(SDL_Event* evt);

@@ -109,6 +109,11 @@ CScriptArray* GetDevices(std::function<uint32_t* (int*)> callback) {
     SDL_free(devices);
     return array;
 }
+void JoystickInit() {
+    if (!(SDL_WasInit(0) & (SDL_INIT_GAMEPAD | SDL_INIT_JOYSTICK))) {
+        SDL_InitSubSystem(SDL_INIT_GAMEPAD | SDL_INIT_JOYSTICK);
+    }
+}
 void InputInit() {
     if (SDL_WasInit(0) & SDL_INIT_VIDEO)
         return;
@@ -116,7 +121,15 @@ void InputInit() {
     memset(g_KeysRepeating, 0, SDL_SCANCODE_COUNT);
     memset(g_KeysForced, 0, SDL_SCANCODE_COUNT);
     memset(g_KeysReleased, 0, SDL_SCANCODE_COUNT);
-    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_JOYSTICK);
+    
+    // Initialize video and joystick/gamepad if not already initialized
+    Uint32 flags = SDL_INIT_VIDEO;
+    if (!(SDL_WasInit(0) & SDL_INIT_GAMEPAD))
+        flags |= SDL_INIT_GAMEPAD;
+    if (!(SDL_WasInit(0) & SDL_INIT_JOYSTICK))
+        flags |= SDL_INIT_JOYSTICK;
+    
+    SDL_Init(flags);
     g_KeysDown = SDL_GetKeyboardState(&g_KeysDownArrayLen);
 }
 void InputDestroy() {
@@ -1105,6 +1118,9 @@ bool TextInputActive() {
 }
 
 void RegisterInput(asIScriptEngine* engine) {
+    // Initialize joystick subsystem early so it works without requiring a window
+    JoystickInit();
+    
     engine->RegisterObjectType("touch_finger", sizeof(SDL_Finger), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<SDL_Finger>());
     engine->RegisterObjectProperty("touch_finger", "const uint64 id", asOFFSET(SDL_Finger, id));
     engine->RegisterObjectProperty("touch_finger", "const float x", asOFFSET(SDL_Finger, x));
