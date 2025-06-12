@@ -57,6 +57,7 @@
 #include "pathfinder.h"
 #include "combination.h"
 #include "pocostuff.h"
+#include "process.h"
 #include "random.h"
 #include "reactphysics.h"
 #include "scriptstuff.h"
@@ -453,6 +454,9 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("misc");
 	RegisterMiscFunctions(engine);
+	engine->EndConfigGroup();
+	engine->BeginConfigGroup("process");
+	RegisterProcess(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_NET);
 	engine->BeginConfigGroup("network");
