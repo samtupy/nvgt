@@ -39,6 +39,7 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include <Poco/clock.h>
 #include <Poco/StringTokenizer.h>
 #include <Poco/SynchronizedObject.h>
 #include <Poco/Thread.h>
@@ -323,8 +324,6 @@ void handle_sdl_event(SDL_Event* evt) {
 		regained_window_focus();
 }
 void refresh_window() {
-	anticheat_check();
-	SDL_PumpEvents();
 	SDL_Event evt;
 	std::unordered_set<int> keys_pressed_this_frame;
 	while (SDL_PollEvent(&evt)) {
@@ -349,14 +348,21 @@ void wait(int ms) {
 		Poco::Thread::sleep(ms);
 		return;
 	}
-	while (ms >= 0) {
-		int MS = (ms > 25 ? 25 : ms);
+	InputClearFrame();
+
+	Poco::Clock clock;
+	while (true) {
+		double elapsed_ms = static_cast<double>(clock.elapsed()) / Poco::Timespan::MILLISECONDS;
+		if (elapsed_ms >= ms)
+			break;
 		if (g_GCMode == 2)
 			garbage_collect_action();
+		refresh_window();
+		double diff = ms - elapsed_ms;
+		if (diff < 1)
+			break;
+		int MS = (diff > 25 ? 25 : diff);
 		Poco::Thread::sleep(MS);
-		SDL_PumpEvents();
-		ms -= MS;
-		if (ms < 1) break;
 	}
 	refresh_window();
 }

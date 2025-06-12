@@ -96,6 +96,7 @@ public:
 void InputInit();
 void InputDestroy();
 bool InputEvent(SDL_Event* evt);
+void InputClearFrame();
 void lost_window_focus();
 void regained_window_focus();
 void RegisterInput(asIScriptEngine* engine);

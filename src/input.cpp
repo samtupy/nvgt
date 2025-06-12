@@ -22,6 +22,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <cstdlib>
 #include <functional>
 #include "nvgt_angelscript.h"
 #include "input.h"
@@ -34,6 +35,7 @@
  * following map variable makes this possible.
  */
 static std::unordered_map<unsigned int, std::string> g_KeyNames;
+bool g_LegacyInputMode = true;
 static unsigned char g_KeysPressed[SDL_SCANCODE_COUNT];
 static unsigned char g_KeysRepeating[SDL_SCANCODE_COUNT];
 static unsigned char g_KeysForced[SDL_SCANCODE_COUNT];
@@ -100,7 +102,6 @@ bool InputEvent(SDL_Event* evt) {
 		if (!evt->key.repeat)
 			g_KeyboardStateChange = true;
 	} else if (evt->type == SDL_EVENT_KEY_UP) {
-		g_KeysPressed[evt->key.scancode] = 0;
 		g_KeysRepeating[evt->key.scancode] = 0;
 		g_KeysReleased[evt->key.scancode] = 1;
 		g_KeyboardStateChange = true;
@@ -113,7 +114,6 @@ bool InputEvent(SDL_Event* evt) {
 		g_MouseButtonsPressed[evt->button.button] = 1;
 		g_MouseButtonsReleased[evt->button.button] = 0;
 	} else if (evt->type == SDL_EVENT_MOUSE_BUTTON_UP) {
-		g_MouseButtonsPressed[evt->button.button] = 0;
 		g_MouseButtonsReleased[evt->button.button] = 1;
 	} else if (evt->type == SDL_EVENT_MOUSE_WHEEL)
 		g_MouseAbsZ += evt->wheel.y;
@@ -122,6 +122,13 @@ bool InputEvent(SDL_Event* evt) {
 	else
 		return false;
 	return true;
+}
+
+void InputClearFrame() {
+	memset(g_KeysPressed, 0, sizeof(g_KeysPressed));
+	memset(g_KeysReleased, 0, sizeof(g_KeysReleased));
+	memset(g_MouseButtonsPressed, 0, sizeof(g_MouseButtonsPressed));
+	memset(g_MouseButtonsReleased, 0, sizeof(g_MouseButtonsReleased));
 }
 
 void remove_keyhook();
@@ -165,7 +172,8 @@ bool KeyPressed(int key) {
 	if (key < 0 || key >= SDL_SCANCODE_COUNT)
 		return false;
 	bool r = g_KeysPressed[key] == 1;
-	g_KeysPressed[key] = 0;
+	if (g_LegacyInputMode)
+		g_KeysPressed[key] = 0;
 	return r;
 }
 bool KeyRepeating(int key) {
@@ -184,11 +192,7 @@ bool key_down(int key) {
 bool KeyReleased(int key) {
 	if (key < 0 || key >= SDL_SCANCODE_COUNT || !g_KeysDown)
 		return false;
-	bool r = g_KeysReleased[key] == 1;
-	if (r && g_KeysDown[key] == 1)
-		return false;
-	g_KeysReleased[key] = 0;
-	return r;
+	return g_KeysReleased[key] == 1;
 }
 bool key_up(int key) {
 	return !key_down(key);
@@ -313,7 +317,8 @@ bool MousePressed(unsigned char button) {
 	if (button > 31)
 		return false;
 	bool r = g_MouseButtonsPressed[button] == 1;
-	g_MouseButtonsPressed[button] = 0;
+	if (g_LegacyInputMode)
+		g_MouseButtonsPressed[button] = 0;
 	return r;
 }
 bool mouse_down(unsigned char button) {
@@ -575,6 +580,7 @@ bool TextInputActive() {
 }
 
 void RegisterInput(asIScriptEngine* engine) {
+	engine->RegisterGlobalProperty("bool legacy_input_mode", &g_LegacyInputMode);
 	engine->RegisterObjectType("touch_finger", sizeof(SDL_Finger), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<SDL_Finger>());
 	engine->RegisterObjectProperty("touch_finger", "const uint64 id", asOFFSET(SDL_Finger, id));
 	engine->RegisterObjectProperty("touch_finger", "const float x", asOFFSET(SDL_Finger, x));
