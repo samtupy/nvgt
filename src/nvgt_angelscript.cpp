@@ -769,11 +769,7 @@ int LoadCompiledScript(asIScriptEngine *engine, unsigned char *code, asUINT size
 	return 0;
 }
 int LoadCompiledExecutable(asIScriptEngine *engine) {
-	#ifndef __ANDROID__
-	FileInputStream fs(Util::Application::instance().commandPath());
-	#else
-	FileInputStream fs(android_get_main_shared_object());
-	#endif
+	FileInputStream fs(get_data_location());
 	BinaryReader br(fs);
 	UInt32 data_location, code_size;
 	#ifdef _WIN32
