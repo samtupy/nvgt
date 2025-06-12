@@ -1,0 +1,20 @@
+/**
+	Retrieves the Euclidean length of the vector.
+	float length();
+	## Arguments:
+		None.
+	## Remarks
+		It is important to emphasize this function returns the vector's Euclidian length (also known as its magnitude). This is calculated as sqrt((x * x) + (y * y) + (z * z)), which gives the distance from the origin (0, 0, 0) to the point represented by the vector.
+		While this may sound abstract at first, it's extremely useful in many common scenarios. Some examples are:
+		* Measuring distance: Use the length to find out how far a vector reaches from the origin. The vector (3, 4, 0) has a length of 5.0, meaning it's 5 units away in space.
+		* Calculating speed: If a vector represents velocity, the length gives you the speed (how fast something is moving), while the vector's direction shows where it's going.
+		* Collision detection: To determine how close two points are, subtract one position from another to get a direction vector, then use the length to measure the distance.
+		If you are looking for the total size (I.E. number of units, volume etc), you will manually need to calculate this by using x * y * z.
+	
+*/
+
+// Example:
+void main() {
+	vector v1(3, 4, 0);
+	alert("Length", v1.length());
+}

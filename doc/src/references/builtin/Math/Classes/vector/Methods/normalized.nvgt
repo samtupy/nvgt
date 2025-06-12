@@ -1,0 +1,15 @@
+/**
+	Returns a new vector normalized based on the axes of the existing one.
+	vector normalized();
+	## Arguments:
+		None.
+	## Remarks
+		This performs the same function as normalize(), except it returns a new vector with the normalized value.
+*/
+
+// Example:
+void main() {
+	vector v1(3, 4, 0);
+	vector v2 = v1.normalized();
+	alert("Vector", "(" + v2.x + ", " + v2.y + ", " + v2.z + ")");
+}
