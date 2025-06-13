@@ -36,11 +36,17 @@ void tone_synth::Release() {
 		delete this;
 	}
 }
-void tone_synth::set_waveform(int type) {
-	el_tonar_set_waveform(gen, type);
+void tone_synth::reset() {
+	el_tonar_reset(gen);
 }
+void tone_synth::set_waveform(int type) {
+	int real_type = bgt_to_tonar_waveform(type);
+	if (real_type < 0) return;
+	el_tonar_set_waveform(gen, real_type);
+}
+
 int tone_synth::get_waveform() {
-	return gen->waveform;
+	return bgt_to_tonar_waveform(gen->waveform);
 }
 void tone_synth::set_volume(double db) {
 	el_tonar_set_volume(gen, db);
@@ -57,13 +63,26 @@ double tone_synth::get_pan() {
 bool tone_synth::set_edge_fades(int start, int end) {
 	return el_tonar_set_edge_fades(gen, start, end)? true: false;
 }
-bool tone_synth::freq(double freq, int ms) {
+bool tone_synth::freq_ms(double freq, int ms) {
 	return el_tonar_freq(gen, freq, ms)? true: false;
 }
-bool tone_synth::rest(int ms) {
+bool tone_synth::rest_ms(int ms) {
 	return el_tonar_rest(gen, ms)? true: false;
 }
+int tone_synth::get_length_ms() {
+	return el_tonar_get_length(gen);
+}
+int tone_synth::get_position_ms() {
+	return el_tonar_get_position(gen);
+}
+bool tone_synth::seek_ms(int position) {
+	return el_tonar_seek(gen, position)? true: false;
+}
+bool tone_synth::rewind_ms(int amount) {
+	return el_tonar_rewind(gen, amount)? true: false;
+}
 sound* tone_synth::generate_sound() {
+init_sound();
 	int size = el_tonar_output_buffer_size(gen);
 	if (size <= 0) return nullptr;
 	char* buffer = new char[size];
@@ -72,7 +91,7 @@ sound* tone_synth::generate_sound() {
 		delete[] buffer;
 		return nullptr;
 	}
-	sound *s = new_global_sound();
+	sound *s = g_audio_engine->new_sound();
 	if (!s) {
 		delete[] buffer;
 		return nullptr;
@@ -80,13 +99,20 @@ sound* tone_synth::generate_sound() {
 	bool loaded = s->load_pcm(buffer, static_cast<unsigned int>(size), ma_format_s16, gen->sample_rate, gen->channels);
 	delete[] buffer;
 	if (!loaded) {
-		s->release();
+		s->release(); // Sound object is not passed to the script if load fails, delete it.
 		return nullptr;
 	}
 	return s;
 }
 bool tone_synth::generate_file(const std::string& filename) {
 	return el_tonar_output_file(gen, const_cast<char*> (filename.c_str()))? true: false;
+}
+int tone_synth::bgt_to_tonar_waveform(int type) {
+	if (type == 1) return 3;
+	if (type == 2) return 2;
+	if (type == 3) return 0;
+	if (type == 4) return 1;
+	return -1;
 }
 tone_synth *script_tone_synth_factory() {
 	return new tone_synth();
@@ -96,15 +122,20 @@ void RegisterScriptTonesynth(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("tone_synth", asBEHAVE_FACTORY, "tone_synth@ f()", asFUNCTION(script_tone_synth_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("tone_synth", asBEHAVE_ADDREF, "void f()", asMETHOD(tone_synth, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("tone_synth", asBEHAVE_RELEASE, "void f()", asMETHOD(tone_synth, Release), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "void reset()", asMETHOD(tone_synth, reset), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "void set_waveform_type(int type) property", asMETHOD(tone_synth, set_waveform), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "int get_waveform_type() const property", asMETHOD(tone_synth, get_waveform), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "void set_volume(double value) property", asMETHOD(tone_synth, set_volume), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "double get_volume() const property", asMETHOD(tone_synth, get_volume), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "void set_pan(double value) property", asMETHOD(tone_synth, set_pan), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "double get_pan() const property", asMETHOD(tone_synth, get_pan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "int get_position_ms() const property", asMETHOD(tone_synth, get_position_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "int get_length_ms() const property", asMETHOD(tone_synth, get_length_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool seek_ms(int position)", asMETHOD(tone_synth, seek_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool rewind_ms(int amount)", asMETHOD(tone_synth, rewind_ms), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool set_edge_fades(int start, int end)", asMETHOD(tone_synth, set_edge_fades), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tone_synth", "bool freq(double freq, int ms)", asMETHOD(tone_synth, freq), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tone_synth", "bool rest(int ms)", asMETHOD(tone_synth, rest), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool freq_ms(double freq, int ms)", asMETHOD(tone_synth, freq_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool rest_ms(int ms)", asMETHOD(tone_synth, rest_ms), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "sound@ write_wave_sound()", asMETHOD(tone_synth, generate_sound), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool write_wave_file(const string &in filename)", asMETHOD(tone_synth, generate_file), asCALL_THISCALL);
 }

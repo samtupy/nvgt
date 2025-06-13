@@ -32,6 +32,7 @@ public:
 	void AddRef();
 	void Release();
 
+	void reset();
 	void set_waveform(int type);
 	int get_waveform();
 	void set_volume(double db);
@@ -39,12 +40,19 @@ public:
 	void set_pan(double pan);
 	double get_pan();
 	bool set_edge_fades(int start, int end);
-	bool freq(double freq, int ms);
-	bool rest(int ms);
+	bool freq_ms(double freq, int ms);
+	bool rest_ms(int ms);
+	int get_length_ms();
+	int get_position_ms();
+	bool seek_ms(int position);
+	bool rewind_ms(int amount);
+
 	sound* generate_sound();
 	bool generate_file(const std::string& filename);
 
 private:
+	int bgt_to_tonar_waveform(int type);
+
 	int refCount = 1;
 	el_tonar* gen = nullptr;
 };
