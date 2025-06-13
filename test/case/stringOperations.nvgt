@@ -1,0 +1,16 @@
+void test_stringOperations() {
+	// Test parse_int
+	int n = parse_int("6");
+	assert(n == 6);
+	n *= 2;
+	assert(n == 12);
+	
+	// Test string indexing
+	string st = "this is a test";
+	assert(st[1] == "h");
+	
+	// Test string substr
+	assert(st.substr(10) == "test");  // From position 10 to end
+	assert(st.substr(5, 2) == "is");   // From position 5, length 2
+	assert(st.substr(st.length() - 1, 1) == "t");  // Last char
+}

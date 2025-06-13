@@ -1,0 +1,24 @@
+void test_anyBasic() {
+	any a1("test");
+	any a2(2);
+	string s;
+	int i;
+	assert(a1.retrieve(s) == true);
+	assert(s == "test");
+	assert(a2.retrieve(i) == true);
+	assert(i == 2);
+}
+
+void test_anyTypes() {
+	any a;
+	a.store(42);
+	int i;
+	string s;
+	assert(a.retrieve(i) == true);
+	assert(i == 42);
+	assert(a.retrieve(s) == false); // Wrong type
+	
+	a.store("hello");
+	assert(a.retrieve(s) == true);
+	assert(s == "hello");
+}

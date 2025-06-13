@@ -1,0 +1,15 @@
+string g_result;
+
+void func(string s) {
+	g_result = s;
+}
+
+void test_namedArguments() {
+	func(s : "test?");
+	assert(g_result == "test?");
+	
+	// Test with multiple named arguments
+	g_result = "";
+	func(s : "named arg test");
+	assert(g_result == "named arg test");
+}

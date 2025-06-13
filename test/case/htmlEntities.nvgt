@@ -1,0 +1,9 @@
+void test_htmlEntitiesDecode() {
+	string result = html_entities_decode("ol&aacute;, como voc&ecirc; est&aacute;?");
+	assert(result == "olá, como você está?");
+	
+	// Test common entities
+	assert(html_entities_decode("&lt;test&gt;") == "<test>");
+	assert(html_entities_decode("&amp;") == "&");
+	assert(html_entities_decode("&quot;hello&quot;") == "\"hello\"");
+}

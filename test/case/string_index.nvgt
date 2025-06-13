@@ -1,6 +1,0 @@
-void test_string_index() {
-	string str = "Testing";
-	assert(str[3] == "t");
-	str[3] = " ";
-	assert(str == "Tes ing");
-}

@@ -1,0 +1,3 @@
+void test_parseDouble() {
+	assert(parse_double("1.0") == 1.0);
+}

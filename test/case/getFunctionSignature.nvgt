@@ -1,0 +1,28 @@
+class signature_test {
+	void func() {
+	}
+}
+
+void gfunc(string arg) {
+}
+
+funcdef void f();
+
+void test_getFunctionSignature() {
+	signature_test t;
+	string sig1 = get_function_signature(f(t.func));
+	// When using funcdef with method, it returns unnamed function
+	assert(sig1.find("void _unnamed_function_()") >= 0);
+	
+	string sig2 = get_function_signature(gfunc);
+	assert(sig2.find("void gfunc(string)") >= 0);
+	
+	// Invalid input throws exception
+	bool exception_thrown = false;
+	try {
+		get_function_signature("invalid");
+	} catch {
+		exception_thrown = true;
+	}
+	assert(exception_thrown);
+}

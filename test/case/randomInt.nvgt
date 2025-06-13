@@ -1,0 +1,6 @@
+void test_randomInt() {
+	int val = random(1, 10);
+	assert(val >= 1 && val <= 10);
+	val = random(-100, 100);
+	assert(val >= -100 && val <= 100);
+}

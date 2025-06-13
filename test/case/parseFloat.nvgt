@@ -1,0 +1,3 @@
+void test_parseFloat() {
+	assert(parse_float("1.0") == 1.0);
+}

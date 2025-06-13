@@ -1,0 +1,24 @@
+class index_test {
+	float[] values = {1.0, 2.5, 3.7, 4.2, 5.9};
+	
+	float get_opIndex(int idx) const property { 
+		if (idx >= 0 && idx < values.length())
+			return values[idx];
+		return 0;
+	}
+	
+	void set_opIndex(int idx, float value) property {
+		if (idx >= 0 && idx < values.length())
+			values[idx] = value;
+	}
+}
+
+void test_opindex() {
+	index_test t;
+	assert(t[0] == 1.0);
+	assert(t[1] == 2.5);
+	assert(t[123] == 0);  // Out of bounds returns 0
+	
+	t[1] = 10.5;
+	assert(t[1] == 10.5);
+}

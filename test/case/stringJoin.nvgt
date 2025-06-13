@@ -1,0 +1,5 @@
+void test_stringJoin() {
+	string[] list = {"test", "test again", "idk", "asdf"};
+	assert(join(list, ", ") == "test, test again, idk, asdf");
+	assert(join({}, ",") == "");
+}

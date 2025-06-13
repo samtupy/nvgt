@@ -1,0 +1,11 @@
+void test_hexAes() {
+	string plaintext = "this is a test";
+	string key = "itsasecret";
+	
+	string encrypted = string_aes_encrypt(plaintext, key);
+	string hex = string_to_hex(encrypted);
+	
+	// Verify we can decrypt back through hex
+	string decrypted = string_aes_decrypt(hex_to_string(hex), key);
+	assert(decrypted == plaintext);
+}

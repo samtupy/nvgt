@@ -1,0 +1,12 @@
+void test_datetimeTimestamp() {
+	datetime u(1970, 1, 1, 0, 0, 0);
+	datetime n;
+	
+	// Test that current datetime is after 1970
+	assert(n > u);
+	
+	// Test timespan creation
+	timespan diff = n - u;
+	// The timespan should represent positive time
+	assert(diff.days >= 0);
+}

@@ -1,0 +1,21 @@
+void test_varType() {
+	var v = 24;
+	var v2 = v + 5;
+	assert(int(1 + v2) == 30);
+	
+	v = v + 5;
+	v -= 3;
+	v--;
+	assert(int(v) == 25);
+	
+	// Test string conversion
+	v = var("testing?");
+	assert(string(v) == "testing?");
+	
+	// Test various types
+	var v_bool = true;
+	assert(bool(v_bool) == true);
+	
+	var v_double = 3.14;
+	assert(double(v_double) == 3.14);
+}

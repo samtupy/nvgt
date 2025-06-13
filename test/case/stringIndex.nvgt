@@ -1,0 +1,6 @@
+void test_stringIndex() {
+	string str = "Testing";
+	assert(str[3] == "t");
+	str[3] = " ";
+	assert(str == "Tes ing");
+}

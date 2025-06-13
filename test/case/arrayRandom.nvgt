@@ -1,0 +1,26 @@
+void test_arrayRandom() {
+	string[] strings = {"hi", "this is a test", "another test", "I never know what to type when doing random strings like this", "uh this is another string I guess?", "bye now"};
+	
+	// Test that random() returns a valid element
+	string result = strings.random();
+	bool found = false;
+	for (uint i = 0; i < strings.length(); i++) {
+		if (strings[i] == result) {
+			found = true;
+			break;
+		}
+	}
+	assert(found);
+	
+	// Test with custom random generator
+	random_gamerand rnd(74);
+	result = strings.random(rnd);
+	found = false;
+	for (uint i = 0; i < strings.length(); i++) {
+		if (strings[i] == result) {
+			found = true;
+			break;
+		}
+	}
+	assert(found);
+}

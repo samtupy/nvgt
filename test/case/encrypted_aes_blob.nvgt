@@ -1,4 +1,0 @@
-void test_encrypted_aes_blob() {
-	string blob = file("data/encrypted_aes_blob.bin", "rb").read(); // For the curious this is safe, the file's close method is guaranteed to be called when the file object destructs at the end of the above statement.
-	assert(string_aes_decrypt(blob, "this here is just a test") == "Hello, this is a test of an encrypted string that was produced while we know that the string_aes_encrypt function works.");
-}

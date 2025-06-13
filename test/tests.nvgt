@@ -1,6 +1,6 @@
 /* tests.nvgt - main test runner application
  * In our case, it's actually better to write our tests directly in Angelscript, as any specific parts of the c++ code will be tested by loading and executing this Angelscript code which can test engine features in the same way as end-users will be employing them.
- * To add a test, create a .nvgt script in the case folder with a function that returns void, takes no arguments and is named after the basename of the test script prepended with the word "test_", for example void test_foo() for foo.nvgt. A test should throw an exception if it fails, if the function returns successfully the test is considered to have passed.
+ * To add a test, create a .nvgt script in the case folder with function(s) that return void, takes no arguments and is prepended with the word "test_", for example void test_foo(), test_bar(). The function names need not match the basename of the file. A test should throw an exception if it fails, if the function returns successfully the test is considered to have passed.
  * If a test case relies on any static files, those should go in the data folder.
  * If a test case produces any temporary data to work with, it should go in the tmp folder so as to be ignored by git.
  *
@@ -22,6 +22,7 @@ bool verbose = false, nonfatal = false, console_available = is_console_available
 script_module@ nvgt_game = script_get_module("nvgt_game");
 int tests_total, tests_skipped, tests_failed, tests_passed;
 string ui_buffer;
+dictionary test_functions; // Maps test case name to array of test functions
 
 void help() {
 	outln("NVGT tests program available options:");
@@ -52,6 +53,7 @@ void main() {
 		}
 	}
 	if (!directory_exists("tmp")) directory_create("tmp");
+	scan_test_functions();
 	// These tests are either intended to run from source or along side the source.
 	string[]@ files = find_files("case/*.nvgt");
 	for (uint i = 0; i < files.length(); i++)
@@ -63,49 +65,114 @@ void main() {
 	if (tests_skipped > 0) outln("%0 tests skipped.".format(tests_skipped));
 	display_ui_buffer();
 }
+void scan_test_functions() {
+	uint function_count = nvgt_game.get_function_count();
+	if (verbose) outln("Scanning %0 functions in module".format(function_count));
+	
+	string[]@ files = find_files("case/*.nvgt");
+	string[] basenames;
+	for (uint i = 0; i < files.length(); i++) {
+		basenames.insert_last(spec::path(files[i]).basename);
+	}
+	
+	for (uint i = 0; i < function_count; i++) {
+		script_function@ func = nvgt_game.get_function_by_index(i);
+		if (@func == null) continue;
+		
+		string func_name = func.get_name();
+		if (!func_name.starts_with("test_")) continue;
+		
+		string test_name = func_name.substr(5);
+		string test_case = "";
+		
+		int best_match_len = 0;
+		for (uint j = 0; j < basenames.length(); j++) {
+			if (test_name.starts_with(basenames[j]) && basenames[j].length() > best_match_len) {
+				test_case = basenames[j];
+				best_match_len = basenames[j].length();
+			}
+		}
+		
+		if (test_case.empty()) {
+			if (verbose) outln("Warning: Could not find test case for function %0".format(func_name));
+			continue;
+		}
+		
+		script_function@[]@ funcs;
+		if (!test_functions.get(test_case, @funcs)) {
+			@funcs = {};
+			test_functions.set(test_case, @funcs);
+		}
+		funcs.insert_last(func);
+	}
+}
+
 void test(const string&in testcase) {
-	tests_total++;
-	if (disabled_tests.exists(testcase)) {
-		if (verbose) outln("Skipping %0 (commandline)".format(testcase));
-		tests_skipped++;
-		return;
-	}
-	// It is possible to skip a test by creating a global variable in the test case called bool test_<case>_skip = true;
-	any@ v_skip = nvgt_game.get_global(nvgt_game.get_global_index_by_decl("bool test_%0_skip".format(testcase)));
-	bool b_skip = false;
-	if (@v_skip != null and v_skip.retrieve(b_skip) and b_skip) {
-		if (verbose) outln("Skipping %0 (script)".format(testcase));
-		tests_skipped++;
-		return;
-	}
-	script_function@ func = nvgt_game.get_function_by_decl("void test_%0()".format(testcase));
-	if (@func == null) {
-		outln("Error, test case %0 is badly formatted, can't find void test_%0()".format(testcase));
+	script_function@[]@ funcs;
+	if (!test_functions.get(testcase, @funcs)) {
+		tests_total++;
 		tests_failed++;
-		if (nonfatal) return;
-		else abort(64);
-	}
-	string[] errors;
-	if (verbose) outp("Testing %0... ".format(testcase));
-	// Give test cases the freedom to safely manipulate the current working directory.
-	string current_dir = cwdir();
-	timer test_clock(0, 1);
-	func({}, errors);
-	chdir(current_dir);
-	if (errors.length() < 1) {
-		if (verbose) outln("OK (" + (test_clock.elapsed / double(MILLISECONDS)) + "ms)");
-		tests_passed++;
+		outln("Error, test case %0 has no test functions".format(testcase));
+		if (!nonfatal) abort(64);
 		return;
 	}
-	tests_failed++;
-	if (verbose) outln("FAILED!");
-	else outln("TEST %0 FAILED!".format(testcase));
-	if (!nonfatal) { // Only print full callstacks if we exit on test fail rather than warn where we just print the exception and last frame instead.
-		for (uint i = 1; i < errors.length(); i++) outln(errors[i]); // We start at offset 1 in order to move the exception itself to the bottom of the output to avoid waiding through the call stack when unwanted.
+	
+	int tests_in_file = funcs.length();
+	tests_total += tests_in_file;
+		
+	for (uint i = 0; i < funcs.length(); i++) {
+		script_function@ func = funcs[i];
+		string func_name = func.get_name();
+		string test_name = func_name.substr(5);
+		
+		// Check if this specific test is disabled
+		if (disabled_tests.exists(testcase) || disabled_tests.exists(test_name)) {
+			if (verbose) outln("Skipping %0::%1 (commandline)".format(testcase, func_name));
+			tests_skipped++;
+			continue;
+		}
+		
+		// Check for skip variable
+		any@ v_skip = nvgt_game.get_global(nvgt_game.get_global_index_by_decl("bool %0_skip".format(func_name)));
+		bool b_skip = false;
+		if (@v_skip != null and v_skip.retrieve(b_skip) and b_skip) {
+			if (verbose) outln("Skipping %0::%1 (script)".format(testcase, func_name));
+			tests_skipped++;
+			continue;
+		}
+		
+		string decl = func.get_decl();
+		if (!decl.starts_with("void " + func_name + "()")) {
+			outln("Error, test function %0 has wrong signature, expected void %0()".format(func_name));
+			tests_failed++;
+			if (nonfatal) continue;
+			else abort(64);
+		}
+		
+		string[] errors;
+		if (verbose) outp("Testing %0::%1... ".format(testcase, func_name));
+		
+		// Give test cases the freedom to safely manipulate the current working directory.
+		string current_dir = cwdir();
+		timer test_clock(0, 1);
+		func({}, errors);
+		chdir(current_dir);
+		
+		if (errors.length() < 1) {
+			if (verbose) outln("OK (" + (test_clock.elapsed / double(MILLISECONDS)) + "ms)");
+			tests_passed++;
+			continue;
+		}
+		
+		tests_failed++;
+		if (verbose) outln("FAILED!");
+		else outln("TEST %0::%1 FAILED!".format(testcase, func_name));
+		if (!nonfatal) { // Only print full callstacks if we exit on test fail rather than warn where we just print the exception and last frame instead.
+			for (uint i = 1; i < errors.length(); i++) outln(errors[i]); // We start at offset 1 in order to move the exception itself to the bottom of the output to avoid waiding through the call stack when unwanted.
+		}
+		outln(errors[0]);
+		if (!nonfatal) abort(1);
 	}
-	outln(errors[0]);
-	if (nonfatal) return;
-	else abort(1);
 }
 
 // utility functions:

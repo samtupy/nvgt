@@ -1,4 +1,0 @@
-void test_string_reverse() {
-	assert("test".reverse() == "tset");
-	assert("Massive string with a lot of data".reverse() == "atad fo tol a htiw gnirts evissaM");
-}

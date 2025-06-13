@@ -3,3 +3,12 @@ void test_base64() {
 	assert(string_base64_encode("hello", STRING_BASE64_PADLESS) == "aGVsbG8");
 	assert(string_base64_decode("aGVsbG8=") == "hello");
 }
+
+void test_base64SpecialChars() {
+	string test_str = "Hi\r\nThis is a string containing newlines and spaces.";
+	string encoded = string_base64_encode(test_str);
+	assert(string_base64_decode(encoded) == test_str);
+	
+	// Test with null bytes and special characters
+	assert(string_base64_decode(string_base64_encode("\0\0\0\r\n\t ")) == "\0\0\0\r\n\t ");
+}

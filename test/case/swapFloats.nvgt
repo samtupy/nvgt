@@ -1,0 +1,20 @@
+void swapf(float& f1, float& f2) {
+	float tmp = f2;
+	f2 = f1;
+	f1 = tmp;
+}
+
+void test_swapFloats() {
+	float f1 = 10;
+	float f2 = 20;
+	swapf(f2, f1);
+	assert(f1 == 20);
+	assert(f2 == 10);
+	
+	// Test with negative values
+	f1 = -5.5;
+	f2 = 7.3;
+	swapf(f1, f2);
+	assert(f1 == 7.3);
+	assert(f2 == -5.5);
+}

@@ -1,0 +1,34 @@
+void test_memoryBuffer() {
+	uint64 addr = memory_allocate_units(4, 32);
+	memory_buffer<float> buf(addr, 32);
+	
+	// Fill buffer with values
+	for (uint i = 0; i < 32; i++) buf[i] = i * 2;
+	
+	// Verify values
+	for (uint i = 0; i < 32; i++) {
+		assert(buf[i] == i * 2);
+	}
+	
+	// Test assignment operator
+	buf = {9, 1, 2, 7};
+	assert(buf[0] == 9);
+	assert(buf[1] == 1);
+	assert(buf[2] == 2);
+	assert(buf[3] == 7);
+	
+	memory_free(addr);
+}
+
+void test_memoryBufferString() {
+	string s = "testing";
+	memory_buffer<uint8> sb(s.address, s.size());
+	
+	// Verify original string bytes
+	assert(sb[0] == 0x74);  // 't'
+	assert(sb[1] == 0x65);  // 'e'
+	
+	// Modify string through buffer
+	sb[0] = 0x66;  // 'f'
+	assert(s == "festing");
+}
