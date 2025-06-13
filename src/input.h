@@ -99,3 +99,12 @@ bool InputEvent(SDL_Event* evt);
 void lost_window_focus();
 void regained_window_focus();
 void RegisterInput(asIScriptEngine* engine);
+
+#ifdef _WIN32
+// Keyhook functions
+bool install_keyhook();
+void uninstall_keyhook();
+void remove_keyhook();
+bool reinstall_keyhook_only();
+void process_keyhook_commands();
+#endif
