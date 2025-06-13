@@ -11,9 +11,10 @@
  */
 
 #pragma once
-#include <angelscript.h>
 
 #include <string>
+
+class asIScriptEngine;
 
 namespace Poco {
 	namespace Redis {

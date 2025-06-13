@@ -2,6 +2,8 @@
 // Copyright (C) 2022-2024 Sam Tupy
 // License: zlib (see license.md in the root of the NVGT distribution)
 
+#pragma plugin redis
+
 void main() {
     redis_client@ client = redis_client();
 

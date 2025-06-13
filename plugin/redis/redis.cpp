@@ -10,6 +10,7 @@
  * 3. This notice may not be removed or altered from any source distribution.
  */
 
+#include "../../src/nvgt_plugin.h"
 #include "redis.h"
 
 #include <Poco/Event.h>
@@ -25,7 +26,6 @@
 #include <Poco/Redis/Type.h>
 #include <Poco/Thread.h>
 #include <Poco/Timespan.h>
-#include <angelscript.h>
 #include <scriptarray.h>
 #include <scriptdictionary.h>
 
@@ -33,17 +33,37 @@
 #include <sstream>
 #include <unordered_map>
 
-#include "pocostuff.h"
-#include "serialize.h"
+int g_StringTypeid = 0;  // Local copy for plugin use
+
+// Don't want to enforce that pocostuff stays the same since this is a plugin.
+// We'll roll our own
+template <class T>
+class plugin_refcounted {
+private:
+	int m_refcount;
+
+public:
+	Poco::SharedPtr<T> shared;
+	T* ptr;
+
+	plugin_refcounted(Poco::SharedPtr<T> s) : m_refcount(1), shared(s), ptr(s.get()) {}
+	virtual ~plugin_refcounted() {}
+
+	void add_ref() { asAtomicInc(m_refcount); }
+	void release() {
+		if (asAtomicDec(m_refcount) < 1)
+			delete this;
+	}
+};
 
 using namespace Poco;
 using namespace Poco::Redis;
 
 // Redis value wrapper
-class redis_value : public poco_shared<RedisType> {
+class redis_value : public plugin_refcounted<RedisType> {
 public:
-	redis_value(RedisType::Ptr value) : poco_shared(value) {}
-	redis_value(redis_value* other) : poco_shared(other->shared) {}
+	redis_value(RedisType::Ptr value) : plugin_refcounted(value) {}
+	redis_value(redis_value* other) : plugin_refcounted(other->shared) {}
 
 	redis_value& operator=(redis_value* other) {
 		shared = other->shared;
@@ -51,7 +71,6 @@ public:
 		return *this;
 	}
 
-	// Type checking methods
 	bool is_string() const {
 		return ptr && (ptr->isBulkString() || ptr->isSimpleString());
 	}
@@ -67,7 +86,6 @@ public:
 		return false;
 	}
 
-	// Value getters
 	std::string get_string() const {
 		if (!ptr) return "";
 		if (ptr->isSimpleString()) {
@@ -116,7 +134,7 @@ public:
 };
 
 // Redis client wrapper
-class redis_client : public poco_shared<Client> {
+class redis_client : public plugin_refcounted<Client> {
 private:
 	std::string m_host;
 	int m_port;
@@ -192,8 +210,8 @@ private:
 	}
 
 public:
-	redis_client() : poco_shared(new Client()), m_host("localhost"), m_port(6379), m_database(0), m_timeout_ms(5000) {}
-	redis_client(redis_client* other) : poco_shared(other->shared),
+	redis_client() : plugin_refcounted(new Client()), m_host("localhost"), m_port(6379), m_database(0), m_timeout_ms(5000) {}
+	redis_client(redis_client* other) : plugin_refcounted(other->shared),
 		m_host(other->m_host),
 		m_port(other->m_port),
 		m_password(other->m_password),
@@ -2332,7 +2350,7 @@ public:
 };
 
 // Blocking subscriber implementation
-class blocking_redis_subscriber : public poco_shared<Client>, public Runnable {
+class blocking_redis_subscriber : public plugin_refcounted<Client>, public Runnable {
 private:
 	Thread m_thread;
 	Event m_stop_event;
@@ -2346,8 +2364,8 @@ private:
 	bool m_running;
 
 public:
-	blocking_redis_subscriber() : poco_shared(new Client()), m_host("localhost"), m_port(6379), m_running(false) {}
-	blocking_redis_subscriber(blocking_redis_subscriber* other) : poco_shared(other->shared),
+	blocking_redis_subscriber() : plugin_refcounted(new Client()), m_host("localhost"), m_port(6379), m_running(false) {}
+	blocking_redis_subscriber(blocking_redis_subscriber* other) : plugin_refcounted(other->shared),
 		m_host(other->m_host),
 		m_port(other->m_port),
 		m_password(other->m_password),
@@ -2366,14 +2384,7 @@ public:
 		stop();
 	}
 
-	// Reference counting methods needed for AngelScript
-	void duplicate() const {
-		const_cast<blocking_redis_subscriber*>(this)->Poco::RefCountedObject::duplicate();
-	}
-
-	void release() const {
-		const_cast<blocking_redis_subscriber*>(this)->Poco::RefCountedObject::release();
-	}
+	// Reference counting is handled by plugin_refcounted base class
 
 	std::string get_host() const { return m_host; }
 	void set_host(const std::string& host) { m_host = host; }
@@ -2535,7 +2546,7 @@ void RegisterRedis(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("redis_type", "REDIS_TYPE_HASH", 5);
 	engine->RegisterObjectType("redis_value", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("redis_value", asBEHAVE_FACTORY, "redis_value@ f()", asFUNCTION(redis_value_factory), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("redis_value", asBEHAVE_ADDREF, "void f()", asMETHOD(redis_value, duplicate), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("redis_value", asBEHAVE_ADDREF, "void f()", asMETHOD(redis_value, add_ref), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("redis_value", asBEHAVE_RELEASE, "void f()", asMETHOD(redis_value, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod("redis_value", "bool get_is_string() const property", asMETHOD(redis_value, is_string), asCALL_THISCALL);
 	engine->RegisterObjectMethod("redis_value", "bool get_is_error() const property", asMETHOD(redis_value, is_error), asCALL_THISCALL);
@@ -2547,7 +2558,7 @@ void RegisterRedis(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("redis_value", "array<redis_value@>@ get_array() const", asMETHOD(redis_value, get_array), asCALL_THISCALL);
 	engine->RegisterObjectType("redis_client", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("redis_client", asBEHAVE_FACTORY, "redis_client@ f()", asFUNCTION(redis_client_factory), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("redis_client", asBEHAVE_ADDREF, "void f()", asMETHOD(redis_client, duplicate), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("redis_client", asBEHAVE_ADDREF, "void f()", asMETHOD(redis_client, add_ref), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("redis_client", asBEHAVE_RELEASE, "void f()", asMETHOD(redis_client, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod("redis_client", "string get_host() const property", asMETHOD(redis_client, get_host), asCALL_THISCALL);
 	engine->RegisterObjectMethod("redis_client", "void set_host(const string&in) property", asMETHOD(redis_client, set_host), asCALL_THISCALL);
@@ -2719,7 +2730,7 @@ void RegisterRedis(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("redis_client", "redis_value@ execute(array<string>@)", asMETHOD(redis_client, execute), asCALL_THISCALL);
 	engine->RegisterObjectType("blocking_redis_subscriber", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("blocking_redis_subscriber", asBEHAVE_FACTORY, "blocking_redis_subscriber@ f()", asFUNCTION(blocking_redis_subscriber_factory), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("blocking_redis_subscriber", asBEHAVE_ADDREF, "void f()", asMETHOD(blocking_redis_subscriber, duplicate), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("blocking_redis_subscriber", asBEHAVE_ADDREF, "void f()", asMETHOD(blocking_redis_subscriber, add_ref), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("blocking_redis_subscriber", asBEHAVE_RELEASE, "void f()", asMETHOD(blocking_redis_subscriber, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod("blocking_redis_subscriber", "string get_host() const property", asMETHOD(blocking_redis_subscriber, get_host), asCALL_THISCALL);
 	engine->RegisterObjectMethod("blocking_redis_subscriber", "void set_host(const string&in) property", asMETHOD(blocking_redis_subscriber, set_host), asCALL_THISCALL);
@@ -2733,4 +2744,17 @@ void RegisterRedis(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("blocking_redis_subscriber", "void stop()", asMETHOD(blocking_redis_subscriber, stop), asCALL_THISCALL);
 	engine->RegisterObjectMethod("blocking_redis_subscriber", "array<string>@ get_messages(const string&in)", asMETHOD(blocking_redis_subscriber, get_messages), asCALL_THISCALL);
 	engine->RegisterObjectMethod("blocking_redis_subscriber", "bool has_messages(const string&in)", asMETHOD(blocking_redis_subscriber, has_messages), asCALL_THISCALL);
+}
+
+plugin_main(nvgt_plugin_shared* shared) {
+	if (!shared || !shared->script_engine)
+		return false;
+	if (!prepare_plugin(shared))
+		return false;
+	CScriptArray::SetMemoryFunctions(std::malloc, std::free);
+	asITypeInfo* stringType = shared->script_engine->GetTypeInfoByDecl("string");
+	if (stringType)
+		g_StringTypeid = stringType->GetTypeId();
+	RegisterRedis(shared->script_engine);
+	return true;
 }

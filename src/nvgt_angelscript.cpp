@@ -59,7 +59,6 @@
 #include "pocostuff.h"
 #include "uuid.h"
 #include "mail.h"
-#include "redis.h"
 #include "random.h"
 #include "reactphysics.h"
 #include "scriptstuff.h"
@@ -477,7 +476,6 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->BeginConfigGroup("poco");
 	RegisterPocostuff(engine);
 	RegisterUUID(engine);
-	RegisterRedis(engine);
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("subscripting");
 	RegisterScriptstuff(engine);
