@@ -1,4 +1,4 @@
-/* uuid.cpp - Direct Poco::UUID value type wrapper for NVGT
+/* uuid.cpp - Poco::UUID wrapper for NVGT
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -11,21 +11,26 @@
  */
 
 #include "uuid.h"
+
 #include <Poco/Exception.h>
 #include <Poco/UUIDGenerator.h>
+
 #include <cstring>
 
-template <class T, typename... A> void generic_construct(T* mem, A... args) { new (mem) T(args...); }
-template <class T> void generic_copy_construct(T* mem, const T& other) { new (mem) T(other); }
-template <class T> void generic_destruct(T* mem) { mem->~T(); }
-template <class T> int opCmp(const T& first, const T& second) {
-	if (first < second) return -1;
-	else if (first > second) return 1;
-	else return 0;
-}
-
-void uuid_construct_default(void* mem) {
-	new (mem) Poco::UUID();
+template <class T, typename... A>
+void generic_construct(T* mem, A... args) { new (mem) T(args...); }
+template <class T>
+void generic_copy_construct(T* mem, const T& other) { new (mem) T(other); }
+template <class T>
+void generic_destruct(T* mem) { mem->~T(); }
+template <class T>
+int opCmp(const T& first, const T& second) {
+	if (first < second)
+		return -1;
+	else if (first > second)
+		return 1;
+	else
+		return 0;
 }
 
 void uuid_construct_string(void* mem, const std::string& str) {
@@ -43,24 +48,8 @@ void uuid_construct_bytes(void* mem, const std::string& bytes) {
 		new (mem) Poco::UUID();
 }
 
-std::string uuid_to_string(const Poco::UUID& uuid) {
-	return uuid.toString();
-}
-
-void uuid_parse(Poco::UUID& uuid, const std::string& str) {
-	uuid.parse(str);
-}
-
-bool uuid_try_parse(Poco::UUID& uuid, const std::string& str) {
-	return uuid.tryParse(str);
-}
-
 int uuid_get_version(const Poco::UUID& uuid) {
 	return static_cast<int>(uuid.version());
-}
-
-int uuid_get_variant(const Poco::UUID& uuid) {
-	return uuid.variant();
 }
 
 std::string uuid_get_bytes(const Poco::UUID& uuid) {
@@ -94,37 +83,21 @@ Poco::UUID uuid_create_from_name(const Poco::UUID& namespace_id, const std::stri
 	return Poco::UUIDGenerator::defaultGenerator().createFromName(namespace_id, name);
 }
 
-Poco::UUID uuid_namespace_dns() {
-	return Poco::UUID::dns();
-}
-
-Poco::UUID uuid_namespace_url() {
-	return Poco::UUID::uri();
-}
-
-Poco::UUID uuid_namespace_oid() {
-	return Poco::UUID::oid();
-}
-
-Poco::UUID uuid_namespace_x500() {
-	return Poco::UUID::x500();
-}
-
 void RegisterUUID(asIScriptEngine* engine) {
 	engine->RegisterObjectType("uuid", sizeof(Poco::UUID), asOBJ_VALUE | asGetTypeTraits<Poco::UUID>());
-	engine->RegisterObjectBehaviour("uuid", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(uuid_construct_default), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("uuid", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(generic_construct<Poco::UUID>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("uuid", asBEHAVE_CONSTRUCT, "void f(const string&in str)", asFUNCTION(uuid_construct_string), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("uuid", asBEHAVE_CONSTRUCT, "void f(const uuid&in)", asFUNCTION(generic_copy_construct<Poco::UUID>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("uuid", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(generic_destruct<Poco::UUID>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("uuid", "uuid& opAssign(const uuid&in)", asMETHODPR(Poco::UUID, operator=, (const Poco::UUID&), Poco::UUID&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("uuid", "string to_string() const", asFUNCTION(uuid_to_string), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("uuid", "string get_str() const property", asFUNCTION(uuid_to_string), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("uuid", "string opConv() const", asFUNCTION(uuid_to_string), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("uuid", "string opImplConv() const", asFUNCTION(uuid_to_string), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("uuid", "void parse(const string&in)", asFUNCTION(uuid_parse), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("uuid", "bool try_parse(const string&in)", asFUNCTION(uuid_try_parse), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("uuid", "string to_string() const", asMETHOD(Poco::UUID, toString), asCALL_THISCALL);
+	engine->RegisterObjectMethod("uuid", "string get_str() const property", asMETHOD(Poco::UUID, toString), asCALL_THISCALL);
+	engine->RegisterObjectMethod("uuid", "string opConv() const", asMETHOD(Poco::UUID, toString), asCALL_THISCALL);
+	engine->RegisterObjectMethod("uuid", "string opImplConv() const", asMETHOD(Poco::UUID, toString), asCALL_THISCALL);
+	engine->RegisterObjectMethod("uuid", "void parse(const string&in)", asMETHOD(Poco::UUID, parse), asCALL_THISCALL);
+	engine->RegisterObjectMethod("uuid", "bool try_parse(const string&in)", asMETHOD(Poco::UUID, tryParse), asCALL_THISCALL);
 	engine->RegisterObjectMethod("uuid", "int get_version() const property", asFUNCTION(uuid_get_version), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("uuid", "int get_variant() const property", asFUNCTION(uuid_get_variant), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("uuid", "int get_variant() const property", asMETHOD(Poco::UUID, variant), asCALL_THISCALL);
 	engine->RegisterObjectMethod("uuid", "bool get_is_null() const property", asMETHOD(Poco::UUID, isNull), asCALL_THISCALL);
 	engine->RegisterObjectMethod("uuid", "bool opEquals(const uuid&in) const", asMETHOD(Poco::UUID, operator==), asCALL_THISCALL);
 	engine->RegisterObjectMethod("uuid", "int opCmp(const uuid&in)", asFUNCTION(opCmp<Poco::UUID>), asCALL_CDECL_OBJFIRST);
@@ -134,8 +107,8 @@ void RegisterUUID(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("uuid uuid_generate_random()", asFUNCTION(uuid_generate_random), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uuid uuid_generate_time()", asFUNCTION(uuid_generate_time), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uuid uuid_create_from_name(const uuid&in, const string&in)", asFUNCTION(uuid_create_from_name), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uuid uuid_namespace_dns()", asFUNCTION(uuid_namespace_dns), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uuid uuid_namespace_url()", asFUNCTION(uuid_namespace_url), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uuid uuid_namespace_oid()", asFUNCTION(uuid_namespace_oid), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uuid uuid_namespace_x500()", asFUNCTION(uuid_namespace_x500), asCALL_CDECL);
+	engine->RegisterGlobalFunction("uuid uuid_namespace_dns()", asFUNCTION(Poco::UUID::dns), asCALL_CDECL);
+	engine->RegisterGlobalFunction("uuid uuid_namespace_url()", asFUNCTION(Poco::UUID::uri), asCALL_CDECL);
+	engine->RegisterGlobalFunction("uuid uuid_namespace_oid()", asFUNCTION(Poco::UUID::oid), asCALL_CDECL);
+	engine->RegisterGlobalFunction("uuid uuid_namespace_x500()", asFUNCTION(Poco::UUID::x500), asCALL_CDECL);
 }

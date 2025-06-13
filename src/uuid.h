@@ -1,4 +1,4 @@
-/* uuid.h - Direct Poco::UUID value type wrapper for NVGT
+/* uuid.h - Poco::UUID wrapper for NVGT
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
