@@ -1,4 +1,4 @@
-/* random.h - registration function for random number generators
+/* mail.h - SMTP mail wrapper for NVGT
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -11,7 +11,14 @@
  */
 
 #pragma once
-class asIScriptEngine;
-unsigned int random_seed();
 
-void RegisterScriptRandom(asIScriptEngine* engine);
+#include <angelscript.h>
+
+#include <string>
+
+void RegisterMail(asIScriptEngine* engine);
+
+// Email validation function
+// Does not strictly follow RFC!
+// Can, and will, accept some invalid email addresses!
+bool validate_email_address(const std::string& email);

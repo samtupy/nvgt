@@ -1,0 +1,70 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#pragma plugin redis
+
+void main() {
+    blocking_redis_subscriber@ subscriber = blocking_redis_subscriber();
+
+    array<string> channels;
+    channels.insert_last("test:channel");
+
+    if (!subscriber.subscribe(channels)) {
+        println("Failed to subscribe: " + subscriber.last_error);
+        return;
+    }
+
+    println("Subscriber started successfully");
+
+    redis_client@ publisher = redis_client();
+    if (!publisher.connect()) {
+        println("Failed to connect publisher");
+        subscriber.stop();
+        return;
+    }
+
+    // Wait for subscriber to be ready
+    // We just assume it is ready after X amount of time
+    // Can we figure out a notification system?
+    // Look into how Redis does it - they might just ping
+    wait(200);
+
+    println("\nPublishing messages...");
+    for (int i = 1; i <= 5; i++) {
+        int64 count = publisher.publish("test:channel", "Message " + i);
+        println("Published message " + i + " to " + count + " subscribers");
+    }
+
+    // Give time for messages to arrive
+    wait(200);
+
+    if (subscriber.has_messages("test:channel")) {
+        array<string>@ messages = subscriber.get_messages("test:channel");
+        println("\nReceived " + messages.length() + " messages:");
+        for (uint i = 0; i < messages.length(); i++) {
+            println("  [" + i + "] " + messages[i]);
+        }
+    }
+
+    // Test shutdown timing
+    uint64 start_time = TIME_SYSTEM_RUNNING_MILLISECONDS;
+
+    subscriber.stop();
+
+    uint64 stop_time = TIME_SYSTEM_RUNNING_MILLISECONDS;
+    uint64 shutdown_duration = stop_time - start_time;
+
+    println("Shutdown completed in " + shutdown_duration + " ms");
+
+    if (shutdown_duration > 1000) {
+        println("WARNING: Shutdown took longer than 1 second!");
+    } else {
+        println("SUCCESS!");
+    }
+
+    println("Subscriber is_running: " + subscriber.is_running);
+
+    publisher.disconnect();
+    println("Redis pub/sub Test Complete!");
+}

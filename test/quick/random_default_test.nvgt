@@ -1,0 +1,32 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+// Test the default random generator selection
+
+void main() {
+	println("Testing Default Random Generator");
+	println("================================");
+	
+	// Test the global random() function
+	println("\nUsing global random() function:");
+	for (int i = 0; i < 5; i++) {
+		println("Random int (1-100): " + random(1, 100));
+	}
+	
+	println("\nUsing global random_bool():");
+	for (int i = 0; i < 5; i++) {
+		println("Random bool: " + random_bool());
+	}
+	
+	println("\nUsing global random_character():");
+	for (int i = 0; i < 5; i++) {
+		println("Random letter: " + random_character("a", "z"));
+	}
+	
+	println("\nUsing random_seed() to get a seed value:");
+	uint seed = random_seed();
+	println("Random seed value: " + seed);
+	
+	println("\nTest completed!");
+}

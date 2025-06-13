@@ -1,0 +1,95 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#pragma plugin redis
+
+void main() {
+    redis_client@ client = redis_client();
+
+    if (!client.connect()) {
+        println("Failed to connect: " + client.last_error);
+        return;
+    }
+
+    client.del("test:list");
+
+    int64 len = client.lpush("test:list", "item1");
+    println("LPUSH test:list 'item1' = " + len + " (length)");
+    
+    len = client.lpush("test:list", "item2");
+    println("LPUSH test:list 'item2' = " + len + " (length)");
+
+    len = client.rpush("test:list", "item3");
+    println("RPUSH test:list 'item3' = " + len + " (length)");
+
+    len = client.rpush("test:list", "item4");
+    println("RPUSH test:list 'item4' = " + len + " (length)");
+
+    len = client.llen("test:list");
+    println("LLEN test:list = " + len);
+
+    array<string>@ items = client.lrange("test:list", 0, -1);
+    println("LRANGE test:list 0 -1:");
+    for (uint i = 0; i < items.length(); i++) {
+        println("  [" + i + "] = '" + items[i] + "'");
+    }
+
+    string item = client.lindex("test:list", 0);
+    println("LINDEX test:list 0 = '" + item + "'");
+
+    item = client.lindex("test:list", -1);
+    println("LINDEX test:list -1 = '" + item + "'");
+
+    if (client.lset("test:list", 1, "modified")) {
+        println("LSET test:list 1 'modified' - OK");
+    }
+
+    item = client.lpop("test:list");
+    println("LPOP test:list = '" + item + "'");
+
+    item = client.rpop("test:list");
+    println("RPOP test:list = '" + item + "'");
+
+    items = client.lrange("test:list", 0, -1);
+    println("Current list contents:");
+    for (uint i = 0; i < items.length(); i++) {
+        println("  [" + i + "] = '" + items[i] + "'");
+    }
+
+    client.rpush("test:list", "duplicate");
+    client.rpush("test:list", "duplicate");
+    client.rpush("test:list", "unique");
+    client.rpush("test:list", "duplicate");
+
+    int64 removed = client.lrem("test:list", 2, "duplicate");
+    println("LREM test:list 2 'duplicate' = " + removed + " (removed)");
+
+    items = client.lrange("test:list", 0, -1);
+    println("After LREM:");
+    for (uint i = 0; i < items.length(); i++) {
+        println("  [" + i + "] = '" + items[i] + "'");
+    }
+
+    if (client.ltrim("test:list", 0, 2)) {
+        println("LTRIM test:list 0 2 - OK");
+    }
+    
+    items = client.lrange("test:list", 0, -1);
+    println("After LTRIM:");
+    for (uint i = 0; i < items.length(); i++) {
+        println("  [" + i + "] = '" + items[i] + "'");
+    }
+
+    len = client.linsert("test:list", "BEFORE", "unique", "inserted");
+    println("LINSERT test:list BEFORE 'unique' 'inserted' = " + len + " (new length)");
+
+    items = client.lrange("test:list", 0, -1);
+    println("After LINSERT:");
+    for (uint i = 0; i < items.length(); i++) {
+        println("  [" + i + "] = '" + items[i] + "'");
+    }
+
+    client.del("test:list");
+    println("\nRedis List Test Complete!");
+}

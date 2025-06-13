@@ -1,0 +1,221 @@
+// Benchmark for array random operations
+
+void bench_array_random_small() {
+	// Small array (10 elements)
+	int[] small_array;
+	for (int i = 0; i < 10; i++)
+		small_array.insert_last(i);
+	
+	println("Benchmarking array.random() on 10-element array");
+	
+	// Default random
+	timer t1(0, 1);
+	for (int i = 0; i < 100000; i++)
+		small_array.random();
+	t1.pause();
+	println("Default random: %0us for 100000 operations".format(float(t1.elapsed)));
+	
+	// With PCG
+	random_pcg pcg;
+	timer t2(0, 1);
+	for (int i = 0; i < 100000; i++)
+		small_array.random(pcg);
+	t2.pause();
+	println("With PCG: %0us for 100000 operations".format(float(t2.elapsed)));
+	
+	// With WELL
+	random_well well;
+	timer t3(0, 1);
+	for (int i = 0; i < 100000; i++)
+		small_array.random(well);
+	t3.pause();
+	println("With WELL: %0us for 100000 operations".format(float(t3.elapsed)));
+	
+	// With Gamerand
+	random_gamerand gamerand;
+	timer t4(0, 1);
+	for (int i = 0; i < 100000; i++)
+		small_array.random(gamerand);
+	t4.pause();
+	println("With Gamerand: %0us for 100000 operations".format(float(t4.elapsed)));
+	
+	// With Xorshift
+	random_xorshift xorshift;
+	timer t5(0, 1);
+	for (int i = 0; i < 100000; i++)
+		small_array.random(xorshift);
+	t5.pause();
+	println("With Xorshift: %0us for 100000 operations".format(float(t5.elapsed)));
+}
+
+void bench_array_random_medium() {
+	// Medium array (1000 elements)
+	string[] medium_array;
+	for (int i = 0; i < 1000; i++)
+		medium_array.insert_last("element_" + i);
+	
+	println("\nBenchmarking array.random() on 1000-element array");
+	
+	// Default random
+	timer t1(0, 1);
+	for (int i = 0; i < 100000; i++)
+		medium_array.random();
+	t1.pause();
+	println("Default random: %0us for 100000 operations".format(float(t1.elapsed)));
+	
+	// With PCG
+	random_pcg pcg;
+	timer t2(0, 1);
+	for (int i = 0; i < 100000; i++)
+		medium_array.random(pcg);
+	t2.pause();
+	println("With PCG: %0us for 100000 operations".format(float(t2.elapsed)));
+	
+	// With WELL
+	random_well well;
+	timer t3(0, 1);
+	for (int i = 0; i < 100000; i++)
+		medium_array.random(well);
+	t3.pause();
+	println("With WELL: %0us for 100000 operations".format(float(t3.elapsed)));
+	
+	// With Gamerand
+	random_gamerand gamerand;
+	timer t4(0, 1);
+	for (int i = 0; i < 100000; i++)
+		medium_array.random(gamerand);
+	t4.pause();
+	println("With Gamerand: %0us for 100000 operations".format(float(t4.elapsed)));
+	
+	// With Xorshift
+	random_xorshift xorshift;
+	timer t5(0, 1);
+	for (int i = 0; i < 100000; i++)
+		medium_array.random(xorshift);
+	t5.pause();
+	println("With Xorshift: %0us for 100000 operations".format(float(t5.elapsed)));
+}
+
+void bench_array_shuffle() {
+	// Create arrays for shuffling
+	int[] test_array;
+	for (int i = 0; i < 100; i++)
+		test_array.insert_last(i);
+	
+	println("\nBenchmarking array.shuffle() on 100-element array");
+	
+	// Default shuffle
+	int[] arr1 = test_array;
+	timer t1(0, 1);
+	for (int i = 0; i < 1000; i++) {
+		arr1 = test_array;  // Reset array
+		arr1.shuffle();
+	}
+	t1.pause();
+	println("Default shuffle: %0us for 1000 operations".format(float(t1.elapsed)));
+	
+	// With PCG
+	random_pcg pcg;
+	int[] arr2 = test_array;
+	timer t2(0, 1);
+	for (int i = 0; i < 1000; i++) {
+		arr2 = test_array;  // Reset array
+		arr2.shuffle(pcg);
+	}
+	t2.pause();
+	println("With PCG: %0us for 1000 operations".format(float(t2.elapsed)));
+	
+	// With WELL
+	random_well well;
+	int[] arr3 = test_array;
+	timer t3(0, 1);
+	for (int i = 0; i < 1000; i++) {
+		arr3 = test_array;  // Reset array
+		arr3.shuffle(well);
+	}
+	t3.pause();
+	println("With WELL: %0us for 1000 operations".format(float(t3.elapsed)));
+	
+	// With Gamerand
+	random_gamerand gamerand;
+	int[] arr4 = test_array;
+	timer t4(0, 1);
+	for (int i = 0; i < 1000; i++) {
+		arr4 = test_array;  // Reset array
+		arr4.shuffle(gamerand);
+	}
+	t4.pause();
+	println("With Gamerand: %0us for 1000 operations".format(float(t4.elapsed)));
+	
+	// With Xorshift
+	random_xorshift xorshift;
+	int[] arr5 = test_array;
+	timer t5(0, 1);
+	for (int i = 0; i < 1000; i++) {
+		arr5 = test_array;  // Reset array
+		arr5.shuffle(xorshift);
+	}
+	t5.pause();
+	println("With Xorshift: %0us for 1000 operations".format(float(t5.elapsed)));
+}
+
+void bench_array_shuffle_large() {
+	// Large array shuffle
+	double[] large_array;
+	for (int i = 0; i < 10000; i++)
+		large_array.insert_last(i * 0.1);
+	
+	println("\nBenchmarking array.shuffle() on 10000-element array");
+	
+	// Default shuffle
+	double[] arr1 = large_array;
+	timer t1(0, 1);
+	for (int i = 0; i < 10; i++) {
+		arr1 = large_array;  // Reset array
+		arr1.shuffle();
+	}
+	t1.pause();
+	println("Default shuffle: %0us for 10 operations".format(float(t1.elapsed)));
+	
+	// With PCG
+	random_pcg pcg;
+	double[] arr2 = large_array;
+	timer t2(0, 1);
+	for (int i = 0; i < 10; i++) {
+		arr2 = large_array;  // Reset array
+		arr2.shuffle(pcg);
+	}
+	t2.pause();
+	println("With PCG: %0us for 10 operations".format(float(t2.elapsed)));
+	
+	// With Gamerand (typically fastest)
+	random_gamerand gamerand;
+	double[] arr3 = large_array;
+	timer t3(0, 1);
+	for (int i = 0; i < 10; i++) {
+		arr3 = large_array;  // Reset array
+		arr3.shuffle(gamerand);
+	}
+	t3.pause();
+	println("With Gamerand: %0us for 10 operations".format(float(t3.elapsed)));
+}
+
+void main() {
+	println("Array Random Operations Benchmarks");
+	println("==================================");
+	
+	// Warm up
+	println("Warming up the JIT...");
+	int[] warm = {1, 2, 3, 4, 5};
+	for (int i = 0; i < 10000; i++) {
+		warm.random();
+		warm.shuffle();
+	}
+	
+	bench_array_random_small();
+	bench_array_random_medium();
+	bench_array_shuffle();
+	bench_array_shuffle_large();
+	
+	println("\nBenchmarks completed!");
+}

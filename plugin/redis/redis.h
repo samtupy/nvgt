@@ -1,4 +1,4 @@
-/* random.h - registration function for random number generators
+/* redis.h - header for Redis client wrapper using Poco::Redis
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -11,7 +11,22 @@
  */
 
 #pragma once
-class asIScriptEngine;
-unsigned int random_seed();
 
-void RegisterScriptRandom(asIScriptEngine* engine);
+#include <string>
+
+class asIScriptEngine;
+
+namespace Poco {
+	namespace Redis {
+		class Client;
+		class Array;
+		class Command;
+		class RedisType;
+		class Error;
+	}  // namespace Redis
+}  // namespace Poco
+
+class CScriptArray;
+class CScriptDictionary;
+
+void RegisterRedis(asIScriptEngine* engine);
