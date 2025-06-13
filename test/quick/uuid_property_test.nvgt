@@ -3,12 +3,12 @@
 // License: zlib (see license.md in the root of the NVGT distribution)
 
 void main() {
-    uuid@ u = uuid_create_random();
+    uuid u = uuid_generate_random();
 
     println("UUID via property: " + u.str);
     println("UUID via method: " + u.to_string());
     println("Are they equal? " + (u.str == u.to_string()));
-    
+
     println("Version: " + u.version);
     println("Variant: " + u.variant);
     println("Is null: " + u.is_null);

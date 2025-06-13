@@ -4,57 +4,56 @@
 
 void main() {
     println("Testing UUID Functionality");
-    println("=========================");
-    
+
     string id1 = uuid_generate();
     string id2 = uuid_generate_random();
     string id3 = uuid_generate_time();
     println("General UUID: " + id1);
     println("Random UUID: " + id2);
     println("Time-based UUID: " + id3);
-    
-    uuid@ u1 = uuid_create();
-    uuid@ u2 = uuid_create_random();
+
+    uuid u1 = uuid_generate();
+    uuid u2 = uuid_generate_random();
     println("UUID object 1: " + u1.str);
     println("UUID object 2: " + u2.str);
     println("u1 version: " + u1.version);
     println("u1 variant: " + u1.variant);
-    
-    uuid@ u3 = uuid("550e8400-e29b-41d4-a716-446655440000");
+
+    uuid u3 = uuid("550e8400-e29b-41d4-a716-446655440000");
     println("Parsed UUID: " + u3.str);
     println("Is null: " + u3.is_null);
-    
-    uuid@ u4 = uuid();
+
+    uuid u4 = uuid();
     println("Null UUID: " + u4.str);
     println("Is null: " + u4.is_null);
-    
-    uuid@ u5 = uuid(u1.str);
+
+    uuid u5 = uuid(u1.str);
     println("u1 == u5: " + (u1 == u5));
     println("u1 == u2: " + (u1 == u2));
-    
-    uuid@ dns_ns = uuid_namespace_dns();
-    uuid@ name_uuid = uuid_create_from_name(dns_ns, "example.com");
+
+    uuid dns_ns = uuid_namespace_dns();
+    uuid name_uuid = uuid_create_from_name(dns_ns, "example.com");
     println("DNS namespace: " + dns_ns.str);
     println("Name-based UUID for 'example.com': " + name_uuid.str);
-    
+
     string bytes = u1.get_bytes();
     println("UUID bytes length: " + bytes.length());
-    uuid@ u6 = uuid();
+    uuid u6 = uuid();
     u6.set_bytes(bytes);
     println("UUID from bytes: " + u6.str);
     println("Matches original: " + (u1 == u6));
-    
-    uuid@ u7 = uuid("not-a-uuid");
+
+    uuid u7 = uuid("not-a-uuid");
     println("Invalid parse result: " + u7.str);
     println("Is null after invalid parse: " + u7.is_null);
-    
-    uuid@ u8 = uuid();
+
+    uuid u8 = uuid();
     bool parsed = u8.try_parse("550e8400-e29b-41d4-a716-446655440000");
     println("try_parse valid UUID: " + parsed);
     println("Result: " + u8.str);
-    
+
     parsed = u8.try_parse("invalid-uuid");
     println("try_parse invalid UUID: " + parsed);
-    
+
     println("\nAll tests completed!");
 }
