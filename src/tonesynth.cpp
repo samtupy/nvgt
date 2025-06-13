@@ -99,6 +99,7 @@ init_sound();
 	bool loaded = s->load_pcm(buffer, static_cast<unsigned int>(size), ma_format_s16, gen->sample_rate, gen->channels);
 	delete[] buffer;
 	if (!loaded) {
+		s->release(); // Sound object is not passed to the script if load fails, delete it.
 		return nullptr;
 	}
 	return s;
