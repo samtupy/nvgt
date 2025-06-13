@@ -7,12 +7,12 @@ void do_something_really_complicated() {
 	continue_main_thread.notify_all();
 }
 
-void test_atomicFlag() {
+void test_atomic_flag() {
 	async<void>(do_something_really_complicated);
 	continue_main_thread.wait(false);
 }
 
-void test_atomicCounters() {
+void test_atomic_counters() {
 	counter1 = 0;
 	++counter1;
 	--counter1;
@@ -34,6 +34,6 @@ void test_atomicCounters() {
 }
 
 void test_atomic() {
-	test_atomicFlag();
-	test_atomicCounters();
+	test_atomic_flag();
+	test_atomic_counters();
 }

@@ -1,4 +1,4 @@
-void test_anyBasic() {
+void test_any_basic() {
 	any a1("test");
 	any a2(2);
 	string s;
@@ -9,7 +9,7 @@ void test_anyBasic() {
 	assert(i == 2);
 }
 
-void test_anyTypes() {
+void test_any_types() {
 	any a;
 	a.store(42);
 	int i;

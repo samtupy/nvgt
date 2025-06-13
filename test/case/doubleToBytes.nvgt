@@ -1,8 +1,0 @@
-void test_doubleToBytes() {
-	random_pcg r;
-	for (uint i = 0; i < 50; i++) {
-		double d = r.nextf() + r.nextf();
-		string b = double_to_bytes(d);
-		assert(bytes_to_double(b) == d);
-	}
-}

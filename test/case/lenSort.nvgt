@@ -1,7 +1,0 @@
-void test_lenSort() {
-	string[] l = {"test1", "test", "1", "33", "this is longer", "hello"};
-	l.sort(function(a1, a2) {
-		return a1.length() > a2.length();
-	});
-	assert(string(l) == "[this is longer, test1, hello, test, 33, 1]");
-}

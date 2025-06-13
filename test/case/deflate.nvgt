@@ -10,7 +10,7 @@ void test_deflate() {
 	assert(inflated == original);
 }
 
-void test_inflateInvalidData() {
+void test_inflate_invalid_data() {
 	bool exception_caught = false;
 	try {
 		string_inflate("oh snap!");

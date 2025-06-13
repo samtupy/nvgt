@@ -1,4 +1,4 @@
-void test_foreachArray() {
+void test_foreach_array() {
 	string[] arr = {"this", "is", "a", "test"};
 	string result = "";
 	foreach(string v : arr) {
@@ -7,7 +7,7 @@ void test_foreachArray() {
 	assert(result == "this is a test ");
 }
 
-void test_foreachDictionary() {
+void test_foreach_dictionary() {
 	dictionary d = {{"test1", "testing1"}, {"test2", "testing2"}};
 	int count = 0;
 	foreach(auto v, string k : d) {

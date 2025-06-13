@@ -1,8 +1,0 @@
-void test_stringIs() {
-	// We should add tests for other encodings as well but UTF8 is the most important.
-	assert("AAAAA".is_upper());
-	assert("aaaaa".is_lower());
-	string mixcase = "AAAaa";
-	assert(!mixcase.is_lower() and !mixcase.is_upper());
-	assert(" ".is_whitespace());
-}

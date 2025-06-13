@@ -1,0 +1,3 @@
+void test_string_recode_ascii() {
+	assert(string_recode("�", "UTF8", "ascii") == "?");
+}

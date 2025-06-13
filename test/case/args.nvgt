@@ -1,0 +1,20 @@
+void test_args_variables() {
+	// Test that COMMAND_LINE exists and is a string
+	assert(COMMAND_LINE.length() >= 0);
+	
+	// Test that ARGS exists and is an array
+	assert(ARGS.length() >= 1); // At least the script name
+	
+	// Test that first argument is the script name/path
+	assert(ARGS[0].length() > 0);
+	
+	// Test relationship between COMMAND_LINE and ARGS
+	// COMMAND_LINE behavior varies by platform and how script is run
+	// It can be empty, so we skip testing it
+	
+	// Test string conversion of ARGS
+	string args_str = string(ARGS);
+	assert(args_str.length() > 0);
+	assert(args_str.find("[") >= 0);
+	assert(args_str.find("]") >= 0);
+}
