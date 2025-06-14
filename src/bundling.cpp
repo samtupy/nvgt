@@ -359,8 +359,15 @@ protected:
 		}
 	}
 	void open_output_stream(const Path& output_path) override {
-		if (!bundle_mode) nvgt_compilation_output_impl::open_output_stream(output_path);
-		else fs.open(Path(workplace.path()).append("Contents/resources/exec").toString(), std::ios::out); // App bundles must store their embedded packs and bytecode as a resource so the app bundle can be signed.
+		nvgt_compilation_output_impl::open_output_stream(output_path);
+		BinaryWriter bw(fs);
+		// NVGT distributes MacOS stubs with the first 2 bytes of the header modified so that they are not recognised as executables by the apple notarization service. Stubs must be distributed unsigned leaving it up to the scripter to sign their games, and any unsigned executables in an app bundle cause notarization to fail even if they are resources. Correct the header here.
+		fs.seekp(0);
+		bw.writeRaw("\xCA\xFE");
+		if (bundle_mode) {
+			fs.close();
+			fs.open(Path(workplace.path()).append("Contents/resources/exec").toString(), std::ios::out); // App bundles must store their embedded packs and bytecode as a resource so the app bundle can be signed.
+		}
 	}
 	void finalize_output_stream() override {
 		if (!bundle_mode) nvgt_compilation_output_impl::finalize_output_stream();

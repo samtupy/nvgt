@@ -79,11 +79,13 @@ def create_info_plist(plist_path, version):
 def main():
 	relpath = "../release"
 	ver = get_version_info()
+	# We create the dmg manually on CI so that we can sign and notarize with Github secrets.
+	do_dmg = len(sys.argv) < 3 or sys.argv[2] != "no_dmg"
 	print(f"Creating NVGT {ver} release...")
 	if len(sys.argv) > 1:
 		relpath = sys.argv[1]
 	make_app_bundle("nvgt.app", relpath, ver)
-	make_dmg("nvgt.app", f"nvgt_{ver}.dmg")
+	if do_dmg: make_dmg("nvgt.app", f"nvgt_{ver}.dmg")
 
 if __name__ == "__main__":
 	main()
