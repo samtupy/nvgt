@@ -171,7 +171,7 @@ jobs:
         cp -r windows_release/lib release/lib_windows
         cp windows_release/stub/* release/stub
         cd install
-        python3 make_macos_ap.py ../release no_dmg
+        python3 make_macos_app.py ../release no_dmg
         cd ..
     - name: sign_package
       if: github.event.repository.fork == false
