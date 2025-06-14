@@ -1,0 +1,13 @@
+void do_test() {
+	assert(2==2);
+	assert(1==2, "bad math");
+}
+
+void test_assert() {
+	try {
+		do_test();
+	} catch {
+		return; // Good
+	}
+	assert(false); // If we get here this is bad because `do_assert` didn't panic when it should have
+}

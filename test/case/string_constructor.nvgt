@@ -1,0 +1,12 @@
+void test_string_constructor() {
+	int[] l = {1, 2, 3, 4, 5};
+	string[] l2 = {"does", "this", "add", "quotes"};
+	
+	string result = string("this ", "is ", "a ", "test! ", 1, 2, l, l2);
+	
+	// The string constructor should concatenate all arguments
+	assert(result.find("this is a test!") >= 0);
+	assert(result.find("12") >= 0);
+	assert(result.find("[1, 2, 3, 4, 5]") >= 0);
+	assert(result.find("[does, this, add, quotes]") >= 0);
+}
