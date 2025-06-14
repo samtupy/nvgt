@@ -19,19 +19,19 @@
 	#include <windows.h>
 	#include "InputBox.h"
 #elif defined(__APPLE__)
-#include <IOKit/IOKitLib.h>
-#include <IOKit/IOCFBundle.h>
-#include <CoreFoundation/CoreFoundation.h>
+	#include <IOKit/IOKitLib.h>
+	#include <IOKit/IOCFBundle.h>
+	#include <CoreFoundation/CoreFoundation.h>
 	#include "apple.h"
 #elif defined(__ANDROID__)
 	#include <android/native_window.h>
 #else
-// Following commented includes are for determining user idle time using x11 screensaver extension. Disabled for now until viability of linking with this library is established or until we fix the idle_ticks() function to use dlopen/dlsym and friends.
-//#include <X11/Xlib.h>
-//#include <X11/extensions/scrnsaver.h>
+	// Following commented includes are for determining user idle time using x11 screensaver extension. Disabled for now until viability of linking with this library is established or until we fix the idle_ticks() function to use dlopen/dlsym and friends.
+	//#include <X11/Xlib.h>
+	//#include <X11/extensions/scrnsaver.h>
 #endif
 #ifndef _WIN32
-#include <sys/time.h>
+	#include <sys/time.h>
 #endif
 #include <SDL3/SDL.h>
 #include <obfuscate.h>
@@ -50,8 +50,8 @@
 #include "timestuff.h"
 #include "UI.h"
 #if defined(__APPLE__) || (!defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))) || defined(__ANDROID__)
-#include <unistd.h>
-#include <cstdio>
+	#include <unistd.h>
+	#include <cstdio>
 #endif
 #include "anticheat.h"
 
@@ -168,9 +168,9 @@ std::string simple_file_dialog(const std::string& filters, const std::string& de
 	end.name = nullptr;
 	end.pattern = nullptr;
 	nvgt_file_dialog_info fdi;
-	if (type == DIALOG_TYPE_OPEN) SDL_ShowOpenFileDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, filter_objects.data(), filter_objects.size() -1, default_location.empty()? nullptr : default_location.c_str(), false);
-	else if (type == DIALOG_TYPE_SAVE) SDL_ShowSaveFileDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, filter_objects.data(), filter_objects.size() -1, default_location.empty()? nullptr : default_location.c_str());
-	else if (type == DIALOG_TYPE_FOLDER) SDL_ShowOpenFolderDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, default_location.empty()? nullptr : default_location.c_str(), false);
+	if (type == DIALOG_TYPE_OPEN) SDL_ShowOpenFileDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, filter_objects.data(), filter_objects.size() - 1, default_location.empty() ? nullptr : default_location.c_str(), false);
+	else if (type == DIALOG_TYPE_SAVE) SDL_ShowSaveFileDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, filter_objects.data(), filter_objects.size() - 1, default_location.empty() ? nullptr : default_location.c_str());
+	else if (type == DIALOG_TYPE_FOLDER) SDL_ShowOpenFolderDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, default_location.empty() ? nullptr : default_location.c_str(), false);
 	while (!fdi.tryWait(5)) SDL_PumpEvents();
 	return fdi.data;
 }
@@ -308,15 +308,17 @@ bool WindowIsHidden() {
 }
 bool set_window_fullscreen(bool fullscreen) {
 	if (!g_WindowHandle) return false;
-return SDL_SetWindowFullscreen(g_WindowHandle, fullscreen);
+	return SDL_SetWindowFullscreen(g_WindowHandle, fullscreen);
 }
 std::string get_window_text() {
 	if (!g_WindowHandle) return "";
 	return std::string(SDL_GetWindowTitle(g_WindowHandle));
 }
-void* get_window_os_handle() { return reinterpret_cast<void*>(g_OSWindowHandle); }
+void* get_window_os_handle() {
+	return reinterpret_cast<void*>(g_OSWindowHandle);
+}
 void handle_sdl_event(SDL_Event* evt) {
-		if (InputEvent(evt)) return;
+	if (InputEvent(evt)) return;
 	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_LOST)
 		lost_window_focus();
 	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_GAINED)
@@ -329,6 +331,7 @@ void refresh_window() {
 	process_keyhook_commands();
 	#endif
 	SDL_PumpEvents();
+	update_joysticks();  // Update all active joystick instances
 	SDL_Event evt;
 	std::unordered_set<int> keys_pressed_this_frame;
 	while (SDL_PollEvent(&evt)) {
@@ -369,54 +372,58 @@ void wait(int ms) {
 // The following function contributed to NVGT by silak
 uint64_t idle_ticks() {
 	#ifdef _WIN32
-		LASTINPUTINFO lii = { sizeof(LASTINPUTINFO) };
-		GetLastInputInfo(&lii);
-		DWORD currentTick = GetTickCount();
-		return (currentTick - lii.dwTime);
+	LASTINPUTINFO lii = { sizeof(LASTINPUTINFO) };
+	GetLastInputInfo(&lii);
+	DWORD currentTick = GetTickCount();
+	return (currentTick - lii.dwTime);
 	#elif __APPLE__
-		io_iterator_t iter;
-		io_registry_entry_t entry;
-		CFMutableDictionaryRef matching = IOServiceMatching("IOHIDSystem");
-		if (!matching) return -1;
-		kern_return_t kr = IOServiceGetMatchingServices(                                                                kIOMainPortDefault, matching, &iter);
-		if (kr != KERN_SUCCESS) return -1;
-		entry = IOIteratorNext(iter);
-		IOObjectRelease(iter);
-		if (entry) {
-			CFNumberRef obj = (CFNumberRef)IORegistryEntryCreateCFProperty(entry, CFSTR("HIDIdleTime"), kCFAllocatorDefault, 0);
-			if (obj) {
-				int64_t idleTimeNanoSeconds = 0;
-				CFNumberGetValue(obj, kCFNumberSInt64Type, &idleTimeNanoSeconds);
-				CFRelease(obj);
-				return idleTimeNanoSeconds / 1000000; // Convert nanoseconds to milliseconds
-			}
-			IOObjectRelease(entry);
+	io_iterator_t iter;
+	io_registry_entry_t entry;
+	CFMutableDictionaryRef matching = IOServiceMatching("IOHIDSystem");
+	if (!matching) return -1;
+	kern_return_t kr = IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter);
+	if (kr != KERN_SUCCESS) return -1;
+	entry = IOIteratorNext(iter);
+	IOObjectRelease(iter);
+	if (entry) {
+		CFNumberRef obj = (CFNumberRef)IORegistryEntryCreateCFProperty(entry, CFSTR("HIDIdleTime"), kCFAllocatorDefault, 0);
+		if (obj) {
+			int64_t idleTimeNanoSeconds = 0;
+			CFNumberGetValue(obj, kCFNumberSInt64Type, &idleTimeNanoSeconds);
+			CFRelease(obj);
+			return idleTimeNanoSeconds / 1000000; // Convert nanoseconds to milliseconds
 		}
-		return -1;
+		IOObjectRelease(entry);
+	}
+	return -1;
 	#else
-		/* Probably switch this to use dlopen instead of direct linkage at least until we can verify that it safely does not compromise portability.
-		Display* dpy = XOpenDisplay(NULL);
-		if (!dpy) return -1;
-		XScreenSaverInfo info;
-		XScreenSaverQueryInfo(dpy, DefaultRootWindow(dpy), &info);
-		uint64_t idleTime = info.idle;
-		XCloseDisplay(dpy);
-		return idleTime;
-		*/
-		return 0; // currently unsupported
+	/* Probably switch this to use dlopen instead of direct linkage at least until we can verify that it safely does not compromise portability.
+	Display* dpy = XOpenDisplay(NULL);
+	if (!dpy) return -1;
+	XScreenSaverInfo info;
+	XScreenSaverQueryInfo(dpy, DefaultRootWindow(dpy), &info);
+	uint64_t idleTime = info.idle;
+	XCloseDisplay(dpy);
+	return idleTime;
+	*/
+	return 0; // currently unsupported
 	#endif
 }
 
 bool is_console_available() {
 	#if defined (_WIN32)
-		return Poco::Util::Application::instance().config().hasOption("application.gui")? GetConsoleWindow() != nullptr : true;
+	return Poco::Util::Application::instance().config().hasOption("application.gui") ? GetConsoleWindow() != nullptr : true;
 	#else
-		return isatty(fileno(stdin)) || isatty(fileno(stdout)) || isatty(fileno(stderr));
+	return isatty(fileno(stdin)) || isatty(fileno(stdout)) || isatty(fileno(stderr));
 	#endif
 }
 
-bool sdl_set_hint(const std::string& hint, const std::string& value, int priority) { return SDL_SetHintWithPriority(hint.c_str(), value.c_str(), SDL_HintPriority(priority)); }
-std::string sdl_get_hint(const std::string& hint) { return SDL_GetHint(hint.c_str()); }
+bool sdl_set_hint(const std::string& hint, const std::string& value, int priority) {
+	return SDL_SetHintWithPriority(hint.c_str(), value.c_str(), SDL_HintPriority(priority));
+}
+std::string sdl_get_hint(const std::string& hint) {
+	return SDL_GetHint(hint.c_str());
+}
 
 void RegisterUI(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UI);
