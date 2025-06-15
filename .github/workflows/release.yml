@@ -182,6 +182,13 @@ jobs:
         codesign --deep --force --options runtime --timestamp -s ${{secrets.MACOS_SIGNING_TEAM_ID}} nvgt_${{env.nvgt_version}}.dmg
         xcrun notarytool submit nvgt_${{env.nvgt_version}}.dmg --wait ${{secrets.MACOS_SIGNING_NOTARY_AUTH}}
         xcrun stapler staple nvgt_${{env.nvgt_version}}.dmg
+        cd ..
+    - name: unsigned_package
+      if: github.event.repository.fork == true
+      run: |
+        cd install
+        hdiutil create -srcfolder nvgt.app nvgt_${{env.nvgt_version}}.dmg
+        cd ..
     - uses: actions/upload-artifact@v4
       with:
         name: mac_package
