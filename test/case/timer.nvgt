@@ -1,0 +1,31 @@
+void test_timer_functionality() {
+	// Test basic timer functionality
+	timer t;
+	assert(t.elapsed >= 0);
+	assert(t.running == true);
+	
+	// Test pause/resume
+	wait(5);
+	int64 before_pause = t.elapsed;
+	assert(before_pause > 0);
+	
+	t.pause();
+	assert(t.running == false);
+	wait(5);
+	assert(t.elapsed == before_pause); // Should not change while paused
+	
+	t.resume();
+	assert(t.running == true);
+	wait(5);
+	assert(t.elapsed > before_pause); // Should increase after resume
+	
+	// Test restart
+	t.restart();
+	assert(t.elapsed < 50); // Should be small after restart
+	
+	// Test has_elapsed
+	timer t2;
+	wait(10);
+	assert(t2.has_elapsed(5));
+	assert(!t2.has_elapsed(1000)); // Shouldn't have elapsed 1 second
+}

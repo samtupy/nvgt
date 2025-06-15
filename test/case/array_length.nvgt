@@ -1,0 +1,12 @@
+void test_array_length() {
+	int[] l = {1, 2, 3, 4, 5};
+	assert(l.length() == 5);
+	
+	// Test empty array
+	int[] empty;
+	assert(empty.length() == 0);
+	
+	// Test after adding elements
+	empty.insert_last(10);
+	assert(empty.length() == 1);
+}

@@ -1,0 +1,20 @@
+void test_vector_insert() {
+	vector[] l;
+	
+	// Test inserting vectors
+	for (uint i = 0; i < 40; i++) {
+		l.insert_last(vector(i, i * 2, i * 3));
+	}
+	
+	assert(l.length() == 40);
+	assert(l[0].x == 0);
+	assert(l[39].x == 39);
+	assert(l[39].y == 78);
+	assert(l[39].z == 117);
+	
+	// Test vector properties
+	vector v(1, 2, 3);
+	assert(v.x == 1);
+	assert(v.y == 2);
+	assert(v.z == 3);
+}

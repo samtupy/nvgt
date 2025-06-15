@@ -1,0 +1,13 @@
+class object {
+	int get_array(uint idx) property {
+		return 5;
+	}
+}
+
+void test_array_property_getter() {
+	object o;
+	// Test that property getter works with array syntax
+	assert(o.array[5] == 5);
+	assert(o.array[0] == 5);
+	assert(o.array[100] == 5);
+}
