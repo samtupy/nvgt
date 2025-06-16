@@ -1,5 +1,5 @@
 # replace
-Try to find any occurrences of a particular string, and replace them with a substitution in a given string object.
+Try to find any occurrences of a particular string, and replace them with a substitution in a given string object, returning a new string.
 
 `string string::replace(const string&in search, const string&in replacement, bool replace_all = true);`
 
