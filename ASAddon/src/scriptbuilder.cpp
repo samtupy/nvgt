@@ -605,18 +605,33 @@ int CScriptBuilder::ProcessScriptSection(const char* script, unsigned int length
 		if (token == "[") {
 			// Look back to see what the previous non-whitespace/comment token was
 			int checkPos = pos - 1;
-			while (checkPos > 0 && (modifiedScript[checkPos] == ' ' || modifiedScript[checkPos] == '\t' ||
-			                        modifiedScript[checkPos] == '\r' || modifiedScript[checkPos] == '\n'))
+			while (checkPos >= 0 && (modifiedScript[checkPos] == ' ' || modifiedScript[checkPos] == '\t' ||
+			                         modifiedScript[checkPos] == '\r' || modifiedScript[checkPos] == '\n'))
 				checkPos--;
-			// If we find an identifier character, @ or ] just before, this is likely an array type, not metadata
+			// Check if this is likely an array bracket rather than metadata
 			bool isArrayType = false;
-			if (checkPos >= 0 && ((modifiedScript[checkPos] >= 'a' && modifiedScript[checkPos] <= 'z') ||
-			                      (modifiedScript[checkPos] >= 'A' && modifiedScript[checkPos] <= 'Z') ||
-			                      (modifiedScript[checkPos] >= '0' && modifiedScript[checkPos] <= '9') ||
-			                      modifiedScript[checkPos] == '_' ||
-			                      modifiedScript[checkPos] == '@' ||
-			                      modifiedScript[checkPos] == ']'))
-				isArrayType = true;
+			if (checkPos >= 0) {
+				char ch = modifiedScript[checkPos];
+				// Case 1: After identifier (letter, digit, _)
+				if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+				    (ch >= '0' && ch <= '9') || ch == '_')
+					isArrayType = true;
+				// Case 2: After ]
+				else if (ch == ']')
+					isArrayType = true;
+				// Case 3: After >
+				else if (ch == '>')
+					isArrayType = true;
+				// Case 4: After @ or after "const" following @
+				else if (ch == '@')
+					isArrayType = true;
+				else if (checkPos >= 4) {
+					// Check for "@ const" pattern
+					if (modifiedScript.substr(checkPos - 4, 5) == "const" &&
+					    checkPos - 5 >= 0 && modifiedScript[checkPos - 5] == '@')
+						isArrayType = true;
+				}
+			}
 			if (!isArrayType) {
 				// Get the metadata string
 				pos = ExtractMetadata(pos, metadata);
