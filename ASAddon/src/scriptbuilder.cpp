@@ -213,7 +213,7 @@ int CScriptBuilder::CalculateLineNumber(const string &script, int pos) {
 }
 
 int CScriptBuilder::ProcessScriptSection(const char* script, unsigned int length, const char* sectionname, int lineOffset) {
-	// Save the current state of modifiedScript before we modify it
+	// Save the current modifiedScript to handle recursive includes
 	string savedModifiedScript = modifiedScript;
 	// Perform a superficial parsing of the script first to store the metadata
 	if (length)
@@ -600,18 +600,36 @@ int CScriptBuilder::ProcessScriptSection(const char* script, unsigned int length
 			continue;
 		}
 		// Is this the start of metadata?
+		// Metadata should only appear at the beginning of a declaration, not in the middle of a type
+		// Check if the previous non-whitespace token was an identifier (could be part of array type)
 		if (token == "[") {
-			// Get the metadata string
-			pos = ExtractMetadata(pos, metadata);
-			// Determine what this metadata is for
-			int type;
-			ExtractDeclaration(pos, name, declaration, type);
-			// Store away the declaration in a map for lookup after the build has completed
-			if (type > 0) {
-				SMetadataDecl decl(metadata, name, declaration, type, currentClass, currentNamespace);
-				foundDeclarations.push_back(decl);
+			// Look back to see what the previous non-whitespace/comment token was
+			int checkPos = pos - 1;
+			while (checkPos > 0 && (modifiedScript[checkPos] == ' ' || modifiedScript[checkPos] == '\t' ||
+			                        modifiedScript[checkPos] == '\r' || modifiedScript[checkPos] == '\n'))
+				checkPos--;
+			// If we find an identifier character, @ or ] just before, this is likely an array type, not metadata
+			bool isArrayType = false;
+			if (checkPos >= 0 && ((modifiedScript[checkPos] >= 'a' && modifiedScript[checkPos] <= 'z') ||
+			                      (modifiedScript[checkPos] >= 'A' && modifiedScript[checkPos] <= 'Z') ||
+			                      (modifiedScript[checkPos] >= '0' && modifiedScript[checkPos] <= '9') ||
+			                      modifiedScript[checkPos] == '_' ||
+			                      modifiedScript[checkPos] == '@' ||
+			                      modifiedScript[checkPos] == ']'))
+				isArrayType = true;
+			if (!isArrayType) {
+				// Get the metadata string
+				pos = ExtractMetadata(pos, metadata);
+				// Determine what this metadata is for
+				int type;
+				ExtractDeclaration(pos, name, declaration, type);
+				// Store away the declaration in a map for lookup after the build has completed
+				if (type > 0) {
+					SMetadataDecl decl(metadata, name, declaration, type, currentClass, currentNamespace);
+					foundDeclarations.push_back(decl);
+				}
+				continue;
 			}
-			continue;
 		}
 		#endif
 		// Move to next token
@@ -620,7 +638,7 @@ int CScriptBuilder::ProcessScriptSection(const char* script, unsigned int length
 	// Build the actual script
 	engine->SetEngineProperty(asEP_COPY_SCRIPT_SECTIONS, true);
 	module->AddScriptSection(sectionname, modifiedScript.c_str(), modifiedScript.size(), lineOffset);
-	// Restore the original modifiedScript state
+	// Restore the saved modifiedScript for recursive includes
 	modifiedScript = savedModifiedScript;
 	return 0;
 }
@@ -681,8 +699,8 @@ int CScriptBuilder::Build() {
 					classMetadataMap.insert(map<int, SClassMetadata>::value_type(typeId, SClassMetadata(decl->parentClass)));
 					it = classMetadataMap.find(typeId);
 				}
-				asITypeInfo *type = engine->GetTypeInfoById(typeId);
-				asIScriptFunction *func = type->GetMethodByName(("get_" + decl->declaration).c_str());
+				asITypeInfo* type = engine->GetTypeInfoById(typeId);
+				asIScriptFunction* func = type->GetMethodByName(("get_" + decl->declaration).c_str());
 				if (func)
 					it->second.funcMetadataMap.insert(map<int, vector<string>>::value_type(func->GetId(), decl->metadata));
 				func = type->GetMethodByName(("set_" + decl->declaration).c_str());
@@ -706,7 +724,7 @@ int CScriptBuilder::Build() {
 					it = classMetadataMap.find(typeId);
 				}
 				// Add the variable to class
-				asITypeInfo *objectType = engine->GetTypeInfoById(typeId);
+				asITypeInfo* objectType = engine->GetTypeInfoById(typeId);
 				int idx = -1;
 				// Search through all properties to get proper declaration
 				for (asUINT i = 0; i < (asUINT)objectType->GetPropertyCount(); ++i) {
