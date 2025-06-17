@@ -1,14 +1,14 @@
 /* timestuff.cpp - code for date/time related routines from checking the system clock to timers.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
+ * Copyright (c) 2022-2025 Sam Tupy
  * https://nvgt.gg
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
- */
+*/
 
 #include "timestuff.h"
 
@@ -23,15 +23,13 @@
 #include <Poco/Timezone.h>
 #include <SDL3/SDL.h>
 #include <obfuscate.h>
-#include <scriptarray.h>
-
+#include <scriptarray.h> 
 #include <chrono>
 #include <cstring>
 #include <ctime>
 #include <fstream>
 #include <iostream>
-#include <string>
-
+#include <string> 
 #include "nvgt.h"
 #include "pocostuff.h"  // angelscript_refcounted
 #include "scriptstuff.h"
@@ -45,8 +43,7 @@ Poco::DateTime g_time_values;
 Poco::FastMutex g_time_mutex;
 
 static asIScriptContext* callback_ctx = NULL;
-timer_queue_item::timer_queue_item(timer_queue *parent, const std::string &id, asIScriptFunction *callback, const std::string &callback_data, int timeout, bool repeating) : parent(parent), id(id), callback(callback), callback_data(callback_data), timeout(timeout), repeating(repeating), is_scheduled(true) {
-}
+timer_queue_item::timer_queue_item(timer_queue *parent, const std::string &id, asIScriptFunction *callback, const std::string &callback_data, int timeout, bool repeating) : parent(parent), id(id), callback(callback), callback_data(callback_data), timeout(timeout), repeating(repeating), is_scheduled(true) {}
 void timer_queue_item::execute() {
 	is_scheduled = false;
 	asIScriptContext *ACtx = asGetActiveContext();
@@ -377,24 +374,19 @@ bool timer::set_secure(bool new_secure) {
 }
 
 // Angelscript factories.
-template <class T, typename... A>
-void timestuff_construct(void* mem, A... args) {
+template <class T, typename... A> void timestuff_construct(void* mem, A... args) {
 	new (mem) T(args...);
 }
-template <class T>
-void timestuff_copy_construct(void* mem, const T &obj) {
+template <class T> void timestuff_copy_construct(void* mem, const T &obj) {
 	new (mem) T(obj);
 }
-template <class T>
-void timestuff_destruct(T *obj) {
+template <class T> void timestuff_destruct(T *obj) {
 	obj->~T();
 }
-template <class T, typename... A>
-void* timestuff_factory(A... args) {
+template <class T, typename... A> void* timestuff_factory(A... args) {
 	return new T(args...);
 }
-template <class T, typename O>
-int timestuff_opCmp(T *self, O other) {
+template <class T, typename O> int timestuff_opCmp(T *self, O other) {
 	if (*self < other)
 		return -1;
 	else if (*self > other)
@@ -403,19 +395,17 @@ int timestuff_opCmp(T *self, O other) {
 		return 0;
 }
 // Assigns one of the datetime types to a new version of itself E. the current date and time.
-template <class T>
-void timestuff_reset(T *obj) {
+template <class T> void timestuff_reset(T *obj) {
 	(*obj) = T();
 }
 /**
  * Additional calendar methods and properties for BGT compatibility.
  * This portion contributed by Caturria, Mar 10, 2025.
- */
+*/
 /**
  * Makes sure the values stored within a LocalDateTime or DateTime object are valid, and raises a script exception if not.
- */
-template <class t>
-bool verify_date_time(t &dt) {
+*/
+template <class t> bool verify_date_time(t &dt) {
 	if (!DateTime::isValid(dt.year(), dt.month(), dt.day(), dt.hour(), dt.minute(), dt.second(), dt.millisecond(), dt.microsecond())) {
 		asGetActiveContext()->SetException("Invalid date/time.");
 		return false;
@@ -435,9 +425,8 @@ std::string get_weekday_name(LocalDateTime &dt) {
 /**
  * Either adds or subtracts a timespan from either a LocalDateTime or a DateTime.
  * Always returns boolean true.
- */
-template <class t>
-bool add_timespan(t &dt, Timespan &timespan, bool negative) {
+*/
+template <class t> bool add_timespan(t &dt, Timespan &timespan, bool negative) {
 	if (negative)
 		dt -= timespan;
 	else
@@ -447,7 +436,7 @@ bool add_timespan(t &dt, Timespan &timespan, bool negative) {
 
 /**
  * Convenience methods for adding days, hours, minutes and seconds to a datetime or calendar.
- */
+*/
 #define make_add_units(x, a, b, c, d, e) \
 	template <class t> \
 	bool add_##x(t &dt, asINT32 amount) { \
@@ -462,15 +451,13 @@ make_add_units(hours, 0, abs(amount), 0, 0, 0)
 make_add_units(minutes, 0, 0, abs(amount), 0, 0)
 make_add_units(seconds, 0, 0, 0, abs(amount), 0)
 
-template <class t>
-bool add_years(t &dt, asINT32 amount) {
+template <class t> bool add_years(t &dt, asINT32 amount) {
 	if (amount == 0)
 		return false;
 	dt.assign(dt.year() + amount, dt.month(), dt.day(), dt.hour(), dt.minute(), dt.second(), dt.microsecond());
 	return true;
 }
-template <class t>
-bool add_months(t &dt, asINT32 amount) {
+template <class t> bool add_months(t &dt, asINT32 amount) {
 	if (amount == 0)
 		return false;
 	asINT32 monthToAssign = dt.month() + amount;
@@ -493,9 +480,8 @@ bool add_months(t &dt, asINT32 amount) {
 /**
  * Computes the difference between two dates either in years, months, days, hours, minutes or seconds.
  * These also match BGT's calendar API.
- */
-template <class t>
-Timespan make_diff_timespan(t &first, t &second) {
+*/
+template <class t> Timespan make_diff_timespan(t &first, t &second) {
 	if (!verify_date_time(first) || !verify_date_time(second)) {
 		return Timespan();  // Script will crash anyway.
 	}
@@ -506,40 +492,33 @@ Timespan make_diff_timespan(t &first, t &second) {
 	if (diff < 0) diff = -diff;
 	return Timespan(diff / 10);
 }
-template <class t>
-asINT64 diff_days(t &first, t &second) {
+template <class t> asINT64 diff_days(t &first, t &second) {
 	return make_diff_timespan(first, second).days();
 }
-template <class t>
-asINT64 diff_hours(t &first, t &second) {
+template <class t> asINT64 diff_hours(t &first, t &second) {
 	return make_diff_timespan(first, second).totalHours();
 }
-template <class t>
-asINT64 diff_minutes(t &first, t &second) {
+template <class t> asINT64 diff_minutes(t &first, t &second) {
 	return make_diff_timespan(first, second).totalMinutes();
 }
-template <class t>
-asINT64 diff_seconds(t &first, t &second) {
+template <class t> asINT64 diff_seconds(t &first, t &second) {
 	return (asINT64)make_diff_timespan(first, second).totalSeconds();
 }
 /**
  * Computes the total duration of the current year as represented by the given object.
  * Used internally by diff_years.
- */
-template <class t>
-Timespan::TimeDiff get_duration_of_year(t &dt) {
+*/
+template <class t> Timespan::TimeDiff get_duration_of_year(t &dt) {
 	return t(dt.year() + 1, 1, 1).utcTime() - t(dt.year(), 1, 1).utcTime();
 }
 /**
  * Computes the amount of time that has elapsed since the start of the year as represented by the given object.
  * Used internally for diff_years.
- */
-template <class t>
-double time_since_year_start(t &dt) {
+*/
+template <class t> double time_since_year_start(t &dt) {
 	return (dt.utcTime() - t(dt.year(), 1, 1).utcTime()) / (double)get_duration_of_year(dt);
 }
-template <class t>
-double diff_years(t &first, t &second) {
+template <class t> double diff_years(t &first, t &second) {
 	t *high, * low;
 	if (first.utcTime() > second.utcTime()) {
 		high = &first;
@@ -556,13 +535,11 @@ double diff_years(t &first, t &second) {
 }
 /**
  * Computes the span of time that has elapsed since midnight on the current day as represented by the given object.
- */
-template <class t>
-Timespan::TimeDiff time_since_midnight(t &dt) {
+*/
+template <class t> Timespan::TimeDiff time_since_midnight(t &dt) {
 	return dt.utcTime() - t(dt.year(), dt.month(), dt.day()).utcTime();
 }
-template <class t>
-bool is_further_into_month(t &high, t &low) {
+template <class t> bool is_further_into_month(t &high, t &low) {
 	if (high.day() > low.day())
 		return false;
 	if (high.day() < low.day())
@@ -572,9 +549,8 @@ bool is_further_into_month(t &high, t &low) {
 }
 /**
  * Computes the difference between two dates in months.
- */
-template <class t>
-asINT64 diff_months(t &first, t &second) {
+*/
+template <class t> asINT64 diff_months(t &first, t &second) {
 	t *high, * low;
 	if (first.utcTime() > second.utcTime()) {
 		high = &first;
@@ -596,26 +572,23 @@ asINT64 diff_months(t &first, t &second) {
 }
 /**
  * Checks if the date held within the object is valid.
- */
-template <class t>
-bool is_valid(t &dt) {
+*/
+template <class t> bool is_valid(t &dt) {
 	return DateTime::isValid(dt.year(), dt.month(), dt.day(), dt.hour(), dt.minute(), dt.second(), dt.millisecond(), dt.microsecond());
 }
 /**
  * Checks if the current year of the object is a leap year.
- */
-template <class t>
-bool is_leap_year(t &dt) {
+*/
+template <class t> bool is_leap_year(t &dt) {
 	return DateTime::isLeapYear(dt.year());
 }
 /**
  * Registers the above extensions with Angelscript.
- */
+*/
 #define register_add_units(x) engine->RegisterObjectMethod(classname.c_str(), "bool add_" #x "(int32 amount)", asFUNCTION(add_##x<t>), asCALL_CDECL_OBJFIRST);
 #define register_diff_units(r, x) engine->RegisterObjectMethod(classname.c_str(), format(#r " diff_" #x "(%s@ other)", classname).c_str(), asFUNCTION(diff_##x<t>), asCALL_CDECL_OBJFIRST);
 
-template <class t>
-void register_date_time_extensions(asIScriptEngine *engine, std::string classname) {
+template <class t> void register_date_time_extensions(asIScriptEngine *engine, std::string classname) {
 	engine->RegisterObjectMethod(classname.c_str(), "string get_month_name() const property", asFUNCTION(get_month_name), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(classname.c_str(), "string get_weekday_name() const property", asFUNCTION(get_weekday_name), asCALL_CDECL_OBJFIRST);
 	register_add_units(days);
