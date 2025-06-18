@@ -53,9 +53,10 @@ if env["PLATFORM"] == "darwin":
 	env.Append(LIBS = ["angelscript", "SDL3", "crypto", "ssl", "iconv", "ogg", "vorbis", "vorbisfile"])
 elif env["PLATFORM"] == "posix":
 	# enable the gold linker, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
-	env.Append(CPPPATH = ["/usr/local/include"], LIBPATH = ["/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
+	env.Append(CPPPATH = ["lindev/include", "/usr/local/include"], LIBPATH = ["lindev/lib", "/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
 	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
-	env.Append(LIBS = [":libangelscript.a", ":libenet6.a", ":libSDL3.a", "crypto", "ssl"])
+	env.Append(LIBS = [":libangelscript.a", ":libenet.a", ":libSDL3.a", ":libz.a", ":libcrypt.a"])
+	env.ParseConfig("pkg-config --libs alsa")
 env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
@@ -94,7 +95,9 @@ if "version.cpp" in sources: sources.remove("version.cpp")
 env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
 version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.
 VariantDir("build/obj_src", "src", duplicate = 0)
-env.Append(LIBS = [["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoZip", "PocoFoundation"] if env["PLATFORM"] != "win32" else [], "phonon", "enet6", "reactphysics3d"])
+env.Append(LIBS = [["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoCrypto", "PocoZip", "PocoFoundation"] if env["PLATFORM"] != "win32" else [], "phonon", "enet", "reactphysics3d"])
+if env["PLATFORM"] == "posix":
+	env.Append(LIBS = [":libssl.a", ":libcrypto.a", ":libexpat.a", ":libz.a", ":libpcre2-8.a", ":libutf8proc.a", ":libpffft.a", ":libmysofa.a"])
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(CPPDEFINES = ["_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING"], LINKFLAGS = ["/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:phonon.dll"])
