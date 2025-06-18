@@ -66,6 +66,7 @@
 #include "system_fingerprint.h"
 #include "threading.h"
 #include "timestuff.h"
+#include "tonesynth.h"
 #include "tts.h"
 #include "version.h"
 #include "xplatform.h"
@@ -490,6 +491,9 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	RegisterSoundsystem(engine);
 	system_namespace();
 	engine->EndConfigGroup();
+	engine->BeginConfigGroup("tonesynth");
+	RegisterScriptTonesynth(engine);
+	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	engine->BeginConfigGroup("system_fingerprint");
 	RegisterSystemFingerprintFunction(engine);
@@ -765,11 +769,7 @@ int LoadCompiledScript(asIScriptEngine *engine, unsigned char *code, asUINT size
 	return 0;
 }
 int LoadCompiledExecutable(asIScriptEngine *engine) {
-	#ifndef __ANDROID__
-	FileInputStream fs(Util::Application::instance().commandPath());
-	#else
-	FileInputStream fs(android_get_main_shared_object());
-	#endif
+	FileInputStream fs(get_data_location());
 	BinaryReader br(fs);
 	UInt32 data_location, code_size;
 	#ifdef _WIN32

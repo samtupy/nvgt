@@ -1,4 +1,4 @@
-/* xplatform.h - header for various cross platform macros and routines
+/* tonesynth.h - header for the tone_synth object
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -12,30 +12,50 @@
 
 #pragma once
 
+extern "C" {
+	#include <tonar.h>
+}
+
 #include <string>
-#include <Poco/Path.h>
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#endif
 
-class asIScriptEngine;
+#include <angelscript.h>
 
-bool running_on_mobile();
-#ifndef NVGT_STUB
-void determine_compile_platform();
-void xplatform_correct_path_to_stubs(Poco::Path& stubpath);
-std::string get_nvgt_lib_directory(const std::string& platform);
-#else
-std::string get_data_location();
-#endif
-#if defined(__ANDROID__) || defined(__APPLE__) && TARGET_OS_IPHONE
-#define NVGT_MOBILE
-#endif
-#if defined(__APPLE__) || defined(__ANDROID__)
-std::string event_requested_file();
-#endif
-#ifdef __ANDROID__
-std::string android_get_main_shared_object();
-#endif
+// Forward declare a few things so they'll work.
+class sound;
+sound* new_global_sound();
 
-void RegisterXplatform(asIScriptEngine* engine);
+class tone_synth {
+public:
+	tone_synth();
+	~tone_synth();
+
+	void AddRef();
+	void Release();
+
+	void reset();
+	void set_waveform(int type);
+	int get_waveform();
+	void set_volume(double db);
+	double get_volume();
+	void set_pan(double pan);
+	double get_pan();
+	bool set_edge_fades(int start, int end);
+	bool freq_ms(double freq, int ms);
+	bool rest_ms(int ms);
+	int get_length_ms();
+	int get_position_ms();
+	bool seek_ms(int position);
+	bool rewind_ms(int amount);
+
+	sound* generate_sound();
+	bool generate_file(const std::string& filename);
+
+private:
+	int bgt_to_tonar_waveform(int type);
+
+	int refCount = 1;
+	el_tonar* gen = nullptr;
+};
+
+tone_synth *script_tone_synth_factory();
+void RegisterScriptTonesynth(asIScriptEngine* engine);

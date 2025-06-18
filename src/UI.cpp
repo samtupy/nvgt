@@ -472,6 +472,10 @@ void handle_sdl_event(SDL_Event* evt) {
 }
 void refresh_window() {
 	anticheat_check();
+	#ifdef _WIN32
+	extern void process_keyhook_commands();
+	process_keyhook_commands();
+	#endif
 	SDL_PumpEvents();
 	SDL_Event evt;
 	std::unordered_set<int> keys_pressed_this_frame;

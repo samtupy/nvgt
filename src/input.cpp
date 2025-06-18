@@ -13,6 +13,7 @@
 #if defined(_WIN32)
 	#define VC_EXTRALEAN
 	#include <windows.h>
+	#include <winuser.h>
 #else
 	#include <cstring>
 #endif
@@ -28,6 +29,16 @@
 #include "misc_functions.h"
 #include "nvgt.h"
 #include "UI.h"
+#ifdef _WIN32
+#include <windows_process_watcher.h>
+#include <thread>
+#include <memory>
+#include <atomic>
+#include <chrono>
+#include <fstream>
+#include <ctime>
+#include <iomanip>
+#endif
 
 /*
  * @literary: Since SDL requires pointer to the key name stay till the program life span,
@@ -51,8 +62,26 @@ SDL_TouchID g_TouchLastDevice = 0;
 static asITypeInfo* key_code_array_type = nullptr;
 static asITypeInfo* joystick_mapping_array_type = nullptr;
 #ifdef _WIN32
+	// prerequisits for keyhook by Silak
 	static HHOOK g_keyhook_hHook = nullptr;
 	bool g_keyhook_active = false;
+	static std::unique_ptr<ProcessWatcher> g_process_watcher = nullptr;
+	static std::thread g_process_watcher_thread;
+	static std::atomic<bool> g_process_watcher_running{false};
+	static std::atomic<bool> g_window_focused{false};
+	static std::atomic<bool> g_jhookldr_process_running{false};
+	static bool g_keyhook_needs_uninstall = false;
+	static bool g_keyhook_needs_install = false;
+	// Used to control/reset various keys, usually insert, when toggling keyhook.
+	void send_keyboard_input(WORD vk_code, bool key_up) {
+		INPUT input = {};
+		input.type = INPUT_KEYBOARD;
+		input.ki.wVk = vk_code;
+		input.ki.dwFlags = key_up ? KEYEVENTF_KEYUP : 0;
+		input.ki.time = 0;
+		input.ki.dwExtraInfo = 0;
+		SendInput(1, &input, sizeof(INPUT));
+	}
 #endif
 // Wrapper function for sdl
 // This function is useful for getting keyboard, mice and touch devices.
@@ -87,6 +116,9 @@ void InputInit() {
 	g_KeysDown = SDL_GetKeyboardState(&g_KeysDownArrayLen);
 }
 void InputDestroy() {
+#ifdef _WIN32
+	uninstall_keyhook();
+#endif
 	SDL_Quit();
 	g_KeysDown = NULL;
 }
@@ -124,19 +156,33 @@ bool InputEvent(SDL_Event* evt) {
 	return true;
 }
 
+#ifdef _WIN32
 void remove_keyhook();
-bool install_keyhook(bool allow_reinstall = true);
+bool install_keyhook();
+void uninstall_keyhook();
+bool reinstall_keyhook_only();
+void process_keyhook_commands();
+LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
+#endif
 void lost_window_focus() {
 	SDL_ResetKeyboard();
 	#ifdef _WIN32
-	if (g_keyhook_active)
-		remove_keyhook();
+	g_window_focused.store(false);
+	if (g_keyhook_hHook) {
+		UnhookWindowsHookEx(g_keyhook_hHook);
+		g_keyhook_hHook = nullptr;
+	}
 	#endif
 }
 void regained_window_focus() {
 	#ifdef _WIN32
-	if (g_keyhook_active)
-		install_keyhook();
+	g_window_focused.store(true);
+	if (!g_keyhook_hHook && g_keyhook_active) {
+		g_keyhook_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, HookKeyboardProc, GetModuleHandle(NULL), NULL);
+		if (g_keyhook_hHook) {
+			send_keyboard_input(VK_INSERT, true);
+		}
+	}
 	#endif
 }
 bool ScreenKeyboardShown() {
@@ -450,17 +496,29 @@ bool joystick::vibrate_triggers(unsigned short left, unsigned short right, int d
 bool altPressed = false;
 bool capsPressed = false;
 bool insertPressed = false;
-
 LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	if (nCode != HC_ACTION)
 		return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
+	
+	bool window_focused = g_window_focused.load();
+	bool process_running = g_jhookldr_process_running.load();
+	
+	// Block keys only if both conditions are met:
+	// 1. Our NVGT window is focused
+	// 2. jhookldr.exe process is running
+	if (!window_focused || !process_running) {
+		return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
+	}
+	
 	PKBDLLHOOKSTRUCT p = reinterpret_cast<PKBDLLHOOKSTRUCT>(lParam);
 	UINT vkCode = p->vkCode;
 	bool altDown = p->flags & LLKHF_ALTDOWN;
 	bool keyDown = (p->flags & LLKHF_UP) == 0;
 	altPressed = altDown;
+	
 	if (vkCode != VK_CAPITAL && vkCode != VK_INSERT && (capsPressed || insertPressed))
 		return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
+	
 	switch (vkCode) {
 		case VK_INSERT:
 			insertPressed = keyDown;
@@ -475,40 +533,129 @@ LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 		case VK_RSHIFT:
 			return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 		default:
-			return 0; // Do nothing for other keys
+			return 0; // Block other keys when window is focused
 	}
 	return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 }
-#endif
-
-void uninstall_keyhook();
-bool install_keyhook(bool allow_reinstall) {
-	#ifdef _WIN32
-	if (g_keyhook_hHook && !allow_reinstall)
-		return false;
-	if (g_keyhook_hHook)
-		uninstall_keyhook();
+void process_watcher_thread_func(const std::string& process_name) {
+	g_process_watcher = std::make_unique<ProcessWatcher>(process_name);
+	int elapsed_time = 10; // Start with fast checking
+	bool found_process = false;
+	while (g_process_watcher_running.load()) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(elapsed_time));
+		// Check if hook is still installed.
+		if (!g_keyhook_active) break;
+		// Process watcher runs independently but only sends commands when window is focused
+		if (!g_window_focused.load()) continue;
+		// Check if process died.
+		if (found_process && !g_process_watcher->monitor()) {
+			elapsed_time = 60; // Slow down checking when process is dead
+			found_process = false;
+			g_jhookldr_process_running.store(false);
+			g_keyhook_needs_uninstall = true;
+			continue;
+		} else if (!found_process) {
+			if (g_process_watcher->find()) {
+				found_process = true;
+				elapsed_time = 10; // Speed up checking when process is found
+				g_jhookldr_process_running.store(true);
+				g_keyhook_needs_install = true;
+			} else g_jhookldr_process_running.store(false);
+		} else g_jhookldr_process_running.store(true);
+	}
+}
+bool start_process_watcher(const std::string& process_name) {
+	if (g_process_watcher_running.load()) {
+		return false; // Already running
+	}
+	
+	g_process_watcher_running.store(true);
+	g_process_watcher_thread = std::thread(process_watcher_thread_func, process_name);
+	return true;
+}
+void stop_process_watcher() {
+	if (g_process_watcher_running.load()) {
+		g_process_watcher_running.store(false);
+		if (g_process_watcher_thread.joinable()) {
+			g_process_watcher_thread.join();
+		}
+		g_process_watcher.reset();
+		g_jhookldr_process_running.store(false);
+	}
+}
+// Function to only reinstall keyhook without affecting process watcher
+bool reinstall_keyhook_only() {
+	// Remove existing hook
+	if (g_keyhook_hHook) {
+		UnhookWindowsHookEx(g_keyhook_hHook);
+		g_keyhook_hHook = nullptr;
+	}
+	// Install new hook
 	g_keyhook_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, HookKeyboardProc, GetModuleHandle(NULL), NULL);
 	g_keyhook_active = true;
-	return g_keyhook_hHook ? true : false;
-	#else
-	return false;
-	#endif
+	if (g_keyhook_hHook) {
+		send_keyboard_input(VK_INSERT, true);
+		return true;
+	} else {
+		g_keyhook_active = false;
+		return false;
+	}
+}
+bool install_keyhook() {
+	if (g_keyhook_hHook) {
+		uninstall_keyhook();
+	}
+	g_keyhook_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, HookKeyboardProc, GetModuleHandle(NULL), NULL);
+	g_keyhook_active = true;
+	if (g_keyhook_hHook) {
+		send_keyboard_input(VK_INSERT, true);
+		// Automatically start process watcher for jhookldr.exe (only on first install)
+		if (!g_process_watcher_running.load()) {
+			start_process_watcher("jhookldr.exe");
+		}
+		return true;
+	} else {
+		return false;
+	}
 }
 void remove_keyhook() {
-	#ifdef _WIN32
 	if (!g_keyhook_hHook)
 		return;
 	UnhookWindowsHookEx(g_keyhook_hHook);
-	g_keyhook_hHook = NULL;
-	#endif
+	g_keyhook_hHook = nullptr;
 }
 void uninstall_keyhook() {
-	#ifdef _WIN32
 	remove_keyhook();
+	stop_process_watcher();
 	g_keyhook_active = false;
-	#endif
 }
+// Function to process keyhook commands in main thread.
+void process_keyhook_commands() {
+	if (g_keyhook_needs_uninstall) {
+		g_keyhook_needs_uninstall = false;
+		// Process died - actually uninstall hook via WinAPI to prevent JAWS from replacing it
+		if (g_keyhook_hHook) {
+			UnhookWindowsHookEx(g_keyhook_hHook);
+			g_keyhook_hHook = nullptr;
+		}
+	}
+	
+	if (g_keyhook_needs_install) {
+		g_keyhook_needs_install = false;
+		// Process found - if window is focused and hook not installed, install it
+		if (!g_keyhook_hHook && g_window_focused.load()) {
+			g_keyhook_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, HookKeyboardProc, GetModuleHandle(NULL), NULL);
+			if (g_keyhook_hHook) {
+				send_keyboard_input(VK_INSERT, true);
+			}
+		}
+	}
+}
+#else
+// Dummy no-op keyhook functions.
+bool install_keyhook() { return false; }
+void uninstall_keyhook() {}
+#endif
 
 // Low level touch interface
 CScriptArray* get_touch_devices() {
@@ -622,7 +769,7 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool is_screen_keyboard_shown()"), asFUNCTION(ScreenKeyboardShown), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_SCREEN_KEYBOARD_SUPPORTED() property"), asFUNCTION(SDL_HasScreenKeyboardSupport), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_characters()"), asFUNCTION(get_characters), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool install_keyhook(bool=true)"), asFUNCTION(install_keyhook), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool install_keyhook()"), asFUNCTION(install_keyhook), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void uninstall_keyhook()"), asFUNCTION(uninstall_keyhook), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint[]@ get_keyboards()"), asFUNCTION(GetKeyboards), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_keyboard_name(uint id)"), asFUNCTION(GetKeyboardName), asCALL_CDECL);

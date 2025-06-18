@@ -561,11 +561,7 @@ bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& 
 	#else
 	const auto& it = filename == "*" ? embedded_packs.begin() : embedded_packs.find(filename.substr(1));
 	if (it == embedded_packs.end()) return false;
-	#ifndef __ANDROID__
-	filename = Poco::Util::Application::instance().config().getString("application.path");
-	#else
-	filename = android_get_main_shared_object();
-	#endif
+	filename = get_data_location();
 	file_offset = it->second.offset;
 	file_size = it->second.size;
 	return true;
