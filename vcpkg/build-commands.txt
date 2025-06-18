@@ -15,3 +15,6 @@ Android:
 After setting android NDK home
 ../vcpkg/bin/vcpkg install --overlay-ports=../vcpkg/ports --overlay-triplets=../vcpkg/triplets --triplet arm64-android enet6[*] libflac curl[http2,openssl] libffi miniupnpc[*] libogg opus[*] libvorbis[*] poco[crypto,net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] angelscript-nc
 ../vcpkg/bin/vcpkg install --overlay-ports=../vcpkg/ports --overlay-triplets=../vcpkg/triplets --triplet arm64-android-dynamic sdl3[vulkan] sdl3-ttf[core,svg] sdl3-image[*] steam-audio freetype[core,bzip2,error-strings,png,subpixel-rendering,zlib]
+Macos:
+no Steam Audio, no openssl, no png, no sdl-image
+./vcpkg install --overlay-ports=../nvgt/vcpkg/ports --overlay-triplets=../nvgt/vcpkg/triplets --triplet arm64-osx enet6[*] libflac curl[http2,core,sectransp] miniupnpc[*] libogg opus[*] sdl3[vulkan] sdl3-ttf[core,svg] libvorbis[*] libarchive[*] poco[net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] freetype[core,bzip2,error-strings,subpixel-rendering,zlib] angelscript
