@@ -53,7 +53,6 @@ if env["PLATFORM"] == "darwin":
 elif env["PLATFORM"] == "posix":
 	# enable the gold linker, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
 	env.Append(CPPPATH = ["lindev/include", "/usr/local/include"], LIBPATH = ["lindev/lib", "/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
-	env.ParseConfig("pkg-config --libs alsa")
 env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
@@ -86,7 +85,8 @@ if len(static_plugins) > 0:
 		static_plugins_object = env.Object(static_plugins_path, static_plugins_path + ".cpp", CPPPATH = env["CPPPATH"] + ["#src"])
 
 # Project libraries
-env.Append(LIBS = [["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoCrypto", "PocoZip", "PocoFoundation", "expat", "z"] if env["PLATFORM"] != "win32" else ["UniversalSpeechStatic", "PocoXMLmt", "libexpatMT", "zlib"], "angelscript", "SDL3", "phonon", "enet", "reactphysics3d", "crypto", "ssl", "utf8proc", "pcre2-8", "ASAddon", "deps", "vorbis", "vorbisfile", "ogg"])
+env.Append(LIBS = [["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoCrypto", "PocoZip", "PocoFoundation", "expat", "z"] if env["PLATFORM"] != "win32" else ["UniversalSpeechStatic", "PocoXMLmt", "libexpatMT", "zlib"], "angelscript", "SDL3", "phonon", "enet", "reactphysics3d", "ssl", "crypto", "utf8proc", "pcre2-8", "ASAddon", "deps", "vorbisfile", "vorbis", "ogg"])
+env.ParseConfig("pkg-config --libs alsa")
 
 # nvgt itself
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
