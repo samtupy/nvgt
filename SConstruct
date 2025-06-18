@@ -149,9 +149,9 @@ elif env["PLATFORM"] == "posix":
 			break
 	if ('target_triplet' in env and env['target_triplet'] is None) or ('target_triplet' not in env):
 		env.Exit(1, f"Unsupported target triple '{detected}'; must be one of: " + ", ".join([t for _, t in mappings]))
-	sources.extend([str(f) for f in Glob(f"arch/{env['target_triplet']}/**.c")])
-	sources.extend([str(f) for f in Glob(f"arch/{env['target_triplet']}/**.S")])
-	VariantDir("build/obj_src/arch", "arch", duplicate=0)
+	sources.extend([str(f) for f in Glob(f"lindev/arch/{env['target_triplet']}/**.c")])
+	sources.extend([str(f) for f in Glob(f"lindev/arch/{env['target_triplet']}/**.S")])
+	VariantDir("build/obj_src/arch", "lindev/arch", duplicate=0)
 	sources.append("posix.cpp")
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
