@@ -31,7 +31,7 @@ if(VCPKG_TARGET_IS_WINDOWS)
 endif()
 
 # We need to find flatc for steam-audio
-find_program(FlatBuffers_EXECUTABLE NAMES flatc PATHS "${CURRENT_HOST_INSTALLED_DIR}/tools/flatbuffers" "bin" NO_DEFAULT_PATHS)
+find_program(FlatBuffers_EXECUTABLE NAMES flatc PATHS "${CURRENT_HOST_INSTALLED_DIR}/tools/flatbuffers" NO_DEFAULT_PATHS)
 
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}/core"
