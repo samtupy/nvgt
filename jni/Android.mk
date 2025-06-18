@@ -14,10 +14,6 @@ LOCAL_MODULE    := libPocoCrypto
 LOCAL_SRC_FILES := $(LIBPATH)/libPocoCrypto.a
 include $(PREBUILT_STATIC_LIBRARY)
 
-LOCAL_MODULE    := libPocoDataSQLite
-LOCAL_SRC_FILES := $(LIBPATH)/libPocoDataSQLite.a
-include $(PREBUILT_STATIC_LIBRARY)
-
 LOCAL_MODULE    := libPocoJSON
 LOCAL_SRC_FILES := $(LIBPATH)/libPocoJSON.a
 include $(PREBUILT_STATIC_LIBRARY)
@@ -42,12 +38,28 @@ LOCAL_MODULE    := libPocoZip
 LOCAL_SRC_FILES := $(LIBPATH)/libPocoZip.a
 include $(PREBUILT_STATIC_LIBRARY)
 
+LOCAL_MODULE    := libz
+LOCAL_SRC_FILES := $(LIBPATH)/libz.a
+include $(PREBUILT_STATIC_LIBRARY)
+
 LOCAL_MODULE    := libangelscript
 LOCAL_SRC_FILES := $(LIBPATH)/libangelscript.a
 include $(PREBUILT_STATIC_LIBRARY)
 
 LOCAL_MODULE    := libcrypto
 LOCAL_SRC_FILES := $(LIBPATH)/libcrypto.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libpcre2-8
+LOCAL_SRC_FILES := $(LIBPATH)/libpcre2-8.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libutf8proc
+LOCAL_SRC_FILES := $(LIBPATH)/libutf8proc.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libexpat
+LOCAL_SRC_FILES := $(LIBPATH)/libexpat.a
 include $(PREBUILT_STATIC_LIBRARY)
 
 LOCAL_MODULE    := libenet6
@@ -93,7 +105,7 @@ LOCAL_C_INCLUDES_COMMON := $(LOCAL_PATH)/../droidev/include $(LOCAL_PATH)/../ASA
 LOCAL_CXXFLAGS_COMMON := -DPOCO_STATIC -DNVGT_BUILDING -DAS_USE_STLNAMES=1 -std=c++20 -fms-extensions -ffunction-sections -O2 -fpermissive -O2 -Wno-narrowing -Wno-int-to-pointer-cast -Wno-delete-incomplete -Wno-unused-result -Wno-deprecated-array-compare -Wno-implicit-const-int-float-conversion -Wno-deprecated-enum-enum-conversion -Wno-absolute-value
 LOCAL_LDFLAGS_COMMON = -Wl,--no-fatal-warnings -Wl,--no-undefined -Wl,--gc-sections
 LOCAL_SHARED_LIBRARIES_COMMON := SDL3 phonon
-LOCAL_STATIC_LIBRARIES_COMMON := libPocoFoundation libPocoCrypto libPocoDataSQLite libPocoJSON libPocoNet libPocoNetSSL libPocoUtil libPocoXML libPocoZip libangelscript libcrypto libenet6 libreactphysics3d libssl libogg libvorbis
+LOCAL_STATIC_LIBRARIES_COMMON := libPocoFoundation libPocoCrypto libPocoJSON libPocoNet libPocoNetSSL libPocoUtil libPocoXML libPocoZip libz libangelscript libcrypto libpcre2-8 libutf8proc libexpat libenet6 libreactphysics3d libssl libogg libvorbis
 LOCAL_LDLIBS_COMMON := -lGLESv1_CM -lGLESv2 -lOpenSLES -llog -landroid
 LOCAL_CPP_FEATURES_COMMON := rtti exceptions
 
