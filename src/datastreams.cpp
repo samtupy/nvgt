@@ -36,6 +36,8 @@
 #include <Poco/StreamCopier.h>
 #include <Poco/TeeStream.h>
 #include <Poco/TextEncoding.h>
+#include <Poco/ScopedLock.h>
+#include <deque>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -68,6 +70,11 @@ bool datastream::open(std::istream* istr, std::ostream* ostr, const std::string&
 	ds = obj;
 	_istr = istr;
 	_ostr = ostr;
+	if (_istr) {
+		_reading = true;
+		_readerThread.start(_reader);
+	} else
+		_reading = false;
 	return true;
 }
 bool datastream::close(bool close_all) {
@@ -220,13 +227,18 @@ std::string datastream::read(unsigned int size) {
 	}
 	return output;
 }
+
+
+//#include <streambuf>  // para in_avail()
+
 std::string datastream::read_line() {
-	if (!_istr)
-		return "";
-	std::string result;
-	std::getline(*_istr, result);
-	return result;
+	Poco::ScopedLock<Poco::Mutex> lg(_queueMutex);
+	if (_lineQueue.empty()) return "";
+	std::string line = std::move(_lineQueue.front());
+	_lineQueue.pop_front();
+	return line;
 }
+
 UInt64 datastream::read_7bit_encoded() {
 	if (!_istr)
 		return 0;
