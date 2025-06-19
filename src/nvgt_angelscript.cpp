@@ -598,7 +598,7 @@ int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
 	if (mod)
 		mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
 	try {
-		if (builder.AddSectionFromFile(Path(scriptFile).makeAbsolute().toString().c_str()) < 0)
+		if (builder.AddSectionFromFile(scriptFile.c_str()) < 0)
 			return -1;
 		for (unsigned int i = 0; i < g_IncludeScripts.size(); i++) {
 			if (builder.AddSectionFromFile(g_IncludeScripts[i].c_str()) < 0)
