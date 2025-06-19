@@ -1,0 +1,172 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#pragma plugin redis
+
+void main() {
+    redis_client@ client = redis_client();
+
+    if (!client.connect()) {
+        println("Failed to connect to Redis.");
+        return;
+    }
+
+    client.del("test:lua:counter");
+    client.del("test:lua:key1");
+    client.del("test:lua:key2");
+
+    string script = "return 'Hello from Lua!'";
+    redis_value@ result = client.eval(script);
+    if (result !is null && result.is_string) {
+        string msg = result.get_string();
+        println("Test 1 - EVAL string: " + msg);
+    }
+
+    script = "return redis.call('set', KEYS[1], ARGV[1])";
+    array<string> keys;
+    keys.insert_last("test:lua:key1");
+    array<string> args;
+    args.insert_last("value from Lua");
+
+    @result = client.eval(script, keys, args);
+
+    string value = client.get("test:lua:key1");
+    println("Test 2 - GET after set via Lua: " + value);
+
+    script = """
+        local counter = redis.call('incr', KEYS[1])
+        redis.call('set', KEYS[2], 'Counter is ' .. counter)
+        return counter
+    """;
+
+    keys.resize(0);
+    keys.insert_last("test:lua:counter");
+    keys.insert_last("test:lua:status");
+
+    @result = client.eval(script, keys);
+    if (result !is null && result.is_integer) {
+        int64 counter = result.get_integer();
+        println("Test 3 - Counter value: " + counter);
+    }
+
+    string status = client.get("test:lua:status");
+    println("Test 3 - Status string: " + status);
+
+    script = """
+        local sum = 0
+        for i = 1, #ARGV do
+            sum = sum + tonumber(ARGV[i])
+        end
+        return sum
+    """;
+
+    string sha1 = client.script_load(script);
+    println("Test 4 - SHA1: " + sha1);
+
+    bool exists = client.script_exists(sha1);
+    println("Test 4 - Script exists: " + exists);
+
+    args.resize(0);
+    args.insert_last("10");
+    args.insert_last("20");
+    args.insert_last("30");
+
+    @result = client.evalsha(sha1, null, args);
+    if (result !is null && result.is_integer) {
+        int64 sum = result.get_integer();
+        println("Test 4 - Sum result: " + sum);
+    }
+
+    script = """
+        local results = {}
+        for i = 1, 3 do
+            table.insert(results, 'Item ' .. i)
+        end
+        return results
+    """;
+
+    @result = client.eval(script);
+    if (result !is null && result.is_array) {
+        array<redis_value@>@ arr = result.get_array();
+        println("Test 5 - Array result:");
+        for (uint i = 0; i < arr.length(); i++) {
+            println("  " + arr[i].get_string());
+        }
+    }
+
+    script = """
+        local key = KEYS[1]
+        local value = redis.call('get', key)
+        if not value then
+            return redis.error_reply('Key not found')
+        end
+        return value
+    """;
+
+    keys.resize(0);
+    keys.insert_last("test:lua:nonexistent");
+
+    @result = client.eval(script, keys);
+    if (result !is null && result.is_error) {
+        string error = result.get_string();
+        println("Test 6 - Error returned: " + error);
+    }
+
+    bool flushed = client.script_flush();
+    println("Test 7 - Script flush success: " + flushed);
+
+    exists = client.script_exists(sha1);
+    println("Test 7 - Script exists after flush: " + exists);
+
+    script = """
+        local current = redis.call('get', KEYS[1])
+        if not current then
+            current = 0
+        else
+            current = tonumber(current)
+        end
+
+        if current < tonumber(ARGV[1]) then
+            redis.call('set', KEYS[1], ARGV[1])
+            return 1
+        else
+            return 0
+        end
+    """;
+
+    client.set("test:lua:max", "50");
+
+    keys.resize(0);
+    keys.insert_last("test:lua:max");
+    args.resize(0);
+    args.insert_last("100");
+
+    @result = client.eval(script, keys, args);
+    if (result !is null && result.is_integer) {
+        int64 updated = result.get_integer();
+        println("Test 8 - Updated to 100? " + updated);
+    }
+
+    string max_val = client.get("test:lua:max");
+    println("Test 8 - Max value after update: " + max_val);
+
+    args[0] = "75";
+    @result = client.eval(script, keys, args);
+    if (result !is null && result.is_integer) {
+        int64 updated = result.get_integer();
+        println("Test 8 - Tried update to 75, success? " + updated);
+    }
+
+    max_val = client.get("test:lua:max");
+    println("Test 8 - Max value after no-op: " + max_val);
+
+    client.del("test:lua:counter");
+    client.del("test:lua:key1");
+    client.del("test:lua:status");
+    client.del("test:lua:max");
+
+    client.disconnect();
+
+    println("\nRedis Lua Scripting Test Complete!");
+}

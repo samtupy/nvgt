@@ -148,6 +148,12 @@ jobs:
     - name: set_version
       run: |
         python3 build/ci_set_version.py
+    - name: import_certs
+      if: github.event.repository.fork == false
+      uses: apple-actions/import-codesign-certs@v3
+      with: 
+        p12-file-base64: ${{ secrets.MACOS_SIGNING_CERT }}
+        p12-password: ${{ secrets.MACOS_SIGNING_CERT_PASSWORD }}
     - name: package
       run: |
         rm -r release
@@ -165,7 +171,24 @@ jobs:
         cp -r windows_release/lib release/lib_windows
         cp windows_release/stub/* release/stub
         cd install
-        python3 make_dmg.py ../release
+        python3 make_macos_app.py ../release no_dmg
+        cd ..
+    - name: sign_package
+      if: github.event.repository.fork == false
+      run: |
+        cd install
+        codesign --deep --force --options runtime --timestamp -s ${{secrets.MACOS_SIGNING_TEAM_ID}} nvgt.app
+        hdiutil create -srcfolder nvgt.app nvgt_${{env.nvgt_version}}.dmg
+        codesign --deep --force --options runtime --timestamp -s ${{secrets.MACOS_SIGNING_TEAM_ID}} nvgt_${{env.nvgt_version}}.dmg
+        xcrun notarytool submit nvgt_${{env.nvgt_version}}.dmg --wait ${{secrets.MACOS_SIGNING_NOTARY_AUTH}}
+        xcrun stapler staple nvgt_${{env.nvgt_version}}.dmg
+        cd ..
+    - name: unsigned_package
+      if: github.event.repository.fork == true
+      run: |
+        cd install
+        hdiutil create -srcfolder nvgt.app nvgt_${{env.nvgt_version}}.dmg
+        cd ..
     - uses: actions/upload-artifact@v4
       with:
         name: mac_package

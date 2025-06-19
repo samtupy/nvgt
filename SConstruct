@@ -140,8 +140,8 @@ if env["PLATFORM"] == "win32":
 	env.Install("c:/nvgt/lib", Glob("#release/lib/*"))
 
 # stubs
-def fix_windows_stub(target, source, env):
-	"""On windows, we replace the first 2 bytes of a stub with 'NV' to stop some sort of antivirus scan upon script compile that makes it take a bit longer."""
+def fix_stub(target, source, env):
+	"""On windows, we replace the first 2 bytes of a stub with 'NV' to stop some sort of antivirus scan upon script compile that makes it take a bit longer. We do the same on MacOS because otherwise apple's notarization service detects the stub as an unsigned binary and fails. Stubs must be unsigned until the nvgt scripter signs their compiled games."""
 	for t in target:
 		if not str(t).endswith(".bin"): continue
 		with open(str(t), "rb+") as f:
@@ -166,19 +166,21 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 		stub_u = stub_env.UPX(f"release/stub/nvgt_{stub_platform}_upx.bin", stub)
 		if env["PLATFORM"] == "win32": env.Install("c:/nvgt/stub", stub_u)
 	# on windows, we should have a version of the Angelscript library without the compiler, allowing for slightly smaller executables.
-	if env["PLATFORM"] == "win32":
-		stub_env.AddPostAction(stub, fix_windows_stub)
-		if "upx" in env: stub_env.AddPostAction(stub_u, fix_windows_stub)
+	if env["PLATFORM"] == "darwin":
+		stub_env.AddPostAction(stub, fix_stub)
+	elif env["PLATFORM"] == "win32":
+		stub_env.AddPostAction(stub, fix_stub)
+		if "upx" in env: stub_env.AddPostAction(stub_u, fix_stub)
 		stublibs = list(stub_env["LIBS"])
 		if "angelscript64" in stublibs:
 			stublibs.remove("angelscript64")
 			stublibs.append("angelscript64nc")
 			stub_nc = stub_env.Program(f"release/stub/nvgt_{stub_platform}_nc", stub_objects, LIBS = stublibs)
-			stub_env.AddPostAction(stub_nc, fix_windows_stub)
+			stub_env.AddPostAction(stub_nc, fix_stub)
 			env.Install("c:/nvgt/stub", stub_nc)
 			if "upx" in env:
 				stub_nc_u = stub_env.UPX(f"release/stub/nvgt_{stub_platform}_nc_upx.bin", stub_nc)
-				stub_env.AddPostAction(stub_nc_u, fix_windows_stub)
+				stub_env.AddPostAction(stub_nc_u, fix_stub)
 				env.Install("c:/nvgt/stub", stub_nc_u)
 
 if ARGUMENTS.get("copylibs", "1") == "1":
