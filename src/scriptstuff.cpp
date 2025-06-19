@@ -174,6 +174,7 @@ std::string generate_profile(bool reset = true) {
 	std::string output(tmp);
 	for (int i = 0; i < size; i++) {
 		char text[4096];
+		if (!results[i]) continue;
 		const char* decl = results[i]->GetDeclaration(true, true, true);
 		float ms = std::chrono::duration_cast<std::chrono::milliseconds>(profiler_cache[results[i]] - profiler_start).count();
 		float p = (ms / total_ms) * 100.0;
@@ -191,11 +192,19 @@ std::string get_call_stack_ctx(asIScriptContext* ctx) {
 	snprintf(tmp, 4096, "Call stack size: %d\r\n\r\n", size);
 	std::string stack = tmp;
 	for (asUINT i = 0; i < size; i++) {
-		const char* section;
-		int line, col;
+		const char* section = nullptr;
+		int line = 0, col = 0;
 		asIScriptFunction* func = ctx->GetFunction(i);
 		line = ctx->GetLineNumber(i, &col, &section);
-		snprintf(tmp, 4096, "Function: %s\r\nFile: %s\r\n", func->GetDeclaration(), section);
+		if (func) {
+			const char* decl = func->GetDeclaration();
+			if (!decl) decl = "(unknown)";
+			if (!section) section = "(unknown)";
+			snprintf(tmp, 4096, "Function: %s\r\nFile: %s\r\n", decl, section);
+		} else {
+			if (!section) section = "(unknown)";
+			snprintf(tmp, 4096, "Function: (unknown)\r\nFile: %s\r\n", section);
+		}
 		stack += tmp;
 		if (line) {
 			snprintf(tmp, 4096, "Line: %d (%d)\r\n", line, col);

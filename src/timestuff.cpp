@@ -582,6 +582,38 @@ template <class t> bool is_valid(t &dt) {
 template <class t> bool is_leap_year(t &dt) {
 	return DateTime::isLeapYear(dt.year());
 }
+
+/**
+ * Wrapper functions for DateTimeParser to handle empty strings
+ * These are needed because Poco::DateTimeParser has a bug where it crashes on empty strings
+ * instead of throwing an exception like it should.
+ */
+DateTime* parse_datetime_wrapper1(const std::string &fmt, const std::string &str, int& tzd) {
+	if (str.empty()) {
+		asGetActiveContext()->SetException("Cannot parse empty date/time string");
+		return nullptr;
+	}
+	try {
+		return new DateTime(DateTimeParser::parse(fmt, str, tzd));
+	} catch (const Poco::Exception& e) {
+		asGetActiveContext()->SetException(e.displayText().c_str());
+		return nullptr;
+	}
+}
+
+DateTime* parse_datetime_wrapper2(const std::string &str, int& tzd) {
+	if (str.empty()) {
+		asGetActiveContext()->SetException("Cannot parse empty date/time string");
+		return nullptr;
+	}
+	try {
+		return new DateTime(DateTimeParser::parse(str, tzd));
+	} catch (const Poco::Exception& e) {
+		asGetActiveContext()->SetException(e.displayText().c_str());
+		return nullptr;
+	}
+}
+
 /**
  * Registers the above extensions with Angelscript.
 */
@@ -826,8 +858,8 @@ void RegisterScriptTimestuff(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("datetime", "string format(const string&in fmt, int tzd = 0xffff)", asFUNCTIONPR(DateTimeFormatter::format, (const DateTime&, const std::string&, int), std::string), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("calendar", "string format(const string&in fmt)", asFUNCTIONPR(DateTimeFormatter::format, (const LocalDateTime&, const std::string&), std::string), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("timespan", "string format(const string&in fmt = \"%dd %H:%M:%S.%i\")", asFUNCTIONPR(DateTimeFormatter::format, (const Timespan&, const std::string&), std::string), asCALL_CDECL_OBJFIRST);
-	engine->RegisterGlobalFunction("datetime@ parse_datetime(const string&in fmt, const string&in str, int& tzd)", asFUNCTIONPR(DateTimeParser::parse, (const std::string&, const std::string&, int&), DateTime), asCALL_CDECL);
-	engine->RegisterGlobalFunction("datetime@ parse_datetime(const string&in str, int& tzd)", asFUNCTIONPR(DateTimeParser::parse, (const std::string&, int&), DateTime), asCALL_CDECL);
+	engine->RegisterGlobalFunction("datetime@ parse_datetime(const string&in fmt, const string&in str, int& tzd)", asFUNCTION(parse_datetime_wrapper1), asCALL_CDECL);
+	engine->RegisterGlobalFunction("datetime@ parse_datetime(const string&in str, int& tzd)", asFUNCTION(parse_datetime_wrapper2), asCALL_CDECL);
 	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_ISO8601", (void*)&DateTimeFormat::ISO8601_FORMAT);
 	engine->RegisterGlobalProperty("const string DATE_TIME_FORMAT_ISO8601_FRAC", (void*)&DateTimeFormat::ISO8601_FRAC_FORMAT);
 	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_ISO8601", (void*)&DateTimeFormat::ISO8601_REGEX);
