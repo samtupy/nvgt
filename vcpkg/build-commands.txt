@@ -31,4 +31,10 @@ lipo -create openssl-arm/libcrypto.a openssl-x64/libcrypto.a -output openssl-fat
 lipo -create openssl-arm/libssl.a openssl-x64/libssl.a -output openssl-fat/libssl.a
     sudo cp openssl-fat/*.a /usr/local/lib
     cd back to vcpkg dir
-./vcpkg install --overlay-ports=../nvgt/vcpkg/ports --overlay-triplets=../nvgt/vcpkg/triplets --triplet arm64-osx enet6[*] libflac curl[http2,core,sectransp] miniupnpc[*] libogg opus[*] sdl3[vulkan] sdl3-ttf[core,svg] libvorbis[*] libarchive[*] poco[net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] freetype[core,bzip2,error-strings,subpixel-rendering,zlib] angelscript
+./vcpkg install --overlay-ports=../nvgt/vcpkg/ports --overlay-triplets=../nvgt/vcpkg/triplets --triplet arm64-osx enet6[*] libflac curl[http2,core,sectransp] miniupnpc[*] libogg opus[*] sdl3[vulkan] sdl3-ttf[core,svg] libvorbis[*] libarchive[*] poco[net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] freetype[core,bzip2,error-strings,subpixel-rendering,zlib]
+iOS:
+Again, no steam audio
+No need to build openssl here; vcpkg will build it just fine. Libffi is still a pest. Because of course it is.
+./vcpkg install --overlay-ports=../nvgt/vcpkg/ports --overlay-triplets=../nvgt/vcpkg/triplets --triplet arm64-ios enet6[*] libflac curl[http2,sectransp] miniupnpc[*] libogg opus[*] libvorbis[*] poco[crypto,net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] angelscript sdl3[vulkan] sdl3-ttf[core,svg] sdl3-image[*] freetype[core,bzip2,error-strings,png,subpixel-rendering,zlib]
+Or for the simulator:
+./vcpkg install --overlay-ports=../nvgt/vcpkg/ports --overlay-triplets=../nvgt/vcpkg/triplets --triplet arm64-ios-simulator enet6[*] libflac curl[http2,sectransp] miniupnpc[*] libogg opus[*] libvorbis[*] poco[crypto,net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] angelscript sdl3[vulkan] sdl3-ttf[core,svg] sdl3-image[*] freetype[core,bzip2,error-strings,png,subpixel-rendering,zlib]
