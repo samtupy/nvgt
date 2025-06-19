@@ -1,0 +1,32 @@
+void test_memory_allocation() {
+	// Test memory allocation
+	uint64 addr = memory_allocate_units(1, 64); // Using allocate_units (calloc) to initialize the bytes to 0.
+	assert(addr != 0); // Allocation should succeed
+	
+	// Test writing to memory using binary format
+	memory_writer@ mw = memory_writer(addr, 64);
+	mw << "hello";  // Use << operator for binary formatted write
+	mw.close();
+	
+	// Test reading from memory using binary format
+	memory_reader@ mr = memory_reader(addr, 64);
+	string result;
+	mr >> result;  // Use >> operator for binary formatted read
+	assert(result == "hello");
+	mr.close();
+	
+	// Test writing more data
+	memory_writer@ mw2 = memory_writer(addr, 64);
+	mw2 << "hello there";
+	mw2.close();
+	
+	// Test reading updated content
+	memory_reader@ mr2 = memory_reader(addr, 64);
+	string result2;
+	mr2 >> result2;
+	assert(result2 == "hello there");
+	mr2.close();
+	
+	// Clean up
+	memory_free(addr);
+}

@@ -1,0 +1,34 @@
+class ref_test {
+	string str = "bla";
+	ref_test(string s) {
+		this.str = s;
+	}
+}
+
+void test_weakref() {
+	weakref<ref_test>[] t;
+	
+	// Create test objects
+	ref_test@ t0 = ref_test("test");
+	ref_test@ t1 = ref_test("asdf");
+	ref_test@ t2 = ref_test("str");
+	ref_test@ t3 = ref_test("");
+	
+	// Insert single item
+	t.insert_last(weakref<ref_test>(t0));
+	assert(t.length() == 1);
+	
+	// Insert multiple items at position 0
+	weakref<ref_test>[] refs = {weakref<ref_test>(t1), weakref<ref_test>(t2), weakref<ref_test>(t3)};
+	t.insert_at(0, refs);
+	assert(t.length() == 4);
+	
+	// Find should return index
+	int idx = t.find(weakref<ref_test>(t2));
+	assert(idx == 1);  // t2 should be at index 1 after insert_at(0)
+	
+	// Verify content through weakref
+	ref_test@ retrieved = t[0].get();
+	assert(@retrieved != null);
+	assert(retrieved.str == "asdf");
+}
