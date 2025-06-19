@@ -826,24 +826,24 @@ bool joystick::set(int index) {
 		int num_hats = SDL_GetNumJoystickHats(js_handle);
 		hat_values.resize(num_hats < 4 ? num_hats : 4, SDL_HAT_CENTERED);
 	}
-    // Pump to get most up-to-date info
-    SDL_PumpEvents();
+	// Pump to get most up-to-date info
+	SDL_PumpEvents();
 	return true;
 }
 
 bool joystick::set_led(unsigned char red, unsigned char green, unsigned char blue) {
 	if (!stick) return false;
-	return SDL_SetGamepadLED(stick, red, green, blue) == 0;
+	return SDL_SetGamepadLED(stick, red, green, blue);
 }
 
 bool joystick::vibrate(unsigned short low_frequency, unsigned short high_frequency, int duration) {
 	if (!stick) return false;
-	return SDL_RumbleGamepad(stick, low_frequency, high_frequency, duration) == 0;
+	return SDL_RumbleGamepad(stick, low_frequency, high_frequency, duration);
 }
 
 bool joystick::vibrate_triggers(unsigned short left, unsigned short right, int duration) {
 	if (!stick) return false;
-	return SDL_RumbleGamepadTriggers(stick, left, right, duration) == 0;
+	return SDL_RumbleGamepadTriggers(stick, left, right, duration);
 }
 
 #ifdef _WIN32
