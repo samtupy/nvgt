@@ -205,6 +205,31 @@ void Print::PrintTemplate(std::ostream & dst, void const* objPtr, int typeId, in
                 return;
         }
 
+	// Check if the object has a string conversion method
+	auto* func = typeInfo->GetMethodByDecl("string opImplConv() const");
+	if (!func) {
+		func = typeInfo->GetMethodByDecl("string opConv() const");
+	}
+
+	if (func) {
+		// Need to create a new context or save the current state
+		asIScriptContext* callCtx = engine->RequestContext();
+		if (callCtx) {
+			// Call the string conversion method
+			callCtx->Prepare(func);
+			callCtx->SetObject(const_cast<void*>(objPtr));
+			if (callCtx->Execute() == asEXECUTION_FINISHED) {
+				auto strPtr = (std::string*)callCtx->GetReturnObject();
+				if (strPtr) {
+					dst << *strPtr;
+					engine->ReturnContext(callCtx);
+					return;
+				}
+			}
+			engine->ReturnContext(callCtx);
+		}
+	}
+
         dst << "RegisteredObject";
 
         return;
@@ -274,15 +299,21 @@ void Print::PrintFormatArray(std::ostream & stream, std::string const& in, CScri
 
 void Print::PrintTemplate(std::ostream & stream, asIScriptGeneric * generic, int offset)
 {
-	for(int i = offset; i < generic->GetArgCount(); ++i)
-	{
-		void * ref = generic->GetArgAddress(i);
+	bool first = true;
+	for (int i = offset; i < generic->GetArgCount(); ++i) {
+		void* ref = generic->GetArgAddress(i);
 		int typeId = generic->GetArgTypeId(i);
 
-		if(typeId)
-			PrintTemplate(stream, ref, typeId, 0);
-	}
+		// Skip null optional arguments
+		if (typeId == 0)
+			continue;
 
+		if (!first)
+			stream << " ";
+		first = false;
+
+		PrintTemplate(stream, ref, typeId, 0);
+	}
 }
 
 static void PrintFunc(asIScriptGeneric * generic)
