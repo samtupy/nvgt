@@ -1,0 +1,73 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+// Test that both built-in and custom generators work together
+
+class simple_counter : random_generator {
+    private uint counter = 0;
+    
+    uint next() {
+        return ++counter;
+    }
+    
+    float nextf() {
+        return float(next() % 1000) / 1000.0;
+    }
+    
+    int range(int min, int max) {
+        if (min >= max) return min;
+        return min + (next() % (max - min + 1));
+    }
+    
+    bool next_bool(int percent = 50) {
+        return (next() % 100) < percent;
+    }
+    
+    string next_character(const string &in min, const string &in max) {
+        if (min == "" || max == "") return "";
+        if (min == max) return min;
+        int minCode = character_to_ascii(min);
+        int maxCode = character_to_ascii(max);
+        return ascii_to_character(range(minCode, maxCode));
+    }
+}
+
+void main() {
+    println("Testing Mixed Random Generator Types");
+    println("==================================");
+    
+    // Create different types of generators
+    random_pcg@ builtinPcg = @random_pcg();
+    simple_counter@ customCounter = @simple_counter();
+    
+    println("Built-in PCG generator:");
+    println("Range(1,10): " + builtinPcg.range(1, 10));
+    println("Float: " + builtinPcg.nextf());
+    
+    println("\nCustom counter generator:");
+    println("Range(1,10): " + customCounter.range(1, 10));
+    println("Float: " + customCounter.nextf());
+    println("Range(1,10) again: " + customCounter.range(1, 10));
+    
+    // Test with arrays using both types
+    println("\nArray operations:");
+    string[] fruits = {"apple", "banana", "cherry", "date", "elderberry"};
+    
+    println("Using built-in PCG:");
+    println("Random fruit: " + fruits.random(builtinPcg));
+    fruits.shuffle(builtinPcg);
+    println("Shuffled: " + join(fruits, ", "));
+    
+    println("\nUsing custom counter:");
+    int[] numbers = {10, 20, 30, 40, 50};
+    println("Random number: " + numbers.random(customCounter));
+    numbers.shuffle(customCounter);
+    
+    string[] numStrings;
+    for (uint i = 0; i < numbers.length(); i++)
+        numStrings.insert_last("" + numbers[i]);
+    println("Shuffled: " + join(numStrings, ", "));
+    
+    println("\nMixed generator test completed!");
+}

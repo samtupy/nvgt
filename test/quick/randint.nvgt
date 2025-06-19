@@ -10,5 +10,5 @@ int randint(int min, int max) {
 }
 void main() {
 	for (uint i = 0; i < 15; i++)
-		alert("test", "" + randint(5, 25));
+		println(randint(5, 25));
 }

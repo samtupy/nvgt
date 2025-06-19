@@ -1,4 +1,4 @@
-/* random.h - registration function for random number generators
+/* uuid.h - Poco::UUID wrapper for NVGT
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -11,7 +11,8 @@
  */
 
 #pragma once
-class asIScriptEngine;
-unsigned int random_seed();
 
-void RegisterScriptRandom(asIScriptEngine* engine);
+#include <Poco/UUID.h>
+#include <angelscript.h>
+
+void RegisterUUID(asIScriptEngine* engine);
