@@ -4,7 +4,6 @@
  * It's my first dive into low level synthesis and processing (yes, with the help of AI) so it's probably not ideal.
  * It's certainly slower than I'd like, but it gets the feature started and working until a better implementation can be found.
  * Todo: Since we're already using MiniAudio, discover how we might use ma_waveform for this, though not sure how much anti-aliasing it has.
- * Todo: Musical concepts (notes, tempo, transposition etc), bends, and reverb still to be implemented.
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2024 Sam Tupy
@@ -44,42 +43,95 @@ void tone_synth::set_waveform(int type) {
 	if (real_type < 0) return;
 	el_tonar_set_waveform(gen, real_type);
 }
-
 int tone_synth::get_waveform() {
-	return bgt_to_tonar_waveform(gen->waveform);
+	return bgt_to_tonar_waveform(el_tonar_get_waveform(gen));
 }
 void tone_synth::set_volume(double db) {
 	el_tonar_set_volume(gen, db);
 }
 double tone_synth::get_volume() {
-	return gen->volume;
+	return el_tonar_get_volume(gen);
 }
 void tone_synth::set_pan(double pan) {
 	el_tonar_set_pan(gen, pan);
 }
 double tone_synth::get_pan() {
-	return gen->pan;
+	return el_tonar_get_pan(gen);
 }
 bool tone_synth::set_edge_fades(int start, int end) {
 	return el_tonar_set_edge_fades(gen, start, end)? true: false;
 }
+void tone_synth::set_tempo(double tempo) {
+	el_tonar_set_tempo(gen, tempo);
+}
+double tone_synth::get_tempo() {
+	return el_tonar_get_tempo(gen);
+}
+void tone_synth::set_note_transpose(double note_transpose) {
+	el_tonar_set_note_transpose(gen, note_transpose);
+}
+double tone_synth::get_note_transpose() {
+	return el_tonar_get_note_transpose(gen);
+}
+void tone_synth::set_freq_transpose(double freq_transpose) {
+	el_tonar_set_freq_transpose(gen, freq_transpose);
+}
+double tone_synth::get_freq_transpose() {
+	return el_tonar_get_freq_transpose(gen);
+}
+bool tone_synth::note(std::string note, double length) {
+	return el_tonar_note(gen, const_cast<char*> (note.c_str()), length)? true: false;
+}
+bool tone_synth::note_ms(std::string note, int ms) {
+	return el_tonar_note_ms(gen, const_cast<char*> (note.c_str()), ms)? true: false;
+}
+bool tone_synth::note_bend(std::string note, int bend_amount, double length, double bend_start, double bend_length) {
+	return el_tonar_note_bend(gen, const_cast<char*> (note.c_str()), bend_amount, length, bend_start, bend_length)? true: false;
+}
+bool tone_synth::note_bend_ms(std::string note, int bend_amount, int length, int bend_start, int bend_length) {
+	return el_tonar_note_bend_ms(gen, const_cast<char*> (note.c_str()), bend_amount, length, bend_start, bend_length)? true: false;
+}
+bool tone_synth::freq(double freq, double length) {
+	return el_tonar_freq(gen, freq, length)? true: false;
+}
 bool tone_synth::freq_ms(double freq, int ms) {
-	return el_tonar_freq(gen, freq, ms)? true: false;
+	return el_tonar_freq_ms(gen, freq, ms)? true: false;
+}
+bool tone_synth::freq_bend(double freq, int bend_amount, double length, double bend_start, double bend_length) {
+	return el_tonar_freq_bend(gen, freq, bend_amount, length, bend_start, bend_length)? true: false;
+}
+bool tone_synth::freq_bend_ms(double freq, int bend_amount, int length, int bend_start, int bend_length) {
+	return el_tonar_freq_bend_ms(gen, freq, bend_amount, length, bend_start, bend_length)? true: false;
+}
+bool tone_synth::rest(double length) {
+	return el_tonar_rest(gen, length)? true: false;
 }
 bool tone_synth::rest_ms(int ms) {
-	return el_tonar_rest(gen, ms)? true: false;
+	return el_tonar_rest_ms(gen, ms)? true: false;
 }
-int tone_synth::get_length_ms() {
+double tone_synth::get_length() {
 	return el_tonar_get_length(gen);
 }
-int tone_synth::get_position_ms() {
+int tone_synth::get_length_ms() {
+	return el_tonar_get_length_ms(gen);
+}
+double tone_synth::get_position() {
 	return el_tonar_get_position(gen);
 }
-bool tone_synth::seek_ms(int position) {
+int tone_synth::get_position_ms() {
+	return el_tonar_get_position_ms(gen);
+}
+bool tone_synth::seek(double position) {
 	return el_tonar_seek(gen, position)? true: false;
 }
-bool tone_synth::rewind_ms(int amount) {
+bool tone_synth::seek_ms(int position) {
+	return el_tonar_seek_ms(gen, position)? true: false;
+}
+bool tone_synth::rewind(double amount) {
 	return el_tonar_rewind(gen, amount)? true: false;
+}
+bool tone_synth::rewind_ms(int amount) {
+	return el_tonar_rewind_ms(gen, amount)? true: false;
 }
 sound* tone_synth::generate_sound() {
 init_sound();
@@ -129,12 +181,30 @@ void RegisterScriptTonesynth(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("tone_synth", "double get_volume() const property", asMETHOD(tone_synth, get_volume), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "void set_pan(double value) property", asMETHOD(tone_synth, set_pan), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "double get_pan() const property", asMETHOD(tone_synth, get_pan), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "void set_tempo(double value) property", asMETHOD(tone_synth, set_tempo), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "double get_tempo() const property", asMETHOD(tone_synth, get_tempo), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "void set_note_transpose(double value) property", asMETHOD(tone_synth, set_note_transpose), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "double get_note_transpose() const property", asMETHOD(tone_synth, get_note_transpose), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "void set_freq_transpose(double value) property", asMETHOD(tone_synth, set_freq_transpose), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "double get_freq_transpose() const property", asMETHOD(tone_synth, get_freq_transpose), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "double get_position() const property", asMETHOD(tone_synth, get_position), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "int get_position_ms() const property", asMETHOD(tone_synth, get_position_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "double get_length() const property", asMETHOD(tone_synth, get_length), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "int get_length_ms() const property", asMETHOD(tone_synth, get_length_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool seek(double position)", asMETHOD(tone_synth, seek), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool seek_ms(int position)", asMETHOD(tone_synth, seek_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool rewind(double amount)", asMETHOD(tone_synth, rewind), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool rewind_ms(int amount)", asMETHOD(tone_synth, rewind_ms), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool set_edge_fades(int start, int end)", asMETHOD(tone_synth, set_edge_fades), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool note(string note, double length)", asMETHOD(tone_synth, note), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool note_ms(string note, int ms)", asMETHOD(tone_synth, note_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool note_bend(string note, int bend_amount, double length, double bend_start, double bend_length)", asMETHOD(tone_synth, note_bend), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool note_bend_ms(string note, int bend_amount, int length, int bend_start, int bend_length)", asMETHOD(tone_synth, note_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool freq(double freq, double length)", asMETHOD(tone_synth, freq), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool freq_ms(double freq, int ms)", asMETHOD(tone_synth, freq_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool freq_bend(double freq, int bend_amount, double length, double bend_start, double bend_length)", asMETHOD(tone_synth, freq_bend), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool freq_bend_ms(double freq, int bend_amount, int length, int bend_start, int bend_length)", asMETHOD(tone_synth, freq_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool rest(double length)", asMETHOD(tone_synth, rest), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool rest_ms(int ms)", asMETHOD(tone_synth, rest_ms), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "sound@ write_wave_sound()", asMETHOD(tone_synth, generate_sound), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool write_wave_file(const string &in filename)", asMETHOD(tone_synth, generate_file), asCALL_THISCALL);
