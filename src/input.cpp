@@ -826,6 +826,8 @@ bool joystick::set(int index) {
 		int num_hats = SDL_GetNumJoystickHats(js_handle);
 		hat_values.resize(num_hats < 4 ? num_hats : 4, SDL_HAT_CENTERED);
 	}
+    // Pump to get most up-to-date info
+    SDL_PumpEvents();
 	return true;
 }
 
