@@ -17,9 +17,21 @@
 #include <angelscript.h>
 #include <scriptarray.h>
 #include <Poco/RefCountedObject.h>
+#include <SDL3/SDL_power.h>
 
 union SDL_Event;
 extern std::string g_UserInput;
+
+struct joystick_power_info {
+	int state;
+	int percentage;
+
+	joystick_power_info() : state(SDL_POWERSTATE_ERROR), percentage(-1) {}
+	joystick_power_info(int s, int p) : state(s), percentage(p) {}
+
+	std::string get_state_name() const;
+	std::string to_string() const;
+};
 
 class joystick : public Poco::RefCountedObject {
 	SDL_Gamepad* stick;
@@ -142,7 +154,7 @@ public:
 
 	// Additional modern properties
 	unsigned int type() const;
-	unsigned int power_level() const;
+	joystick_power_info get_power_info() const;
 	bool has_led() const;
 	bool can_vibrate() const;
 	bool can_vibrate_triggers() const;
