@@ -645,26 +645,28 @@ unsigned int joystick::type() const {
 	return SDL_GetGamepadType(stick);
 }
 
-unsigned int joystick::power_level() const {
-	if (!js_handle) return 0;
+// joystick_power_info implementation
+std::string joystick_power_info::get_state_name() const {
+	switch (state) {
+		case SDL_POWERSTATE_ERROR: return "Error";
+		case SDL_POWERSTATE_UNKNOWN: return "Unknown";
+		case SDL_POWERSTATE_ON_BATTERY: return "On Battery";
+		case SDL_POWERSTATE_NO_BATTERY: return "No Battery";
+		case SDL_POWERSTATE_CHARGING: return "Charging";
+		case SDL_POWERSTATE_CHARGED: return "Charged";
+		default: return "Invalid";
+	}
+}
+
+std::string joystick_power_info::to_string() const {
+	return get_state_name() + " (" + std::to_string(percentage) + "%)";
+}
+
+joystick_power_info joystick::get_power_info() const {
+	if (!js_handle) return joystick_power_info();
 	int percent = 0;
 	SDL_PowerState state = SDL_GetJoystickPowerInfo(js_handle, &percent);
-	// Map SDL3 power states to BGT-compatible values
-	switch (state) {
-		case SDL_POWERSTATE_UNKNOWN:
-			return 0;
-		case SDL_POWERSTATE_ON_BATTERY:
-			if (percent <= 5) return 1;
-			else if (percent <= 20) return 2;
-			else if (percent <= 70) return 3;
-			else return 4;
-		case SDL_POWERSTATE_NO_BATTERY:
-		case SDL_POWERSTATE_CHARGING:
-		case SDL_POWERSTATE_CHARGED:
-			return 5;
-		default:
-			return 0;
-	}
+	return joystick_power_info(state, percent);
 }
 
 std::string joystick::serial() const {
@@ -826,22 +828,24 @@ bool joystick::set(int index) {
 		int num_hats = SDL_GetNumJoystickHats(js_handle);
 		hat_values.resize(num_hats < 4 ? num_hats : 4, SDL_HAT_CENTERED);
 	}
+	// Pump to get most up-to-date info
+	SDL_PumpEvents();
 	return true;
 }
 
 bool joystick::set_led(unsigned char red, unsigned char green, unsigned char blue) {
 	if (!stick) return false;
-	return SDL_SetGamepadLED(stick, red, green, blue) == 0;
+	return SDL_SetGamepadLED(stick, red, green, blue);
 }
 
 bool joystick::vibrate(unsigned short low_frequency, unsigned short high_frequency, int duration) {
 	if (!stick) return false;
-	return SDL_RumbleGamepad(stick, low_frequency, high_frequency, duration) == 0;
+	return SDL_RumbleGamepad(stick, low_frequency, high_frequency, duration);
 }
 
 bool joystick::vibrate_triggers(unsigned short left, unsigned short right, int duration) {
 	if (!stick) return false;
-	return SDL_RumbleGamepadTriggers(stick, left, right, duration) == 0;
+	return SDL_RumbleGamepadTriggers(stick, left, right, duration);
 }
 
 #ifdef _WIN32
@@ -1062,6 +1066,23 @@ bool TextInputActive() {
 	return SDL_TextInputActive(g_WindowHandle);
 }
 
+// Helper functions for joystick_power_info struct
+void joystick_power_info_construct(void* mem) {
+	new (mem) joystick_power_info();
+}
+
+void joystick_power_info_construct_params(void* mem, int state, int percentage) {
+	new (mem) joystick_power_info(state, percentage);
+}
+
+void joystick_power_info_copy_construct(void* mem, const joystick_power_info& other) {
+	new (mem) joystick_power_info(other);
+}
+
+void joystick_power_info_destruct(void* mem) {
+	((joystick_power_info*)mem)->~joystick_power_info();
+}
+
 void RegisterInput(asIScriptEngine* engine) {
 	// Initialize joystick subsystem early so it works without requiring a window
 	JoystickInit();
@@ -1075,7 +1096,7 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnum(_O("touch_device_type"));
 	engine->RegisterEnum(_O("joystick_type"));
 	engine->RegisterEnum(_O("joystick_bind_type"));
-	engine->RegisterEnum(_O("joystick_power_level"));
+	engine->RegisterEnum(_O("joystick_power_state"));
 	engine->RegisterEnum(_O("joystick_control_type"));
 	engine->RegisterGlobalFunction(_O("bool start_text_input()"), asFUNCTION(StartTextInput), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool stop_text_input()"), asFUNCTION(StopTextInput), asCALL_CDECL);
@@ -1399,13 +1420,13 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("joystick_bind_type", "JOYSTICK_BIND_TYPE_BUTTON", SDL_GAMEPAD_BINDTYPE_BUTTON);
 	engine->RegisterEnumValue("joystick_bind_type", "JOYSTICK_BIND_TYPE_AXIS", SDL_GAMEPAD_BINDTYPE_AXIS);
 	engine->RegisterEnumValue("joystick_bind_type", "JOYSTICK_BIND_TYPE_HAT", SDL_GAMEPAD_BINDTYPE_HAT);
-	// SDL3 doesn't have these constants anymore, so we define our own
-	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_UNKNOWN", 0);
-	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_EMPTY", 1);
-	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_LOW", 2);
-	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_MEDIUM", 3);
-	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_FULL", 4);
-	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_WIRED", 5);
+	// SDL_PowerState enum values for joystick power state
+	engine->RegisterEnumValue("joystick_power_state", "JOYSTICK_POWER_ERROR", SDL_POWERSTATE_ERROR);
+	engine->RegisterEnumValue("joystick_power_state", "JOYSTICK_POWER_UNKNOWN", SDL_POWERSTATE_UNKNOWN);
+	engine->RegisterEnumValue("joystick_power_state", "JOYSTICK_POWER_ON_BATTERY", SDL_POWERSTATE_ON_BATTERY);
+	engine->RegisterEnumValue("joystick_power_state", "JOYSTICK_POWER_NO_BATTERY", SDL_POWERSTATE_NO_BATTERY);
+	engine->RegisterEnumValue("joystick_power_state", "JOYSTICK_POWER_CHARGING", SDL_POWERSTATE_CHARGING);
+	engine->RegisterEnumValue("joystick_power_state", "JOYSTICK_POWER_CHARGED", SDL_POWERSTATE_CHARGED);
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_INVALID", SDL_GAMEPAD_BUTTON_INVALID);
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_A", SDL_GAMEPAD_BUTTON_SOUTH);
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_B", SDL_GAMEPAD_BUTTON_EAST);
@@ -1429,6 +1450,18 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_PADDLE4", SDL_GAMEPAD_BUTTON_LEFT_PADDLE2);
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_TOUCHPAD", SDL_GAMEPAD_BUTTON_TOUCHPAD);
 	engine->RegisterGlobalFunction(_O("int joystick_count(bool = true)"), asFUNCTION(joystick_count), asCALL_CDECL);
+	// Register joystick_power_info struct
+	engine->RegisterObjectType("joystick_power_info", sizeof(joystick_power_info), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_ALLINTS | asGetTypeTraits<joystick_power_info>());
+	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(joystick_power_info_construct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_CONSTRUCT, "void f(int, int)", asFUNCTION(joystick_power_info_construct_params), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_CONSTRUCT, "void f(const joystick_power_info&in)", asFUNCTION(joystick_power_info_copy_construct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(joystick_power_info_destruct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectProperty("joystick_power_info", "int state", asOFFSET(joystick_power_info, state));
+	engine->RegisterObjectProperty("joystick_power_info", "int percentage", asOFFSET(joystick_power_info, percentage));
+	engine->RegisterObjectMethod("joystick_power_info", "string get_state_name() const property", asMETHOD(joystick_power_info, get_state_name), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick_power_info", "string to_string() const", asMETHOD(joystick_power_info, to_string), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick_power_info", "string opConv() const", asMETHOD(joystick_power_info, to_string), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick_power_info", "string opImplConv() const", asMETHOD(joystick_power_info, to_string), asCALL_THISCALL);
 	engine->RegisterObjectType("joystick", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("joystick", asBEHAVE_FACTORY, "joystick@ f()", asFUNCTION(joystick_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("joystick", asBEHAVE_ADDREF, "void f()", asMETHOD(joystick, duplicate), asCALL_THISCALL);
@@ -1499,7 +1532,7 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("joystick", "bool refresh_joystick_list()", asMETHOD(joystick, refresh_joystick_list), asCALL_THISCALL);
 	engine->RegisterObjectMethod("joystick", "bool set(int index)", asMETHOD(joystick, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod("joystick", "uint get_type() const property", asMETHOD(joystick, type), asCALL_THISCALL);
-	engine->RegisterObjectMethod("joystick", "uint get_power_level() const property", asMETHOD(joystick, power_level), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "joystick_power_info get_power_info() const property", asMETHOD(joystick, get_power_info), asCALL_THISCALL);
 	engine->RegisterObjectMethod("joystick", "bool get_has_led() const property", asMETHOD(joystick, has_led), asCALL_THISCALL);
 	engine->RegisterObjectMethod("joystick", "bool get_can_vibrate() const property", asMETHOD(joystick, can_vibrate), asCALL_THISCALL);
 	engine->RegisterObjectMethod("joystick", "bool get_can_vibrate_triggers() const property", asMETHOD(joystick, can_vibrate_triggers), asCALL_THISCALL);
