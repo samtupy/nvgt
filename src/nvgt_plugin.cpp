@@ -91,14 +91,6 @@ bool load_nvgt_plugin(const std::string& name, std::string* errmsg, void* user) 
 	}
 	nvgt_plugin_shared* shared = (nvgt_plugin_shared*)malloc(sizeof(nvgt_plugin_shared));
 	prepare_plugin_shared(shared, g_ScriptEngine, user);
-	shared->request_resource = nvgt_request_resource_impl;
-	shared->release_resource = nvgt_release_resource_impl;
-	shared->get_resource_limit = nvgt_get_resource_limit_impl;
-	shared->get_service = nvgt_get_service_impl;
-	shared->register_service = nvgt_register_service_impl;
-	shared->unregister_service = nvgt_unregister_service_impl;
-	shared->enumerate_services = nvgt_enumerate_services_impl;
-	shared->set_resource_callback = nvgt_set_resource_callback_impl;
 	plugin_context_guard context(name);
 	if (!entry || !entry(shared)) {
 		free(shared);
@@ -163,7 +155,6 @@ void unload_nvgt_plugins() {
 
 struct resource_info {
 	nvgt_resource_handle handle;
-	std::unique_ptr < char[] > plugin_name_storage;
 	std::unique_ptr < void, std::function < void(void*)>> cleanup;
 };
 
@@ -181,7 +172,7 @@ void cleanup_plugin_resources(const std::string& plugin_name) {
 		plugin_resources.erase(it);
 	}
 	for (auto handle : handles_to_release)
-		nvgt_release_resource_impl(handle);
+		nvgt_release_resource(handle);
 }
 
 void cleanup_all_plugin_resources() {
@@ -191,7 +182,7 @@ void cleanup_all_plugin_resources() {
 }
 
 // Silly demonstration of resource functionality
-nvgt_resource_handle* nvgt_request_resource_impl(const nvgt_resource_request* request) {
+nvgt_resource_handle* nvgt_request_resource(const nvgt_resource_request* request) {
 	if (!request) return nullptr;
 	Poco::FastMutex::ScopedLock lock(resource_mutex);
 	std::string plugin_name = current_plugin_name ? *current_plugin_name : "core";
@@ -201,14 +192,11 @@ nvgt_resource_handle* nvgt_request_resource_impl(const nvgt_resource_request* re
 	info->handle.internal_data = nullptr;
 	info->handle.on_release_callback = nullptr;
 	info->handle.callback_user_data = nullptr;
-	info->plugin_name_storage = std::make_unique < char[] > (plugin_name.length() + 1);
-	std::strcpy(info->plugin_name_storage.get(), plugin_name.c_str());
-	info->handle.plugin_name = info->plugin_name_storage.get();
+	info->handle.plugin_name = plugin_name;
 	switch (request->type) {
 		case NVGT_RESOURCE_FILESYSTEM: {
-			if (!request->identifier) return nullptr;
-			std::string path(request->identifier);
-			auto* file = new std::ifstream(path, std::ios::binary);
+			if (request->identifier.empty()) return nullptr;
+			auto* file = new std::ifstream(request->identifier, std::ios::binary);
 			if (!file->is_open()) {
 				delete file;
 				return nullptr;
@@ -239,7 +227,7 @@ nvgt_resource_handle* nvgt_request_resource_impl(const nvgt_resource_request* re
 	return handle;
 }
 
-void nvgt_release_resource_impl(nvgt_resource_handle* handle) {
+void nvgt_release_resource(nvgt_resource_handle* handle) {
 	if (!handle) return;
 	nvgt_resource_callback callback = nullptr;
 	void* callback_data = nullptr;
@@ -252,9 +240,8 @@ void nvgt_release_resource_impl(nvgt_resource_handle* handle) {
 		callback = handle->on_release_callback;
 		callback_data = handle->callback_user_data;
 		resource_type = handle->type;
-		const char* plugin_name = handle->plugin_name;
-		if (plugin_name) {
-			auto plugin_it = plugin_resources.find(plugin_name);
+		if (!handle->plugin_name.empty()) {
+			auto plugin_it = plugin_resources.find(handle->plugin_name);
 			if (plugin_it != plugin_resources.end()) {
 				plugin_it->second.erase(handle);
 				if (plugin_it->second.empty())
@@ -269,7 +256,7 @@ void nvgt_release_resource_impl(nvgt_resource_handle* handle) {
 
 
 // Global resource limit showcase
-size_t nvgt_get_resource_limit_impl(uint32_t resource_type) {
+size_t nvgt_get_resource_limit(uint32_t resource_type) {
 	switch (resource_type) {
 		case NVGT_RESOURCE_FILESYSTEM:
 			return 100;
@@ -289,8 +276,8 @@ static std::unordered_map < std::string, service_info > service_registry;
 static std::unordered_map < std::string, std::unordered_set < std::string>> plugin_services;
 static Poco::FastMutex service_mutex;
 
-void* nvgt_get_service_impl(const char* service_name) {
-	if (!service_name) return nullptr;
+void* nvgt_get_service(const std::string& service_name) {
+	if (service_name.empty()) return nullptr;
 	Poco::FastMutex::ScopedLock lock(service_mutex);
 	auto it = service_registry.find(service_name);
 	if (it != service_registry.end())
@@ -298,14 +285,14 @@ void* nvgt_get_service_impl(const char* service_name) {
 	return nullptr;
 }
 
-bool nvgt_register_service_impl(const char* service_name, void* service, const char* plugin_name) {
-	if (!service_name || !service) return false;
+bool nvgt_register_service(const std::string& service_name, void* service, const std::string& plugin_name) {
+	if (service_name.empty() || !service) return false;
 	Poco::FastMutex::ScopedLock lock(service_mutex);
 	if (service_registry.find(service_name) != service_registry.end())
 		return false;
 	service_info info;
 	info.service = service;
-	if (plugin_name)
+	if (!plugin_name.empty())
 		info.plugin_name = plugin_name;
 	else if (current_plugin_name)
 		info.plugin_name = *current_plugin_name;
@@ -316,8 +303,8 @@ bool nvgt_register_service_impl(const char* service_name, void* service, const c
 	return true;
 }
 
-bool nvgt_unregister_service_impl(const char* service_name) {
-	if (!service_name) return false;
+bool nvgt_unregister_service(const std::string& service_name) {
+	if (service_name.empty()) return false;
 	Poco::FastMutex::ScopedLock lock(service_mutex);
 	auto it = service_registry.find(service_name);
 	if (it == service_registry.end())
@@ -333,14 +320,14 @@ bool nvgt_unregister_service_impl(const char* service_name) {
 	return true;
 }
 
-void nvgt_enumerate_services_impl(void* callback_context, void (*callback)(void* context, const char* service_name)) {
+void nvgt_enumerate_services(void* callback_context, void (*callback)(void* context, const char* service_name)) {
 	if (!callback) return;
 	Poco::FastMutex::ScopedLock lock(service_mutex);
 	for (const auto& pair : service_registry)
 		callback(callback_context, pair.first.c_str());
 }
 
-bool nvgt_set_resource_callback_impl(nvgt_resource_handle* handle, nvgt_resource_callback on_release, void* user_data) {
+bool nvgt_set_resource_callback(nvgt_resource_handle* handle, nvgt_resource_callback on_release, void* user_data) {
 	if (!handle) return false;
 	Poco::FastMutex::ScopedLock lock(resource_mutex);
 	auto it = active_resources.find(handle);

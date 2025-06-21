@@ -59,17 +59,7 @@ enum NVGT_RESOURCE_TYPE {
 struct nvgt_resource_request;
 struct nvgt_resource_handle;
 
-typedef nvgt_resource_handle* (*nvgt_request_resource_func)(const nvgt_resource_request* request);
-typedef void (*nvgt_release_resource_func)(nvgt_resource_handle* handle);
-typedef size_t (*nvgt_get_resource_limit_func)(uint32_t resource_type);
-
-typedef void* (*nvgt_get_service_func)(const char* service_name);
-typedef bool (*nvgt_register_service_func)(const char* service_name, void* service, const char* plugin_name);
-typedef bool (*nvgt_unregister_service_func)(const char* service_name);
-typedef void (*nvgt_enumerate_services_func)(void* callback_context, void (*callback)(void* context, const char* service_name));
-
 typedef void (*nvgt_resource_callback)(uint32_t resource_type, void* user_data);
-typedef bool (*nvgt_set_resource_callback_func)(nvgt_resource_handle* handle, nvgt_resource_callback on_release, void* user_data);
 
 // Exported external functions usually from Angelscript.h:
 #define NVGT_PLUGIN_EXTERNAL_FUNCTIONS \
@@ -98,8 +88,15 @@ typedef bool (*nvgt_set_resource_callback_func)(nvgt_resource_handle* handle, nv
 	X(uint64_t, microticks, (bool secure)) \
 	X(std::string, string_aes_encrypt, (const std::string& plaintext, std::string key)) \
 	X(std::string, string_aes_decrypt, (const std::string& ciphertext, std::string key)) \
-	X(bool, running_on_mobile, ())
-// Add more functions here...
+	X(bool, running_on_mobile, ()) \
+	X(nvgt_resource_handle*, nvgt_request_resource, (const nvgt_resource_request* request)) \
+	X(void, nvgt_release_resource, (nvgt_resource_handle* handle)) \
+	X(size_t, nvgt_get_resource_limit, (uint32_t resource_type)) \
+	X(void*, nvgt_get_service, (const std::string& service_name)) \
+	X(bool, nvgt_register_service, (const std::string& service_name, void* service, const std::string& plugin_name)) \
+	X(bool, nvgt_unregister_service, (const std::string& service_name)) \
+	X(void, nvgt_enumerate_services, (void* callback_context, void (*callback)(void* context, const char* service_name))) \
+	X(bool, nvgt_set_resource_callback, (nvgt_resource_handle* handle, nvgt_resource_callback on_release, void* user_data))
 
 #define X(ret, name, args) typedef ret t_##name args;
 NVGT_PLUGIN_EXTERNAL_FUNCTIONS
@@ -115,14 +112,6 @@ typedef struct {
 	asIScriptEngine* script_engine;
 	asIThreadManager* script_thread_manager;
 	void* user;
-	nvgt_request_resource_func request_resource;
-	nvgt_release_resource_func release_resource;
-	nvgt_get_resource_limit_func get_resource_limit;
-	nvgt_get_service_func get_service;
-	nvgt_register_service_func register_service;
-	nvgt_unregister_service_func unregister_service;
-	nvgt_enumerate_services_func enumerate_services;
-	nvgt_set_resource_callback_func set_resource_callback;
 } nvgt_plugin_shared;
 
 // Function prototype for a plugin's entry point.
@@ -137,27 +126,11 @@ typedef int nvgt_plugin_version_func();
 	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
 	NVGT_PLUGIN_FUNCTIONS
 	#undef X
-	nvgt_request_resource_func nvgt_request_resource = nullptr;
-	nvgt_release_resource_func nvgt_release_resource = nullptr;
-	nvgt_get_resource_limit_func nvgt_get_resource_limit = nullptr;
-	nvgt_get_service_func nvgt_get_service = nullptr;
-	nvgt_register_service_func nvgt_register_service = nullptr;
-	nvgt_unregister_service_func nvgt_unregister_service = nullptr;
-	nvgt_enumerate_services_func nvgt_enumerate_services = nullptr;
-	nvgt_set_resource_callback_func nvgt_set_resource_callback = nullptr;
 #else // If an angelscript addon includes nvgt_plugin.h, set NVGT_PLUGIN_INCLUDE to prevent these symbols from being defined multiple times.
 	#define X(ret, name, args) extern t_##name* name;
 	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
 	NVGT_PLUGIN_FUNCTIONS
 	#undef X
-	extern nvgt_request_resource_func nvgt_request_resource;
-	extern nvgt_release_resource_func nvgt_release_resource;
-	extern nvgt_get_resource_limit_func nvgt_get_resource_limit;
-	extern nvgt_get_service_func nvgt_get_service;
-	extern nvgt_register_service_func nvgt_register_service;
-	extern nvgt_unregister_service_func nvgt_unregister_service;
-	extern nvgt_enumerate_services_func nvgt_enumerate_services;
-	extern nvgt_set_resource_callback_func nvgt_set_resource_callback;
 #endif
 #elif (!defined(NVGT_BUILDING))
 // Any functions we want to expose from NVGT rather than Angelscript must be forward declared here, we only get to skip the Angelscript ones because we include angelscript.h. NVGT headers might not be available to a plugin developer.
@@ -198,14 +171,6 @@ inline bool prepare_plugin(nvgt_plugin_shared* shared) {
 	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
 	NVGT_PLUGIN_FUNCTIONS
 #undef X
-	nvgt_request_resource = shared->request_resource;
-	nvgt_release_resource = shared->release_resource;
-	nvgt_get_resource_limit = shared->get_resource_limit;
-	nvgt_get_service = shared->get_service;
-	nvgt_register_service = shared->register_service;
-	nvgt_unregister_service = shared->unregister_service;
-	nvgt_enumerate_services = shared->enumerate_services;
-	nvgt_set_resource_callback = shared->set_resource_callback;
 	asPrepareMultithread(shared->script_thread_manager);
 	#endif
 	return true;
@@ -233,14 +198,6 @@ inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* e
 	shared->script_engine = engine;
 	shared->script_thread_manager = asGetThreadManager();
 	shared->user = user;
-	shared->request_resource = nullptr;
-	shared->release_resource = nullptr;
-	shared->get_resource_limit = nullptr;
-	shared->get_service = nullptr;
-	shared->register_service = nullptr;
-	shared->unregister_service = nullptr;
-	shared->enumerate_services = nullptr;
-	shared->set_resource_callback = nullptr;
 }
 // Forward declarations only needed when compiling for nvgt and not for a plugin, thus the following functions are in nvgt_plugin.cpp.
 namespace Poco { class BinaryReader; class BinaryWriter; }
@@ -250,14 +207,6 @@ bool load_serialized_nvgt_plugins(Poco::BinaryReader& br);
 void serialize_nvgt_plugins(Poco::BinaryWriter& bw);
 void list_loaded_nvgt_plugins(std::vector < std::string > & output);
 void unload_nvgt_plugins();
-nvgt_resource_handle* nvgt_request_resource_impl(const nvgt_resource_request* request);
-void nvgt_release_resource_impl(nvgt_resource_handle* handle);
-size_t nvgt_get_resource_limit_impl(uint32_t resource_type);
-void* nvgt_get_service_impl(const char* service_name);
-bool nvgt_register_service_impl(const char* service_name, void* service, const char* plugin_name);
-bool nvgt_unregister_service_impl(const char* service_name);
-void nvgt_enumerate_services_impl(void* callback_context, void (*callback)(void* context, const char* service_name));
-bool nvgt_set_resource_callback_impl(nvgt_resource_handle* handle, nvgt_resource_callback on_release, void* user_data);
 // Boilerplate to make registering a static plugin in the nvgt_config.h file consist of a single pretty looking line.
 #ifndef static_plugin
 #ifndef NVGT_LOAD_STATIC_PLUGINS // This is defined in nvggt.cpp before including nvgt_config.h which includes this file, so that static plugins load once in one place.
@@ -280,7 +229,7 @@ public:
 
 struct nvgt_resource_request {
 	uint32_t type;
-	const char* identifier;
+	std::string identifier;
 	uint32_t flags;
 	size_t size_hint; // For memory allocations
 };
@@ -288,7 +237,7 @@ struct nvgt_resource_request {
 struct nvgt_resource_handle {
 	void* resource;
 	uint32_t type;
-	const char* plugin_name;
+	std::string plugin_name;
 	void* internal_data; // For NVGT's use
 	nvgt_resource_callback on_release_callback;
 	void* callback_user_data;
