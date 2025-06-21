@@ -21,7 +21,7 @@
 #include <iostream>
 #include <string>
 
-#define NVGT_PLUGIN_API_VERSION 4
+#define NVGT_PLUGIN_API_VERSION 5
 
 // Subsystem flags, used for controling access to certain functions during development.
 enum NVGT_SUBSYSTEM {
@@ -50,6 +50,17 @@ enum NVGT_SUBSYSTEM {
 	NVGT_SUBSYSTEM_SCRIPTING_SANDBOX = NVGT_SUBSYSTEM_GENERAL | NVGT_SUBSYSTEM_DATA | NVGT_SUBSYSTEM_DATETIME
 };
 
+enum NVGT_RESOURCE_TYPE {
+	NVGT_RESOURCE_FILESYSTEM = 1,
+	NVGT_RESOURCE_MEMORY = 2,
+	NVGT_RESOURCE_CUSTOM = 0x80000000
+};
+
+struct nvgt_resource_request;
+struct nvgt_resource_handle;
+
+typedef void (*nvgt_resource_callback)(uint32_t resource_type, void* user_data);
+
 // Exported external functions usually from Angelscript.h:
 #define NVGT_PLUGIN_EXTERNAL_FUNCTIONS \
 	X(const char*, asGetLibraryVersion, ()) \
@@ -77,10 +88,16 @@ enum NVGT_SUBSYSTEM {
 	X(uint64_t, microticks, (bool secure)) \
 	X(std::string, string_aes_encrypt, (const std::string& plaintext, std::string key)) \
 	X(std::string, string_aes_decrypt, (const std::string& ciphertext, std::string key)) \
-	X(bool, running_on_mobile, ())
-// Add more functions here...
+	X(bool, running_on_mobile, ()) \
+	X(nvgt_resource_handle*, nvgt_request_resource, (const nvgt_resource_request* request)) \
+	X(void, nvgt_release_resource, (nvgt_resource_handle* handle)) \
+	X(size_t, nvgt_get_resource_limit, (uint32_t resource_type)) \
+	X(void*, nvgt_get_service, (const std::string& service_name)) \
+	X(bool, nvgt_register_service, (const std::string& service_name, void* service, const std::string& plugin_name)) \
+	X(bool, nvgt_unregister_service, (const std::string& service_name)) \
+	X(void, nvgt_enumerate_services, (void* callback_context, void (*callback)(void* context, const char* service_name))) \
+	X(bool, nvgt_set_resource_callback, (nvgt_resource_handle* handle, nvgt_resource_callback on_release, void* user_data))
 
-// Function typedefs:
 #define X(ret, name, args) typedef ret t_##name args;
 NVGT_PLUGIN_EXTERNAL_FUNCTIONS
 NVGT_PLUGIN_FUNCTIONS
@@ -88,10 +105,10 @@ NVGT_PLUGIN_FUNCTIONS
 
 typedef struct {
 	int version;
-	#define X(ret, name, args) t_##name* f_##name;
+#define X(ret, name, args) t_##name* f_##name;
 	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
 	NVGT_PLUGIN_FUNCTIONS
-	#undef X
+#undef X
 	asIScriptEngine* script_engine;
 	asIThreadManager* script_thread_manager;
 	void* user;
@@ -104,56 +121,56 @@ typedef int nvgt_plugin_version_func();
 #ifndef NVGT_BUILDING
 // If this macro is not defined, this header is being included from within a plugin that will receive pointers to needed functions from the main NVGT application.
 #ifndef NVGT_PLUGIN_STATIC // Code that only executes for dll plugins.
-	#if !defined(NVGT_PLUGIN_INCLUDE)
-		#define X(ret, name, args) t_##name* name = nullptr;
-		NVGT_PLUGIN_EXTERNAL_FUNCTIONS
-		NVGT_PLUGIN_FUNCTIONS
-		#undef X
-	#else // If an angelscript addon includes nvgt_plugin.h, set NVGT_PLUGIN_INCLUDE to prevent these symbols from being defined multiple times.
-		#define X(ret, name, args) extern t_##name* name;
-		NVGT_PLUGIN_EXTERNAL_FUNCTIONS
-		NVGT_PLUGIN_FUNCTIONS
-		#undef X
-	#endif
-#elif (!defined(NVGT_BUILDING))
-	// Any functions we want to expose from NVGT rather than Angelscript must be forward declared here, we only get to skip the Angelscript ones because we include angelscript.h. NVGT headers might not be available to a plugin developer.
-	// Any functions we wish to export with a different name from NVGT's core must be inlined like this:
-	void wait(int ms);
-	inline void nvgt_wait(int ms) { wait(ms); }
-	#define X(ret, name, args) ret name args;
+#if !defined(NVGT_PLUGIN_INCLUDE)
+	#define X(ret, name, args) t_##name* name = nullptr;
+	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
+	NVGT_PLUGIN_FUNCTIONS
+	#undef X
+#else // If an angelscript addon includes nvgt_plugin.h, set NVGT_PLUGIN_INCLUDE to prevent these symbols from being defined multiple times.
+	#define X(ret, name, args) extern t_##name* name;
+	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
 	NVGT_PLUGIN_FUNCTIONS
 	#undef X
 #endif
+#elif (!defined(NVGT_BUILDING))
+// Any functions we want to expose from NVGT rather than Angelscript must be forward declared here, we only get to skip the Angelscript ones because we include angelscript.h. NVGT headers might not be available to a plugin developer.
+// Any functions we wish to export with a different name from NVGT's core must be inlined like this:
+void wait(int ms);
+inline void nvgt_wait(int ms) { wait(ms); }
+#define X(ret, name, args) ret name args;
+NVGT_PLUGIN_FUNCTIONS
+#undef X
+#endif
 // Macro to ease the definition of a plugin's entry point. If this plugin is compiled as a static library then the entry point is called nvgt_plugin_%plugname% where as a dll just calls it nvgt_plugin and externs it. We also define nvgt_plugin_version() here.
 #ifndef plugin_main
-	#ifdef NVGT_PLUGIN_STATIC
-		#define CONCAT(x, y) x##y
-		#define XCONCAT(x, y) CONCAT(x, y) // Yes both CONCAT functions are needed for correct macro expansion below.
-		#define plugin_main bool XCONCAT(nvgt_plugin_, NVGT_PLUGIN_STATIC)
-		#define plugin_version int XCONCAT(nvgt_plugin_version_, NVGT_PLUGIN_STATIC)
+#ifdef NVGT_PLUGIN_STATIC
+	#define CONCAT(x, y) x##y
+	#define XCONCAT(x, y) CONCAT(x, y) // Yes both CONCAT functions are needed for correct macro expansion below.
+	#define plugin_main bool XCONCAT(nvgt_plugin_, NVGT_PLUGIN_STATIC)
+	#define plugin_version int XCONCAT(nvgt_plugin_version_, NVGT_PLUGIN_STATIC)
+#else
+	#ifdef _WIN32
+		#define plugin_export __declspec(dllexport)
+	#elif defined(__GNUC__)
+		#define plugin_export __attribute__((visibility ("default")))
 	#else
-		#ifdef _WIN32
-			#define plugin_export __declspec(dllexport)
-		#elif defined(__GNUC__)
-			#define plugin_export __attribute__((visibility ("default")))
-		#else
-			#define plugin_export
-		#endif
-		#define plugin_main extern "C" plugin_export bool nvgt_plugin
-		#define plugin_version extern "C" plugin_export int nvgt_plugin_version
+		#define plugin_export
 	#endif
-	#ifndef NVGT_PLUGIN_INCLUDE
-		plugin_version() { return NVGT_PLUGIN_API_VERSION; }
-	#endif
+	#define plugin_main extern "C" plugin_export bool nvgt_plugin
+	#define plugin_version extern "C" plugin_export int nvgt_plugin_version
+#endif
+#ifndef NVGT_PLUGIN_INCLUDE
+plugin_version() { return NVGT_PLUGIN_API_VERSION; }
+#endif
 #endif
 // Pass a pointer to an nvgt_plugin_shared structure to this function, making Angelscript available for use in any file that includes nvgt_plugin.h after calling this function.
 inline bool prepare_plugin(nvgt_plugin_shared* shared) {
 	if (shared->version != NVGT_PLUGIN_API_VERSION) return false;
 	#ifndef NVGT_PLUGIN_STATIC // If a static plugin, the following symbols are available by default as well as the thread manager.
-	#define X(ret, name, args) name = shared->f_##name;
+#define X(ret, name, args) name = shared->f_##name;
 	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
 	NVGT_PLUGIN_FUNCTIONS
-	#undef X
+#undef X
 	asPrepareMultithread(shared->script_thread_manager);
 	#endif
 	return true;
@@ -174,10 +191,10 @@ NVGT_PLUGIN_FUNCTIONS
 // This function prepares an nvgt_plugin_shared structure for passing to a plugins entry point. Sane input expected, no error checking.
 inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* engine, void* user = NULL) {
 	shared->version = NVGT_PLUGIN_API_VERSION;
-	#define X(ret, name, args) shared->f_##name = name;
+#define X(ret, name, args) shared->f_##name = name;
 	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
 	NVGT_PLUGIN_FUNCTIONS
-	#undef X
+#undef X
 	shared->script_engine = engine;
 	shared->script_thread_manager = asGetThreadManager();
 	shared->user = user;
@@ -188,7 +205,7 @@ bool load_nvgt_plugin(const std::string& name, std::string* errmsg = nullptr, vo
 bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e, nvgt_plugin_version_func* v);
 bool load_serialized_nvgt_plugins(Poco::BinaryReader& br);
 void serialize_nvgt_plugins(Poco::BinaryWriter& bw);
-void list_loaded_nvgt_plugins(std::vector<std::string>& output);
+void list_loaded_nvgt_plugins(std::vector < std::string > & output);
 void unload_nvgt_plugins();
 // Boilerplate to make registering a static plugin in the nvgt_config.h file consist of a single pretty looking line.
 #ifndef static_plugin
@@ -210,10 +227,26 @@ public:
 
 #endif // NVGT_BUILDING
 
+struct nvgt_resource_request {
+	uint32_t type;
+	std::string identifier;
+	uint32_t flags;
+	size_t size_hint; // For memory allocations
+};
+
+struct nvgt_resource_handle {
+	void* resource;
+	uint32_t type;
+	std::string plugin_name;
+	void* internal_data; // For NVGT's use
+	nvgt_resource_callback on_release_callback;
+	void* callback_user_data;
+};
+
 // This class must be derived from for any custom pack or vfs objects that wish to integrate with NVGT's sound system.
 class pack_interface {
 	mutable int refcount;
-	public:
+public:
 	pack_interface() : refcount(1) {}
 	virtual ~pack_interface() = default;
 	void duplicate() const { asAtomicInc(refcount); }
@@ -222,8 +255,8 @@ class pack_interface {
 	virtual const pack_interface* get_mutable() const = 0;
 	virtual std::istream* get_file(const std::string& filename) const { return nullptr; }
 	virtual const std::string get_pack_name() const { return ""; }
-	template <class A, class B> static B* op_cast(A* from) {
-		B* casted = dynamic_cast<B*>(from);
+	template < class A, class B > static B* op_cast(A* from) {
+		B* casted = dynamic_cast < B* > (from);
 		if (!casted) return nullptr;
 		casted->duplicate();
 		return casted;
