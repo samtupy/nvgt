@@ -23,9 +23,9 @@ jobs:
         cp build/build_macos.sh .
         sudo chmod +x build_macos.sh
         ./build_macos.sh ci
+        chmod +x release/nvgt
         cd test
         ../release/nvgt -- tests.nvgt
-        
     - uses: actions/upload-artifact@v4
       with:
         name: mac_release
