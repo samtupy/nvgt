@@ -189,10 +189,29 @@ class menu {
 	private int last_selected_index;
 	private string last_selected_id;
 	// Simple sound management
+	#if plugin_legacy_sound
+	private sound@[] playing_sounds;
+	bool play(const string&in soundpath) {
+		if (soundpath.empty()) return false;
+		sound s;
+		if (!s.load(sounds_prefix + soundpath + sounds_suffix, @pack_file != null? @pack_file : @sound_default_pack)) return false;
+		bool r = s.play();
+		// Clean sounds that have finished playing.
+		for (uint i = 0; i < playing_sounds.length(); i++) {
+			if (playing_sounds[i].playing) continue;
+			playing_sounds.remove_at(i);
+			i--;
+		}
+		playing_sounds.insert_last(s);
+		return r;
+	}
+	#endif
+	#if_not plugin_legacy_sound
 	bool play(const string&in soundpath) {
 		if (soundpath.empty()) return false;
 		return  sound_play(sounds_prefix + soundpath + sounds_suffix, pack_file = pack_file) != null;
 	}
+	#endif
 	private int on_form_list_event(audio_form@ f, int c, control_event_type event, dictionary@ args) {
 		if (event != event_list_cursor) return 0;
 		if (args.exists("boundary")) {
