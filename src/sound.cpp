@@ -8,7 +8,7 @@
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
- */
+*/
 
 #define NOMINMAX
 #include <memory>
@@ -29,6 +29,7 @@
 #include "pack.h"
 #include <miniaudio_wdl_resampler.h>
 #include <atomic>
+#include <unordered_set>
 #include <utility>
 #include <cstdint>
 #include <miniaudio_libvorbis.h>
@@ -81,6 +82,7 @@ bool init_sound() {
 void uninit_sound() {
 	if (!g_soundsystem_initialized.test())
 		return;
+	garbage_collect_inline_sounds();
 	if (g_audio_engine != nullptr) {
 		g_audio_engine->release();
 		g_audio_engine = nullptr;
@@ -176,6 +178,21 @@ ma_result wav_seek_proc(ma_encoder *pEncoder, ma_int64 offset, ma_seek_origin or
 	if (!stream->good())
 		return MA_ERROR;
 	return MA_SUCCESS;
+}
+
+// The following code manages inlined, one-shot sounds. While miniaudio does provide support for this, it is subpar when considering what NVGT users wish for, namely it cannot return the ma_sound that was created.
+unordered_set<sound*> g_inlined_sounds;
+mutex g_inlined_sounds_mutex;
+void garbage_collect_inline_sounds() {
+	auto it = g_inlined_sounds.begin();
+	while (it != g_inlined_sounds.end()) {
+		if ((*it)->get_playing()) ++it;
+		else {
+			unique_lock<mutex> lock(g_inlined_sounds_mutex);
+			(*it)->release();
+			it = g_inlined_sounds.erase(it);
+		}
+	}
 }
 
 // Miniaudio objects must be allocated on the heap as nvgt's API introduces the concept of an uninitialized sound, which a stack based system would make more difficult to implement.
@@ -440,8 +457,26 @@ public:
 		set_sound_position_changed();
 	}
 	bool get_listener_enabled(unsigned int index) const override { return ma_engine_listener_is_enabled(&*engine, index); }
-	bool play_through_node(const string &filename, audio_node *node, unsigned int bus_index) override { return engine ? (g_soundsystem_last_error = ma_engine_play_sound_ex(&*engine, filename.c_str(), node ? node->get_ma_node() : nullptr, bus_index)) == MA_SUCCESS : false; }
-	bool play(const string &filename, mixer *mixer) override { return engine ? (ma_engine_play_sound(&*engine, filename.c_str(), mixer ? mixer->get_ma_sound() : nullptr)) == MA_SUCCESS : false; }
+	sound* play(const string& path, const reactphysics3d::Vector3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) override {
+		garbage_collect_inline_sounds();
+		sound* snd = new_sound();
+		if (!snd) return nullptr;
+		if (!snd->load(path, pack_file)) {
+			snd->release();
+			return nullptr;
+		}
+		if (mix) snd->set_mixer(mix);
+		if (position.x != FLT_MAX || position.y != FLT_MAX || position.z != FLT_MAX) {
+			snd->set_spatialization_enabled(true);
+			snd->set_position_3d_vector(position);
+		} else snd->set_spatialization_enabled(false);
+		snd->set_volume(volume);
+		snd->set_pan(pan);
+		snd->set_pitch(pitch);
+		if (autoplay) snd->play();
+		snd->set_autoclose();
+		return snd;
+	}
 	mixer *new_mixer() override { return ::new_mixer(this); }
 	sound *new_sound() override { return ::new_sound(this); }
 };
@@ -816,7 +851,6 @@ class sound_impl final : public mixer_impl, public virtual sound {
 	typedef struct {
 		ma_async_notification_callbacks cb;
 		std::atomic_flag *pAtomicFlag;
-
 	} async_notification_callbacks;
 	std::string pcm_buffer;      // When loading from raw PCM (like TTS) we store the intermediate wav data here so we can take advantage of async loading to return quickly. Makes a substantial difference in the responsiveness of TTS calls.
 	std::string loaded_filename; // Contains the loaded filename as passed in the load/stream method, used just for convenience.
@@ -824,13 +858,14 @@ class sound_impl final : public mixer_impl, public virtual sound {
 	async_notification_callbacks notification_callbacks;
 	mutable std::atomic_flag load_completed;
 	bool paused;
+	bool should_autoclose; // If this is true, the release method defers sound destruction until playback has complete.
 
 public:
 	static void async_notification_callback(ma_async_notification *pNotification) {
 		async_notification_callbacks *anc = (async_notification_callbacks *)pNotification;
 		anc->pAtomicFlag->test_and_set();
 	}
-	sound_impl(audio_engine *e) : paused(false), mixer_impl(static_cast < audio_engine_impl * > (e), false), pcm_buffer(), sound() {
+	sound_impl(audio_engine *e) : paused(false), should_autoclose(false), mixer_impl(static_cast < audio_engine_impl * > (e), false), pcm_buffer(), sound() {
 		init_sound();
 		snd = nullptr;
 		ma_fence_init(&fence);
@@ -840,6 +875,17 @@ public:
 	~sound_impl() {
 		close();
 		ma_fence_uninit(&fence);
+	}
+	inline void release() override {
+		if (asAtomicDec(refcount) < 1) {
+			if (!should_autoclose || !get_playing()) delete this;
+			else {
+				should_autoclose = false;
+				duplicate();
+				unique_lock<mutex> lock(g_inlined_sounds_mutex);
+				g_inlined_sounds.insert(this); // Freed with garbage_collect_inline_sounds();
+			}
+		}
 	}
 	bool load_special(const std::string &filename, const size_t protocol_slot = 0, directive_t protocol_directive = nullptr, const size_t filter_slot = 0, directive_t filter_directive = nullptr, ma_uint32 ma_flags = MA_SOUND_FLAG_DECODE) override {
 		if (snd)
@@ -956,11 +1002,13 @@ public:
 			pcm_buffer.resize(0);
 			loaded_filename.clear();
 			load_completed.clear();
-			paused = false;
+			paused = should_autoclose = false;
 			return true;
 		}
 		return false;
 	}
+	void set_autoclose(bool enabled) override { should_autoclose = enabled; }
+	bool get_autoclose() const override { return should_autoclose; }
 	const std::string &get_loaded_filename() const override { return loaded_filename; }
 	bool get_active() override {
 		return snd ? true : false;
@@ -1138,6 +1186,24 @@ void set_sound_output_device(int device) {
 	init_sound();
 	g_audio_engine->set_device(device);
 }
+sound* sound_play(const string& path, const reactphysics3d::Vector3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) {
+	if (!init_sound()) return nullptr;
+	return g_audio_engine->play(path, position, volume, pan, pitch, mix, pack_file, autoplay);
+}
+reactphysics3d::Vector3 sound_get_listener_position(unsigned int listener_index = 0) {
+	if (!init_sound()) return reactphysics3d::Vector3(0, 0, 0);
+	return g_audio_engine->get_listener_position(listener_index);
+}
+bool sound_set_listener_position(float x, float y, float z, unsigned int listener_index = 0) {
+	if (!init_sound()) return false;
+	g_audio_engine->set_listener_position(listener_index, x, y, z);
+	return true;
+}
+bool sound_set_listener_position_vector(const reactphysics3d::Vector3& position, unsigned int listener_index = 0) {
+	if (!init_sound()) return false;
+	g_audio_engine->set_listener_position_vector(listener_index, position);
+	return true;
+}
 // Encryption.
 void set_default_decryption_key(const std::string &key) {
 	if (!init_sound())
@@ -1263,8 +1329,6 @@ void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "vector get_listener_world_up(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_world_up, reactphysics3d::Vector3, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_enabled(int index, bool enabled)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_enabled, void, int, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "bool get_listener_enabled(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_enabled, bool, int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "bool play(const string&in path, audio_node@ node, uint input_bus_index)", asFUNCTION((virtual_call < audio_engine, &audio_engine::play_through_node, bool, const string &, audio_node *, unsigned int >)), asCALL_CDECL_OBJFIRST);
-	// the other play overload and the new_mixer/sound functions are registered later after the definitions of mixer and sound.
 	engine->RegisterGlobalProperty("audio_engine@ sound_default_engine", (void*)&g_audio_engine);
 }
 template < class T >
@@ -1472,7 +1536,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	RegisterSoundsystemMixer < mixer > (engine, "mixer");
 	engine->RegisterObjectBehaviour("mixer", asBEHAVE_FACTORY, "mixer@ m()", asFUNCTION(new_global_mixer), asCALL_CDECL);
 	RegisterSoundsystemMixer < sound > (engine, "sound");
-	engine->RegisterObjectMethod("audio_engine", "bool play(const string&in path, mixer@ mix = null)", asFUNCTION((virtual_call < audio_engine, &audio_engine::play, bool, const string &, mixer * >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "sound@ play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@ mix = null, const pack_interface@ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION((virtual_call < audio_engine, &audio_engine::play, sound*, const string &, const reactphysics3d::Vector3&, float, float, float, mixer*, const pack_interface*, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "mixer@ mixer()", asFUNCTION((virtual_call < audio_engine, &audio_engine::new_mixer, mixer * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "sound@ sound()", asFUNCTION((virtual_call < audio_engine, &audio_engine::new_sound, sound * >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemNodes(engine);
@@ -1485,6 +1549,8 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("sound", "bool load_pcm(const int16[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool load_pcm(const uint8[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool close()", asFUNCTION((virtual_call < sound, &sound::close, bool >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "void set_autoclose(bool enabled = true) property", asFUNCTION((virtual_call < sound, &sound::set_autoclose, void, bool >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool get_autoclose() const property", asFUNCTION((virtual_call < sound, &sound::get_autoclose, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "const string& get_loaded_filename() const property", asFUNCTION((virtual_call < sound, &sound::get_loaded_filename, const std::string & >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_load_complete() const property", asFUNCTION((virtual_call < sound, &sound::is_load_completed, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_active() const property", asFUNCTION((virtual_call < sound, &sound::get_active, bool >)), asCALL_CDECL_OBJFIRST);
@@ -1518,11 +1584,14 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("const string[]@+ get_sound_output_devices() property", asFUNCTION(get_sound_output_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_output_device(int device) property", asFUNCTION(set_sound_output_device), asCALL_CDECL);
+	engine->RegisterGlobalFunction("sound@ sound_play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@ mix = null, const pack_interface@ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION(sound_play), asCALL_CDECL);
+	engine->RegisterGlobalFunction("vector sound_get_listener_position(uint listener_index = 0)", asFUNCTION(sound_get_listener_position), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool sound_set_listener_position(float x, float y, float z, uint listener_index = 0)", asFUNCTION(sound_set_listener_position), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool sound_set_listener_position(const vector&in position, uint listener_index = 0)", asFUNCTION(sound_set_listener_position_vector), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_decryption_key(const string& in key) property", asFUNCTION(set_default_decryption_key), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_pack(pack_interface@ storage) property", asFUNCTION(set_sound_default_storage), asCALL_CDECL);
 	engine->RegisterGlobalFunction("pack_interface@ get_sound_default_pack() property", asFUNCTION(get_sound_default_storage), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_master_volume(float db) property", asFUNCTION(set_sound_master_volume), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float get_sound_master_volume() property", asFUNCTION(get_sound_master_volume), asCALL_CDECL);
-
 	engine->RegisterGlobalFunction("audio_error_state get_SOUNDSYSTEM_LAST_ERROR() property", asFUNCTION(get_soundsystem_last_error), asCALL_CDECL);
 }

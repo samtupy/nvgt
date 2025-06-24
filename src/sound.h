@@ -32,6 +32,7 @@ bool add_decoder(ma_decoding_backend_vtable *vtable);
 bool init_sound();
 void uninit_sound();
 bool refresh_audio_devices();
+void garbage_collect_inline_sounds();
 
 class audio_node {
 public:
@@ -110,8 +111,7 @@ public:
 	virtual reactphysics3d::Vector3 get_listener_world_up(unsigned int index) const = 0;
 	virtual void set_listener_enabled(unsigned int index, bool enabled) = 0;
 	virtual bool get_listener_enabled(unsigned int index) const = 0;
-	virtual bool play_through_node(const std::string &path, audio_node *node, unsigned int input_bus_index) = 0;
-	virtual bool play(const std::string &path, mixer *mixer = nullptr) = 0;
+	virtual sound* play(const std::string& path, const reactphysics3d::Vector3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) = 0;
 	virtual mixer *new_mixer() = 0;
 	virtual sound *new_sound() = 0;
 };
@@ -224,6 +224,8 @@ public:
 	virtual bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) = 0;
 	virtual bool load_pcm_script(CScriptArray *buffer, int samplerate, int channels) = 0;
 	virtual bool close() = 0;
+	virtual void set_autoclose(bool enabled = true) = 0;
+	virtual bool get_autoclose() const = 0;
 	virtual const std::string &get_loaded_filename() const = 0;
 	virtual bool get_active() = 0;
 	virtual bool get_paused() = 0;
