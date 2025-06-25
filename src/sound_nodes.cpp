@@ -103,13 +103,13 @@ static void ma_mixer_monitor_node_process_pcm_frames(ma_node* pNode, const float
 	ma_mixer_monitor_node* pMonitorNode = (ma_mixer_monitor_node*) pNode;
 	mixer* m = pMonitorNode->m;
 	if (!m->get_ma_sound()) return; // Sound is closing, unsafe to access it's properties.
+	bool listener_moved = g_sound_position_changed != pMonitorNode->position_changed && pMonitorNode->position_changed != -1, sound_moved = pMonitorNode->position_changed == -1;
+	if (listener_moved && m->get_shape_object() && !m->get_shape_object()->connected_sound) m->set_position_3d_vector(m->get_position_3d()); // Force the sound to update it's position based on the shape.
+	pMonitorNode->position_changed = g_sound_position_changed; // Indicate that we've processed all changes for this frame.
 	phonon_binaural_node* hrtf_node = dynamic_cast<phonon_binaural_node*>(m->get_hrtf_node());
 	if (m->get_hrtf()) {
 		if (!g_hrtf_enabled || !m->get_spatialization_enabled()) g_hrtf_update_notifications.enqueueNotification(new hrtf_update(m, false));
-		else if ((g_sound_position_changed != pMonitorNode->position_changed || pMonitorNode->position_changed == -1) && hrtf_node) {
-			hrtf_node->set_direction_vector(m->get_direction_to_listener() * -1, m->get_distance_to_listener());
-			pMonitorNode->position_changed = g_sound_position_changed;
-		}
+		else if ((listener_moved || sound_moved) && hrtf_node) hrtf_node->set_direction_vector(m->get_direction_to_listener() * -1, m->get_distance_to_listener());
 	} else if (g_hrtf_enabled && m->get_hrtf_desired() && m->get_spatialization_enabled()) g_hrtf_update_notifications.enqueueNotification(new hrtf_update(m, true));
 	else m->set_directional_attenuation_factor(std::clamp(m->get_distance_to_listener() / 4, 0.0f, 1.0f)); // Should we make 4 a configurable factor?
 }

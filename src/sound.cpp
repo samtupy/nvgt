@@ -18,8 +18,10 @@
 #include <Poco/FileStream.h>
 #include <Poco/Format.h>
 #include <Poco/MemoryStream.h>
+#include <reactphysics3d/collision/shapes/AABB.h>
 #include <angelscript.h>
 #include <scriptarray.h>
+#include <scripthandle.h>
 #include "misc_functions.h" // script_memory_buffer
 #include "nvgt.h" // g_ScriptEngine
 #include "nvgt_angelscript.h" // get_array_type
@@ -194,6 +196,47 @@ void garbage_collect_inline_sounds() {
 		}
 	}
 }
+
+// Sound shapes let mixer/sound::set_position_3d position the sound as though it was more than one tile wide in each direction.
+typedef sound_shape* sound_shape_setup_callback(mixer* connected_sound, CScriptHandle* shape_reference);
+std::unordered_map<int, sound_shape_setup_callback*> g_sound_shape_setup_callbacks;
+std::unordered_set<sound_shape*> g_blocking_sound_shapes; // Most built-in shapes are threadsafe, thus when the listener moves we can safely update the sound position from audio processing threads. Sometimes however such as in the case of script callbacks, we wish to insilate the scripter from being threadsafe, and we store all such non-threadsafe shapes here.
+bool register_blocking_sound_shape(sound_shape* shape, mixer* connected_sound) {
+	if (!shape || !connected_sound) return false;
+	shape->connected_sound = connected_sound;
+	g_blocking_sound_shapes.insert(shape);
+	return true;
+}
+bool unregister_blocking_sound_shape(sound_shape* shape) {
+	auto it = g_blocking_sound_shapes.find(shape);
+	if (it == g_blocking_sound_shapes.end()) return false;
+	shape->connected_sound = nullptr;
+	g_blocking_sound_shapes.erase(it);
+	return true;
+}
+void update_blocking_sound_shapes() {
+	for (sound_shape* s : g_blocking_sound_shapes) s->connected_sound->set_position_3d_vector(s->get_position());
+}
+sound_shape* sound_shape_builtin_standard_setup(mixer* snd, CScriptHandle* shape_ref) {
+	// This assumes that the shape object has already been created by the scripter and is contained within the CScriptHandle we've received.
+	sound_shape* shape = (sound_shape*)(shape_ref->GetRef());
+	shape->duplicate();
+	return shape;
+}
+class sound_aabb_shape : public sound_shape {
+public:
+	int left_range, right_range, backward_range, forward_range, lower_range, upper_range;
+	sound_aabb_shape(int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range) : sound_shape(), left_range(left_range), right_range(right_range), backward_range(backward_range), forward_range(forward_range), lower_range(lower_range), upper_range(upper_range) {}
+	bool contains(const reactphysics3d::Vector3& listener_position, reactphysics3d::Vector3& sound_position) override {
+		reactphysics3d::AABB bounds(reactphysics3d::Vector3(sound_position - reactphysics3d::Vector3(left_range, backward_range, lower_range)), reactphysics3d::Vector3(sound_position + reactphysics3d::Vector3(right_range, forward_range, upper_range)));
+		if (bounds.contains(listener_position)) return true;
+		sound_position.x = clamp(listener_position.x, bounds.getMin().x, bounds.getMax().x);
+		sound_position.y = clamp(listener_position.y, bounds.getMin().y, bounds.getMax().y);
+		sound_position.z = clamp(listener_position.z, bounds.getMin().z, bounds.getMax().z);
+		return false;
+	}
+};
+sound_aabb_shape* create_sound_aabb_shape(int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range) { return new sound_aabb_shape(left_range, right_range, backward_range, forward_range, lower_range, upper_range); }
 
 // Miniaudio objects must be allocated on the heap as nvgt's API introduces the concept of an uninitialized sound, which a stack based system would make more difficult to implement.
 class audio_engine_impl final : public audio_engine {
@@ -410,6 +453,7 @@ public:
 		if (engine)
 			ma_engine_listener_set_position(&*engine, index, position.x, position.y, position.z);
 		set_sound_position_changed();
+		update_blocking_sound_shapes();
 	}
 	reactphysics3d::Vector3 get_listener_position(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_position(&*engine, index)) : reactphysics3d::Vector3(); }
 	void set_listener_direction(unsigned int index, float x, float y, float z) override {
@@ -489,6 +533,7 @@ protected:
 	unique_ptr<ma_sound> snd;
 	mutable mutex hrtf_toggle_mtx;
 	mixer *parent_mixer;
+	sound_shape* shape;
 	mixer_monitor_node *monitor;
 	phonon_binaural_node *hrtf;
 	bool hrtf_desired;
@@ -496,8 +541,8 @@ protected:
 	audio_node *get_output_node() { return hrtf ? hrtf : dynamic_cast<audio_node *>(monitor); }
 
 public:
-	mixer_impl() : audio_node_impl(), snd(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {}
-	mixer_impl(audio_engine *e, bool sound_group = true) : engine(static_cast<audio_engine_impl *>(e)), audio_node_impl(), snd(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {
+	mixer_impl() : audio_node_impl(), snd(nullptr), shape(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {}
+	mixer_impl(audio_engine *e, bool sound_group = true) : engine(static_cast<audio_engine_impl *>(e)), audio_node_impl(), snd(nullptr), shape(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {
 		init_sound();
 		if (!sound_group) return;
 		snd = make_unique<ma_sound>();
@@ -518,6 +563,10 @@ public:
 			parent_mixer->release();
 		if (hrtf)
 			hrtf->release();
+		if (shape) {
+			if (shape->connected_sound) unregister_blocking_sound_shape(shape);
+			shape->release();
+		}
 		if (snd)
 			ma_sound_group_uninit(&*snd);
 	}
@@ -573,6 +622,27 @@ public:
 	bool get_hrtf() const override { return hrtf != nullptr; }
 	bool get_hrtf_desired() const override { return hrtf_desired; }
 	audio_node *get_hrtf_node() const override { return hrtf; }
+	bool set_shape(CScriptHandle* new_shape) override {
+		// release old shape.
+		sound_shape* old_shape = shape;
+		shape = nullptr;
+		if (old_shape) old_shape->release();
+		if (!new_shape) return true;
+		int ot = new_shape->GetTypeId();
+		ot ^= asTYPEID_OBJHANDLE;
+		if (!g_sound_shape_setup_callbacks.contains(ot)) return false;
+		sound_shape* new_shape_obj = g_sound_shape_setup_callbacks[ot](this, new_shape);
+		if (!new_shape_obj) return false;
+		new_shape_obj->set_shape(new_shape);
+		new_shape_obj->set_position(get_position_3d());
+		shape = new_shape_obj;
+		return true;
+	}
+	CScriptHandle* get_shape() const override {
+		if (!shape) return nullptr;
+		return shape->get_shape();
+	}
+	sound_shape* get_shape_object() const override { return shape; }
 	bool play(bool reset_loop_state = true) override {
 		if (snd == nullptr)
 			return false;
@@ -647,8 +717,16 @@ public:
 	void set_position_3d(float x, float y, float z) override {
 		if (!snd)
 			return;
-		set_spatialization_enabled(true);
-		ma_sound_set_position(&*snd, x, y, z);
+		if (shape) {
+			reactphysics3d::Vector3 pos(x, y, z);
+			reactphysics3d::Vector3 listener = get_engine()->get_listener_position(get_listener());
+			bool is_contained = shape->is_in_shape(listener, pos);
+			if (!is_contained) ma_sound_set_position(&*snd, pos.x, pos.y, pos.z);
+			else ma_sound_set_position(&*snd, listener.x, listener.y, listener.z);
+		} else {
+			set_spatialization_enabled(true);
+			ma_sound_set_position(&*snd, x, y, z);
+		}
 		if (monitor)
 			monitor->set_position_changed();
 	}
@@ -656,6 +734,7 @@ public:
 	reactphysics3d::Vector3 get_position_3d() const override {
 		if (!snd)
 			return reactphysics3d::Vector3();
+		if (shape) return shape->get_position(); // True sound position is stored in the shape because the position stored in miniaudio may have been altered by the shape.
 		const auto pos = ma_sound_get_position(&*snd);
 		reactphysics3d::Vector3 res;
 		res.setAllValues(pos.x, pos.y, pos.z);
@@ -1365,9 +1444,10 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	engine->RegisterObjectMethod(type.c_str(), "bool set_hrtf(bool hrtf = true)", asFUNCTION((virtual_call < T, &T::set_hrtf, bool, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf() const property", asFUNCTION((virtual_call < T, &T::get_hrtf, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf_desired() const property", asFUNCTION((virtual_call < T, &T::get_hrtf_desired, bool >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_shape(ref@ shape)", asFUNCTION((virtual_call < T, &T::set_shape, bool, CScriptHandle*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "ref@ get_shape() const property", asFUNCTION((virtual_call < T, &T::get_shape, CScriptHandle*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play(bool reset_loop_state = true)", asFUNCTION((virtual_call < T, &T::play, bool, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play_looped()", asFUNCTION((virtual_call < T, &T::play_looped, bool >)), asCALL_CDECL_OBJFIRST);
-
 	engine->RegisterObjectMethod(type.c_str(), "bool stop()", asFUNCTION((virtual_call < T, &T::stop, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_volume(float volume) property", asFUNCTION((virtual_call < T, &T::set_volume, void, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "float get_volume() const property", asFUNCTION((virtual_call < T, &T::get_volume, float >)), asCALL_CDECL_OBJFIRST);
@@ -1431,6 +1511,19 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("bool get_sound_global_hrtf() property", asFUNCTION(get_global_hrtf), asCALL_CDECL);
 	RegisterSoundsystemAudioNode < splitter_node > (engine, "audio_splitter_node");
 	engine->RegisterObjectBehaviour("audio_splitter_node", asBEHAVE_FACTORY, "audio_splitter_node@ n(audio_engine@ engine, int channels)", asFUNCTION(splitter_node::create), asCALL_CDECL);
+}
+void RegisterSoundsystemShapes(asIScriptEngine* engine) {
+	int ot = engine->RegisterObjectType("sound_aabb_shape", 0, asOBJ_REF); assert(ot >= 0);
+	g_sound_shape_setup_callbacks[ot] = sound_shape_builtin_standard_setup;
+	engine->RegisterObjectBehaviour("sound_aabb_shape", asBEHAVE_FACTORY, "sound_aabb_shape@ s(int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range)", asFUNCTION(create_sound_aabb_shape), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("sound_aabb_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(sound_aabb_shape, duplicate), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("sound_aabb_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(sound_aabb_shape, release), asCALL_THISCALL);
+	engine->RegisterObjectProperty("sound_aabb_shape", "int left_range", asOFFSET(sound_aabb_shape, left_range));
+	engine->RegisterObjectProperty("sound_aabb_shape", "int right_range", asOFFSET(sound_aabb_shape, right_range));
+	engine->RegisterObjectProperty("sound_aabb_shape", "int backward_range", asOFFSET(sound_aabb_shape, backward_range));
+	engine->RegisterObjectProperty("sound_aabb_shape", "int forward_range", asOFFSET(sound_aabb_shape, forward_range));
+	engine->RegisterObjectProperty("sound_aabb_shape", "int lower_range", asOFFSET(sound_aabb_shape, lower_range));
+	engine->RegisterObjectProperty("sound_aabb_shape", "int upper_range", asOFFSET(sound_aabb_shape, upper_range));
 }
 void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterEnum("audio_error_state");
@@ -1540,6 +1633,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "mixer@ mixer()", asFUNCTION((virtual_call < audio_engine, &audio_engine::new_mixer, mixer * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "sound@ sound()", asFUNCTION((virtual_call < audio_engine, &audio_engine::new_sound, sound * >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemNodes(engine);
+	RegisterSoundsystemShapes(engine);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
 	engine->RegisterObjectMethod("sound", "bool load(const string&in filename, const pack_interface@ pack = null)", asFUNCTION((virtual_call < sound, &sound::load, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool stream(const string&in filename, const pack_interface@ pack = null)", asFUNCTION((virtual_call < sound, &sound::stream, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
