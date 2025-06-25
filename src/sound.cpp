@@ -31,6 +31,7 @@
 #include "pack.h"
 #include <miniaudio_wdl_resampler.h>
 #include <atomic>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <cstdint>
