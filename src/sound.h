@@ -157,7 +157,8 @@ public:
 	virtual void set_reverb3d(reverb3d* verb) = 0;
 	virtual reverb3d* get_reverb3d() const = 0;
 	virtual splitter_node* get_reverb3d_attachment() const = 0;
-	virtual audio_node_chain* get_node_chain() const = 0;
+	virtual audio_node_chain* get_effects_chain() = 0;
+	virtual audio_node_chain* get_internal_node_chain() const = 0;
 	virtual bool play(bool reset_loop_state = true) = 0;
 	virtual bool play_looped() = 0;
 	virtual bool stop() = 0;

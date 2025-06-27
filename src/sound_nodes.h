@@ -54,26 +54,24 @@ public:
 };
 
 // When nodes are added or removed from a node_chain, they are automatically reattached as needed.
-class audio_node_chain {
+class audio_node_chain : public virtual audio_node {
 public:
-	virtual void duplicate() const = 0;
-	virtual void release() const = 0;
+	virtual bool attach_output_bus(unsigned int bus_index, audio_node* node, unsigned int input_bus_index) override = 0;
+	virtual bool detach_output_bus(unsigned int bus_index) override = 0;
+	virtual bool detach_all_output_buses() override = 0;
 	virtual bool add_node(audio_node* node, audio_node* after = nullptr, unsigned int input_bus_index = 0) = 0;
 	virtual bool add_node_at(audio_node* node, int after = -1, unsigned int input_bus_index = 0) = 0;
 	virtual bool remove_node(audio_node* node) = 0;
 	virtual bool remove_node_at(unsigned int index) = 0;
 	virtual bool clear(bool detach_nodes = true) = 0;
-	virtual void set_source(audio_node* source) = 0;
-	virtual void release_source_ref() = 0;
-	virtual audio_node* get_source() const = 0;
-	virtual void set_endpoint(audio_node* endpoint) = 0;
+	virtual void set_endpoint(audio_node* endpoint, unsigned int input_bus_index = 0) = 0;
 	virtual audio_node* get_endpoint() const = 0;
 	virtual audio_node* first() const = 0;
 	virtual audio_node* last() const = 0;
 	virtual audio_node* operator[](unsigned int index) const = 0;
 	virtual int index_of(audio_node* node) const = 0;
 	virtual unsigned int get_node_count() const = 0;
-	static audio_node_chain* create(audio_node* source = nullptr, audio_node* endpoint = nullptr);
+	static audio_node_chain* create(audio_node* source = nullptr, audio_node* endpoint = nullptr, audio_engine* engine = nullptr);
 };
 
 bool set_global_hrtf(bool enabled);
@@ -95,6 +93,78 @@ class mixer_monitor_node : public virtual audio_node {
 class splitter_node : public virtual audio_node {
 	public:
 	static splitter_node* create(audio_engine* engine, int channels);
+};
+class low_pass_filter_node : public virtual audio_node {
+public:
+	virtual void set_cutoff_frequency(double freq) = 0;
+	virtual double get_cutoff_frequency() const = 0;
+	virtual void set_order(unsigned int order) = 0;
+	virtual unsigned int get_order() const = 0;
+	static low_pass_filter_node* create(double cutoff_frequency, unsigned int order, audio_engine* engine);
+};
+class high_pass_filter_node : public virtual audio_node {
+public:
+	virtual void set_cutoff_frequency(double freq) = 0;
+	virtual double get_cutoff_frequency() const = 0;
+	virtual void set_order(unsigned int order) = 0;
+	virtual unsigned int get_order() const = 0;
+	static high_pass_filter_node* create(double cutoff_frequency, unsigned int order, audio_engine* engine);
+};
+class band_pass_filter_node : public virtual audio_node {
+public:
+	virtual void set_cutoff_frequency(double freq) = 0;
+	virtual double get_cutoff_frequency() const = 0;
+	virtual void set_order(unsigned int order) = 0;
+	virtual unsigned int get_order() const = 0;
+	static band_pass_filter_node* create(double cutoff_frequency, unsigned int order, audio_engine* engine);
+};
+class notch_filter_node : public virtual audio_node {
+public:
+	virtual void set_q(double q) = 0;
+	virtual double get_q() const = 0;
+	virtual void set_frequency(double freq) = 0;
+	virtual double get_frequency() const = 0;
+	static notch_filter_node* create(double q, double frequency, audio_engine* engine);
+};
+class peak_filter_node : public virtual audio_node {
+public:
+	virtual void set_gain(double gain) = 0;
+	virtual double get_gain() const = 0;
+	virtual void set_q(double q) = 0;
+	virtual double get_q() const = 0;
+	virtual void set_frequency(double freq) = 0;
+	virtual double get_frequency() const = 0;
+	static peak_filter_node* create(double gain_db, double q, double frequency, audio_engine* engine);
+};
+class low_shelf_filter_node : public virtual audio_node {
+public:
+	virtual void set_gain(double gain) = 0;
+	virtual double get_gain() const = 0;
+	virtual void set_q(double q) = 0;
+	virtual double get_q() const = 0;
+	virtual void set_frequency(double freq) = 0;
+	virtual double get_frequency() const = 0;
+	static low_shelf_filter_node* create(double gain_db, double q, double frequency, audio_engine* engine);
+};
+class high_shelf_filter_node : public virtual audio_node {
+public:
+	virtual void set_gain(double gain) = 0;
+	virtual double get_gain() const = 0;
+	virtual void set_q(double q) = 0;
+	virtual double get_q() const = 0;
+	virtual void set_frequency(double freq) = 0;
+	virtual double get_frequency() const = 0;
+	static high_shelf_filter_node* create(double gain_db, double q, double frequency, audio_engine* engine);
+};
+class delay_node : public virtual audio_node {
+public:
+	virtual void set_wet(float wet) = 0;
+	virtual float get_wet() const = 0;
+	virtual void set_dry(float dry) = 0;
+	virtual float get_dry() const = 0;
+	virtual void set_decay(float decay) = 0;
+	virtual float get_decay() const = 0;
+	static delay_node* create(unsigned int delay_in_frames, float decay, audio_engine* engine);
 };
 class freeverb_node : public virtual audio_node {
 	public:
@@ -126,6 +196,8 @@ public:
 	virtual float get_max_volume() const = 0;
 	virtual void set_max_volume_distance(float distance) = 0;
 	virtual float get_max_volume_distance() const = 0;
+	virtual void set_max_audible_distance(float distance) = 0;
+	virtual float get_max_audible_distance() const = 0;
 	virtual float get_volume_at(float distance) const = 0;
 	virtual splitter_node* create_attachment(audio_node* dry_input = nullptr, audio_node* dry_output = nullptr) = 0;
 	static reverb3d* create(audio_node* reverb, mixer* destination = nullptr, audio_engine* e = g_audio_engine);

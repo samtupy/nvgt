@@ -540,10 +540,10 @@ protected:
 	reverb3d* reverb;
 	splitter_node* reverb_attachment;
 	audio_node_chain* node_chain;
+	audio_node_chain* effects_chain;
 	bool hrtf_desired;
 public:
-	mixer_impl() : audio_node_impl(), snd(nullptr), shape(nullptr), parent_mixer(nullptr), reverb(nullptr), reverb_attachment(nullptr), monitor(mixer_monitor_node::create(this)), node_chain(audio_node_chain::create()), hrtf(nullptr), hrtf_desired(true) {}
-	mixer_impl(audio_engine *e, bool sound_group = true) : audio_node_impl(), engine(static_cast<audio_engine_impl *>(e)), snd(nullptr), shape(nullptr), reverb(nullptr), reverb_attachment(nullptr), node_chain(audio_node_chain::create()), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {
+	mixer_impl(audio_engine *e, bool sound_group = true) : audio_node_impl(), engine(static_cast<audio_engine_impl *>(e)), snd(nullptr), shape(nullptr), reverb(nullptr), reverb_attachment(nullptr), node_chain(audio_node_chain::create(nullptr, nullptr, e)), effects_chain(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {
 		init_sound();
 		node_chain->add_node(monitor);
 		node_chain->set_endpoint(e->get_endpoint());
@@ -551,8 +551,7 @@ public:
 		snd = make_unique<ma_sound>();
 		ma_sound_group_init(e->get_ma_engine(), 0, nullptr, &*snd);
 		node = (ma_node_base *)&*snd;
-		node_chain->set_source(this);
-		node_chain->release_source_ref(); // Otherwise this object can never destruct.
+		attach_output_bus(0, node_chain, 0);
 		// set_attenuation_model(ma_attenuation_model_linear); // Investigate why this doesn't seem to work even though ma_attenuation_linear returns a correctly attenuated gain.
 		set_rolloff(0.75);
 		set_directional_attenuation_factor(1);
@@ -573,6 +572,8 @@ public:
 			reverb->release();
 		if (node_chain)
 			node_chain->release();
+		if (effects_chain)
+			effects_chain->release();
 		if (shape) {
 			if (shape->connected_sound) unregister_blocking_sound_shape(shape);
 			shape->release();
@@ -597,7 +598,7 @@ public:
 			node_chain->set_endpoint(get_engine()->get_endpoint());
 			return node_chain->get_endpoint() == get_engine()->get_endpoint();
 		}
-	return false;
+		return false;
 	}
 	mixer *get_mixer() const override { return parent_mixer; }
 	bool set_hrtf_internal(bool enable) override {
@@ -674,7 +675,14 @@ public:
 	}
 	reverb3d* get_reverb3d() const override { return reverb; }
 	splitter_node* get_reverb3d_attachment() const override { return reverb_attachment; }
-	audio_node_chain* get_node_chain() const override { return node_chain; }
+	audio_node_chain* get_effects_chain() override {
+		if (!effects_chain) {
+			effects_chain = audio_node_chain::create(nullptr, nullptr, get_engine());
+			node_chain->add_node(effects_chain);
+		}
+		return effects_chain;
+	}
+	audio_node_chain* get_internal_node_chain() const override { return node_chain; }
 	bool play(bool reset_loop_state = true) override {
 		if (snd == nullptr)
 			return false;
@@ -1044,8 +1052,7 @@ public:
 			// set_attenuation_model(ma_attenuation_model_linear); // If spatialization is enabled however lets use linear attenuation by default so that we focus more on hearing objects from further out in audio games as opposed to complete but hard to hear realism. At least lets do it once ma_attenuation_model_linear actually works.
 			set_rolloff(0.75);
 			set_directional_attenuation_factor(1);
-			node_chain->set_source(this);
-			node_chain->release_source_ref();
+			attach_output_bus(0, node_chain, 0);
 			// If we didn't load our sound asynchronously or if we streamed it, then we simply mark it as load_completed or we'll end up with a deadlock at destruction time.
 			if (!(cfg.flags & MA_SOUND_FLAG_ASYNC))
 				load_completed.test_and_set();
@@ -1105,7 +1112,6 @@ public:
 	}
 	bool close() override {
 		if (snd) {
-			node_chain->set_source(nullptr);
 			// It's possible that this sound could still be loading in a job thread when we try to destroy it. Unfortunately there isn't a way to cancel this, so we have to just wait.
 			if (!load_completed.test())
 				ma_fence_wait(&fence);
@@ -1483,7 +1489,8 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	engine->RegisterObjectMethod(type.c_str(), "void set_reverb3d(reverb3d@ reverb) property", asFUNCTION((virtual_call < T, &T::set_reverb3d, void, reverb3d*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "reverb3d@+ get_reverb3d() const property", asFUNCTION((virtual_call < T, &T::get_reverb3d, reverb3d*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_splitter_node@+ get_reverb3d_attachment() const property", asFUNCTION((virtual_call < T, &T::get_reverb3d_attachment, splitter_node*>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "audio_node_chain@+ get_node_chain() const property", asFUNCTION((virtual_call < T, &T::get_node_chain, audio_node_chain*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_node_chain@+ get_effects_chain() property", asFUNCTION((virtual_call < T, &T::get_effects_chain, audio_node_chain*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_node_chain@+ get_internal_node_chain() const property", asFUNCTION((virtual_call < T, &T::get_internal_node_chain, audio_node_chain*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play(bool reset_loop_state = true)", asFUNCTION((virtual_call < T, &T::play, bool, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play_looped()", asFUNCTION((virtual_call < T, &T::play_looped, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool stop()", asFUNCTION((virtual_call < T, &T::stop, bool >)), asCALL_CDECL_OBJFIRST);
@@ -1540,17 +1547,13 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	engine->RegisterObjectMethod(type.c_str(), "bool get_playing() const property", asFUNCTION((virtual_call < T, &T::get_playing, bool >)), asCALL_CDECL_OBJFIRST);
 }
 void RegisterSoundsystemNodes(asIScriptEngine *engine) {
-	engine->RegisterObjectBehaviour("audio_node_chain", asBEHAVE_FACTORY, "audio_node_chain@ c(audio_node@ source = null, audio_node@ endpoint = null)", asFUNCTION(audio_node_chain::create), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("audio_node_chain", asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::duplicate, void >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("audio_node_chain", asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::release, void >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("audio_node_chain", asBEHAVE_FACTORY, "audio_node_chain@ c(audio_node@ source = null, audio_node@ endpoint = null, audio_engine@+ engine = sound_default_engine)", asFUNCTION(audio_node_chain::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_node_chain", "bool add_node(audio_node@+ node, audio_node@+ after = null, uint input_bus_index = 0)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::add_node, bool, audio_node*, audio_node*, unsigned int>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_node_chain", "bool add_node(audio_node@+ node, int after = -1, uint input_bus_index = 0)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::add_node_at, bool, audio_node*, int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "bool add_node(audio_node@+ node, int after, uint input_bus_index = 0)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::add_node_at, bool, audio_node*, int, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_node_chain", "bool remove_node(audio_node@+ node)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::remove_node, bool, audio_node*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_node_chain", "bool remove_node(uint index)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::remove_node_at, bool, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_node_chain", "bool clear(bool detach_nodes = true)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::clear, bool, bool>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_node_chain", "void set_source(audio_node@+ source) property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::set_source, void, audio_node*>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_node_chain", "audio_node@+ get_source() const property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::get_source, audio_node*>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_node_chain", "void set_endpoint(audio_node@+ endpoint) property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::set_endpoint, void, audio_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "void set_endpoint(audio_node@+ endpoint, uint input_bus_index = 0)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::set_endpoint, void, audio_node*, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_node_chain", "audio_node@+ get_endpoint() const property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::get_endpoint, audio_node*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_node_chain", "audio_node@+ get_first() const property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::first, audio_node*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_node_chain", "audio_node@+ get_last() const property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::last, audio_node*>)), asCALL_CDECL_OBJFIRST);
@@ -1565,6 +1568,62 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("bool set_sound_global_hrtf(bool enabled)", asFUNCTION(set_global_hrtf), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool get_sound_global_hrtf() property", asFUNCTION(get_global_hrtf), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("audio_splitter_node", asBEHAVE_FACTORY, "audio_splitter_node@ n(audio_engine@ engine, int channels)", asFUNCTION(splitter_node::create), asCALL_CDECL);
+	RegisterSoundsystemAudioNode <low_pass_filter_node> (engine, "audio_low_pass_filter");
+	engine->RegisterObjectBehaviour("audio_low_pass_filter", asBEHAVE_FACTORY, "audio_low_pass_filter@ f(double cutoff_frequency, uint order, audio_engine@ engine = sound_default_engine)", asFUNCTION(low_pass_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("audio_low_pass_filter", "void set_cutoff_frequency(double frequency) property", asFUNCTION((virtual_call < low_pass_filter_node, &low_pass_filter_node::set_cutoff_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_low_pass_filter", "double get_cutoff_frequency() const property", asFUNCTION((virtual_call < low_pass_filter_node, &low_pass_filter_node::get_cutoff_frequency, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_low_pass_filter", "void set_order(uint order) property", asFUNCTION((virtual_call < low_pass_filter_node, &low_pass_filter_node::set_order, void, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_low_pass_filter", "uint get_order() const property", asFUNCTION((virtual_call < low_pass_filter_node, &low_pass_filter_node::get_order, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	RegisterSoundsystemAudioNode <high_pass_filter_node> (engine, "audio_high_pass_filter");
+	engine->RegisterObjectBehaviour("audio_high_pass_filter", asBEHAVE_FACTORY, "audio_high_pass_filter@ f(double cutoff_frequency, uint order, audio_engine@ engine = sound_default_engine)", asFUNCTION(high_pass_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("audio_high_pass_filter", "void set_cutoff_frequency(double frequency) property", asFUNCTION((virtual_call < high_pass_filter_node, &high_pass_filter_node::set_cutoff_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_high_pass_filter", "double get_cutoff_frequency() const property", asFUNCTION((virtual_call < high_pass_filter_node, &high_pass_filter_node::get_cutoff_frequency, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_high_pass_filter", "void set_order(uint order) property", asFUNCTION((virtual_call < high_pass_filter_node, &high_pass_filter_node::set_order, void, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_high_pass_filter", "uint get_order() const property", asFUNCTION((virtual_call < high_pass_filter_node, &high_pass_filter_node::get_order, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	RegisterSoundsystemAudioNode <band_pass_filter_node> (engine, "audio_band_pass_filter");
+	engine->RegisterObjectBehaviour("audio_band_pass_filter", asBEHAVE_FACTORY, "audio_band_pass_filter@ f(double cutoff_frequency, uint order, audio_engine@ engine = sound_default_engine)", asFUNCTION(band_pass_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("audio_band_pass_filter", "void set_cutoff_frequency(double frequency) property", asFUNCTION((virtual_call < band_pass_filter_node, &band_pass_filter_node::set_cutoff_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_band_pass_filter", "double get_cutoff_frequency() const property", asFUNCTION((virtual_call < band_pass_filter_node, &band_pass_filter_node::get_cutoff_frequency, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_band_pass_filter", "void set_order(uint order) property", asFUNCTION((virtual_call < band_pass_filter_node, &band_pass_filter_node::set_order, void, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_band_pass_filter", "uint get_order() const property", asFUNCTION((virtual_call < band_pass_filter_node, &band_pass_filter_node::get_order, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	RegisterSoundsystemAudioNode <notch_filter_node> (engine, "audio_notch_filter");
+	engine->RegisterObjectBehaviour("audio_notch_filter", asBEHAVE_FACTORY, "audio_notch_filter@ f(double q, double frequency, audio_engine@ engine = sound_default_engine)", asFUNCTION(notch_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("audio_notch_filter", "void set_q(double q) property", asFUNCTION((virtual_call < notch_filter_node, &notch_filter_node::set_q, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_notch_filter", "double get_q() const property", asFUNCTION((virtual_call < notch_filter_node, &notch_filter_node::get_q, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_notch_filter", "void set_frequency(double frequency) property", asFUNCTION((virtual_call < notch_filter_node, &notch_filter_node::set_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_notch_filter", "double get_frequency() const property", asFUNCTION((virtual_call < notch_filter_node, &notch_filter_node::get_frequency, double >)), asCALL_CDECL_OBJFIRST);
+	RegisterSoundsystemAudioNode <peak_filter_node> (engine, "audio_peak_filter");
+	engine->RegisterObjectBehaviour("audio_peak_filter", asBEHAVE_FACTORY, "audio_peak_filter@ f(double gain_db, double q, double frequency, audio_engine@ engine = sound_default_engine)", asFUNCTION(peak_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("audio_peak_filter", "void set_gain(double gain) property", asFUNCTION((virtual_call < peak_filter_node, &peak_filter_node::set_gain, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_peak_filter", "double get_gain() const property", asFUNCTION((virtual_call < peak_filter_node, &peak_filter_node::get_gain, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_peak_filter", "void set_q(double q) property", asFUNCTION((virtual_call < peak_filter_node, &peak_filter_node::set_q, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_peak_filter", "double get_q() const property", asFUNCTION((virtual_call < peak_filter_node, &peak_filter_node::get_q, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_peak_filter", "void set_frequency(double frequency) property", asFUNCTION((virtual_call < peak_filter_node, &peak_filter_node::set_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_peak_filter", "double get_frequency() const property", asFUNCTION((virtual_call < peak_filter_node, &peak_filter_node::get_frequency, double >)), asCALL_CDECL_OBJFIRST);
+	RegisterSoundsystemAudioNode <low_shelf_filter_node> (engine, "audio_low_shelf_filter");
+	engine->RegisterObjectBehaviour("audio_low_shelf_filter", asBEHAVE_FACTORY, "audio_low_shelf_filter@ f(double gain_db, double q, double frequency, audio_engine@ engine = sound_default_engine)", asFUNCTION(low_shelf_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("audio_low_shelf_filter", "void set_gain(double gain) property", asFUNCTION((virtual_call < low_shelf_filter_node, &low_shelf_filter_node::set_gain, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_low_shelf_filter", "double get_gain() const property", asFUNCTION((virtual_call < low_shelf_filter_node, &low_shelf_filter_node::get_gain, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_low_shelf_filter", "void set_q(double q) property", asFUNCTION((virtual_call < low_shelf_filter_node, &low_shelf_filter_node::set_q, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_low_shelf_filter", "double get_q() const property", asFUNCTION((virtual_call < low_shelf_filter_node, &low_shelf_filter_node::get_q, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_low_shelf_filter", "void set_frequency(double frequency) property", asFUNCTION((virtual_call < low_shelf_filter_node, &low_shelf_filter_node::set_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_low_shelf_filter", "double get_frequency() const property", asFUNCTION((virtual_call < low_shelf_filter_node, &low_shelf_filter_node::get_frequency, double >)), asCALL_CDECL_OBJFIRST);
+	RegisterSoundsystemAudioNode <high_shelf_filter_node> (engine, "audio_high_shelf_filter");
+	engine->RegisterObjectBehaviour("audio_high_shelf_filter", asBEHAVE_FACTORY, "audio_high_shelf_filter@ f(double gain_db, double q, double frequency, audio_engine@ engine = sound_default_engine)", asFUNCTION(high_shelf_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("audio_high_shelf_filter", "void set_gain(double gain) property", asFUNCTION((virtual_call < high_shelf_filter_node, &high_shelf_filter_node::set_gain, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_high_shelf_filter", "double get_gain() const property", asFUNCTION((virtual_call < high_shelf_filter_node, &high_shelf_filter_node::get_gain, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_high_shelf_filter", "void set_q(double q) property", asFUNCTION((virtual_call < high_shelf_filter_node, &high_shelf_filter_node::set_q, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_high_shelf_filter", "double get_q() const property", asFUNCTION((virtual_call < high_shelf_filter_node, &high_shelf_filter_node::get_q, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_high_shelf_filter", "void set_frequency(double frequency) property", asFUNCTION((virtual_call < high_shelf_filter_node, &high_shelf_filter_node::set_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_high_shelf_filter", "double get_frequency() const property", asFUNCTION((virtual_call < high_shelf_filter_node, &high_shelf_filter_node::get_frequency, double >)), asCALL_CDECL_OBJFIRST);
+	RegisterSoundsystemAudioNode <delay_node> (engine, "audio_delay_node");
+	engine->RegisterObjectBehaviour("audio_delay_node", asBEHAVE_FACTORY, "audio_delay_node@ d(uint delay_in_frames, float decay, audio_engine@ engine = sound_default_engine)", asFUNCTION(delay_node::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("audio_delay_node", "void set_wet(float wet) property", asFUNCTION((virtual_call < delay_node, &delay_node::set_wet, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_delay_node", "float get_wet() const property", asFUNCTION((virtual_call < delay_node, &delay_node::get_wet, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_delay_node", "void set_dry(float dry) property", asFUNCTION((virtual_call < delay_node, &delay_node::set_dry, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_delay_node", "float get_dry() const property", asFUNCTION((virtual_call < delay_node, &delay_node::get_dry, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_delay_node", "void set_decay(float decay) property", asFUNCTION((virtual_call < delay_node, &delay_node::set_decay, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_delay_node", "float get_decay() const property", asFUNCTION((virtual_call < delay_node, &delay_node::get_decay, float >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemAudioNode <freeverb_node> (engine, "audio_freeverb_node");
 	engine->RegisterObjectBehaviour("audio_freeverb_node", asBEHAVE_FACTORY, "audio_freeverb_node@ n(audio_engine@ engine, int channels)", asFUNCTION(freeverb_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_freeverb_node", "void set_room_size(float size) property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::set_room_size, void, float >)), asCALL_CDECL_OBJFIRST);
@@ -1592,6 +1651,8 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("reverb3d", "float get_max_volume() const property", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_max_volume, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("reverb3d", "void set_max_volume_distance(float distance) property", asFUNCTION((virtual_call < reverb3d, &reverb3d::set_max_volume_distance, void, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("reverb3d", "float get_max_volume_distance() const property", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_max_volume_distance, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "void set_max_audible_distance(float distance) property", asFUNCTION((virtual_call < reverb3d, &reverb3d::set_max_audible_distance, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "float get_max_audible_distance() const property", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_max_audible_distance, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("reverb3d", "float get_volume_at(float distance) const", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_volume_at, float, float>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("reverb3d", "audio_splitter_node@ create_attachment(audio_node@+ dry_input = null, audio_node@+ dry_output = null)", asFUNCTION((virtual_call < reverb3d, &reverb3d::create_attachment, splitter_node*, audio_node*, audio_node*>)), asCALL_CDECL_OBJFIRST);
 }
@@ -1709,7 +1770,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_PERCENTAGE_ATTRIBUTES", audio_engine::PERCENTAGE_ATTRIBUTES);
 	RegisterSoundsystemAudioNode < audio_node > (engine, "audio_node");
 	RegisterSoundsystemEngine(engine);
-	engine->RegisterObjectType("audio_node_chain", 0, asOBJ_REF);
+	RegisterSoundsystemAudioNode < audio_node_chain > (engine, "audio_node_chain");
 	RegisterSoundsystemAudioNode < splitter_node > (engine, "audio_splitter_node");
 	RegisterSoundsystemAudioNode <reverb3d> (engine, "reverb3d");
 	RegisterSoundsystemMixer < mixer > (engine, "mixer");

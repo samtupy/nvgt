@@ -21,24 +21,44 @@
 
 using namespace std;
 
-class audio_node_chain_impl : public virtual audio_node_chain {
+// The following node acts as a simple passthrough, with a callback that does nothing. The purpose is for any object that exists between or in any way handles nodes to be able to exist in the node graph.
+// For example a reverb3d node acts as a high level API to applying reverb to 3d sounds. We want the user to be able to swap underlying reverb effect nodes that all sounds attached to the reverb3d objects are using, but prefferably without keeping track of sounds to reattach. Therefor, reverb3d acts as a passthrough node which all connected sounds are attached to, allowing us to swap the underlying reverb effect in one place rather than for all connected sounds.
+typedef struct {
+	ma_node_base base;
+} ma_passthrough_node;
+static void ma_passthrough_node_process_pcm_frames(ma_node* pNode, const float** ppFramesIn, ma_uint32* pFrameCountIn, float** ppFramesOut, ma_uint32* pFrameCountOut) {}
+static ma_node_vtable ma_passthrough_node_vtable = { ma_passthrough_node_process_pcm_frames, nullptr, 1, 1, MA_NODE_FLAG_PASSTHROUGH | MA_NODE_FLAG_CONTINUOUS_PROCESSING | MA_NODE_FLAG_ALLOW_NULL_INPUT };
+
+class audio_node_chain_impl : public audio_node_impl, public virtual audio_node_chain {
 	audio_node* source;
 	std::vector<audio_node*> nodes;
 	audio_node* endpoint;
-	mutable int refcount;
-	bool owns_source_ref;
+	unsigned int endpoint_input_bus_index;
+	unique_ptr<ma_passthrough_node> pn;
 public:
-	audio_node_chain_impl(audio_node* source, audio_node* endpoint) : source(source), endpoint(endpoint), refcount(1), owns_source_ref(false) {
-		if (source && endpoint) source->attach_output_bus(0, endpoint, 0);
+	audio_node_chain_impl(audio_node* source, audio_node* endpoint, audio_engine* e) : pn(make_unique<ma_passthrough_node>()), audio_node_impl(nullptr, e), endpoint(endpoint) {
+		ma_node_config cfg = ma_node_config_init();
+		ma_uint32 channels = e->get_channels();
+		cfg.vtable          = &ma_passthrough_node_vtable;
+		cfg.pInputChannels  = &channels;
+		cfg.pOutputChannels = &channels;
+		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*pn)) != MA_SUCCESS) throw std::runtime_error("failed to create audio_node_chain");
+		node = (ma_node_base*)&*pn;
+		if (source) source->attach_output_bus(0, this, 0);
+		if (endpoint) attach_output_bus(0, endpoint, 0);
 	}
 	~audio_node_chain_impl() {
 		// We only release references, all attachments are kept in tact. Call clear(true) to detach all known nodes instead.
-		if (source && owns_source_ref) source->release();
 		for (audio_node* node: nodes) node->release();
 		if (endpoint) endpoint->release();
+		if (pn) ma_node_uninit(&*pn, nullptr);
 	}
-	void duplicate() const override { asAtomicInc(refcount); }
-	void release() const override { if (asAtomicDec(refcount) < 1) delete this; }
+	bool attach_output_bus(unsigned int bus_index, audio_node* node, unsigned int input_bus_index) override {
+		set_endpoint(node, input_bus_index);
+		return endpoint == node;
+	}
+	bool detach_output_bus(unsigned int bus_index) override { set_endpoint(nullptr, 0); return endpoint == nullptr; }
+	bool detach_all_output_buses() override { return detach_output_bus(0); }
 	bool add_node(audio_node* node, audio_node* after, unsigned int input_bus_index) override {
 		if (!node) return false;
 		unsigned int new_idx = 0;
@@ -47,13 +67,11 @@ public:
 			if (new_idx == -1) return false;
 			else new_idx += 1; // Be sure to insert after this position rather than before.
 		}
-		audio_node* prev = new_idx? nodes[new_idx -1] : source;
+		audio_node* prev = new_idx? nodes[new_idx -1] : nullptr;
 		audio_node* next = new_idx? (new_idx < nodes.size()? nodes[new_idx] : endpoint) : (!nodes.empty()? first() : endpoint);
+		if (prev && !prev->attach_output_bus(0, node, 0)) return false;
+		else if (!prev && !audio_node_impl::attach_output_bus(0, node, 0)) return false;
 		if (next && !node->attach_output_bus(0, next, input_bus_index)) return false;
-		if (prev && !prev->attach_output_bus(0, node, 0)) {
-			node->detach_output_bus(0);
-			return false;
-		}
 		nodes.insert(nodes.begin() + new_idx, node);
 		node->duplicate();
 		return true;
@@ -67,9 +85,10 @@ public:
 		if (!node) return false;
 		auto it = find(nodes.begin(), nodes.end(), node);
 		if (it == nodes.end()) return false;
-		audio_node* prev = (*it) != nodes.front()? *(it -1) : source;
+		audio_node* prev = (*it) != nodes.front()? *(it -1) : nullptr;
 		audio_node* next = (*it) != nodes.back()? *(it + 1) : endpoint;
 		if (prev && next && !prev->attach_output_bus(0, next, 0)) return false;
+		else if (!prev && next && !audio_node_impl::attach_output_bus(0, next, 0)) return false;
 		nodes.erase(it);
 		bool success = node->detach_output_bus(0);
 		node->release();
@@ -80,52 +99,35 @@ public:
 		return remove_node(nodes[index]);
 	}
 	bool clear(bool detach_nodes) override {
-		bool success = !source || source->detach_output_bus(0);
+		bool success = audio_node_impl::detach_output_bus(0);
 		for (audio_node* node : nodes) {
 			if (success && detach_nodes) success = node->detach_output_bus(0);
 			node->release();
 		}
+		if (success && endpoint) success = audio_node_impl::attach_output_bus(0, endpoint, 0);
 		nodes.clear();
 		return success;
 	}
-	void set_source(audio_node* node) override {
-		if (source) {
-			source->detach_output_bus(0);
-			if (owns_source_ref) source->release();
-		}
-		source = node;
-		if (source) {
-			if (!nodes.empty()) source->attach_output_bus(0, first(), 0);
-			else if (endpoint) source->attach_output_bus(0, endpoint, 0);
-			source->duplicate();
-			owns_source_ref = true;
-		} else owns_source_ref = false;
-	}
-	void release_source_ref() override {
-		if (source && owns_source_ref) source->release();
-		owns_source_ref = false;
-	}
-	audio_node* get_source() const override { return source; }
-	void set_endpoint(audio_node* node) override {
+	void set_endpoint(audio_node* node, unsigned int input_bus_index) override {
 		if (endpoint) {
 			if (!nodes.empty()) last()->detach_output_bus(0);
-			else if (source) source->detach_output_bus(0);
+			else audio_node_impl::detach_output_bus(0);
 			endpoint->release();
 		}
 		endpoint = node;
 		if (endpoint) {
-			if (!nodes.empty()) last()->attach_output_bus(0, endpoint, 0);
-			else if (source) source->attach_output_bus(0, endpoint, 0);
+			if (!nodes.empty()) last()->attach_output_bus(0, endpoint, input_bus_index);
+			else audio_node_impl::attach_output_bus(0, endpoint, input_bus_index);
 			endpoint->duplicate();
 		}
 	}
 	audio_node* get_endpoint() const override { return endpoint; }
 	audio_node* first() const override {
-		if (nodes.size() < 1) return nullptr;
+		if (nodes.empty()) return nullptr;
 		return nodes[0];
 	}
 	audio_node* last() const override {
-		if (nodes.size() < 1) return nullptr;
+		if (nodes.empty()) return nullptr;
 		return nodes[nodes.size() -1];
 	}
 	audio_node* operator[](unsigned int index) const override {
@@ -139,7 +141,7 @@ public:
 	}
 	unsigned int get_node_count() const override { return nodes.size(); }
 };
-audio_node_chain* audio_node_chain::create(audio_node* source, audio_node* endpoint) { return new audio_node_chain_impl(source, endpoint); }
+audio_node_chain* audio_node_chain::create(audio_node* source, audio_node* endpoint, audio_engine* engine) { return new audio_node_chain_impl(source, endpoint, engine); }
 
 static IPLAudioSettings g_phonon_audio_settings {44100, SOUNDSYSTEM_FRAMESIZE}; // We will update samplerate later in phonon_init.
 static IPLContext g_phonon_context = nullptr;
@@ -278,6 +280,216 @@ class splitter_node_impl : public audio_node_impl, public virtual splitter_node 
 };
 splitter_node* splitter_node::create(audio_engine* e, int channels) { return new splitter_node_impl(e, channels); }
 
+class low_pass_filter_node_impl : public audio_node_impl, public virtual low_pass_filter_node {
+	unique_ptr<ma_lpf_node> fn;
+	ma_lpf_node_config cfg;
+	public:
+	low_pass_filter_node_impl(double cutoff_frequency, int order, audio_engine* e) : fn(make_unique<ma_lpf_node>()), audio_node_impl(nullptr, e) {
+		cfg = ma_lpf_node_config_init(e->get_channels(), e->get_sample_rate(), cutoff_frequency, order);
+		if ((g_soundsystem_last_error = ma_lpf_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_low_pass_filter_node was not initialized");
+		node = (ma_node_base*)&*fn;
+	}
+	~low_pass_filter_node_impl() {
+		if (fn) ma_lpf_node_uninit(&*fn, nullptr);
+	}
+	void set_cutoff_frequency(double freq) override {
+		cfg.lpf.cutoffFrequency = freq;
+		ma_lpf_node_reinit(&cfg.lpf, &*fn);
+	}
+	double get_cutoff_frequency() const override { return cfg.lpf.cutoffFrequency; }
+	void set_order(unsigned int order) override {
+		cfg.lpf.order = order;
+		ma_lpf_node_reinit(&cfg.lpf, &*fn);
+	}
+	unsigned int get_order() const override { return cfg.lpf.order; }
+};
+low_pass_filter_node* low_pass_filter_node::create(double cutoff_frequency, unsigned int order, audio_engine* engine) { return new low_pass_filter_node_impl(cutoff_frequency, order, engine); }
+
+class high_pass_filter_node_impl : public audio_node_impl, public virtual high_pass_filter_node {
+	unique_ptr<ma_hpf_node> fn;
+	ma_hpf_node_config cfg;
+	public:
+	high_pass_filter_node_impl(double cutoff_frequency, int order, audio_engine* e) : fn(make_unique<ma_hpf_node>()), audio_node_impl(nullptr, e) {
+		cfg = ma_hpf_node_config_init(e->get_channels(), e->get_sample_rate(), cutoff_frequency, order);
+		if ((g_soundsystem_last_error = ma_hpf_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_high_pass_filter_node was not initialized");
+		node = (ma_node_base*)&*fn;
+	}
+	~high_pass_filter_node_impl() {
+		if (fn) ma_hpf_node_uninit(&*fn, nullptr);
+	}
+	void set_cutoff_frequency(double freq) override {
+		cfg.hpf.cutoffFrequency = freq;
+		ma_hpf_node_reinit(&cfg.hpf, &*fn);
+	}
+	double get_cutoff_frequency() const override { return cfg.hpf.cutoffFrequency; }
+	void set_order(unsigned int order) override {
+		cfg.hpf.order = order;
+		ma_hpf_node_reinit(&cfg.hpf, &*fn);
+	}
+	unsigned int get_order() const override { return cfg.hpf.order; }
+};
+high_pass_filter_node* high_pass_filter_node::create(double cutoff_frequency, unsigned int order, audio_engine* engine) { return new high_pass_filter_node_impl(cutoff_frequency, order, engine); }
+
+class band_pass_filter_node_impl : public audio_node_impl, public virtual band_pass_filter_node {
+	unique_ptr<ma_bpf_node> fn;
+	ma_bpf_node_config cfg;
+	public:
+	band_pass_filter_node_impl(double cutoff_frequency, int order, audio_engine* e) : fn(make_unique<ma_bpf_node>()), audio_node_impl(nullptr, e) {
+		cfg = ma_bpf_node_config_init(e->get_channels(), e->get_sample_rate(), cutoff_frequency, order);
+		if ((g_soundsystem_last_error = ma_bpf_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_band_pass_filter_node was not initialized");
+		node = (ma_node_base*)&*fn;
+	}
+	~band_pass_filter_node_impl() {
+		if (fn) ma_bpf_node_uninit(&*fn, nullptr);
+	}
+	void set_cutoff_frequency(double freq) override {
+		cfg.bpf.cutoffFrequency = freq;
+		ma_bpf_node_reinit(&cfg.bpf, &*fn);
+	}
+	double get_cutoff_frequency() const override { return cfg.bpf.cutoffFrequency; }
+	void set_order(unsigned int order) override {
+		cfg.bpf.order = order;
+		ma_bpf_node_reinit(&cfg.bpf, &*fn);
+	}
+	unsigned int get_order() const override { return cfg.bpf.order; }
+};
+band_pass_filter_node* band_pass_filter_node::create(double cutoff_frequency, unsigned int order, audio_engine* engine) { return new band_pass_filter_node_impl(cutoff_frequency, order, engine); }
+
+class notch_filter_node_impl : public audio_node_impl, public virtual notch_filter_node {
+	unique_ptr<ma_notch_node> fn;
+	ma_notch_node_config cfg;
+	public:
+	notch_filter_node_impl(double q, double frequency, audio_engine* e) : fn(make_unique<ma_notch_node>()), audio_node_impl(nullptr, e) {
+		cfg = ma_notch_node_config_init(e->get_channels(), e->get_sample_rate(), q, frequency);
+		if ((g_soundsystem_last_error = ma_notch_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_notch_filter_node was not initialized");
+		node = (ma_node_base*)&*fn;
+	}
+	~notch_filter_node_impl() {
+		if (fn) ma_notch_node_uninit(&*fn, nullptr);
+	}
+	void set_q(double q) override {
+		cfg.notch.q = q;
+		ma_notch_node_reinit(&cfg.notch, &*fn);
+	}
+	double get_q() const override { return cfg.notch.q; }
+	void set_frequency(double freq) override {
+		cfg.notch.frequency = freq;
+		ma_notch_node_reinit(&cfg.notch, &*fn);
+	}
+	double get_frequency() const override { return cfg.notch.frequency; }
+};
+notch_filter_node* notch_filter_node::create(double q, double frequency, audio_engine* engine) { return new notch_filter_node_impl(q, frequency, engine); }
+
+class peak_filter_node_impl : public audio_node_impl, public virtual peak_filter_node {
+	unique_ptr<ma_peak_node> fn;
+	ma_peak_node_config cfg;
+	public:
+	peak_filter_node_impl(double gain_db, double q, double frequency, audio_engine* e) : fn(make_unique<ma_peak_node>()), audio_node_impl(nullptr, e) {
+		cfg = ma_peak_node_config_init(e->get_channels(), e->get_sample_rate(), gain_db, q, frequency);
+		if ((g_soundsystem_last_error = ma_peak_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_peak_filter_node was not initialized");
+		node = (ma_node_base*)&*fn;
+	}
+	~peak_filter_node_impl() {
+		if (fn) ma_peak_node_uninit(&*fn, nullptr);
+	}
+	void set_gain(double gain) override {
+		cfg.peak.gainDB = gain;
+		ma_peak_node_reinit(&cfg.peak, &*fn);
+	}
+	double get_gain() const override { return cfg.peak.gainDB; }
+	void set_q(double q) override {
+		cfg.peak.q = q;
+		ma_peak_node_reinit(&cfg.peak, &*fn);
+	}
+	double get_q() const override { return cfg.peak.q; }
+	void set_frequency(double freq) override {
+		cfg.peak.frequency = freq;
+		ma_peak_node_reinit(&cfg.peak, &*fn);
+	}
+	double get_frequency() const override { return cfg.peak.frequency; }
+};
+peak_filter_node* peak_filter_node::create(double gain_db, double q, double frequency, audio_engine* engine) { return new peak_filter_node_impl(gain_db, q, frequency, engine); }
+
+class low_shelf_filter_node_impl : public audio_node_impl, public virtual low_shelf_filter_node {
+	unique_ptr<ma_loshelf_node> fn;
+	ma_loshelf_node_config cfg;
+	public:
+	low_shelf_filter_node_impl(double gain_db, double q, double frequency, audio_engine* e) : fn(make_unique<ma_loshelf_node>()), audio_node_impl(nullptr, e) {
+		cfg = ma_loshelf_node_config_init(e->get_channels(), e->get_sample_rate(), gain_db, q, frequency);
+		if ((g_soundsystem_last_error = ma_loshelf_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_low_shelf_filter_node was not initialized");
+		node = (ma_node_base*)&*fn;
+	}
+	~low_shelf_filter_node_impl() {
+		if (fn) ma_loshelf_node_uninit(&*fn, nullptr);
+	}
+	void set_gain(double gain) override {
+		cfg.loshelf.gainDB = gain;
+		ma_loshelf_node_reinit(&cfg.loshelf, &*fn);
+	}
+	double get_gain() const override { return cfg.loshelf.gainDB; }
+	void set_q(double q) override {
+		cfg.loshelf.shelfSlope = q;
+		ma_loshelf_node_reinit(&cfg.loshelf, &*fn);
+	}
+	double get_q() const override { return cfg.loshelf.shelfSlope; }
+	void set_frequency(double freq) override {
+		cfg.loshelf.frequency = freq;
+		ma_loshelf_node_reinit(&cfg.loshelf, &*fn);
+	}
+	double get_frequency() const override { return cfg.loshelf.frequency; }
+};
+low_shelf_filter_node* low_shelf_filter_node::create(double gain_db, double q, double frequency, audio_engine* engine) { return new low_shelf_filter_node_impl(gain_db, q, frequency, engine); }
+
+class high_shelf_filter_node_impl : public audio_node_impl, public virtual high_shelf_filter_node {
+	unique_ptr<ma_hishelf_node> fn;
+	ma_hishelf_node_config cfg;
+	public:
+	high_shelf_filter_node_impl(double gain_db, double q, double frequency, audio_engine* e) : fn(make_unique<ma_hishelf_node>()), audio_node_impl(nullptr, e) {
+		cfg = ma_hishelf_node_config_init(e->get_channels(), e->get_sample_rate(), gain_db, q, frequency);
+		if ((g_soundsystem_last_error = ma_hishelf_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_high_shelf_filter_node was not initialized");
+		node = (ma_node_base*)&*fn;
+	}
+	~high_shelf_filter_node_impl() {
+		if (fn) ma_hishelf_node_uninit(&*fn, nullptr);
+	}
+	void set_gain(double gain) override {
+		cfg.hishelf.gainDB = gain;
+		ma_hishelf_node_reinit(&cfg.hishelf, &*fn);
+	}
+	double get_gain() const override { return cfg.hishelf.gainDB; }
+	void set_q(double q) override {
+		cfg.hishelf.shelfSlope = q;
+		ma_hishelf_node_reinit(&cfg.hishelf, &*fn);
+	}
+	double get_q() const override { return cfg.hishelf.shelfSlope; }
+	void set_frequency(double freq) override {
+		cfg.hishelf.frequency = freq;
+		ma_hishelf_node_reinit(&cfg.hishelf, &*fn);
+	}
+	double get_frequency() const override { return cfg.hishelf.frequency; }
+};
+high_shelf_filter_node* high_shelf_filter_node::create(double gain_db, double q, double frequency, audio_engine* engine) { return new high_shelf_filter_node_impl(gain_db, q, frequency, engine); }
+
+class delay_node_impl : public audio_node_impl, public virtual delay_node {
+	unique_ptr<ma_delay_node> dn;
+	public:
+	delay_node_impl(unsigned int delay_in_frames, float decay, audio_engine* e) : dn(make_unique<ma_delay_node>()), audio_node_impl(nullptr, e) {
+		ma_delay_node_config cfg = ma_delay_node_config_init(e->get_channels(), e->get_sample_rate(), delay_in_frames, decay);
+		if ((g_soundsystem_last_error = ma_delay_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*dn)) != MA_SUCCESS) throw std::runtime_error("ma_delay_node was not initialized");
+		node = (ma_node_base*)&*dn;
+	}
+	~delay_node_impl() {
+		if (dn) ma_delay_node_uninit(&*dn, nullptr);
+	}
+	void set_wet(float wet) override { ma_delay_node_set_wet(&*dn, wet); }
+	float get_wet() const override { return ma_delay_node_get_wet(&*dn); }
+	void set_dry(float dry) override { ma_delay_node_set_dry(&*dn, dry); }
+	float get_dry() const override { return ma_delay_node_get_dry(&*dn); }
+	void set_decay(float decay) override { ma_delay_node_set_decay(&*dn, decay); }
+	float get_decay() const override { return ma_delay_node_get_decay(&*dn); }
+};
+delay_node* delay_node::create(unsigned int delay_in_frames, float decay, audio_engine* engine) { return new delay_node_impl(delay_in_frames, decay, engine); }
+
 class freeverb_node_impl : public audio_node_impl, public virtual freeverb_node {
 	unique_ptr<ma_reverb_node> rn;
 	public:
@@ -306,21 +518,13 @@ class freeverb_node_impl : public audio_node_impl, public virtual freeverb_node 
 };
 freeverb_node* freeverb_node::create(audio_engine* e, int channels) { return new freeverb_node_impl(e, channels); }
 
-// The following node acts as a simple passthrough, with a callback that does nothing. The purpose is for any object that exists between or in any way handles nodes to be able to exist in the node graph.
-// For example a reverb3d node acts as a high level API to applying reverb to 3d sounds. We want the user to be able to swap underlying reverb effect nodes that all sounds attached to the reverb3d objects are using, but prefferably without keeping track of sounds to reattach. Therefor, reverb3d acts as a passthrough node which all connected sounds are attached to, allowing us to swap the underlying reverb effect in one place rather than for all connected sounds.
-typedef struct {
-	ma_node_base base;
-} ma_passthrough_node;
-static void ma_passthrough_node_process_pcm_frames(ma_node* pNode, const float** ppFramesIn, ma_uint32* pFrameCountIn, float** ppFramesOut, ma_uint32* pFrameCountOut) {}
-static ma_node_vtable ma_passthrough_node_vtable = { ma_passthrough_node_process_pcm_frames, nullptr, 1, 1, MA_NODE_FLAG_PASSTHROUGH | MA_NODE_FLAG_CONTINUOUS_PROCESSING | MA_NODE_FLAG_ALLOW_NULL_INPUT };
-
 class reverb3d_impl : public audio_node_impl, public virtual reverb3d {
 	unique_ptr<ma_passthrough_node> pn;
 	audio_node* reverb;
 	mixer* output_mixer;
-	float min_volume, max_volume, max_volume_distance;
+	float min_volume, max_volume, max_volume_distance, max_audible_distance;
 public:
-	reverb3d_impl(audio_engine* e, audio_node* reverb, mixer* destination) : pn(make_unique<ma_passthrough_node>()), audio_node_impl(nullptr, e), output_mixer(destination), reverb(reverb), min_volume(0.3), max_volume(2.0), max_volume_distance(15.0) {
+	reverb3d_impl(audio_engine* e, audio_node* reverb, mixer* destination) : pn(make_unique<ma_passthrough_node>()), audio_node_impl(nullptr, e), output_mixer(destination), reverb(reverb), min_volume(0.3), max_volume(2.0), max_volume_distance(15.0), max_audible_distance(40.0) {
 		ma_node_config cfg = ma_node_config_init();
 		ma_uint32 channels = e->get_channels();
 		cfg.vtable          = &ma_passthrough_node_vtable;
@@ -368,9 +572,14 @@ public:
 	float get_max_volume() const override { return max_volume; }
 	void set_max_volume_distance(float value) override { max_volume_distance = value; }
 	float get_max_volume_distance() const override { return max_volume_distance; }
+	void set_max_audible_distance(float value) override { max_audible_distance = value; }
+	float get_max_audible_distance() const override { return max_audible_distance; }
 	float get_volume_at(float distance) const override {
-		float v = range_convert(distance, 0, max_volume_distance, min_volume, max_volume);
-		return clamp(v, min_volume, max_volume);
+		if (distance > max_audible_distance) distance = max_audible_distance;
+		float v;
+		if (distance <= max_volume_distance) v = range_convert(distance, 0, max_volume_distance, min_volume, max_volume);
+		else v = max_volume - range_convert(distance, max_volume_distance, max_audible_distance, 0, max_volume);
+		return clamp(v, 0.0f, max_volume);
 	}
 	splitter_node* create_attachment(audio_node* dry_input, audio_node* dry_output) override {
 		splitter_node* splitter = splitter_node::create(get_engine(), get_output_channels(0));
