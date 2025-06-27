@@ -50,7 +50,7 @@ If you want to see what other custom switches are available in NVGT's SConstruct
 You can omit the `-s` from the build command if you want to get spammed with the outputting of every internal build command used, which is hundreds of them.
 
 ### Android
-Separate documentation is provided [in the building NVGT for android document](doc/src/advanced/Building NVGT for Android.md) which gives instructions and details for building on this platform.
+Separate documentation is provided [in the building NVGT for android document](https://github.com/samtupy/nvgt/blob/main/doc/src/advanced/Building%20NVGT%20for%20Android.md) which gives instructions and details for building on this platform.
 
 ## Contributing
 Contributions to NVGT are extremely welcome and are what help the project grow. Please view the [contribution guidelines](.github/CONTRIBUTING.md) before you contribute.

@@ -1472,8 +1472,10 @@ inline void RegisterSoundsystemAudioNode(asIScriptEngine *engine, const std::str
 	engine->RegisterObjectMethod(type.c_str(), "audio_node_state get_state_by_time_range(uint64 global_time_begin, uint64 global_time_end)", asFUNCTION((virtual_call < T, &T::get_state_by_time_range, ma_node_state, unsigned long long, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint64 get_time() const", asFUNCTION((virtual_call < T, &T::get_time, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_time(uint64 local_time)", asFUNCTION((virtual_call < T, &T::set_time, bool, ma_node_state >)), asCALL_CDECL_OBJFIRST);
-	if constexpr (!std::is_same < T, audio_node >::value)
+	if constexpr (!std::is_same < T, audio_node >::value) {
 		engine->RegisterObjectMethod(type.c_str(), "audio_node@ opImplCast()", asFUNCTION((op_cast < T, audio_node >)), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectMethod("audio_node", Poco::format("%s@ opCast()", type).c_str(), asFUNCTION((op_cast < audio_node, T >)), asCALL_CDECL_OBJFIRST);
+	}
 }
 template < class T >
 void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
