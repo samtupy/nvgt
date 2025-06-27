@@ -25,6 +25,9 @@ class pack_interface;
 class audio_engine;
 class mixer;
 class sound;
+class audio_node_chain;
+class splitter_node;
+class reverb3d;
 
 extern audio_engine *g_audio_engine;
 extern std::atomic<ma_result> g_soundsystem_last_error;
@@ -151,6 +154,10 @@ public:
 	virtual bool set_shape(CScriptHandle* shape) = 0;
 	virtual CScriptHandle* get_shape() const = 0;
 	virtual sound_shape* get_shape_object() const = 0;
+	virtual void set_reverb3d(reverb3d* verb) = 0;
+	virtual reverb3d* get_reverb3d() const = 0;
+	virtual splitter_node* get_reverb3d_attachment() const = 0;
+	virtual audio_node_chain* get_node_chain() const = 0;
 	virtual bool play(bool reset_loop_state = true) = 0;
 	virtual bool play_looped() = 0;
 	virtual bool stop() = 0;

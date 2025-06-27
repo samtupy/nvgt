@@ -138,10 +138,10 @@ reactphysics3d::Vector3 ma_vec3_to_rp_vec3(const ma_vec3f &v) { return reactphys
 MA_API float ma_sound_get_distance_to_listener(const ma_sound *pSound) {
 	ma_vec3f relativePos;
 	if (pSound == NULL)
-		return FLT_MAX;
+		return 0;
 	ma_engine *pEngine = ma_sound_get_engine(pSound);
 	if (pEngine == NULL)
-		return FLT_MAX;
+		return 0;
 	ma_spatializer_get_relative_position_and_direction(&pSound->engineNode.spatializer, &pEngine->listeners[ma_sound_get_listener_index(pSound)], &relativePos, NULL);
 	return sqrt(pow(relativePos.x, 2) + pow(relativePos.y, 2) + pow(relativePos.z, 2));
 }
@@ -537,19 +537,22 @@ protected:
 	sound_shape* shape;
 	mixer_monitor_node *monitor;
 	phonon_binaural_node *hrtf;
+	reverb3d* reverb;
+	splitter_node* reverb_attachment;
+	audio_node_chain* node_chain;
 	bool hrtf_desired;
-	audio_node *get_input_node() { return parent_mixer ? parent_mixer : engine->get_endpoint(); }
-	audio_node *get_output_node() { return hrtf ? hrtf : dynamic_cast<audio_node *>(monitor); }
-
 public:
-	mixer_impl() : audio_node_impl(), snd(nullptr), shape(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {}
-	mixer_impl(audio_engine *e, bool sound_group = true) : engine(static_cast<audio_engine_impl *>(e)), audio_node_impl(), snd(nullptr), shape(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {
+	mixer_impl() : audio_node_impl(), snd(nullptr), shape(nullptr), parent_mixer(nullptr), reverb(nullptr), reverb_attachment(nullptr), monitor(mixer_monitor_node::create(this)), node_chain(audio_node_chain::create()), hrtf(nullptr), hrtf_desired(true) {}
+	mixer_impl(audio_engine *e, bool sound_group = true) : audio_node_impl(), engine(static_cast<audio_engine_impl *>(e)), snd(nullptr), shape(nullptr), reverb(nullptr), reverb_attachment(nullptr), node_chain(audio_node_chain::create()), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {
 		init_sound();
+		node_chain->add_node(monitor);
+		node_chain->set_endpoint(e->get_endpoint());
 		if (!sound_group) return;
 		snd = make_unique<ma_sound>();
 		ma_sound_group_init(e->get_ma_engine(), 0, nullptr, &*snd);
 		node = (ma_node_base *)&*snd;
-		audio_node_impl::attach_output_bus(0, monitor, 0);
+		node_chain->set_source(this);
+		node_chain->release_source_ref(); // Otherwise this object can never destruct.
 		// set_attenuation_model(ma_attenuation_model_linear); // Investigate why this doesn't seem to work even though ma_attenuation_linear returns a correctly attenuated gain.
 		set_rolloff(0.75);
 		set_directional_attenuation_factor(1);
@@ -564,6 +567,12 @@ public:
 			parent_mixer->release();
 		if (hrtf)
 			hrtf->release();
+		if (reverb_attachment)
+			reverb_attachment->release();
+		if (reverb)
+			reverb->release();
+		if (node_chain)
+			node_chain->release();
 		if (shape) {
 			if (shape->connected_sound) unregister_blocking_sound_shape(shape);
 			shape->release();
@@ -573,46 +582,43 @@ public:
 	}
 	inline void duplicate() override { audio_node_impl::duplicate(); }
 	inline void release() override { audio_node_impl::release(); }
-	bool attach_output_bus(unsigned int output_bus_index, audio_node *input_bus, unsigned int input_bus_index) override { return get_output_node()->attach_output_bus(output_bus_index, input_bus, input_bus_index); }
-	bool detach_output_bus(unsigned int output_bus_index) override { return get_output_node()->detach_output_bus(output_bus_index); }
-	bool detach_all_output_buses() override { return get_output_node()->detach_all_output_buses(); }
 	bool set_mixer(mixer *mix) override {
 		if (mix == parent_mixer)
 			return false;
 		if (parent_mixer) {
-			if (!detach_output_bus(0))
-				return false;
 			parent_mixer->release();
 			parent_mixer = nullptr;
 		}
 		if (mix) {
-			if (!attach_output_bus(0, mix, 0))
-				return false;
 			parent_mixer = mix;
-			return true;
-		} else
-			return attach_output_bus(0, get_engine()->get_endpoint(), 0);
+			node_chain->set_endpoint(mix);
+			return node_chain->get_endpoint() == mix;
+		} else {
+			node_chain->set_endpoint(get_engine()->get_endpoint());
+			return node_chain->get_endpoint() == get_engine()->get_endpoint();
+		}
+	return false;
 	}
 	mixer *get_mixer() const override { return parent_mixer; }
 	bool set_hrtf_internal(bool enable) override {
 		unique_lock<mutex> lock(hrtf_toggle_mtx);
 		if (hrtf && enable or !hrtf && !enable)
 			return true;
-		audio_node *i = get_input_node(), *o = get_output_node();
 		if (enable) {
 			if ((hrtf = phonon_binaural_node::create(engine, engine->get_channels(), engine->get_sample_rate())) == nullptr)
 				return false;
-			if (!hrtf->attach_output_bus(0, i, 0))
+			if (!node_chain->add_node(hrtf, monitor)) {
+				hrtf->release();
+				hrtf = nullptr;
 				return false;
-			if (!o->attach_output_bus(0, hrtf, 0))
-				return false;
+			}
 			set_directional_attenuation_factor(0);
 		} else {
 			set_directional_attenuation_factor(1);
-			if (!monitor->attach_output_bus(0, i, 0))
-				return false; // This chain will become more complex as we add a builtin reverb node.
+			bool success = node_chain->remove_node(hrtf);
 			hrtf->release();
 			hrtf = nullptr;
+			if (!success) return false;
 		}
 		return true;
 	}
@@ -644,6 +650,31 @@ public:
 		return shape->get_shape();
 	}
 	sound_shape* get_shape_object() const override { return shape; }
+	void set_reverb3d(reverb3d* verb) override {
+		if (verb == reverb) return;
+		if (reverb) {
+			if (reverb_attachment) {
+				node_chain->remove_node(reverb_attachment);
+				reverb_attachment->release();
+				reverb_attachment = nullptr;
+			}
+			reverb->release();
+		}
+		reverb = verb;
+		if (verb) {
+			reverb_attachment = reverb->create_attachment();
+			reverb_attachment->set_output_bus_volume(1, reverb->get_volume_at(get_distance_to_listener()));
+			if (!node_chain->add_node(reverb_attachment, node_chain->last())) {
+				reverb->release();
+				if (reverb_attachment) reverb_attachment->release();
+				reverb = nullptr;
+				reverb_attachment = nullptr;
+			}
+		}
+	}
+	reverb3d* get_reverb3d() const override { return reverb; }
+	splitter_node* get_reverb3d_attachment() const override { return reverb_attachment; }
+	audio_node_chain* get_node_chain() const override { return node_chain; }
 	bool play(bool reset_loop_state = true) override {
 		if (snd == nullptr)
 			return false;
@@ -714,7 +745,7 @@ public:
 		res.setAllValues(dir.x, dir.y, dir.z);
 		return res;
 	}
-	float get_distance_to_listener() const override { return snd ? ma_sound_get_distance_to_listener(&*snd) : FLT_MAX; }
+	float get_distance_to_listener() const override { return snd && get_spatialization_enabled()? ma_sound_get_distance_to_listener(&*snd) : 0.0; }
 	void set_position_3d(float x, float y, float z) override {
 		if (!snd)
 			return;
@@ -1013,7 +1044,8 @@ public:
 			// set_attenuation_model(ma_attenuation_model_linear); // If spatialization is enabled however lets use linear attenuation by default so that we focus more on hearing objects from further out in audio games as opposed to complete but hard to hear realism. At least lets do it once ma_attenuation_model_linear actually works.
 			set_rolloff(0.75);
 			set_directional_attenuation_factor(1);
-			audio_node_impl::attach_output_bus(0, monitor, 0);  // Connect the sound up to the node that monitors hrtf position changes etc.
+			node_chain->set_source(this);
+			node_chain->release_source_ref();
 			// If we didn't load our sound asynchronously or if we streamed it, then we simply mark it as load_completed or we'll end up with a deadlock at destruction time.
 			if (!(cfg.flags & MA_SOUND_FLAG_ASYNC))
 				load_completed.test_and_set();
@@ -1073,6 +1105,7 @@ public:
 	}
 	bool close() override {
 		if (snd) {
+			node_chain->set_source(nullptr);
 			// It's possible that this sound could still be loading in a job thread when we try to destroy it. Unfortunately there isn't a way to cancel this, so we have to just wait.
 			if (!load_completed.test())
 				ma_fence_wait(&fence);
@@ -1447,6 +1480,10 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf_desired() const property", asFUNCTION((virtual_call < T, &T::get_hrtf_desired, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_shape(ref@ shape)", asFUNCTION((virtual_call < T, &T::set_shape, bool, CScriptHandle*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "ref@ get_shape() const property", asFUNCTION((virtual_call < T, &T::get_shape, CScriptHandle*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_reverb3d(reverb3d@ reverb) property", asFUNCTION((virtual_call < T, &T::set_reverb3d, void, reverb3d*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "reverb3d@+ get_reverb3d() const property", asFUNCTION((virtual_call < T, &T::get_reverb3d, reverb3d*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_splitter_node@+ get_reverb3d_attachment() const property", asFUNCTION((virtual_call < T, &T::get_reverb3d_attachment, splitter_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_node_chain@+ get_node_chain() const property", asFUNCTION((virtual_call < T, &T::get_node_chain, audio_node_chain*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play(bool reset_loop_state = true)", asFUNCTION((virtual_call < T, &T::play, bool, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play_looped()", asFUNCTION((virtual_call < T, &T::play_looped, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool stop()", asFUNCTION((virtual_call < T, &T::stop, bool >)), asCALL_CDECL_OBJFIRST);
@@ -1503,6 +1540,23 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	engine->RegisterObjectMethod(type.c_str(), "bool get_playing() const property", asFUNCTION((virtual_call < T, &T::get_playing, bool >)), asCALL_CDECL_OBJFIRST);
 }
 void RegisterSoundsystemNodes(asIScriptEngine *engine) {
+	engine->RegisterObjectBehaviour("audio_node_chain", asBEHAVE_FACTORY, "audio_node_chain@ c(audio_node@ source = null, audio_node@ endpoint = null)", asFUNCTION(audio_node_chain::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_node_chain", asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::duplicate, void >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("audio_node_chain", asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::release, void >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "bool add_node(audio_node@+ node, audio_node@+ after = null, uint input_bus_index = 0)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::add_node, bool, audio_node*, audio_node*, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "bool add_node(audio_node@+ node, int after = -1, uint input_bus_index = 0)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::add_node_at, bool, audio_node*, int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "bool remove_node(audio_node@+ node)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::remove_node, bool, audio_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "bool remove_node(uint index)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::remove_node_at, bool, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "bool clear(bool detach_nodes = true)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::clear, bool, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "void set_source(audio_node@+ source) property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::set_source, void, audio_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "audio_node@+ get_source() const property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::get_source, audio_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "void set_endpoint(audio_node@+ endpoint) property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::set_endpoint, void, audio_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "audio_node@+ get_endpoint() const property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::get_endpoint, audio_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "audio_node@+ get_first() const property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::first, audio_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "audio_node@+ get_last() const property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::last, audio_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "audio_node@+ opIndex(uint index) const", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::operator[], audio_node*, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "int find(audio_node@+ node) const", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::index_of, int, audio_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_node_chain", "uint get_node_count() const property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::get_node_count, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemAudioNode < phonon_binaural_node > (engine, "phonon_binaural_node");
 	engine->RegisterObjectBehaviour("phonon_binaural_node", asBEHAVE_FACTORY, "phonon_binaural_node@ n(audio_engine@ engine, int channels, int sample_rate, int frame_size = 0)", asFUNCTION(phonon_binaural_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("phonon_binaural_node", "void set_direction(float x, float y, float z, float distance)", asFUNCTION((virtual_call < phonon_binaural_node, &phonon_binaural_node::set_direction, void, float, float, float, float >)), asCALL_CDECL_OBJFIRST);
@@ -1510,8 +1564,36 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("phonon_binaural_node", "void set_spatial_blend_max_distance(float max_distance)", asFUNCTION((virtual_call < phonon_binaural_node, &phonon_binaural_node::set_spatial_blend_max_distance, void, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterGlobalFunction("bool set_sound_global_hrtf(bool enabled)", asFUNCTION(set_global_hrtf), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool get_sound_global_hrtf() property", asFUNCTION(get_global_hrtf), asCALL_CDECL);
-	RegisterSoundsystemAudioNode < splitter_node > (engine, "audio_splitter_node");
 	engine->RegisterObjectBehaviour("audio_splitter_node", asBEHAVE_FACTORY, "audio_splitter_node@ n(audio_engine@ engine, int channels)", asFUNCTION(splitter_node::create), asCALL_CDECL);
+	RegisterSoundsystemAudioNode <freeverb_node> (engine, "audio_freeverb_node");
+	engine->RegisterObjectBehaviour("audio_freeverb_node", asBEHAVE_FACTORY, "audio_freeverb_node@ n(audio_engine@ engine, int channels)", asFUNCTION(freeverb_node::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("audio_freeverb_node", "void set_room_size(float size) property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::set_room_size, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "float get_room_size() const property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::get_room_size, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "void set_damping(float damping) property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::set_damping, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "float get_damping() const property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::get_damping, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "void set_width(float width) property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::set_width, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "float get_width() const property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::get_width, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "void set_wet(float wet) property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::set_wet, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "float get_wet() const property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::get_wet, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "void set_dry(float dry) property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::set_dry, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "float get_dry() const property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::get_dry, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "void set_input_width(float width) property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::set_input_width, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "float get_input_width() const property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::get_input_width, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "void set_frozen(bool frozen) property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::set_frozen, void, bool >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_freeverb_node", "bool get_frozen() const property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::get_frozen, bool >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("reverb3d", asBEHAVE_FACTORY, "reverb3d@ n(audio_node@ reverb, mixer@ destination = mixer(), audio_engine@+ engine = sound_default_engine)", asFUNCTION(reverb3d::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("reverb3d", "void set_reverb(audio_node@ reverb) property", asFUNCTION((virtual_call < reverb3d, &reverb3d::set_reverb, void, audio_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "audio_node@+ get_reverb() const property", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_reverb, audio_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "void set_mixer(mixer@ mix) property", asFUNCTION((virtual_call < reverb3d, &reverb3d::set_mixer, void, mixer*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "mixer@+ get_mixer() const property", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_mixer, mixer*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "void set_min_volume(float min_volume) property", asFUNCTION((virtual_call < reverb3d, &reverb3d::set_min_volume, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "float get_min_volume() const property", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_min_volume, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "void set_max_volume(float max_volume) property", asFUNCTION((virtual_call < reverb3d, &reverb3d::set_max_volume, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "float get_max_volume() const property", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_max_volume, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "void set_max_volume_distance(float distance) property", asFUNCTION((virtual_call < reverb3d, &reverb3d::set_max_volume_distance, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "float get_max_volume_distance() const property", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_max_volume_distance, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "float get_volume_at(float distance) const", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_volume_at, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "audio_splitter_node@ create_attachment(audio_node@+ dry_input = null, audio_node@+ dry_output = null)", asFUNCTION((virtual_call < reverb3d, &reverb3d::create_attachment, splitter_node*, audio_node*, audio_node*>)), asCALL_CDECL_OBJFIRST);
 }
 void RegisterSoundsystemShapes(asIScriptEngine* engine) {
 	int ot = engine->RegisterObjectType("sound_aabb_shape", 0, asOBJ_REF); assert(ot >= 0);
@@ -1627,6 +1709,9 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_PERCENTAGE_ATTRIBUTES", audio_engine::PERCENTAGE_ATTRIBUTES);
 	RegisterSoundsystemAudioNode < audio_node > (engine, "audio_node");
 	RegisterSoundsystemEngine(engine);
+	engine->RegisterObjectType("audio_node_chain", 0, asOBJ_REF);
+	RegisterSoundsystemAudioNode < splitter_node > (engine, "audio_splitter_node");
+	RegisterSoundsystemAudioNode <reverb3d> (engine, "reverb3d");
 	RegisterSoundsystemMixer < mixer > (engine, "mixer");
 	engine->RegisterObjectBehaviour("mixer", asBEHAVE_FACTORY, "mixer@ m()", asFUNCTION(new_global_mixer), asCALL_CDECL);
 	RegisterSoundsystemMixer < sound > (engine, "sound");

@@ -21,7 +21,7 @@ protected:
 	audio_engine *engine;
 	int refcount;
 public:
-	audio_node_impl() : audio_node(), node(nullptr), refcount(1) {
+	audio_node_impl() : audio_node(), node(nullptr), engine(nullptr), refcount(1) {
 		if (!init_sound()) throw std::runtime_error("sound system was not initialized");
 	}
 	audio_node_impl(ma_node_base *node, audio_engine *engine) : audio_node(), node(node), engine(engine), refcount(1) {
@@ -53,6 +53,29 @@ public:
 	bool set_time(unsigned long long local_time) { return node ? (g_soundsystem_last_error = ma_node_set_time(node, local_time)) == MA_SUCCESS : false; }
 };
 
+// When nodes are added or removed from a node_chain, they are automatically reattached as needed.
+class audio_node_chain {
+public:
+	virtual void duplicate() const = 0;
+	virtual void release() const = 0;
+	virtual bool add_node(audio_node* node, audio_node* after = nullptr, unsigned int input_bus_index = 0) = 0;
+	virtual bool add_node_at(audio_node* node, int after = -1, unsigned int input_bus_index = 0) = 0;
+	virtual bool remove_node(audio_node* node) = 0;
+	virtual bool remove_node_at(unsigned int index) = 0;
+	virtual bool clear(bool detach_nodes = true) = 0;
+	virtual void set_source(audio_node* source) = 0;
+	virtual void release_source_ref() = 0;
+	virtual audio_node* get_source() const = 0;
+	virtual void set_endpoint(audio_node* endpoint) = 0;
+	virtual audio_node* get_endpoint() const = 0;
+	virtual audio_node* first() const = 0;
+	virtual audio_node* last() const = 0;
+	virtual audio_node* operator[](unsigned int index) const = 0;
+	virtual int index_of(audio_node* node) const = 0;
+	virtual unsigned int get_node_count() const = 0;
+	static audio_node_chain* create(audio_node* source = nullptr, audio_node* endpoint = nullptr);
+};
+
 bool set_global_hrtf(bool enabled);
 bool get_global_hrtf();
 void set_sound_position_changed(); // Indicates to all hrtf nodes that they should update their positions, should be set if a listener moves.
@@ -72,4 +95,38 @@ class mixer_monitor_node : public virtual audio_node {
 class splitter_node : public virtual audio_node {
 	public:
 	static splitter_node* create(audio_engine* engine, int channels);
+};
+class freeverb_node : public virtual audio_node {
+	public:
+	virtual void set_room_size(float size) = 0;
+	virtual float get_room_size() const = 0;
+	virtual void set_damping(float damping) = 0;
+	virtual float get_damping() const = 0;
+	virtual void set_width(float width) = 0;
+	virtual float get_width() const = 0;
+	virtual void set_wet(float wet) = 0;
+	virtual float get_wet() const = 0;
+	virtual void set_dry(float dry) = 0;
+	virtual float get_dry() const = 0;
+	virtual void set_input_width(float width) = 0;
+	virtual float get_input_width() const = 0;
+	virtual void set_frozen(bool frozen) = 0;
+	virtual bool get_frozen() const = 0;
+	static freeverb_node* create(audio_engine* engine, int channels);
+};
+class reverb3d : public virtual audio_node {
+public:
+	virtual void set_reverb(audio_node* verb) = 0;
+	virtual audio_node* get_reverb() const = 0;
+	virtual void set_mixer(mixer* mix) = 0;
+	virtual mixer* get_mixer() const = 0;
+	virtual void set_min_volume(float min_volume) = 0;
+	virtual float get_min_volume() const = 0;
+	virtual void set_max_volume(float max_volume) = 0;
+	virtual float get_max_volume() const = 0;
+	virtual void set_max_volume_distance(float distance) = 0;
+	virtual float get_max_volume_distance() const = 0;
+	virtual float get_volume_at(float distance) const = 0;
+	virtual splitter_node* create_attachment(audio_node* dry_input = nullptr, audio_node* dry_output = nullptr) = 0;
+	static reverb3d* create(audio_node* reverb, mixer* destination = nullptr, audio_engine* e = g_audio_engine);
 };
