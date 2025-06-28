@@ -497,7 +497,7 @@ std::streampos section_istreambuf::seekoff(std::streamoff off, std::ios_base::se
 			// Istream uses 0 cur to implement tell, so just report the current position without moving anything.
 			if (off == 0)
 				return source->tellg() - (std::streampos) start - (std::streampos) in_avail();
-			return seekpos(source->tellg() - std::streampos(start - in_avail() + off));
+			return seekpos(source->tellg() - (std::streampos)start - (std::streampos)in_avail() + off);
 	}
 	return -1; // Can't get here.
 }
