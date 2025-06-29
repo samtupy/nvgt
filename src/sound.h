@@ -74,6 +74,7 @@ public:
 	virtual void duplicate() = 0; // reference counting
 	virtual void release() = 0;
 	virtual ~audio_engine() = default;
+	virtual int get_flags() const = 0;
 	virtual int get_device() const = 0;
 	virtual bool set_device(int device) = 0;
 	virtual audio_node *get_endpoint() const = 0;

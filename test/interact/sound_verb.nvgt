@@ -11,13 +11,13 @@ void main() {
 	freeverb.input_width = 0.2;
 	freeverb.damping = 1;
 	reverb3d verb(freeverb);
-	verb.max_volume_distance = 10;
-	verb.max_volume = 3;
-	sound@ snd = sound_play("C:/windows/media/Ring10.wav", vector(5, 5, 0), autoplay = false);
-	@snd.reverb3d = verb;
-	snd.effects_chain.add_node(audio_high_pass_filter(1000, 2));
+	mixer snd;
+	snd.set_position_3d(5, 5, 0);
 	if (!snd.set_shape(sound_aabb_shape(0, 5, 0, 5, 0, 1))) alert("warning", "shape set fail");
-	snd.play_looped();
+	@snd.reverb3d = verb;
+	sound@ s = sound_play("C:/windows/media/Ring10.wav", mix = snd, autoplay = false);
+	snd.effects_chain.add_node(audio_high_pass_filter(1000, 2));
+	s.play_looped();
 	while (!key_pressed(KEY_ESCAPE)) {
 		wait(5);
 		vector l = sound_get_listener_position();

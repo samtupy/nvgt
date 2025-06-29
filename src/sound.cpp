@@ -289,6 +289,7 @@ public:
 			cfg.playback.channels = 2;
 			cfg.playback.format = ma_format_f32;
 			cfg.sampleRate = 0; // Let the device decide.
+			cfg.noClip = MA_TRUE;
 			cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE;
 
 			// Hook up high quality resampling, because we want the app to accommodate the device's sample rate, not the other way around.
@@ -372,6 +373,7 @@ public:
 	}
 	ma_engine *get_ma_engine() const override { return engine.get(); }
 	audio_node *get_endpoint() const override { return engine_endpoint; }
+	int get_flags() const override { return flags; }
 	int get_device() const override {
 		if (!engine || flags & NO_DEVICE)
 			return -1;
@@ -397,6 +399,7 @@ public:
 			cfg.playback.pDeviceID = &g_sound_output_devices[device].id;
 		cfg.playback.channels = old_dev->playback.channels;
 		cfg.sampleRate = old_dev->sampleRate;
+		cfg.noClip = MA_TRUE;
 		cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE;
 		cfg.resampling.algorithm = ma_resample_algorithm_custom;
 		cfg.resampling.pBackendVTable = &wdl_resampler_backend_vtable;
@@ -530,7 +533,6 @@ class mixer_impl : public audio_node_impl, public virtual mixer {
 	// In miniaudio, a sound_group is really just a sound. A typical ma_sound_group_x function looks like float ma_sound_group_get_pan(const ma_sound_group* pGroup) { return ma_sound_get_pan(pGroup); }.
 	// Furthermore ma_sound_group is just a typedef for ma_sound. As such, for the sake of less code and better inheritance, we will directly call the ma_sound APIs in this class even though it deals with sound groups and not sounds.
 protected:
-	audio_engine_impl *engine;
 	unique_ptr<ma_sound> snd;
 	mutable mutex hrtf_toggle_mtx;
 	mixer *parent_mixer;
@@ -543,7 +545,7 @@ protected:
 	audio_node_chain* effects_chain;
 	bool hrtf_desired;
 public:
-	mixer_impl(audio_engine *e, bool sound_group = true) : audio_node_impl(), engine(static_cast<audio_engine_impl *>(e)), snd(nullptr), shape(nullptr), reverb(nullptr), reverb_attachment(nullptr), node_chain(audio_node_chain::create(nullptr, nullptr, e)), effects_chain(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {
+	mixer_impl(audio_engine *e, bool sound_group = true) : audio_node_impl(nullptr, e), snd(nullptr), shape(nullptr), reverb(nullptr), reverb_attachment(nullptr), node_chain(audio_node_chain::create(nullptr, nullptr, e)), effects_chain(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {
 		init_sound();
 		node_chain->add_node(monitor);
 		node_chain->set_endpoint(e->get_endpoint());
@@ -551,10 +553,10 @@ public:
 		snd = make_unique<ma_sound>();
 		ma_sound_group_init(e->get_ma_engine(), 0, nullptr, &*snd);
 		node = (ma_node_base *)&*snd;
-		attach_output_bus(0, node_chain, 0);
-		// set_attenuation_model(ma_attenuation_model_linear); // Investigate why this doesn't seem to work even though ma_attenuation_linear returns a correctly attenuated gain.
-		set_rolloff(0.75);
+		set_attenuation_model(ma_attenuation_model_linear_db);
+		set_max_distance(70); // Max distance must be explicitly set for linear attenuation to function.
 		set_directional_attenuation_factor(1);
+		attach_output_bus(0, node_chain, 0);
 		play();
 	}
 	~mixer_impl() {
@@ -661,17 +663,20 @@ public:
 			}
 			reverb->release();
 		}
-		reverb = verb;
 		if (verb) {
-			reverb_attachment = reverb->create_attachment();
-			reverb_attachment->set_output_bus_volume(1, reverb->get_volume_at(get_distance_to_listener()));
+			reverb_attachment = verb->create_attachment();
+			if (!reverb_attachment) {
+				verb->release();
+				return;
+			}
+			reverb_attachment->set_output_bus_volume(1, verb->get_volume_at(get_distance_to_listener()));
 			if (!node_chain->add_node(reverb_attachment, node_chain->last())) {
-				reverb->release();
+				verb->release();
 				if (reverb_attachment) reverb_attachment->release();
-				reverb = nullptr;
 				reverb_attachment = nullptr;
 			}
 		}
+		reverb = verb;
 	}
 	reverb3d* get_reverb3d() const override { return reverb; }
 	splitter_node* get_reverb3d_attachment() const override { return reverb_attachment; }
@@ -701,15 +706,15 @@ public:
 	bool stop() override { return snd ? (g_soundsystem_last_error = ma_sound_stop(&*snd)) == MA_SUCCESS : false; }
 	void set_volume(float volume) override {
 		if (snd)
-			ma_sound_set_volume(&*snd, std::min((engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_db_to_linear(volume) : volume), 1.0f));
+			ma_sound_set_volume(&*snd, std::min((get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_db_to_linear(volume) : volume), 1.0f));
 	}
-	float get_volume() const override { return snd ? (engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_linear_to_db(ma_sound_get_volume(&*snd)) : ma_sound_get_volume(&*snd)) : NAN; }
+	float get_volume() const override { return snd ? (get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_linear_to_db(ma_sound_get_volume(&*snd)) : ma_sound_get_volume(&*snd)) : NAN; }
 	void set_pan(float pan) override {
 		if (snd)
-			ma_sound_set_pan(&*snd, engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES ? pan_db_to_linear(pan) : pan);
+			ma_sound_set_pan(&*snd, get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES ? pan_db_to_linear(pan) : pan);
 	}
 	float get_pan() const override {
-		return snd ? (engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES ? pan_linear_to_db(ma_sound_get_pan(&*snd)) : ma_sound_get_pan(&*snd)) : NAN;
+		return snd ? (get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES ? pan_linear_to_db(ma_sound_get_pan(&*snd)) : ma_sound_get_pan(&*snd)) : NAN;
 	}
 	void set_pan_mode(ma_pan_mode mode) override {
 		if (snd)
@@ -720,10 +725,10 @@ public:
 	}
 	void set_pitch(float pitch) override {
 		if (snd)
-			ma_sound_set_pitch(&*snd, engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES ? pitch / 100.0f : pitch);
+			ma_sound_set_pitch(&*snd, get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES ? pitch / 100.0f : pitch);
 	}
 	float get_pitch() const override {
-		return snd ? (engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_sound_get_pitch(&*snd) * 100 : ma_sound_get_pitch(&*snd)) : NAN;
+		return snd ? (get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_sound_get_pitch(&*snd) * 100 : ma_sound_get_pitch(&*snd)) : NAN;
 	}
 	void set_spatialization_enabled(bool enabled) override {
 		if (snd)
@@ -894,7 +899,7 @@ public:
 	void set_fade(float start_volume, float end_volume, ma_uint64 length) override {
 		if (!snd)
 			return;
-		if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
+		if (get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES)
 			set_fade_in_frames(start_volume, end_volume, length);
 		else
 			set_fade_in_milliseconds(start_volume, end_volume, length);
@@ -902,7 +907,7 @@ public:
 	void set_fade_in_frames(float start_volume, float end_volume, ma_uint64 frames) override {
 		if (!snd)
 			return;
-		if (engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES) {
+		if (get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES) {
 			start_volume = start_volume == FLT_MAX ? -1 : ma_volume_db_to_linear(start_volume);
 			end_volume = ma_volume_db_to_linear(end_volume);
 		}
@@ -911,19 +916,19 @@ public:
 	void set_fade_in_milliseconds(float start_volume, float end_volume, ma_uint64 milliseconds) override {
 		if (!snd)
 			return;
-		if (engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES) {
+		if (get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES) {
 			start_volume = start_volume == FLT_MAX ? -1 : ma_volume_db_to_linear(start_volume);
 			end_volume = ma_volume_db_to_linear(end_volume);
 		}
 		ma_sound_set_fade_in_milliseconds(&*snd, start_volume, end_volume, milliseconds);
 	}
 	float get_current_fade_volume() const override {
-		return snd ? (engine->flags & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_linear_to_db(ma_sound_get_current_fade_volume(&*snd)) : ma_sound_get_current_fade_volume(&*snd)) : NAN;
+		return snd ? (get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_linear_to_db(ma_sound_get_current_fade_volume(&*snd)) : ma_sound_get_current_fade_volume(&*snd)) : NAN;
 	}
 	void set_start_time(ma_uint64 absolute_time) override {
 		if (!snd)
 			return;
-		if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
+		if (get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES)
 			set_start_time_in_frames(absolute_time);
 		else
 			set_start_time_in_milliseconds(absolute_time);
@@ -939,7 +944,7 @@ public:
 	void set_stop_time(ma_uint64 absolute_time) override {
 		if (!snd)
 			return;
-		if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
+		if (get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES)
 			set_stop_time_in_frames(absolute_time);
 		else
 			set_stop_time_in_milliseconds(absolute_time);
@@ -953,7 +958,7 @@ public:
 			ma_sound_set_stop_time_in_milliseconds(&*snd, absolute_time);
 	}
 	ma_uint64 get_time() const override {
-		return snd ? ((engine->flags & audio_engine::DURATIONS_IN_FRAMES) ? get_time_in_frames() : get_time_in_milliseconds()) : 0;
+		return snd ? ((get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES) ? get_time_in_frames() : get_time_in_milliseconds()) : 0;
 	}
 	ma_uint64 get_time_in_frames() const override {
 		return snd ? ma_sound_get_time_in_pcm_frames(&*snd) : 0;
@@ -1049,8 +1054,8 @@ public:
 			loaded_filename = filename;
 			node = (ma_node_base *)&*snd;
 			set_spatialization_enabled(false);                  // The user must call set_position_3d or manually enable spatialization or else their ambience and UI sounds will be spatialized.
-			// set_attenuation_model(ma_attenuation_model_linear); // If spatialization is enabled however lets use linear attenuation by default so that we focus more on hearing objects from further out in audio games as opposed to complete but hard to hear realism. At least lets do it once ma_attenuation_model_linear actually works.
-			set_rolloff(0.75);
+			set_attenuation_model(ma_attenuation_model_linear_db); // If spatialization is enabled however lets use linear attenuation by default so that we focus more on hearing objects from further out in audio games that can still fade to silence as opposed to complete but hard to hear realism.
+			set_max_distance(70);
 			set_directional_attenuation_factor(1);
 			attach_output_bus(0, node_chain, 0);
 			// If we didn't load our sound asynchronously or if we streamed it, then we simply mark it as load_completed or we'll end up with a deadlock at destruction time.
@@ -1164,7 +1169,7 @@ public:
 		return false;
 	}
 	bool pause_fade(unsigned long long length) override {
-		return (engine->flags & audio_engine::DURATIONS_IN_FRAMES) ? pause_fade_in_frames(length) : pause_fade_in_milliseconds(length);
+		return (get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES) ? pause_fade_in_frames(length) : pause_fade_in_milliseconds(length);
 	}
 	bool pause_fade_in_frames(unsigned long long frames) override {
 		if (snd) {
@@ -1181,7 +1186,7 @@ public:
 		return false;
 	}
 	void set_timed_fade(float start_volume, float end_volume, unsigned long long length, unsigned long long absolute_time) override {
-		return (engine->flags & audio_engine::DURATIONS_IN_FRAMES) ? set_timed_fade_in_frames(start_volume, end_volume, length, absolute_time) : set_timed_fade_in_milliseconds(start_volume, end_volume, length, absolute_time);
+		return (get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES) ? set_timed_fade_in_frames(start_volume, end_volume, length, absolute_time) : set_timed_fade_in_milliseconds(start_volume, end_volume, length, absolute_time);
 	}
 	void set_timed_fade_in_frames(float start_volume, float end_volume, unsigned long long frames, unsigned long long absolute_time_in_frames) override {
 		if (snd)
@@ -1192,7 +1197,7 @@ public:
 			ma_sound_set_fade_start_in_milliseconds(&*snd, start_volume, end_volume, frames, absolute_time_in_frames);
 	}
 	void set_stop_time_with_fade(unsigned long long absolute_time, unsigned long long fade_length) override {
-		return (engine->flags & audio_engine::DURATIONS_IN_FRAMES) ? set_stop_time_with_fade_in_frames(absolute_time, fade_length) : set_stop_time_with_fade_in_milliseconds(absolute_time, fade_length);
+		return (get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES) ? set_stop_time_with_fade_in_frames(absolute_time, fade_length) : set_stop_time_with_fade_in_milliseconds(absolute_time, fade_length);
 	}
 	void set_stop_time_with_fade_in_frames(unsigned long long absolute_time, unsigned long long fade_length) override {
 		if (snd)
@@ -1213,7 +1218,7 @@ public:
 		return snd ? ma_sound_at_end(&*snd) : false;
 	}
 	bool seek(unsigned long long position) override {
-		if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
+		if (get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES)
 			return seek_in_frames(position);
 		else
 			return seek_in_milliseconds(position);
@@ -1228,7 +1233,7 @@ public:
 	unsigned long long get_position() override {
 		if (!snd)
 			return 0;
-		if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
+		if (get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES)
 			return get_position_in_frames();
 		else
 			return get_position_in_milliseconds();
@@ -1252,7 +1257,7 @@ public:
 	unsigned long long get_length() override {
 		if (!snd)
 			return 0;
-		if (engine->flags & audio_engine::DURATIONS_IN_FRAMES)
+		if (get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES)
 			return get_length_in_frames();
 		else
 			return get_length_in_milliseconds();
@@ -1655,6 +1660,8 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("reverb3d", "float get_max_volume_distance() const property", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_max_volume_distance, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("reverb3d", "void set_max_audible_distance(float distance) property", asFUNCTION((virtual_call < reverb3d, &reverb3d::set_max_audible_distance, void, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("reverb3d", "float get_max_audible_distance() const property", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_max_audible_distance, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "void set_volume_curve(float volume_curve) property", asFUNCTION((virtual_call < reverb3d, &reverb3d::set_volume_curve, void, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("reverb3d", "float get_volume_curve() const property", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_volume_curve, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("reverb3d", "float get_volume_at(float distance) const", asFUNCTION((virtual_call < reverb3d, &reverb3d::get_volume_at, float, float>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("reverb3d", "audio_splitter_node@ create_attachment(audio_node@+ dry_input = null, audio_node@+ dry_output = null)", asFUNCTION((virtual_call < reverb3d, &reverb3d::create_attachment, splitter_node*, audio_node*, audio_node*>)), asCALL_CDECL_OBJFIRST);
 }
@@ -1765,6 +1772,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_INVERSE", ma_attenuation_model_inverse);
 	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_LINEAR", ma_attenuation_model_linear);
 	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_EXPONENTIAL", ma_attenuation_model_exponential);
+	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_LINEAR_DB", ma_attenuation_model_linear_db);
 	engine->RegisterEnum("audio_engine_flags");
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_DURATIONS_IN_FRAMES", audio_engine::DURATIONS_IN_FRAMES);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_AUTO_START", audio_engine::NO_AUTO_START);
@@ -1838,3 +1846,6 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("float get_sound_master_volume() property", asFUNCTION(get_sound_master_volume), asCALL_CDECL);
 	engine->RegisterGlobalFunction("audio_error_state get_SOUNDSYSTEM_LAST_ERROR() property", asFUNCTION(get_soundsystem_last_error), asCALL_CDECL);
 }
+void nvgt_audio_plugin_node_register(const string& nodename) { RegisterSoundsystemAudioNode<plugin_node>(g_ScriptEngine, nodename); }
+plugin_node* nvgt_audio_plugin_node_create(audio_plugin_node_interface* impl, unsigned char input_bus_count, unsigned char output_bus_count, unsigned int flags, audio_engine* engine) { return plugin_node::create(impl, input_bus_count, output_bus_count, flags, engine); }
+audio_plugin_node_interface* nvgt_audio_plugin_node_get(plugin_node* node) { return node->get_plugin_interface(); }

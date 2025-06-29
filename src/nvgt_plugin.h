@@ -20,8 +20,11 @@
 #include <angelscript.h>
 #include <iostream>
 #include <string>
+class plugin_node;
+class audio_plugin_node_interface;
+class audio_engine;
 
-#define NVGT_PLUGIN_API_VERSION 4
+#define NVGT_PLUGIN_API_VERSION 5
 
 // Subsystem flags, used for controling access to certain functions during development.
 enum NVGT_SUBSYSTEM {
@@ -77,6 +80,9 @@ enum NVGT_SUBSYSTEM {
 	X(uint64_t, microticks, (bool secure)) \
 	X(std::string, string_aes_encrypt, (const std::string& plaintext, std::string key)) \
 	X(std::string, string_aes_decrypt, (const std::string& ciphertext, std::string key)) \
+	X(void, nvgt_audio_plugin_node_register, (const std::string& nodename)) \
+	X(plugin_node*, nvgt_audio_plugin_node_create, (audio_plugin_node_interface* impl, unsigned char input_bus_count, unsigned char output_bus_count, unsigned int flags, audio_engine* engine)) \
+	X(audio_plugin_node_interface*, nvgt_audio_plugin_node_get, (plugin_node* node)) \
 	X(bool, running_on_mobile, ())
 // Add more functions here...
 
@@ -228,4 +234,9 @@ class pack_interface {
 		casted->duplicate();
 		return casted;
 	}
+};
+// This class must be derived from for any custom audio node that is being implemented via plugins.
+class audio_plugin_node_interface {
+public:
+	virtual void process(audio_plugin_node_interface* node, const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
 };

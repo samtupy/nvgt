@@ -21,9 +21,6 @@ protected:
 	audio_engine *engine;
 	int refcount;
 public:
-	audio_node_impl() : audio_node(), node(nullptr), engine(nullptr), refcount(1) {
-		if (!init_sound()) throw std::runtime_error("sound system was not initialized");
-	}
 	audio_node_impl(ma_node_base *node, audio_engine *engine) : audio_node(), node(node), engine(engine), refcount(1) {
 		if (!init_sound()) throw std::runtime_error("sound system was not initialized");
 	}
@@ -53,8 +50,13 @@ public:
 	bool set_time(unsigned long long local_time) { return node ? (g_soundsystem_last_error = ma_node_set_time(node, local_time)) == MA_SUCCESS : false; }
 };
 
+class passthrough_node : public virtual audio_node {
+	public:
+	static passthrough_node* create(audio_engine* engine);
+};
+
 // When nodes are added or removed from a node_chain, they are automatically reattached as needed.
-class audio_node_chain : public virtual audio_node {
+class audio_node_chain : public virtual passthrough_node {
 public:
 	virtual bool attach_output_bus(unsigned int bus_index, audio_node* node, unsigned int input_bus_index) override = 0;
 	virtual bool detach_output_bus(unsigned int bus_index) override = 0;
@@ -184,7 +186,7 @@ class freeverb_node : public virtual audio_node {
 	virtual bool get_frozen() const = 0;
 	static freeverb_node* create(audio_engine* engine, int channels);
 };
-class reverb3d : public virtual audio_node {
+class reverb3d : public virtual passthrough_node {
 public:
 	virtual void set_reverb(audio_node* verb) = 0;
 	virtual audio_node* get_reverb() const = 0;
@@ -198,7 +200,15 @@ public:
 	virtual float get_max_volume_distance() const = 0;
 	virtual void set_max_audible_distance(float distance) = 0;
 	virtual float get_max_audible_distance() const = 0;
+	virtual void set_volume_curve(float volume_curve) = 0;
+	virtual float get_volume_curve() const = 0;
 	virtual float get_volume_at(float distance) const = 0;
 	virtual splitter_node* create_attachment(audio_node* dry_input = nullptr, audio_node* dry_output = nullptr) = 0;
 	static reverb3d* create(audio_node* reverb, mixer* destination = nullptr, audio_engine* e = g_audio_engine);
+};
+class plugin_node : public virtual audio_node {
+public:
+	virtual audio_plugin_node_interface* get_plugin_interface() const = 0;
+	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
+	static plugin_node* create(audio_plugin_node_interface* impl, unsigned char input_bus_count, unsigned char output_bus_count, unsigned int flags, audio_engine* engine);
 };

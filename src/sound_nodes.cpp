@@ -28,22 +28,31 @@ typedef struct {
 } ma_passthrough_node;
 static void ma_passthrough_node_process_pcm_frames(ma_node* pNode, const float** ppFramesIn, ma_uint32* pFrameCountIn, float** ppFramesOut, ma_uint32* pFrameCountOut) {}
 static ma_node_vtable ma_passthrough_node_vtable = { ma_passthrough_node_process_pcm_frames, nullptr, 1, 1, MA_NODE_FLAG_PASSTHROUGH | MA_NODE_FLAG_CONTINUOUS_PROCESSING | MA_NODE_FLAG_ALLOW_NULL_INPUT };
-
-class audio_node_chain_impl : public audio_node_impl, public virtual audio_node_chain {
-	audio_node* source;
-	std::vector<audio_node*> nodes;
-	audio_node* endpoint;
-	unsigned int endpoint_input_bus_index;
+class passthrough_node_impl : public audio_node_impl, public virtual passthrough_node {
+	public:
 	unique_ptr<ma_passthrough_node> pn;
-public:
-	audio_node_chain_impl(audio_node* source, audio_node* endpoint, audio_engine* e) : pn(make_unique<ma_passthrough_node>()), audio_node_impl(nullptr, e), endpoint(endpoint) {
+	passthrough_node_impl(audio_engine* e) : pn(make_unique<ma_passthrough_node>()), audio_node_impl(nullptr, e) {
 		ma_node_config cfg = ma_node_config_init();
 		ma_uint32 channels = e->get_channels();
 		cfg.vtable          = &ma_passthrough_node_vtable;
 		cfg.pInputChannels  = &channels;
 		cfg.pOutputChannels = &channels;
-		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*pn)) != MA_SUCCESS) throw std::runtime_error("failed to create audio_node_chain");
+		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*pn)) != MA_SUCCESS) throw std::runtime_error("failed to create passthrough node");
 		node = (ma_node_base*)&*pn;
+	}
+	~passthrough_node_impl() {
+		if (pn) ma_node_uninit((ma_node_base*)&*pn, nullptr);
+	}
+};
+passthrough_node* passthrough_node::create(audio_engine* engine) { return new passthrough_node_impl(engine); }
+
+class audio_node_chain_impl : public passthrough_node_impl, public virtual audio_node_chain {
+	audio_node* source;
+	std::vector<audio_node*> nodes;
+	audio_node* endpoint;
+	unsigned int endpoint_input_bus_index;
+public:
+	audio_node_chain_impl(audio_node* source, audio_node* endpoint, audio_engine* e) : passthrough_node_impl(e), endpoint(endpoint) {
 		if (source) source->attach_output_bus(0, this, 0);
 		if (endpoint) attach_output_bus(0, endpoint, 0);
 	}
@@ -51,7 +60,6 @@ public:
 		// We only release references, all attachments are kept in tact. Call clear(true) to detach all known nodes instead.
 		for (audio_node* node: nodes) node->release();
 		if (endpoint) endpoint->release();
-		if (pn) ma_node_uninit(&*pn, nullptr);
 	}
 	bool attach_output_bus(unsigned int bus_index, audio_node* node, unsigned int input_bus_index) override {
 		set_endpoint(node, input_bus_index);
@@ -518,20 +526,12 @@ class freeverb_node_impl : public audio_node_impl, public virtual freeverb_node 
 };
 freeverb_node* freeverb_node::create(audio_engine* e, int channels) { return new freeverb_node_impl(e, channels); }
 
-class reverb3d_impl : public audio_node_impl, public virtual reverb3d {
-	unique_ptr<ma_passthrough_node> pn;
+class reverb3d_impl : public passthrough_node_impl, public virtual reverb3d {
 	audio_node* reverb;
 	mixer* output_mixer;
-	float min_volume, max_volume, max_volume_distance, max_audible_distance;
+	float min_volume, max_volume, max_volume_distance, max_audible_distance, volume_curve;
 public:
-	reverb3d_impl(audio_engine* e, audio_node* reverb, mixer* destination) : pn(make_unique<ma_passthrough_node>()), audio_node_impl(nullptr, e), output_mixer(destination), reverb(reverb), min_volume(0.3), max_volume(2.0), max_volume_distance(15.0), max_audible_distance(40.0) {
-		ma_node_config cfg = ma_node_config_init();
-		ma_uint32 channels = e->get_channels();
-		cfg.vtable          = &ma_passthrough_node_vtable;
-		cfg.pInputChannels  = &channels;
-		cfg.pOutputChannels = &channels;
-		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*pn)) != MA_SUCCESS) throw std::runtime_error("failed to create reverb3d_node");
-		node = (ma_node_base*)&*pn;
+	reverb3d_impl(audio_engine* e, audio_node* reverb, mixer* destination) : passthrough_node_impl(e), output_mixer(destination), reverb(reverb), min_volume(0.5), max_volume(70.0), max_volume_distance(50.0), max_audible_distance(500.0), volume_curve(0.7) {
 		if (reverb) {
 			attach_output_bus(0, reverb, 0);
 			if (output_mixer) reverb->attach_output_bus(0, output_mixer, 0);
@@ -541,7 +541,6 @@ public:
 	~reverb3d_impl() {
 		if (output_mixer) output_mixer->release();
 		if (reverb) reverb->release();
-		if (pn) ma_node_uninit(&*pn, nullptr);
 	}
 	void set_reverb(audio_node* verb) override {
 		if (reverb) {
@@ -574,11 +573,18 @@ public:
 	float get_max_volume_distance() const override { return max_volume_distance; }
 	void set_max_audible_distance(float value) override { max_audible_distance = value; }
 	float get_max_audible_distance() const override { return max_audible_distance; }
+	void set_volume_curve(float value) override { volume_curve = value; }
+	float get_volume_curve() const override { return volume_curve; }
 	float get_volume_at(float distance) const override {
 		if (distance > max_audible_distance) distance = max_audible_distance;
 		float v;
-		if (distance <= max_volume_distance) v = range_convert(distance, 0, max_volume_distance, min_volume, max_volume);
-		else v = max_volume - range_convert(distance, max_volume_distance, max_audible_distance, 0, max_volume);
+		if (distance <= max_volume_distance) {
+			if (volume_curve <= 0) return max_volume;
+			else if (volume_curve >= 1) return min_volume;
+			v = range_convert(distance, 0, max_volume_distance, 0, 1);
+			v = (1.0 - volume_curve) * ((v <= volume_curve? v : volume_curve) / volume_curve) + volume_curve * ((v > volume_curve? v - volume_curve : 0) / (1 - volume_curve));
+			v = range_convert(v, 0, 1, min_volume, max_volume);
+		} else v = max_volume - range_convert(distance, max_volume_distance, max_audible_distance, 0, max_volume);
 		return clamp(v, 0.0f, max_volume);
 	}
 	splitter_node* create_attachment(audio_node* dry_input, audio_node* dry_output) override {
@@ -600,3 +606,35 @@ public:
 };
 reverb3d* reverb3d::create(audio_node* reverb, mixer* destination, audio_engine* e) { return new reverb3d_impl(e, reverb, destination); }
 
+typedef struct {
+	ma_node_base base;
+	plugin_node* impl;
+} ma_plugin_node;
+static void ma_plugin_node_process_pcm_frames(ma_node* pNode, const float** ppFramesIn, ma_uint32* pFrameCountIn, float** ppFramesOut, ma_uint32* pFrameCountOut) {
+	ma_plugin_node* n = (ma_plugin_node*)pNode;
+	if (n->impl) n->impl->process(ppFramesIn, pFrameCountIn, ppFramesOut, pFrameCountOut);
+}
+class plugin_node_impl : public audio_node_impl, public virtual plugin_node {
+	unique_ptr<ma_plugin_node> pn;
+	audio_plugin_node_interface* impl;
+	ma_node_vtable vtable; // The user should be able to configure custom settings.
+	public:
+	plugin_node_impl(audio_plugin_node_interface* impl, unsigned char input_bus_count, unsigned char output_bus_count, unsigned int flags, audio_engine* engine) : pn(make_unique<ma_plugin_node>()), audio_node_impl(nullptr, engine), impl(impl) {
+		vtable = { ma_plugin_node_process_pcm_frames, nullptr, input_bus_count, output_bus_count, flags };
+		ma_node_config cfg = ma_node_config_init();
+		ma_uint32 channels = engine->get_channels();
+		cfg.vtable          = &vtable;
+		cfg.pInputChannels  = &channels;
+		cfg.pOutputChannels = &channels;
+		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(engine->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*pn)) != MA_SUCCESS) throw std::runtime_error("failed to create plugin_node");
+		node = (ma_node_base*)&*pn;
+	}
+	~plugin_node_impl() {
+		if (pn) ma_node_uninit(&*pn, nullptr);
+	}
+	audio_plugin_node_interface* get_plugin_interface() const override { return impl; }
+	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
+		if (impl) impl->process(impl, frames_in, frame_count_in, frames_out, frame_count_out);
+	}
+};
+plugin_node* plugin_node::create(audio_plugin_node_interface* impl, unsigned char input_bus_count, unsigned char output_bus_count, unsigned int flags,audio_engine* engine) { return new plugin_node_impl(impl, input_bus_count, output_bus_count, flags, engine); }
