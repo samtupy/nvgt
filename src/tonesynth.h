@@ -38,6 +38,8 @@ public:
 	double get_volume();
 	void set_pan(double pan);
 	double get_pan();
+	void set_allow_silence(bool silence);
+	bool get_allow_silence();
 	bool set_edge_fades(int start, int end);
 	void set_tempo(double tempo);
 	double get_tempo();
