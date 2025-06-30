@@ -133,6 +133,18 @@ CScriptArray *get_sound_output_devices() {
 }
 
 reactphysics3d::Vector3 ma_vec3_to_rp_vec3(const ma_vec3f &v) { return reactphysics3d::Vector3(v.x, v.y, v.z); }
+ma_format ma_format_from_angelscript_type(int type_id) {
+	if (type_id == asTYPEID_FLOAT)
+		return ma_format_f32;
+	else if (type_id == asTYPEID_INT32)
+		return ma_format_s32;
+	else if (type_id == asTYPEID_INT16)
+		return ma_format_s16;
+	else if (type_id == asTYPEID_UINT8)
+		return ma_format_u8;
+	else
+		return ma_format_unknown;
+}
 
 // The following function based on ma_sound_get_direction_to_listener.
 MA_API float ma_sound_get_distance_to_listener(const ma_sound *pSound) {
@@ -337,8 +349,8 @@ public:
 		cfg.pResourceManager = &*resource_manager;
 		cfg.noAutoStart = (flags & NO_AUTO_START) ? MA_TRUE : MA_FALSE;
 		cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE; // Steam Audio requires fixed sized updates. We can make this not be a magic constant if anyone has some reason for wanting to change it.
-		if ((flags & NO_DEVICE) == 0)
-			cfg.pDevice = &*device;
+		if ((flags & NO_DEVICE) == 0) cfg.pDevice = &*device;
+		else cfg.noDevice = MA_TRUE;
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS) {
 			engine.reset();
 			return;
@@ -981,15 +993,27 @@ class sound_impl final : public mixer_impl, public virtual sound {
 	ma_fence fence;
 	async_notification_callbacks notification_callbacks;
 	mutable std::atomic_flag load_completed;
+	unique_ptr<ma_pcm_rb> pcm_stream;
 	bool paused;
 	bool should_autoclose; // If this is true, the release method defers sound destruction until playback has complete.
-
+	inline void postload(const string& filename, bool async_load = false) {
+		loaded_filename = filename;
+		node = (ma_node_base *)&*snd;
+		set_spatialization_enabled(false);                  // The user must call set_position_3d or manually enable spatialization or else their ambience and UI sounds will be spatialized.
+		set_attenuation_model(ma_attenuation_model_linear_db); // If spatialization is enabled however lets use linear attenuation by default so that we focus more on hearing objects from further out in audio games that can still fade to silence as opposed to complete but hard to hear realism.
+		set_max_distance(70);
+		set_directional_attenuation_factor(1);
+		attach_output_bus(0, node_chain, 0);
+		// If we didn't load our sound asynchronously or if we streamed it, then we simply mark it as load_completed or we'll end up with a deadlock at destruction time.
+		if (!async_load)
+			load_completed.test_and_set();
+	}
 public:
 	static void async_notification_callback(ma_async_notification *pNotification) {
 		async_notification_callbacks *anc = (async_notification_callbacks *)pNotification;
 		anc->pAtomicFlag->test_and_set();
 	}
-	sound_impl(audio_engine *e) : paused(false), should_autoclose(false), mixer_impl(static_cast < audio_engine_impl * > (e), false), pcm_buffer(), sound() {
+	sound_impl(audio_engine *e) : paused(false), should_autoclose(false), pcm_stream(nullptr), mixer_impl(static_cast < audio_engine_impl * > (e), false), pcm_buffer(), sound() {
 		init_sound();
 		snd = nullptr;
 		ma_fence_init(&fence);
@@ -1050,18 +1074,7 @@ public:
 
 		if (g_soundsystem_last_error != MA_SUCCESS)
 			snd.reset();
-		else {
-			loaded_filename = filename;
-			node = (ma_node_base *)&*snd;
-			set_spatialization_enabled(false);                  // The user must call set_position_3d or manually enable spatialization or else their ambience and UI sounds will be spatialized.
-			set_attenuation_model(ma_attenuation_model_linear_db); // If spatialization is enabled however lets use linear attenuation by default so that we focus more on hearing objects from further out in audio games that can still fade to silence as opposed to complete but hard to hear realism.
-			set_max_distance(70);
-			set_directional_attenuation_factor(1);
-			attach_output_bus(0, node_chain, 0);
-			// If we didn't load our sound asynchronously or if we streamed it, then we simply mark it as load_completed or we'll end up with a deadlock at destruction time.
-			if (!(cfg.flags & MA_SOUND_FLAG_ASYNC))
-				load_completed.test_and_set();
-		}
+		else postload(filename, (cfg.flags & MA_SOUND_FLAG_ASYNC));
 		// Sound service has to store data pertaining to our triplet, and this is the earliest point at which it's safe to clean that up.
 		g_sound_service->cleanup_triplet(triplet);
 		return g_soundsystem_last_error == MA_SUCCESS;
@@ -1096,21 +1109,71 @@ public:
 		// Sam: Actually nno we can't right now, this causes the game to crash in the vfs read function on startup if sounds are playing while tts speaks. Haven't had time to debug this as I discovered it hours before an intended release.
 		return load_special(":pcm", g_memory_protocol_slot, memory_protocol::directive(&pcm_buffer[0], pcm_buffer.size()), sound_service::null_filter_slot, nullptr, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC);
 	}
-	bool load_pcm_script(CScriptArray *buffer, int samplerate, int channels) override {
+	bool load_pcm_script_array(CScriptArray *buffer, int samplerate, int channels) override {
 		if (!buffer)
 			return false;
-		ma_format format;
-		if (buffer->GetElementTypeId() == asTYPEID_FLOAT)
-			format = ma_format_f32;
-		else if (buffer->GetElementTypeId() == asTYPEID_INT32)
-			format = ma_format_s32;
-		else if (buffer->GetElementTypeId() == asTYPEID_INT16)
-			format = ma_format_s16;
-		else if (buffer->GetElementTypeId() == asTYPEID_UINT8)
-			format = ma_format_u8;
-		else
-			return false;
+		ma_format format = ma_format_from_angelscript_type(buffer->GetElementTypeId());
+		if (format == ma_format_unknown) return false;
 		return load_pcm(buffer->GetBuffer(), buffer->GetSize() * buffer->GetElementSize(), format, samplerate, channels);
+	}
+	bool load_pcm_script_memory_buffer(script_memory_buffer* buffer, int samplerate, int channels) override {
+		if (!buffer)
+			return false;
+		ma_format format = ma_format_from_angelscript_type(buffer->subtypeid);
+		if (format == ma_format_unknown) return false;
+		return load_pcm(buffer->ptr, buffer->size * buffer->get_element_size(), format, samplerate, channels);
+	}
+	bool stream_pcm(const void* data, unsigned int size_in_frames, ma_format format, unsigned int sample_rate, unsigned int channels, unsigned int buffer_size) {
+		if (format != ma_format_unknown) {
+			if (snd) close();
+			if (!buffer_size) buffer_size = size_in_frames + 2;
+			if (!buffer_size) return false;
+			if (!channels) channels = get_engine()->get_channels();
+			if (!sample_rate) sample_rate = get_engine()->get_sample_rate();
+			pcm_stream = make_unique<ma_pcm_rb>();
+			if ((g_soundsystem_last_error = ma_pcm_rb_init(format, channels, buffer_size, nullptr, nullptr, &*pcm_stream)) != MA_SUCCESS) {
+				pcm_stream.reset();
+				return false;
+			}
+			ma_pcm_rb_set_sample_rate(&*pcm_stream, sample_rate);
+			snd = make_unique<ma_sound>();
+			if ((g_soundsystem_last_error = ma_sound_init_from_data_source(get_engine()->get_ma_engine(), &*pcm_stream, 0, nullptr, &*snd)) != MA_SUCCESS) {
+				snd.reset();
+				ma_pcm_rb_uninit(&*pcm_stream);
+				pcm_stream.reset();
+				return false;
+			}
+			postload(":pcm", false);
+			play(true);
+		}
+		if (!pcm_stream) return false;
+		const char* input = (const char*)data;
+		unsigned int frames_written = 0;
+		unsigned int frame_size = ma_get_bytes_per_frame(ma_pcm_rb_get_format(&*pcm_stream), ma_pcm_rb_get_channels(&*pcm_stream));
+		while (size_in_frames) {
+			void* buffer_ptr = nullptr;
+			unsigned int frames_requested = size_in_frames;
+			if ((g_soundsystem_last_error = ma_pcm_rb_acquire_write(&*pcm_stream, &frames_requested, &buffer_ptr)) != MA_SUCCESS || !buffer_ptr) return false;
+			memcpy(buffer_ptr, input + (frames_written * frame_size), frames_requested * frame_size);
+			if ((g_soundsystem_last_error = ma_pcm_rb_commit_write(&*pcm_stream, frames_requested)) != MA_SUCCESS) return false;
+			frames_written += frames_requested;
+			size_in_frames -= frames_requested;
+		}
+		return true;
+	}
+	bool stream_pcm_script_array(CScriptArray *buffer, unsigned int sample_rate, unsigned int channels, unsigned int buffer_size) override {
+		if (!buffer)
+			return false;
+		ma_format format = pcm_stream? ma_format_unknown : ma_format_from_angelscript_type(buffer->GetElementTypeId());
+		int nchannels = pcm_stream? ma_pcm_rb_get_channels(&*pcm_stream) : channels? channels : get_engine()->get_channels();
+		return stream_pcm(buffer->GetBuffer(), buffer->GetSize() / nchannels, format, sample_rate, channels, buffer_size);
+	}
+	bool stream_pcm_script_memory_buffer(script_memory_buffer* buffer, unsigned int sample_rate, unsigned int channels, unsigned int buffer_size) override {
+		if (!buffer)
+			return false;
+		ma_format format = pcm_stream? ma_format_unknown : ma_format_from_angelscript_type(buffer->subtypeid);
+		int nchannels = pcm_stream? ma_pcm_rb_get_channels(&*pcm_stream) : channels? channels : get_engine()->get_channels();
+		return stream_pcm(buffer->ptr, buffer->size / nchannels, format, sample_rate, channels, buffer_size);
 	}
 	bool is_load_completed() const override {
 		return load_completed.test();
@@ -1123,6 +1186,8 @@ public:
 			ma_sound_uninit(&*snd);
 			snd.reset();
 			node = nullptr;
+			if (pcm_stream) ma_pcm_rb_uninit(&*pcm_stream);
+			pcm_stream.reset();
 			pcm_buffer.resize(0);
 			loaded_filename.clear();
 			load_completed.clear();
@@ -1142,14 +1207,16 @@ public:
 	}
 	bool play(bool reset_loop_state = true) override {
 		paused = false;
+		if (pcm_stream) ma_pcm_rb_reset(&*pcm_stream);
 		return mixer_impl::play(reset_loop_state);
 	}
 	bool play_looped() override {
+		if (pcm_stream) return false;
 		paused = false;
 		return mixer_impl::play_looped();
 	}
 	bool play_wait() override {
-		if (!play())
+		if (pcm_stream || !play())
 			return false;
 		while (get_playing())
 			wait(5);
@@ -1160,7 +1227,7 @@ public:
 		return mixer_impl::stop() && seek(0);
 	}
 	bool pause() override {
-		if (snd) {
+		if (snd && !pcm_stream) {
 			g_soundsystem_last_error = ma_sound_stop(&*snd);
 			if (g_soundsystem_last_error == MA_SUCCESS)
 				paused = true;
@@ -1414,6 +1481,7 @@ void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_FACTORY, "audio_engine@ e(int flags)", asFUNCTION(new_audio_engine), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call < audio_engine, &audio_engine::duplicate, void >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call < audio_engine, &audio_engine::release, void >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "int get_flags() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_flags, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "int get_device() const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_device, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "bool set_device(int device)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_device, bool, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "audio_node@+ get_endpoint() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_endpoint, audio_node * >)), asCALL_CDECL_OBJFIRST);
@@ -1795,10 +1863,22 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("sound", "bool load(const string&in filename, const pack_interface@ pack = null)", asFUNCTION((virtual_call < sound, &sound::load, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool stream(const string&in filename, const pack_interface@ pack = null)", asFUNCTION((virtual_call < sound, &sound::stream, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool load_memory(const string&in data)", asFUNCTION((virtual_call < sound, &sound::load_string, bool, const string & >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool load_pcm(const float[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool load_pcm(const int[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool load_pcm(const int16[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool load_pcm(const uint8[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const float[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const int[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const int16[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const uint8[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const memory_buffer<float>&in data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_memory_buffer, bool, script_memory_buffer*, int, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const memory_buffer<int>&in data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_memory_buffer, bool, script_memory_buffer*, int, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const memory_buffer<int16>&in data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_memory_buffer, bool, script_memory_buffer*, int, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const memory_buffer<uint8>&in data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_memory_buffer, bool, script_memory_buffer*, int, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_pcm(const float[]@ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_array, bool, CScriptArray*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_pcm(const int[]@ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_array, bool, CScriptArray*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_pcm(const int16[]@ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_array, bool, CScriptArray*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_pcm(const uint8[]@ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_array, bool, CScriptArray*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_pcm(const memory_buffer<float>&in data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_memory_buffer, bool, script_memory_buffer*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_pcm(const memory_buffer<int>&in data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_memory_buffer, bool, script_memory_buffer*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_pcm(const memory_buffer<int16>&in data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_memory_buffer, bool, script_memory_buffer*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_pcm(const memory_buffer<uint8>&in data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_memory_buffer, bool, script_memory_buffer*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool close()", asFUNCTION((virtual_call < sound, &sound::close, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "void set_autoclose(bool enabled = true) property", asFUNCTION((virtual_call < sound, &sound::set_autoclose, void, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_autoclose() const property", asFUNCTION((virtual_call < sound, &sound::get_autoclose, bool >)), asCALL_CDECL_OBJFIRST);

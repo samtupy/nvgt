@@ -21,6 +21,7 @@
 class CScriptArray;
 class CScriptHandle;
 class asIScriptEngine;
+class script_memory_buffer;
 class pack_interface;
 class audio_engine;
 class mixer;
@@ -253,8 +254,12 @@ public:
 	 * Output must be preallocated and must be at least 44 bytes larger than the input buffer.
 	 */
 	static bool pcm_to_wav(const void *buffer, unsigned int size, ma_format format, int samplerate, int channels, void *output);
-	virtual bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) = 0;
-	virtual bool load_pcm_script(CScriptArray *buffer, int samplerate, int channels) = 0;
+	virtual bool load_pcm(void *buffer, unsigned int size_in_bytes, ma_format format, int samplerate, int channels) = 0;
+	virtual bool load_pcm_script_array(CScriptArray *buffer, int samplerate, int channels) = 0;
+	virtual bool load_pcm_script_memory_buffer(script_memory_buffer*buffer, int samplerate, int channels) = 0;
+	virtual bool stream_pcm(const void* data, unsigned int size_in_frames, ma_format format = ma_format_unknown, unsigned int sample_rate = 0, unsigned int channels = 0, unsigned int buffer_size = 0) = 0;
+	virtual bool stream_pcm_script_array(CScriptArray *buffer, unsigned int samplerate, unsigned int channels, unsigned int buffer_size = 0) = 0;
+	virtual bool stream_pcm_script_memory_buffer(script_memory_buffer*buffer, unsigned int samplerate, unsigned int channels, unsigned int buffer_size = 0) = 0;
 	virtual bool close() = 0;
 	virtual void set_autoclose(bool enabled = true) = 0;
 	virtual bool get_autoclose() const = 0;
