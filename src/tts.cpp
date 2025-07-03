@@ -407,7 +407,7 @@ std::string tts_voice::speak_to_memory(const std::string &text) {
 	output.resize(bufsize + 44);
 	if (!sound::pcm_to_wav(ptr, bufsize, bitrate == 16 ? ma_format_s16 : ma_format_u8, samprate, channels, &output[0]))
 		return "";
-	if (voice_index == builtin_index)
+	if (should_free_data())
 		free(data);
 	return output;
 }
