@@ -347,7 +347,7 @@ bool tts_voice::speak(const std::string &text, bool interrupt) {
 	char *ptr = tts_trim(data, &bufsize, bitrate, channels);
 	soundptr s(g_audio_engine->new_sound());
 	bool ret = s->load_pcm(ptr, bufsize, bitrate == 16 ? ma_format_s16 : ma_format_u8, samprate, channels);
-	if (voice_index == builtin_index)
+	if (should_free_data())
 		free(data);
 
 	if (!ret)
@@ -618,6 +618,14 @@ bool tts_voice::refresh() {
 	setup();
 	set_voice(voice);
 	return !destroyed;
+}
+
+bool tts_voice::should_free_data() {
+	if (voice_index == builtin_index) return true;
+	#ifdef _WIN32
+		return true;
+	#endif
+return false;
 }
 
 tts_voice *Script_tts_voice_Factory(const std::string &builtin_voice_name) {

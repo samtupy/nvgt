@@ -96,6 +96,7 @@ public:
 	bool set_voice(int voice);
 	bool get_speaking();
 	bool refresh();
+	bool should_free_data();
 	bool stop();
 };
 
