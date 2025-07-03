@@ -290,11 +290,13 @@ HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, wtext, SPF_DEFAULT, NULL);
 free(wtext);
 if(FAILED(hr))
 {
+sapi->voice->lpVtbl->SetOutput(sapi->voice, NULL, TRUE);
 stream->lpVtbl->Release(stream);
 return 0;
     }
 sbz_sapi_cache_audio_attributes(sapi);
 int ok=sbz_sapi_capture_stream_output(sapi, stream, buffer, size);
+sapi->voice->lpVtbl->SetOutput(sapi->voice, NULL, TRUE);
 stream->lpVtbl->Close(stream);
 stream->lpVtbl->Release(stream);
 return ok;
