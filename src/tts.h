@@ -17,7 +17,7 @@
 #include <scriptarray.h>
 #include "sound.h"
 #ifdef _WIN32
-	struct blastspeak;
+	#include "sapibridge.h"
 #elif defined(__APPLE__)
 	class AVTTSVoice;
 #elif defined(__ANDROID__)
@@ -29,7 +29,7 @@
 class tts_voice {
 	int RefCount;
 	#ifdef _WIN32
-	blastspeak *inst;
+	sb_sapi *inst;
 	#elif defined(__APPLE__)
 	AVTTSVoice *inst;
 	#elif defined(__ANDROID__)

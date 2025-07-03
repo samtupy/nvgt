@@ -14,7 +14,7 @@
 
 #ifdef _WIN32
 	#define NOMINMAX
-	#include <blastspeak.h>
+	#include <sapibridge.h>
 #endif
 #include <obfuscate.h>
 #ifdef __APPLE__
@@ -219,9 +219,9 @@ tts_voice::~tts_voice() {
 void tts_voice::setup() {
 	#ifdef _WIN32
 	voice_index = -1;
-	inst = (blastspeak *)malloc(sizeof(blastspeak));
-	memset(inst, 0, sizeof(blastspeak));
-	if (!blastspeak_initialize(inst)) {
+	inst = (sb_sapi *)malloc(sizeof(sb_sapi));
+	memset(inst, 0, sizeof(sb_sapi));
+	if (!sb_sapi_initialise(inst)) {
 		free(inst);
 		inst = NULL;
 		voice_index = builtin_index;
@@ -272,7 +272,7 @@ void tts_voice::destroy() {
 	#ifdef _WIN32
 	if (destroyed || !inst)
 		return;
-	blastspeak_destroy(inst);
+	sb_sapi_cleanup(inst);
 	if (inst)
 		free(inst);
 	inst = NULL;
@@ -317,14 +317,14 @@ bool tts_voice::speak(const std::string &text, bool interrupt) {
 	else {
 		if (!inst && !refresh())
 			return FALSE;
-		data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
-		if (!data)
+		void *temp = NULL;
+		sb_sapi_speak_to_memory(inst, const_cast<char*>(text.c_str()), &temp, reinterpret_cast<int*>(&bufsize));
+		if (!temp)
 			return false;
-		if ((inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels)) {
-			samprate = inst->sample_rate;
-			bitrate = inst->bits_per_sample;
-			channels = inst->channels;
-		}
+		data = static_cast<char*>(temp);
+		samprate = sb_sapi_get_sample_rate(inst);
+		bitrate = sb_sapi_get_bit_depth(inst);
+		channels = sb_sapi_get_channels(inst);
 	}
 	#elif defined(__APPLE__)
 	else
@@ -386,12 +386,14 @@ std::string tts_voice::speak_to_memory(const std::string &text) {
 	else {
 		if (!inst && !refresh())
 			return "";
-		data = blastspeak_speak_to_memory(inst, &bufsize, text.c_str());
-		if ((inst->sample_rate != samprate || inst->bits_per_sample != bitrate || inst->channels != channels)) {
-			samprate = inst->sample_rate;
-			bitrate = inst->bits_per_sample;
-			channels = inst->channels;
-		}
+		void *temp = NULL;
+		sb_sapi_speak_to_memory(inst, const_cast<char*>(text.c_str()), &temp, reinterpret_cast<int*>(&bufsize));
+		if (!temp)
+			return "";
+		data = static_cast<char*>(temp);
+		samprate = sb_sapi_get_sample_rate(inst);
+		bitrate = sb_sapi_get_bit_depth(inst);
+		channels = sb_sapi_get_channels(inst);
 	}
 	#elif defined(__APPLE__) || defined(__ANDROID__)
 	else {
@@ -445,9 +447,7 @@ int tts_voice::get_rate() {
 	#ifdef _WIN32
 	if (!inst && !refresh())
 		return 0;
-	long result;
-	if (!blastspeak_get_voice_rate(inst, &result))
-		return 0;
+	int result = sb_sapi_get_rate(inst);
 	return result;
 	#elif defined(__APPLE__)
 	return inst->getRate() * 7;
@@ -459,7 +459,7 @@ int tts_voice::get_rate() {
 int tts_voice::get_pitch() {
 	// if(voice_index == builtin_index) return builtin_pitch;
 	#ifdef _WIN32
-	// not implemented yet
+	int result = sb_sapi_get_pitch(inst);
 	#elif defined(__APPLE__)
 	return inst->getPitch();
 	#elif defined(__ANDROID__)
@@ -473,9 +473,7 @@ int tts_voice::get_volume() {
 	#ifdef _WIN32
 	if (!inst && !refresh())
 		return 0;
-	long result;
-	if (!blastspeak_get_voice_volume(inst, &result))
-		return 0;
+	int result = sb_sapi_get_volume(inst);
 	return result - 100;
 	#elif defined(__APPLE__)
 	return inst->getVolume();
@@ -490,7 +488,7 @@ void tts_voice::set_rate(int rate) {
 	#ifdef _WIN32
 	if (!inst && !refresh())
 		return;
-	blastspeak_set_voice_rate(inst, rate);
+	sb_sapi_set_rate(inst, rate);
 	#elif defined(__APPLE__)
 	inst->setRate(rate / 7.0);
 	#elif defined(__ANDROID__)
@@ -500,7 +498,9 @@ void tts_voice::set_rate(int rate) {
 void tts_voice::set_pitch(int pitch) {
 	// if(voice_index == builtin_index) builtin_pitch = pitch;
 	#ifdef _WIN32
-	// not implemented
+	if (!inst && !refresh())
+		return;
+	sb_sapi_set_pitch(inst, pitch);
 	#elif defined(__APPLE__)
 	inst->setPitch(pitch);
 	#elif defined(__ANDROID__)
@@ -514,7 +514,7 @@ void tts_voice::set_volume(int volume) {
 	#ifdef _WIN32
 	if (!inst && !refresh())
 		return;
-	blastspeak_set_voice_volume(inst, volume + 100);
+	sb_sapi_set_volume(inst, volume + 100);
 	#elif defined(__APPLE__)
 	inst->setVolume(volume);
 	#elif defined(__ANDROID__)
@@ -529,7 +529,7 @@ bool tts_voice::set_voice(int voice) {
 	#ifdef _WIN32
 	if (!inst && !refresh())
 		return FALSE;
-	if (blastspeak_set_voice(inst, voice - (builtin_index + 1))) {
+	if (sb_sapi_set_voice(inst, voice - (builtin_index + 1))) {
 		voice_index = voice;
 		return true;
 	}
@@ -567,7 +567,7 @@ CScriptArray *tts_voice::list_voices() {
 		return array;
 	array->Resize(array->GetSize() + inst->voice_count);
 	for (int i = 0; i < inst->voice_count; i++) {
-		const char *result = blastspeak_get_voice_description(inst, i);
+		char *result = sb_sapi_get_voice_name(inst, i);
 		int array_idx = i + (builtin_index + 1);
 		if (result)
 			((std::string *)(array->At(array_idx)))->assign(result);
@@ -601,7 +601,7 @@ std::string tts_voice::get_voice_name(int index) {
 		return "";
 	if (c < 1 || index < 0 || index >= c)
 		return "";
-	const char *result = blastspeak_get_voice_description(inst, index);
+	char *result = sb_sapi_get_voice_name(inst, index);
 	if (result)
 		return std::string(result);
 	#elif defined(__APPLE__)
