@@ -13,16 +13,22 @@ You will need a C++ build toolchain if you want to build NVGT from source. On Wi
 
 NVGT uses SCons, a Python build system. If you have Python, you can get it by running `pip install scons`.
 
-Other than SCons, the following libraries are needed to build NVGT:
+Other than SCons, the following libraries are needed to build NVGT's core:
 * AngelScript scripting library
-* bullet3 physics library, though at the time of writing only some headers (the Bullet3Common and LinearMath folders) are needed
-* Enet networking library
+* bass, bassmix and bass-fx from un4seen if you wish to build the legacy sound system
+* Enet networking library - we use a custom fork called enet6 with IPV6 support
+* libplist to create MacOS bundles
+* ogg and opus codecs
+* Phonon / steam audio
 * Poco C++ portable components
+* Reactphysics3d
 * SDL3
+* Universal speech
 
-You also need to locate headers and binaries for the Bass Audio library (bass, bassmix and bass_fx) and for Phonon (Steam Audio) though some are provided if you want to use those.
-
-If you want to build all plugins, you will also need the Curl and Libgit2 libraries.
+By default, NVGT will try to build all plugins contained within the plugin folder. Furthermore, if you check out the repository with submodules, the [nvgt_extra repository](https://github.com/samtupy/nvgt_extra) will be cloned into a subfolder called extra, in which case all plugins contained within extra/plugin/integrated will be automatically built by default as well. This means that unless you use the no_plugins=1 SCons switch or else the switches that disable individual plugins, you might also need the following dependencies.
+* Bass, bassmix and bass_fx from un4seen to build plugin/legacy_sound
+* libcurl to build extra/plugin/integrated/curl
+* libgit2 to build extra/plugin/integrated/git
 
 For Linux and Mac-OS, scripts with build commands are in build/build_Linux.sh and build/build_macos.sh.
 
@@ -44,24 +50,7 @@ If you want to see what other custom switches are available in NVGT's SConstruct
 You can omit the `-s` from the build command if you want to get spammed with the outputting of every internal build command used, which is hundreds of them.
 
 ### Android
-To build NVGT for Android, you will need the Android SDK. The easiest way to get this at least on Windows is if you have Visual Studio to download the Mobile Development workload, or else to install Android Studio.
-
-As with other platforms, most of the work regarding building libraries has been done for you, you can download [droidev.zip](https://nvgt.gg/droidev.zip) here, and extract it similarly to how it is described above for other platforms. Look at jni/example-custom.mk to learn how to set a custom location to this directory.
-
-On some systems, the Android SDK requires a bit of setup to use it extensively enough to build NVGT. If you are using Android Studio directly or if anything else has configured your Android SDK for you it is unlikely you'll need any of this, but in case you need to set up your SDK manually especially on Windows, here are a few notes:
-1. The Android SDK on Windows must not be in a directory containing spaces, or at least must not be invoked with one. For example, the Mobile Development workload on Visual Studio by default installs the tools in "C:\Program Files (x86)\Android". So to use it, you may need to symlink the folder with a command run as administrator like `mklink /d C:\android "C:\Program Files (x86)\Android"`.
-2. It may also be a good idea to run the Gradle tool (described below) as administrator if you get any weird access denied errors when trying to do it otherwise, you'll see it's trying to write to some file within the Android SDK directory which may require administrative rights to access depending on where it is installed. If you keep getting errors even after doing this, run `gradlew -stop` to kill any old Gradle daemons that were running without privileges.
-3. There are a couple of environment variables you may need to set before building. These are the `ANDROID_NDK_HOME`, `ANDROID_HOME`, and `JAVA_HOME` variables which help locate the Android development tools for anything that needs them. An example of setting them at least for Windows is in other/droidev.bat.
-4. If at any point you need to run sdkmanager to accept licenses on Windows, run it... yep, as admin. Otherwise you will be informed that the licenses have been successfully accepted, but when you try using the tools, you'll be told to accept them again.
-5. It should be noted that both Visual Studio and Android Studio install a functioning Java runtime environment for you, so you don't have to go hunting for one. On Visual Studio, this may be at "C:\Program Files (x86)\Android\openjdk\jdk-17.0.8.101-hotspot", and for Android Studio it may be at "C:\Android\Android Studio\jre". Sadly these paths might change a bit over time (especially the JDK version in the Visual Studio path), so you may need to look up the latest paths if you are having trouble.
-
-To build NVGT for Android, cd to the jni directory and run `gradlew assembleRunnerDebug assembleStubRelease`
-
-On platforms other than Windows you may need to run `./gradlew` instead of `gradlew`.
-
-If you want to install the runner application to any devices connected in debug mode, you can run `gradlew installRunnerDebug`.
-
-Do not directly install the stub APK on your device, only do that for the runner application. In regards to the stub, after the Gradle build command succeeds, there is now a file in release/stub/nvgt_android.bin which should be moved into the stub folder of your actual NVGT installation, allowing NVGT to compile .APK files from game source code.
+Separate documentation is provided [in the building NVGT for android document](https://github.com/samtupy/nvgt/blob/main/doc/src/advanced/Building%20NVGT%20for%20Android.md) which gives instructions and details for building on this platform.
 
 ## Contributing
 Contributions to NVGT are extremely welcome and are what help the project grow. Please view the [contribution guidelines](.github/CONTRIBUTING.md) before you contribute.

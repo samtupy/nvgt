@@ -19,11 +19,16 @@
 #define SOUNDSYSTEM_FRAMESIZE 128 // We can make this be configureable if enough people want it.
 
 class CScriptArray;
+class CScriptHandle;
 class asIScriptEngine;
+class script_memory_buffer;
 class pack_interface;
 class audio_engine;
 class mixer;
 class sound;
+class audio_node_chain;
+class splitter_node;
+class reverb3d;
 
 extern audio_engine *g_audio_engine;
 extern std::atomic<ma_result> g_soundsystem_last_error;
@@ -32,6 +37,7 @@ bool add_decoder(ma_decoding_backend_vtable *vtable);
 bool init_sound();
 void uninit_sound();
 bool refresh_audio_devices();
+void garbage_collect_inline_sounds();
 
 class audio_node {
 public:
@@ -69,6 +75,7 @@ public:
 	virtual void duplicate() = 0; // reference counting
 	virtual void release() = 0;
 	virtual ~audio_engine() = default;
+	virtual int get_flags() const = 0;
 	virtual int get_device() const = 0;
 	virtual bool set_device(int device) = 0;
 	virtual audio_node *get_endpoint() const = 0;
@@ -110,10 +117,28 @@ public:
 	virtual reactphysics3d::Vector3 get_listener_world_up(unsigned int index) const = 0;
 	virtual void set_listener_enabled(unsigned int index, bool enabled) = 0;
 	virtual bool get_listener_enabled(unsigned int index) const = 0;
-	virtual bool play_through_node(const std::string &path, audio_node *node, unsigned int input_bus_index) = 0;
-	virtual bool play(const std::string &path, mixer *mixer = nullptr) = 0;
+	virtual sound* play(const std::string& path, const reactphysics3d::Vector3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) = 0;
 	virtual mixer *new_mixer() = 0;
 	virtual sound *new_sound() = 0;
+};
+class sound_shape {
+	// This facility allows sounds to be attached to any arbitrary shape for positioning.
+	// When a shape is attached to a sound or mixer, set_position_3d exhibits different functionality. if sound_shape::contains returns true based on whether listener_position is within the shape, spatialization is disabled on the sound. Otherwise, the sound's position is set to the sound_position vector passed to the contains callback, the callback can alter it to point at the nearest edge of the shape if needed and should be overridden by subclasses. Do not override is_in_shape as it's a base function which calls contains.
+	// We keep track of the original sound position before it was mutated so that sound::get_position_3d works as expected, as well as the original ref handle the scripter passed to sound::set_shape so that sound::get_shape returns something valid.
+	mutable int refcount;
+	CScriptHandle* shape;
+	reactphysics3d::Vector3 position;
+public:
+	mixer* connected_sound; // If set, this object is not threadsafe.
+	sound_shape(CScriptHandle* script_shape = nullptr) : refcount(1), shape(script_shape), connected_sound(nullptr) {}
+	void duplicate() const { asAtomicInc(refcount); }
+	void release() const { if (asAtomicDec(refcount) < 1) delete this; }
+	void set_shape(CScriptHandle* script_shape) { shape = script_shape; }
+	CScriptHandle* get_shape() const { return shape; }
+	void set_position(const reactphysics3d::Vector3& new_position) { position = new_position; }
+	reactphysics3d::Vector3 get_position() const { return position; }
+	bool is_in_shape(const reactphysics3d::Vector3& listener_position, reactphysics3d::Vector3& sound_position) { position = sound_position; return contains(listener_position, sound_position); }
+	virtual bool contains(const reactphysics3d::Vector3&  listener_position, reactphysics3d::Vector3& sound_position) { return sound_position == listener_position; }
 };
 class mixer : public virtual audio_node {
 public:
@@ -128,6 +153,14 @@ public:
 	virtual bool get_hrtf() const = 0;         // whether hrtf is currently enabled
 	virtual bool get_hrtf_desired() const = 0; // whether hrtf is desired by the user even if global hrtf is currently off
 	virtual audio_node *get_hrtf_node() const = 0;
+	virtual bool set_shape(CScriptHandle* shape) = 0;
+	virtual CScriptHandle* get_shape() const = 0;
+	virtual sound_shape* get_shape_object() const = 0;
+	virtual void set_reverb3d(reverb3d* verb) = 0;
+	virtual reverb3d* get_reverb3d() const = 0;
+	virtual splitter_node* get_reverb3d_attachment() const = 0;
+	virtual audio_node_chain* get_effects_chain() = 0;
+	virtual audio_node_chain* get_internal_node_chain() const = 0;
 	virtual bool play(bool reset_loop_state = true) = 0;
 	virtual bool play_looped() = 0;
 	virtual bool stop() = 0;
@@ -221,9 +254,15 @@ public:
 	 * Output must be preallocated and must be at least 44 bytes larger than the input buffer.
 	 */
 	static bool pcm_to_wav(const void *buffer, unsigned int size, ma_format format, int samplerate, int channels, void *output);
-	virtual bool load_pcm(void *buffer, unsigned int size, ma_format format, int samplerate, int channels) = 0;
-	virtual bool load_pcm_script(CScriptArray *buffer, int samplerate, int channels) = 0;
+	virtual bool load_pcm(void *buffer, unsigned int size_in_bytes, ma_format format, int samplerate, int channels) = 0;
+	virtual bool load_pcm_script_array(CScriptArray *buffer, int samplerate, int channels) = 0;
+	virtual bool load_pcm_script_memory_buffer(script_memory_buffer*buffer, int samplerate, int channels) = 0;
+	virtual bool stream_pcm(const void* data, unsigned int size_in_frames, ma_format format = ma_format_unknown, unsigned int sample_rate = 0, unsigned int channels = 0, unsigned int buffer_size = 0) = 0;
+	virtual bool stream_pcm_script_array(CScriptArray *buffer, unsigned int samplerate, unsigned int channels, unsigned int buffer_size = 0) = 0;
+	virtual bool stream_pcm_script_memory_buffer(script_memory_buffer*buffer, unsigned int samplerate, unsigned int channels, unsigned int buffer_size = 0) = 0;
 	virtual bool close() = 0;
+	virtual void set_autoclose(bool enabled = true) = 0;
+	virtual bool get_autoclose() const = 0;
 	virtual const std::string &get_loaded_filename() const = 0;
 	virtual bool get_active() = 0;
 	virtual bool get_paused() = 0;

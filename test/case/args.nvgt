@@ -1,0 +1,12 @@
+void test_args_variables() {
+	assert(COMMAND_LINE.length() >= 0);
+	
+	assert(ARGS.length() >= 1); // At least the script name
+	
+	assert(ARGS[0].length() > 0);
+	
+	string args_str = string(ARGS);
+	assert(args_str.length() > 0);
+	assert(args_str.find("[") >= 0);
+	assert(args_str.find("]") >= 0);
+}
