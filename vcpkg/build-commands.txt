@@ -14,22 +14,10 @@ After setting android NDK home
 ../vcpkg/bin/vcpkg install --overlay-ports=../vcpkg/ports --overlay-triplets=../vcpkg/triplets --triplet arm64-android enet6[*] libflac curl[http2,openssl] libffi miniupnpc[*] libogg opus[*] libvorbis[*] poco[crypto,net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] angelscript-nc
 ../vcpkg/bin/vcpkg install --overlay-ports=../vcpkg/ports --overlay-triplets=../vcpkg/triplets --triplet arm64-android-dynamic sdl3[vulkan] sdl3-ttf[core,svg] sdl3-image[*] steam-audio freetype[core,bzip2,error-strings,png,subpixel-rendering,zlib]
 Macos:
-git clone -b openssl-3.5.0 --recursive https://github.com/openssl/openssl openssl-arm
-git clone -b openssl-3.5.0 --recursive https://github.com/openssl/openssl openssl-x64
-cd openssl-arm
-./Configure zlib darwin64-arm64-cc no-apps no-docs no-filenames no-shared no-weak-ssl-ciphers --release
-make -s
-sudo make install -s
-cd ../openssl-x64
-./Configure zlib darwin64-x86_64-cc no-apps no-docs no-filenames no-shared no-weak-ssl-ciphers --release
-make -s
-cd ..
-mkdir openssl-fat
-lipo -create openssl-arm/libcrypto.a openssl-x64/libcrypto.a -output openssl-fat/libcrypto.a
-lipo -create openssl-arm/libssl.a openssl-x64/libssl.a -output openssl-fat/libssl.a
-    sudo cp openssl-fat/*.a /usr/local/lib
-    cd back to vcpkg dir
-./vcpkg install --overlay-ports=../nvgt/vcpkg/ports --overlay-triplets=../nvgt/vcpkg/triplets --triplet arm64-osx enet6[*] libflac curl[http2,core,sectransp] miniupnpc[*] libogg opus[*] sdl3[vulkan] sdl3-ttf[core,svg] libvorbis[*] libarchive[*] poco[net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] freetype[core,bzip2,error-strings,subpixel-rendering,zlib]
+../vcpkg/bin/vcpkg install --overlay-ports=../vcpkg/ports --overlay-triplets=../vcpkg/triplets --triplet arm64-osx enet6[*] libflac curl[openssl] libffi miniupnpc[*] libogg opus[*] opusfile sdl3[vulkan] sdl3-image sdl3-ttf freetype[core,bzip2,error-strings,subpixel-rendering,zlib] libvorbis[*] poco[net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] angelscript reactphysics3d libgit2[core,pcre2] libplist libarchive[core,bzip2,libxml2,lz4,lzma,zstd]
+../vcpkg/bin/vcpkg install --overlay-ports=../vcpkg/ports --overlay-triplets=../vcpkg/triplets --triplet x64-osx openssl libffi
+to create fat binaries for openssl and libffi, modify/duplicate the command:
+lipo -create arm.a x64.a -output fat.a
 iOS:
 Again, no steam audio
 No need to build openssl here; vcpkg will build it just fine. Libffi is still a pest. Because of course it is.
