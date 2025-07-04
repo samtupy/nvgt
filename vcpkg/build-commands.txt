@@ -19,8 +19,6 @@ Macos:
 to create fat binaries for openssl and libffi, modify/duplicate the command:
 lipo -create arm.a x64.a -output fat.a
 iOS:
-Again, no steam audio
-No need to build openssl here; vcpkg will build it just fine. Libffi is still a pest. Because of course it is.
-./vcpkg install --overlay-ports=../nvgt/vcpkg/ports --overlay-triplets=../nvgt/vcpkg/triplets --triplet arm64-ios enet6[*] libflac curl[http2,sectransp] miniupnpc[*] libogg opus[*] libvorbis[*] poco[crypto,net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] angelscript sdl3[vulkan] sdl3-ttf[core,svg] sdl3-image[*] freetype[core,bzip2,error-strings,png,subpixel-rendering,zlib]
+../vcpkg/bin/vcpkg install --overlay-ports=../vcpkg/ports --overlay-triplets=../vcpkg/triplets --triplet arm64-ios enet6[*] libflac curl[openssl] libffi miniupnpc[*] libogg opus[*] opusfile sdl3[vulkan] sdl3-image sdl3-ttf freetype[core,bzip2,error-strings,subpixel-rendering,zlib] libvorbis[*] poco[net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] angelscript reactphysics3d libgit2[core,pcre2] libplist libarchive[core,bzip2,libxml2,lz4,lzma,zstd]
 Or for the simulator:
-./vcpkg install --overlay-ports=../nvgt/vcpkg/ports --overlay-triplets=../nvgt/vcpkg/triplets --triplet arm64-ios-simulator enet6[*] libflac curl[http2,sectransp] miniupnpc[*] libogg opus[*] libvorbis[*] poco[crypto,net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] angelscript sdl3[vulkan] sdl3-ttf[core,svg] sdl3-image[*] freetype[core,bzip2,error-strings,png,subpixel-rendering,zlib]
+../vcpkg/bin/vcpkg install --overlay-ports=../vcpkg/ports --overlay-triplets=../vcpkg/triplets --triplet arm64-ios-simulator enet6[*] libflac curl[openssl] libffi miniupnpc[*] libogg opus[*] opusfile sdl3[vulkan] sdl3-image sdl3-ttf freetype[core,bzip2,error-strings,subpixel-rendering,zlib] libvorbis[*] poco[net,netssl,json,util,xml,zip,encodings,mongodb,redis,jwt,prometheus,sevenzip] angelscript reactphysics3d libgit2[core,pcre2] libplist libarchive[core,bzip2,libxml2,lz4,lzma,zstd]
