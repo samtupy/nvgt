@@ -4,7 +4,7 @@
 #include "miniaudio_libopus.h"
 
 #if !defined(MA_NO_LIBOPUS)
-#include <opusfile.h>
+#include <opus/opusfile.h>
 #endif
 
 #include <string.h> /* For memset(). */
