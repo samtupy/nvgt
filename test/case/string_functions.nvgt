@@ -1,0 +1,14 @@
+void test_string_functions() {
+	assert("this is a test".upper() == "THIS IS A TEST");
+	assert("23".is_digits() == true);
+	assert("23a".is_digits() == false);
+	assert("23".is_alphabetic() == false);
+	assert("abc".is_alphabetic() == true);
+	assert("this is a test".ends_with("est") == true);
+	assert("this is a test".ends_with("xyz") == false);
+	
+	// Test more string functions
+	assert("HELLO".lower() == "hello");
+	assert("test string".starts_with("test") == true);
+	assert("  spaces  ".trim_whitespace() == "spaces");
+}

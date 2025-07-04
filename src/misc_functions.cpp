@@ -346,6 +346,7 @@ script_memory_buffer& script_memory_buffer::from_array(CScriptArray* array) {
 	else std::memcpy(ptr, array->GetBuffer(), (array->GetSize() < size? array->GetSize() : size) * g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid));
 	return *this;
 }
+int script_memory_buffer::get_element_size() const {return g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid); }
 void script_memory_buffer::make(script_memory_buffer* mem, asITypeInfo* subtype, void* ptr, int size) { new(mem) script_memory_buffer(subtype, ptr, size); }
 void script_memory_buffer::copy(script_memory_buffer* mem, asITypeInfo* subtype, const script_memory_buffer& other) { new(mem) script_memory_buffer(other); }
 void script_memory_buffer::destroy(script_memory_buffer* mem) { mem->~script_memory_buffer(); }
@@ -365,6 +366,7 @@ void script_memory_buffer::angelscript_register(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("memory_buffer<T>", "const T& opIndex(uint64 index) const", asMETHODPR(script_memory_buffer, at, (size_t) const, const void*), asCALL_THISCALL);
 	engine->RegisterObjectMethod("memory_buffer<T>", "array<T>@ opImplConv() const", asMETHOD(script_memory_buffer, to_array), asCALL_THISCALL);
 	engine->RegisterObjectMethod("memory_buffer<T>", "memory_buffer<T>& opAssign(array<T>@ array)", asMETHOD(script_memory_buffer, from_array), asCALL_THISCALL);
+	engine->RegisterObjectMethod("memory_buffer<T>", "int get_element_size() const property", asMETHOD(script_memory_buffer, get_element_size), asCALL_THISCALL);
 }
 void* string_get_address(std::string& str) {
 	if (str.size() < 1) return nullptr;

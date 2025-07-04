@@ -1,0 +1,160 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+// Tests all the new features added to the mail wrapper
+// This runs them dry - no credentials support
+// We needed something to test while developing this and couldn't be bothered setting up credentials at the outset.
+
+void main() {
+    test_email_validation();
+    test_message_threading();
+    test_dsn();
+    test_connection_status();
+    test_email_parsing();
+
+    println();
+
+    println("All tests completed!");
+}
+
+void test_email_validation() {
+    // Valid email addresses
+    string[] valid_emails = {
+        "user@example.com",
+        "firstname.lastname@example.com",
+        "email@subdomain.example.com",
+        "firstname+lastname@example.com",
+        "email@123.123.123.123",
+        "1234567890@example.com",
+        "_______@example.com"
+    };
+    
+    // Invalid email addresses
+    // Some of these get through the regex because we're not doing the full exhaustive check yet
+    string[] invalid_emails = {
+        "plainaddress",
+        "@example.com",
+        "user@",
+        "user..name@example.com",
+        "user@example",
+        "user @example.com",
+        "user@example..com"
+    };
+    
+    println("Testing valid email addresses:");
+    for (uint i = 0; i < valid_emails.length(); i++) {
+        bool result = validate_email_address(valid_emails[i]);
+        println("  " + valid_emails[i] + ": " + (result ? "VALID" : "INVALID (unexpected!)"));
+    }
+    
+    println("\nTesting invalid email addresses:");
+    for (uint i = 0; i < invalid_emails.length(); i++) {
+        bool result = validate_email_address(invalid_emails[i]);
+        println("  " + invalid_emails[i] + ": " + (result ? "VALID (unexpected!)" : "INVALID"));
+    }
+}
+
+void test_message_threading() {
+    mail_message@ msg = mail_message();
+
+    msg.set_in_reply_to("<original-message-id@example.com>");
+    msg.set_references("<thread-start@example.com> <second-message@example.com>");
+
+    println("In-Reply-To header set to: " + msg.in_reply_to);
+    println("References header set to: " + msg.references);
+
+    if (msg.in_reply_to == "<original-message-id@example.com>") {
+        println("In-Reply-To header: PASSED");
+    } else {
+        println("In-Reply-To header: FAILED");
+    }
+
+    if (msg.references == "<thread-start@example.com> <second-message@example.com>") {
+        println("References header: PASSED");
+    } else {
+        println("References header: FAILED");
+    }
+}
+
+void test_dsn() {
+    mail_message@ msg = mail_message();
+
+    msg.set_return_receipt_to("receipts@example.com");
+    msg.set_disposition_notification_to("notifications@example.com");
+
+    println("Return-Receipt-To set to: " + msg.return_receipt_to);
+    println("Disposition-Notification-To set to: " + msg.disposition_notification_to);
+    
+    if (msg.return_receipt_to == "receipts@example.com") {
+        println("Return-Receipt-To header: PASSED");
+    } else {
+        println("Return-Receipt-To header: FAILED");
+    }
+
+    if (msg.disposition_notification_to == "notifications@example.com") {
+        println("Disposition-Notification-To header: PASSED");
+    } else {
+        println("Disposition-Notification-To header: FAILED");
+    }
+}
+
+void test_connection_status() {
+    smtp_client@ client = smtp_client();
+    
+    println("Initial connection state: " + (client.is_connected ? "connected" : "not connected"));
+    println("Initial authenticated state: " + (client.is_authenticated ? "authenticated" : "not authenticated"));
+    
+    client.set_timeout(15000); // 15 seconds
+    println("Timeout set to: " + client.timeout + " ms");
+    
+    if (client.timeout == 15000) {
+        println("Timeout property: PASSED");
+    } else {
+        println("Timeout property: FAILED");
+    }
+    
+    client.host = "invalid.smtp.server";
+    client.port = 25;
+    
+    if (!client.connect()) {
+        println("Invalid server connection test: PASSED (failed as expected)");
+        println("Error: " + client.last_error);
+    } else {
+        println("Invalid server connection test: FAILED (should not connect)");
+        client.close();
+    }
+}
+
+void test_email_parsing() {
+    // Create a sample email string (simplified RFC format)
+    string raw_email = "From: sender@example.com\r\n";
+    raw_email += "To: recipient@example.com\r\n";
+    raw_email += "Subject: Test Email\r\n";
+    raw_email += "Message-ID: <test123@example.com>\r\n";
+    raw_email += "In-Reply-To: <original@example.com>\r\n";
+    raw_email += "References: <thread@example.com>\r\n";
+    raw_email += "\r\n";
+    raw_email += "This is the email body.";
+    
+    println("Parsing email message...");
+    
+    mail_message@ parsed = parse_email_message(raw_email);
+    
+    if (parsed !is null) {
+        println("Email parsed successfully!");
+        println("  From: " + parsed.sender);
+        println("  Subject: " + parsed.subject);
+        println("  Message-ID: " + parsed.message_id);
+        println("  In-Reply-To: " + parsed.in_reply_to);
+        println("  References: " + parsed.references);
+
+        // Note: The parser may not populate all fields correctly
+        // due to the simplified implementation
+        if (!parsed.last_error.empty()) {
+            println("  Parse errors: " + parsed.last_error);
+        }
+    } else {
+        println("Failed to parse email!");
+    }
+}
+

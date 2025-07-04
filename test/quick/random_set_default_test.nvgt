@@ -1,0 +1,64 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+// Test setting user script generator as default
+
+class dumb_generator : random_generator {
+    private uint value = 42;
+    
+    uint next() {
+        return value;
+    }
+    
+    float nextf() {
+        return 0.5;
+    }
+    
+    int range(int min, int max) {
+        return (min + max) / 2;
+    }
+    
+    bool next_bool(int percent = 50) {
+        return true;
+    }
+    
+    string next_character(const string &in min, const string &in max) {
+        return "x";
+    }
+}
+
+void main() {
+    println("Testing Set Default with Script Generator");
+    println("========================================");
+    
+    println("Built-in default random:");
+    println("random(1, 10): " + random(1, 10));
+    println("random(1, 10): " + random(1, 10));
+    
+    // Create our dumb generator
+    dumb_generator@ dumb = @dumb_generator();
+    
+    println("\nTesting dumb generator directly:");
+    println("range(1, 10): " + dumb.range(1, 10));
+    println("nextf(): " + dumb.nextf());
+    println("next_bool(): " + dumb.next_bool());
+    
+    // The critical test: can we set it as default?
+    println("\nSetting dumb generator as default...");
+    
+    set_default_random(dumb);
+    println("Successfully set script generator as default!");
+    
+    // Test that the default changed
+    println("\nTesting with new default:");
+    println("random(1, 10): " + random(1, 10)); // Should always be 5
+    println("random(1, 10): " + random(1, 10)); // Should always be 5
+    println("random(50, 100): " + random(50, 100)); // Should always be 75
+    
+    string[] words = {"hello", "world", "test", "nvgt"};
+    println("Array random: " + words.random()); // Uses dumb default
+    println("Array random: " + words.random()); // Should be same
+    
+    println("\nDefault setting test PASSED!");
+}

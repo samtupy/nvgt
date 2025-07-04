@@ -433,26 +433,34 @@ bool script_function_retrieve(asIScriptFunction* func, asIScriptFunction** out_f
 	return false;
 }
 int script_function_get_line(asIScriptFunction* func) {
-	asIScriptContext* ctx = g_ScriptEngine->CreateContext();
-	if (!ctx) return -2;
-	if (ctx->Prepare(func) < 0) return -3;
-	int ret = ctx->GetLineNumber();
-	ctx->Release();
-	return ret;
+	const char* section = nullptr;
+	int row, col;
+	if (!func || func->GetDeclaredAt(&section, &row, &col) < 0) return -1;
+	return row;
 }
 std::string script_function_get_decl(asIScriptFunction* func, bool include_object_name = true, bool include_namespace = true, bool include_param_names = false) {
+	if (!func) return "";
 	return std::string(func->GetDeclaration(include_object_name, include_namespace, include_param_names));
 }
 std::string script_function_get_decl_property(asIScriptFunction* func) { return script_function_get_decl(func); }
 std::string script_function_get_name(asIScriptFunction* func) {
+	if (!func) return "";
 	return std::string(func->GetName());
 }
 std::string script_function_get_namespace(asIScriptFunction* func) {
+	if (!func) return "";
 	return std::string(func->GetNamespace());
 }
-std::string script_function_get_script(asIScriptFunction* func, int* row, int* col) {
-	const char* script;
-	if (func->GetDeclaredAt(&script, row, col) < 0) return "";
+std::string script_function_get_declared_at(asIScriptFunction* func, int* row, int* col) {
+	const char* script = nullptr;
+	if (!func || func->GetDeclaredAt(&script, row, col) < 0) return "";
+	return std::string(script);
+}
+std::string script_function_get_script_property(asIScriptFunction* func) {
+	const char* script = nullptr;
+	int row, col;
+	if (!func || func->GetDeclaredAt(&script, &row, &col) < 0) return "";
+	if (!func || func->GetDeclaredAt(&script, &row, &col) < 0) return "";
 	return std::string(script);
 }
 void script_function_line_callback(asIScriptContext* ctx, script_function_call_data* data) {
@@ -719,11 +727,12 @@ void RegisterScripting(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("script_function"), _O("dictionary@ call(dictionary@ args, string[]@ errors = null, int max_statement_count = 0)"), asFUNCTION(script_function_call), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("dictionary@ opCall(dictionary@ args, string[]@ errors = null, int max_statement_count = 0)"), asFUNCTION(script_function_call), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("bool retrieve(?&out)"), asFUNCTION(script_function_retrieve), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("string get_declared_at(int& row, int& column)"), asFUNCTION(script_function_get_declared_at), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("string get_decl(bool include_object_name, bool include_namespace = true, bool include_param_names = true)"), asFUNCTION(script_function_get_decl), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("string get_decl() property"), asFUNCTION(script_function_get_decl_property), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("string get_name() property"), asFUNCTION(script_function_get_name), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("string get_namespace() property"), asFUNCTION(script_function_get_namespace), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(_O("script_function"), _O("string get_script() property"), asFUNCTION(script_function_get_script), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("string get_script() property"), asFUNCTION(script_function_get_script_property), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("int get_line() property"), asFUNCTION(script_function_get_line), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("bool get_is_explicit() property"), asMETHOD(asIScriptFunction, IsExplicit), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_function"), _O("bool get_is_final() property"), asMETHOD(asIScriptFunction, IsFinal), asCALL_THISCALL);

@@ -458,7 +458,7 @@ class settings {
 		if (!this.active) return false;
 		string file_path = this.data_helper.get_data_path();
 		if (!file_delete(file_path)) return false;
-		string[]@ path = file_path.split("/");
+		string[]@ path = file_path.split("/\\", false);
 		path.remove_at(path.length() - 1);
 		if (this.has_other_products()) path.remove_at(path.length() - 1);
 		return directory_delete(join(path, "/"));

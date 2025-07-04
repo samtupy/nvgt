@@ -1,0 +1,208 @@
+// Benchmark for various random operations
+
+void bench_next_bool() {
+	float total = 0.0;
+	random_pcg pcg;
+	random_well well;
+	random_gamerand gamerand;
+	random_xorshift xorshift;
+	
+	println("Benchmarking next_bool() with 50% probability");
+	
+	// PCG
+	timer t1(0, 1);
+	for (int i = 0; i < 1000000; i++)
+		pcg.next_bool(50);
+	t1.pause();
+	println("PCG next_bool(50): %0us".format(float(t1.elapsed)));
+	
+	// WELL
+	timer t2(0, 1);
+	for (int i = 0; i < 1000000; i++)
+		well.next_bool(50);
+	t2.pause();
+	println("WELL next_bool(50): %0us".format(float(t2.elapsed)));
+	
+	// Gamerand
+	timer t3(0, 1);
+	for (int i = 0; i < 1000000; i++)
+		gamerand.next_bool(50);
+	t3.pause();
+	println("Gamerand next_bool(50): %0us".format(float(t3.elapsed)));
+	
+	// Xorshift
+	timer t4(0, 1);
+	for (int i = 0; i < 1000000; i++)
+		xorshift.next_bool(50);
+	t4.pause();
+	println("Xorshift next_bool(50): %0us".format(float(t4.elapsed)));
+}
+
+void bench_next_character() {
+	float total = 0.0;
+	random_pcg pcg;
+	random_well well;
+	random_gamerand gamerand;
+	random_xorshift xorshift;
+	
+	println("\nBenchmarking next_character('a', 'z')");
+	
+	// PCG
+	timer t1(0, 1);
+	for (int i = 0; i < 100000; i++)
+		pcg.next_character("a", "z");
+	t1.pause();
+	println("PCG next_character: %0us".format(float(t1.elapsed)));
+	
+	// WELL
+	timer t2(0, 1);
+	for (int i = 0; i < 100000; i++)
+		well.next_character("a", "z");
+	t2.pause();
+	println("WELL next_character: %0us".format(float(t2.elapsed)));
+	
+	// Gamerand
+	timer t3(0, 1);
+	for (int i = 0; i < 100000; i++)
+		gamerand.next_character("a", "z");
+	t3.pause();
+	println("Gamerand next_character: %0us".format(float(t3.elapsed)));
+	
+	// Xorshift
+	timer t4(0, 1);
+	for (int i = 0; i < 100000; i++)
+		xorshift.next_character("a", "z");
+	t4.pause();
+	println("Xorshift next_character: %0us".format(float(t4.elapsed)));
+}
+
+void bench_seeding() {
+	float total = 0.0;
+	random_pcg pcg;
+	random_well well;
+	random_gamerand gamerand;
+	random_xorshift xorshift;
+	
+	println("\nBenchmarking seed() operations");
+	
+	// PCG
+	timer t1(0, 1);
+	for (int i = 0; i < 10000; i++)
+		pcg.seed(i);
+	t1.pause();
+	println("PCG seed(): %0us for 10000 operations".format(float(t1.elapsed)));
+	
+	// WELL
+	timer t2(0, 1);
+	for (int i = 0; i < 10000; i++)
+		well.seed(i);
+	t2.pause();
+	println("WELL seed(): %0us for 10000 operations".format(float(t2.elapsed)));
+	
+	// Gamerand
+	timer t3(0, 1);
+	for (int i = 0; i < 10000; i++)
+		gamerand.seed(i);
+	t3.pause();
+	println("Gamerand seed(): %0us for 10000 operations".format(float(t3.elapsed)));
+	
+	// Xorshift
+	timer t4(0, 1);
+	for (int i = 0; i < 10000; i++)
+		xorshift.seed(i);
+	t4.pause();
+	println("Xorshift seed(): %0us for 10000 operations".format(float(t4.elapsed)));
+}
+
+void bench_state_operations() {
+	random_pcg pcg;
+	random_well well;
+	random_gamerand gamerand;
+	random_xorshift xorshift;
+	
+	println("\nBenchmarking get_state/set_state operations");
+	
+	// Generate some random numbers first to have interesting state
+	for (int i = 0; i < 1000; i++) {
+		pcg.next();
+		well.next();
+		gamerand.next();
+		xorshift.next();
+	}
+	
+	// Get states
+	string pcg_state = pcg.get_state();
+	string well_state = well.get_state();
+	string gamerand_state = gamerand.get_state();
+	string xorshift_state = xorshift.get_state();
+	
+	// Benchmark get_state
+	timer t1(0, 1);
+	for (int i = 0; i < 10000; i++)
+		pcg.get_state();
+	t1.pause();
+	println("PCG get_state(): %0us for 10000 operations".format(float(t1.elapsed)));
+	
+	timer t2(0, 1);
+	for (int i = 0; i < 10000; i++)
+		well.get_state();
+	t2.pause();
+	println("WELL get_state(): %0us for 10000 operations".format(float(t2.elapsed)));
+	
+	timer t3(0, 1);
+	for (int i = 0; i < 10000; i++)
+		gamerand.get_state();
+	t3.pause();
+	println("Gamerand get_state(): %0us for 10000 operations".format(float(t3.elapsed)));
+	
+	timer t4(0, 1);
+	for (int i = 0; i < 10000; i++)
+		xorshift.get_state();
+	t4.pause();
+	println("Xorshift get_state(): %0us for 10000 operations".format(float(t4.elapsed)));
+	
+	// Benchmark set_state
+	timer t5(0, 1);
+	for (int i = 0; i < 10000; i++)
+		pcg.set_state(pcg_state);
+	t5.pause();
+	println("\nPCG set_state(): %0us for 10000 operations".format(float(t5.elapsed)));
+	
+	timer t6(0, 1);
+	for (int i = 0; i < 10000; i++)
+		well.set_state(well_state);
+	t6.pause();
+	println("WELL set_state(): %0us for 10000 operations".format(float(t6.elapsed)));
+	
+	timer t7(0, 1);
+	for (int i = 0; i < 10000; i++)
+		gamerand.set_state(gamerand_state);
+	t7.pause();
+	println("Gamerand set_state(): %0us for 10000 operations".format(float(t7.elapsed)));
+	
+	timer t8(0, 1);
+	for (int i = 0; i < 10000; i++)
+		xorshift.set_state(xorshift_state);
+	t8.pause();
+	println("Xorshift set_state(): %0us for 10000 operations".format(float(t8.elapsed)));
+}
+
+void main() {
+	println("Random Operations Benchmarks");
+	println("============================");
+	
+	// Warm up
+	println("Warming up the JIT...");
+	random_pcg pcg;
+	for (int i = 0; i < 10000; i++) {
+		pcg.next_bool();
+		pcg.next_character("a", "z");
+	}
+	
+	bench_next_bool();
+	bench_next_character();
+	bench_seeding();
+	bench_state_operations();
+	
+	println("\nBenchmarks completed!");
+}

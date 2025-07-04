@@ -1,0 +1,90 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#pragma plugin redis
+
+void main() {
+    redis_client@ client = redis_client();
+
+    if (!client.connect()) {
+        println("Failed to connect to Redis.");
+        return;
+    }
+
+    client.del("hll_test");
+    client.del("hll_test2");
+    client.del("hll_merged");
+
+    println("Testing PFADD - Adding elements to HyperLogLog...");
+
+    bool changed1 = client.pfadd("hll_test", "a");
+    bool changed2 = client.pfadd("hll_test", "b");
+    bool changed3 = client.pfadd("hll_test", "c");
+    bool changed4 = client.pfadd("hll_test", "a"); // Duplicate
+
+    println("PFADD Results:\n"
+        "Added 'a': " + changed1 + "\n" +
+        "Added 'b': " + changed2 + "\n" +
+        "Added 'c': " + changed3 + "\n" +
+        "Added 'a' again: " + changed4 + " (should be false)");
+
+    string[] elements = {"d", "e", "f", "g"};
+    bool changed_multi = client.pfadd("hll_test", elements);
+    println("PFADD Multiple: Added multiple elements: " + changed_multi);
+
+    uint64 count1 = client.pfcount("hll_test");
+    println("PFCOUNT: Estimated cardinality: " + count1 + " (should be 7)");
+
+    string[] more_elements = {"x", "y", "z", "a", "b"};
+    client.pfadd("hll_test2", more_elements);
+
+    uint64 count2 = client.pfcount("hll_test2");
+    println("Second HLL: hll_test2 cardinality: " + count2 + " (should be 5)");
+
+    string[] keys = {"hll_test", "hll_test2"};
+    uint64 union_count = client.pfcount(keys);
+    println("PFCOUNT Union: Union cardinality: " + union_count + " (should be ~10)");
+
+    bool merge_success = client.pfmerge("hll_merged", keys);
+    println("PFMERGE: Merge successful: " + merge_success);
+
+    uint64 merged_count = client.pfcount("hll_merged");
+    println("Merged HLL: Merged cardinality: " + merged_count + " (should match union count)");
+
+    println("Large Dataset Test: Adding 1000 unique elements...");
+
+    client.del("hll_large");
+    for (int i = 0; i < 1000; i++) {
+        client.pfadd("hll_large", "element_" + i);
+    }
+
+    uint64 large_count = client.pfcount("hll_large");
+    double error_rate = (double(abs(int64(large_count) - 1000)) / 1000.0) * 100.0;
+
+    println("Large Dataset Results:\n"
+        "Added 1000 unique elements\n" +
+        "Estimated count: " + large_count + "\n" +
+        "Error rate: " + format_float(error_rate, 2) + "%\n" +
+        "(HyperLogLog has ~0.81% standard error)");
+
+    println("Testing Error Cases: Testing non-existent key...");
+    uint64 non_existent = client.pfcount("non_existent_hll");
+    println("Non-existent Key: Count: " + non_existent + " (should be 0)");
+
+    client.del("hll_test");
+    client.del("hll_test2");
+    client.del("hll_merged");
+    client.del("hll_large");
+
+    println("HyperLogLog test completed successfully!");
+}
+
+string format_float(double value, int decimals) {
+    string result = value;
+    int dot_pos = result.find(".");
+    if (dot_pos >= 0 && dot_pos + decimals + 1 < result.length()) {
+        result = result.substr(0, dot_pos + decimals + 1);
+    }
+    return result;
+}
