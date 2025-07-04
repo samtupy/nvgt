@@ -95,7 +95,7 @@ public:
 			const Type<BulkString>* bs = dynamic_cast<const Type<BulkString>*>(ptr);
 			return (bs && !bs->value().isNull()) ? bs->value().value() : "";
 		} else if (ptr->isError()) {
-			const Type<Error>* err = dynamic_cast<const Type<Error>*>(ptr);
+			const Type<Redis::Error>* err = dynamic_cast<const Type<Redis::Error>*>(ptr);
 			return err ? err->value().getMessage() : "";
 		} else if (ptr->isInteger()) {
 			const Type<Int64>* i = dynamic_cast<const Type<Int64>*>(ptr);
@@ -1911,7 +1911,7 @@ public:
 					}
 				}
 			} else if (reply->type() == RedisType::REDIS_ERROR) {
-				Type<Error>* err = dynamic_cast<Type<Error>*>(reply.get());
+				Type<Redis::Error>* err = dynamic_cast<Type<Redis::Error>*>(reply.get());
 				if (err)
 					m_last_error = "SCAN error: " + err->value().getMessage();
 			}
@@ -2314,7 +2314,7 @@ public:
 					result->InsertLast(&val);
 					val->release();
 				} catch (const RedisException& e) {
-					RedisType::Ptr errorReply = new Type<Error>(Error(e.message()));
+					RedisType::Ptr errorReply = new Type<Redis::Error>(Redis::Error(e.message()));
 					redis_value* val = new redis_value(errorReply);
 					result->InsertLast(&val);
 					val->release();

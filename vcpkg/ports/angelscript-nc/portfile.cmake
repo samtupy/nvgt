@@ -13,7 +13,7 @@ vcpkg_from_github(
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}/sdk/angelscript/projects/cmake"
     OPTIONS
-        -DAS_NO_COMPILER=ON
+        "-DAS_NO_COMPILER=ON" "-DCMAKE_CXX_STANDARD=11" "-DMSVC_COMPILE_FLAGS=/MT"
 )
 
 vcpkg_cmake_install()

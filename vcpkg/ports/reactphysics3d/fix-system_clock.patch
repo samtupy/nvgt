@@ -1,5 +1,5 @@
---- include/reactphysics3d/utils/DefaultLogger.h
-+++ include/reactphysics3d/utils/DefaultLogger.h
+--- a/include/reactphysics3d/utils/DefaultLogger.h
++++ b/include/reactphysics3d/utils/DefaultLogger.h
 @@ -37,6 +37,7 @@
  #include <iomanip>
  #include <mutex>
