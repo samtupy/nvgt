@@ -25,8 +25,6 @@ bool running_on_mobile();
 void determine_compile_platform();
 void xplatform_correct_path_to_stubs(Poco::Path& stubpath);
 std::string get_nvgt_lib_directory(const std::string& platform);
-#else
-std::string get_data_location();
 #endif
 #if defined(__ANDROID__) || defined(__APPLE__) && TARGET_OS_IPHONE
 #define NVGT_MOBILE

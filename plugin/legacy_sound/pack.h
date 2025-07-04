@@ -54,7 +54,7 @@ class legacy_pack {
 	std::string current_filename;
 	pack_open_mode open_mode;
 	std::string pack_ident;
-	uint64_t file_offset; // Offset into opened file where pack is contained, used for embedding packs into executables.
+	unsigned int file_offset; // Offset into opened file where pack is contained, used for embedding packs into executables.
 	int RefCount;
 public:
 	unsigned int next_stream_idx;

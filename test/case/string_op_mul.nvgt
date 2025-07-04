@@ -1,6 +1,0 @@
-void test_string_op_mul() {
-	assert("hello " * 10 == "hello hello " * 5);
-	string tmp = "testing ";
-	tmp *= 100;
-	assert(tmp == "testing testing testing testing " * 25);
-}

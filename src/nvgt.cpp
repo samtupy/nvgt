@@ -47,7 +47,6 @@
 	#include "../user/nvgt_config.h"
 #endif
 #include "random.h"    // random_seed()
-#include "random_interface.h"    // cleanup_default_random()
 #include "serialize.h" // current location of g_StringTypeid (subject to change)
 #include "sound.h"
 #include "srspeech.h"
@@ -124,14 +123,14 @@ protected:
 		g_ScriptEngine = asCreateScriptEngine();
 		if (!g_ScriptEngine || PreconfigureEngine(g_ScriptEngine) < 0) throw ApplicationException("unable to initialize script engine");
 	}
-	void setupCommandLineProperty(const vector<string>& argv, int offset = 0) {
+	void setupCommandLineProperty(const vector<string> &argv, int offset = 0) {
 		// Prepare the COMMAND_LINE property used by scripts by combining all arguments into one string, for bgt backwards compatibility. NVGT also has a new ARGS array which we will also set up here.
 		if (!g_StringTypeid)
 			g_StringTypeid = g_ScriptEngine->GetStringFactory();
 		g_command_line_args = CScriptArray::Create(g_ScriptEngine->GetTypeInfoByDecl("string[]"));
 		for (unsigned int i = offset; i < argv.size(); i++) {
 			g_CommandLine += argv[i];
-			g_command_line_args->InsertLast((void*)&argv[i]);
+			g_command_line_args->InsertLast((void *)&argv[i]);
 			if (i < argv.size() - 1)
 				g_CommandLine += " ";
 		}
@@ -255,7 +254,7 @@ protected:
 		}
 		return ""; // How did we get here?
 	}
-	virtual int main(const std::vector<std::string>& args) override {
+	virtual int main(const std::vector<std::string> &args) override {
 		// Determine the script file that is to be executed.
 		string scriptfile = "";
 		#if defined(__APPLE__) || defined(__ANDROID__)
@@ -311,9 +310,8 @@ protected:
 			return Application::EXIT_CONFIG;
 		}
 		#endif
-		g_scriptpath = Path(scriptfile).makeParent().toString();
 		setupCommandLineProperty(args, 1);
-		g_command_line_args->InsertAt(0, (void*)&scriptfile);
+		g_command_line_args->InsertAt(0, (void *)&scriptfile);
 		ConfigureEngineOptions(g_ScriptEngine);
 		if (mode == NVGT_RUN) {
 			if (CompileScript(g_ScriptEngine, scriptfile.c_str()) < 0) {
@@ -339,10 +337,10 @@ protected:
 		return retcode;
 	}
 	#else
-	virtual int main(const std::vector<std::string>& args) override {
+	virtual int main(const std::vector<std::string> &args) override {
 		setupCommandLineProperty(args);
 		std::string path_tmp;
-		g_command_line_args->InsertAt(0, (void*)&path_tmp);
+		g_command_line_args->InsertAt(0, (void *)&path_tmp);
 		int retcode = Application::EXIT_OK;
 		if (LoadCompiledExecutable(g_ScriptEngine) < 0 || (retcode = ExecuteScript(g_ScriptEngine, commandName().c_str())) < 0) {
 			ShowAngelscriptMessages();
@@ -361,7 +359,6 @@ protected:
 		InputDestroy();
 		uninit_sound();
 		anticheat_deinit();
-		cleanup_default_random();
 		if (g_ScriptEngine)
 			g_ScriptEngine->ShutDownAndRelease();
 		g_ScriptEngine = nullptr;
@@ -373,7 +370,7 @@ protected:
 #undef SDL_MAIN_HANDLED
 #undef SDL_main_h_
 #include <SDL3/SDL_main.h>
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
 	AutoPtr<Application> app = new nvgt_application();
 	try {
 		app->init(argc, argv);

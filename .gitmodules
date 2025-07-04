@@ -2,6 +2,3 @@
 	path = extra
 	url = https://github.com/samtupy/nvgt_extra
 branch = master
-[submodule "vcpkg/bin"]
-	path = vcpkg/bin
-	url = https://github.com/microsoft/vcpkg

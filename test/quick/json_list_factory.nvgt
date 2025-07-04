@@ -1,0 +1,11 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	json_object@ t = compose_json({{"bla", 1}, {"meh", "test"}});
+	t["list"] = json_array = {1,2,3};
+	alert("test", t.stringify());
+}
+// can we pass repeating list to function?
+json_object@ compose_json(json_object@ j) { return j; }

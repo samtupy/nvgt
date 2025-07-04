@@ -39,20 +39,23 @@ if ARGUMENTS.get("debug", "0") == "1":
 	env.Tool('compilation_db')
 	cdb = env.CompilationDatabase()
 	Alias('cdb', cdb)
-
-# Platform setup and system libraries
 if env["PLATFORM"] == "win32":
 	env.Append(CCFLAGS = ["/EHsc", "/J", "/MT" if not "windev_debug" in env else "/MTd", "/Z7", "/std:c++20", "/GF", "/Zc:inline", "/O2" if ARGUMENTS.get("debug", "0") == "0" else "/Od", "/bigobj", "/permissive-", "/W3" if ARGUMENTS.get("warnings", "0") == "1" else "", "/WX" if ARGUMENTS.get("warnings_as_errors", "0") == "1" else ""])
 	env.Append(LINKFLAGS = ["/NOEXP", "/NOIMPLIB"], no_import_lib = 1)
+	env.Append(LIBS = ["UniversalSpeechStatic", "angelscript64", "SDL3", "vorbis", "vorbisfile", "ogg", "opusfile", "opus"])
 	env.Append(LIBS = ["Kernel32", "User32", "imm32", "OneCoreUAP", "dinput8", "dxguid", "gdi32", "winspool", "shell32", "iphlpapi", "ole32", "oleaut32", "delayimp", "uuid", "comdlg32", "advapi32", "netapi32", "winmm", "version", "crypt32", "normaliz", "wldap32", "ws2_32", "ntdll"])
 else:
 	env.Append(CXXFLAGS = ["-fms-extensions", "-std=c++20", "-fpermissive", "-O0" if ARGUMENTS.get("debug", 0) == "1" else "-O3", "-Wno-narrowing", "-Wno-int-to-pointer-cast", "-Wno-delete-incomplete", "-Wno-unused-result", "-g" if ARGUMENTS.get("debug", 0) == "1" else "", "-Wall" if ARGUMENTS.get("warnings", "0") == "1" else "", "-Wextra" if ARGUMENTS.get("warnings", "0") == "1" else "", "-Werror" if ARGUMENTS.get("warnings_as_errors", "0") == "1" else ""], LIBS = ["m"])
 if env["PLATFORM"] == "darwin":
 	# homebrew paths and other libraries/flags for MacOS
 	env.Append(CCFLAGS = ["-mmacosx-version-min=14.0", "-arch", "arm64", "-arch", "x86_64"], LINKFLAGS = ["-arch", "arm64", "-arch", "x86_64"])
+	# The following, to say the least, is absolutely not ideal. In some cases we have both static and dynamic libraries on the system and must explicitly choose the static one. The normal :libname.a trick doesn't seem to work on clang, we're just informed that libs couldn't be found. If anybody knows a better way to force static library linkage on MacOS particularly without the absolute paths, please let me know!
+	env.Append(LIBS = ["angelscript", "SDL3", "crypto", "ssl", "iconv", "ogg", "vorbis", "vorbisfile", "opusfile", "opus"])
 elif env["PLATFORM"] == "posix":
 	# enable the gold linker, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
-	env.Append(CPPPATH = ["lindev/include", "/usr/local/include"], LIBPATH = ["lindev/lib", "/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
+	env.Append(CPPPATH = ["/usr/local/include"], LIBPATH = ["/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
+	# We must explicitly denote the static linkage for several libraries or else gcc will choose the dynamic ones.
+	env.Append(LIBS = [":libangelscript.a", ":libenet6.a", ":libSDL3.a", "crypto", "ssl"])
 env.Append(CPPDEFINES = ["POCO_STATIC", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
@@ -84,10 +87,6 @@ if len(static_plugins) > 0:
 		for plugin in static_plugins: f.write(f"static_plugin({plugin})" + "\n")
 		static_plugins_object = env.Object(static_plugins_path, static_plugins_path + ".cpp", CPPPATH = env["CPPPATH"] + ["#src"])
 
-# Project libraries
-env.Append(LIBS = [["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoCrypto", "PocoZip", "PocoFoundation", "expat", "z"] if env["PLATFORM"] != "win32" else ["UniversalSpeechStatic", "PocoXMLmt", "libexpatMT", "zlib"], "angelscript", "SDL3", "phonon", "enet", "reactphysics3d", "ssl", "crypto", "utf8proc", "pcre2-8", "ASAddon", "deps", "vorbisfile", "vorbis", "ogg"])
-if env["PLATFORM"] == "posix": env.ParseConfig("pkg-config --libs alsa")
-
 # nvgt itself
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
 if "android.cpp" in sources: sources.remove("android.cpp")
@@ -95,19 +94,21 @@ if "version.cpp" in sources: sources.remove("version.cpp")
 env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
 version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.
 VariantDir("build/obj_src", "src", duplicate = 0)
-env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"])
+env.Append(LIBS = [["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoCrypto", "PocoZip", "PocoFoundation"] if env["PLATFORM"] != "win32" else [], "phonon", "enet6", "reactphysics3d"])
+env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"], LIBS = ["ASAddon", "deps"])
 if env["PLATFORM"] == "win32":
 	env.Append(CPPDEFINES = ["_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING"], LINKFLAGS = ["/OPT:REF", "/OPT:ICF", "/ignore:4099", "/delayload:phonon.dll"])
 elif env["PLATFORM"] == "darwin":
 	sources.append("apple.mm")
 	sources.append("macos.mm")
-	# We must link MacOS frameworks here rather than above in the system libraries section to insure that they don't get linked with random plugins.
 	env["FRAMEWORKPREFIX"] = "-weak_framework"
 	env.Append(FRAMEWORKS = ["CoreAudio",  "CoreFoundation", "CoreHaptics", "CoreMedia", "CoreVideo", "AudioToolbox", "AVFoundation", "AppKit", "IOKit", "Carbon", "Cocoa", "ForceFeedback", "GameController", "QuartzCore", "Metal", "UniformTypeIdentifiers"])
 	env.Append(LIBS = ["objc"])
 	env.Append(LINKFLAGS = ["-Wl,-rpath,'@loader_path',-rpath,'@loader_path/lib',-rpath,'@loader_path/../Frameworks',-dead_strip_dylibs", "-mmacosx-version-min=14.0"])
 elif env["PLATFORM"] == "posix":
 	env.Append(LINKFLAGS = ["-Wl,-rpath,'$$ORIGIN/.',-rpath,'$$ORIGIN/lib'"])
+	# Libvorbis must appear in the library link order after deps on Linux.
+	env.Append(LIBS = [":libvorbisfile.a", ":libvorbis.a", ":libogg.a", ":libopusfile.a", ":libopus.a"])
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
 		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
@@ -139,8 +140,8 @@ if env["PLATFORM"] == "win32":
 	env.Install("c:/nvgt/lib", Glob("#release/lib/*"))
 
 # stubs
-def fix_stub(target, source, env):
-	"""On windows, we replace the first 2 bytes of a stub with 'NV' to stop some sort of antivirus scan upon script compile that makes it take a bit longer. We do the same on MacOS because otherwise apple's notarization service detects the stub as an unsigned binary and fails. Stubs must be unsigned until the nvgt scripter signs their compiled games."""
+def fix_windows_stub(target, source, env):
+	"""On windows, we replace the first 2 bytes of a stub with 'NV' to stop some sort of antivirus scan upon script compile that makes it take a bit longer."""
 	for t in target:
 		if not str(t).endswith(".bin"): continue
 		with open(str(t), "rb+") as f:
@@ -165,21 +166,19 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 		stub_u = stub_env.UPX(f"release/stub/nvgt_{stub_platform}_upx.bin", stub)
 		if env["PLATFORM"] == "win32": env.Install("c:/nvgt/stub", stub_u)
 	# on windows, we should have a version of the Angelscript library without the compiler, allowing for slightly smaller executables.
-	if env["PLATFORM"] == "darwin":
-		stub_env.AddPostAction(stub, fix_stub)
-	elif env["PLATFORM"] == "win32":
-		stub_env.AddPostAction(stub, fix_stub)
-		if "upx" in env: stub_env.AddPostAction(stub_u, fix_stub)
+	if env["PLATFORM"] == "win32":
+		stub_env.AddPostAction(stub, fix_windows_stub)
+		if "upx" in env: stub_env.AddPostAction(stub_u, fix_windows_stub)
 		stublibs = list(stub_env["LIBS"])
-		if "angelscript" in stublibs:
-			stublibs.remove("angelscript")
-			stublibs.append("angelscript-nc")
+		if "angelscript64" in stublibs:
+			stublibs.remove("angelscript64")
+			stublibs.append("angelscript64nc")
 			stub_nc = stub_env.Program(f"release/stub/nvgt_{stub_platform}_nc", stub_objects, LIBS = stublibs)
-			stub_env.AddPostAction(stub_nc, fix_stub)
+			stub_env.AddPostAction(stub_nc, fix_windows_stub)
 			env.Install("c:/nvgt/stub", stub_nc)
 			if "upx" in env:
 				stub_nc_u = stub_env.UPX(f"release/stub/nvgt_{stub_platform}_nc_upx.bin", stub_nc)
-				stub_env.AddPostAction(stub_nc_u, fix_stub)
+				stub_env.AddPostAction(stub_nc_u, fix_windows_stub)
 				env.Install("c:/nvgt/stub", stub_nc_u)
 
 if ARGUMENTS.get("copylibs", "1") == "1":

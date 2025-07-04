@@ -55,10 +55,7 @@
 #include "nvgt_plugin.h"
 #include "pack.h"
 #include "pathfinder.h"
-#include "combination.h"
 #include "pocostuff.h"
-#include "uuid.h"
-#include "mail.h"
 #include "random.h"
 #include "reactphysics.h"
 #include "scriptstuff.h"
@@ -68,7 +65,6 @@
 #include "system_fingerprint.h"
 #include "threading.h"
 #include "timestuff.h"
-#include "tonesynth.h"
 #include "tts.h"
 #include "version.h"
 #include "xplatform.h"
@@ -91,45 +87,44 @@
 #include "weakref.h"
 #include "anticheat.h"
 #ifndef NVGT_STUB
-	int PragmaCallback(const std::string &pragmaText, CScriptBuilder &builder, void* /*userParam*/);
+	int PragmaCallback(const std::string &pragmaText, CScriptBuilder &builder, void * /*userParam*/);
 #endif
-asIScriptContext* RequestContextCallback(asIScriptEngine *engine, void* /*param*/);
-void ReturnContextCallback(asIScriptEngine *engine, asIScriptContext *ctx, void* /*param*/);
-void ExceptionHandlerCallback(asIScriptContext *ctx, void* obj);
+asIScriptContext *RequestContextCallback(asIScriptEngine *engine, void * /*param*/);
+void ReturnContextCallback(asIScriptEngine *engine, asIScriptContext *ctx, void * /*param*/);
+void ExceptionHandlerCallback(asIScriptContext *ctx, void *obj);
 
 using namespace std;
 using namespace Poco;
 
-CContextMgr* g_ctxMgr = nullptr;
+CContextMgr *g_ctxMgr = nullptr;
 #ifndef NVGT_STUB
-	CDebugger* g_dbg = nullptr;
+	CDebugger *g_dbg = nullptr;
 #endif
 int g_bcCompressionLevel = 9;
 string g_last_exception_callstack;
-vector<asIScriptContext*> g_ctxPool;
+vector<asIScriptContext *> g_ctxPool;
 Mutex g_ctxPoolMutex;
 vector<string> g_IncludeDirs;
 vector<string> g_IncludeScripts;
 std::string g_CommandLine;
-CScriptArray* g_command_line_args = 0;
+CScriptArray *g_command_line_args = 0;
 bool g_debug = true;         // Whether script has been compiled with extra debug information in the bytecode, true by default because source runs contain such information.
 bool g_ASDebugBreak = false; // If the angelscript debugger is in use, user can ctrl+c to perform a manual break.
-asIScriptEngine* g_ScriptEngine = NULL;
+asIScriptEngine *g_ScriptEngine = NULL;
 std::string g_command_line;
 int g_LastError;
 int g_retcode = 0;
 bool g_initialising_globals = true;
 bool g_shutting_down = false;
 std::string g_stub = "";
-std::string g_scriptpath = "";
 std::string g_platform = "auto";
 bool g_make_console = false;
-std::unordered_map<std::string, asITypeInfo*> g_TypeInfoCache;
+std::unordered_map<std::string, asITypeInfo *> g_TypeInfoCache;
 Timestamp g_script_build_time;
 unordered_map<string, string> g_system_namespaces;
 
 class NVGTBytecodeStream : public asIBinaryStream {
-	unsigned char* content;
+	unsigned char *content;
 	z_stream zstr;
 	int cursor;
 	int written_size;
@@ -155,12 +150,12 @@ public:
 		#endif
 	}
 	#ifndef NVGT_STUB
-	int Write(const void* ptr, asUINT size) {
+	int Write(const void *ptr, asUINT size) {
 		if (!content) {
-			content = (unsigned char*)malloc(buffer_size);
+			content = (unsigned char *)malloc(buffer_size);
 			zstr.data_type = 0;
 			deflateInit(&zstr, g_bcCompressionLevel);
-			zstr.next_out = (Bytef*)content;
+			zstr.next_out = (Bytef *)content;
 			cursor = 0;
 			written_size = 0;
 			alloc_size = buffer_size;
@@ -169,11 +164,11 @@ public:
 		written_size += size;
 		if (written_size > alloc_size) {
 			alloc_size *= 2;
-			content = (unsigned char*)realloc(content, alloc_size);
-			zstr.next_out = (Bytef*)(content + zstr.total_out);
+			content = (unsigned char *)realloc(content, alloc_size);
+			zstr.next_out = (Bytef *)(content + zstr.total_out);
 			zstr.avail_out = alloc_size - zstr.total_out;
 		}
-		zstr.next_in = (Bytef*)ptr;
+		zstr.next_in = (Bytef *)ptr;
 		zstr.avail_in = size;
 		while (zstr.avail_in > 0)
 			deflate(&zstr, Z_NO_FLUSH);
@@ -181,12 +176,12 @@ public:
 		return size;
 	}
 	#else
-	int Write(const void* ptr, asUINT size) {
+	int Write(const void *ptr, asUINT size) {
 		return -1;
 	}
 	#endif
-	int Read(void* ptr, asUINT size) {
-		zstr.next_out = (Bytef*)ptr;
+	int Read(void *ptr, asUINT size) {
+		zstr.next_out = (Bytef *)ptr;
 		zstr.avail_out = size;
 		inflate(&zstr, Z_SYNC_FLUSH);
 		cursor += size;
@@ -196,23 +191,23 @@ public:
 		cursor = 0; // This storage area holds more than bytecode, and after extra non-bytecode data is read, we may need to reset the variable keeping track of the number of bytes read encase we need to use that information later for debugging angelscript bytecode load failures which only provide an offset of bytes read in the stream as debug info. We don't store our non-bytecode data at the end of the stream to avoid any imagined edgecase where Angelscript could read a few less bytes than it's written during compilation thus making such data inaccessible.
 	}
 	// Receives raw bytes read from a compiled executable for decryption and decompression.
-	void set(unsigned char* code, int size) {
+	void set(unsigned char *code, int size) {
 		written_size = angelscript_bytecode_decrypt(code, size, alloc_size);
 		content = code;
 		zstr.data_type = 0;
 		inflateInit(&zstr);
-		zstr.next_in = (Bytef*)content;
+		zstr.next_in = (Bytef *)content;
 		zstr.avail_in = written_size;
 	}
 	#ifndef NVGT_STUB
 	// ZLib compress and encrypt the bytecode for saving to a compiled binary. Encryption is handled by function angelscript_bytecode_encrypt in nvgt_config.h. If that function needs to change the size of the data, it should realloc() the data.
-	int get(unsigned char** code) {
+	int get(unsigned char **code) {
 		if (zstr.avail_out < buffer_size) {
 			alloc_size += buffer_size;
 			zstr.avail_out += buffer_size;
-			content = (unsigned char*)realloc(content, alloc_size);
+			content = (unsigned char *)realloc(content, alloc_size);
 		}
-		zstr.next_out = (Bytef*)(content + zstr.total_out);
+		zstr.next_out = (Bytef *)(content + zstr.total_out);
 		deflate(&zstr, Z_FINISH);
 		written_size = zstr.total_out;
 		written_size = angelscript_bytecode_encrypt(content, written_size, alloc_size);
@@ -234,12 +229,12 @@ private:
 		return c;
 	}
 	int writeToDevice(char c) { return stream->Write(&c, 1); }
-	NVGTBytecodeStream* stream;
+	NVGTBytecodeStream *stream;
 };
 class nvgt_bytecode_stream_ios : public virtual std::ios {
 public:
 	nvgt_bytecode_stream_ios(NVGTBytecodeStream *stream) : _buf(stream) { poco_ios_init(&_buf); }
-	nvgt_bytecode_stream_iostream_buf* rdbuf() { return &_buf; }
+	nvgt_bytecode_stream_iostream_buf *rdbuf() { return &_buf; }
 
 protected:
 	nvgt_bytecode_stream_iostream_buf _buf;
@@ -279,7 +274,7 @@ void ShowAngelscriptMessages() {
 	g_scriptMessagesErr = g_scriptMessagesWarn = g_scriptMessagesLine0 = ""; // Clear out the message buffers such that only new messages will be displayed upon a second call to this function.
 }
 
-void MessageCallback(const asSMessageInfo *msg, void* param) {
+void MessageCallback(const asSMessageInfo *msg, void *param) {
 	string type = "ERROR";
 	if (msg->type == asMSGTYPE_WARNING)
 		type = "WARNING";
@@ -298,7 +293,7 @@ void MessageCallback(const asSMessageInfo *msg, void* param) {
 	} else
 		g_scriptMessagesWarn += g_scriptMessagesInfo + buffer;
 }
-void nvgt_line_callback(asIScriptContext *ctx, void* obj) {
+void nvgt_line_callback(asIScriptContext *ctx, void *obj) {
 	#ifndef NVGT_STUB
 	if (g_dbg) {
 		if (g_ASDebugBreak) {
@@ -312,7 +307,7 @@ void nvgt_line_callback(asIScriptContext *ctx, void* obj) {
 	profiler_callback(ctx, obj);
 }
 #ifndef NVGT_STUB
-int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilder *builder, void* param) {
+int IncludeCallback(const char *filename, const char *sectionname, CScriptBuilder *builder, void *param) {
 	#ifdef NVGT_MOBILE
 	// Including scripts on mobile platforms that use content URIs and sandboxing is far from ideal, we're currently restricted to assets bundled with the NVGT runner which must be accessed via file_get_contents at this time.
 	string include_text = file_get_contents(filename);
@@ -356,7 +351,7 @@ int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilde
 	return -1;
 }
 #endif
-void TranslateException(asIScriptContext *ctx, void* /*userParam*/) {
+void TranslateException(asIScriptContext *ctx, void * /*userParam*/) {
 	try {
 		throw;
 	} catch (Exception &e) {
@@ -407,9 +402,6 @@ int PreconfigureEngine(asIScriptEngine* engine) {
 	RegisterScriptDatastreams(engine);
 	engine->EndConfigGroup();
 	engine->RegisterObjectType("pack_interface", 0, asOBJ_REF);
-	engine->RegisterObjectType("json_object", 0, asOBJ_REF);
-	engine->RegisterObjectType("json_array", 0, asOBJ_REF);
-	engine->RegisterObjectType("var", 0, asOBJ_REF);
 	return 0;
 }
 // Registrations in the following function are usually done in alphabetical order, with some exceptions involving one subsystem depending on another. For example the internet subsystem registers functions that take timespans, meaning that timestuff gets registered before internet.
@@ -420,7 +412,6 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	RegisterScriptHandle(engine);
 	RegisterScriptMath(engine);
 	RegisterScriptMathComplex(engine);
-	RegisterScriptCombination(engine);
 	RegisterScriptWeakRef(engine);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_TERMINAL);
 	Print::asRegister(engine);
@@ -475,7 +466,6 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->BeginConfigGroup("poco");
 	RegisterPocostuff(engine);
-	RegisterUUID(engine);
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("subscripting");
 	RegisterScriptstuff(engine);
@@ -494,9 +484,6 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	RegisterSoundsystem(engine);
 	system_namespace();
 	engine->EndConfigGroup();
-	engine->BeginConfigGroup("tonesynth");
-	RegisterScriptTonesynth(engine);
-	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	engine->BeginConfigGroup("system_fingerprint");
 	RegisterSystemFingerprintFunction(engine);
@@ -513,7 +500,6 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("internet");
 	RegisterInternet(engine);
-	RegisterMail(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_FS);
 	engine->BeginConfigGroup("filesystem");
@@ -602,7 +588,7 @@ int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
 	if (mod)
 		mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
 	try {
-		if (builder.AddSectionFromFile(scriptFile.c_str()) < 0)
+		if (builder.AddSectionFromFile(Path(scriptFile).makeAbsolute().toString().c_str()) < 0)
 			return -1;
 		for (unsigned int i = 0; i < g_IncludeScripts.size(); i++) {
 			if (builder.AddSectionFromFile(g_IncludeScripts[i].c_str()) < 0)
@@ -633,7 +619,7 @@ int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
 	}
 	return 0;
 }
-int SaveCompiledScript(asIScriptEngine *engine, unsigned char** output) {
+int SaveCompiledScript(asIScriptEngine *engine, unsigned char **output) {
 	asIScriptModule *mod = engine->GetModule("nvgt_game", asGM_ONLY_IF_EXISTS);
 	if (mod == 0)
 		return -1;
@@ -655,7 +641,7 @@ class CompileExecutableTask : public Runnable {
 	// NVGT shows a status window as compilation is proceeding. That window must be pulled for events on the main thread so it won't hang, but compilation requires a lot of I/O (enough that pulling the window during compilation often enough is not viable). Thus we create this task so that the heavy lifting of the compilation can happen on another thread while we pull the status window in the main one.
 	// To further complicate things, sometimes a success message or an extra question might pop up during compilation, and as with most UI stuff, such alert dialogs also must be shown on the main thread. For now we just split the task into 2 segments with the option of showing messages in between, and if we find we need more in the future, we'll create a queue of callables instead.
 	string script_file;
-	asIScriptEngine* engine;
+	asIScriptEngine *engine;
 	int stage;
 	SharedPtr<Thread> worker;
 
@@ -675,7 +661,7 @@ public:
 			fail = true;
 			return;
 		}
-		unsigned char* code = NULL;
+		unsigned char *code = NULL;
 		UInt32 code_size = SaveCompiledScript(engine, &code);
 		if (code_size < 1) {
 			engine->WriteMessage(script_file.c_str(), 0, 0, asMSGTYPE_ERROR, format("failed to retrieve bytecode while trying to compile %s", output->get_output_file()).c_str());
@@ -740,7 +726,7 @@ int CompileExecutable(asIScriptEngine *engine, const string &scriptFile) {
 	#endif // !NVGT_MOBILE
 }
 #else
-int LoadCompiledScript(asIScriptEngine *engine, unsigned char* code, asUINT size) {
+int LoadCompiledScript(asIScriptEngine *engine, unsigned char *code, asUINT size) {
 	asIScriptModule *mod = engine->GetModule("nvgt_game", asGM_ALWAYS_CREATE);
 	if (mod == 0)
 		return -1;
@@ -773,7 +759,11 @@ int LoadCompiledScript(asIScriptEngine *engine, unsigned char* code, asUINT size
 	return 0;
 }
 int LoadCompiledExecutable(asIScriptEngine *engine) {
-	FileInputStream fs(get_data_location());
+	#ifndef __ANDROID__
+	FileInputStream fs(Util::Application::instance().commandPath());
+	#else
+	FileInputStream fs(android_get_main_shared_object());
+	#endif
 	BinaryReader br(fs);
 	UInt32 data_location, code_size;
 	#ifdef _WIN32
@@ -787,13 +777,13 @@ int LoadCompiledExecutable(asIScriptEngine *engine) {
 	if (sig != IMAGE_NT_SIGNATURE)
 		return -1;
 	IMAGE_FILE_HEADER ih;
-	br.readRaw(reinterpret_cast<char*>(&ih), sizeof(IMAGE_FILE_HEADER));
+	br.readRaw(reinterpret_cast<char *>(&ih), sizeof(IMAGE_FILE_HEADER));
 	// Skip the optional header
 	fs.seekg(ih.SizeOfOptionalHeader, ios::cur);
 	DWORD offset = 0;
 	for (int i = 0; i < ih.NumberOfSections; i++) {
 		IMAGE_SECTION_HEADER sh;
-		br.readRaw(reinterpret_cast<char*>(&sh), sizeof(IMAGE_SECTION_HEADER));
+		br.readRaw(reinterpret_cast<char *>(&sh), sizeof(IMAGE_SECTION_HEADER));
 		if (sh.PointerToRawData + sh.SizeOfRawData > offset)
 			offset = sh.PointerToRawData + sh.SizeOfRawData;
 	}
@@ -807,8 +797,8 @@ int LoadCompiledExecutable(asIScriptEngine *engine) {
 		return -1;
 	br.read7BitEncoded(code_size);
 	code_size ^= NVGT_BYTECODE_NUMBER_XOR;
-	unsigned char* code = (unsigned char*)malloc(code_size);
-	br.readRaw((char*)code, code_size);
+	unsigned char *code = (unsigned char *)malloc(code_size);
+	br.readRaw((char *)code, code_size);
 	fs.close();
 	int r = LoadCompiledScript(engine, code, code_size);
 	free(code);
@@ -879,7 +869,7 @@ int ExecuteScript(asIScriptEngine *engine, const string &scriptFile) {
 			g_ctxMgr->DoneWithContext(ctx);
 	} else {
 		if (func->GetReturnTypeId() == asTYPEID_INT32)
-			retcode = *(int*)ctx->GetAddressOfReturnValue();
+			retcode = *(int *)ctx->GetAddressOfReturnValue();
 		else
 			retcode = 0;
 	}
@@ -902,7 +892,7 @@ int ExecuteScript(asIScriptEngine *engine, const string &scriptFile) {
 }
 
 #ifndef NVGT_STUB
-int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*userParam*/) {
+int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void * /*userParam*/) {
 	asIScriptEngine *engine = builder.GetEngine();
 	Util::LayeredConfiguration &config = Util::Application::instance().config();
 	asUINT pos = 0;
@@ -951,11 +941,11 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*us
 		g_bcCompressionLevel = strtol(cleanText.substr(21).c_str(), NULL, 10);
 		if (g_bcCompressionLevel < 0 || g_bcCompressionLevel > 9)
 			return -1;
-	} else if (cleanText.starts_with("namespace")) {
-		string ns = cleanText.substr(10);
-		int space = ns.rfind(" ");
-		if (space == string::npos) return -1;
-		g_system_namespaces[ns.substr(0, space)] = ns.substr(space + 1);
+			} else if (cleanText.starts_with("namespace")) {
+				string ns = cleanText.substr(10);
+				int space = ns.rfind(" ");
+				if (space == string::npos) return -1;
+				g_system_namespaces[ns.substr(0, space)] = ns.substr(space + 1);
 	} else if (cleanText == "console")
 		config.setString("build.windowsConsole", "");
 	else
@@ -963,8 +953,8 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*us
 	return 0;
 }
 // angelscript debugger stuff taken from asrun sample.
-std::string StringToString(void* obj, int /* expandMembers */, CDebugger* /* dbg */) {
-	std::string *val = reinterpret_cast<std::string*>(obj);
+std::string StringToString(void *obj, int /* expandMembers */, CDebugger * /* dbg */) {
+	std::string *val = reinterpret_cast<std::string *>(obj);
 	std::stringstream s;
 	s << "(len=" << val->length() << ") \"";
 	if (val->length() < 240)
@@ -973,8 +963,8 @@ std::string StringToString(void* obj, int /* expandMembers */, CDebugger* /* dbg
 		s << val->substr(0, 240) << "...";
 	return s.str();
 }
-std::string ArrayToString(void* obj, int expandMembers, CDebugger *dbg) {
-	CScriptArray *arr = reinterpret_cast<CScriptArray*>(obj);
+std::string ArrayToString(void *obj, int expandMembers, CDebugger *dbg) {
+	CScriptArray *arr = reinterpret_cast<CScriptArray *>(obj);
 	std::stringstream s;
 	s << "(len=" << arr->GetSize() << ")";
 	if (expandMembers > 0) {
@@ -988,8 +978,8 @@ std::string ArrayToString(void* obj, int expandMembers, CDebugger *dbg) {
 	}
 	return s.str();
 }
-std::string DictionaryToString(void* obj, int expandMembers, CDebugger *dbg) {
-	CScriptDictionary *dic = reinterpret_cast<CScriptDictionary*>(obj);
+std::string DictionaryToString(void *obj, int expandMembers, CDebugger *dbg) {
+	CScriptDictionary *dic = reinterpret_cast<CScriptDictionary *>(obj);
 	std::stringstream s;
 	s << "(len=" << dic->GetSize() << ")";
 	if (expandMembers > 0) {
@@ -997,10 +987,10 @@ std::string DictionaryToString(void* obj, int expandMembers, CDebugger *dbg) {
 		asUINT n = 0;
 		for (CScriptDictionary::CIterator it = dic->begin(); it != dic->end(); it++, n++) {
 			s << "[" << it.GetKey() << "] = ";
-			const void* val = it.GetAddressOfValue();
+			const void *val = it.GetAddressOfValue();
 			int typeId = it.GetTypeId();
 			asIScriptContext *ctx = asGetActiveContext();
-			s << dbg->ToString(const_cast<void*>(val), typeId, expandMembers - 1, ctx ? ctx->GetEngine() : 0);
+			s << dbg->ToString(const_cast<void *>(val), typeId, expandMembers - 1, ctx ? ctx->GetEngine() : 0);
 			if (n < dic->GetSize() - 1)
 				s << ", ";
 		}
@@ -1008,15 +998,15 @@ std::string DictionaryToString(void* obj, int expandMembers, CDebugger *dbg) {
 	}
 	return s.str();
 }
-std::string DateTimeToString(void* obj, int expandMembers, CDebugger *dbg) {
-	Poco::DateTime *dt = reinterpret_cast<Poco::DateTime*>(obj);
+std::string DateTimeToString(void *obj, int expandMembers, CDebugger *dbg) {
+	Poco::DateTime *dt = reinterpret_cast<Poco::DateTime *>(obj);
 	std::stringstream s;
 	s << "{" << dt->year() << "-" << dt->month() << "-" << dt->day() << " ";
 	s << dt->hour() << ":" << dt->minute() << ":" << dt->second() << "}";
 	return s.str();
 }
-std::string Vector3ToString(void* obj, int expandMembers, CDebugger *dbg) {
-	reactphysics3d::Vector3 *v = reinterpret_cast<reactphysics3d::Vector3*>(obj);
+std::string Vector3ToString(void *obj, int expandMembers, CDebugger *dbg) {
+	reactphysics3d::Vector3 *v = reinterpret_cast<reactphysics3d::Vector3 *>(obj);
 	return v->to_string();
 }
 #ifdef _WIN32
@@ -1061,7 +1051,7 @@ void asDebuggerAddFileBreakpoint(const std::string &file, int line) {}
 void asDebuggerAddFuncBreakpoint(const std::string &func) {}
 #endif
 
-asIScriptContext* RequestContextCallback(asIScriptEngine *engine, void* /*param*/) {
+asIScriptContext *RequestContextCallback(asIScriptEngine *engine, void * /*param*/) {
 	asIScriptContext *ctx = 0;
 	int pool_size = 0;
 	{
@@ -1079,16 +1069,16 @@ asIScriptContext* RequestContextCallback(asIScriptEngine *engine, void* /*param*
 	}
 	return ctx;
 }
-void ReturnContextCallback(asIScriptEngine *engine, asIScriptContext *ctx, void* /*param*/) {
+void ReturnContextCallback(asIScriptEngine *engine, asIScriptContext *ctx, void * /*param*/) {
 	ctx->Unprepare();
 	ScopedLock<Mutex> l(g_ctxPoolMutex);
 	g_ctxPool.push_back(ctx);
 }
-void ExceptionHandlerCallback(asIScriptContext *ctx, void* obj) {
+void ExceptionHandlerCallback(asIScriptContext *ctx, void *obj) {
 	g_last_exception_callstack = get_call_stack();
 }
 
-asITypeInfo* get_array_type(const std::string &decl) {
+asITypeInfo *get_array_type(const std::string &decl) {
 	if (!g_TypeInfoCache.contains(decl)) {
 		asITypeInfo *t = g_ScriptEngine->GetTypeInfoByDecl(decl.c_str());
 		if (!t)
@@ -1105,14 +1095,14 @@ bool script_dictionary_get_string(CScriptDictionary* dict, const std::string& ke
 // Try not to register things here unless absolutely no other place can be found for them.
 void RegisterUnsorted(asIScriptEngine *engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
-	engine->RegisterGlobalProperty("const string NVGT_VERSION", (void*)&NVGT_VERSION);
-	engine->RegisterGlobalProperty("const string NVGT_VERSION_COMMIT_HASH", (void*)&NVGT_VERSION_COMMIT_HASH);
-	engine->RegisterGlobalProperty("const string NVGT_VERSION_BUILD_TIME", (void*)&NVGT_VERSION_BUILD_TIME);
-	engine->RegisterGlobalProperty("const uint NVGT_VERSION_BUILD_TIMESTAMP", (void*)&NVGT_VERSION_BUILD_TIMESTAMP);
-	engine->RegisterGlobalProperty("const int NVGT_VERSION_MAJOR", (void*)&NVGT_VERSION_MAJOR);
-	engine->RegisterGlobalProperty("const int NVGT_VERSION_MINOR", (void*)&NVGT_VERSION_MINOR);
-	engine->RegisterGlobalProperty("const int NVGT_VERSION_PATCH", (void*)&NVGT_VERSION_PATCH);
-	engine->RegisterGlobalProperty("const string NVGT_VERSION_TYPE", (void*)&NVGT_VERSION_TYPE);
+	engine->RegisterGlobalProperty("const string NVGT_VERSION", (void *)&NVGT_VERSION);
+	engine->RegisterGlobalProperty("const string NVGT_VERSION_COMMIT_HASH", (void *)&NVGT_VERSION_COMMIT_HASH);
+	engine->RegisterGlobalProperty("const string NVGT_VERSION_BUILD_TIME", (void *)&NVGT_VERSION_BUILD_TIME);
+	engine->RegisterGlobalProperty("const uint NVGT_VERSION_BUILD_TIMESTAMP", (void *)&NVGT_VERSION_BUILD_TIMESTAMP);
+	engine->RegisterGlobalProperty("const int NVGT_VERSION_MAJOR", (void *)&NVGT_VERSION_MAJOR);
+	engine->RegisterGlobalProperty("const int NVGT_VERSION_MINOR", (void *)&NVGT_VERSION_MINOR);
+	engine->RegisterGlobalProperty("const int NVGT_VERSION_PATCH", (void *)&NVGT_VERSION_PATCH);
+	engine->RegisterGlobalProperty("const string NVGT_VERSION_TYPE", (void *)&NVGT_VERSION_TYPE);
 	engine->RegisterGlobalFunction("void debug_break()", asFUNCTION(asDebugBreak), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void debug_add_file_breakpoint(const string&in, int)", asFUNCTION(asDebuggerAddFileBreakpoint), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void debug_add_func_breakpoint(const string&in)", asFUNCTION(asDebuggerAddFuncBreakpoint), asCALL_CDECL);

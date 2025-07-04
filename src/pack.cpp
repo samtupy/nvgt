@@ -27,7 +27,6 @@
 #include "crypto.h" // chacha_stream
 #include "datastreams.h"
 #include <scriptarray.h>
-#include "xplatform.h"
 
 bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& file_size);
 static const int header_size = 64;
@@ -497,7 +496,7 @@ std::streampos section_istreambuf::seekoff(std::streamoff off, std::ios_base::se
 			// Istream uses 0 cur to implement tell, so just report the current position without moving anything.
 			if (off == 0)
 				return source->tellg() - (std::streampos) start - (std::streampos) in_avail();
-			return seekpos(source->tellg() - (std::streampos)start - (std::streampos)in_avail() + off);
+			return seekpos(source->tellg() - std::streampos(start - in_avail() + off));
 	}
 	return -1; // Can't get here.
 }
@@ -561,7 +560,11 @@ bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& 
 	#else
 	const auto& it = filename == "*" ? embedded_packs.begin() : embedded_packs.find(filename.substr(1));
 	if (it == embedded_packs.end()) return false;
-	filename = get_data_location();
+	#ifndef __ANDROID__
+	filename = Poco::Util::Application::instance().config().getString("application.path");
+	#else
+	filename = android_get_main_shared_object();
+	#endif
 	file_offset = it->second.offset;
 	file_size = it->second.size;
 	return true;

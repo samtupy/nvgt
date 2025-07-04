@@ -791,27 +791,6 @@ static string StringSubString(asUINT start, int count, const string &str)
 	return ret;
 }
 
-// This is a wrapper for substr that supports negative start indices
-static string StringSubStringInt(int start, int count, const string &str)
-{
-	asUINT ustart;
-	if( start < 0 )
-	{
-		int len = (int)str.length();
-		start = len + start;
-		if( start < 0 )
-			start = 0;
-	}
-	ustart = (asUINT)start;
-	
-	// Check for out-of-bounds
-	string ret;
-	if( ustart < str.length() && count != 0 )
-		ret = str.substr(ustart, (size_t)(count < 0 ? string::npos : count));
-	
-	return ret;
-}
-
 // String equality comparison.
 // Returns true iff lhs is equal to rhs.
 //
@@ -908,7 +887,6 @@ void RegisterStdString_Native(asIScriptEngine *engine)
 
 	// Utilities
 	r = engine->RegisterObjectMethod("string", "string substr(uint start = 0, int count = -1) const", asFUNCTION(StringSubString), asCALL_CDECL_OBJLAST); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("string", "string substr(int start, int count = -1) const", asFUNCTION(StringSubStringInt), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("string", "int find_first(const string &in, uint start = 0) const", asFUNCTION(StringFindFirst), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("string", "int find_first_of(const string &in, uint start = 0) const", asFUNCTION(StringFindFirstOf), asCALL_CDECL_OBJLAST); assert(r >= 0);
 	r = engine->RegisterObjectMethod("string", "int find_first_not_of(const string &in, uint start = 0) const", asFUNCTION(StringFindFirstNotOf), asCALL_CDECL_OBJLAST); assert(r >= 0);
@@ -1355,17 +1333,6 @@ static void StringSubString_Generic(asIScriptGeneric *gen)
 	new(gen->GetAddressOfReturnLocation()) string(StringSubString(start, count, *str));
 }
 
-static void StringSubStringInt_Generic(asIScriptGeneric *gen)
-{
-	// Get the arguments
-	string *str   = (string*)gen->GetObject();
-	int     start = *(int*)gen->GetAddressOfArg(0);
-	int     count = *(int*)gen->GetAddressOfArg(1);
-
-	// Return the substring
-	new(gen->GetAddressOfReturnLocation()) string(StringSubStringInt(start, count, *str));
-}
-
 void RegisterStdString_Generic(asIScriptEngine *engine)
 {
 	int r = 0;
@@ -1429,7 +1396,6 @@ void RegisterStdString_Generic(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("string", "string opAdd_r(bool) const", asFUNCTION(AddBool2StringGeneric), asCALL_GENERIC); assert( r >= 0 );
 
 	r = engine->RegisterObjectMethod("string", "string substr(uint start = 0, int count = -1) const", asFUNCTION(StringSubString_Generic), asCALL_GENERIC); assert(r >= 0);
-	r = engine->RegisterObjectMethod("string", "string substr(int start, int count = -1) const", asFUNCTION(StringSubStringInt_Generic), asCALL_GENERIC); assert(r >= 0);
 	r = engine->RegisterObjectMethod("string", "int find_first(const string &in, uint start = 0) const", asFUNCTION(StringFindFirst_Generic), asCALL_GENERIC); assert(r >= 0);
 	r = engine->RegisterObjectMethod("string", "int find_firstOf(const string &in, uint start = 0) const", asFUNCTION(StringFindFirstOf_Generic), asCALL_GENERIC); assert(r >= 0);
 	r = engine->RegisterObjectMethod("string", "int find_firstNotOf(const string &in, uint start = 0) const", asFUNCTION(StringFindFirstNotOf_Generic), asCALL_GENERIC); assert(r >= 0);

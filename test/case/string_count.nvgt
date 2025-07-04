@@ -1,8 +1,0 @@
-void test_string_count() {
-	assert("testtest".count("test") == 2);
-	assert("hello world".count("l") == 3);
-	assert("aaa".count("aa") == 2);  // Overlapping matches
-	assert("aaaa".count("aa") == 3);  // Overlapping matches
-	assert("test".count("not found") == 0);
-	assert("".count("test") == 0);
-}

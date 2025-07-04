@@ -1,8 +1,0 @@
-void test_random_same_bounds() {
-	// Test that random with same min and max always returns that value
-	for (int i = 0; i < 10; i++) {
-		assert(random(10, 10) == 10);
-		assert(random(-5, -5) == -5);
-		assert(random(0, 0) == 0);
-	}
-}

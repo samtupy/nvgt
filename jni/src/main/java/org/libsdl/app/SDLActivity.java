@@ -23,7 +23,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.LocaleList;
 import android.os.Message;
 import android.os.ParcelFileDescriptor;
 import android.util.DisplayMetrics;
@@ -60,8 +59,8 @@ import java.util.Locale;
 public class SDLActivity extends Activity implements View.OnSystemUiVisibilityChangeListener {
     private static final String TAG = "SDL";
     private static final int SDL_MAJOR_VERSION = 3;
-    private static final int SDL_MINOR_VERSION = 3;
-    private static final int SDL_MICRO_VERSION = 0;
+    private static final int SDL_MINOR_VERSION = 1;
+    private static final int SDL_MICRO_VERSION = 2;
 /*
     // Display InputType.SOURCE/CLASS of events and devices
     //
@@ -224,7 +223,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     protected static SDLClipboardHandler mClipboardHandler;
     protected static Hashtable<Integer, PointerIcon> mCursors;
     protected static int mLastCursorID;
-    protected static SDLGenericMotionListener_API14 mMotionListener;
+    protected static SDLGenericMotionListener_API12 mMotionListener;
     protected static HIDDeviceManager mHIDDeviceManager;
 
     // This is what SDL runs in. It invokes SDL_main(), eventually
@@ -232,16 +231,15 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     protected static boolean mSDLMainFinished = false;
     protected static boolean mActivityCreated = false;
     private static SDLFileDialogState mFileDialogState = null;
-    protected static boolean mDispatchingKeyEvent = false;
 
-    protected static SDLGenericMotionListener_API14 getMotionListener() {
+    protected static SDLGenericMotionListener_API12 getMotionListener() {
         if (mMotionListener == null) {
             if (Build.VERSION.SDK_INT >= 26 /* Android 8.0 (O) */) {
                 mMotionListener = new SDLGenericMotionListener_API26();
             } else if (Build.VERSION.SDK_INT >= 24 /* Android 7.0 (N) */) {
                 mMotionListener = new SDLGenericMotionListener_API24();
             } else {
-                mMotionListener = new SDLGenericMotionListener_API14();
+                mMotionListener = new SDLGenericMotionListener_API12();
             }
         }
 
@@ -809,14 +807,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
             ) {
             return false;
         }
-        mDispatchingKeyEvent = true;
-        boolean result = super.dispatchKeyEvent(event);
-        mDispatchingKeyEvent = false;
-        return result;
-    }
-
-    public static boolean dispatchingKeyEvent() {
-        return mDispatchingKeyEvent;
+        return super.dispatchKeyEvent(event);
     }
 
     /* Transition to next state */
@@ -936,10 +927,6 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
                             }
                             if (Build.VERSION.SDK_INT >= 28 /* Android 9 (Pie) */) {
                                 window.getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-                            }
-                            if (Build.VERSION.SDK_INT >= 30 /* Android 11 (R) */ &&
-                                Build.VERSION.SDK_INT < 35 /* Android 15 */) {
-                                SDLActivity.onNativeInsetsChanged(0, 0, 0, 0);
                             }
                         }
                     } else {
@@ -1072,7 +1059,6 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     public static native void onNativeTouch(int touchDevId, int pointerFingerId,
                                             int action, float x,
                                             float y, float p);
-    public static native void onNativePen(int penId, int button, int action, float x, float y, float p);
     public static native void onNativeAccel(float x, float y, float z);
     public static native void onNativeClipboardChanged();
     public static native void onNativeSurfaceCreated();
@@ -1504,6 +1490,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
                 // on some devices key events are sent for mouse BUTTON_BACK/FORWARD presses
                 // they are ignored here because sending them as mouse input to SDL is messy
                 if ((keyCode == KeyEvent.KEYCODE_BACK) || (keyCode == KeyEvent.KEYCODE_FORWARD)) {
+    Log.v("SDL", "keycode is back or forward");
                     switch (event.getAction()) {
                     case KeyEvent.ACTION_DOWN:
                     case KeyEvent.ACTION_UP:
@@ -1516,8 +1503,6 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
         }
 
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            onNativeKeyDown(keyCode);
-
             if (isTextInputEvent(event)) {
                 if (ic != null) {
                     ic.commitText(String.valueOf((char) event.getUnicodeChar()), 1);
@@ -1525,6 +1510,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
                     SDLInputConnection.nativeCommitText(String.valueOf((char) event.getUnicodeChar()), 1);
                 }
             }
+            onNativeKeyDown(keyCode);
             return true;
         } else if (event.getAction() == KeyEvent.ACTION_UP) {
             onNativeKeyUp(keyCode);
@@ -2116,44 +2102,6 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     static class SDLFileDialogState {
         int requestCode;
         boolean multipleChoice;
-    }
-    
-    /**
-     * This method is called by SDL using JNI.
-     */
-    public static String getPreferredLocales() {
-        String result = "";
-        if (Build.VERSION.SDK_INT >= 24 /* Android 7 (N) */) {
-            LocaleList locales = LocaleList.getAdjustedDefault();
-            for (int i = 0; i < locales.size(); i++) {
-                if (i != 0) result += ",";
-                result += formatLocale(locales.get(i));
-            }
-        } else if (mCurrentLocale != null) {
-            result = formatLocale(mCurrentLocale);
-        }
-        return result;
-    }
-
-    public static String formatLocale(Locale locale) {
-        String result = "";
-        String lang = "";
-        if (locale.getLanguage() == "in") {
-            // Indonesian is "id" according to ISO 639.2, but on Android is "in" because of Java backwards compatibility
-            lang = "id";
-        } else if (locale.getLanguage() == "") {
-            // Make sure language is never empty
-            lang = "und";
-        } else {
-            lang = locale.getLanguage();
-        }
-
-        if (locale.getCountry() == "") {
-            result = lang;
-        } else {
-            result = lang + "_" + locale.getCountry();
-        }
-        return result;
     }
 }
 

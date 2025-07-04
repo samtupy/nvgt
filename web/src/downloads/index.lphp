@@ -34,8 +34,9 @@ function echo_version($ver) {
 ?>
 
 <h1>Downloads</h1>
-<p>This page contains the latest stable binary releases for NVGT for windows, Mac OS and Linux.</p>
-<p>Starting after version 0.89.1-beta, you can also download binary releases including the absolute latest bleeding edge development version from the project's <a href="https://github.com/samtupy/nvgt/releases">Github releases</a> page.</p>
+<p>This page contains the latest binary releases for NVGT for windows, Mac OS and Linux.</p>
+<p>Please note that the stability of these packages is still actively improving as NVGT's first public release happened very recently.</p>
+<p>Since several people have asked, yes we do soon intend to interface with github releases. I'm not sure we will entirely abandon the idea of this page, but either this page will link to release artifacts on Github, our github releases will link to this page, or both if needed.</p>
 
 <?php
 if (count($versions) < 1) {

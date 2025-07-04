@@ -1,0 +1,33 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+int64 I = -5287301742;
+// use string constructor/addAssign, this is just a test to see how hard it was to write a number to string function.
+
+void main() {
+	alert("test", ntostr(I));
+}
+
+
+string ntostr(int64 n, bool include_commas = true) {
+	string r;
+	if (n < 0) {
+		r += "-";
+		n *= -1;
+	}
+	int64 place = 1, place_count = 1;
+	while (place * 10 < n) {
+		place *= 10;
+		place_count++;
+	}
+	while (place >= 1) {
+		int digit = int(n / place);
+		r += ascii_to_character(digit + 0x30);
+		n -= (place * digit);
+		place /= 10;
+		place_count--;
+		if (include_commas and place_count > 0 and place_count % 3 == 0) r += ",";
+	}
+	return r;
+}

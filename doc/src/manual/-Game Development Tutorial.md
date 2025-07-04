@@ -1,6 +1,4 @@
 # Effective Programming and Game Development with NVGT
-Please note that this tutorial is still incomplete and though you should read it as a beginner to gain new information, you should be ware that it will cut off abruptly as the author has not come forward to complete what they started at this time.
-
 ## What is Game Development?
 If you are an experienced programmer looking to get skilled up with NVGT as fast as possible, you can safely skip this section.
 
@@ -735,7 +733,5 @@ This is true of most programming languages, with a notable exception being lua.
 
 0-based indexing means that, instead of the 1st item being at index 1, it is at index 0. Item 2 would be at index 1, item 3 at 2, and item 20 at 19.
 
-## To be Continued
-Unfortunately, this game development tutorial is not yet complete, you should stop reading at this point if you are a beginner.
 * classes (methods and properties)
 * datastreams and files

@@ -1,0 +1,16 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+dictionary d;
+
+void main() {
+	string[] e;
+	d.set("e", @e);
+	int i;
+	string s;
+	alert("test", d.get("e", s));
+	alert("test", d.get("e", i));
+	d.set("s", "testing");
+	alert("test", d.get("s", e));
+}

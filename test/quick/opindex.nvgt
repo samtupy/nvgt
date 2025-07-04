@@ -1,0 +1,12 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+class test {
+	float get_opIndex(int idx) const property { return 0; }
+	void set_opIndex(int idx, float value) property { }
+}
+void main() {
+	test t;
+	alert("test", t[123]);
+}

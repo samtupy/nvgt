@@ -32,7 +32,7 @@
 
 extern SDL_Window* g_WindowHandle;
 
-int message_box(const std::string& title, const std::string& text, const std::vector < std::string > & buttons, unsigned int mb_flags = 0);
+int message_box(const std::string& title, const std::string& text, const std::vector<std::string>& buttons, unsigned int mb_flags = 0);
 int alert(const std::string& title, const std::string& text, bool can_cancel = false, unsigned int flags = 0);
 int question(const std::string& title, const std::string& text, bool can_cancel = false, unsigned int flags = 0);
 void message(const std::string& text, const std::string& header);

@@ -14,8 +14,6 @@
 
 #include <string>
 #include <unordered_map>
-#include <SDL3/SDL_loadso.h>
-
 class asIScriptEngine;
 class asIScriptFunction;
 class CScriptDictionary;
@@ -23,7 +21,7 @@ class CScriptDictionary;
 class library {
 	asIScriptEngine* engine;
 	std::string engine_errors;
-	SDL_SharedObject* shared_object;
+	void* shared_object;
 	std::unordered_map<std::string, asIScriptFunction*> functions;
 	int ref_count;
 	int ptr_type_id;
