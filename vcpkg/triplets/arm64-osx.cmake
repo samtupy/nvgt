@@ -3,7 +3,7 @@ set(VCPKG_CRT_LINKAGE dynamic)
 set(VCPKG_LIBRARY_LINKAGE static)
 
 set(VCPKG_CMAKE_SYSTEM_NAME Darwin)
-if(PORT MATCHES "openssl")
+if(PORT MATCHES "openssl" OR PORT MATCHES "libffi")
 	set(VCPKG_OSX_ARCHITECTURES arm64)
 else()
 	set(VCPKG_OSX_ARCHITECTURES arm64;x86_64)
