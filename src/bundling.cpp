@@ -349,12 +349,29 @@ protected:
 			workplace = Path(workplace_tmp->path()).append(Path(output_path).makeFile().getFileName()).setExtension("app");
 		} else if(bundle_mode > 0) workplace = Path(output_path).makeFile().setExtension("app");
 		if (bundle_mode) {
-			Path tmp = Path(workplace.path()).append("Contents/MacOS");
+			Path tmp = Path(workplace.path()).append("Contents/Resources");
+			File(tmp).createDirectories();
+			tmp = Path(workplace.path()).append("Contents/MacOS");
 			File(tmp).createDirectories();
 			tmp.append(output_path.getBaseName()).makeFile();
 			final_output_path = output_path;
 			output_path = tmp;
 		}
+	}
+	void open_output_stream(const Path& output_path) override {
+		nvgt_compilation_output_impl::open_output_stream(output_path);
+		BinaryWriter bw(fs);
+		// NVGT distributes MacOS stubs with the first 2 bytes of the header modified so that they are not recognised as executables by the apple notarization service. Stubs must be distributed unsigned leaving it up to the scripter to sign their games, and any unsigned executables in an app bundle cause notarization to fail even if they are resources. Correct the header here.
+		fs.seekp(0);
+		bw.writeRaw("\xCA\xFE");
+		if (bundle_mode) {
+			fs.close();
+			fs.open(Path(workplace.path()).append("Contents/resources/exec").toString(), std::ios::out); // App bundles must store their embedded packs and bytecode as a resource so the app bundle can be signed.
+		}
+	}
+	void finalize_output_stream() override {
+		if (!bundle_mode) nvgt_compilation_output_impl::finalize_output_stream();
+		else BinaryWriter(fs) << int(0); // assets are being read from Resources/exec file, for code compatibility we make the last 4 bytes a data location like other platforms, 0 for the beginning of the file.
 	}
 	void finalize_product(Path& output_path) override {
 		if (!bundle_mode) return; // We are not creating a bundle in this condition.

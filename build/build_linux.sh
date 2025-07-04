@@ -101,12 +101,12 @@ function setup_nvgt {
 	fi
 	
 	echo Downloading lindev...
-	wget https://nvgt.gg/lindev.tar.gz
+	wget https://nvgt.gg/lindev.zip
 	mkdir -p lindev
 	cd lindev
-	tar -xvf ../lindev.tar.gz
+	unzip -q ../lindev.zip
 	cd ..
-	rm lindev.tar.gz
+	rm lindev.zip
 	if ! which scons &> /dev/null; then
 		pip3 install scons
 	fi

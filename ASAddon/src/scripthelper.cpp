@@ -1002,8 +1002,8 @@ std::string ScriptGetExceptionModule()
 		return "";
 	asIScriptFunction* func=ctx->GetExceptionFunction();
 	if(!func) return "";
-	const char* section_name;
-	if (func->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0) return std::string(section_name);
+	const char* section_name = nullptr;
+	if (func->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0 && section_name) return std::string(section_name);
 	else return "";
 }
 

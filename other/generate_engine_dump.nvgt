@@ -80,6 +80,7 @@ void main() {
 	for (uint i = 0; i < len; i += 1) {
 		string line = lines[i];
 		if (line.starts_with("objmthd ")) parse_class_method(line);
+		else if (line.starts_with("objbeh ")) parse_class_behaviour(line);
 		else if (line.starts_with("func")) parse_nvgt_function(line);
 		else if (line.starts_with("prop")) add_global_var(line);
 		else if (line.starts_with("enumval")) parse_enum_value(line);
@@ -117,6 +118,20 @@ string[]@ quoted_split(const string&in input) {
 	} // end for
 	args.insert_last (arg);
 	return args;
+}
+string[]@ partition(const string&in str, const string&in delim) {
+	if (delim.empty()) return {str, "", ""};
+	int c = str.find_first_of(delim);
+	if (c < 0) return {str, "", ""};
+	string[] output(3);
+	output[0] = str.substr(0, c);
+	int delim_start = c;
+	for (uint j = delim.find_first_of(str[c]); j < delim.length(); j++, c++) {
+		if (str[c] != delim[j]) break;
+	}
+	output[1] = str.substr(delim_start, c - delim_start);
+	output[2] = str.substr(c);
+	return output;
 }
 void write_global_vars() {
 	file tempfile;
@@ -159,6 +174,14 @@ void write_exported_enums() {
 		if (@e == null) continue;
 		e.export(path);
 	}
+}
+void parse_class_behaviour(string data) {
+	if (data.is_empty()) return;
+	string[]@ p = quoted_split(data);
+	string classname = p[1];
+	if (p[2] != "0" and p[2] != "3") return; // We only handle basic constructors/factories for now.
+	string func = partition(p[3], " ")[2];
+	add_nvgt_class_method(classname, func);
 }
 void parse_class_method(string data) {
 	if (data.is_empty()) return;

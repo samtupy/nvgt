@@ -21,6 +21,7 @@
 #include "nvgt.h"
 #include "nvgt_plugin.h"
 #include "UI.h"
+#include "xplatform.h"
 
 // Helper functions that are shared with plugins.
 void* nvgt_datastream_create(std::ios* stream, const std::string& encoding, int byteorder) { return new datastream(stream, encoding, byteorder); }
@@ -33,13 +34,13 @@ typedef struct {
 	nvgt_plugin_entry* e;
 	nvgt_plugin_version_func* v;
 } static_plugin_vtable;
-std::unordered_map<std::string, void*> loaded_plugins; // Contains handles to sdl objects.
+std::unordered_map<std::string, SDL_SharedObject*> loaded_plugins; // Contains handles to sdl objects.
 std::unordered_map<std::string, static_plugin_vtable>* static_plugins = NULL; // Contains pointers to static plugin entry points. This doesn't contain entry points for plugins loaded from a dll, rather those that have been linked statically into the executable produced by a custom build of nvgt. This is a pointer because the map is initialized the first time register_static_plugin is called so that we are not trusting in global initialization order.
 
 bool load_nvgt_plugin(const std::string& name, std::string* errmsg, void* user) {
 	nvgt_plugin_entry* entry = NULL;
 	nvgt_plugin_version_func* version = NULL;
-	void* obj = NULL;
+	SDL_SharedObject* obj = NULL;
 	if (loaded_plugins.contains(name)) return true; // plugin already loaded
 	if (static_plugins && static_plugins->contains(name)) {
 		entry = (*static_plugins)[name].e;

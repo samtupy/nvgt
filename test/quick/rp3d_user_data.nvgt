@@ -1,0 +1,128 @@
+void main() {
+    physics_world_settings settings;
+    settings.world_name = "Demo World";
+    physics_world@ world = physics_world(settings);
+
+    physics_transform transform;
+    transform.position = vector(0, 0, 0);
+    physics_rigid_body@ body = world.create_rigid_body(transform);
+
+    any@ stringData = "Hello Physics!";
+    body.set_user_data(stringData);
+
+    any@ retrievedString = body.get_user_data();
+    if (retrievedString !is null) {
+        string message;
+        retrievedString.retrieve(message);
+        println("Retrieved string: " + message);
+    } else {
+        println("Failed to retrieve string");
+    }
+
+    any@ numberData = 42.5f;
+    body.set_user_data(numberData);
+
+    any@ retrievedNumber = body.get_user_data();
+    if (retrievedNumber !is null) {
+        float value;
+        retrievedNumber.retrieve(value);
+        println("Retrieved number: " + value);
+    } else {
+        println("Failed to retrieve number");
+    }
+
+    dictionary@ dict = dictionary();
+    dict.set("name", "TestBody");
+    dict.set("health", 100);
+    dict.set("position", vector(1, 2, 3));
+
+    any@ dictData = @dict;
+    body.set_user_data(dictData);
+
+    any@ retrievedDict = body.get_user_data();
+    if (retrievedDict !is null) {
+        dictionary@ retrievedDictionary;
+        retrievedDict.retrieve(@retrievedDictionary);
+
+        if (retrievedDictionary !is null) {
+            string name;
+            int health;
+            vector pos;
+
+            retrievedDictionary.get("name", name);
+            retrievedDictionary.get("health", health);
+            retrievedDictionary.get("position", pos);
+
+            println("Retrieved dict - Name: " + name);
+            println("Retrieved dict - Health: " + health);
+            println("Retrieved dict - Position: " + pos.x + "," + pos.y + "," + pos.z);
+        }
+    } else {
+        println("Failed to retrieve dictionary");
+    }
+
+    body.set_user_data(null);
+    any@ clearedData = body.get_user_data();
+    println("Data after clearing: " + (clearedData is null ? "null" : "not null"));
+
+    physics_rigid_body@ body2 = world.create_rigid_body(transform);
+    physics_rigid_body@ body3 = world.create_rigid_body(transform);
+
+    any@ data1 = "Body1";
+    any@ data2 = "Body2"; 
+    any@ data3 = "Body3";
+
+    body.set_user_data(data1);
+    body2.set_user_data(data2);
+    body3.set_user_data(data3);
+
+    for (int i = 0; i < 3; i++) {
+        physics_rigid_body@ currentBody;
+        string bodyName;
+
+        if (i == 0) {
+            @currentBody = body;
+            bodyName = "First";
+        } else if (i == 1) {
+            @currentBody = body2;
+            bodyName = "Second";
+        } else {
+            @currentBody = body3;
+            bodyName = "Third";
+        }
+
+        any@ data = currentBody.get_user_data();
+        if (data !is null) {
+            string value;
+            data.retrieve(value);
+            println(bodyName + " body data: " + value);
+        }
+    }
+
+    physics_body@ genericBody = body; // Upcast
+    any@ dataFromGeneric = genericBody.get_user_data();
+    if (dataFromGeneric !is null) {
+        string value;
+        dataFromGeneric.retrieve(value);
+        println("Data accessed via generic body: " + value);
+    } else {
+        println("Failed to access data from generic body");
+    }
+
+    any@ intData = 123;
+    body.set_user_data(intData);
+
+    any@ retrievedInt = body.get_user_data();
+    if (retrievedInt !is null) {
+        int value;
+        retrievedInt.retrieve(value);
+        println("Retrieved integer: " + value);
+    } else {
+        println("Failed to retrieve integer");
+    }
+
+    world.destroy_rigid_body(body);
+    world.destroy_rigid_body(body2);
+    world.destroy_rigid_body(body3);
+    physics_world_destroy(world);
+}

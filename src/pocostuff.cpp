@@ -619,9 +619,6 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	g_platform_version = Environment::osVersion();
 	g_platform_architecture = Environment::osArchitecture();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
-	engine->RegisterObjectType("json_object", 0, asOBJ_REF);
-	engine->RegisterObjectType("json_array", 0, asOBJ_REF);
-	engine->RegisterObjectType("var", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("var", asBEHAVE_FACTORY, "var @v()", asFUNCTION(poco_var_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("var", asBEHAVE_ADDREF, "void f()", asMETHOD(poco_shared<Dynamic::Var>, duplicate), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("var", asBEHAVE_RELEASE, "void f()", asMETHOD(poco_shared<Dynamic::Var>, release), asCALL_THISCALL);

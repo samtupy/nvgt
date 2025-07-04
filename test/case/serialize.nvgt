@@ -1,0 +1,31 @@
+void test_serialize() {
+	dictionary d;
+	d["hi"] = false;
+	d["test"] = 12345.6;
+	d["num"] = 7;
+	d["str"] = "this is a string!";
+	
+	string s = d.serialize();
+	assert(s.length() > 0);
+	
+	dictionary@ D = deserialize(s);
+	assert(@D != null);
+	assert(D.get_size() == 4);
+	
+	// Verify all values
+	string str_val;
+	assert(D.get("str", str_val) == true);
+	assert(str_val == "this is a string!");
+	
+	double double_val;
+	assert(D.get("test", double_val) == true);
+	assert(double_val == 12345.6);
+	
+	int int_val;
+	assert(D.get("num", int_val) == true);
+	assert(int_val == 7);
+	
+	bool bool_val;
+	assert(D.get("hi", bool_val) == true);
+	assert(bool_val == false);
+}
