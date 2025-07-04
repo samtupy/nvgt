@@ -119,8 +119,8 @@ SConscript("ASAddon/_SConscript", variant_dir = "build/obj_ASAddon", duplicate =
 SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, exports = "env")
 # We'll clone the environment for stubs now so that we can then add any extra libraries that are not needed for stubs to the main nvgt environment.
 stub_env = env.Clone(PROGSUFFIX = ".bin")
-if env["PLATFORM"] == "win32": env.Append(LINKFLAGS = ["/delayload:plist.dll"])
-env.Append(LIBS = ["plist-2.0" if env["PLATFORM"] != "win32" else "plist"])
+if env["PLATFORM"] == "win32": env.Append(LINKFLAGS = ["/delayload:plist-2.0.dll"])
+env.Append(LIBS = ["plist-2.0"])
 extra_objects = [version_object]
 if static_plugins_object: extra_objects.append(static_plugins_object)
 nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + extra_objects, PDB = "#build/debug/nvgt.pdb")
