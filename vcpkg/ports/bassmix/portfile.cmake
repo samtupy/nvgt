@@ -16,7 +16,7 @@ else()
 endif()
 vcpkg_download_distfile(ARCHIVE
     URLS "https://www.un4seen.com/files/bassmix${VERSION}${FILE_SUFFIX}.zip"
-    FILENAME "bass${VERSION}${FILE_SUFFIX}.zip"
+    FILENAME "bassmix${VERSION}${FILE_SUFFIX}.zip"
     SHA512 ${FILE_HASH}
 )
 vcpkg_extract_source_archive(
