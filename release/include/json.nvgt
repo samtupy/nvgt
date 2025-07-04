@@ -87,7 +87,13 @@ class json {
 		if (top) f = k;
 		else {
 			for (uint i = 0; i < k.length(); i++) {
-				f.insert_last(key + "." + k[i]);
+				if (!v.is_object(k[i])) {
+					f.insert_last(key + "." + k[i]);
+				} else {
+					json_object@ j = v.get(k[i]);
+					if (@j == null) continue;
+					f.extend(this.list_keys_recursive(key + "." + k[i], @j, false));
+				}
 			}
 		}
 		return f;
