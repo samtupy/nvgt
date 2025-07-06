@@ -61,7 +61,9 @@ def macos_fat_binaries():
 	try: subprocess.check_output([vcpkg_path, "install", "--classic", "--triplet", "x64-osx", "--overlay-ports=ports", "--overlay-triplets=triplets", "libffi", "openssl"])
 	except subprocess.CalledProcessError as cpe: sys.exit(f"Building libffi and openssl for x64-osx failed with error code {cpe.returncode}.\n{cpe.output.decode()}")
 	for f in ["libcrypto.a", "libffi.a", "libssl.a"]:
+		os.remove("../macosdev/debug/" + f)
 		os.remove("../macosdev/lib/" + f)
+		subprocess.check_output(["lipo", "-create", "bin/installed/x64-osx/debug/" + f, "vcpkg_installed/arm64-osx/debug/" + f, "-output", "../macosdev/debug/" + f])
 		subprocess.check_output(["lipo", "-create", "bin/installed/x64-osx/lib/" + f, "vcpkg_installed/arm64-osx/lib/" + f, "-output", "../macosdev/lib/" + f])
 def windows_lib_rename():
 	"""Sometimes windows libraries get built with annoying names that complicate build scripts. We have to handle them somewhere, may as well be here."""
