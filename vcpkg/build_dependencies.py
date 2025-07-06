@@ -4,6 +4,7 @@
 # Copyright (c) 2022-2024 Sam Tupy
 # license: zlib
 
+import glob
 import hashlib
 import os
 from pathlib import Path
@@ -11,18 +12,16 @@ import shutil
 import subprocess
 import sys
 
-# Insure we're running from the vcpkg directory
-os.chdir(os.path.dirname(__file__))
-vcpkg_path = Path(os.getcwd()) / "bin" / ("vcpkg" if sys.platform != "win32" else "vcpkg.exe")
+vcpkg_path = Path(os.path.dirname(__file__)) / "bin" / ("vcpkg" if sys.platform != "win32" else "vcpkg.exe")
 
 def bootstrap_vcpkg():
-    if vcpkg_path.exists() and vcpkg_path.is_file():
-        return
-    print("Bootstrapping vcpkg...")
-    if platform.System() == "Windows":
-        subprocess.check_output("bin/bootstrap-vcpkg.bat")
-    else:
-        subprocess.check_output("bin/bootstrap-vcpkg.sh")
+	os.chdir(os.path.dirname(__file__))
+	if vcpkg_path.exists() and vcpkg_path.is_file():
+		return
+	if platform.System() == "Windows":
+		subprocess.check_output("bin/bootstrap-vcpkg.bat")
+	else:
+		subprocess.check_output("bin/bootstrap-vcpkg.sh")
 def build(triplet):
 	if not triplet:
 		# Try to determine, logic probably could be improved
@@ -46,11 +45,13 @@ def build(triplet):
 	shutil.copytree(Path("vcpkg_installed") / triplet / "lib", out_dir / "lib", dirs_exist_ok = True)
 	if triplet == "arm64-osx": macos_fat_binaries()
 	elif triplet == "x64-windows": windows_lib_rename()
+	if triplet.endswith("osx") or triplet.endswith("linux"): remove_duplicates()
 	try:
 		shutil.rmtree(out_dir / "lib" / "cmake")
 		shutil.rmtree(out_dir / "lib" / "pkgconfig")
 		shutil.rmtree(out_dir / "debug" / "lib" / "cmake")
 		shutil.rmtree(out_dir / "debug" / "lib" / "pkgconfig")
+		shutil.rmtree(out_dir / "debug" / "licenses")
 	except FileNotFoundError: pass
 	if do_archive:
 		shutil.make_archive("../" + dev_basename, format = "zip", root_dir = out_dir)
@@ -68,7 +69,7 @@ def macos_fat_binaries():
 		subprocess.check_output(["lipo", "-create", "bin/installed/x64-osx/debug/lib/" + f, "vcpkg_installed/arm64-osx/debug/lib/" + f, "-output", "../macosdev/debug/lib/" + f])
 		subprocess.check_output(["lipo", "-create", "bin/installed/x64-osx/lib/" + f, "vcpkg_installed/arm64-osx/lib/" + f, "-output", "../macosdev/lib/" + f])
 def windows_lib_rename():
-	"""Sometimes windows libraries get built with annoying names that complicate build scripts. We have to handle them somewhere, may as well be here."""
+	"""Sometimes windows libraries get built with annoying names that complicate build scripts. We have to handle them somewhere, may as well be here. Temporarily we'll also copy angelscript as angelscript-nc."""
 	renames = [
 		("libcrypto.lib", "crypto.lib"),
 		("libssl.lib", "ssl.lib"),
@@ -76,14 +77,25 @@ def windows_lib_rename():
 		("utf8proc_static.lib", "utf8proc.lib")
 	] # end renames list
 	for r in renames:
+		if (os.path.exists("../windev/lib/" + r[1])): os.remove("../windev/lib/" + r[1])
 		os.rename("../windev/lib/" + r[0], "../windev/lib/" + r[1])
+	shutil.copyfile("../windev/lib/angelscript.lib", "../windev/lib/angelscript-nc.lib")
+def remove_duplicates(triplet):
+	"""A couple libraries on Linux and MacOS might have created duplicate versions of themselves because of symlinks, lets get rid of them."""
+	for lib in ["libarchive", "libgit2"]:
+		for libdir in ["debug/lib", "lib"]:
+			versions = glob.glob(f"../{triplet}/{libdir}/{lib}*")
+			if len(versions) < 2: continue
+			versions.sort(key = len)
+			for v in versions[1]: os.remove(v)
 
-triplets = []
-do_archive = False
-if len(sys.argv) > 1:
-	for arg in sys.argv[1:]:
-		if arg == "--archive": do_archive = True
-		else: triplets.append(arg)
-if len(triplets) < 1: triplets.append("")
-bootstrap_vcpkg()
-for t in triplets: build(t)
+if __name__ == "__main__":
+	triplets = []
+	do_archive = False
+	if len(sys.argv) > 1:
+		for arg in sys.argv[1:]:
+			if arg == "--archive": do_archive = True
+			else: triplets.append(arg)
+	if len(triplets) < 1: triplets.append("")
+	bootstrap_vcpkg()
+	for t in triplets: build(t)
