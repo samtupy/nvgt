@@ -10,8 +10,6 @@ set -e
 python3 -m venv venv --upgrade-deps
 chmod +x venv/bin/activate
 source ./venv/bin/activate
-mkdir -p deps
-cd deps
 echo Building NVGT...
 if [[ "$IS_CI" != 1 ]]; then
 	# Assumed to not be running on CI; NVGT should be cloned outside of deps first.
