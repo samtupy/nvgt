@@ -1125,7 +1125,7 @@ public:
 		if (format == ma_format_unknown) return false;
 		return load_pcm(buffer->ptr, buffer->size * buffer->get_element_size(), format, samplerate, channels);
 	}
-	bool stream_pcm(const void* data, unsigned int size_in_frames, ma_format format, unsigned int sample_rate, unsigned int channels, unsigned int buffer_size) {
+	bool stream_pcm(const void* data, unsigned int size_in_frames, ma_format format, unsigned int sample_rate, unsigned int channels, unsigned int buffer_size) override {
 		if (format != ma_format_unknown) {
 			if (snd) close();
 			if (!buffer_size) buffer_size = size_in_frames + 2;
