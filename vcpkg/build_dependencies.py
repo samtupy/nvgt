@@ -47,8 +47,10 @@ def build(triplet):
 	if triplet == "arm64-osx": macos_fat_binaries()
 	elif triplet == "x64-windows": windows_lib_rename()
 	try:
-		shutil.rmtree(out_dir / "lib/cmake")
-		shutil.rmtree(out_dir / "lib/pkgconfig")
+		shutil.rmtree(out_dir / "lib" / "cmake")
+		shutil.rmtree(out_dir / "lib" / "pkgconfig")
+		shutil.rmtree(out_dir / "debug" / "lib" / "cmake")
+		shutil.rmtree(out_dir / "debug" / "lib" / "pkgconfig")
 	except FileNotFoundError: pass
 	if do_archive:
 		shutil.make_archive("../" + dev_basename, format = "zip", root_dir = out_dir)
