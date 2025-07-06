@@ -14,12 +14,10 @@ echo Building NVGT...
 if [[ "$IS_CI" != 1 ]]; then
 	# Assumed to not be running on CI; NVGT should be cloned outside of deps first.
 	echo Not running on CI.
-	cd ..	
 	git clone --depth 1 https://github.com/samtupy/nvgt||true
 	cd nvgt
 else
 	echo Running on CI.
-	cd ..
 fi
 echo Downloading macosdev...
 curl -s -O https://nvgt.gg/macosdev.zip

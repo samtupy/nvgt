@@ -19,7 +19,7 @@ def bootstrap_vcpkg():
 	if vcpkg_path.exists() and vcpkg_path.is_file():
 		return
 	if sys.platform == "win32":
-		subprocess.check_output("bin/bootstrap-vcpkg.bat")
+		subprocess.check_output("bin\\bootstrap-vcpkg.bat")
 	else:
 		subprocess.check_output("bin/bootstrap-vcpkg.sh")
 def build(triplet):
