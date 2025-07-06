@@ -31,7 +31,7 @@ def build(triplet):
 		elif sys.platform == "linux": triplet = "x64-linux"
 		else: sys.exit("unable to determine platform, please pass a triplet explicitly.")
 	try: subprocess.check_output([vcpkg_path, "install", "--triplet", triplet])
-	except subprocess.CalledProcessError as cpe: sys.exit(f"Building packages for {triplet} failed with error code {cpe.returncode}.\n{cpe.output}")
+	except subprocess.CalledProcessError as cpe: sys.exit(f"Building packages for {triplet} failed with error code {cpe.returncode}.\n{cpe.output.decode()}")
 	dev_basename = ""
 	if "-windows" in triplet: dev_basename = "windev"
 	elif "-osx" in triplet: dev_basename = "macosdev"
@@ -58,7 +58,7 @@ def build(triplet):
 			hf.write(h.hexdigest())
 def macos_fat_binaries():
 	"""We must manually build libffi and openssl for x64 as well and then run lipo on both of our builds to create universal binaries for them. This is meant to be run after the macosdev directory is created."""
-	try: subprocess.check_output([vcpkg_path, "install", "--classic", "--triplet", "x64-osx", "libffi", "openssl"])
+	try: subprocess.check_output([vcpkg_path, "install", "--classic", "--triplet", "x64-osx", "--overlay-ports=ports", "--overlay-triplets=triplets", "libffi", "openssl"])
 	except subprocess.CalledProcessError as cpe: sys.exit(f"Building libffi and openssl for x64-osx failed with error code {cpe.returncode}.\n{cpe.output.decode()}")
 	for f in ["libcrypto.a", "libffi.a", "libssl.a"]:
 		os.remove("../macosdev/lib/" + f)
