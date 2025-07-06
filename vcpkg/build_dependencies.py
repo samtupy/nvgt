@@ -59,7 +59,7 @@ def build(triplet):
 def macos_fat_binaries():
 	"""We must manually build libffi and openssl for x64 as well and then run lipo on both of our builds to create universal binaries for them. This is meant to be run after the macosdev directory is created."""
 	try: subprocess.check_output([vcpkg_path, "install", "--triplet", "x64-osx", "libffi", "openssl"])
-	except subprocess.CalledProcessError as cpe: sys.exit(f"Building libffi and openssl for x64-osx failed with error code {cpe.returncode}.\n{cpe.output}")
+	except subprocess.CalledProcessError as cpe: sys.exit(f"Building libffi and openssl for x64-osx failed with error code {cpe.returncode}.\n{cpe.output.decode()}")
 	for f in ["libcrypto.a", "libffi.a", "libssl.a"]:
 		os.remove("../macosdev/lib/" + f)
 		subprocess.check_output(["lipo", "-create", "bin/installed/x64-osx/lib/" + f, "vcpkg_installed/x64-osx/lib/" + f, "-output", "../macosdev/lib/" + f])
