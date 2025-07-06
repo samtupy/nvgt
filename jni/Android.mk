@@ -1,5 +1,5 @@
 LOCAL_PATH := $(call my-dir)
-LIBPATH := ../droidev/libs/$(TARGET_ARCH_ABI)
+LIBPATH := ../droidev/lib
 ifneq ($(wildcard Custom.mk),)
 include Custom.mk
 endif
