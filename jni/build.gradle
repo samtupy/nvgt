@@ -25,13 +25,13 @@ android {
 	}
 	flavorDimensions "version"
 	defaultConfig {
-		minSdkVersion 21
+		minSdkVersion 28
 		targetSdkVersion 34
 		versionCode 1
 		versionName "1.0"
 		externalNativeBuild {
 			ndkBuild {
-				arguments "APP_PLATFORM=android-21", "-j8"
+				arguments "APP_PLATFORM=android-28", "-j8"
 				abiFilters 'arm64-v8a' // 'armeabi-v7a', 
 			}
 		}

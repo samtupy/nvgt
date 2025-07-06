@@ -384,7 +384,7 @@ bool mouse_down(unsigned char button) {
 		return false;
 	if (!g_KeysDown)
 		return false;
-	return (SDL_GetMouseState(&g_MouseAbsX, &g_MouseAbsY) & SDL_BUTTON(button)) != 0;
+	return (SDL_GetMouseState(&g_MouseAbsX, &g_MouseAbsY) & SDL_BUTTON_MASK(button)) != 0;
 }
 bool MouseReleased(unsigned char button) {
 	if (button > 31)
