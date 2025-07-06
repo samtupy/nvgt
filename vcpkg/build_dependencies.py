@@ -45,7 +45,7 @@ def build(triplet):
 	shutil.copytree(Path("vcpkg_installed") / triplet / "lib", out_dir / "lib", dirs_exist_ok = True)
 	if triplet == "arm64-osx": macos_fat_binaries()
 	elif triplet == "x64-windows": windows_lib_rename()
-	if triplet.endswith("osx") or triplet.endswith("linux"): remove_duplicates()
+	if triplet.endswith("osx") or triplet.endswith("linux"): remove_duplicates(dev_basename)
 	try:
 		shutil.rmtree(out_dir / "lib" / "cmake")
 		shutil.rmtree(out_dir / "lib" / "pkgconfig")
@@ -80,14 +80,14 @@ def windows_lib_rename():
 		if (os.path.exists("../windev/lib/" + r[1])): os.remove("../windev/lib/" + r[1])
 		os.rename("../windev/lib/" + r[0], "../windev/lib/" + r[1])
 	shutil.copyfile("../windev/lib/angelscript.lib", "../windev/lib/angelscript-nc.lib")
-def remove_duplicates(triplet):
+def remove_duplicates(dev_basename):
 	"""A couple libraries on Linux and MacOS might have created duplicate versions of themselves because of symlinks, lets get rid of them."""
 	for lib in ["libarchive", "libgit2"]:
 		for libdir in ["debug/lib", "lib"]:
-			versions = glob.glob(f"../{triplet}/{libdir}/{lib}*")
+			versions = glob.glob(f"../{dev_basename}/{libdir}/{lib}*")
 			if len(versions) < 2: continue
 			versions.sort(key = len)
-			for v in versions[1]: os.remove(v)
+			for v in versions[1:]: os.remove(v)
 
 if __name__ == "__main__":
 	triplets = []
