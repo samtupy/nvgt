@@ -40,7 +40,8 @@ def build(triplet):
 	out_dir = Path("..") / dev_basename
 	out_dir.mkdir(parents=True, exist_ok=True)
 	if (Path("vcpkg_installed") / triplet / "bin").exists(): shutil.copytree(Path("vcpkg_installed") / triplet / "bin", out_dir / "bin", dirs_exist_ok = True)
-	shutil.copytree(Path("vcpkg_installed") / triplet / "debug", out_dir / "debug", dirs_exist_ok = True)
+	if (Path("vcpkg_installed") / triplet / "debug" / "bin").exists(): shutil.copytree(Path("vcpkg_installed") / triplet / "debug" / "bin", out_dir / "debug" / "bin", dirs_exist_ok = True)
+	shutil.copytree(Path("vcpkg_installed") / triplet / "debug" / "lib", out_dir / "debug" / "lib", dirs_exist_ok = True)
 	shutil.copytree(Path("vcpkg_installed") / triplet / "include", out_dir / "include", dirs_exist_ok = True)
 	shutil.copytree(Path("vcpkg_installed") / triplet / "lib", out_dir / "lib", dirs_exist_ok = True)
 	if triplet == "arm64-osx": macos_fat_binaries()
@@ -51,7 +52,6 @@ def build(triplet):
 		shutil.rmtree(out_dir / "lib" / "pkgconfig")
 		shutil.rmtree(out_dir / "debug" / "lib" / "cmake")
 		shutil.rmtree(out_dir / "debug" / "lib" / "pkgconfig")
-		shutil.rmtree(out_dir / "debug" / "licenses")
 	except FileNotFoundError: pass
 	if do_archive:
 		shutil.make_archive("../" + dev_basename, format = "zip", root_dir = out_dir)
