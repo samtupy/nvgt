@@ -41,6 +41,8 @@ windev
 deps
 venv
 vcpkg/vcpkg_installed
+*.zip
+*.blake2b
 
 # website builds
 web/public_html
