@@ -427,7 +427,8 @@ This is where consts will save the day!
 
 Using them , we could rewrite our code like this:
 ```
-const int price_foldable_chair = 30;
+#include "speech.nvgt"
+const int price_folding_chair = 30;
 void main(){
     speak("Welcome to the camping store! You need to have " + price_folding_chair + " dollars to buy a folding chair.");
 }
