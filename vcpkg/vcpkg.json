@@ -25,10 +25,16 @@
 			"name": "libplist",
 			"platform": "windows|osx|linux"
 		},
-		{
-			"name": "sdl3",
-			"features": ["vulkan"]
-		},
+{
+    "name": "sdl3",
+    "features": ["vulkan"],
+    "platform": "windows|osx|ios|android"
+},
+{
+    "name": "sdl3",
+    "platform": "linux",
+    "features": ["vulkan", "ibus", "wayland", "x11"]
+},
 		{
 			"name": "freetype",
 			"default-features": false,
