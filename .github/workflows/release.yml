@@ -177,9 +177,9 @@ jobs:
       if: github.event.repository.fork == false
       run: |
         cd install
-        codesign --deep --force --options runtime --timestamp -s ${{secrets.MACOS_SIGNING_TEAM_ID}} nvgt.app
+        codesign --deep --force --options runtime --entitlements macos-entitlements.plist --timestamp -s ${{secrets.MACOS_SIGNING_TEAM_ID}} nvgt.app
         hdiutil create -srcfolder nvgt.app nvgt_${{env.nvgt_version}}.dmg
-        codesign --deep --force --options runtime --timestamp -s ${{secrets.MACOS_SIGNING_TEAM_ID}} nvgt_${{env.nvgt_version}}.dmg
+        codesign --deep --force --options runtime --entitlements macos-entitlements.plist --timestamp -s ${{secrets.MACOS_SIGNING_TEAM_ID}} nvgt_${{env.nvgt_version}}.dmg
         xcrun notarytool submit nvgt_${{env.nvgt_version}}.dmg --wait ${{secrets.MACOS_SIGNING_NOTARY_AUTH}}
         xcrun stapler staple nvgt_${{env.nvgt_version}}.dmg
         cd ..
