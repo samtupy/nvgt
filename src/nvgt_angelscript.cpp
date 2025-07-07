@@ -715,7 +715,7 @@ public:
 				else
 					cout << status << endl;
 			}
-			refresh_window();
+			if (isUI) refresh_window();
 		}
 		return !fail;
 	}

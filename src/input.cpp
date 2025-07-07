@@ -121,7 +121,7 @@ void InputInit() {
 	g_KeysDown = SDL_GetKeyboardState(&g_KeysDownArrayLen);
 }
 void InputDestroy() {
-	if (!(SDL_WasInit(0) & SDL_INIT_VIDEO))
+	if (SDL_WasInit(0) == 0)
 		return;
 	#ifdef _WIN32
 	uninstall_keyhook();
