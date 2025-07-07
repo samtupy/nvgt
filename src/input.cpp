@@ -109,6 +109,10 @@ CScriptArray* GetDevices(std::function<uint32_t* (int*)> callback) {
 	SDL_free(devices);
 	return array;
 }
+void JoystickInit() {
+	if (!(SDL_WasInit(0) & (SDL_INIT_GAMEPAD | SDL_INIT_JOYSTICK)))
+		SDL_InitSubSystem(SDL_INIT_GAMEPAD | SDL_INIT_JOYSTICK);
+}
 void InputInit() {
 	if (SDL_WasInit(0) & SDL_INIT_VIDEO)
 		return;
@@ -117,7 +121,7 @@ void InputInit() {
 	memset(g_KeysForced, 0, SDL_SCANCODE_COUNT);
 	memset(g_KeysReleased, 0, SDL_SCANCODE_COUNT);
 	// Initialize video and joystick/gamepad if not already initialized
-	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_JOYSTICK);
+	SDL_Init(SDL_INIT_VIDEO);
 	g_KeysDown = SDL_GetKeyboardState(&g_KeysDownArrayLen);
 }
 void InputDestroy() {
@@ -434,7 +438,7 @@ static Poco::FastMutex g_joysticks_mutex;
 
 // Helper function to count joysticks
 int joystick_count(bool gamepads_only) {
-	InputInit();
+	JoystickInit();
 	if (gamepads_only) {
 		int count;
 		SDL_JoystickID* joysticks = SDL_GetGamepads(&count);
@@ -506,7 +510,7 @@ void joystick::update() {
 
 // BGT compatibility property implementations
 unsigned int joystick::get_joysticks() const {
-	InputInit();
+	JoystickInit();
 	int count;
 	SDL_JoystickID* joysticks = SDL_GetGamepads(&count);
 	if (joysticks) SDL_free(joysticks);
