@@ -23,7 +23,7 @@ jobs:
         add-to-path: true
     - name: build
       run: |
-        python3 vcpkg/build_dependencies.py --archive
+        python3 vcpkg/build_dependencies.py arm64-android --archive
     - uses: actions/upload-artifact@v4
       with:
         name: droidev.zip
