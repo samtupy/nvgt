@@ -5,6 +5,29 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  android_build:
+    runs-on: macos-14
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+    - uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        cache: 'gradle'
+    - uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25c
+        link-to-sdk: true
+        add-to-path: true
+    - name: build
+      run: |
+        python3 vcpkg/build_dependencies.py --archive
+    - uses: actions/upload-artifact@v4
+      with:
+        name: droidev.zip
+        path: 'droidev.zip'
   mac_build:
     runs-on: macos-14
     steps:
@@ -29,5 +52,18 @@ jobs:
         python3 vcpkg/build_dependencies.py --archive
     - uses: actions/upload-artifact@v4
       with:
-        name: macosdev.zip
-        path: 'macosdev.zip'
+        name: windev.zip
+        path: 'windev.zip'
+  linux_build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: build
+      run: |
+        python3 vcpkg/build_dependencies.py --archive
+    - uses: actions/upload-artifact@v4
+      with:
+        name: lindev.zip
+        path: 'lindev.zip'
