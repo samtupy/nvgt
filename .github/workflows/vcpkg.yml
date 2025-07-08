@@ -1,0 +1,33 @@
+name: vcpkg
+on:
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  mac_build:
+    runs-on: macos-14
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: build
+      run: |
+        python3 vcpkg/build_dependencies.py --archive
+    - uses: actions/upload-artifact@v4
+      with:
+        name: macosdev.zip
+        path: 'macosdev.zip'
+  windows_build:
+    runs-on: windows-2022
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: build
+      run: |
+        python3 vcpkg/build_dependencies.py --archive
+    - uses: actions/upload-artifact@v4
+      with:
+        name: macosdev.zip
+        path: 'macosdev.zip'
