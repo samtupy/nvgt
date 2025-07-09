@@ -174,7 +174,7 @@ jobs:
         python3 make_macos_app.py ../release no_dmg
         cd ..
     - name: sign_package
-      if: github.event.repository.fork == false
+      if: github.event.repository.fork == false && false
       run: |
         cd install
         codesign --deep --force --options runtime --entitlements macos-entitlements.plist --timestamp -s ${{secrets.MACOS_SIGNING_TEAM_ID}} nvgt.app
@@ -184,7 +184,7 @@ jobs:
         xcrun stapler staple nvgt_${{env.nvgt_version}}.dmg
         cd ..
     - name: unsigned_package
-      if: github.event.repository.fork == true
+      if: github.event.repository.fork == true || true
       run: |
         cd install
         hdiutil create -srcfolder nvgt.app nvgt_${{env.nvgt_version}}.dmg
