@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   mac_build:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
     - uses: actions/checkout@v4
       with:
@@ -140,7 +140,7 @@ jobs:
         path: 'install/nvgt_${{env.nvgt_version}}.exe'
 
   mac_package:
-    runs-on: macos-latest
+    runs-on: macos-15
     needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v4
