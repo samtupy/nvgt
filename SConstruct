@@ -88,6 +88,8 @@ if len(static_plugins) > 0:
 
 # Project libraries
 env.Append(LIBS = [["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoCrypto", "PocoZip", "PocoFoundation", "expat", "expat" if env["PLATFORM"] == "darwin" else "z"] if env["PLATFORM"] != "win32" else ["UniversalSpeechStatic", "PocoXMLmt", "libexpatMT", "zlib"], "angelscript", "SDL3", "phonon", "enet", "reactphysics3d", "ssl", "crypto", "utf8proc", "pcre2-8", "ASAddon", "deps", "vorbisfile", "vorbis", "ogg", "opusfile", "opus"])
+if env["PLATFORM"] == "darwin": env.Prepend(LIBS = ["z"]) # Try putting lib at beginning of link list?
+if env["PLATFORM"] == "darwin": env.Append(LIBS = ["z"]) # Try putting lib at end of link list?
 
 # nvgt itself
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
