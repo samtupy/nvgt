@@ -43,6 +43,7 @@ void rnd_xorshift_seed( rnd_xorshift_t* xorshift, RND_U64 seed );
 RND_U64 rnd_xorshift_next( rnd_xorshift_t* xorshift );
 float rnd_xorshift_nextf( rnd_xorshift_t* xorshift );
 int rnd_xorshift_range( rnd_xorshift_t* xorshift, int min, int max );
+RND_U64 rnd_xorshift_range64(rnd_xorshift_t* xorshift, RND_U64 min, RND_U64 max);
 
 #endif /* rnd_h */
 

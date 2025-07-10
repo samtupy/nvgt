@@ -32,6 +32,7 @@ private:
 	asIScriptFunction* nextFunc;
 	asIScriptFunction* nextfFunc;
 	asIScriptFunction* rangeFunc;
+	asIScriptFunction* range64Func;
 	asIScriptFunction* nextBoolFunc;
 	asIScriptFunction* nextCharFunc;
 	int32 ref_count;
@@ -46,6 +47,7 @@ public:
 			nextFunc = scriptObj->GetObjectType()->GetMethodByDecl("uint next()");
 			nextfFunc = scriptObj->GetObjectType()->GetMethodByDecl("float nextf()");
 			rangeFunc = scriptObj->GetObjectType()->GetMethodByDecl("int range(int, int)");
+			range64Func = scriptObj->GetObjectType()->GetMethodByDecl("int64 range64(int64, int64)");
 			nextBoolFunc = scriptObj->GetObjectType()->GetMethodByDecl("bool next_bool(int)");
 			nextCharFunc = scriptObj->GetObjectType()->GetMethodByDecl("string next_character(const string&in, const string&in)");
 		}
@@ -77,6 +79,16 @@ public:
 	int32 range(int32 min, int32 max) override {
 		if (!rangeFunc || !ctx) return min;
 		ctx->Prepare(rangeFunc);
+		ctx->SetObject(scriptObj);
+		ctx->SetArgDWord(0, min);
+		ctx->SetArgDWord(1, max);
+		ctx->Execute();
+		return ctx->GetReturnDWord();
+	}
+
+		int64 range64(int64 min, int64 max) override {
+		if (!range64Func || !ctx) return min;
+		ctx->Prepare(range64Func);
 		ctx->SetObject(scriptObj);
 		ctx->SetArgDWord(0, min);
 		ctx->SetArgDWord(1, max);
@@ -382,6 +394,10 @@ float32 random_xorshift::nextf() {
 
 int32 random_xorshift::range(int32 min, int32 max) {
 	return rnd_xorshift_range(&gen, min, max);
+}
+
+int64 random_xorshift::range64(int64 min, int64 max) {
+	return rnd_xorshift_range64(&gen, min, max);
 }
 
 void random_xorshift::seed(uint32 s) {

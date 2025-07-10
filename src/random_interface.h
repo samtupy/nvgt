@@ -22,6 +22,7 @@
 typedef uint32_t uint32;
 typedef int32_t int32;
 typedef uint64_t uint64;
+typedef int64_t int64;
 typedef uint8_t uint8;
 typedef float float32;
 
@@ -38,6 +39,7 @@ public:
 	virtual uint32 next() = 0;
 	virtual float32 nextf() = 0;
 	virtual int32 range(int32 min, int32 max) = 0;
+	virtual int64 range64(int64 min, int64 max) = 0;
 	virtual void seed(uint32 s) = 0;
 	virtual void seed64(uint64 s) { seed(static_cast<uint32>(s)); }
 	virtual std::string get_state() const = 0;
@@ -64,6 +66,7 @@ public:
 	uint32 next() override;
 	float32 nextf() override;
 	int32 range(int32 min, int32 max) override;
+	int64 range64(int64 min, int64 max) override;
 	void seed(uint32 s) override;
 	std::string get_state() const override;
 	bool set_state(const std::string& state) override;
@@ -82,6 +85,7 @@ public:
 	uint32 next() override;
 	float32 nextf() override;
 	int32 range(int32 min, int32 max) override;
+	int64 range64(int64 min, int64 max) override;
 	void seed(uint32 s) override;
 	std::string get_state() const override;
 	bool set_state(const std::string& state) override;
@@ -100,6 +104,7 @@ public:
 	uint32 next() override;
 	float32 nextf() override;
 	int32 range(int32 min, int32 max) override;
+	int64 range64(int64 min, int64 max) override;
 	void seed(uint32 s) override;
 	std::string get_state() const override;
 	bool set_state(const std::string& state) override;
@@ -118,6 +123,7 @@ public:
 	uint32 next() override;
 	float32 nextf() override;
 	int32 range(int32 min, int32 max) override;
+	int64 range64(int64 min, int64 max) override;
 	void seed(uint32 s) override;
 	void seed64(uint64 s) override;
 	std::string get_state() const override;

@@ -50,6 +50,7 @@ std::string random_get_state() {
 int random(int min, int max) {
 	return get_default_random()->range(min, max);
 }
+
 float random_float() {
 	return get_default_random()->nextf();
 }
