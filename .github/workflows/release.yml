@@ -98,8 +98,6 @@ jobs:
       run: |
         pip3 install scons
         choco install -y upx
-        curl -s -O https://nvgt.gg/windev.zip
-        7z x windev.zip -owindev
         scons -s no_upx=0
     - uses: actions/upload-artifact@v4
       with:

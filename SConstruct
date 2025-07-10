@@ -9,6 +9,8 @@ Help("""
 	Available custom build switches for NVGT:
 		copylibs=0 or 1 (default 1): Copy shared libraries to release/lib after building?
 		debug=0 or 1 (default 0): Include debug symbols in the resulting binaries?
+		deps=build, download, or unmanaged (default download): How to fetch dependencies required to build NVGT? build = use vcpkg to build from source, download = download prebuilt binaries from nvgt.gg if newer than existing, unmanaged = assume dependencies are in place.
+		deps_path=path: Optional location where dependencies are stored? Defaults to a folder named after the platform in the repository root.
 		no_upx=0 or 1 (default 1): Disable UPX stubs?
 		no_plugins=0 or 1 (default 0): Disable the plugin system entirely?
 		no_shared_plugins=0 or 1 (default 0): Only compile plugins statically?
@@ -35,6 +37,7 @@ SConscript("build/upx_sconscript.py", exports = ["env"])
 SConscript("build/version_sconscript.py", exports = ["env"])
 env.SetOption("num_jobs", multiprocessing.cpu_count())
 SConscript("build/osdev_sconscript.py", exports = ["env"])
+SConscript("vcpkg/_SConscript", exports = ["env"])
 if ARGUMENTS.get("debug", "0") == "1":
 	env.Tool('compilation_db')
 	cdb = env.CompilationDatabase()
