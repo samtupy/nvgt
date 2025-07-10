@@ -12,6 +12,7 @@ before you include this file in *one* C/C++ file to create the implementation.
 
 #ifndef rnd_h
 #define rnd_h
+#include <cstdint>
 
 #ifndef RND_U32
     #define RND_U32 unsigned int
@@ -43,7 +44,12 @@ void rnd_xorshift_seed( rnd_xorshift_t* xorshift, RND_U64 seed );
 RND_U64 rnd_xorshift_next( rnd_xorshift_t* xorshift );
 float rnd_xorshift_nextf( rnd_xorshift_t* xorshift );
 int rnd_xorshift_range( rnd_xorshift_t* xorshift, int min, int max );
-RND_U64 rnd_xorshift_range64(rnd_xorshift_t* xorshift, RND_U64 min, RND_U64 max);
+
+static inline int64_t rnd_xorshift_range64(rnd_xorshift_t* state, int64_t min, int64_t max) {
+    uint64_t r = (static_cast<uint64_t>(rnd_xorshift_next(state)) << 32) | rnd_xorshift_next(state);
+    uint64_t range = max - min + 1;
+    return min + (r % range);
+}
 
 #endif /* rnd_h */
 
