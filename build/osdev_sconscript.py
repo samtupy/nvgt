@@ -24,9 +24,9 @@ def set_osdev_paths(env, osdev_path = prefix + "dev"):
 	else: found = True
 	env.Append(CPPPATH = [os.path.join(osdev_path, "include")])
 	env.Append(LIBPATH = [os.path.join(osdev_path, "lib")])
+	env["NVGT_OSDEV_PATH"] = osdev_path
 	if env["PLATFORM"] == "win32":
 		env.Append(LIBPATH = [os.path.join(osdev_path, "bin")])
-		env["NVGT_OSDEV_PATH"] = osdev_path
 		if "debug" in osdev_path: env["windev_debug"] = 1
 
 set_osdev_paths(env)
