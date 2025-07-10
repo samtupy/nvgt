@@ -50,6 +50,9 @@ std::string random_get_state() {
 int random(int min, int max) {
 	return get_default_random()->range(min, max);
 }
+int64 random64(int64 min, int64 max) {
+	return g_random_xorshift->range64(min, max);
+}
 
 float random_float() {
 	return get_default_random()->nextf();
@@ -152,12 +155,14 @@ void RegisterScriptRandom(asIScriptEngine* engine) {
 	random_pcg* default_rng = new random_pcg();
 	init_default_random(default_rng);
 	default_rng->release(); // init_default_random already added a ref
+	g_random_xorshift = new random_xorshift();
 	// Register legacy global functions for backwards compatibility
 	engine->RegisterGlobalFunction(_O("bool random_set_state(const string& in)"), asFUNCTION(random_set_state), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string random_get_state()"), asFUNCTION(random_get_state), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint random_seed()"), asFUNCTION(random_seed), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64 random_seed64()"), asFUNCTION(random_seed64), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int random(int, int)"), WRAP_FN_PR(random, (int, int), int), asCALL_GENERIC);
+	engine->RegisterGlobalFunction(_O("int64 random64(int64, int64)"), asFUNCTION(random64), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("float random_float()"), asFUNCTION(random_float), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool random_bool(int = 50)"), asFUNCTION(random_bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string random_character(const string& in, const string& in)"), asFUNCTION(random_character), asCALL_CDECL);

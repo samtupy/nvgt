@@ -125,6 +125,7 @@ public:
 // Global default random generator
 random_interface* g_default_random = nullptr;
 static script_random_wrapper* g_default_script_wrapper = nullptr;
+random_xorshift* g_random_xorshift = nullptr;
 
 // Initialize default generator with provided rng
 void init_default_random(random_interface* rng) {
@@ -151,6 +152,10 @@ void cleanup_default_random() {
 	if (g_default_script_wrapper) {
 		g_default_script_wrapper->release();
 		g_default_script_wrapper = nullptr;
+	}
+	if (g_random_xorshift) {
+		g_random_xorshift->release();
+		g_random_xorshift = nullptr;
 	}
 	g_default_random = nullptr;
 }

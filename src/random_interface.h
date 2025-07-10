@@ -39,7 +39,11 @@ public:
 	virtual uint32 next() = 0;
 	virtual float32 nextf() = 0;
 	virtual int32 range(int32 min, int32 max) = 0;
-	virtual int64 range64(int64 min, int64 max) = 0;
+
+	virtual int64 range64(int64 min, int64 max) {
+		return static_cast<int64>(range(static_cast<int32>(min), static_cast<int32>(max)));
+	}
+	
 	virtual void seed(uint32 s) = 0;
 	virtual void seed64(uint64 s) { seed(static_cast<uint32>(s)); }
 	virtual std::string get_state() const = 0;
@@ -66,7 +70,6 @@ public:
 	uint32 next() override;
 	float32 nextf() override;
 	int32 range(int32 min, int32 max) override;
-	int64 range64(int64 min, int64 max) override;
 	void seed(uint32 s) override;
 	std::string get_state() const override;
 	bool set_state(const std::string& state) override;
@@ -85,7 +88,6 @@ public:
 	uint32 next() override;
 	float32 nextf() override;
 	int32 range(int32 min, int32 max) override;
-	int64 range64(int64 min, int64 max) override;
 	void seed(uint32 s) override;
 	std::string get_state() const override;
 	bool set_state(const std::string& state) override;
@@ -104,7 +106,6 @@ public:
 	uint32 next() override;
 	float32 nextf() override;
 	int32 range(int32 min, int32 max) override;
-	int64 range64(int64 min, int64 max) override;
 	void seed(uint32 s) override;
 	std::string get_state() const override;
 	bool set_state(const std::string& state) override;
@@ -132,6 +133,7 @@ public:
 	void release() override;
 };
 
+extern random_xorshift* g_random_xorshift;
 extern random_interface* g_default_random;
 void set_default_random(random_interface* rng);
 void set_default_random_script(asIScriptObject* scriptObj);
