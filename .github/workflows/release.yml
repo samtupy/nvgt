@@ -120,11 +120,6 @@ jobs:
         cd ..
     - name: build
       run: |
-        curl -s -O https://nvgt.gg/droidev.zip
-        mkdir -p droidev
-        cd droidev
-        unzip -q ../droidev.zip
-        cd ../jni
         ./gradlew assembleRunnerRelease AssembleStubRelease --no-daemon -Pandroid.injected.signing.store.file=android.keystore -Pandroid.injected.signing.store.password=${{env.ANDROID_RUNNER_KEYSTORE_PW}} -Pandroid.injected.signing.key.alias=app -Pandroid.injected.signing.key.password="${{env.ANDROID_RUNNER_KEYSTORE_PW}}"
         mv build/outputs/apk/runner/release/nvgt-runner-release.apk ../release/nvgt.apk
         cd ..
