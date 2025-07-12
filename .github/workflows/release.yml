@@ -18,6 +18,19 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: true
+    - uses: actions/cache@v4
+      with:
+        path: macosdev
+        key: macosdev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
+      id: cache
+    - name: build dependencies
+      if: ${{ steps.cache.outputs.cache_hit != 'true' }}
+      run: python3 vcpkg/build_dependencies.py --archive
+    - name: publish dependencies
+      if: ${{ steps.cache.outputs.cache_hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
+      run: |
+        curl -u "${{secrets.CIFTP}}" -s -T macosdev.zip ftp://nvgt.gg
+        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/devlibs_update.php"
     - name: build
       run: |
         cp build/build_macos.sh .
@@ -34,6 +47,23 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: true
+    - uses: actions/cache@v4
+      with:
+        path: lindev
+        key: lindev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
+      id: cache
+    - name: build dependencies
+      if: ${{ steps.cache.outputs.cache_hit != 'true' }}
+      run: |
+        sudo apt update
+        sudo apt full-upgrade -y
+        sudo apt install -y build-essential libtool mesa-common-dev libxext-dev libxcursor-dev ladspa-sdk libxcomposite-dev libsystemd-dev autoconf libxxf86vm-dev libgl1-mesa-dev libxinerama-dev libx11-dev libltdl-dev libgtk-4-dev libglib2.0-dev libspeechd-dev libudev-dev linux-libc-dev libxrandr-dev libxrender-dev libwayland-dev pkg-config xorg-dev libglu1-mesa-dev libxft-dev libgsasl-dev clang python3-jinja2 zip gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+        python3 vcpkg/build_dependencies.py --archive
+    - name: publish dependencies
+      if: ${{ steps.cache.outputs.cache_hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
+      run: |
+        curl -u "${{secrets.CIFTP}}" -s -T lindev.zip ftp://nvgt.gg
+        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/devlibs_update.php"
     - name: build
       run: |
         pip3 install scons
@@ -45,9 +75,11 @@ jobs:
         path: 'release'
 
   android_build:
-    runs-on: ubuntu-latest
+    runs-on: macos-14
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: true
     - uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
@@ -58,6 +90,19 @@ jobs:
         ndk-version: r25c
         link-to-sdk: true
         add-to-path: true
+    - uses: actions/cache@v4
+      with:
+        path: droidev
+        key: droidev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
+      id: cache
+    - name: build dependencies
+      if: ${{ steps.cache.outputs.cache_hit != 'true' }}
+      run: python3 vcpkg/build_dependencies.py --archive arm64-android
+    - name: publish dependencies
+      if: ${{ steps.cache.outputs.cache_hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
+      run: |
+        curl -u "${{secrets.CIFTP}}" -s -T droidev.zip ftp://nvgt.gg
+        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/devlibs_update.php"
     - name: keystore_official
       if: github.event.repository.fork == false
       run: |
@@ -94,6 +139,19 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: true
+    - uses: actions/cache@v4
+      with:
+        path: windev
+        key: windev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
+      id: cache
+    - name: build dependencies
+      if: ${{ steps.cache.outputs.cache_hit != 'true' }}
+      run: python3 vcpkg/build_dependencies.py --archive
+    - name: publish dependencies
+      if: ${{ steps.cache.outputs.cache_hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
+      run: |
+        curl -u "${{secrets.CIFTP}}" -s -T windev.zip ftp://nvgt.gg
+        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/devlibs_update.php"
     - name: build
       run: |
         pip3 install scons
