@@ -14,7 +14,7 @@ void main() {
 }
 
 void announce_keys() {
-	key_code[]@ key_codes = keys_pressed();
+	int[]@ key_codes = keys_pressed();
 	if (key_codes.empty())
 		return;
 
