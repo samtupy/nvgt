@@ -37,6 +37,9 @@ class random_interface {
 public:
 	virtual ~random_interface() = default;
 	virtual uint32 next() = 0;
+	virtual int64 next64() {
+		return static_cast<int64>(next());
+	}
 	virtual float32 nextf() = 0;
 	virtual int32 range(int32 min, int32 max) = 0;
 
@@ -122,6 +125,7 @@ public:
 	random_xorshift();
 	random_xorshift(uint64 s);
 	uint32 next() override;
+	int64 next64() override;
 	float32 nextf() override;
 	int32 range(int32 min, int32 max) override;
 	int64 range64(int64 min, int64 max) override;

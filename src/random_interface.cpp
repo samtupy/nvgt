@@ -30,6 +30,7 @@ private:
 	asIScriptObject* scriptObj;
 	asIScriptContext* ctx;
 	asIScriptFunction* nextFunc;
+	asIScriptFunction* next64Func;
 	asIScriptFunction* nextfFunc;
 	asIScriptFunction* rangeFunc;
 	asIScriptFunction* range64Func;
@@ -45,6 +46,7 @@ public:
 			ctx = engine->CreateContext();
 			// Get method pointers
 			nextFunc = scriptObj->GetObjectType()->GetMethodByDecl("uint next()");
+			next64Func = scriptObj->GetObjectType()->GetMethodByDecl("int64 next64()");
 			nextfFunc = scriptObj->GetObjectType()->GetMethodByDecl("float nextf()");
 			rangeFunc = scriptObj->GetObjectType()->GetMethodByDecl("int range(int, int)");
 			range64Func = scriptObj->GetObjectType()->GetMethodByDecl("int64 range64(int64, int64)");
@@ -74,6 +76,14 @@ public:
 		ctx->SetObject(scriptObj);
 		ctx->Execute();
 		return ctx->GetReturnFloat();
+	}
+
+		int64 next64() override {
+		if (!next64Func || !ctx) return 0;
+		ctx->Prepare(next64Func);
+		ctx->SetObject(scriptObj);
+		ctx->Execute();
+		return ctx->GetReturnDWord();
 	}
 
 	int32 range(int32 min, int32 max) override {
@@ -391,6 +401,10 @@ random_xorshift::random_xorshift(uint64 s) : ref_count(1) {
 
 uint32 random_xorshift::next() {
 	return static_cast<uint32>(rnd_xorshift_next(&gen));
+}
+
+int64 random_xorshift::next64() {
+	return static_cast<int64>(rnd_xorshift_next(&gen));
 }
 
 float32 random_xorshift::nextf() {

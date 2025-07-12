@@ -248,6 +248,7 @@ void RegisterScriptRandom(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("random_xorshift"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(random_xorshift, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("random_xorshift"), _O("uint next()"), asMETHOD(random_xorshift, next), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("random_xorshift"), _O("float nextf()"), asMETHOD(random_xorshift, nextf), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("random_xorshift"), _O("int64 next64()"), asMETHOD(random_xorshift, next64), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("random_xorshift"), _O("int range(int min, int max)"), asMETHOD(random_xorshift, range), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("random_xorshift"), _O("void seed(uint s)"), asMETHOD(random_xorshift, seed), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("random_xorshift"), _O("void seed64(uint64 s)"), asMETHOD(random_xorshift, seed64), asCALL_THISCALL);
