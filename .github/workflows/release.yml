@@ -24,10 +24,10 @@ jobs:
         key: macosdev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
       id: cache
     - name: build dependencies
-      if: ${{ steps.cache.outputs.cache_hit != 'true' }}
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       run: python3 vcpkg/build_dependencies.py --archive
     - name: publish dependencies
-      if: ${{ steps.cache.outputs.cache_hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
+      if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
       run: |
         curl -u "${{secrets.CIFTP}}" -s -T macosdev.zip ftp://nvgt.gg
         curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/devlibs_update.php"
@@ -53,14 +53,14 @@ jobs:
         key: lindev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
       id: cache
     - name: build dependencies
-      if: ${{ steps.cache.outputs.cache_hit != 'true' }}
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       run: |
         sudo apt update
         sudo apt full-upgrade -y
         sudo apt install -y build-essential libtool mesa-common-dev libxext-dev libxcursor-dev ladspa-sdk libxcomposite-dev libsystemd-dev autoconf libxxf86vm-dev libgl1-mesa-dev libxinerama-dev libx11-dev libltdl-dev libgtk-4-dev libglib2.0-dev libspeechd-dev libudev-dev linux-libc-dev libxrandr-dev libxrender-dev libwayland-dev pkg-config xorg-dev libglu1-mesa-dev libxft-dev libgsasl-dev clang python3-jinja2 zip gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
         python3 vcpkg/build_dependencies.py --archive
     - name: publish dependencies
-      if: ${{ steps.cache.outputs.cache_hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
+      if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
       run: |
         curl -u "${{secrets.CIFTP}}" -s -T lindev.zip ftp://nvgt.gg
         curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/devlibs_update.php"
@@ -96,10 +96,10 @@ jobs:
         key: droidev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
       id: cache
     - name: build dependencies
-      if: ${{ steps.cache.outputs.cache_hit != 'true' }}
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       run: python3 vcpkg/build_dependencies.py --archive arm64-android
     - name: publish dependencies
-      if: ${{ steps.cache.outputs.cache_hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
+      if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
       run: |
         curl -u "${{secrets.CIFTP}}" -s -T droidev.zip ftp://nvgt.gg
         curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/devlibs_update.php"
@@ -143,10 +143,10 @@ jobs:
         key: windev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
       id: cache
     - name: build dependencies
-      if: ${{ steps.cache.outputs.cache_hit != 'true' }}
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       run: python3 vcpkg/build_dependencies.py --archive
     - name: publish dependencies
-      if: ${{ steps.cache.outputs.cache_hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
+      if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
       run: |
         curl -u "${{secrets.CIFTP}}" -s -T windev.zip ftp://nvgt.gg
         curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/devlibs_update.php"
