@@ -17,6 +17,10 @@
 		"bassmix",
 		"steam-audio-official",
 		{
+			"name": "openssl",
+			"default-features": false
+		},
+		{
 			"name": "curl",
 			"default-features": false,
 			"features": ["openssl"]

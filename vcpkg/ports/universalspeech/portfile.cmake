@@ -4,8 +4,8 @@ vcpkg_find_acquire_program(SCONS)
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO samtupy/UniversalSpeechMSVCStatic
-    REF 8aea220de691cc2b3c3df604b7973f9119c8b994
-    SHA512 78916702e7bd98183340286ba82d3b4be6055abe0aa64f095b67bca0b2c2198aaefadbfb8904879492e1dc79cd7df011c30c14a2e8f1844f0f123966a623cb2b
+    REF ad2fb95eca691eb580121d716d8b89d68cb912e2
+    SHA512 37dbf79fa6264fc82829d433b572373358831e3ea407582693274c3b96bb52f750ace501ff9bf32b4d8fea56fcca5274b235a3af50223df8edbe4c8a928c5efd
     HEAD_REF master
 )
 
@@ -27,7 +27,7 @@ vcpkg_execute_build_process(
 )
 file(INSTALL "${SOURCE_PATH}/UniversalSpeechStatic.lib" DESTINATION ${CURRENT_PACKAGES_DIR}/lib)
 
-file(GLOB DLLS "${SOURCE_PATH}/bin/*.dll")
+file(GLOB DLLS "${SOURCE_PATH}/bin-x64/*.dll")
 if(DLLS)
     file(INSTALL ${DLLS} DESTINATION ${CURRENT_PACKAGES_DIR}/bin)
     file(INSTALL ${DLLS} DESTINATION ${CURRENT_PACKAGES_DIR}/debug/bin)
