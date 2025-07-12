@@ -45,6 +45,7 @@ def build(triplet = "", do_archive = False, out_dir = ""):
 	shutil.copytree(vcpkg_installed_path / triplet / "debug" / "lib", out_dir / "debug" / "lib", dirs_exist_ok = True)
 	shutil.copytree(vcpkg_installed_path / triplet / "include", out_dir / "include", dirs_exist_ok = True)
 	shutil.copytree(vcpkg_installed_path / triplet / "lib", out_dir / "lib", dirs_exist_ok = True)
+	fix_debug(out_dir)
 	if triplet == "arm64-osx": macos_fat_binaries(out_dir)
 	elif triplet == "x64-windows": windows_lib_rename(out_dir)
 	if triplet.endswith("osx") or triplet.endswith("linux"): remove_duplicates(out_dir)
@@ -69,18 +70,47 @@ def macos_fat_binaries(out_dir):
 		(out_dir / "lib" / f).unlink()
 		subprocess.check_output(["lipo", "-create", vcpkg_path.parent / "installed" / "x64-osx" / "debug" / "lib" / f, vcpkg_installed_path / "arm64-osx" / "debug" / "lib" / f, "-output", out_dir / "debug" / "lib" / f])
 		subprocess.check_output(["lipo", "-create", vcpkg_path.parent / "installed" / "x64-osx" / "lib" / f, vcpkg_installed_path / "arm64-osx" / "lib" / f, "-output", out_dir / "lib" / f])
+def fix_debug(out_dir):
+	"""Several debug libraries frustratingly have different filenames to their release counterparts, which just makes build scripts more complicated. We'll just fix it here. Usually a d is just tacked on to the end of the filename which we'll get rid of as well as a hifen that sometimes appears."""
+	excludes = ["reactphysics3d"]
+	for f in (out_dir / "debug" / "lib").iterdir():
+		if not f.stem.lower().endswith("d"): continue
+		exclude = f.stem if not f.stem.startswith("lib") else f.stem[3:]
+		if exclude in excludes: continue
+		count = 1 if not f.stem.lower().endswith("-d") else 2
+		f.replace(f.with_stem(f.stem[:-count]))
 def windows_lib_rename(out_dir):
 	"""Sometimes windows libraries get built with annoying names that complicate build scripts. We have to handle them somewhere, may as well be here. Temporarily we'll also copy angelscript as angelscript-nc."""
 	renames = [
-		("libcrypto.lib", "crypto.lib"),
-		("libssl.lib", "ssl.lib"),
-		("SDL3-static.lib", "SDL3.lib"),
-		("utf8proc_static.lib", "utf8proc.lib")
+		("libcrypto", "crypto"),
+		("libcurl", "curl"),
+		("libexpatMT", "expat"),
+		("libexpatdMT", "expat"),
+		("libssl", "ssl"),
+		("pocoCryptomt", "pocoCrypto"),
+		("pocoEncodingsmt", "pocoEncodings"),
+		("pocoFoundationmt", "pocoFoundation"),
+		("pocoJSONmt", "pocoJSON"),
+		("pocoJWTmt", "pocoJWT"),
+		("pocoMongoDBmt", "pocoMongoDB"),
+		("pocoNetmt", "pocoNet"),
+		("pocoNetSSLmt", "pocoNetSSL"),
+		("pocoPrometheusmt", "pocoPrometheus"),
+		("pocoRedismt", "pocoRedis"),
+		("pocoSevenZipmt", "pocoSevenZip"),
+		("pocoUtilmt", "pocoUtil"),
+		("pocoXMLmt", "pocoXML"),
+		("pocoZipmt", "pocoZip"),
+		("SDL3-static", "SDL3"),
+		("SDL3_image-static", "SDL3_image"),
+		("SDL3_ttf-static", "SDL3_ttf"),
+		("utf8proc_static", "utf8proc"),
+		("zlib", "z")
 	] # end renames list
 	for lib in ["debug/lib", "lib"]:
 		for r in renames:
-			(out_dir / lib / r[0]).replace(out_dir / lib / r[1])
-	shutil.copyfile(out_dir / "lib" / "angelscript.lib", out_dir / "lib" / "angelscript-nc.lib")
+			if (out_dir / lib / (r[0] + ".lib")).exists(): (out_dir / lib / (r[0] + ".lib")).replace(out_dir / lib / (r[1] + ".lib"))
+		shutil.copyfile(out_dir / lib / "angelscript.lib", out_dir / lib / "angelscript-nc.lib")
 def remove_duplicates(out_dir):
 	"""A couple libraries on Linux and MacOS might have created duplicate versions of themselves because of symlinks, lets get rid of them."""
 	for lib in ["libarchive", "libgit2"]:

@@ -1,8 +1,10 @@
 //
 // Code for VS_VERSION resource
 //
-#define _UNICODE
+#ifndef UNICODE
 #define UNICODE
+#endif
+#define _UNICODE
 #include <stdlib.h>
 #include <string.h>
 #include <strsafe.h>

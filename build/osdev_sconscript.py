@@ -17,9 +17,11 @@ def set_osdev_paths(env, osdev_path = ARGUMENTS.get("deps_path", prefix + "dev")
 	if not "deps_path" in ARGUMENTS and Path(osdev_path + "_path").exists(): osdev_path = Path(osdev_path).read_text()
 	else: osdev_path = Path("#" + osdev_path)
 	env.Append(CPPPATH = [str(osdev_path / "include")])
+	if ARGUMENTS.get("debug", "0") == "1": env.Append(LIBPATH = [str(osdev_path / "debug" / "lib")])
 	env.Append(LIBPATH = [str(osdev_path / "lib")])
 	env["NVGT_OSDEV_PATH"] = str(Dir(osdev_path))
 	if env["PLATFORM"] == "win32":
+		if ARGUMENTS.get("debug", "0") == "1": env.Append(LIBPATH = [str(osdev_path / "debug" / "bin")])
 		env.Append(LIBPATH = [str(osdev_path / "bin")])
 
 set_osdev_paths(env)
@@ -27,8 +29,8 @@ set_osdev_paths(env)
 # Copy dynamic libraries to the release/lib directory. Usually these are contained in osdev/bin or osdev/lib, but the entire libpath is searched. Later we may consider doing this only on a successful NVGT build, but this could cause it to happen too infrequently.
 def copy_osdev_libraries(env):
 	libs = ["archive", "bass", "bass_fx", "bassmix", "git2", "plist-2.0", "phonon"]
-	if env["PLATFORM"] == "win32": libs += ["GPUUtilities", "nvdaControllerClient64", "SAAPI64", "TrueAudioNext"]
+	if env["PLATFORM"] == "win32": libs += ["GPUUtilities", "nvdaControllerClient", "SAAPI32", "TrueAudioNext"]
 	for l in libs:
-		env.Install("#release/lib", FindFile(env.subst("${SHLIBPREFIX}" + l + ("$SHLIBSUFFIX" if not env["SHLIBSUFFIX"] in l else "")), env["LIBPATH"] + ["/usr/local/lib"]))
+		env.Install("#release/lib", FindFile(env.subst("${SHLIBPREFIX}" + l + ("$SHLIBSUFFIX" if not env["SHLIBSUFFIX"] in l else "")), env["LIBPATH"]))
 
 env["NVGT_OSDEV_COPY_LIBS"] = copy_osdev_libraries
