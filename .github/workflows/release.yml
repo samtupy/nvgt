@@ -134,6 +134,9 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: true
+    - uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: '4.0.1'
     - uses: actions/cache@v4
       with:
         path: windev

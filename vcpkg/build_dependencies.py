@@ -72,7 +72,7 @@ def macos_fat_binaries(out_dir):
 		subprocess.check_output(["lipo", "-create", vcpkg_path.parent / "installed" / "x64-osx" / "lib" / f, vcpkg_installed_path / "arm64-osx" / "lib" / f, "-output", out_dir / "lib" / f])
 def fix_debug(out_dir):
 	"""Several debug libraries frustratingly have different filenames to their release counterparts, which just makes build scripts more complicated. We'll just fix it here. Usually a d is just tacked on to the end of the filename which we'll get rid of as well as a hifen that sometimes appears."""
-	excludes = ["reactphysics3d"]
+	excludes = ["reactphysics3d", "zstd"]
 	for f in (out_dir / "debug" / "lib").iterdir():
 		if not f.stem.lower().endswith("d"): continue
 		exclude = f.stem if not f.stem.startswith("lib") else f.stem[3:]
