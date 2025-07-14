@@ -1,0 +1,14 @@
+/**
+	Read raw bytes from a stream into a float.
+	float read_float();
+	## Arguments:
+		None.
+	## Returns:
+		float: The data that was read, or 0 on failure.
+*/
+
+// Example:
+void main() {
+	datastream ds("Hello there, I am a string wrapped in a sstream!");
+	alert("example", ds.read_float()); // Will return the first 4 bytes of the string as a float.
+}
