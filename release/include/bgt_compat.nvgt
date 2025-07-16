@@ -26,7 +26,7 @@ string string_left(const string& in str, uint count) {
 string string_right(const string& in str, uint count) {
 	if (str == "") return str;
 	if (count >= str.length()) return str;
-	return str.slice(str.length() - count, 0);
+	return str.slice(str.length() - count, str.length());
 }
 string string_trim_left(const string& in str, uint count) {
 	if (str == "") return str;
