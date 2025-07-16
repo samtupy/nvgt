@@ -22,6 +22,7 @@
 typedef uint32_t uint32;
 typedef int32_t int32;
 typedef uint64_t uint64;
+typedef int64_t int64;
 typedef uint8_t uint8;
 typedef float float32;
 
@@ -36,8 +37,16 @@ class random_interface {
 public:
 	virtual ~random_interface() = default;
 	virtual uint32 next() = 0;
+	virtual int64 next64() {
+		return static_cast<int64>(next());
+	}
 	virtual float32 nextf() = 0;
 	virtual int32 range(int32 min, int32 max) = 0;
+
+	virtual int64 range64(int64 min, int64 max) {
+		return static_cast<int64>(range(static_cast<int32>(min), static_cast<int32>(max)));
+	}
+	
 	virtual void seed(uint32 s) = 0;
 	virtual void seed64(uint64 s) { seed(static_cast<uint32>(s)); }
 	virtual std::string get_state() const = 0;
@@ -116,8 +125,10 @@ public:
 	random_xorshift();
 	random_xorshift(uint64 s);
 	uint32 next() override;
+	int64 next64() override;
 	float32 nextf() override;
 	int32 range(int32 min, int32 max) override;
+	int64 range64(int64 min, int64 max) override;
 	void seed(uint32 s) override;
 	void seed64(uint64 s) override;
 	std::string get_state() const override;
@@ -126,6 +137,7 @@ public:
 	void release() override;
 };
 
+extern random_xorshift* g_random_xorshift;
 extern random_interface* g_default_random;
 void set_default_random(random_interface* rng);
 void set_default_random_script(asIScriptObject* scriptObj);
