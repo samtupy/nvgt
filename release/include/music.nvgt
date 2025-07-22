@@ -277,6 +277,14 @@ class music_manager {
 		else if (@next_track != null) return next_track.playing;
 		return false;
 	}
+	string get_playing_filename() const property {
+		if (@main_track != null) return main_track.intro_end > 0? main_track.intro_filename : main_track.main_filename;
+		return "";
+	}
+	string get_upcoming_filename() const property {
+		if (@next_track != null) return next_track.intro_end > 0? next_track.intro_filename : next_track.main_filename;
+		return "";
+	}
 	void loop(uint64 t = ticks()) {
 		if (@main_track != null) main_track.loop(t);
 		if (stopping and !playing) {
