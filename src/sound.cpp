@@ -1122,6 +1122,7 @@ class sound_impl final : public mixer_impl, public virtual sound {
 		set_max_distance(70);
 		set_directional_attenuation_factor(1);
 		attach_output_bus(0, node_chain, 0);
+		monitor->set_state(ma_node_state_started);
 		// If we didn't load our sound asynchronously or if we streamed it, then we simply mark it as load_completed or we'll end up with a deadlock at destruction time.
 		if (!async_load)
 			load_completed.test_and_set();
@@ -1297,6 +1298,7 @@ public:
 		return load_completed.test();
 	}
 	bool close() override {
+		if (monitor) monitor->set_state(ma_node_state_stopped);
 		if (snd) {
 			// It's possible that this sound could still be loading in a job thread when we try to destroy it. Unfortunately there isn't a way to cancel this, so we have to just wait.
 			if (!load_completed.test())
