@@ -29,6 +29,7 @@
 #include "sound.h"
 #include "sound_nodes.h"
 #include "pack.h"
+#include "datastreams.h"
 #include <miniaudio_wdl_resampler.h>
 #include <atomic>
 #include <unordered_map>
@@ -279,13 +280,13 @@ class audio_engine_impl final : public audio_engine {
 			}
 			ctx->Execute(); // Really not sure what to do about exceptions and errors taking place in the audio thread yet as we don't have a fully established logging facility set up.
 			g_ScriptEngine->ReturnContext(ctx);
-			engine->release();
 		}
+		engine->release();
 	}
 
 public:
 	engine_flags flags;
-	audio_engine_impl(int flags)
+	audio_engine_impl(int flags, int sample_rate, int channels)
 		: audio_engine(),
 		  engine(nullptr),
 		  resource_manager(nullptr),
@@ -293,17 +294,17 @@ public:
 		  engine_endpoint(nullptr),
 		  flags(static_cast<engine_flags>(flags)),
 		  refcount(1) {
+		if (channels > MA_MAX_CHANNELS) throw runtime_error(Poco::format("exceeded maximum channel count of %d", MA_MAX_CHANNELS));
 		init_sound();
 		engine = std::make_unique<ma_engine>();
 		// We need a self-managed device because at least on Windows, we can't meet low-latency requirements without specific configurations.
 		if ((flags & NO_DEVICE) == 0) {
 			device = std::make_unique<ma_device>();
 			ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
-			// Just set to some hard-coded defaults for now.
-			cfg.playback.channels = 2;
+			cfg.playback.channels = channels;
 			cfg.playback.format = ma_format_f32;
-			cfg.sampleRate = 0; // Let the device decide.
-			cfg.noClip = MA_TRUE;
+			cfg.sampleRate = sample_rate;
+			cfg.noClip = (flags & engine_flags::NO_CLIP)? MA_TRUE : MA_FALSE;
 			cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE;
 
 			// Hook up high quality resampling, because we want the app to accommodate the device's sample rate, not the other way around.
@@ -315,10 +316,9 @@ public:
 			cfg.pUserData = this;
 			g_soundsystem_last_error = ma_device_init(&g_sound_context, &cfg, &*device);
 			if (g_soundsystem_last_error != MA_SUCCESS) {
-
 				engine.reset();
 				device.reset();
-				return;
+				throw runtime_error(Poco::format("failed to initialize sound engine device %d", int(g_soundsystem_last_error)));
 			}
 		}
 
@@ -328,7 +328,7 @@ public:
 			// Attach the resource manager to the sound service so that it can receive audio from custom sources.
 			cfg.pVFS = g_sound_service->get_vfs();
 			// This is the sample rate that sounds will be resampled to if necessary during loading. We set this equal to whatever sample rate the device got. This is maximally efficient as long as the user doesn't switch devices to one that runs at a different rate. When they do, a single resampler kicks in.
-			cfg.decodedSampleRate = device ? device->playback.internalSampleRate : 48000; // Todo: get rid of this magic number and set up a constructor argument.
+			cfg.decodedSampleRate = device && !sample_rate? device->playback.internalSampleRate : sample_rate;
 			// Set the resampler used during decoding to a high quality one. At the time of writing this, this is relying on support that I added to MiniAudio myself and has not yet been merged upstream.
 			cfg.resampling.algorithm = ma_resample_algorithm_custom;
 			cfg.resampling.pBackendVTable = &wdl_resampler_backend_vtable;
@@ -343,19 +343,23 @@ public:
 				device.reset();
 				engine.reset();
 				resource_manager.reset();
-				return;
+				throw runtime_error(Poco::format("failed to initialize sound engine resource manager %d", int(g_soundsystem_last_error)));
 			}
 		}
 		ma_engine_config cfg = ma_engine_config_init();
-		cfg.pContext = &g_sound_context; // Miniaudio won't let us quickly uninitilize then reinitialize a device sometimes when using the same context, so we won't manage it until we figure that out.
+		cfg.pContext = &g_sound_context;
 		cfg.pResourceManager = &*resource_manager;
 		cfg.noAutoStart = (flags & NO_AUTO_START) ? MA_TRUE : MA_FALSE;
 		cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE; // Steam Audio requires fixed sized updates. We can make this not be a magic constant if anyone has some reason for wanting to change it.
 		if ((flags & NO_DEVICE) == 0) cfg.pDevice = &*device;
-		else cfg.noDevice = MA_TRUE;
+		else {
+			cfg.noDevice = MA_TRUE;
+			cfg.channels = channels;
+			cfg.sampleRate = sample_rate;
+		}
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS) {
 			engine.reset();
-			return;
+			throw runtime_error(Poco::format("failed to initialize sound engine %d", int(g_soundsystem_last_error)));
 		}
 		// Set some default properties for spatialization.
 		set_listener_direction(0, 0, 1, 0); // Y forward
@@ -542,6 +546,118 @@ public:
 	mixer *new_mixer() override { return ::new_mixer(this); }
 	sound *new_sound() override { return ::new_sound(this); }
 };
+class audio_decoder_impl : public virtual audio_decoder {
+	unique_ptr<ma_decoder> decoder;
+	mutable int refcount;
+	datastream* datastream_ref; // If the user opens a datastream, we must maintain a reference to it encase the user drops their handle.
+	static ma_result on_read_datastream(ma_decoder *pDecoder, void *pDst, size_t sizeInBytes, size_t *pBytesRead) {
+		if (pBytesRead) *pBytesRead = 0;
+		datastream* ds = static_cast<datastream*>(pDecoder->pUserData);
+		if (!ds) return MA_ERROR;
+		istream* stream = ds->get_istr();
+		if (!stream) return MA_ERROR;
+		if (!stream->good()) return MA_AT_END;
+		stream->read((char *)pDst, sizeInBytes);
+		if (pBytesRead) *pBytesRead = stream->gcount();
+		return MA_SUCCESS;
+	}
+	static ma_result on_seek_datastream(ma_decoder *pDecoder, ma_int64 offset, ma_seek_origin origin) {
+		datastream* ds = static_cast<datastream*>(pDecoder->pUserData);
+		if (!ds) return MA_ERROR;
+		istream* stream = ds->get_istr();
+		if (!stream) return MA_ERROR;
+		stream->clear();
+		std::ios_base::seekdir dir;
+		switch (origin) {
+			case ma_seek_origin_start:
+				dir = stream->beg;
+				break;
+			case ma_seek_origin_current:
+				dir = stream->cur;
+				break;
+			case ma_seek_origin_end:
+				dir = stream->end;
+				break;
+			default: // Should never get here.
+				return MA_ERROR;
+		}
+		stream->seekg(offset, dir);
+		return MA_SUCCESS;
+	}
+	static ma_result on_tell_datastream(ma_decoder *pDecoder, ma_int64 *pCursor) {
+		datastream* ds = static_cast<datastream*>(pDecoder->pUserData);
+		if (!ds) return MA_ERROR;
+		istream* stream = ds->get_istr();
+		if (!stream) return MA_ERROR;
+		*pCursor = stream->tellg();
+		return MA_SUCCESS;
+	}
+	ma_decoder_config decoder_config_init(unsigned int sample_rate, unsigned int channels) {
+		init_sound();
+		ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, channels, sample_rate);
+		cfg.resampling.algorithm = ma_resample_algorithm_custom;
+		cfg.resampling.pBackendVTable = &wdl_resampler_backend_vtable;
+		if (!g_decoders.empty()) {
+			cfg.ppCustomBackendVTables = &g_decoders[0];
+			cfg.customBackendCount = g_decoders.size();
+		}
+		if (!decoder) decoder = make_unique<ma_decoder>();
+		return cfg;
+	}
+public:
+	audio_decoder_impl() : decoder(nullptr), refcount(1), datastream_ref(nullptr) {}
+	~audio_decoder_impl() { close(); }
+	void duplicate() const override { asAtomicInc(refcount); }
+	void release() const override { if (asAtomicDec(refcount) < 1) delete this; }
+	virtual bool open(const std::string& filename, const pack_interface* pack_file, unsigned int sample_rate, unsigned int channels) override {
+		if (decoder && !close()) return false;
+		ma_decoder_config cfg = decoder_config_init(sample_rate, channels);
+		std::string triplet = g_sound_service->prepare_triplet(filename, pack_file ? g_pack_protocol_slot : 0, pack_file ? std::shared_ptr < const pack_interface > (pack_file->make_immutable()) : nullptr, 0, nullptr);
+		if ((g_soundsystem_last_error = ma_decoder_init_vfs(g_sound_service->get_vfs(), triplet.c_str(), &cfg, &*decoder)) != MA_SUCCESS) decoder.reset();
+		g_sound_service->cleanup_triplet(triplet);
+		return g_soundsystem_last_error == MA_SUCCESS;
+	}
+	virtual bool open_stream(datastream* ds, unsigned int sample_rate = 0, unsigned int channels = 0) override {
+		if (!ds || !ds->get_istr() || decoder && !close()) {
+			if (ds) ds->release();
+			return false;
+		}
+		ma_decoder_config cfg = decoder_config_init(sample_rate, channels);
+		if ((g_soundsystem_last_error = ma_decoder_init(on_read_datastream, on_seek_datastream, on_tell_datastream, ds, &cfg, &*decoder)) != MA_SUCCESS) {
+			decoder.reset();
+			ds->release();
+		} else datastream_ref = ds;
+		return g_soundsystem_last_error == MA_SUCCESS;
+	}
+	virtual bool close() {
+		if (!decoder) return false;
+		if (datastream_ref) {
+			datastream_ref->release();
+			datastream_ref = nullptr;
+		}
+		if ((g_soundsystem_last_error = ma_decoder_uninit(&*decoder)) != MA_SUCCESS ) return false;
+		decoder.reset();
+		return true;
+	}
+	unsigned long long read(void* buffer, unsigned long long frame_count) override {
+		if (!decoder) return 0;
+		ma_uint64 frames_read;
+		if ((g_soundsystem_last_error = ma_decoder_read_pcm_frames(&*decoder, buffer, frame_count, &frames_read)) != MA_SUCCESS) return 0;
+		return frames_read;
+	}
+	CScriptArray* read_script(unsigned long long frame_count) override {
+		if (!decoder) return nullptr;
+		CScriptArray* array = CScriptArray::Create(get_array_type("array<float>"), frame_count * decoder->outputChannels);
+		unsigned long long frames_read = read(array->GetBuffer(), frame_count);
+		array->Resize(frames_read * decoder->outputChannels);
+		return array;
+	}
+	virtual bool seek(unsigned long long frame_index) override { return decoder? (g_soundsystem_last_error = ma_decoder_seek_to_pcm_frame(&*decoder, frame_index)) == MA_SUCCESS : false; }
+	virtual unsigned long long get_cursor() const override { return decoder? decoder->readPointerInPCMFrames : 0; }
+	virtual unsigned int get_sample_rate() const override { return decoder? decoder->outputSampleRate : 0; }
+	virtual unsigned int get_channels() const override { return decoder? decoder->outputChannels : 0; }
+};
+audio_decoder* audio_decoder::create() { return new audio_decoder_impl(); }
 class mixer_impl : public audio_node_impl, public virtual mixer {
 	friend class audio_node_impl;
 	// In miniaudio, a sound_group is really just a sound. A typical ma_sound_group_x function looks like float ma_sound_group_get_pan(const ma_sound_group* pGroup) { return ma_sound_get_pan(pGroup); }.
@@ -1128,7 +1244,7 @@ public:
 	bool stream_pcm(const void* data, unsigned int size_in_frames, ma_format format, unsigned int sample_rate, unsigned int channels, unsigned int buffer_size) override {
 		if (format != ma_format_unknown) {
 			if (snd) close();
-			if (!buffer_size) buffer_size = size_in_frames + 2;
+			if (!buffer_size) buffer_size = size_in_frames * 2;
 			if (!buffer_size) return false;
 			if (!channels) channels = get_engine()->get_channels();
 			if (!sample_rate) sample_rate = get_engine()->get_sample_rate();
@@ -1360,7 +1476,7 @@ public:
 	}
 };
 
-audio_engine *new_audio_engine(int flags) { return new audio_engine_impl(flags); }
+audio_engine *new_audio_engine(int flags, int sample_rate, int channels) { return new audio_engine_impl(flags, sample_rate, channels); }
 mixer *new_mixer(audio_engine *engine) { return new mixer_impl(engine); }
 sound *new_sound(audio_engine *engine) { return new sound_impl(engine); }
 mixer *new_global_mixer() {
@@ -1480,7 +1596,7 @@ ReturnType virtual_call(T *object, Args... args) {
 void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectType("audio_engine", 0, asOBJ_REF);
 	engine->RegisterFuncdef("void audio_engine_processing_callback(audio_engine@ engine, memory_buffer<float>& data, uint64 frames)");
-	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_FACTORY, "audio_engine@ e(int flags)", asFUNCTION(new_audio_engine), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_FACTORY, "audio_engine@ e(int flags, int sample_rate = 0, int channels = 0)", asFUNCTION(new_audio_engine), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call < audio_engine, &audio_engine::duplicate, void >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call < audio_engine, &audio_engine::release, void >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "int get_flags() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_flags, int >)), asCALL_CDECL_OBJFIRST);
@@ -1524,6 +1640,20 @@ void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_enabled(int index, bool enabled)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_enabled, void, int, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "bool get_listener_enabled(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_enabled, bool, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterGlobalProperty("audio_engine@ sound_default_engine", (void*)&g_audio_engine);
+}
+void RegisterSoundsystemAudioDecoder(asIScriptEngine* engine) {
+	engine->RegisterObjectType("audio_decoder", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("audio_decoder", asBEHAVE_FACTORY, "audio_decoder@ d()", asFUNCTION(audio_decoder::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_decoder", asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::duplicate, void >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("audio_decoder", asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::release, void >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_decoder", "bool open(const string&in filename, const pack_interface@+ pack_file = sound_default_pack, uint sample_rate = 0, uint channels = 0)", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::open, bool, const string&, const pack_interface*, unsigned int, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_decoder", "bool open(datastream@ stream, uint sample_rate = 0, uint channels = 0)", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::open_stream, bool, datastream*, unsigned int, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_decoder", "bool close()", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::close, bool >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_decoder", "float[]@ read(uint64 frame_count)", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::read_script, CScriptArray*, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_decoder", "bool seek(uint64 frame_index)", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::seek, bool, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_decoder", "uint64 get_cursor() const property", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::get_cursor, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_decoder", "uint get_sample_rate() const property", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::get_sample_rate, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_decoder", "uint get_channels() const property", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::get_channels, unsigned int >)), asCALL_CDECL_OBJFIRST);
 }
 template < class T >
 inline void RegisterSoundsystemAudioNode(asIScriptEngine *engine, const std::string &type) {
@@ -1859,6 +1989,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "sound@ play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@ mix = null, const pack_interface@ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION((virtual_call < audio_engine, &audio_engine::play, sound*, const string &, const reactphysics3d::Vector3&, float, float, float, mixer*, const pack_interface*, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "mixer@ mixer()", asFUNCTION((virtual_call < audio_engine, &audio_engine::new_mixer, mixer * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "sound@ sound()", asFUNCTION((virtual_call < audio_engine, &audio_engine::new_sound, sound * >)), asCALL_CDECL_OBJFIRST);
+	RegisterSoundsystemAudioDecoder(engine);
 	RegisterSoundsystemNodes(engine);
 	RegisterSoundsystemShapes(engine);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);

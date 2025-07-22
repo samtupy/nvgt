@@ -22,6 +22,7 @@ class CScriptArray;
 class CScriptHandle;
 class asIScriptEngine;
 class script_memory_buffer;
+class datastream;
 class pack_interface;
 class audio_engine;
 class mixer;
@@ -70,7 +71,8 @@ public:
 		DURATIONS_IN_FRAMES = 1,  // If set, all durations possible will expect a value in PCM frames rather than milliseconds unless explicitly specified.
 		NO_AUTO_START = 2,        // if set, audio_engine::start must be called after initialization.
 		NO_DEVICE = 4,            // If set, audio_engine::read() must be used to receive raw audio samples from the engine instead.
-		PERCENTAGE_ATTRIBUTES = 8 // If this is set, attributes for sounds will be in percentages such as 100 instead of decimals such as 1.0, ecentially a multiplication by 100 for backwards compatibility or preference. This also causes sound.volume to work in db.
+		NO_CLIP = 8, // If set, disables miniaudio's sample clipping.
+		PERCENTAGE_ATTRIBUTES = 16 // If this is set, attributes for sounds will be in percentages such as 100 instead of decimals such as 1.0, ecentially a multiplication by 100 for backwards compatibility or preference. This also causes sound.volume to work in db.
 	};
 	virtual void duplicate() = 0; // reference counting
 	virtual void release() = 0;
@@ -120,6 +122,21 @@ public:
 	virtual sound* play(const std::string& path, const reactphysics3d::Vector3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) = 0;
 	virtual mixer *new_mixer() = 0;
 	virtual sound *new_sound() = 0;
+};
+class audio_decoder {
+public:
+	virtual void duplicate() const = 0;
+	virtual void release() const = 0;
+	virtual bool open(const std::string& filename, const pack_interface* pack_file = nullptr, unsigned int sample_rate = 0, unsigned int channels = 0) = 0;
+	virtual bool open_stream(datastream* ds, unsigned int sample_rate = 0, unsigned int channels = 0) = 0;
+	virtual bool close() = 0;
+	virtual unsigned long long read(void* buffer, unsigned long long frame_count) = 0;
+	virtual CScriptArray* read_script(unsigned long long frame_count) = 0;
+	virtual bool seek(unsigned long long frame_index) = 0;
+	virtual unsigned long long get_cursor() const = 0;
+	virtual unsigned int get_sample_rate() const = 0;
+	virtual unsigned int get_channels() const = 0;
+	static audio_decoder* create();
 };
 class sound_shape {
 	// This facility allows sounds to be attached to any arbitrary shape for positioning.
@@ -294,7 +311,7 @@ public:
 	virtual double get_pitch_lower_limit() = 0;
 };
 
-audio_engine *new_audio_engine(int flags);
+audio_engine *new_audio_engine(int flags, int sample_rate = 0, int channels = 0);
 mixer *new_mixer(audio_engine *engine);
 sound *new_sound(audio_engine *engine);
 void RegisterSoundsystem(asIScriptEngine *engine);
