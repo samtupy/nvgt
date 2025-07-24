@@ -499,7 +499,7 @@ template <class T> void RegisterStreamSocket(asIScriptEngine* engine, const std:
 	engine->RegisterObjectMethod(type.c_str(), "int shutdown()", asMETHODPR(T, shutdown, (), int), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "int send_bytes(const string&in data, int flags = 0)", asFUNCTION(socket_send_bytes<T>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "string receive_bytes(int length, int flags = 0)", asFUNCTION(socket_receive_bytes<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "string receive_bytes(int flags = 0, const timespan& timeout = 100000)", asFUNCTION(socket_receive_bytes_buf<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "string receive_bytes(int flags = 0, const timespan&in timeout = 100000)", asFUNCTION(socket_receive_bytes_buf<T>), asCALL_CDECL_OBJFIRST);
 }
 void RegisterWebSocket(asIScriptEngine* engine) {
 	engine->RegisterEnum("web_socket_mode");
