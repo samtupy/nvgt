@@ -82,7 +82,7 @@ bool init_sound() {
 	add_decoder(ma_decoding_backend_libopus);
 	g_soundsystem_initialized.test_and_set();
 	refresh_audio_devices();
-	g_audio_engine = new_audio_engine(audio_engine::PERCENTAGE_ATTRIBUTES);
+	g_audio_engine = new_audio_engine(audio_engine::PERCENTAGE_ATTRIBUTES | audio_engine::NO_CLIP);
 	return true;
 }
 void uninit_sound() {
@@ -1979,6 +1979,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_DURATIONS_IN_FRAMES", audio_engine::DURATIONS_IN_FRAMES);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_AUTO_START", audio_engine::NO_AUTO_START);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_DEVICE", audio_engine::NO_DEVICE);
+	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_CLIP", audio_engine::NO_CLIP);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_PERCENTAGE_ATTRIBUTES", audio_engine::PERCENTAGE_ATTRIBUTES);
 	RegisterSoundsystemAudioNode < audio_node > (engine, "audio_node");
 	RegisterSoundsystemEngine(engine);
