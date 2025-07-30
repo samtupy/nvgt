@@ -1,0 +1,14 @@
+/**
+	Write the value of a 32-bit integer into a stream.
+	uint write_int64(int64 content);
+	## Arguments:
+		* content: The content that is to be written.
+	## Returns:
+		uint: the number of bytes written.
+*/
+
+// Example:
+void main() {
+	datastream ds;
+	ds.write_int64(4);
+}

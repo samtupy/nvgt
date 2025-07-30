@@ -1,8 +1,8 @@
 /**
 	This type is essentially just a more convenient 2d array. One place it's super useful is when representing a game board.
-	1. grid();
-	2. grid(uint width, uint height);
-	3. grid({repeat {repeat_same T}});
+	In this documentation, "T" refers to the dynamic type that a grid was instanciated with.
+	1. `grid<T>();`
+	2. `grid<T>(uint width, uint height);`
 	## Arguments (2):
 		* uint width: the width of the grid.
 		* uint height: the height of the grid.
@@ -10,6 +10,8 @@
 		One of the things that makes this class especially convenient is its opIndex overload. It's possible to index into a grid like:
 		`my_grid[1, 2];`
 		to access the value at (1, 2) on your grid.
+		Besides the constructors listed above, you can also make a grid using the brace syntax, similar to arrays, like this:
+		`grid<T> g={{item1, item2}, {item3, item4}}`
 */
 
 // Example:

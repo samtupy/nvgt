@@ -1,5 +1,5 @@
 /**
-	Trims any and all whitespace from the beginning and end of a string.
+	Trims any and all whitespace from the beginning and end of a string, returning a new string.
 	string string::trim_whitespace();
 	## Returns:
 		string: the specified string, with any trailing/leading whitespace removed.
