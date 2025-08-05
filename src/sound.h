@@ -314,4 +314,5 @@ public:
 audio_engine *new_audio_engine(int flags, int sample_rate = 0, int channels = 0);
 mixer *new_mixer(audio_engine *engine);
 sound *new_sound(audio_engine *engine);
+sound* new_global_sound();
 void RegisterSoundsystem(asIScriptEngine *engine);
