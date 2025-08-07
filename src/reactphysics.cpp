@@ -64,6 +64,13 @@ bool aabb_test_collision_triangle(const AABB& aabb, CScriptArray* points) {
 
 	return aabb.testCollisionTriangleAABB(tri);
 }
+bool aabb_test_ray_intersect(const AABB& aabb, Vector3 start, Vector3 dir, float dist) {
+	Vector3 invdir(999999, 999999, 999999);
+	if (dir.x != 0) invdir.x = 1.0 / dir.x;
+	if (dir.y != 0) invdir.y = 1.0 / dir.y;
+	if (dir.z != 0) invdir.z = 1.0 / dir.z;
+	return aabb.testRayIntersect(start, invdir, dist);
+}
 
 CollisionCallback::ContactPoint contact_pair_get_contact_point(const CollisionCallback::ContactPair& pair, uint32 index) {
 	return pair.getContactPoint(index);
@@ -1001,7 +1008,7 @@ void RegisterCorePhysicsTypes(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("aabb", "bool test_collision_triangle_aabb(const vector[]@ points) const", asFUNCTION(aabb_test_collision_triangle), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("aabb", "float get_volume() const property", asMETHOD(AABB, getVolume), asCALL_THISCALL);
 	engine->RegisterObjectMethod("aabb", "void apply_scale(const vector&in scale)", asMETHOD(AABB, applyScale), asCALL_THISCALL);
-	engine->RegisterObjectMethod("aabb", "bool test_ray_intersect(const vector&in ray_origin, const vector&in ray_direction_inv, float ray_max_fraction)", asMETHOD(AABB, testRayIntersect), asCALL_THISCALL);
+	engine->RegisterObjectMethod("aabb", "bool test_ray_intersect(const vector&in ray_origin, const vector&in ray_direction, float ray_max_fraction)", asFUNCTION(aabb_test_ray_intersect), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("aabb", "bool raycast(const ray&in ray, vector&out hit_point)", asMETHOD(AABB, raycast), asCALL_THISCALL);
 	engine->RegisterGlobalFunction("aabb aabb_create_from_triangle(const vector[]@ points)", asFUNCTION(aabb_from_triangle), asCALL_CDECL);
 	engine->RegisterObjectType("raycast_info", sizeof(RaycastInfo), asOBJ_VALUE | asGetTypeTraits<RaycastInfo>());
