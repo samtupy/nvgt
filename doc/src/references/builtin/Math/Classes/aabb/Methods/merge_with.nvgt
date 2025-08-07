@@ -1,0 +1,19 @@
+/**
+	Expands this AABB to fully contain both itself and the other AABB.
+	void merge_with(const aabb&in aabb);
+	## Arguments:
+		aabb: The AABB to merge.
+*/
+
+// Example:
+void main() {
+	aabb b1;
+	aabb b2;
+	b1.min = vector(1, 3, 5);
+	b1.max = vector(5, 5, 5);
+	b2.min = vector(9, 9, 9);
+	b2.max = vector(12, 15, 18);
+	b1.merge_with(b2);
+	alert("The bottom left corner of the box is located at", round(b1.min.x, 0)+", "+round(b1.min.y, 0)+", "+round(b1.min.z, 0));
+	alert("The top right corner of the box is located at", round(b1.max.x, 0)+", "+round(b1.max.y, 0)+", "+round(b1.max.z, 0));
+}

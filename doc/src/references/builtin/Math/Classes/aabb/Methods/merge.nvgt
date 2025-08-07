@@ -1,0 +1,23 @@
+/**
+	Sets this AABB to be the bounding box that contains both aabb1 and aabb2.
+	void merge(const aabb&in aabb1, const aabb&in aabb2);
+	## Arguments:
+		* aabb1: The first box to merge.
+		* aabb2: The second box to merge.
+*/
+
+// Example:
+void main() {
+	aabb b1;
+	aabb b2;
+	aabb b3;
+	b1.min = vector(0, 0, 0);
+	b1.max = vector(50, 500, 5000);
+	b2.min = vector(1, 3, 5);
+	b2.max = vector(5, 5, 5);
+	b3.min = vector(9, 9, 9);
+	b3.max = vector(12, 15, 18);
+	b1.merge(b2, b3); // Completely changes the size to merge 2 and 3 into 1.
+	alert("The bottom left corner of the box is located at", round(b1.min.x, 0)+", "+round(b1.min.y, 0)+", "+round(b1.min.z, 0));
+	alert("The top right corner of the box is located at", round(b1.max.x, 0)+", "+round(b1.max.y, 0)+", "+round(b1.max.z, 0));
+}

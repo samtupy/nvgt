@@ -1,0 +1,19 @@
+/**
+	Casts a ray at the box and, if it intersects, gives you the exact point where it hits.
+	bool raycast(const ray&in ray, vector&out hit_point);
+	## Arguments:
+		* ray: The ray to cast.
+		* hit_point (out): Stores the hit point where the ray collided with the box.
+*/
+
+// Example:
+void main() {
+	aabb b;
+	b.min = vector(1, 1, 1);
+	b.max = vector(10, 10, 2);
+	vector start = vector(50, 50, 1);
+	vector target = vector(5, 5, 1);
+	ray r(start, target, 100);
+	vector hit;
+	if (b.raycast(r, hit)) alert("Boom!", "We collided at "+round(hit.x, 0)+", "+round(hit.y, 0)+", "+round(hit.z, 0)+".");
+}
