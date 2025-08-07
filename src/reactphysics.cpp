@@ -56,7 +56,13 @@ void transform_set_from_opengl_matrix(Transform& t, CScriptArray* matrix) {
 
 bool aabb_test_collision_triangle(const AABB& aabb, CScriptArray* points) {
 	if (points->GetSize() != 3) throw runtime_error("triangle must have 3 points");
-	return aabb.testCollisionTriangleAABB(reinterpret_cast<const Vector3*>(points->GetBuffer()));
+	Vector3 tri[3];
+	for (int i = 0; i < 3; i++) {
+		const Vector3& v = *static_cast<const Vector3*>(points->At(i));
+		tri[i] = Vector3(v.x, v.y, v.z);
+    }
+
+	return aabb.testCollisionTriangleAABB(tri);
 }
 
 CollisionCallback::ContactPoint contact_pair_get_contact_point(const CollisionCallback::ContactPair& pair, uint32 index) {
