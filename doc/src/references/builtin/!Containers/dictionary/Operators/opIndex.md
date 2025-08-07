@@ -1,5 +1,6 @@
 # opIndex
 Set or retrieve the value of a dictionary by its key.
+
 `int opIndex(* const string &in key);`
 
 ## Arguments:
