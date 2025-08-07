@@ -148,8 +148,8 @@ static string StringSlice(int start, int end, const string &str)
 	asUINT size = str.size();
 	if (start < 0)
 		start = size + start;
-	if (end <= 0)
-		end = size - end;
+	if (end < 0)
+		end = size + end;
 	if (end >= size)
 		end = size;
 	int count = end - start;

@@ -40,7 +40,12 @@ class menu {
 	private bool _allow_escape = true; // If set to false, the user must click on an option manually and will not be able to use escape to exit the menu.
 	private bool _allow_go_to_index = true; // If set to false, the user can no longer press ctrl+g to select a menu item by number.
 	private bool _allow_search = true; // If set to false, the user can no longer press ctrl+f to search for an item in the menu by text.
-	pack_file@ pack_file; // Optionally set this to a pack containing sounds.
+	#if plugin_legacy_sound
+	pack@ pack_file = null;
+	#endif
+	#if_not plugin_legacy_sound
+	pack_file@ pack_file = null;
+	#endif
 	menu() {
 		reset();
 	}
@@ -189,6 +194,7 @@ class menu {
 	private int last_selected_index;
 	private string last_selected_id;
 	// Simple sound management
+	#if plugin_legacy_sound
 	private sound@[] playing_sounds;
 	bool play(const string&in soundpath) {
 		if (soundpath.empty()) return false;
@@ -204,6 +210,13 @@ class menu {
 		playing_sounds.insert_last(s);
 		return r;
 	}
+	#endif
+	#if_not plugin_legacy_sound
+	bool play(const string&in soundpath) {
+		if (soundpath.empty()) return false;
+		return  sound_play(sounds_prefix + soundpath + sounds_suffix, pack_file = pack_file) != null;
+	}
+	#endif
 	private int on_form_list_event(audio_form@ f, int c, control_event_type event, dictionary@ args) {
 		if (event != event_list_cursor) return 0;
 		if (args.exists("boundary")) {

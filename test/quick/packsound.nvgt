@@ -2,27 +2,44 @@
 // Copyright (C) 2022-2024 Sam Tupy
 // License: zlib (see license.md in the root of the NVGT distribution)
 
-#pragma stub nc
 void main() {
-	pack_set_global_identifier("testpack");
-	pack p;
-	if (!p.open("packsound.dat", PACK_OPEN_MODE_CREATE)) {
+	pack_file p1, p2;
+	if (!p1.create("../tmp/packsound1.dat")) {
 		alert("Oh no!", "Couldn't create pack");
 		return;
 	}
-	if (!p.add_file("C:\\windows\\media\\ding.wav", "ding")) {
+	if (!p1.add_file("C:\\windows\\media\\ding.wav", "ding")) {
 		alert("An unfortunate error indeed", "Can't add file to pack");
 		exit();
 	}
-	alert("test", p.size + " files now in pack!");
-	p.close();
-	if (!p.open("packsound.dat", PACK_OPEN_MODE_READ)) {
+	alert("test", p1.file_count + " files now in pack!");
+	p1.close();
+	if (!p2.create("../tmp/packsound2.dat")) {
+		alert("Oh no!", "Couldn't create pack");
+		return;
+	}
+	if (!p2.add_file("C:\\windows\\media\\chord.wav", "chord")) {
+		alert("An unfortunate error indeed", "Can't add file to pack");
+		exit();
+	}
+	p2.close();
+	if (!p1.open("../tmp/packsound1.dat")) {
 		alert("Oh no!", "Couldn't open pack");
 		return;
 	}
-	sound s;
-	s.load("ding", p);
-	s.play_wait();
-	s.close();
-	p.close();
+	if (!p2.open("../tmp/packsound2.dat")) {
+		alert("Oh no!", "Couldn't open pack");
+		return;
+	}
+	@sound_default_pack = p1;
+	sound s1;
+	s1.load("ding");
+	s1.play();
+	@sound_default_pack = p2;
+	sound s2;
+	s2.load("chord");
+	s2.play_wait();
+	s1.close();
+	p1.close();
+	p2.close();
 }

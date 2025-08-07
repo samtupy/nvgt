@@ -1,0 +1,72 @@
+void main() {
+    physics_world_settings settings;
+    settings.gravity = vector(0, -9.81f, 0);
+    physics_world@ world = physics_world(settings);
+
+    // Create different shapes
+    physics_sphere_shape@ sphereShape = physics_sphere_shape(0.5f);
+    physics_box_shape@ boxShape = physics_box_shape(vector(0.5f, 0.5f, 0.5f));
+    physics_capsule_shape@ capsuleShape = physics_capsule_shape(0.3f, 1.0f);
+    physics_box_shape@ groundShape = physics_box_shape(vector(20, 0.5f, 20));
+
+    // Create static ground
+    physics_transform groundTransform(vector(0, -0.5f, 0), IDENTITY_QUATERNION);
+    physics_rigid_body@ ground = world.create_rigid_body(groundTransform);
+    ground.set_type(PHYSICS_BODY_STATIC);
+    ground.add_collider(groundShape, IDENTITY_TRANSFORM);
+
+    // Create multiple falling objects
+    array<physics_rigid_body@> objects;
+
+    for (int i = 0; i < 5; i++) {
+        vector pos(i * 2.0f - 4.0f, 10 + i, 0);  // Spread them out
+        physics_transform objTransform(pos, IDENTITY_QUATERNION);
+
+        physics_rigid_body@ obj = world.create_rigid_body(objTransform);
+        obj.set_type(PHYSICS_BODY_DYNAMIC);
+        obj.set_mass(1.0f);
+
+        // Use different shapes
+        if (i % 3 == 0) {
+            obj.add_collider(sphereShape, IDENTITY_TRANSFORM);
+        } else if (i % 3 == 1) {
+            obj.add_collider(boxShape, IDENTITY_TRANSFORM);
+        } else {
+            obj.add_collider(capsuleShape, IDENTITY_TRANSFORM);
+        }
+
+        // Add some initial velocity
+        obj.set_linear_velocity(vector((i-2) * 1.0f, 0, 0));
+        obj.set_angular_velocity(vector(0, 0, i * 2.0f));
+
+        objects.insert_last(obj);
+    }
+
+    // Simulation loop
+    float timeStep = 1.0f / 60.0f;
+    for (int frame = 0; frame < 600; frame++) {
+        world.update(timeStep);
+
+        if (frame % 60 == 0) {
+            println("=== Time: " + (frame * timeStep) + "s ===");
+            for (uint i = 0; i < objects.length(); i++) {
+                vector pos = objects[i].get_transform().get_position();
+                vector vel = objects[i].get_linear_velocity();
+                println("Object " + i + ": pos(" + pos.x + ", " + pos.y + ", " + pos.z + 
+                      ") vel(" + vel.x + ", " + vel.y + ", " + vel.z + ")");
+            }
+        }
+    }
+
+    // Cleanup
+    for (uint i = 0; i < objects.length(); i++) {
+        world.destroy_rigid_body(objects[i]);
+    }
+    world.destroy_rigid_body(ground);
+
+    physics_sphere_shape_destroy(sphereShape);
+    physics_box_shape_destroy(boxShape);
+    physics_capsule_shape_destroy(capsuleShape);
+    physics_box_shape_destroy(groundShape);
+    physics_world_destroy(world);
+}

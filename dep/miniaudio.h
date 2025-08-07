@@ -5123,7 +5123,8 @@ typedef enum
     ma_attenuation_model_none,          /* No distance attenuation and no spatialization. */
     ma_attenuation_model_inverse,       /* Equivalent to OpenAL's AL_INVERSE_DISTANCE_CLAMPED. */
     ma_attenuation_model_linear,        /* Linear attenuation. Equivalent to OpenAL's AL_LINEAR_DISTANCE_CLAMPED. */
-    ma_attenuation_model_exponential    /* Exponential attenuation. Equivalent to OpenAL's AL_EXPONENT_DISTANCE_CLAMPED. */
+    ma_attenuation_model_exponential,    /* Exponential attenuation. Equivalent to OpenAL's AL_EXPONENT_DISTANCE_CLAMPED. */
+    ma_attenuation_model_linear_db   /* Custom attenuation model defined by NVGT. */
 } ma_attenuation_model;
 
 typedef enum
@@ -50159,6 +50160,10 @@ static float ma_attenuation_exponential(float distance, float minDistance, float
     return (float)ma_powd(ma_clamp(distance, minDistance, maxDistance) / minDistance, -rolloff);
 }
 
+static float ma_attenuation_linear_db(float distance, float minDistance, float maxDistance, float rolloff)
+{
+    return ma_volume_db_to_linear((1 - ma_attenuation_linear(distance, minDistance, maxDistance, rolloff)) * -65);
+}
 
 /*
 Doppler Effect calculation taken from the OpenAL spec, with two main differences:
@@ -50892,6 +50897,10 @@ MA_API ma_result ma_spatializer_process_pcm_frames(ma_spatializer* pSpatializer,
             case ma_attenuation_model_exponential:
             {
                 gain = ma_attenuation_exponential(distance, minDistance, maxDistance, rolloff);
+            } break;
+            case ma_attenuation_model_linear_db:
+            {
+                gain = ma_attenuation_linear_db(distance, minDistance, maxDistance, rolloff);
             } break;
             case ma_attenuation_model_none:
             default:

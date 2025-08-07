@@ -1,0 +1,314 @@
+// Global variables for demonstration
+physics_world@ world;
+physics_rigid_body@[] bodies;
+physics_collider@[] colliders;
+
+// Store shape references for cleanup  
+physics_sphere_shape@[] sphereShapes;
+physics_box_shape@[] boxShapes;
+physics_capsule_shape@[] capsuleShapes;
+
+// Hit counter for demonstrations
+int hitCount = 0;
+
+// Raycast callback for collecting all hits
+float collect_all_hits_callback(const raycast_info&in info) {
+    hitCount++;
+    println("=== HIT #" + hitCount + " DETECTED ===");
+    println("Hit Point: (" + info.world_point.x + ", " + info.world_point.y + ", " + info.world_point.z + ")");
+    println("Hit Normal: (" + info.world_normal.x + ", " + info.world_normal.y + ", " + info.world_normal.z + ")");
+    println("Hit Fraction: " + info.hit_fraction);
+    println("Triangle Index: " + info.triangle_index);
+    
+    if (info.body !is null) {
+        println("Hit Body Entity ID: " + info.body.entity.id);
+        vector pos = info.body.transform.position;
+        println("Body Transform: (" + pos.x + ", " + pos.y + ", " + pos.z + ")");
+    }
+
+    if (info.collider !is null) {
+        println("Hit Collider Entity ID: " + info.collider.entity.id);
+        println("Collider Shape Type: " + info.collider.collision_shape.type);
+        
+        // Determine shape type for better display
+        string shapeType = "Unknown";
+        if (info.collider.collision_shape.type == SHAPE_TYPE_SPHERE) {
+            shapeType = "Sphere";
+        } else if (info.collider.collision_shape.type == SHAPE_TYPE_CONVEX_POLYHEDRON) {
+            if (info.collider.collision_shape.name == SHAPE_BOX) {
+                shapeType = "Box";
+            } else if (info.collider.collision_shape.name == SHAPE_CAPSULE) {
+                shapeType = "Capsule";
+            }
+        }
+        println("Shape Name: " + shapeType);
+    }
+
+    println(); // Empty line for readability
+
+    // Return 1.0 to continue collecting all hits
+    return 1.0;
+}
+
+// Raycast callback that stops at first hit
+float stop_at_first_hit_callback(const raycast_info&in info) {
+    hitCount++;
+    println("=== FIRST HIT #" + hitCount + " - STOPPING ===");
+    println("Hit Point: (" + info.world_point.x + ", " + info.world_point.y + ", " + info.world_point.z + ")");
+    println("Hit Normal: (" + info.world_normal.x + ", " + info.world_normal.y + ", " + info.world_normal.z + ")");
+    println("Hit Fraction: " + info.hit_fraction);
+
+    if (info.body !is null) {
+        vector pos = info.body.transform.position;
+        println("Hit Body at: (" + pos.x + ", " + pos.y + ", " + pos.z + ")");
+    }
+
+    println(">>> RAYCAST STOPPED - No further hits will be detected <<<");
+    println();
+
+    // Return 0.0 to stop raycasting immediately
+    return 0.0;
+}
+
+// Raycast callback that clips ray at hit points
+float clip_ray_callback(const raycast_info&in info) {
+    hitCount++;
+    println("=== HIT #" + hitCount + " - CLIPPING RAY ===");
+    println("Hit Point: (" + info.world_point.x + ", " + info.world_point.y + ", " + info.world_point.z + ")");
+    println("Hit Normal: (" + info.world_normal.x + ", " + info.world_normal.y + ", " + info.world_normal.z + ")");
+    println("Original hit fraction: " + info.hit_fraction);
+
+    if (info.body !is null) {
+        vector pos = info.body.transform.position;
+        println("Hit Body at: (" + pos.x + ", " + pos.y + ", " + pos.z + ")");
+    }
+
+    println(">>> RAY CLIPPED - Effective ray length reduced to hit point <<<");
+    println();
+
+    // Return the hit fraction to clip the ray at this point
+    // This means the ray will be shortened to only go up to this hit point
+    return info.hit_fraction;
+}
+
+void setup_physics_world() {
+    physics_world_settings settings;
+    settings.world_name = "Raycast Demo World";
+    settings.gravity = vector(0, -9.81, 0);
+    settings.default_friction_coefficient = 0.3;
+    settings.default_bounciness = 0.5;
+
+    @world = physics_world(settings);
+
+    println("Created world: " + settings.world_name);
+    println("Gravity: (" + settings.gravity.x + ", " + settings.gravity.y + ", " + settings.gravity.z + ")");
+    println("Default friction: " + settings.default_friction_coefficient);
+    println("Default bounciness: " + settings.default_bounciness);
+    println();
+}
+
+void create_complex_scene() {
+    // Create a line of spheres
+    for (int i = 0; i < 3; i++) {
+        sphereShapes.insert_last(physics_sphere_shape(0.8));
+        vector pos(i * 3.0, 0, 0);
+        physics_transform sphereTransform(pos, IDENTITY_QUATERNION);
+        bodies.insert_last(world.create_rigid_body(sphereTransform));
+        colliders.insert_last(bodies[bodies.length()-1].add_collider(sphereShapes[sphereShapes.length()-1], IDENTITY_TRANSFORM));
+        bodies[bodies.length()-1].type = PHYSICS_BODY_STATIC;
+
+        println("Created sphere " + (i+1) + " at: (" + pos.x + ", " + pos.y + ", " + pos.z + ") with radius 0.8");
+    }
+
+    // Create some boxes at different heights
+    for (int i = 0; i < 2; i++) {
+        boxShapes.insert_last(physics_box_shape(vector(0.7, 0.7, 0.7)));
+        vector pos(i * 4.0 + 1.5, 2.0, 0);
+        physics_transform boxTransform(pos, IDENTITY_QUATERNION);
+        bodies.insert_last(world.create_rigid_body(boxTransform));
+        colliders.insert_last(bodies[bodies.length()-1].add_collider(boxShapes[boxShapes.length()-1], IDENTITY_TRANSFORM));
+        bodies[bodies.length()-1].type = PHYSICS_BODY_STATIC;
+
+        println("Created box " + (i+1) + " at: (" + pos.x + ", " + pos.y + ", " + pos.z + ") with half-extents (0.7, 0.7, 0.7)");
+    }
+
+    // Create a capsule in the middle
+    capsuleShapes.insert_last(physics_capsule_shape(0.5, 2.0));
+    vector capsulePos(3.0, 0, 1.5);
+    physics_transform capsuleTransform(capsulePos, IDENTITY_QUATERNION);
+    bodies.insert_last(world.create_rigid_body(capsuleTransform));
+    colliders.insert_last(bodies[bodies.length()-1].add_collider(capsuleShapes[capsuleShapes.length()-1], IDENTITY_TRANSFORM));
+    bodies[bodies.length()-1].type = PHYSICS_BODY_STATIC;
+
+    println("Created capsule at: (" + capsulePos.x + ", " + capsulePos.y + ", " + capsulePos.z + ") with radius 0.5 and height 2.0");
+
+    println("Total bodies created: " + bodies.length());
+    println();
+}
+
+void test_collect_all_hits() {
+    println("=== TEST 1: COLLECT ALL HITS CALLBACK ===");
+    println("This callback returns 1.0, so it will detect ALL objects along the ray path.");
+    println("Ray will pass through multiple spheres from left to right.");
+
+    ray testRay(vector(-2, 0, 0), vector(8, 0, 0));
+    println("Ray from: (" + testRay.point1.x + ", " + testRay.point1.y + ", " + testRay.point1.z + ")");
+    println("Ray to: (" + testRay.point2.x + ", " + testRay.point2.y + ", " + testRay.point2.z + ")");
+    println();
+    
+    hitCount = 0;
+    world.raycast(testRay, collect_all_hits_callback);
+    
+    println("RESULT: Detected " + hitCount + " total hits.");
+    println("=====================================");
+    println();
+}
+
+void test_stop_at_first_hit() {
+    println("=== TEST 2: STOP AT FIRST HIT CALLBACK ===");
+    println("This callback returns 0.0, so it will stop at the FIRST object hit.");
+    println("Ray will stop at the first sphere, ignoring objects behind it.");
+
+    ray testRay(vector(-2, 0, 0), vector(8, 0, 0));
+    println("Ray from: (" + testRay.point1.x + ", " + testRay.point1.y + ", " + testRay.point1.z + ")");
+    println("Ray to: (" + testRay.point2.x + ", " + testRay.point2.y + ", " + testRay.point2.z + ")");
+    println();
+
+    hitCount = 0;
+    world.raycast(testRay, stop_at_first_hit_callback);
+
+    println("RESULT: Detected " + hitCount + " hit(s) before stopping.");
+    println("==========================================");
+    println();
+}
+
+void test_clip_ray_callback() {
+    println("=== TEST 3: CLIP RAY CALLBACK ===");
+    println("This callback returns hit_fraction, which clips the ray at each hit point.");
+    println("Ray gets progressively shorter with each hit, but continues beyond each object.");
+
+    ray testRay(vector(-2, 0, 0), vector(8, 0, 0));
+    println("Ray from: (" + testRay.point1.x + ", " + testRay.point1.y + ", " + testRay.point1.z + ")");
+    println("Ray to: (" + testRay.point2.x + ", " + testRay.point2.y + ", " + testRay.point2.z + ")");
+    println("Original ray length: " + (testRay.point2 - testRay.point1).length());
+    println();
+
+    hitCount = 0;
+    world.raycast(testRay, clip_ray_callback);
+
+    println("RESULT: Ray was clipped " + hitCount + " time(s).");
+    println("===============================");
+    println();
+}
+
+void test_diagonal_ray() {
+    println("=== TEST 4: DIAGONAL RAY THROUGH SCENE ===");
+    println("Testing a diagonal ray that might hit objects at different heights.");
+
+    ray testRay(vector(-1, -1, -1), vector(7, 3, 2));
+    println("Ray from: (" + testRay.point1.x + ", " + testRay.point1.y + ", " + testRay.point1.z + ")");
+    println("Ray to: (" + testRay.point2.x + ", " + testRay.point2.y + ", " + testRay.point2.z + ")");
+
+    vector direction = testRay.point2 - testRay.point1;
+    direction.normalize();
+    println("Ray direction (normalized): (" + direction.x + ", " + direction.y + ", " + direction.z + ")");
+    println();
+
+    hitCount = 0;
+    world.raycast(testRay, collect_all_hits_callback);
+
+    println("RESULT: Diagonal ray hit " + hitCount + " object(s).");
+    println("=====================================");
+    println();
+}
+
+void test_ray_with_max_fraction() {
+    println("=== TEST 5: RAY WITH LIMITED MAX_FRACTION ===");
+    println("Testing ray behavior with max_fraction < 1.0 (shortened ray).");
+
+    ray testRay(vector(-2, 0, 0), vector(8, 0, 0), 0.3); // Only 30% of full ray length
+    vector effectiveEnd = testRay.point1 + (testRay.point2 - testRay.point1) * testRay.max_fraction;
+
+    println("Ray from: (" + testRay.point1.x + ", " + testRay.point1.y + ", " + testRay.point1.z + ")");
+    println("Ray to: (" + testRay.point2.x + ", " + testRay.point2.y + ", " + testRay.point2.z + ")");
+    println("Max fraction: " + testRay.max_fraction);
+    println("Effective end point: (" + effectiveEnd.x + ", " + effectiveEnd.y + ", " + effectiveEnd.z + ")");
+    println();
+
+    hitCount = 0;
+    world.raycast(testRay, collect_all_hits_callback);
+
+    println("RESULT: Limited ray hit " + hitCount + " object(s).");
+    println("=========================================");
+    println();
+}
+
+void test_individual_body_raycasts() {
+    println("=== TEST 6: INDIVIDUAL BODY RAYCASTS ===");
+    println("Testing direct raycast against specific bodies.");
+
+    ray testRay(vector(-1, 0, 0), vector(7, 3.5, 0));
+    raycast_info info;
+
+    for (uint i = 0; i < bodies.length(); i++) {
+        if (bodies[i] !is null) {
+            bool hit = bodies[i].raycast(testRay, info);
+            vector bodyPos = bodies[i].transform.position;
+
+            println("Body " + (i+1) + " at (" + bodyPos.x + ", " + bodyPos.y + ", " + bodyPos.z + "): " + (hit ? "HIT" : "MISS"));
+            if (hit) {
+                println("  Hit point: (" + info.world_point.x + ", " + info.world_point.y + ", " + info.world_point.z + ")");
+                println("  Hit fraction: " + info.hit_fraction);
+            }
+        }
+    }
+
+    println("===========================================");
+    println();
+}
+
+void cleanup() {
+    // Must do bodies first
+    // Doing shapes first gives segfaults because dangling references
+    if (world !is null) {
+        for (uint i = 0; i < bodies.length(); i++) {
+            if (bodies[i] !is null) {
+                world.destroy_rigid_body(bodies[i]);
+            }
+        }
+    }
+
+    for (uint i = 0; i < sphereShapes.length(); i++) {
+        if (sphereShapes[i] !is null) {
+            physics_sphere_shape_destroy(sphereShapes[i]);
+        }
+    }
+    for (uint i = 0; i < boxShapes.length(); i++) {
+        if (boxShapes[i] !is null) {
+            physics_box_shape_destroy(boxShapes[i]);
+        }
+    }
+    for (uint i = 0; i < capsuleShapes.length(); i++) {
+        if (capsuleShapes[i] !is null) {
+            physics_capsule_shape_destroy(capsuleShapes[i]);
+        }
+    }
+
+    if (world !is null) {
+        physics_world_destroy(world);
+    }
+}
+
+void main() {
+    setup_physics_world();
+    create_complex_scene();
+
+    test_collect_all_hits();
+    test_stop_at_first_hit();
+    test_clip_ray_callback();
+    test_diagonal_ray();
+    test_ray_with_max_fraction();
+    test_individual_body_raycasts();
+
+    cleanup();
+}

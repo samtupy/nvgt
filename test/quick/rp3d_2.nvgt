@@ -1,0 +1,67 @@
+// Sanity check
+// Need to run via cmd or similar to see output
+
+void main() {
+    // Vectors
+    vector a(1, 2, 3);
+    vector b(4, 5, 6);
+    vector c = a + b;
+    println("Vector A: ", string(a));
+    println("Vector B: ", string(b));
+    println("A + B = ", string(c));
+    println("A dot B = ", a.dot(b));
+    println("A cross B = ", string(a.cross(b)));
+    println("A length = ", a.length());
+
+    // Quaternions
+    quaternion q1;
+    q1.set_to_identity();
+    println("Identity quaternion: ", string(q1));
+
+    // Transforms
+    physics_transform t1;
+    t1.set_to_identity();
+    println("Identity transform position: ", string(t1.get_position()));
+
+    physics_transform t2(vector(1, 2, 3), q1);
+    println("Transform with position (1,2,3): ", string(t2.get_position()));
+
+    // AABB
+    aabb box1(vector(-1, -1, -1), vector(1, 1, 1));
+    println("AABB center: ", string(box1.get_center()));
+    println("AABB extent: ", string(box1.get_extent()));
+    println("AABB volume: ", box1.get_volume());
+
+    // Ray
+    ray testRay(vector(0, 0, 0), vector(1, 1, 1));
+    println("Ray point1: ", string(testRay.point1));
+    println("Ray point2: ", string(testRay.point2));
+    println("Ray max_fraction: ", testRay.max_fraction);
+
+    // World settings
+    physics_world_settings settings;
+    settings.world_name = "Test World";
+    settings.gravity = vector(0, -9.81, 0);  // Earth gravity
+    println("World gravity: ", string(settings.gravity));
+
+    // Physics world
+    physics_world@ world = physics_world(settings);
+    println("Created physics world: ", world.get_name());
+    println("World gravity: ", string(world.get_gravity()));
+    println("Gravity enabled: ", world.get_is_gravity_enabled());
+
+    // Create a simple rigid body (without shapes for now)
+    physics_transform bodyTransform(vector(0, 5, 0), get_IDENTITY_QUATERNION());
+    physics_rigid_body@ body = world.create_rigid_body(bodyTransform);
+    body.set_type(PHYSICS_BODY_DYNAMIC);
+    body.set_mass(1.0);
+    println("Body created at: ", string(body.get_transform().get_position()));
+    println("Body mass: ", body.get_mass(), " kg");
+    println("Body type: ", body.get_type());
+
+    // Body props
+    body.set_linear_velocity(vector(1, 0, 0));
+    println("Body velocity: ", string(body.get_linear_velocity()));
+    body.set_angular_velocity(vector(0, 1, 0));
+    println("Body angular velocity: ", string(body.get_angular_velocity()));
+}

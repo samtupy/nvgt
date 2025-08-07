@@ -1,0 +1,15 @@
+void test_number_to_words() {
+	// Test basic number to words conversion
+	assert(number_to_words(0, false) == "zero");
+	assert(number_to_words(1, false) == "one");
+	assert(number_to_words(10, false) == "ten");
+	assert(number_to_words(21, false) == "twenty one"); // No hyphen
+	assert(number_to_words(100, false) == "one hundred");
+	assert(number_to_words(1000, false) == "one thousand");
+	
+	// Test the specific number from the original test
+	assert(number_to_words(172745, false) == "one hundred seventy two thousand seven hundred forty five");
+	
+	// Test with "and" (when second parameter is true or omitted)
+	assert(number_to_words(172745) == "one hundred and seventy two thousand seven hundred and forty five");
+}

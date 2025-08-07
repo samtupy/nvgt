@@ -1,0 +1,11 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#include "bgt_compat.nvgt"
+void main() {
+	file_put_contents("../tmp/file_decrypted.txt", "this is a message");
+	if (!file_encrypt("../tmp/file_decrypted.txt", "../tmp/file_encrypted.bin", "testing")) throw("failed to encrypt");
+	if (!file_decrypt("../tmp/file_encrypted.bin", "../tmp/file_redecrypted.txt", "testing")) throw("failed to decrypt");
+	alert("test", file_get_contents("../tmp/file_redecrypted.txt"));
+}

@@ -1,0 +1,16 @@
+void test_build_timestamp() {
+	// Test that SCRIPT_BUILD_TIME is a valid timestamp
+	assert(SCRIPT_BUILD_TIME > 0);
+	
+	// Test that it can be converted to a datetime object
+	datetime dt(SCRIPT_BUILD_TIME);
+	
+	// Test that the datetime can be formatted
+	string formatted = dt.format(DATE_TIME_FORMAT_ISO8601);
+	assert(formatted.length() > 0);
+	assert(formatted.find("-") >= 0); // ISO8601 contains dashes
+	assert(formatted.find("T") >= 0); // ISO8601 contains T separator
+	
+	// Test that build time is not in the future
+	assert(SCRIPT_BUILD_TIME <= timestamp());
+}

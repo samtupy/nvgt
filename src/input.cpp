@@ -13,21 +13,36 @@
 #if defined(_WIN32)
 	#define VC_EXTRALEAN
 	#include <windows.h>
+	#include <winuser.h>
 #else
 	#include <cstring>
 #endif
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_power.h>
 #include <angelscript.h>
 #include <obfuscate.h>
+#include <Poco/Mutex.h>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <functional>
+#include <vector>
+#include <algorithm>
 #include "nvgt_angelscript.h"
 #include "input.h"
 #include "misc_functions.h"
 #include "nvgt.h"
 #include "UI.h"
+#ifdef _WIN32
+	#include <windows_process_watcher.h>
+	#include <thread>
+	#include <memory>
+	#include <atomic>
+	#include <chrono>
+	#include <fstream>
+	#include <ctime>
+	#include <iomanip>
+#endif
 
 /*
  * @literary: Since SDL requires pointer to the key name stay till the program life span,
@@ -51,8 +66,26 @@ SDL_TouchID g_TouchLastDevice = 0;
 static asITypeInfo* key_code_array_type = nullptr;
 static asITypeInfo* joystick_mapping_array_type = nullptr;
 #ifdef _WIN32
-	static HHOOK g_keyhook_hHook = nullptr;
-	bool g_keyhook_active = false;
+// prerequisits for keyhook by Silak
+static HHOOK g_keyhook_hHook = nullptr;
+bool g_keyhook_active = false;
+static std::unique_ptr<ProcessWatcher> g_process_watcher = nullptr;
+static std::thread g_process_watcher_thread;
+static std::atomic<bool> g_process_watcher_running{false};
+static std::atomic<bool> g_window_focused{false};
+static std::atomic<bool> g_jhookldr_process_running{false};
+static bool g_keyhook_needs_uninstall = false;
+static bool g_keyhook_needs_install = false;
+// Used to control/reset various keys, usually insert, when toggling keyhook.
+void send_keyboard_input(WORD vk_code, bool key_up) {
+	INPUT input = {};
+	input.type = INPUT_KEYBOARD;
+	input.ki.wVk = vk_code;
+	input.ki.dwFlags = key_up ? KEYEVENTF_KEYUP : 0;
+	input.ki.time = 0;
+	input.ki.dwExtraInfo = 0;
+	SendInput(1, &input, sizeof(INPUT));
+}
 #endif
 // Wrapper function for sdl
 // This function is useful for getting keyboard, mice and touch devices.
@@ -76,6 +109,10 @@ CScriptArray* GetDevices(std::function<uint32_t* (int*)> callback) {
 	SDL_free(devices);
 	return array;
 }
+void JoystickInit() {
+	if (!(SDL_WasInit(0) & (SDL_INIT_GAMEPAD | SDL_INIT_JOYSTICK)))
+		SDL_InitSubSystem(SDL_INIT_GAMEPAD | SDL_INIT_JOYSTICK);
+}
 void InputInit() {
 	if (SDL_WasInit(0) & SDL_INIT_VIDEO)
 		return;
@@ -83,10 +120,16 @@ void InputInit() {
 	memset(g_KeysRepeating, 0, SDL_SCANCODE_COUNT);
 	memset(g_KeysForced, 0, SDL_SCANCODE_COUNT);
 	memset(g_KeysReleased, 0, SDL_SCANCODE_COUNT);
+	// Initialize video and joystick/gamepad if not already initialized
 	SDL_Init(SDL_INIT_VIDEO);
 	g_KeysDown = SDL_GetKeyboardState(&g_KeysDownArrayLen);
 }
 void InputDestroy() {
+	if (SDL_WasInit(0) == 0)
+		return;
+	#ifdef _WIN32
+	uninstall_keyhook();
+	#endif
 	SDL_Quit();
 	g_KeysDown = NULL;
 }
@@ -124,19 +167,32 @@ bool InputEvent(SDL_Event* evt) {
 	return true;
 }
 
-void remove_keyhook();
-bool install_keyhook(bool allow_reinstall = true);
+#ifdef _WIN32
+	void remove_keyhook();
+	bool install_keyhook();
+	void uninstall_keyhook();
+	bool reinstall_keyhook_only();
+	void process_keyhook_commands();
+	LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
+#endif
 void lost_window_focus() {
 	SDL_ResetKeyboard();
 	#ifdef _WIN32
-	if (g_keyhook_active)
-		remove_keyhook();
+	g_window_focused.store(false);
+	if (g_keyhook_hHook) {
+		UnhookWindowsHookEx(g_keyhook_hHook);
+		g_keyhook_hHook = nullptr;
+	}
 	#endif
 }
 void regained_window_focus() {
 	#ifdef _WIN32
-	if (g_keyhook_active)
-		install_keyhook();
+	g_window_focused.store(true);
+	if (!g_keyhook_hHook && g_keyhook_active) {
+		g_keyhook_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, HookKeyboardProc, GetModuleHandle(NULL), NULL);
+		if (g_keyhook_hHook)
+			send_keyboard_input(VK_INSERT, true);
+	}
 	#endif
 }
 bool ScreenKeyboardShown() {
@@ -248,8 +304,12 @@ inline bool post_key_event(int key, SDL_EventType evt_type) {
 	e.key.key = SDL_GetKeyFromScancode(e.key.scancode, SDL_GetModState(), true);
 	return SDL_PushEvent(&e);
 }
-bool simulate_key_down(int key) { return post_key_event(key, SDL_EVENT_KEY_DOWN); }
-bool simulate_key_up(int key) { return post_key_event(key, SDL_EVENT_KEY_UP); }
+bool simulate_key_down(int key) {
+	return post_key_event(key, SDL_EVENT_KEY_DOWN);
+}
+bool simulate_key_up(int key) {
+	return post_key_event(key, SDL_EVENT_KEY_UP);
+}
 CScriptArray* keys_pressed() {
 	asIScriptContext* ctx = asGetActiveContext();
 	asIScriptEngine* engine = ctx->GetEngine();
@@ -321,7 +381,7 @@ bool mouse_down(unsigned char button) {
 		return false;
 	if (!g_KeysDown)
 		return false;
-	return (SDL_GetMouseState(&g_MouseAbsX, &g_MouseAbsY) & SDL_BUTTON(button)) != 0;
+	return (SDL_GetMouseState(&g_MouseAbsX, &g_MouseAbsY) & SDL_BUTTON_MASK(button)) != 0;
 }
 bool MouseReleased(unsigned char button) {
 	if (button > 31)
@@ -369,90 +429,438 @@ std::string GetMouseName(unsigned int id) {
 	return result;
 }
 
-/* unfinished joystick stuff - to be converted to SDL3
-int joystick_count(bool only_active = true) {
-    int total_joysticks;
-    SDL_JoystickID* sticks = SDL_GetJoysticks(&total_joysticks);
-    SDL_free(sticks);
-    if (!only_active) return total_joysticks;
-    int ret = 0;
-    for (int i = 0; i < total_joysticks; i++) {
-        if (SDL_IsGamepad(i))
-            ret++;
-    }
-    return ret;
-}
-CScriptArray* joystick_mappings() {
-    asIScriptContext* ctx = asGetActiveContext();
-    asIScriptEngine* engine = ctx->GetEngine();
-    if (!joystick_mapping_array_type)
-        joystick_mapping_array_type = engine->GetTypeInfoByDecl("array<string>@");
-    CScriptArray* array = CScriptArray::Create(joystick_mapping_array_type);
-    int num_mappings = SDL_GameControllerNumMappings();
-    for (int i = 0; i < num_mappings; i++) {
-        std::string mapping = SDL_GameControllerMappingForIndex(i);
-        array->InsertLast(&mapping);
-    }
-    return array;
+// Static variable for preferred joystick index (BGT compatibility)
+static int g_preferred_joystick = 0;
+
+// Global list of active joystick instances for updating
+static std::vector<joystick*> g_active_joysticks;
+static Poco::FastMutex g_joysticks_mutex;
+
+// Helper function to count joysticks
+int joystick_count(bool gamepads_only) {
+	JoystickInit();
+	if (gamepads_only) {
+		int count;
+		SDL_JoystickID* joysticks = SDL_GetGamepads(&count);
+		if (joysticks) SDL_free(joysticks);
+		return count;
+	} else {
+		int count;
+		SDL_JoystickID* joysticks = SDL_GetJoysticks(&count);
+		if (joysticks) SDL_free(joysticks);
+		return count;
+	}
 }
 
-joystick::joystick() {
-    if (joystick_count() > 0)
-        stick = SDL_OpenGamepad(0);
+static joystick* joystick_factory() {
+	return new joystick();
 }
+
+void update_joysticks() {
+	Poco::FastMutex::ScopedLock lock(g_joysticks_mutex);
+	for (joystick* js : g_active_joysticks) {
+		if (js) js->update();
+	}
+}
+
+joystick::joystick() : stick(nullptr), js_handle(nullptr), current_index(-1) {
+	refresh_joystick_list();
+	if (get_joysticks() > 0)
+		set(g_preferred_joystick);
+	Poco::FastMutex::ScopedLock lock(g_joysticks_mutex);
+	g_active_joysticks.push_back(this);
+}
+
 joystick::~joystick() {
-    SDL_CloseGamepad(stick);
+	{
+		Poco::FastMutex::ScopedLock lock(g_joysticks_mutex);
+		auto it = std::find(g_active_joysticks.begin(), g_active_joysticks.end(), this);
+		if (it != g_active_joysticks.end())
+			g_active_joysticks.erase(it);
+	}
+	if (stick) {
+		SDL_CloseGamepad(stick);
+		stick = nullptr;
+	}
+	js_handle = nullptr; // This is owned by gamepad, don't close separately
+}
+
+void joystick::update() {
+	if (!stick) return;
+	for (size_t i = 0; i < button_states.size(); i++) {
+		bool current_state = SDL_GetGamepadButton(stick, (SDL_GamepadButton)i) != 0;
+		if (current_state && !button_states[i])
+			button_pressed_states[i] = true;
+		else
+			button_pressed_states[i] = false;
+		if (!current_state && button_states[i])
+			button_released_states[i] = true;
+		else
+			button_released_states[i] = false;
+		button_states[i] = current_state;
+	}
+	for (int i = 0; i < SDL_GAMEPAD_AXIS_COUNT; i++)
+		axis_values[i] = SDL_GetGamepadAxis(stick, (SDL_GamepadAxis)i);
+	if (js_handle) {
+		int num_hats = SDL_GetNumJoystickHats(js_handle);
+		for (int i = 0; i < num_hats && i < 4; i++)
+			hat_values[i] = SDL_GetJoystickHat(js_handle, i);
+	}
+}
+
+// BGT compatibility property implementations
+unsigned int joystick::get_joysticks() const {
+	JoystickInit();
+	int count;
+	SDL_JoystickID* joysticks = SDL_GetGamepads(&count);
+	if (joysticks) SDL_free(joysticks);
+	return count;
+}
+
+bool joystick::get_has_x() const {
+	return stick != nullptr;
+}
+
+bool joystick::get_has_y() const {
+	return stick != nullptr;
+}
+
+bool joystick::get_has_z() const {
+	return stick != nullptr; // Right stick Y axis can be used as Z
+}
+
+bool joystick::get_has_r_x() const {
+	return stick != nullptr;
+}
+
+bool joystick::get_has_r_y() const {
+	return stick != nullptr;
+}
+
+bool joystick::get_has_r_z() const {
+	return false; // No direct mapping in standard gamepad
+}
+
+unsigned int joystick::get_buttons() const {
+	if (!stick) return 0;
+	// SDL gamepad has a fixed number of buttons
+	return SDL_GAMEPAD_BUTTON_COUNT;
+}
+
+unsigned int joystick::get_sliders() const {
+	if (!stick) return 0;
+	// Triggers can be considered as sliders
+	return 2;
+}
+
+unsigned int joystick::get_povs() const {
+	if (!js_handle) return 0;
+	return SDL_GetNumJoystickHats(js_handle);
+}
+
+std::string joystick::get_name() const {
+	if (!stick) return "";
+	const char* name = SDL_GetGamepadName(stick);
+	return name ? name : "";
+}
+
+bool joystick::get_active() const {
+	return stick && SDL_GamepadConnected(stick);
+}
+
+int joystick::get_preferred_joystick() const {
+	return g_preferred_joystick;
+}
+
+void joystick::set_preferred_joystick(int index) {
+	g_preferred_joystick = index;
+}
+
+int joystick::get_x() const {
+	if (!stick || axis_values.size() <= SDL_GAMEPAD_AXIS_LEFTX) return 0;
+	// Convert from SDL range (-32768 to 32767) to BGT range (0 to 65535)
+	return axis_values[SDL_GAMEPAD_AXIS_LEFTX] + 32768;
+}
+
+int joystick::get_y() const {
+	if (!stick || axis_values.size() <= SDL_GAMEPAD_AXIS_LEFTY) return 0;
+	return axis_values[SDL_GAMEPAD_AXIS_LEFTY] + 32768;
+}
+
+int joystick::get_z() const {
+	if (!stick || axis_values.size() <= SDL_GAMEPAD_AXIS_RIGHTY) return 0;
+	// Use right stick Y as Z axis for BGT compatibility
+	return axis_values[SDL_GAMEPAD_AXIS_RIGHTY] + 32768;
+}
+
+int joystick::get_r_x() const {
+	if (!stick || axis_values.size() <= SDL_GAMEPAD_AXIS_RIGHTX) return 0;
+	return axis_values[SDL_GAMEPAD_AXIS_RIGHTX] + 32768;
+}
+
+int joystick::get_r_y() const {
+	if (!stick || axis_values.size() <= SDL_GAMEPAD_AXIS_RIGHTY) return 0;
+	return axis_values[SDL_GAMEPAD_AXIS_RIGHTY] + 32768;
+}
+
+int joystick::get_r_z() const {
+	// No direct mapping, return centered position
+	return 32768;
+}
+
+int joystick::get_slider_1() const {
+	if (!stick || axis_values.size() <= SDL_GAMEPAD_AXIS_LEFT_TRIGGER) return 0;
+	// Triggers range from 0 to 32767, scale to 0 to 65535
+	return axis_values[SDL_GAMEPAD_AXIS_LEFT_TRIGGER] * 2;
+}
+
+int joystick::get_slider_2() const {
+	if (!stick || axis_values.size() <= SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) return 0;
+	return axis_values[SDL_GAMEPAD_AXIS_RIGHT_TRIGGER] * 2;
+}
+
+int joystick::get_pov_1() const {
+	if (!js_handle || hat_values.empty()) return -1;
+	return hat_values[0];
+}
+
+int joystick::get_pov_2() const {
+	if (!js_handle || hat_values.size() < 2) return -1;
+	return hat_values[1];
+}
+
+int joystick::get_pov_3() const {
+	if (!js_handle || hat_values.size() < 3) return -1;
+	return hat_values[2];
+}
+
+int joystick::get_pov_4() const {
+	if (!js_handle || hat_values.size() < 4) return -1;
+	return hat_values[3];
 }
 
 unsigned int joystick::type() const {
-    return SDL_GetGamepadType(stick);
+	if (!stick) return 0;
+	return SDL_GetGamepadType(stick);
 }
-unsigned int joystick::power_level() const {
-    return SDL_JoystickCurrentPowerLevel(SDL_GetGamepadJoystick(stick));
+
+// joystick_power_info implementation
+std::string joystick_power_info::get_state_name() const {
+	switch (state) {
+		case SDL_POWERSTATE_ERROR: return "Error";
+		case SDL_POWERSTATE_UNKNOWN: return "Unknown";
+		case SDL_POWERSTATE_ON_BATTERY: return "On Battery";
+		case SDL_POWERSTATE_NO_BATTERY: return "No Battery";
+		case SDL_POWERSTATE_CHARGING: return "Charging";
+		case SDL_POWERSTATE_CHARGED: return "Charged";
+		default: return "Invalid";
+	}
 }
-std::string joystick::name() const {
-    return SDL_GetGamepadName(stick);
+
+std::string joystick_power_info::to_string() const {
+	return get_state_name() + " (" + std::to_string(percentage) + "%)";
 }
-bool joystick::active() const {
-    return SDL_GamepadConnected(stick);
+
+joystick_power_info joystick::get_power_info() const {
+	if (!js_handle) return joystick_power_info();
+	int percent = 0;
+	SDL_PowerState state = SDL_GetJoystickPowerInfo(js_handle, &percent);
+	return joystick_power_info(state, percent);
 }
+
 std::string joystick::serial() const {
-    const char* serial = SDL_GetGamepadSerial(stick);
-    if (serial == nullptr) return "";
-    return std::string(serial);
+	if (!stick) return "";
+	const char* serial = SDL_GetGamepadSerial(stick);
+	return serial ? serial : "";
 }
+
 bool joystick::has_led() const {
-    return SDL_GameControllerHasLED(stick);
+	// Only in SDL 3.2.0
+	return false;
 }
+
 bool joystick::can_vibrate() const {
-    return SDL_GameControllerHasRumble(stick);
+	// Only in SDL 3.2.0
+	return stick != nullptr;
 }
+
 bool joystick::can_vibrate_triggers() const {
-    return SDL_GameControllerHasRumbleTriggers(stick);
+	// Only in SDL 3.2.0
+	return false;
 }
+
 int joystick::touchpads() const {
-    return SDL_GetNumGamepadTouchpads(stick);
+	if (!stick) return 0;
+	return SDL_GetNumGamepadTouchpads(stick);
+}
+
+bool joystick::button_down(int button) {
+	if (!stick || button < 0 || button >= (int)button_states.size()) return false;
+	return button_states[button];
+}
+
+bool joystick::button_pressed(int button) {
+	if (!stick || button < 0 || button >= (int)button_pressed_states.size()) return false;
+	bool result = button_pressed_states[button];
+	button_pressed_states[button] = false; // Clear after reading
+	return result;
+}
+
+bool joystick::button_released(int button) {
+	if (!stick || button < 0 || button >= (int)button_released_states.size()) return false;
+	bool result = button_released_states[button];
+	button_released_states[button] = false; // Clear after reading
+	return result;
+}
+
+bool joystick::button_up(int button) {
+	return !button_down(button);
+}
+
+CScriptArray* joystick::buttons_down() {
+	asITypeInfo* array_type = get_array_type("int[]");
+	if (!array_type) return nullptr;
+	CScriptArray* array = CScriptArray::Create(array_type);
+	if (!array || !stick) return array;
+	for (int i = 0; i < (int)button_states.size(); i++) {
+		if (button_states[i])
+			array->InsertLast(&i);
+	}
+	return array;
+}
+
+CScriptArray* joystick::buttons_pressed() {
+	asITypeInfo* array_type = get_array_type("int[]");
+	if (!array_type) return nullptr;
+	CScriptArray* array = CScriptArray::Create(array_type);
+	if (!array || !stick) return array;
+	for (int i = 0; i < (int)button_pressed_states.size(); i++) {
+		if (button_pressed_states[i]) {
+			array->InsertLast(&i);
+			button_pressed_states[i] = false; // Clear after reading
+		}
+	}
+	return array;
+}
+
+CScriptArray* joystick::buttons_released() {
+	asITypeInfo* array_type = get_array_type("int[]");
+	if (!array_type) return nullptr;
+	CScriptArray* array = CScriptArray::Create(array_type);
+	if (!array || !stick) return array;
+	for (int i = 0; i < (int)button_released_states.size(); i++) {
+		if (button_released_states[i]) {
+			array->InsertLast(&i);
+			button_released_states[i] = false; // Clear after reading
+		}
+	}
+	return array;
+}
+
+CScriptArray* joystick::buttons_up() {
+	asITypeInfo* array_type = get_array_type("int[]");
+	if (!array_type) return nullptr;
+	CScriptArray* array = CScriptArray::Create(array_type);
+	if (!array || !stick) return array;
+	for (int i = 0; i < (int)button_states.size(); i++) {
+		if (!button_states[i])
+			array->InsertLast(&i);
+	}
+	return array;
+}
+
+CScriptArray* joystick::list_joysticks() {
+	asITypeInfo* array_type = get_array_type("string[]");
+	if (!array_type) return nullptr;
+	CScriptArray* array = CScriptArray::Create(array_type);
+	if (!array) return array;
+	int count;
+	SDL_JoystickID* joysticks = SDL_GetGamepads(&count);
+	if (!joysticks) return array;
+	for (int i = 0; i < count; i++) {
+		const char* name = SDL_GetGamepadNameForID(joysticks[i]);
+		std::string name_str = name ? name : "Unknown Gamepad";
+		array->InsertLast(&name_str);
+	}
+	SDL_free(joysticks);
+	return array;
+}
+
+bool joystick::pov_centered(int pov) {
+	if (!js_handle || pov < 0 || pov >= (int)hat_values.size()) return true;
+	return hat_values[pov] == SDL_HAT_CENTERED;
+}
+
+bool joystick::refresh_joystick_list() {
+	// SDL automatically detects joystick changes
+	// This is here for BGT compatibility
+	return true;
+}
+
+bool joystick::set(int index) {
+	// Close current gamepad if open
+	if (stick) {
+		SDL_CloseGamepad(stick);
+		stick = nullptr;
+		js_handle = nullptr;
+	}
+	int count;
+	SDL_JoystickID* joysticks = SDL_GetGamepads(&count);
+	if (!joysticks || index < 0 || index >= count) {
+		if (joysticks) SDL_free(joysticks);
+		current_index = -1;
+		return false;
+	}
+	stick = SDL_OpenGamepad(joysticks[index]);
+	SDL_free(joysticks);
+	if (!stick) {
+		current_index = -1;
+		return false;
+	}
+	js_handle = SDL_GetGamepadJoystick(stick);
+	current_index = index;
+	button_states.resize(SDL_GAMEPAD_BUTTON_COUNT, false);
+	button_pressed_states.resize(SDL_GAMEPAD_BUTTON_COUNT, false);
+	button_released_states.resize(SDL_GAMEPAD_BUTTON_COUNT, false);
+	axis_values.resize(SDL_GAMEPAD_AXIS_COUNT, 0);
+	if (js_handle) {
+		int num_hats = SDL_GetNumJoystickHats(js_handle);
+		hat_values.resize(num_hats < 4 ? num_hats : 4, SDL_HAT_CENTERED);
+	}
+	// Pump to get most up-to-date info
+	SDL_PumpEvents();
+	return true;
 }
 
 bool joystick::set_led(unsigned char red, unsigned char green, unsigned char blue) {
-    return SDL_SetGamepadLED(stick, red, green, blue);
+	if (!stick) return false;
+	return SDL_SetGamepadLED(stick, red, green, blue);
 }
+
 bool joystick::vibrate(unsigned short low_frequency, unsigned short high_frequency, int duration) {
-    return SDL_RumbleGamepad(stick, low_frequency, high_frequency, duration);
+	if (!stick) return false;
+	return SDL_RumbleGamepad(stick, low_frequency, high_frequency, duration);
 }
+
 bool joystick::vibrate_triggers(unsigned short left, unsigned short right, int duration) {
-    return SDL_RumbleGamepadTriggers(stick, left, right, duration);
+	if (!stick) return false;
+	return SDL_RumbleGamepadTriggers(stick, left, right, duration);
 }
-*/
 
 #ifdef _WIN32
 // Thanks Quentin Cosendey (Universal Speech) for this jaws keyboard hook code as well as to male-srdiecko and silak for various improvements and fixes that have taken place since initial implementation.
 bool altPressed = false;
 bool capsPressed = false;
 bool insertPressed = false;
-
 LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	if (nCode != HC_ACTION)
+		return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
+	bool window_focused = g_window_focused.load();
+	bool process_running = g_jhookldr_process_running.load();
+	// Block keys only if both conditions are met:
+	// 1. Our NVGT window is focused
+	// 2. jhookldr.exe process is running
+	if (!window_focused || !process_running)
 		return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 	PKBDLLHOOKSTRUCT p = reinterpret_cast<PKBDLLHOOKSTRUCT>(lParam);
 	UINT vkCode = p->vkCode;
@@ -475,40 +883,123 @@ LRESULT CALLBACK HookKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 		case VK_RSHIFT:
 			return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 		default:
-			return 0; // Do nothing for other keys
+			return 0; // Block other keys when window is focused
 	}
 	return CallNextHookEx(g_keyhook_hHook, nCode, wParam, lParam);
 }
-#endif
-
-void uninstall_keyhook();
-bool install_keyhook(bool allow_reinstall) {
-	#ifdef _WIN32
-	if (g_keyhook_hHook && !allow_reinstall)
+void process_watcher_thread_func(const std::string& process_name) {
+	g_process_watcher = std::make_unique<ProcessWatcher>(process_name);
+	int elapsed_time = 10; // Start with fast checking
+	bool found_process = false;
+	while (g_process_watcher_running.load()) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(elapsed_time));
+		// Check if hook is still installed.
+		if (!g_keyhook_active) break;
+		// Process watcher runs independently but only sends commands when window is focused
+		if (!g_window_focused.load()) continue;
+		// Check if process died.
+		if (found_process && !g_process_watcher->monitor()) {
+			elapsed_time = 60; // Slow down checking when process is dead
+			found_process = false;
+			g_jhookldr_process_running.store(false);
+			g_keyhook_needs_uninstall = true;
+			continue;
+		} else if (!found_process) {
+			if (g_process_watcher->find()) {
+				found_process = true;
+				elapsed_time = 10; // Speed up checking when process is found
+				g_jhookldr_process_running.store(true);
+				g_keyhook_needs_install = true;
+			} else g_jhookldr_process_running.store(false);
+		} else g_jhookldr_process_running.store(true);
+	}
+}
+bool start_process_watcher(const std::string& process_name) {
+	if (g_process_watcher_running.load()) {
+		return false; // Already running
+	}
+	g_process_watcher_running.store(true);
+	g_process_watcher_thread = std::thread(process_watcher_thread_func, process_name);
+	return true;
+}
+void stop_process_watcher() {
+	if (g_process_watcher_running.load()) {
+		g_process_watcher_running.store(false);
+		if (g_process_watcher_thread.joinable())
+			g_process_watcher_thread.join();
+		g_process_watcher.reset();
+		g_jhookldr_process_running.store(false);
+	}
+}
+// Function to only reinstall keyhook without affecting process watcher
+bool reinstall_keyhook_only() {
+	// Remove existing hook
+	if (g_keyhook_hHook) {
+		UnhookWindowsHookEx(g_keyhook_hHook);
+		g_keyhook_hHook = nullptr;
+	}
+	// Install new hook
+	g_keyhook_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, HookKeyboardProc, GetModuleHandle(NULL), NULL);
+	g_keyhook_active = true;
+	if (g_keyhook_hHook) {
+		send_keyboard_input(VK_INSERT, true);
+		return true;
+	} else {
+		g_keyhook_active = false;
 		return false;
+	}
+}
+bool install_keyhook() {
 	if (g_keyhook_hHook)
 		uninstall_keyhook();
 	g_keyhook_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, HookKeyboardProc, GetModuleHandle(NULL), NULL);
 	g_keyhook_active = true;
-	return g_keyhook_hHook ? true : false;
-	#else
-	return false;
-	#endif
+	if (g_keyhook_hHook) {
+		send_keyboard_input(VK_INSERT, true);
+		// Automatically start process watcher for jhookldr.exe (only on first install)
+		if (!g_process_watcher_running.load())
+			start_process_watcher("jhookldr.exe");
+		return true;
+	} else
+		return false;
 }
 void remove_keyhook() {
-	#ifdef _WIN32
 	if (!g_keyhook_hHook)
 		return;
 	UnhookWindowsHookEx(g_keyhook_hHook);
-	g_keyhook_hHook = NULL;
-	#endif
+	g_keyhook_hHook = nullptr;
 }
 void uninstall_keyhook() {
-	#ifdef _WIN32
 	remove_keyhook();
+	stop_process_watcher();
 	g_keyhook_active = false;
-	#endif
 }
+// Function to process keyhook commands in main thread.
+void process_keyhook_commands() {
+	if (g_keyhook_needs_uninstall) {
+		g_keyhook_needs_uninstall = false;
+		// Process died - actually uninstall hook via WinAPI to prevent JAWS from replacing it
+		if (g_keyhook_hHook) {
+			UnhookWindowsHookEx(g_keyhook_hHook);
+			g_keyhook_hHook = nullptr;
+		}
+	}
+	if (g_keyhook_needs_install) {
+		g_keyhook_needs_install = false;
+		// Process found - if window is focused and hook not installed, install it
+		if (!g_keyhook_hHook && g_window_focused.load()) {
+			g_keyhook_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, HookKeyboardProc, GetModuleHandle(NULL), NULL);
+			if (g_keyhook_hHook)
+				send_keyboard_input(VK_INSERT, true);
+		}
+	}
+}
+#else
+// Dummy no-op keyhook functions.
+bool install_keyhook() { return false; }
+void uninstall_keyhook() {}
+void process_keyhook_commands() {}
+#endif
 
 // Low level touch interface
 CScriptArray* get_touch_devices() {
@@ -574,6 +1065,23 @@ bool TextInputActive() {
 	return SDL_TextInputActive(g_WindowHandle);
 }
 
+// Helper functions for joystick_power_info struct
+void joystick_power_info_construct(void* mem) {
+	new (mem) joystick_power_info();
+}
+
+void joystick_power_info_construct_params(void* mem, int state, int percentage) {
+	new (mem) joystick_power_info(state, percentage);
+}
+
+void joystick_power_info_copy_construct(void* mem, const joystick_power_info& other) {
+	new (mem) joystick_power_info(other);
+}
+
+void joystick_power_info_destruct(void* mem) {
+	((joystick_power_info*)mem)->~joystick_power_info();
+}
+
 void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterObjectType("touch_finger", sizeof(SDL_Finger), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<SDL_Finger>());
 	engine->RegisterObjectProperty("touch_finger", "const uint64 id", asOFFSET(SDL_Finger, id));
@@ -585,7 +1093,7 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnum(_O("touch_device_type"));
 	engine->RegisterEnum(_O("joystick_type"));
 	engine->RegisterEnum(_O("joystick_bind_type"));
-	engine->RegisterEnum(_O("joystick_power_level"));
+	engine->RegisterEnum(_O("joystick_power_state"));
 	engine->RegisterEnum(_O("joystick_control_type"));
 	engine->RegisterGlobalFunction(_O("bool start_text_input()"), asFUNCTION(StartTextInput), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool stop_text_input()"), asFUNCTION(StopTextInput), asCALL_CDECL);
@@ -622,7 +1130,7 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool is_screen_keyboard_shown()"), asFUNCTION(ScreenKeyboardShown), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_SCREEN_KEYBOARD_SUPPORTED() property"), asFUNCTION(SDL_HasScreenKeyboardSupport), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_characters()"), asFUNCTION(get_characters), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool install_keyhook(bool=true)"), asFUNCTION(install_keyhook), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool install_keyhook()"), asFUNCTION(install_keyhook), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void uninstall_keyhook()"), asFUNCTION(uninstall_keyhook), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint[]@ get_keyboards()"), asFUNCTION(GetKeyboards), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_keyboard_name(uint id)"), asFUNCTION(GetKeyboardName), asCALL_CDECL);
@@ -893,8 +1401,9 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("key_code", "KEY_SOFTRIGHT", SDL_SCANCODE_SOFTRIGHT);
 	engine->RegisterEnumValue("key_code", "KEY_CALL", SDL_SCANCODE_CALL);
 	engine->RegisterEnumValue("key_code", "KEY_ENDCALL", SDL_SCANCODE_ENDCALL);
-	/* joystick stuff needs converting to SDL3
-	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_UNKNOWN", SDL_GAMEPAD_TYPE_STANDARD);
+	// Joystick enumerations
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_UNKNOWN", SDL_GAMEPAD_TYPE_UNKNOWN);
+	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_STANDARD", SDL_GAMEPAD_TYPE_STANDARD);
 	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_XBOX360", SDL_GAMEPAD_TYPE_XBOX360);
 	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_XBOX1", SDL_GAMEPAD_TYPE_XBOXONE);
 	engine->RegisterEnumValue("joystick_type", "JOYSTICK_TYPE_PS3", SDL_GAMEPAD_TYPE_PS3);
@@ -908,12 +1417,13 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("joystick_bind_type", "JOYSTICK_BIND_TYPE_BUTTON", SDL_GAMEPAD_BINDTYPE_BUTTON);
 	engine->RegisterEnumValue("joystick_bind_type", "JOYSTICK_BIND_TYPE_AXIS", SDL_GAMEPAD_BINDTYPE_AXIS);
 	engine->RegisterEnumValue("joystick_bind_type", "JOYSTICK_BIND_TYPE_HAT", SDL_GAMEPAD_BINDTYPE_HAT);
-	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_UNKNOWN", SDL_JOYSTICK_POWER_UNKNOWN);
-	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_EMPTY", SDL_JOYSTICK_POWER_EMPTY);
-	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_LOW", SDL_JOYSTICK_POWER_LOW);
-	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_MEDIUM", SDL_JOYSTICK_POWER_MEDIUM);
-	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_FULL", SDL_JOYSTICK_POWER_FULL);
-	engine->RegisterEnumValue("joystick_power_level", "JOYSTICK_POWER_WIRED", SDL_JOYSTICK_POWER_WIRED);
+	// SDL_PowerState enum values for joystick power state
+	engine->RegisterEnumValue("joystick_power_state", "JOYSTICK_POWER_ERROR", SDL_POWERSTATE_ERROR);
+	engine->RegisterEnumValue("joystick_power_state", "JOYSTICK_POWER_UNKNOWN", SDL_POWERSTATE_UNKNOWN);
+	engine->RegisterEnumValue("joystick_power_state", "JOYSTICK_POWER_ON_BATTERY", SDL_POWERSTATE_ON_BATTERY);
+	engine->RegisterEnumValue("joystick_power_state", "JOYSTICK_POWER_NO_BATTERY", SDL_POWERSTATE_NO_BATTERY);
+	engine->RegisterEnumValue("joystick_power_state", "JOYSTICK_POWER_CHARGING", SDL_POWERSTATE_CHARGING);
+	engine->RegisterEnumValue("joystick_power_state", "JOYSTICK_POWER_CHARGED", SDL_POWERSTATE_CHARGED);
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_INVALID", SDL_GAMEPAD_BUTTON_INVALID);
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_A", SDL_GAMEPAD_BUTTON_SOUTH);
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_BUTTON_B", SDL_GAMEPAD_BUTTON_EAST);
@@ -936,11 +1446,96 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_PADDLE3", SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2);
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_PADDLE4", SDL_GAMEPAD_BUTTON_LEFT_PADDLE2);
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_TOUCHPAD", SDL_GAMEPAD_BUTTON_TOUCHPAD);
-	engine->RegisterGlobalFunction("int joystick_count(bool = true)", asFUNCTION(joystick_count), asCALL_CDECL);
-	engine->RegisterGlobalFunction("array<string>@ joystick_mappings()", asFUNCTION(joystick_mappings), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int joystick_count(bool = true)"), asFUNCTION(joystick_count), asCALL_CDECL);
+	// Register joystick_power_info struct
+	engine->RegisterObjectType("joystick_power_info", sizeof(joystick_power_info), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_ALLINTS | asGetTypeTraits<joystick_power_info>());
+	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(joystick_power_info_construct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_CONSTRUCT, "void f(int, int)", asFUNCTION(joystick_power_info_construct_params), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_CONSTRUCT, "void f(const joystick_power_info&in)", asFUNCTION(joystick_power_info_copy_construct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(joystick_power_info_destruct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectProperty("joystick_power_info", "int state", asOFFSET(joystick_power_info, state));
+	engine->RegisterObjectProperty("joystick_power_info", "int percentage", asOFFSET(joystick_power_info, percentage));
+	engine->RegisterObjectMethod("joystick_power_info", "string get_state_name() const property", asMETHOD(joystick_power_info, get_state_name), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick_power_info", "string to_string() const", asMETHOD(joystick_power_info, to_string), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick_power_info", "string opConv() const", asMETHOD(joystick_power_info, to_string), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick_power_info", "string opImplConv() const", asMETHOD(joystick_power_info, to_string), asCALL_THISCALL);
 	engine->RegisterObjectType("joystick", 0, asOBJ_REF);
-	engine->RegisterObjectBehaviour("joystick", asBEHAVE_ADDREF, "void f()", asMETHODPR(joystick, duplicate, () const, void), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("async<T>", asBEHAVE_RELEASE, "void f()", asMETHODPR(async_result, release, () const, void), asCALL_THISCALL);
-	engine->RegisterObjectMethod("joystick", "bool get_has_LED() const property", asFUNCTION(SDL_GameControllerHasLED), asCALL_CDECL_OBJFIRST, 0, asOFFSET(joystick, stick), false);
-	end joystick stuff*/
+	engine->RegisterObjectBehaviour("joystick", asBEHAVE_FACTORY, "joystick@ f()", asFUNCTION(joystick_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("joystick", asBEHAVE_ADDREF, "void f()", asMETHOD(joystick, duplicate), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("joystick", asBEHAVE_RELEASE, "void f()", asMETHOD(joystick, release), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "uint get_joysticks() const property", asMETHOD(joystick, get_joysticks), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool get_has_x() const property", asMETHOD(joystick, get_has_x), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool get_has_y() const property", asMETHOD(joystick, get_has_y), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool get_has_z() const property", asMETHOD(joystick, get_has_z), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool get_has_r_x() const property", asMETHOD(joystick, get_has_r_x), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool get_has_r_y() const property", asMETHOD(joystick, get_has_r_y), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool get_has_r_z() const property", asMETHOD(joystick, get_has_r_z), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "uint get_buttons() const property", asMETHOD(joystick, get_buttons), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "uint get_sliders() const property", asMETHOD(joystick, get_sliders), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "uint get_povs() const property", asMETHOD(joystick, get_povs), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "string get_name() const property", asMETHOD(joystick, get_name), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool get_active() const property", asMETHOD(joystick, get_active), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_preferred_joystick() const property", asMETHOD(joystick, get_preferred_joystick), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "void set_preferred_joystick(int index) property", asMETHOD(joystick, set_preferred_joystick), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_x() const property", asMETHOD(joystick, get_x), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_y() const property", asMETHOD(joystick, get_y), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_z() const property", asMETHOD(joystick, get_z), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_r_x() const property", asMETHOD(joystick, get_r_x), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_r_y() const property", asMETHOD(joystick, get_r_y), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_r_z() const property", asMETHOD(joystick, get_r_z), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_slider_1() const property", asMETHOD(joystick, get_slider_1), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_slider_2() const property", asMETHOD(joystick, get_slider_2), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_pov_1() const property", asMETHOD(joystick, get_pov_1), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_pov_2() const property", asMETHOD(joystick, get_pov_2), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_pov_3() const property", asMETHOD(joystick, get_pov_3), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_pov_4() const property", asMETHOD(joystick, get_pov_4), asCALL_THISCALL);
+	// Velocity properties (not implemented in SDL, return 0)
+	engine->RegisterObjectMethod("joystick", "int get_v_x() const property", asMETHOD(joystick, get_v_x), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_v_y() const property", asMETHOD(joystick, get_v_y), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_v_z() const property", asMETHOD(joystick, get_v_z), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_vr_x() const property", asMETHOD(joystick, get_vr_x), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_vr_y() const property", asMETHOD(joystick, get_vr_y), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_vr_z() const property", asMETHOD(joystick, get_vr_z), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_v_slider_1() const property", asMETHOD(joystick, get_v_slider_1), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_v_slider_2() const property", asMETHOD(joystick, get_v_slider_2), asCALL_THISCALL);
+	// Acceleration properties (not implemented in SDL, return 0)
+	engine->RegisterObjectMethod("joystick", "int get_a_x() const property", asMETHOD(joystick, get_a_x), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_a_y() const property", asMETHOD(joystick, get_a_y), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_a_z() const property", asMETHOD(joystick, get_a_z), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_ar_x() const property", asMETHOD(joystick, get_ar_x), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_ar_y() const property", asMETHOD(joystick, get_ar_y), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_ar_z() const property", asMETHOD(joystick, get_ar_z), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_a_slider_1() const property", asMETHOD(joystick, get_a_slider_1), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_a_slider_2() const property", asMETHOD(joystick, get_a_slider_2), asCALL_THISCALL);
+	// Force feedback properties (not implemented in SDL, return 0)
+	engine->RegisterObjectMethod("joystick", "int get_f_x() const property", asMETHOD(joystick, get_f_x), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_f_y() const property", asMETHOD(joystick, get_f_y), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_f_z() const property", asMETHOD(joystick, get_f_z), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_fr_x() const property", asMETHOD(joystick, get_fr_x), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_fr_y() const property", asMETHOD(joystick, get_fr_y), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_fr_z() const property", asMETHOD(joystick, get_fr_z), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_f_slider_1() const property", asMETHOD(joystick, get_f_slider_1), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_f_slider_2() const property", asMETHOD(joystick, get_f_slider_2), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool button_down(int button)", asMETHOD(joystick, button_down), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool button_pressed(int button)", asMETHOD(joystick, button_pressed), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool button_released(int button)", asMETHOD(joystick, button_released), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool button_up(int button)", asMETHOD(joystick, button_up), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int[]@ buttons_down()", asMETHOD(joystick, buttons_down), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int[]@ buttons_pressed()", asMETHOD(joystick, buttons_pressed), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int[]@ buttons_released()", asMETHOD(joystick, buttons_released), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int[]@ buttons_up()", asMETHOD(joystick, buttons_up), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "string[]@ list_joysticks()", asMETHOD(joystick, list_joysticks), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool pov_centered(int pov)", asMETHOD(joystick, pov_centered), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool refresh_joystick_list()", asMETHOD(joystick, refresh_joystick_list), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool set(int index)", asMETHOD(joystick, set), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "uint get_type() const property", asMETHOD(joystick, type), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "joystick_power_info get_power_info() const property", asMETHOD(joystick, get_power_info), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool get_has_led() const property", asMETHOD(joystick, has_led), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool get_can_vibrate() const property", asMETHOD(joystick, can_vibrate), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool get_can_vibrate_triggers() const property", asMETHOD(joystick, can_vibrate_triggers), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "int get_touchpads() const property", asMETHOD(joystick, touchpads), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "string get_serial() const property", asMETHOD(joystick, serial), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool set_led(uint8 red, uint8 green, uint8 blue)", asMETHOD(joystick, set_led), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool vibrate(uint16 low_frequency, uint16 high_frequency, int duration)", asMETHOD(joystick, vibrate), asCALL_THISCALL);
+	engine->RegisterObjectMethod("joystick", "bool vibrate_triggers(uint16 left, uint16 right, int duration)", asMETHOD(joystick, vibrate_triggers), asCALL_THISCALL);
 }

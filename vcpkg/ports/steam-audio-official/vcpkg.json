@@ -1,0 +1,7 @@
+{
+  "name": "steam-audio-official",
+  "version": "4.6.1",
+  "description": "official release binaries for the steam audio library",
+  "homepage": "https://github.com/ValveSoftware/steam-audio/releases",
+  "license": "Apache-2.0"
+}

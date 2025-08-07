@@ -1,0 +1,64 @@
+{
+	"dependencies": [
+		"enet6",
+		"libflac",
+		"libffi",
+		"miniupnpc",
+		"libogg",
+		"opus",
+		"opusfile",
+		"sdl3-image",
+		"sdl3-ttf",
+		"libvorbis",
+		"angelscript",
+		"reactphysics3d",
+		"bass",
+		"bass-fx",
+		"bassmix",
+		"steam-audio-official",
+		{
+			"name": "curl",
+			"default-features": false,
+			"features": ["openssl"]
+		},
+		{
+			"name": "libplist",
+			"platform": "windows|osx|linux"
+		},
+{
+    "name": "sdl3",
+    "features": ["vulkan"],
+    "platform": "windows|osx|ios|android"
+},
+{
+    "name": "sdl3",
+    "platform": "linux",
+    "features": ["vulkan", "ibus", "wayland", "x11"]
+},
+		{
+			"name": "freetype",
+			"default-features": false,
+			"features": ["bzip2", "error-strings", "subpixel-rendering", "zlib"]
+		},
+		{
+			"name": "universalspeech",
+			"platform": "windows"
+		},
+		{
+			"name": "poco",
+			"default-features": false,
+			"features": ["net", "netssl", "json", "util", "xml", "zip", "encodings", "mongodb", "redis", "jwt", "prometheus", "sevenzip"]
+		},
+		{
+			"name": "libgit2",
+			"default-features": false,
+			"features": ["pcre2"]
+		},
+		{
+			"name": "libarchive",
+			"default-features": false,
+			"platform": "windows|osx|linux",
+			"features": ["bzip2", "libxml2", "lz4", "lzma", "zstd"]
+		}
+	]
+}
