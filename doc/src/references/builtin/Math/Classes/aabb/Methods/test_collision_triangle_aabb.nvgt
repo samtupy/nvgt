@@ -1,0 +1,21 @@
+/**
+	Checks whether a triangle (given by 3 points) intersects the AABB.
+	bool test_collision_triangle_aabb(const array<vector>@ points) const;
+	## Arguments:
+		points: The points of the triangle.
+	## Remarks:
+		This method would be the same as placing the minimum and maximum vectors of the triangle inside another AABB and calling test_collision.
+		Note that if the input parameter doesn't represent a triangle (I.E. have exactly three points), the method will throw an exception.
+*/
+
+// Example:
+void main() {
+	vector[] points;
+	points.insert_last(vector(2, 2, 0));
+	points.insert_last(vector(8, 2, 0));
+	points.insert_last(vector(5, 5, 0));
+	aabb b;
+	b.min = vector(1, 1, 0);
+	b.max = vector(12, 15, 5);
+	if (b.test_collision_triangle_aabb(points)) alert("Bang!", "We collided.");
+}

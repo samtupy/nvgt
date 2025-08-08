@@ -1,0 +1,21 @@
+/**
+	Seek to an offset in the datastream.
+	bool seek(int offset);
+	## Arguments:
+		offset: The byte offset you wish to seek to.
+	## Returns:
+		bool: Returns true if the stream could seek, false otherwise.
+	## Remarks:
+		Note that most datastreams do not support seeking as this would result in needing to store more data in memory than we are comfortable with, however, file objects and raw datastreams that read from a string do support seeking. Other than these stream types, you should assume that seek operations are not supported unless otherwise documented.
+*/
+
+// Example:
+void main() {
+	datastream ds;
+	if (!ds.open("this is a demonstration")) {
+		alert("Oh no", "Maybe this could happen for a file but it should never happen for a basic datastream!");
+		exit();
+	}
+		ds.seek(10);
+alert("example", ds.read()); // Will display "demonstration".
+}

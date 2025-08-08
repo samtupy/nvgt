@@ -1,5 +1,5 @@
 /**
-	Trims any and all whitespace from the left side of a string, returning a reference to it.
+	Trims any and all whitespace from the left side of a string, modifying the calling string.
 	string& string::trim_whitespace_left();
 	## Returns:
 		string&: a two-way reference to the specified string, with the whitespace removed from the left side.
