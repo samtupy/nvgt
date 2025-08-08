@@ -1,6 +1,6 @@
 /**
 	Overloads the -= operator, allowing you to subtract a vector from another.
-	vector& opSubAssign(const vector &in other);
+	vector& vector::opSubAssign(const vector &in other);
 	## Arguments:
 		* const vector&in other: the vector to subtract.
 */

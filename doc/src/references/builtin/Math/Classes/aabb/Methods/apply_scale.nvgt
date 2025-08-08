@@ -1,6 +1,6 @@
 /**
 	Scales the box by multiplying both min and max directly with the given scale vector. This causes the box to scale relative to the origin (0,0,0), meaning both its size and position will change if it's not centered at the origin.
-	void apply_scale(const vector&in scale);
+	void aabb::apply_scale(const vector&in scale);
 	## Arguments:
 		* scale: A vector containing the factors to scale by.
 */

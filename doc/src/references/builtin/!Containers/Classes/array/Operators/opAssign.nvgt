@@ -1,0 +1,13 @@
+/**
+	Overloads the = operator, allowing you to assign an array to another, already existing one.
+	array& opAssign(const array&in);
+	## Arguments:
+		* const array&in: the array to assign.
+*/
+
+// Example:
+void main() {
+	string[] a = {"Apple", "Banana", "Cherry"};
+	string[] b = a;
+	alert("Fruity!", join(b, ", "));
+}

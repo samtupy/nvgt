@@ -1,6 +1,6 @@
 /**
 	Checks whether a ray (straight line) intersects the box, given a starting point, direction, and distance.
-	bool test_ray_intersect(const vector&in ray_origin, const vector&in ray_direction, float ray_max_fraction);
+	bool aabb::test_ray_intersect(const vector&in ray_origin, const vector&in ray_direction, float ray_max_fraction);
 	## Arguments:
 		* ray_origin: The starting position.
 		* ray_direction: The direction you expect to move.

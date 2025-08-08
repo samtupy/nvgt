@@ -1,10 +1,11 @@
 /**
 	Removes an element of an array by a given position.
-	void array::remove_at(uint index);
+	1. void array::remove_at(uint index);
+	2. void array::erase(uint index);
 	## Arguments:
 		* uint index: the position to be removed.
 	## Remarks:
-		Please note that the position value is 0 base, and failure to define correct index will cause NVGT to throw "index out of bounds" exception.
+		Please note that the position value is zero-based, and failure to define correct index will cause NVGT to throw "index out of bounds" exception.
 */
 
 // Example:

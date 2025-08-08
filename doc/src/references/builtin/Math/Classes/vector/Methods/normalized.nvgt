@@ -1,6 +1,6 @@
 /**
 	Returns a new vector normalized based on the axes of the existing one.
-	vector normalized();
+	vector vector::normalized();
 	## Arguments:
 		None.
 	## Remarks

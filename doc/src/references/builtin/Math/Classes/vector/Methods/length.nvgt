@@ -1,6 +1,6 @@
 /**
 	Retrieves the Euclidean length of the vector.
-	float length();
+	float vector::length();
 	## Arguments:
 		None.
 	## Remarks

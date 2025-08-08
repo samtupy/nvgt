@@ -1,6 +1,6 @@
 /**
 	Checks whether another AABB is fully contained within this one.
-	bool contains(const aabb&in other) const;
+	bool aabb::contains(const aabb&in other) const;
 	Checks whether the given point lies inside this AABB, optionally with a margin of error (epsilon).
 	bool contains(const vector&in point, float epsilon = EPSILON) const
 	## Arguments (1):

@@ -1,0 +1,11 @@
+/**
+	Overloads the OpFor* loop iterators, allowing the foreach loop using a key and a value.
+*/
+
+// Example:
+void main() {
+	string[] a = {"Apple", "Banana", "Cherry"};
+	foreach(string v, int k: a) {
+		alert("Array", "Index "+k+"="+v);
+	}
+}

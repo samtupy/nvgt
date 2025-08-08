@@ -9,4 +9,4 @@ None.
 ## Remarks:
 The format used for serializing is different to that used by BGT.
 
-At this time there is no corresponding deserialize method.
+Please note the corresponding deserialize method is a standalone global function.

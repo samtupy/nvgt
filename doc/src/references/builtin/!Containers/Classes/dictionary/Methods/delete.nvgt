@@ -1,6 +1,7 @@
 /**
 	This method deletes the given key from the dictionary.
-	bool dictionary::delete(const string &in key);
+	1. bool dictionary::delete(const string &in key);
+	2. bool dictionary::erase(const string &in key);
 	## Arguments:
 		* const string &in key: the key to delete.
 	## Returns:

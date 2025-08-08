@@ -1,6 +1,6 @@
 /**
 	Rotates the given vector around the calling vector (used as the rotation axis), by the specified angle in radians.
-	vector rotate(const vector&in source, float angle);
+	vector vector::rotate(const vector&in source, float angle);
 	## Arguments:
 		* source: The vector to rotate.
 		* angle: The angle in radians.

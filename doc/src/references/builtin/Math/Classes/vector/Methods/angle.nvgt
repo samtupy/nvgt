@@ -1,6 +1,6 @@
 /**
 	Returns the angle in radians between this vector and the given vector.
-	float angle(const vector&in compare);
+	float vector::angle(const vector&in compare);
 	## Arguments:
 		* compare: The vector to compare against.
 

@@ -1,6 +1,6 @@
 /**
 	Overloads the *= operator, allowing you to multiply one vector by a scalar.
-	vector& opMulAssign(float scalar);
+	vector& vector::opMulAssign(float scalar);
 	## Arguments:
 		* float scalar: The scalar to multiply by.
 	## Remarks

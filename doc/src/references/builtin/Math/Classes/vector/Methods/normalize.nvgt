@@ -1,6 +1,6 @@
 /**
 	Normalizes the vector so that its Euclidian length is 1.
-	vector& normalize();
+	vector& vector::normalize();
 	## Arguments:
 		None.
 	## Remarks

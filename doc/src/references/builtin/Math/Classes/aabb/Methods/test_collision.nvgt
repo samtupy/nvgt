@@ -1,6 +1,6 @@
 /**
 	Checks if the position of one box would collide or overlap with another.
-	bool test_collision(const aabb&in aabb) const;
+	bool aabb::test_collision(const aabb&in aabb) const;
 	## Arguments:
 		aabb: The box to compare with.
 	## Remarks

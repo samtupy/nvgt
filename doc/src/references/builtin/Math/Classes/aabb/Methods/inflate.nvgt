@@ -1,6 +1,6 @@
 /**
 	Expands the box by the given amounts in all directions. This means that the total size increases by twice the given values.
-	void inflate(float x, float y, float z);
+	void aabb::inflate(float x, float y, float z);
 	## Arguments:
 		* x: Value to inflate X axis.
 		* y: Value to inflate Y axis.

@@ -1,6 +1,6 @@
 /**
 	Expands the box only if necessary to ensure the given point is contained within it. If the point is already inside, nothing changes.
-	void inflate_with_point(const vector&in point);
+	void aabb::inflate_with_point(const vector&in point);
 	## Arguments:
 		point: The point to include.
 */

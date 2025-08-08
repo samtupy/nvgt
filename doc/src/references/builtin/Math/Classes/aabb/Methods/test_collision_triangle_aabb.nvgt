@@ -1,6 +1,6 @@
 /**
 	Checks whether a triangle (given by 3 points) intersects the AABB.
-	bool test_collision_triangle_aabb(const array<vector>@ points) const;
+	bool aabb::test_collision_triangle_aabb(const array<vector>@ points) const;
 	## Arguments:
 		points: The points of the triangle.
 	## Remarks:

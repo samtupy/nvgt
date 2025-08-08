@@ -1,6 +1,6 @@
 /**
 	Overloads the += operator, allowing you to add a vector to another, already existing one.
-	vector& opAddAssign(const vector &in other);
+	vector& vector::opAddAssign(const vector &in other);
 	## Arguments:
 		* const vector&in other: the vector to add.
 */

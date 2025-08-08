@@ -1,0 +1,24 @@
+/**
+	Inserts an element or another array into an array at a given position, moving other items aside to make room if necessary.
+	1. void array::insert(uint index, const T&in value);
+	2. void array::insert(uint index, const array<T>&inout arr);
+	3. void array::insert_at(uint index, const T&in value);
+	4. void array::insert_at(uint index, const array<T>&inout arr);
+	## Arguments (1, 3):
+		* uint index: the position to insert at.
+		* const T&in value: the element to be inserted.
+	## Arguments (2, 4):
+		* uint index: the position to insert at.
+		* array<T>&inout arr: The array to be inserted.
+	## Remarks:
+		This method adds an element to the given position of an array. If you pass index 0, the item will be inserted at the beginning of the aray, and if you pass the array's absolute length, the item will be inserted at the end. Any values less than 0 or greater than the array's absolute length will result in an index out of bounds exception being thrown.
+*/
+
+// Example:
+void main() {
+	string[] names = {"HTML", "CSS"};
+string[] others = {"JavaScript", "PHP"};
+	names.insert_at(2, others);
+	names.insert_at(3, "ASP");
+	alert("Languages", join(names, ", "));
+}

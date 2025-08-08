@@ -1,7 +1,7 @@
 /**
 	Overloads the / operator, allowing you to divide two vectors, or divide one vector by a scalar.
-	vector& opDiv(const vector &in other);
-	vector& opDiv(float scalar);
+	vector& vector::opDiv(const vector &in other);
+	vector& vector::opDiv(float scalar);
 	## Arguments (1):
 		* const vector&in other: the vector to divide by.
 	## Arguments (2):

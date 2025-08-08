@@ -1,6 +1,6 @@
 /**
 	Sets this AABB to be the bounding box that contains both aabb1 and aabb2.
-	void merge(const aabb&in aabb1, const aabb&in aabb2);
+	void aabb::merge(const aabb&in aabb1, const aabb&in aabb2);
 	## Arguments:
 		* aabb1: The first box to merge.
 		* aabb2: The second box to merge.

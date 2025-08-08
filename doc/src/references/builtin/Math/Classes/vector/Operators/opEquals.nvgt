@@ -1,6 +1,6 @@
 /**
 	Overloads the == operator, checking if two vectors are equal.
-	bool opEquals(const vector &in other);
+	bool vector::opEquals(const vector &in other);
 	## Arguments:
 		* const vector&in other: the vector to compare.
 */

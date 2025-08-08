@@ -1,6 +1,7 @@
 /**
 	Returns the size of the dictionary.
-	uint dictionary::get_size();
+	1. uint dictionary::get_size();
+	2. uint dictionary::size();
 	## Returns:
 		uint: the size of the dictionary, another word, the total keys on success, 0 otherwise.
 */

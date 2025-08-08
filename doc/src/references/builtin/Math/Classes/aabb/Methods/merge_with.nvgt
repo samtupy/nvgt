@@ -1,6 +1,6 @@
 /**
 	Expands this AABB to fully contain both itself and the other AABB.
-	void merge_with(const aabb&in aabb);
+	void aabb::merge_with(const aabb&in aabb);
 	## Arguments:
 		aabb: The AABB to merge.
 */
