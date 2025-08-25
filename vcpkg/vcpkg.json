@@ -1,6 +1,7 @@
 {
 	"dependencies": [
 		"enet6",
+		"fast-float",
 		"libflac",
 		"libffi",
 		"miniupnpc",
@@ -9,6 +10,9 @@
 		"opusfile",
 		"sdl3-image",
 		"sdl3-ttf",
+		"tiny-aes-c",
+		"tinyexpr",
+		"unordered-dense",
 		"libvorbis",
 		"angelscript",
 		"reactphysics3d",
