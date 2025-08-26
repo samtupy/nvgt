@@ -60,10 +60,10 @@ bool aabb_test_collision_triangle(const AABB& aabb, CScriptArray* points) {
 	for (int i = 0; i < 3; i++) {
 		const Vector3& v = *static_cast<const Vector3*>(points->At(i));
 		tri[i] = Vector3(v.x, v.y, v.z);
-    }
-
+	}
 	return aabb.testCollisionTriangleAABB(tri);
 }
+
 bool aabb_test_ray_intersect(const AABB& aabb, Vector3 start, Vector3 dir, float dist) {
 	Vector3 invdir(999999, 999999, 999999);
 	if (dir.x != 0) invdir.x = 1.0 / dir.x;
