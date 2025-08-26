@@ -1,0 +1,20 @@
+/**
+	Returns the dot product of two vectors.
+	float vector::dot(const vector&in other);
+	## Arguments:
+		* other: The vector to sum.
+
+	## Remarks
+		The dot product is a measure of how much two vectors point in the same direction. This is often used in physics for checking if an object is moving into or away from a surface, measuring forces, calculating angles, or .
+		* Returns a positive value if both vectors point roughly in the same direction.
+		* Returns zero if the vectors are perpendicular (at right angles, not pointing the same way at all).
+		* Returns a negative value if the vectors point in opposite directions.
+		The dot product is calculated as (ax * bx) + (ay * by) + (az * bz).
+*/
+
+// Example:
+void main() {
+	vector v1(1, 2, 3);
+	vector v2(4, 5, 6);
+	alert("Dot", v2.dot(v1)); // (1 * 4) + (2 * 5) + (3 * 6) = 32.
+}

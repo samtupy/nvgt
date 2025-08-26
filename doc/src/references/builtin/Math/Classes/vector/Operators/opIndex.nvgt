@@ -1,0 +1,14 @@
+/**
+	Overloads the [] operator, allowing you to access the axes via their indexes.
+	bool vector::opIndex(int index);
+	## Arguments:
+		* int index: the index of the axis to query.
+	## Remarks
+		The axis index is represent by a number: x = 0, y = 1, z = 2.
+*/
+
+// Example:
+void main() {
+	vector v(2, 3, 5);
+	alert("Vector", v[0]+", "+v[1]+", "+v[2]);
+}

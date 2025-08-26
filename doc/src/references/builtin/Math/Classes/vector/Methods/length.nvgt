@@ -10,7 +10,6 @@
 		* Calculating speed: If a vector represents velocity, the length gives you the speed (how fast something is moving), while the vector's direction shows where it's going.
 		* Collision detection: To determine how close two points are, subtract one position from another to get a direction vector, then use the length to measure the distance.
 		If you are looking for the total size (I.E. number of units, volume etc), you will manually need to calculate this by using x * y * z.
-	
 */
 
 // Example:

@@ -1,0 +1,10 @@
+/**
+	Returns the minimum value of the vector.
+	float vector::min_value const;
+*/
+
+// Example:
+void main() {
+	vector v(5, 7, 4);
+	alert("Minimum value", v.min_value);
+}

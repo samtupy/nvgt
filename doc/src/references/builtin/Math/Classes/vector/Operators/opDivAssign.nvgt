@@ -1,0 +1,15 @@
+/**
+	Overloads the /= operator, allowing you to divide one vector by a scalar.
+	vector& vector::opDivAssign(float scalar);
+	## Arguments:
+		* float scalar: The scalar to divide by.
+	## Remarks
+		Dividing by a scalar will divide all axes by that scalar.
+*/
+
+// Example:
+void main() {
+	vector v1(3, 12, 16);
+	v1*=3;
+	alert("The first vector =", "(" + v1.x + ", " + v1.y + ", " + v1.z + ")");
+}

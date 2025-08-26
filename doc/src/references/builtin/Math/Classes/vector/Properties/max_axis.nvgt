@@ -1,0 +1,12 @@
+/**
+	Returns the index of the axis which contains the maximum value.
+	int vector::max_axis const;
+	## Remarks
+		The axis index is represent by a number: x = 0, y = 1, z = 2.
+*/
+
+// Example:
+void main() {
+	vector v(5, 7, 4);
+	alert("maximum axis", v.max_axis);
+}
