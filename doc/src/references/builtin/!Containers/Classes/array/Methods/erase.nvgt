@@ -5,7 +5,7 @@
 	## Arguments:
 		* uint index: the position to be removed.
 	## Remarks:
-		Please note that the position value is zero-based, and failure to define correct index will cause NVGT to throw "index out of bounds" exception.
+		Please note that the position value is zero-based, and failure to define the correct index will cause NVGT to throw an "index out of bounds" exception.
 */
 
 // Example:
