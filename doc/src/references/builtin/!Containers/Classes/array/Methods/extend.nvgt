@@ -1,14 +1,14 @@
 /**
-	Appends another array to the end of the array.
-	void array::extend(const array<T>&inout arr);
+	Appends the items from another array into this array.
+	void array::extend(const array<T>& arr);
 	## Arguments:
-		* array<T>&inout arr: The array to be inserted.
+		* array<T>& arr: The array to be inserted.
 */
 
 // Example:
 void main() {
 	string[] names = {"HTML", "CSS"};
-string[] others = {"JavaScript", "PHP", "ASP"};
+	string[] others = {"JavaScript", "PHP", "ASP"};
 	names.extend(others);
 	alert("Languages", join(names, ", "));
 }
