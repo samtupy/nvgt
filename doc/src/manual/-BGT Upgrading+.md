@@ -9,27 +9,27 @@ our goal is to make the transition as seamless as possible from BGT to NVGT, but
 
 ## Missing features
 NVGT currently has some missing features compared with BGT. These may be added in the future, or have already been replaced with more flexible options.
-* Security functions such as `file_encrypt`, `file_decrypt`, `file_hash` and `set_sound_decryption_key` do not exist in NVGT. These may or may not be added, but in the meantime you can encrypt/decrypt/hash files manually by using string_aes_encrypt/decrypt/hash_sha256/sha512.
-* NVGT does not interface with WindowEyes, which is now considered a legacy screen reader.
+* Security functions such as `file_encrypt`, `file_decrypt`, `file_hash` do not exist in NVGT. These may or may not be added, but in the meantime you can encrypt/decrypt/hash files manually by using string_aes_encrypt/decrypt/hash_sha256/sha512.
 
 ## Differences
 ### Functional
 Some functions which have the same name as those in BGT work slightly differently.
-* get_last_error: Currently doesn't trigger in all the situations that BGT does.
-* When refering to an array's length, pass length as a method call and not as a property. For example, you would use `array.length();` rather than `array.length;`.
+* `get_last_error`: Currently doesn't trigger in all the situations that BGT does.
+* When refering to an array's length, use length as a method call and not as a property. For example, you would use `array.length();` rather than `array.length;`.
 * Screen reader functions no longer need to specify the screen reader. If an active screen reader is detected it will automatically speak through there.
 * Data encrypted with BGT cannot be decrypted with NVGT, and vice versa.
-* The `sound::stream()` method does exist in NVGT, but it's simply an alias to `sound::load()`. For this reason it is recommended that you change all your `stream()` calls to `load()` instead. The load function performs an  efficient combination of streaming and preloading by default.
-* load() contains a second optional argument to pass a pack file. set_sound_storage() is no longer used for the moment. However, you can set sound_pool.pack_file or even the global sound_default_pack property to a pack handle to get a similar effect.
-* Take care to check any method calls using the tts_voice object as a few methods such as set_voice have changed from their BGT counterparts.
+* The `sound::stream()` method does exist in NVGT, but it's simply an alias to `sound::load()`. For this reason it is recommended that you change all your `stream()` calls to `load()` instead. The `load` function performs an  efficient combination of streaming and preloading by default.
+* `load()` contains a second optional argument to pass a pack file. `set_sound_storage()` is no longer used for the moment. However, you can set `sound_pool.pack_file` or even the global `sound_default_pack` property to a pack handle to get a similar effect.
+* Take care to check any method calls using the `tts_voice` object as a few methods such as `set_voice` have changed from their BGT counterparts.
 * When splitting a string, matching against \r\n is advised as BGT handles this differently. This will result in not having spurious line breaks at the ends of split text.
-* The settings object no longer writes to the registry, but instead has been replaced by the settings.nvgt include which wraps the previous settings object API, but instead writes to configuration files in various formats.
+* The `settings` object no longer writes to the registry, but instead has been replaced by the settings.nvgt include which wraps the previous settings object API, but instead writes to configuration files in various formats.
 * The dynamic_menu.bgt include is now called bgt_dynamic_menu.nvgt. This is because NVGT now includes it's own menu class called menu.nvgt.
 * There is a type called `var` in the engine now, so you may need to be careful if your project contains any variables named var.
 * It's worth noting that unlike BGT, NVGT by default attempts to fully package your game for you including sounds, libraries, documents and any other assets into a .zip file or similar on other platforms intended for distrobution. If you don't like this behavior, you can create a file next to nvgt.exe called config.properties and add the line build.windows_bundle = 0 which will cause NVGT to just produce a standalone executable like BGT did, though you now may need to copy some libraries from the lib folder for the compiled product to run. For more information, see the Compiling your Project for Distribution topic.
 * In bgt, you could include pack files with the `#include` directive. In nvgt, we've decided that this should only include code. To embed packs, you can instead add the line `#pragma embed packname.dat` to your project, the extension can be any of your choosing for both code and packs this way.
 * Unlike BGT, you can embed multiple packs into an exe. For BGT compatibility, therefore, opening a pack file called `*` will open the first available pack, but it is recommended that you specify a filename such as `*mypack.dat`.
-* The generate_profile function returns a string which you can write into a file if desired.
+* The `generate_profile` function returns a string which you can write into a file if desired.
+* Encrypting/decrypting sounds is done with the `asset_encryptor`/`asset_decryptor` datastreams, rather than with `file_encrypt`/`file_decrypt` functions. You can play encrypted sounds by setting the `sound_default_decryption_key` property.
 
 ### Nominal
 The names of many functions have changed in NVGT. Some have even been moved into the objects they are linked to.
@@ -69,7 +69,7 @@ Below is a list starting with the BGT function and the NVGT equivalent:
 * string_reverse: string.reverse_bytes
 * string_split: string.split
 * string_to_lower_case: string.lower
-* string_to_number: parse_float
+* string_to_number: parse_float/parse_double
 * string_to_upper_case: string.upper
 * The five substring functions string_left, string_mid, string_right, string_trim_left, string_trim_right, have been replaced with just two methods: string.substr and string.slice.
 
@@ -91,6 +91,5 @@ The following key constants are also different:
 You can `#include "bgt_compat.nvgt"`, which implements a lot of aliases to BGT-compatible functions and classes. However when doing this, please be aware of the following limitations:
 * Using built-in functions may improve performance so this is more or less a stop-gap to get you up and running quickly; however if you wish for your code to just run, bgt_compat will certainly be of use.
 * Please note you will not be able to use this script if you have disabled global variables.
-* `set_sound_decryption_key` is also a dummy function.
 * Since the screen reader internal functions no longer require you to specify a screen reader, the reader parameter is ignored.
 * The hardware_only parameter of generate_computer_id is ignored.
