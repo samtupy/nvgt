@@ -12,14 +12,15 @@ gen->size=0;
 gen->waveform=el_tonar_waveform_sine;
 gen->volume=0;
 gen->pan=0;
-gen->fade_start=8;
-gen->fade_end=12;
+gen->fade_start=el_tonar_default_fade_start;
+gen->fade_end=el_tonar_default_fade_end;
 gen->note_transpose=0;
 gen->freq_transpose=0;
 gen->tempo=120;
 gen->sample_rate=44100;
 gen->channels=2;
 gen->peak=0;
+gen->output_silence=0;
 gen->begin=elz_tonar_begin;
 gen->end=elz_tonar_end;
 return 1;
@@ -40,8 +41,7 @@ return gen->waveform;
 int el_tonar_set_volume(el_tonar* gen, double db)
 {
 if(!elz_tonar_is_init(gen)) return 0;
-if(db>0) return 0;
-if(db<-100) return 0;
+if((db<el_tonar_min_db)||(db>el_tonar_max_db)) return 0;
 gen->volume=db;
 return 1;
 }
@@ -49,6 +49,18 @@ double el_tonar_get_volume(el_tonar* gen)
 {
 if(!elz_tonar_is_init(gen)) return 0;
 return gen->volume;
+}
+int el_tonar_set_allow_silence(el_tonar* gen, int silence)
+{
+if(!elz_tonar_is_init(gen)) return 0;
+gen->output_silence=(silence? 1: 0);
+return 1;
+}
+int el_tonar_get_allow_silence(el_tonar* gen)
+{
+if(!elz_tonar_is_init(gen)) return 0;
+return gen->output_silence;
+return 1;
 }
 int el_tonar_set_pan(el_tonar* gen, double pan)
 {
@@ -216,7 +228,7 @@ return el_tonar_seek(gen, el_tonar_get_position(gen)-amount);
 }
 int el_tonar_output_buffer_size(el_tonar* gen)
 {
-if(elz_tonar_is_silent(gen)) return 0;
+if(!elz_tonar_can_output(gen)) return 0;
 int samples=gen->length;
 int bytes_per_sample=2;
 return samples*bytes_per_sample;
@@ -237,8 +249,6 @@ return 1;
 }
 int el_tonar_output_file(el_tonar* gen, char* fn)
 {
-if(!elz_tonar_is_init(gen)) return 0;
-if(elz_tonar_is_silent(gen)) return 1;
 int outsize=el_tonar_output_buffer_size(gen);
 if(outsize<=0) return 0;
 char* output=malloc(outsize+44);
@@ -290,6 +300,12 @@ int elz_tonar_is_silent(el_tonar* gen)
 if(elz_tonar_is_empty(gen)) return 1;
 if(gen->peak<=0) return 1;
 return 0;
+}
+int elz_tonar_can_output(el_tonar* gen)
+{
+if(elz_tonar_is_empty(gen)) return 0;
+if(!elz_tonar_is_silent(gen)) return 1;
+return gen->output_silence;
 }
 int elz_tonar_sequence(el_tonar* gen, double freq, double bend_amount, int length, int bend_start, int bend_length)
 {

@@ -200,7 +200,6 @@ ma_result tts_voice::job_proc(ma_job *pJob) {
 	return MA_SUCCESS;
 }
 tts_voice::tts_voice(const std::string &builtin_voice_name) {
-	init_sound();
 	RefCount = 1;
 	samprate = 0;
 	bitrate = 0;
@@ -345,7 +344,7 @@ bool tts_voice::speak(const std::string &text, bool interrupt) {
 	if (!data)
 		return false;
 	char *ptr = tts_trim(data, &bufsize, bitrate, channels);
-	soundptr s(g_audio_engine->new_sound());
+	soundptr s(new_global_sound());
 	bool ret = s->load_pcm(ptr, bufsize, bitrate == 16 ? ma_format_s16 : ma_format_u8, samprate, channels);
 	if (voice_index == builtin_index)
 		free(data);
@@ -410,7 +409,7 @@ std::string tts_voice::speak_to_memory(const std::string &text) {
 	return output;
 }
 sound *tts_voice::speak_to_sound(const std::string &text) {
-	sound *s = g_audio_engine->new_sound();
+	sound *s = new_global_sound();
 	std::string speech = speak_to_memory(text);
 	if (speech.empty())
 		return s;

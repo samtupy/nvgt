@@ -19,13 +19,6 @@ if [[ "$IS_CI" != 1 ]]; then
 else
 	echo Running on CI.
 fi
-echo Downloading lindev...
-wget https://nvgt.gg/lindev.zip
-mkdir -p lindev
-cd lindev
-unzip -q ../lindev.zip
-cd ..
-rm lindev.zip
 if ! which scons &> /dev/null; then
 	pip3 install scons
 fi

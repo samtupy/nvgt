@@ -19,13 +19,6 @@ if [[ "$IS_CI" != 1 ]]; then
 else
 	echo Running on CI.
 fi
-echo Downloading macosdev...
-curl -s -O https://nvgt.gg/macosdev.zip
-mkdir -p macosdev
-cd macosdev
-unzip -q ../macosdev.zip
-cd ..
-rm macosdev.zip
 scons -s
 echo NVGT built.
 deactivate

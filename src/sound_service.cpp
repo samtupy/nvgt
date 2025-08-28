@@ -321,7 +321,9 @@ private:
 		return MA_SUCCESS;
 	}
 	static ma_result onRead(ma_vfs *pVFS, ma_vfs_file file, void *pDst, size_t sizeInBytes, size_t *pBytesRead) {
+		if (pBytesRead) *pBytesRead = 0;
 		file_cast(file);
+		if (!stream->good()) return MA_AT_END;
 		stream->read((char *)pDst, sizeInBytes);
 		if (pBytesRead) *pBytesRead = stream->gcount();
 

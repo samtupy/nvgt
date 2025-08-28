@@ -50,6 +50,7 @@ public:
 	bool is_client;
 	bool IPv6enabled;
 	bool receive_timeout_event;
+	bool send_immediately;
 	network();
 	void addRef();
 	void release();
@@ -75,6 +76,7 @@ public:
 	bool send_unreliable_peer(asQWORD peer, const std::string& message, unsigned char channel) {
 		return send(peer, message, channel, false);
 	}
+	bool flush();
 	bool disconnect_peer_softly(asQWORD peer_id);
 	bool disconnect_peer(asQWORD peer_id);
 	bool disconnect_peer_forcefully(asQWORD peer_id);

@@ -37,6 +37,8 @@ void tone_synth::Release() {
 }
 void tone_synth::reset() {
 	el_tonar_reset(gen);
+	el_tonar_set_waveform(gen, 3);
+	el_tonar_set_allow_silence(gen, 1);
 }
 void tone_synth::set_waveform(int type) {
 	int real_type = bgt_to_tonar_waveform(type);
@@ -57,6 +59,12 @@ void tone_synth::set_pan(double pan) {
 }
 double tone_synth::get_pan() {
 	return el_tonar_get_pan(gen);
+}
+void tone_synth::set_allow_silence(bool silence) {
+	el_tonar_set_allow_silence(gen, (silence? 1: 0));
+}
+bool tone_synth::get_allow_silence() {
+	return (el_tonar_get_allow_silence(gen)? true: false);
 }
 bool tone_synth::set_edge_fades(int start, int end) {
 	return el_tonar_set_edge_fades(gen, start, end)? true: false;
@@ -177,6 +185,8 @@ void RegisterScriptTonesynth(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("tone_synth", "void reset()", asMETHOD(tone_synth, reset), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "void set_waveform_type(int type) property", asMETHOD(tone_synth, set_waveform), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "int get_waveform_type() const property", asMETHOD(tone_synth, get_waveform), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "void set_allow_silent_output(bool silence) property", asMETHOD(tone_synth, set_allow_silence), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool get_allow_silent_output() const property", asMETHOD(tone_synth, get_allow_silence), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "void set_volume(double value) property", asMETHOD(tone_synth, set_volume), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "double get_volume() const property", asMETHOD(tone_synth, get_volume), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "void set_pan(double value) property", asMETHOD(tone_synth, set_pan), asCALL_THISCALL);

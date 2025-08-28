@@ -2,7 +2,7 @@
 # There are many more libraries and headers for the windows version of this package than for other platforms where getting the packages takes considerably less time and effort, but never the less there are still bass builds and steam audio for linux and macos.
 # This also contains code to copy these libraries to the release/lib directory in the repo to make packaging easier, this way the release directory contains a fully working copy of nvgt upon build.
 
-import os
+from pathlib import Path
 
 Import("env")
 
@@ -11,23 +11,18 @@ if env["PLATFORM"] == "win32": prefix = "win"
 elif env["PLATFORM"] == "darwin": prefix = "macos"
 elif env["PLATFORM"] == "posix": prefix = "lin"
 else: Exit(1)
+env["NVGT_OSDEV_NAME"] = prefix + "dev"
 
-def set_osdev_paths(env, osdev_path = prefix + "dev"):
-	found = False
-	if not os.path.isdir("../" + osdev_path):
-		try: osdev_path = open(prefix + "dev_path").read()
-		except: return
-	else:
-		osdev_path = "#" + osdev_path
-		found = True
-	if not found and not os.path.isdir(osdev_path): return
-	else: found = True
-	env.Append(CPPPATH = [os.path.join(osdev_path, "include")])
-	env.Append(LIBPATH = [os.path.join(osdev_path, "lib")])
+def set_osdev_paths(env, osdev_path = ARGUMENTS.get("deps_path", prefix + "dev")):
+	if not "deps_path" in ARGUMENTS and Path(osdev_path + "_path").exists(): osdev_path = Path(osdev_path).read_text()
+	else: osdev_path = Path("#" + osdev_path)
+	env.Append(CPPPATH = [str(osdev_path / "include")])
+	if ARGUMENTS.get("debug", "0") == "1": env.Append(LIBPATH = [str(osdev_path / "debug" / "lib")])
+	env.Append(LIBPATH = [str(osdev_path / "lib")])
+	env["NVGT_OSDEV_PATH"] = str(Dir(osdev_path))
 	if env["PLATFORM"] == "win32":
-		env.Append(LIBPATH = [os.path.join(osdev_path, "bin")])
-		env["NVGT_OSDEV_PATH"] = osdev_path
-		if "debug" in osdev_path: env["windev_debug"] = 1
+		if ARGUMENTS.get("debug", "0") == "1": env.Append(LIBPATH = [str(osdev_path / "debug" / "bin")])
+		env.Append(LIBPATH = [str(osdev_path / "bin")])
 
 set_osdev_paths(env)
 
@@ -36,6 +31,6 @@ def copy_osdev_libraries(env):
 	libs = ["archive", "bass", "bass_fx", "bassmix", "git2", "plist-2.0", "phonon"]
 	if env["PLATFORM"] == "win32": libs += ["GPUUtilities", "nvdaControllerClient64", "SAAPI64", "TrueAudioNext"]
 	for l in libs:
-		env.Install("#release/lib", FindFile(env.subst("${SHLIBPREFIX}" + l + ("$SHLIBSUFFIX" if not env["SHLIBSUFFIX"] in l else "")), env["LIBPATH"] + ["/usr/local/lib"]))
+		env.Install("#release/lib", FindFile(env.subst("${SHLIBPREFIX}" + l + ("$SHLIBSUFFIX" if not env["SHLIBSUFFIX"] in l else "")), env["LIBPATH"]))
 
 env["NVGT_OSDEV_COPY_LIBS"] = copy_osdev_libraries
