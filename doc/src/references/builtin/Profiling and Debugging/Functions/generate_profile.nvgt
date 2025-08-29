@@ -7,7 +7,6 @@
 
 // Example:
 void main() {
-	
 	start_profiling();
 	wait(1000);
 	alert("Profile", generate_profile());
