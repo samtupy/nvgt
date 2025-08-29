@@ -56,6 +56,7 @@ extern "C" {
         DISPID voice_token_dispids[2];
         DISPID memory_stream_dispids[3];
         DISPID audio_format_getwaveformatex_dispid;
+        DISPID audio_format_setwaveformatex_dispid;
         DISPID waveformatex_dispids[4];
         unsigned long sample_rate;
         unsigned char bits_per_sample;

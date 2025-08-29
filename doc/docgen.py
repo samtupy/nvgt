@@ -7,6 +7,7 @@ import json
 import mistune
 import os
 import shutil
+import sys
 
 html_base = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>{title}</title>\n</head>\n<body>\n{body}\n</body>\n</html>\n"
 liquid_base = "---\nlayout: default.liquid\ntitle: {title}\n---\n\n{body}"
@@ -150,7 +151,14 @@ def parse_nvgt_markdown(tree, path, data):
 def process_topic(tree, path, indent):
 	"""Processes a topic. Returns the plain text version of a topic given it's path, including indenting it's text, this is used in the output_documentation_section function below. Prior to returning the plaintext, outputs the chm source and markdown formats for this topic. Tree is required for cached topic names."""
 	if not os.path.isfile(path): return
-	data = open(path, "r", encoding = "UTF8").read()
+	data = ""
+	try :
+		with open(path, "r", encoding = "UTF8") as f:
+			data = f.read()
+	except Exception as e:
+		print(f"Error processing {path}: {e!s}")
+		sys.exit(1)
+
 	markdown = "\n"
 	if path.endswith(".nvgt"): markdown += parse_nvgt_markdown(tree, path, data)
 	else: markdown += data

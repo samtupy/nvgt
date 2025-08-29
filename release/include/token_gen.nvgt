@@ -22,14 +22,19 @@ string generate_token(int token_length, int mode = TOKEN_CHARACTERS | TOKEN_NUMB
 	if (mode & TOKEN_CHARACTERS != 0) chars += "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	if (mode & TOKEN_NUMBERS != 0) chars += "1234567890";
 	if (mode & TOKEN_SYMBOLS != 0) chars += "`~!@#$%^&*()_+=-[]{}/.,;:|?><";
-	return generate_custom_token(token_length, chars);
+	string[] ch;
+	for(uint i = 0; i<chars.length(); i+=1) ch.insert_last(chars[i]);
+	return generate_custom_token(token_length, ch);
 }
 
-string generate_custom_token(int token_length, const string&in characters) {
-	if (characters.empty() || token_length <= 0) return "";
+string generate_custom_token(int token_length, string[]@ values) {
+	if (values.is_empty() || token_length <= 0) return "";
 	string final_token;
 	final_token.resize(token_length);
 	for (uint i = 0; i < token_length; i++)
-		final_token[i] = characters[random(0, characters.length() - 1)];
+		final_token[i] = values[random(0, values.length()-1)];
 	return final_token;
+}
+string generate_custom_token(int token_length, const string&in characters) {
+	return generate_custom_token(token_length, {characters});
 }

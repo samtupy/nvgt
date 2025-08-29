@@ -1,0 +1,32 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	show_window("Test get_characters");
+	// It is necessary to start text input on android for get _characters to work.
+	// Because SDL shows on screen keyboard by default when you start input,
+	//you have to set a hint once that disables this behavior.
+	//  We do this so the touch.nvgt and onscreen keyboards don't have a conflict.
+	// Useful for the times when the user has disabled the screen reader and is using the tts_voice for reader output.
+	// Note: the hint should be set before calling start_text_input.
+	sdl_set_hint("SDL_ENABLE_SCREEN_KEYBOARD", "0");
+	start_text_input();
+	if (!text_input_active()) {
+		alert("Error", "Text input couldn't start");
+		exit();
+	}
+
+	tts_voice tts;
+	string characters;
+
+	tts.speak_interrupt("Type any character on the keyboard, and I will speak that for you!");
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		characters = get_characters();
+		if (characters.empty())
+			continue;
+
+		tts.speak_interrupt(characters);
+	}
+}

@@ -22,7 +22,12 @@ To have a number spoken, call either the "speak" or the "speak_wait" method in t
 class number_speaker {
 	string prepend;
 	string append;
-	pack@ pack_file = null;
+	#if plugin_legacy_sound
+	pack@ pack = null;
+	#endif
+	#if_not plugin_legacy_sound
+	pack_file@ pack = null;
+	#endif
 	bool include_and;
 
 	// We set everything to default values in the constructor.
@@ -95,7 +100,7 @@ class number_speaker {
 			}
 
 			// Now we have a filename to test, let's see if it loads.
-			if (number_speech.load(assembled_filename, this.pack_file) == false) {
+			if (number_speech.load(assembled_filename, this.pack) == false) {
 
 				// It didn't, so we remove the last entry from our current search.
 				look_until -= 1;

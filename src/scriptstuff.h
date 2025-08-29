@@ -14,10 +14,12 @@
 
 #include <string>
 #include <angelscript.h>
+#include "nvgt.h"
 
 bool script_compiled();
 void profiler_callback(asIScriptContext* ctx, void* obj);
 extern int g_GCMode;
+void prepare_profiler();
 void garbage_collect_action();
 extern asIScriptFunction* profiler_last_func;
 extern int profiler_current_line;

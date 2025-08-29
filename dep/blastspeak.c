@@ -414,11 +414,8 @@ extern "C" {
         }
         return 1;
     }
-
-    int blastspeak_speak ( blastspeak* instance, const char* text )
+    static int blastspeak_reset_output(blastspeak *instance)
     {
-        if ( instance->must_reset_output )
-        {
             HRESULT hr;
             VARIANT return_value;
             VARIANT argument;
@@ -438,6 +435,17 @@ extern "C" {
             }
             VariantClear ( &return_value );
             instance->must_reset_output = 0;
+            return 1;
+    }
+
+    int blastspeak_speak ( blastspeak* instance, const char* text )
+    {
+        if ( instance->must_reset_output )
+        {
+            if(!blastspeak_reset_output(instance))
+            {
+                return 0;
+            }
         }
 
         return blastspeak_speak_internal ( instance, text );
@@ -480,6 +488,13 @@ extern "C" {
 
     int blastspeak_set_voice ( blastspeak* instance, unsigned int voice_index )
     {
+        if ( instance->must_reset_output )
+        {
+            if(!blastspeak_reset_output(instance))
+            {
+                return 0;
+            }
+        }
         IDispatch* voice_token = blastspeak_get_voice ( instance, voice_index );
         HRESULT hr;
         DISPPARAMS parameters;
@@ -520,12 +535,10 @@ extern "C" {
             return 0;
         }
         VariantClear ( &return_value );
-
         if ( blastspeak_get_stream_format ( instance, 0, &instance->sample_rate, &instance->bits_per_sample, &instance->channels ) == 0 )
         {
             return 0;
         }
-
         return 1;
     }
 
@@ -787,6 +800,7 @@ extern "C" {
     static int blastspeak_get_stream_format ( blastspeak* instance, int retrieve_dispids, unsigned long* sample_rate, unsigned char* bits_per_sample, unsigned char* channels )
     {
         OLECHAR* audio_format_getwaveformatex_name = L"GetWaveFormatEx";
+                OLECHAR* audio_format_setwaveformatex_name = L"SetWaveFormatEx";
         OLECHAR* waveformatex_names[] = {L"BitsPerSample", L"Channels", L"FormatTag", L"SamplesPerSec"};
         IDispatch* audio_device_stream;
         IDispatch* formatex = NULL;
@@ -839,6 +853,12 @@ extern "C" {
             {
                 goto error;
             }
+                        hr = instance->format->lpVtbl->GetIDsOfNames ( instance->format, &BS_IID_null, &audio_format_setwaveformatex_name, 1, LOCALE_SYSTEM_DEFAULT, &instance->audio_format_setwaveformatex_dispid );
+            if ( FAILED ( hr ) )
+            {
+                goto error;
+            }
+
         }
 
         hr = instance->format->lpVtbl->Invoke ( instance->format, instance->audio_format_getwaveformatex_dispid, &BS_IID_null, LOCALE_SYSTEM_DEFAULT, DISPATCH_METHOD, &parameters, &return_value, NULL, &puArgErr );
@@ -976,10 +996,13 @@ error:
         UINT puArgErr;
         char* ptr;
         LONGLONG elements;
-        char* data;
-        IDispatch* stream;
+        char* data = NULL;
+        IDispatch* stream = NULL;
+        IDispatch *stream_format = NULL;
+        IDispatch *formatex = NULL;
         DISPID dispid_named = DISPID_PROPERTYPUT;
-
+        DISPID dispid_method = DISPID_UNKNOWN;
+        int num_refs;
         if ( instance->format == NULL )
         {
             return NULL;
@@ -990,21 +1013,38 @@ error:
         {
             return NULL;
         }
-
-        parameters.rgvarg = &argument;
-        parameters.cArgs = 1;
-        parameters.rgdispidNamedArgs = &dispid_named;
-        parameters.cNamedArgs = 1;
-        argument.vt = VT_DISPATCH;
-        argument.pdispVal = instance->format;
-
-        hr = stream->lpVtbl->Invoke ( stream, instance->memory_stream_dispids[1], &BS_IID_null, LOCALE_SYSTEM_DEFAULT, DISPATCH_PROPERTYPUTREF, &parameters, &return_value, NULL, &puArgErr );
+        //Bug: if we call SetFormat on the SpMemoryStream it will make a copy and leak it.
+        //Workaround: retrieve the existing SpAudioFormat held by the stream, retrieve the WaveFormatEx held by the current voice's SpAudioFormat, and call SetWaveFormatEx on the SpMemoryStream's existing SpAudioFormat.
+        parameters.cArgs = 0;
+        parameters.cNamedArgs = 0;
+        parameters.rgdispidNamedArgs = NULL;
+        parameters.rgvarg = NULL;
+        hr = stream->lpVtbl->Invoke ( stream, instance->memory_stream_dispids[1], &BS_IID_null, LOCALE_SYSTEM_DEFAULT, DISPATCH_PROPERTYGET, &parameters, &return_value, NULL, &puArgErr );
         if ( FAILED ( hr ) )
         {
-            stream->lpVtbl->Release ( stream );
-            return 0;
+            goto done;
         }
-        VariantClear ( &return_value );
+        stream_format = return_value.pdispVal;
+
+        hr = instance->format->lpVtbl->Invoke ( instance->format, instance->audio_format_getwaveformatex_dispid, &BS_IID_null, LOCALE_SYSTEM_DEFAULT, DISPATCH_METHOD, &parameters, &return_value, NULL, &puArgErr );
+        if ( FAILED ( hr ) || return_value.vt != VT_DISPATCH )
+        {
+goto done;
+      }
+        formatex = return_value.pdispVal;
+        parameters.rgvarg = &argument;
+        parameters.cArgs = 1;
+        argument.vt = VT_DISPATCH;
+        argument.pdispVal = formatex;
+        hr = stream_format->lpVtbl->Invoke ( stream_format, instance->audio_format_setwaveformatex_dispid, &BS_IID_null, LOCALE_SYSTEM_DEFAULT, DISPATCH_METHOD, &parameters, &return_value, NULL, &puArgErr );
+        if(FAILED(hr))
+        {
+            goto done;
+        }
+        VariantClear(&return_value);
+
+        parameters.rgdispidNamedArgs = &dispid_named;
+        parameters.cNamedArgs = 1;
 
         argument.vt = VT_DISPATCH;
         argument.pdispVal = stream;
@@ -1012,17 +1052,16 @@ error:
         hr = instance->voice->lpVtbl->Invoke ( instance->voice, instance->voice_dispids[1], &BS_IID_null, LOCALE_SYSTEM_DEFAULT, DISPATCH_PROPERTYPUTREF, &parameters, &return_value, NULL, &puArgErr );
         if ( FAILED ( hr ) )
         {
-            stream->lpVtbl->Release ( stream );
-            return 0;
+            goto done;
         }
         VariantClear ( &return_value );
+        
         instance->must_reset_output = 1;
 
         temp = blastspeak_speak_internal ( instance, text );
         if ( temp == 0 )
         {
-            stream->lpVtbl->Release ( stream );
-            return NULL;
+            goto done;
         }
 
         parameters.rgvarg = NULL;
@@ -1031,19 +1070,19 @@ error:
         parameters.cNamedArgs = 0;
 
         hr = stream->lpVtbl->Invoke ( stream, instance->memory_stream_dispids[0], &BS_IID_null, LOCALE_SYSTEM_DEFAULT, DISPATCH_METHOD, &parameters, &return_value, NULL, &puArgErr );
-        stream->lpVtbl->Release ( stream );
         if ( FAILED ( hr ) )
         {
-            return NULL;
-        }
+goto done;
+       }
         if ( return_value.vt != 8209 )
         {
             VariantClear ( &return_value );
-            return NULL;
+goto done;
         }
 
         ptr = ( char* ) return_value.parray->pvData;
         elements = return_value.parray->rgsabound[0].cElements;
+
         ptr += return_value.parray->rgsabound[0].lLbound;
         data = blastspeak_get_temporary_memory ( instance, ( unsigned int ) elements );
         if ( data )
@@ -1056,6 +1095,25 @@ error:
             *bytes = 0;
         }
         VariantClear ( &return_value );
+done:
+if(instance->must_reset_output)
+{
+    blastspeak_reset_output(instance);
+}
+//Several operations performed here involving the stream have called AddRef on it, and they never get cleaned up. So we'll have to find out how many references the stream has and clear all of them so that it doesn't just leak.
+for(num_refs = stream->lpVtbl->AddRef(stream) ; num_refs > 0; num_refs--)
+{
+    stream->lpVtbl->Release(stream);
+}
+if(formatex != NULL)
+{
+    formatex->lpVtbl->Release(formatex);
+
+}
+if(stream_format != NULL)
+{
+    stream_format->lpVtbl->Release(stream_format);
+}
 
         return data;
     }

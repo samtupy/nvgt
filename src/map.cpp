@@ -136,10 +136,8 @@ void map_area::unframe() {
 		auto it = std::find(f->areas.begin(), f->areas.end(), this);
 		while (it != f->areas.end()) {
 			f->areas.erase(it);
-			if (ref_count > 1)
-			release();
-			else
-				it = std::find(f->areas.begin(), f->areas.end(), this);
+			if (ref_count > 1) release();
+			it = std::find(f->areas.begin(), f->areas.end(), this);
 		}
 	}
 	framed = false;
@@ -224,7 +222,7 @@ bool map_area::is_in_area_range(float minx, float maxx, float miny, float maxy, 
 			R = rotate(R, get_center(minx, maxx, miny, maxy, minz, maxz), r);
 		return R.x >= minx - d && R.x < maxx + d + 1.0 && R.y >= miny - d && R.y < maxy + d + 1.0 && R.z >= minz - d && R.z < maxz + d + 1.0 && is_unfiltered(filter_callback);
 	}
-	return minz >= this->minz - d && maxz < this->maxz + d + 1.0 && boxes_intersect(minx - d, maxx + d, miny - d, maxy + d, r, this->minx, this->maxx, this->miny, this->maxy, this->rotation) && is_unfiltered(filter_callback);
+	return this->minz >= minz - d && this->maxz < maxz + d + 1.0 && this->miny >= miny - d && this->maxy < maxy + d + 1.0 && this->minx >= minx - d && this->maxx < maxx + d + 1.0 && is_unfiltered(filter_callback);
 }
 
 int map_frame::add_areas_for_point(std::vector<map_area*>& local_areas, float x, float y, float z, float d, int p, asIScriptFunction* filter_callback, asINT64 flags, asINT64 excluded_flags) {

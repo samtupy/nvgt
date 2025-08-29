@@ -205,6 +205,31 @@ void Print::PrintTemplate(std::ostream & dst, void const* objPtr, int typeId, in
                 return;
         }
 
+	// Check if the object has a string conversion method
+	auto* func = typeInfo->GetMethodByDecl("string opImplConv() const");
+	if (!func) {
+		func = typeInfo->GetMethodByDecl("string opConv() const");
+	}
+
+	if (func) {
+		// Need to create a new context or save the current state
+		asIScriptContext* callCtx = engine->RequestContext();
+		if (callCtx) {
+			// Call the string conversion method
+			callCtx->Prepare(func);
+			callCtx->SetObject(const_cast<void*>(objPtr));
+			if (callCtx->Execute() == asEXECUTION_FINISHED) {
+				auto strPtr = (std::string*)callCtx->GetReturnObject();
+				if (strPtr) {
+					dst << *strPtr;
+					engine->ReturnContext(callCtx);
+					return;
+				}
+			}
+			engine->ReturnContext(callCtx);
+		}
+	}
+
         dst << "RegisteredObject";
 
         return;
@@ -243,18 +268,52 @@ void Print::PrintFormat(std::ostream & stream, std::string const& in, asIScriptG
     }
 }
 
+void Print::PrintFormatArray(std::ostream & stream, std::string const& in, CScriptArray* array, int offset)
+{
+	int argc = array->GetSize() - offset;
+    if(argc <= 0)
+    {
+        stream << in;
+        return;
+    }
+
+	for(size_t itr = 0, next = 0; itr < in.size(); itr = next)
+    {
+        next = in.find_first_of('%', itr);
+        stream << in.substr(itr, next-itr);
+
+        if(next == std::string::npos) break;
+
+        if(!isdigit(in[++next]))
+            stream << '%';
+        else
+        {
+            auto arg = atoi(&in[next]) % argc;
+            while(next < in.size() && isdigit(in[next])) ++next;
+
+			Print::PrintTemplate(stream, array->At(offset+arg), array->GetElementTypeId(), 0);
+        }
+    }
+}
+
 
 void Print::PrintTemplate(std::ostream & stream, asIScriptGeneric * generic, int offset)
 {
-	for(int i = offset; i < generic->GetArgCount(); ++i)
-	{
-		void * ref = generic->GetArgAddress(i);
+	bool first = true;
+	for (int i = offset; i < generic->GetArgCount(); ++i) {
+		void* ref = generic->GetArgAddress(i);
 		int typeId = generic->GetArgTypeId(i);
 
-		if(typeId)
-			PrintTemplate(stream, ref, typeId, 0);
-	}
+		// Skip null optional arguments
+		if (typeId == 0)
+			continue;
 
+		if (!first)
+			stream << " ";
+		first = false;
+
+		PrintTemplate(stream, ref, typeId, 0);
+	}
 }
 
 static void PrintFunc(asIScriptGeneric * generic)
@@ -288,6 +347,13 @@ static void PrettyPrintingF(asIScriptGeneric * generic)
 	generic->SetReturnObject(&result);
 }
 
+static std::string PrettyPrintingArrayF(std::string* fmt, CScriptArray* elements)
+{
+    std::stringstream ss;
+	Print::PrintFormatArray(ss, *fmt, elements, 0);
+	return ss.str();
+}
+
 /*
 static void ScanFormat(std::string const& in, IN_ARGS_16)
 {
@@ -305,6 +371,7 @@ void Print::asRegister(asIScriptEngine * engine, bool registerStdStringFormatter
     if(registerStdStringFormatter)
     {
 		r = engine->RegisterObjectBehaviour("string", asBEHAVE_CONSTRUCT,  "void f(const ?&in, " INS_15 ")",  asFUNCTION(PrettyPrinting), asCALL_GENERIC); assert( r >= 0 );
+		r = engine->RegisterObjectMethod("string", "string format(string[]@ elements) const",  asFUNCTION(PrettyPrintingArrayF), asCALL_CDECL_OBJFIRST); assert( r >= 0 );
 		r = engine->RegisterObjectMethod("string", "string format(" INS_16 ") const",  asFUNCTION(PrettyPrintingF), asCALL_GENERIC); assert( r >= 0 );
     }
 

@@ -1,0 +1,38 @@
+void test_shuffle() {
+	int[] nums = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+	int[] original = nums;
+	
+	// Shuffle should change the order (with high probability)
+	bool changed = false;
+	for (int i = 0; i < 10; i++) {
+		int[] nums2 = nums;
+		nums2.shuffle();
+		
+		// Check if order changed
+		for (uint j = 0; j < nums2.length(); j++) {
+			if (nums2[j] != original[j]) {
+				changed = true;
+				break;
+			}
+		}
+		if (changed) break;
+	}
+	assert(changed);  // Should have changed in at least one of 10 attempts
+	
+	// All elements should still be present
+	int[] shuffled = nums;
+	shuffled.shuffle();
+	assert(shuffled.length() == 10);
+	
+	// Check all numbers 1-10 are still present
+	for (int i = 1; i <= 10; i++) {
+		bool found = false;
+		for (uint j = 0; j < shuffled.length(); j++) {
+			if (shuffled[j] == i) {
+				found = true;
+				break;
+			}
+		}
+		assert(found);
+	}
+}

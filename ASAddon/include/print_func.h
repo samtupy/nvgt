@@ -7,6 +7,7 @@ namespace AngelScript { class asIScriptEngine; }
 #else
 class asIScriptEngine;
 class asIScriptGeneric;
+class CScriptArray;
 #endif
 
 namespace Print
@@ -26,6 +27,7 @@ extern PrintNonPrimitiveType* g_PrintScriptObjectType;
 
 void PrintTemplate(std::ostream & dst, void const *objPtr, int typeId, int depth = 0);
 void PrintFormat(std::ostream & stream, std::string const& in, asIScriptGeneric * generic, int offset = 0);
+void PrintFormatArray(std::ostream & stream, std::string const& in, CScriptArray * array, int offset = 0);
 void PrintTemplate(std::ostream & stream, asIScriptGeneric * generic, int offset = 0);
 
 //currently only string and array

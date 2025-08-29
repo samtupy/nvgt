@@ -72,6 +72,9 @@ public:
 	unsigned int write(const std::string& data);
 	template<typename T> datastream& read(T& value);
 	template <typename T> T read();
+	Poco::UInt64 read_7bit_encoded();
+	void read_7bit_encoded(Poco::UInt64& integer);
+	void write_7bit_encoded(Poco::UInt64 integer);
 	template<typename T> datastream& write(T value);
 	std::string read_until(const std::string& text, bool full);
 	inline bool good() {

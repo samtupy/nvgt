@@ -31,8 +31,8 @@ network::network() {
 	host = NULL;
 	next_peer = 1;
 	channel_count = 0;
-	is_client = receive_timeout_event = false;
-	IPv6enabled = true;
+	is_client = receive_timeout_event = IPv6enabled = false;
+	send_immediately = true;
 	RefCount = 1;
 	reset_totals();
 }
@@ -170,6 +170,7 @@ bool network::send(asQWORD peer_id, const std::string& message, unsigned char ch
 	if (peer_id) r = enet_peer_send(peer, channel, packet) == 0;
 	else enet_host_broadcast(host, channel, packet);
 	if (!r) enet_packet_destroy(packet);
+	if (send_immediately) flush();
 	return r;
 }
 bool network::send_peer(asQWORD peer, const std::string& message, unsigned char channel, bool reliable) {
@@ -180,7 +181,14 @@ bool network::send_peer(asQWORD peer, const std::string& message, unsigned char 
 	if (!packet) return false;
 	bool r = enet_peer_send(peer_obj, channel, packet) == 0;
 	if (!r) enet_packet_destroy(packet);
+	if (send_immediately) flush();
 	return r;
+}
+
+bool network::flush() {
+	if (!host) return false;
+	enet_host_flush(host);
+	return true;
 }
 
 bool network::disconnect_peer_softly(asQWORD peer_id) {
@@ -296,6 +304,7 @@ void RegisterScriptNetwork(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("network"), _O("bool send_peer(uint64 peer_pointer, const string& in message, uint8 channel, bool reliable = true)"), asMETHOD(network, send_peer), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool send_reliable_peer(uint64 peer_pointer, const string& in message, uint8 channel)"), asMETHOD(network, send_reliable_peer), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool send_unreliable_peer(uint64 peer_pointer, const string& in message, uint8 channel)"), asMETHOD(network, send_unreliable_peer), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("bool flush()"), asMETHOD(network, flush), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool disconnect_peer_softly(uint64 peer_id)"), asMETHOD(network, disconnect_peer_softly), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool disconnect_peer(uint64 peer_id)"), asMETHOD(network, disconnect_peer), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool disconnect_peer_forcefully(uint64 peer_id)"), asMETHOD(network, disconnect_peer_forcefully), asCALL_THISCALL);
@@ -313,4 +322,5 @@ void RegisterScriptNetwork(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("network"), _O("bool get_active() const property"), asMETHOD(network, active), asCALL_THISCALL);
 	engine->RegisterObjectProperty(_O("network"), _O("bool IPV6enabled"), asOFFSET(network, IPv6enabled));
 	engine->RegisterObjectProperty(_O("network"), _O("bool receive_timeout_event"), asOFFSET(network, receive_timeout_event));
+	engine->RegisterObjectProperty(_O("network"), _O("bool send_immediately"), asOFFSET(network, send_immediately));
 }

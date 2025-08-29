@@ -26,7 +26,7 @@ string string_left(const string& in str, uint count) {
 string string_right(const string& in str, uint count) {
 	if (str == "") return str;
 	if (count >= str.length()) return str;
-	return str.slice(str.length() - count, 0);
+	return str.slice(str.length() - count, str.length());
 }
 string string_trim_left(const string& in str, uint count) {
 	if (str == "") return str;
@@ -84,7 +84,7 @@ string get_last_error_text() {
 	return "";
 }
 shared double string_to_number(const string& in num) {
-	return parse_float(num.trim_whitespace_left());
+	return parse_double(num.trim_whitespace_left());
 }
 bool show_game_window(const string& in title) {
 	return show_window(title);
@@ -139,94 +139,6 @@ double tangent(double x) {
 	return (tan(x));
 }
 
-//dummy joystick class
-class joystick {
-	uint joysticks;
-	bool has_x;
-	bool has_y;
-	bool has_z;
-	bool has_r_x;
-	bool has_r_y;
-	bool has_r_z;
-	uint buttons;
-	uint sliders;
-	uint povs;
-	string name;
-	bool active;
-	int preferred_joystick;
-	uint x;
-	uint y;
-	uint z;
-	uint r_x;
-	uint r_y;
-	uint r_z;
-	uint slider_1;
-	uint slider_2;
-	uint pov_1;
-	uint pov_2;
-	uint pov_3;
-	uint pov_4;
-	uint v_x;
-	uint v_y;
-	uint v_z;
-	uint vr_x;
-	uint vr_y;
-	uint vr_z;
-	uint v_slider_1;
-	uint v_slider_2;
-	uint a_x;
-	uint a_y;
-	uint a_z;
-	uint ar_x;
-	uint ar_y;
-	uint ar_z;
-	uint a_slider_1;
-	uint a_slider_2;
-	uint f_x;
-	uint f_y;
-	uint f_z;
-	uint fr_x;
-	uint fr_y;
-	uint fr_z;
-	uint f_slider_1;
-	uint f_slider_2;
-	bool button_down(int button) {
-		return (false);
-	}
-	bool button_pressed(int button) {
-		return (false);
-	}
-	bool button_released(int button) {
-		return (false);
-	}
-	bool button_up(int button) {
-		return (false);
-	}
-	int[] buttons_down() {
-		return ({0});
-	}
-	int[] buttons_pressed() {
-		return ({0});
-	}
-	int[] buttons_released() {
-		return ({0});
-	}
-	int[] buttons_up() {
-		return ({0});
-	}
-	string[] list_joysticks() {
-		return ({""});
-	}
-	bool pov_centered(int pov) {
-		return (true);
-	}
-	bool refresh_joystick_list() {
-		return (true);
-	}
-	bool set(int index) {
-		return (true);
-	}
-}
 // Most of these directory constants are functional.
 const string DIRECTORY_DESKTOP_VIRTUAL = "";
 const string DIRECTORY_DESKTOP = "";
@@ -259,9 +171,11 @@ bool screen_reader_stop_speech(int reader) {
 
 //hashing
 string string_hash(const string& in data, int algorithm, bool binary) {
-	if (algorithm == 1) return (string_hash_sha256(data, binary));
-	if (algorithm == 2) return (string_hash_sha512(data, binary));
-	return ("");
+	string hash;
+	if (algorithm == 1) hash = string_hash_sha256(data, binary);
+	if (algorithm == 2) hash = string_hash_sha512(data, binary);
+	if (!binary) hash.upper_this();
+	return hash;
 }
 string file_hash(const string& in filename, int algorithm, bool binary) {
 	file f;
@@ -278,6 +192,29 @@ string string_encrypt(const string& in the_string, const string& in encryption_k
 
 string string_decrypt(const string& in the_string, const string& in encryption_key) {
 	return (string_aes_decrypt(the_string, encryption_key));
+}
+
+// file_encrypt/decrypt
+bool file_encrypt(const string&in input_file, const string&in output_file, string key) {
+	file input;
+	if (!input.open(input_file, "rb")) return false;
+	file output;
+	if (!output.open(output_file, "wb")) return false;
+	asset_encryptor encryptor(output, key);
+	encryptor.write(input.read());
+	input.close();
+	encryptor.close();
+	return true;
+}
+bool file_decrypt(const string&in input_file, const string&in output_file, string key) {
+	file input;
+	if (!input.open(input_file, "rb")) return false;
+	file output;
+	if (!output.open(output_file, "wb")) return false;
+	output.write(asset_decryptor(input, key).read());
+	input.close();
+	output.close();
+	return true;
 }
 
 //clipboard functions
@@ -300,7 +237,7 @@ string generate_computer_id(const string& in application_id, bool hardware_only)
 
 
 //dummy sound storage functions
-
+#if plugin_legacy_sound
 string get_sound_storage() {
 	return sound_storage;
 }
@@ -327,6 +264,37 @@ bool set_sound_storage(const string&in filename, bool reset = false) {
 bool set_sound_decryption_key(const string& in key, bool force_encryption) {
 	return (true);
 }
+#endif
+#if_not plugin_legacy_sound
+pack_file@open_pack(const string&in filename, const string&in key = "", bool force_encryption = false) {
+	if (filename.is_empty()) return null;
+	pack_file p;
+	if (p.open(filename, key)) return p;
+	else {
+		if(force_encryption) return null;
+		if(p.open(filename, "")) return p;
+	}
+	return null;
+}
+bool set_sound_storage(const string&in filename, const string&in key = "", bool force_encryption = false, bool reset = false) {
+	if (reset and filename.is_empty()) {
+		@sound_default_pack = null;
+		sound_storage = "";
+	}
+	pack_file@p = open_pack(filename, key, force_encryption);
+	if(@p == null) return false;
+	@sound_default_pack = p;
+	return true;
+}
+string get_sound_storage() {
+	if(@sound_default_pack == null) return "";
+	return cast<pack_file@>(sound_default_pack).pack_name;
+}
+bool set_sound_decryption_key(const string& in key, bool force_encryption) {
+	sound_default_decryption_key = key;
+	return (true);
+}
+#endif
 
 // legacy generate_profile
 bool generate_profile(const string& in filename) {

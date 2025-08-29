@@ -1,0 +1,31 @@
+void test_random_implementations() {
+	// Test that both random implementations work correctly
+	
+	// Test standard random
+	for (int i = 0; i < 100; i++) {
+		int val = random(0, 100000);
+		assert(val >= 0);
+		assert(val <= 100000);
+	}
+	
+	// Test PCG random
+	random_pcg r;
+	for (int i = 0; i < 100; i++) {
+		int val = r.range(0, 100000);
+		assert(val >= 0);
+		assert(val <= 100000);
+	}
+	
+	// Test that they produce different sequences
+	int standard1 = random(0, 100000);
+	int standard2 = random(0, 100000);
+	int standard3 = random(0, 100000);
+	
+	random_pcg r2;
+	int pcg1 = r2.range(0, 100000);
+	int pcg2 = r2.range(0, 100000);
+	int pcg3 = r2.range(0, 100000);
+	
+	// Very unlikely to get same sequence
+	assert(!(standard1 == pcg1 && standard2 == pcg2 && standard3 == pcg3));
+}

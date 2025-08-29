@@ -8,7 +8,7 @@
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
-*/
+ */
 
 #pragma once
 
@@ -20,6 +20,11 @@
 #include "scriptarray.h"
 #include "scriptany.h"
 #include "nvgt.h"
+enum callback_modes {
+	CALLBACK_SIMPLE = 0,
+	CALLBACK_ADVANCED, // Same as simple but with parent_x, parent_y, parent_z.
+	CALLBACK_LEGACY = 2, // BGT compatible. Effectively 2D mode with legacy user_data string instead of any.
+};
 
 class hashpoint {
 	// https://stackoverflow.com/questions/16792751/hashmap-for-2d3d-coordinates-i-e-vector-of-ints/47928817
@@ -36,7 +41,6 @@ struct hashpoint_hash {
 		const uint32_t x = static_cast<uint32_t>(p.x - min_coord);
 		const uint32_t y = static_cast<uint32_t>(p.y - min_coord);
 		const uint32_t z = static_cast<uint32_t>(p.z - min_coord);
-
 		// Interleave the bits of each coordinate
 		uint32_t xx = x;
 		uint32_t yy = y;
@@ -53,7 +57,6 @@ struct hashpoint_hash {
 		zz = (zz | (zz << 8)) & 0x0300F00F;
 		zz = (zz | (zz << 4)) & 0x030C30C3;
 		zz = (zz | (zz << 2)) & 0x09249249;
-
 		// Combine the interleaved bits into a single hash value and add back the minimum coordinate value
 		const size_t hash_val = static_cast<size_t>((xx << 2) | (yy << 1) | zz);
 		return hash_val + static_cast<size_t>(min_coord);
@@ -75,6 +78,9 @@ class pathfinder : public micropather::Graph {
 	bool abort;
 	bool must_reset;
 	bool gc_flag;
+	bool cache; // Because Micropather doesn't expose a method to determine if path caching is enabled, and disabling of cache should disable our local cache too.
+	callback_modes callback_mode;
+
 public:
 	bool solving;
 	int desperation_factor;
@@ -91,12 +97,16 @@ public:
 	int get_ref_count();
 	void set_gc_flag();
 	bool get_gc_flag();
-	void set_callback_function(asIScriptFunction* func);
-	float get_difficulty(void* state);
-	float get_difficulty(int x, int y, int z);
+	void set_callback_function(asIScriptFunction* func); // Basic callback with only x, y, z, user_data.
+	void set_callback_function_ex(asIScriptFunction* func); // Advanced callback with x, y, z, parent_x, parent_y, parent_z, user_data.
+	void set_callback_function_legacy(asIScriptFunction* func); // 2D BGT legacy mode with string as user_data.
+
+	float get_difficulty(void* state, void* parent_state);
+	float get_difficulty(int x, int y, int z, int parent_x, int parent_y, int parent_z);
 	void cancel();
 	void reset();
 	CScriptArray* find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny* data);
+	CScriptArray* find_legacy(int start_x, int start_y, int parent_x, int parent_y, std::string user_data);
 	virtual float LeastCostEstimate(void* nodeStart, void* nodeEnd);
 	virtual void AdjacentCost(void* node, micropather::MPVector<micropather::StateCost>* neighbors);
 	virtual void PrintStateInfo(void* state) {

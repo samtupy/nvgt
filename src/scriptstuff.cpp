@@ -134,16 +134,21 @@ void reset_profiler() {
 	profiler_ticks = std::chrono::high_resolution_clock::now();
 	profiler_start = std::chrono::high_resolution_clock::now();
 	profiler_last_func = NULL;
+	prepare_profiler();
+}
+void prepare_profiler() {
+	if (!is_profiling) return;
+	asIScriptContext* ctx = asGetActiveContext();
+	if (!ctx) return;
+	profiler_last_func = ctx->GetFunction();
+	profiler_cache[profiler_last_func] = profiler_start;
 }
 void start_profiling() {
-	asIScriptContext* ctx = asGetActiveContext();
 	if (is_profiling) return;
+	asIScriptContext* ctx = asGetActiveContext();
+	if (!ctx) return;
+	is_profiling = true;
 	reset_profiler();
-	if (ctx) {
-		is_profiling = true;
-		profiler_last_func = ctx->GetFunction();
-		profiler_cache[profiler_last_func] = profiler_start;
-	}
 }
 void stop_profiling() {
 	asIScriptContext* ctx = asGetActiveContext();
@@ -169,6 +174,7 @@ std::string generate_profile(bool reset = true) {
 	std::string output(tmp);
 	for (int i = 0; i < size; i++) {
 		char text[4096];
+		if (!results[i]) continue;
 		const char* decl = results[i]->GetDeclaration(true, true, true);
 		float ms = std::chrono::duration_cast<std::chrono::milliseconds>(profiler_cache[results[i]] - profiler_start).count();
 		float p = (ms / total_ms) * 100.0;
@@ -186,11 +192,19 @@ std::string get_call_stack_ctx(asIScriptContext* ctx) {
 	snprintf(tmp, 4096, "Call stack size: %d\r\n\r\n", size);
 	std::string stack = tmp;
 	for (asUINT i = 0; i < size; i++) {
-		const char* section;
-		int line, col;
+		const char* section = nullptr;
+		int line = 0, col = 0;
 		asIScriptFunction* func = ctx->GetFunction(i);
 		line = ctx->GetLineNumber(i, &col, &section);
-		snprintf(tmp, 4096, "Function: %s\r\nFile: %s\r\n", func->GetDeclaration(), section);
+		if (func) {
+			const char* decl = func->GetDeclaration();
+			if (!decl) decl = "(unknown)";
+			if (!section) section = "(unknown)";
+			snprintf(tmp, 4096, "Function: %s\r\nFile: %s\r\n", decl, section);
+		} else {
+			if (!section) section = "(unknown)";
+			snprintf(tmp, 4096, "Function: (unknown)\r\nFile: %s\r\n", section);
+		}
 		stack += tmp;
 		if (line) {
 			snprintf(tmp, 4096, "Line: %d (%d)\r\n", line, col);
@@ -227,6 +241,9 @@ int get_script_current_line() {
 }
 std::string get_script_executable() {
 	return Poco::Util::Application::instance().config().getString("application.path");
+}
+std::string get_script_path() {
+	return g_scriptpath;
 }
 std::string get_function_signature(void* function, int type_id) {
 	asIScriptContext* ctx = asGetActiveContext();
@@ -416,25 +433,35 @@ bool script_function_retrieve(asIScriptFunction* func, asIScriptFunction** out_f
 	return false;
 }
 int script_function_get_line(asIScriptFunction* func) {
-	asIScriptContext* ctx = g_ScriptEngine->CreateContext();
-	if (!ctx) return -2;
-	if (ctx->Prepare(func) < 0) return -3;
-	int ret = ctx->GetLineNumber();
-	ctx->Release();
-	return ret;
+	const char* section = nullptr;
+	int row, col;
+	if (!func || func->GetDeclaredAt(&section, &row, &col) < 0) return -1;
+	return row;
 }
 std::string script_function_get_decl(asIScriptFunction* func, bool include_object_name = true, bool include_namespace = true, bool include_param_names = false) {
+	if (!func) return "";
 	return std::string(func->GetDeclaration(include_object_name, include_namespace, include_param_names));
 }
 std::string script_function_get_decl_property(asIScriptFunction* func) { return script_function_get_decl(func); }
 std::string script_function_get_name(asIScriptFunction* func) {
+	if (!func) return "";
 	return std::string(func->GetName());
 }
 std::string script_function_get_namespace(asIScriptFunction* func) {
+	if (!func) return "";
 	return std::string(func->GetNamespace());
 }
-std::string script_function_get_script(asIScriptFunction* func) {
-	return std::string(func->GetScriptSectionName());
+std::string script_function_get_declared_at(asIScriptFunction* func, int* row, int* col) {
+	const char* script = nullptr;
+	if (!func || func->GetDeclaredAt(&script, row, col) < 0) return "";
+	return std::string(script);
+}
+std::string script_function_get_script_property(asIScriptFunction* func) {
+	const char* script = nullptr;
+	int row, col;
+	if (!func || func->GetDeclaredAt(&script, &row, &col) < 0) return "";
+	if (!func || func->GetDeclaredAt(&script, &row, &col) < 0) return "";
+	return std::string(script);
 }
 void script_function_line_callback(asIScriptContext* ctx, script_function_call_data* data) {
 	profiler_callback(ctx, NULL);
@@ -700,11 +727,12 @@ void RegisterScripting(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("script_function"), _O("dictionary@ call(dictionary@ args, string[]@ errors = null, int max_statement_count = 0)"), asFUNCTION(script_function_call), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("dictionary@ opCall(dictionary@ args, string[]@ errors = null, int max_statement_count = 0)"), asFUNCTION(script_function_call), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("bool retrieve(?&out)"), asFUNCTION(script_function_retrieve), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("string get_declared_at(int& row, int& column)"), asFUNCTION(script_function_get_declared_at), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("string get_decl(bool include_object_name, bool include_namespace = true, bool include_param_names = true)"), asFUNCTION(script_function_get_decl), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("string get_decl() property"), asFUNCTION(script_function_get_decl_property), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("string get_name() property"), asFUNCTION(script_function_get_name), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("string get_namespace() property"), asFUNCTION(script_function_get_namespace), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(_O("script_function"), _O("string get_script() property"), asFUNCTION(script_function_get_script), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("script_function"), _O("string get_script() property"), asFUNCTION(script_function_get_script_property), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("int get_line() property"), asFUNCTION(script_function_get_line), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("script_function"), _O("bool get_is_explicit() property"), asMETHOD(asIScriptFunction, IsExplicit), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_function"), _O("bool get_is_final() property"), asMETHOD(asIScriptFunction, IsFinal), asCALL_THISCALL);
@@ -760,11 +788,12 @@ void RegisterScriptstuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("void reset_profiler()", asFUNCTION(reset_profiler), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string generate_profile(bool = true)", asFUNCTION(generate_profile), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
-	engine->RegisterGlobalFunction("string get_call_stack()", asFUNCTION(get_call_stack), asCALL_CDECL);
-	engine->RegisterGlobalFunction("int get_call_stack_size()", asFUNCTION(get_call_stack_size), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string get_call_stack() property", asFUNCTION(get_call_stack), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int get_call_stack_size() property", asFUNCTION(get_call_stack_size), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_SCRIPT_CURRENT_FUNCTION() property", asFUNCTION(get_script_current_function), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_SCRIPT_CURRENT_FILE() property", asFUNCTION(get_script_current_file), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_SCRIPT_CURRENT_LINE() property", asFUNCTION(get_script_current_line), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string get_SCRIPT_MAIN_PATH() property", asFUNCTION(get_script_path), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void assert(bool, const string&in = \"\")", asFUNCTION(script_assert), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	engine->RegisterGlobalFunction("string get_SCRIPT_EXECUTABLE() property", asFUNCTION(get_script_executable), asCALL_CDECL);

@@ -1,0 +1,21 @@
+/**
+	Divides this complex number by another.
+	complex& complex::opDivAssign(const complex&in other);
+	## Arguments:
+		* const complex&in other: the complex number to divide by.
+	## Returns:
+		complex&: a reference to the complex number being operated on.
+*/
+
+// Example:
+// Helper function to print a complex number.
+string to_string(const complex&in c) {
+	return "(" + c.r + ", " + c.i + ")";
+}
+
+void main() {
+	complex a(1, 2);
+	complex b(3, 4);
+	a /= b;
+	alert("a / b =", to_string(a));
+}

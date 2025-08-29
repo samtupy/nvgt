@@ -1,0 +1,143 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#pragma plugin redis
+
+#include "bgt_compat.nvgt"
+
+void main() {
+    redis_client@ client = redis_client();
+
+    println("--- Connection Error Handling ---");
+    client.host = "invalid.host.name";
+    client.port = 9999;
+    client.timeout = 1000; // 1 second timeout
+
+    if (!client.connect()) {
+        println("Expected connection failure:");
+        println("  Error: " + client.last_error);
+    }
+
+    // Reset to valid connection
+    client.host = "localhost";
+    client.port = 6379;
+    client.timeout = 5000;
+
+    if (!client.connect()) {
+        println("Failed to connect to localhost:6379");
+        return;
+    }
+
+    array<string> test_cmd;
+    redis_value@ result;
+
+    test_cmd = {"PING"};
+    @result = client.execute(test_cmd);
+    if (result !is null) {
+        println("PING response:");
+        println("  is_string = " + (result.is_string ? "true" : "false"));
+        println("  get_string() = '" + result.get_string() + "'");
+    }
+
+    client.set("test:int", "42");
+    test_cmd = {"STRLEN", "test:int"};
+    @result = client.execute(test_cmd);
+    if (result !is null) {
+        println("\nSTRLEN response:");
+        println("  is_integer = " + (result.is_integer ? "true" : "false"));
+        println("  get_integer() = " + result.get_integer());
+        println("  get_string() = '" + result.get_string() + "'");
+    }
+
+    test_cmd = {"GET", "test:nonexistent"};
+    @result = client.execute(test_cmd);
+    if (result !is null) {
+        println("\nGET nonexistent key:");
+        println("  is_nil = " + (result.is_nil ? "true" : "false"));
+        println("  get_string() = '" + result.get_string() + "'");
+    }
+
+    client.lpush("test:list", "item1");
+    client.lpush("test:list", "item2");
+    test_cmd = {"LRANGE", "test:list", "0", "-1"};
+    @result = client.execute(test_cmd);
+    if (result !is null) {
+        println("\nLRANGE response:");
+        println("  is_array = " + (result.is_array ? "true" : "false"));
+        array<redis_value@>@ arr = result.get_array();
+        println("  array length = " + arr.length());
+        for (uint i = 0; i < arr.length(); i++) {
+            println("    [" + i + "] = '" + arr[i].get_string() + "'");
+        }
+    }
+
+    test_cmd = {"ZADD", "test:list"}; // Wrong number of arguments
+    @result = client.execute(test_cmd);
+    if (result !is null) {
+        println("\nError response:");
+        println("  is_error = " + (result.is_error ? "true" : "false"));
+        println("  get_string() = '" + result.get_string() + "'");
+    }
+
+    string large_data = "";
+    for (int i = 0; i < 1024; i++) {
+        large_data += "x" * 1024; // 1KB per iteration
+    }
+    println("Created " + large_data.length() + " byte string");
+
+    if (client.set("test:large", large_data)) {
+        println("SET large data - OK");
+
+        string retrieved = client.get("test:large");
+        println("GET large data - Retrieved " + retrieved.length() + " bytes");
+        println("Data integrity: " + (retrieved == large_data ? "OK" : "FAILED"));
+    }
+
+    // Create 100 keys
+    for (int i = 0; i < 100; i++) {
+        client.set("test:many:" + i, "value" + i);
+    }
+
+    int64 cursor = 0;
+    int total_found = 0;
+    int iterations = 0;
+
+    do {
+        array<string>@ scan_result = client.scan(cursor, "test:many:*", 10);
+        if (scan_result.length() > 0) {
+            cursor = string_to_number(scan_result[0]);
+            iterations++;
+            total_found += scan_result.length() - 1;
+        
+            println("SCAN iteration " + iterations + ":");
+            println("  Next cursor: " + cursor);
+            println("  Keys found: " + (scan_result.length() - 1));
+        } else {
+            break;
+        }
+    } while (cursor != 0);
+
+    println("Total keys found via SCAN: " + total_found);
+
+    string special_key = "test:special:!@#$%^&*()_+-=[]{}|;':\",./<>?";
+    string special_value = "Value with\nnewlines\ttabs\rand special chars: üöä€";
+
+    if (client.set(special_key, special_value)) {
+        println("SET with special characters - OK");
+        string retrieved = client.get(special_key);
+        println("GET special characters - " + (retrieved == special_value ? "OK" : "FAILED"));
+    }
+
+    client.del("test:int");
+    client.del("test:list");
+    client.del("test:large");
+    client.del(special_key);
+    client.del("test:binary");
+
+    array<string>@ many_keys = client.keys("test:many:*");
+    for (uint i = 0; i < many_keys.length(); i++) {
+        client.del(many_keys[i]);
+    }
+    println("\nRedis Advanced Test Complete ");
+}
