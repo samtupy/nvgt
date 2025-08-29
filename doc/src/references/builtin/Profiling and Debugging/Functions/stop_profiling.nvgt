@@ -5,7 +5,6 @@
 
 // Example:
 void main() {
-	
 	start_profiling();
 	wait(1000);
 	stop_profiling();
