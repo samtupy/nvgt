@@ -10,6 +10,6 @@
 // Example:
 void main() {
 	vector v1(3, 12, 16);
-	v1*=3;
+	v1 /= 3;
 	alert("The first vector =", "(" + v1.x + ", " + v1.y + ", " + v1.z + ")");
 }
