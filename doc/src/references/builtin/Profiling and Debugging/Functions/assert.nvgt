@@ -12,6 +12,5 @@
 
 // Example:
 void main() {
-	
 	assert(false, "I am an assertion violation. I love causing chaos!");
 }
