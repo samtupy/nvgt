@@ -30,8 +30,10 @@ private:
 	asIScriptObject* scriptObj;
 	asIScriptContext* ctx;
 	asIScriptFunction* nextFunc;
+	asIScriptFunction* next64Func;
 	asIScriptFunction* nextfFunc;
 	asIScriptFunction* rangeFunc;
+	asIScriptFunction* range64Func;
 	asIScriptFunction* nextBoolFunc;
 	asIScriptFunction* nextCharFunc;
 	int32 ref_count;
@@ -44,8 +46,10 @@ public:
 			ctx = engine->CreateContext();
 			// Get method pointers
 			nextFunc = scriptObj->GetObjectType()->GetMethodByDecl("uint next()");
+			next64Func = scriptObj->GetObjectType()->GetMethodByDecl("int64 next64()");
 			nextfFunc = scriptObj->GetObjectType()->GetMethodByDecl("float nextf()");
 			rangeFunc = scriptObj->GetObjectType()->GetMethodByDecl("int range(int, int)");
+			range64Func = scriptObj->GetObjectType()->GetMethodByDecl("int64 range64(int64, int64)");
 			nextBoolFunc = scriptObj->GetObjectType()->GetMethodByDecl("bool next_bool(int)");
 			nextCharFunc = scriptObj->GetObjectType()->GetMethodByDecl("string next_character(const string&in, const string&in)");
 		}
@@ -74,9 +78,27 @@ public:
 		return ctx->GetReturnFloat();
 	}
 
+		int64 next64() override {
+		if (!next64Func || !ctx) return 0;
+		ctx->Prepare(next64Func);
+		ctx->SetObject(scriptObj);
+		ctx->Execute();
+		return ctx->GetReturnDWord();
+	}
+
 	int32 range(int32 min, int32 max) override {
 		if (!rangeFunc || !ctx) return min;
 		ctx->Prepare(rangeFunc);
+		ctx->SetObject(scriptObj);
+		ctx->SetArgDWord(0, min);
+		ctx->SetArgDWord(1, max);
+		ctx->Execute();
+		return ctx->GetReturnDWord();
+	}
+
+		int64 range64(int64 min, int64 max) override {
+		if (!range64Func || !ctx) return min;
+		ctx->Prepare(range64Func);
 		ctx->SetObject(scriptObj);
 		ctx->SetArgDWord(0, min);
 		ctx->SetArgDWord(1, max);
@@ -113,6 +135,7 @@ public:
 // Global default random generator
 random_interface* g_default_random = nullptr;
 static script_random_wrapper* g_default_script_wrapper = nullptr;
+random_xorshift* g_random_xorshift = nullptr;
 
 // Initialize default generator with provided rng
 void init_default_random(random_interface* rng) {
@@ -139,6 +162,10 @@ void cleanup_default_random() {
 	if (g_default_script_wrapper) {
 		g_default_script_wrapper->release();
 		g_default_script_wrapper = nullptr;
+	}
+	if (g_random_xorshift) {
+		g_random_xorshift->release();
+		g_random_xorshift = nullptr;
 	}
 	g_default_random = nullptr;
 }
@@ -376,12 +403,20 @@ uint32 random_xorshift::next() {
 	return static_cast<uint32>(rnd_xorshift_next(&gen));
 }
 
+int64 random_xorshift::next64() {
+	return static_cast<int64>(rnd_xorshift_next(&gen));
+}
+
 float32 random_xorshift::nextf() {
 	return rnd_xorshift_nextf(&gen);
 }
 
 int32 random_xorshift::range(int32 min, int32 max) {
 	return rnd_xorshift_range(&gen, min, max);
+}
+
+int64 random_xorshift::range64(int64 min, int64 max) {
+	return rnd_xorshift_range64(&gen, min, max);
 }
 
 void random_xorshift::seed(uint32 s) {
