@@ -10,6 +10,6 @@
 
 // Example:
 void main() {
-	input_box("Test", "Whatever"); // Error is set if you cancel.
+	input_box("Test", "Cancel to cause an error"); // Error is set if you cancel.
 	alert("Error", get_last_error());
 }
