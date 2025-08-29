@@ -5,7 +5,7 @@
 		* other: The vector to sum.
 
 	## Remarks
-		The dot product is a measure of how much two vectors point in the same direction. This is often used in physics for checking if an object is moving into or away from a surface, measuring forces, calculating angles, or .
+		The dot product is a measure of how much two vectors point in the same direction. This is often used in physics for checking if an object is moving into or away from a surface, measuring forces, or calculating angles.
 		* Returns a positive value if both vectors point roughly in the same direction.
 		* Returns zero if the vectors are perpendicular (at right angles, not pointing the same way at all).
 		* Returns a negative value if the vectors point in opposite directions.
