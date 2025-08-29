@@ -10,4 +10,4 @@ Insert a string into another string at a given position.
 ## Remarks
 Please note this modifies the calling string. To keep the original you will need to make a copy.
 
-if pos is out of bounds, an exception is thrown.
+If pos is out of bounds, an exception is thrown.
