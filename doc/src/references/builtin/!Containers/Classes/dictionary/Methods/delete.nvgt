@@ -1,0 +1,17 @@
+/**
+	This method deletes the given key from the dictionary.
+	1. bool dictionary::delete(const string &in key);
+	2. bool dictionary::erase(const string &in key);
+	## Arguments:
+		* const string &in key: the key to delete.
+	## Returns:
+		bool: true if the key was successfully deleted, false otherwise.
+*/
+
+// Example:
+void main() {
+	dictionary data;
+	data.set("nvgt", "An audiogame engine using AngelScript");
+	alert("Information", data.delete("nvgt")); //true
+	alert("Information", data.delete("nvgt")); //false because the key is already deleted, another word, it does not exist.
+}

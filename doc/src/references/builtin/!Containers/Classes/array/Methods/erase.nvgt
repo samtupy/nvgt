@@ -1,0 +1,16 @@
+/**
+	Removes an element of an array by a given position.
+	1. void array::remove_at(uint index);
+	2. void array::erase(uint index);
+	## Arguments:
+		* uint index: the position to be removed.
+	## Remarks:
+		Please note that the position value is zero-based, and failure to define the correct index will cause NVGT to throw an "index out of bounds" exception.
+*/
+
+// Example:
+void main() {
+	string[] names = {"HTML", "CSS"};
+	names.remove_at(0);
+	alert("Languages", join(names, ", "));
+}

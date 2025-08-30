@@ -1,0 +1,9 @@
+/**
+	Overloads the index operator, allowing you to access its elements using square brackets.
+*/
+
+// Example:
+void main() {
+	string[] a = {"Apple", "Banana", "Cherry"};
+	alert("Array", "Index 1="+a[1]);
+}

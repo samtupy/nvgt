@@ -1,0 +1,14 @@
+/**
+	Returns the size of the dictionary.
+	1. uint dictionary::get_size();
+	2. uint dictionary::size();
+	## Returns:
+		uint: the size of the dictionary, another word, the total keys on success, 0 otherwise.
+*/
+
+// Example:
+void main() {
+	dictionary data;
+	data.set("nvgt", "An audiogame engine using AngelScript");
+	alert("Dictionary size is", data.get_size());
+}

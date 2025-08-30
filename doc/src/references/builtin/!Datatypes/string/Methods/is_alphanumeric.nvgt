@@ -1,0 +1,25 @@
+/**
+	Checks whether a string contains only alphabetical or numeric characters and nothing else.
+	bool string::is_alphanumeric(string encoding = "UTF8");
+	## Arguments:
+		* string encoding = "UTF8": The encoding to check against, with the UTF8 encoding being cached for speed.
+	## Returns:
+		bool: true if the input string contains only alphabetic or numeric characters, false otherwise.
+	## Remarks:
+		This function only returns true if the string contains only alphabetical or numeric characters in the given encoding. If a single other non-alphanumeric character is encountered, this function will return false.
+		If this function is called on a string that contains data that is not in the specified encoding, the results are undefined.
+*/
+
+// example:
+void main() {
+	alert("example", "aabdslf".is_alphanumeric()); // Should show true.
+	string input = input_box("example", "enter a string");
+	if(input.empty()) {
+		alert("Info", "You must type a string.");
+		exit(1);
+	}
+	if(input.is_alphanumeric())
+		alert("example", "you typed a string that contains only alphanumeric characters");
+	else
+		alert("example", "this string contains more than just alphanumeric characters");
+}

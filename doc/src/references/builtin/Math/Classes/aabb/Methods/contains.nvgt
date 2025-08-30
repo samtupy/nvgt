@@ -1,0 +1,28 @@
+/**
+	Checks whether another AABB is fully contained within this one.
+	bool aabb::contains(const aabb&in other) const;
+	Checks whether the given point lies inside this AABB, optionally with a margin of error (epsilon).
+	bool contains(const vector&in point, float epsilon = EPSILON) const
+	## Arguments (1):
+		* other: Another AABB to compare.
+	## Arguments (2):
+		* point: The point to check for.
+		* epsilon: Error tolerance level (default is constant EPSILON, which should be fine for most cases).
+	## Remarks (1):
+		Unlike the test_collision method, this method tests whether one box is fully contained inside another. If any part of the inner box is outside the boundaries of the first, this method will return false.
+	## Remarks (2):
+		EPSILON is a very small floating point constant (1.19e-7) used to allow tolerance in equality or boundary checks due to rounding errors in floating point math. Changing this to a smaller value (such as 0) could lead to subtle bugs when comparing floating point values, while changing it to a larger value could provide incorrect results. It is therefore recommended to leave this parameter untouched unless you are changing it for a specific edge case.
+*/
+
+// Example:
+void main() {
+	aabb b1;
+	aabb b2;
+	b1.min = vector(1, 1, 1);
+	b1.max = vector(5, 5, 5);
+	b2.min = vector(3, 3, 3);
+	b2.max = vector(5, 5, 5);
+	// Both these conditions should be true.
+	if (b1.contains(b2)) alert("Boxed in a box!", "box1 contains box2.");
+	if (b1.contains(vector(1,2,3))) alert("Point found!", "box1 contains point 1,2,3.");
+}

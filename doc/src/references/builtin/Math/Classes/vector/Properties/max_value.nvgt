@@ -1,0 +1,10 @@
+/**
+	Returns the maximum value of the vector.
+	float vector::max_value const;
+*/
+
+// Example:
+void main() {
+	vector v(5, 7, 4);
+	alert("maximum value", v.max_value);
+}
