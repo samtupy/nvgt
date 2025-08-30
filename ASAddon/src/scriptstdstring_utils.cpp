@@ -106,22 +106,24 @@ static void StringSplit_Generic(asIScriptGeneric *gen)
 //
 // AngelScript signature:
 // string join(const array<string> &in array, const string &in delim)
-static string StringJoin(const CScriptArray &array, const string &delim)
+static string StringJoin(const CScriptArray &array, const string &delim, int start, int count)
 {
 	// Create the new string
 	string str = "";
-	if (array.GetSize())
+	int size = array.GetSize();
+	if (start < 0 || start >= size) return "";
+	if (count < -1 || count == 0) return "";
+	int end = start + count;
+	if (end < start) end = size;
+	int n = start;
+	for (n = start; n < end - 1; n++)
 	{
-		int n;
-		for (n = 0; n < (int)array.GetSize() - 1; n++)
-		{
-			str += *(string *)array.At(n);
-			str += delim;
-		}
+		str += *(string *)array.At(n);
+		str += delim;
+	}
 
 		// Add the last part
-		str += *(string *)array.At(n);
-	}
+	str += *(string *)array.At(n);
 
 	return str;
 }
@@ -131,9 +133,11 @@ static void StringJoin_Generic(asIScriptGeneric *gen)
 	// Get the arguments
 	CScriptArray *array = *(CScriptArray **)gen->GetAddressOfArg(0);
 	string *delim = *(string **)gen->GetAddressOfArg(1);
+	int start = *(int *)gen->GetAddressOfArg(2);
+	int count = *(int *)gen->GetAddressOfArg(3);
 
 	// Return the string
-	new (gen->GetAddressOfReturnLocation()) string(StringJoin(*array, *delim));
+	new (gen->GetAddressOfReturnLocation()) string(StringJoin(*array, *delim, start, count));
 }
 // As an alternativve to string::substr, this function returns a substring of the input string by emulating Python's string slicing, or at least a convenient subset of it.
 // The only slight oddity is that since angelscript doesn't support blank arguments in cases such as str[5:] or str[:-4], we use the number 0 to indicate such slices.
@@ -419,7 +423,7 @@ void RegisterStdStringUtils(asIScriptEngine *engine)
 	{
 		r = engine->RegisterObjectMethod("string", "array<string>@ split(const string &in, bool = true, bool=false) const", asFUNCTION(StringSplit_Generic), asCALL_GENERIC);
 		assert(r >= 0);
-		r = engine->RegisterGlobalFunction("string join(const array<string> &in, const string &in)", asFUNCTION(StringJoin_Generic), asCALL_GENERIC);
+		r = engine->RegisterGlobalFunction("string join(const array<string> &in, const string &in, int = 0, int = -1)", asFUNCTION(StringJoin_Generic), asCALL_GENERIC);
 		assert(r >= 0);
 		r = engine->RegisterObjectMethod("string", "string slice(int start = 0, int end = 0) const", asFUNCTION(StringSlice_Generic), asCALL_GENERIC);
 		assert(r >= 0);
@@ -432,7 +436,7 @@ void RegisterStdStringUtils(asIScriptEngine *engine)
 	{
 		r = engine->RegisterObjectMethod("string", "array<string>@ split(const string &in, bool = true, bool=false) const", asFUNCTION(StringSplit), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
-		r = engine->RegisterGlobalFunction("string join(const array<string> &in, const string &in)", asFUNCTION(StringJoin), asCALL_CDECL);
+		r = engine->RegisterGlobalFunction("string join(const array<string> &in, const string &in, int = 0, int = -1)", asFUNCTION(StringJoin), asCALL_CDECL);
 		assert(r >= 0);
 		r = engine->RegisterObjectMethod("string", "string slice(int start = 0, int end = 0) const", asFUNCTION(StringSlice), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
