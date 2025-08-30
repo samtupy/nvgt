@@ -53,3 +53,6 @@ web/src/docs
 
 # Compilation databases; easy to generate
 compile_commands.json
+
+# Generated engine dumps.
+other/nvgtexport/
