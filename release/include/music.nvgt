@@ -83,7 +83,7 @@ class music_track {
 		if (@parent != null)
 			return parent.load_sound(@s, filename);
 		else {
-			s.load(filename);
+			s.stream(filename);
 			if (!s.active) return null;
 			return @s;
 		}
@@ -219,7 +219,7 @@ class music_manager {
 		if (@s == null) @s = sound();
 		s.set_mixer(music_mixer);
 		if (@load_callback != null) return load_callback(s, filename);
-		s.load(filename);
+		s.stream(filename);
 		if (!s.active) return null;
 		return s;
 	}
