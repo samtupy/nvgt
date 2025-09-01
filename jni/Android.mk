@@ -6,6 +6,14 @@ endif
 include $(CLEAR_VARS)
 
 # static libraries
+LOCAL_MODULE    := tiny-aes-c
+LOCAL_SRC_FILES := $(LIBPATH)/libtiny-aes-c.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := tinyexpr
+LOCAL_SRC_FILES := $(LIBPATH)/libtinyexpr.a
+include $(PREBUILT_STATIC_LIBRARY)
+
 LOCAL_MODULE    := libPocoFoundation
 LOCAL_SRC_FILES := $(LIBPATH)/libPocoFoundation.a
 include $(PREBUILT_STATIC_LIBRARY)
