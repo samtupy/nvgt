@@ -5,6 +5,7 @@
 		"libflac",
 		"libffi",
 		"miniupnpc",
+		"libobfuscate",
 		"libogg",
 		"opus",
 		"opusfile",
