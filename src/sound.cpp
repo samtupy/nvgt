@@ -46,6 +46,7 @@ void wait(int ms);
 // Globals, currently NVGT does not support instanciating multiple miniaudio contexts and NVGT provides a global sound engine.
 static ma_context g_sound_context;
 audio_engine *g_audio_engine = nullptr;
+mixer* g_audio_mixer = nullptr;
 static std::atomic_flag g_soundsystem_initialized;
 std::atomic<ma_result> g_soundsystem_last_error = MA_SUCCESS;
 static std::unique_ptr<sound_service> g_sound_service;
@@ -1487,7 +1488,10 @@ mixer *new_global_mixer() {
 }
 sound *new_global_sound() {
 	init_sound();
-	return new sound_impl(g_audio_engine);
+	sound* s = new sound_impl(g_audio_engine);
+	if (!s) return nullptr;
+	if (g_audio_mixer) s->set_mixer(g_audio_mixer);
+	return s;
 }
 int get_sound_output_device() {
 	init_sound();
@@ -2050,6 +2054,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("const string[]@+ get_sound_input_devices() property", asFUNCTION(get_sound_input_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("const string[]@+ get_sound_output_devices() property", asFUNCTION(get_sound_output_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);
+	engine->RegisterGlobalProperty("mixer@ sound_default_mixer", (void*)&g_audio_mixer);
 	engine->RegisterGlobalFunction("void set_sound_output_device(int device) property", asFUNCTION(set_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("sound@ sound_play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@ mix = null, const pack_interface@ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION(sound_play), asCALL_CDECL);
 	engine->RegisterGlobalFunction("vector sound_get_listener_position(uint listener_index = 0)", asFUNCTION(sound_get_listener_position), asCALL_CDECL);

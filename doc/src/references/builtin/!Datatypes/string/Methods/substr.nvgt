@@ -3,9 +3,13 @@
 	string string::substr(uint start = 0, int count = -1);
 	## Arguments:
 		* uint start = 0: The index where the substring begins (inclusive).
-		* int count = -1: The number of characters to include in the substring. -1 means all remaining characters after the start index.
+		* int count = -1: The number of characters to include in the substring (see remarks).
 	## Returns:
 		string: A new string with the characters modified.
+	## Remarks
+		If the count is out of bounds, the string is returned from the start index to the end.
+		If the start index is out of bounds, an empty string is returned.
+		This is useful for working with fixed length data (for instance, give me 4 characters at position 4). If you want to split a string between start and end points, prefer slice.
 */
 
 // Example:

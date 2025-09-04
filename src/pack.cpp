@@ -373,7 +373,7 @@ std::istream* pack::get_file(const std::string& filename) const {
 		if (read->pack_offset != 0 || read->pack_size != 0)
 			fis = new section_istream(*fis, read->pack_offset, read->pack_size);
 		if (!key.empty())
-			fis = new chacha_istream(*fis, key);
+			fis = &(new chacha_istream(*fis, key))->own_source(true);
 		return new section_istream(*fis, entry->offset, entry->size);
 	} catch (std::exception&) {
 		delete fis;

@@ -1,0 +1,13 @@
+/**
+	Overloads the == operator, checking if two arrays are equal.
+	bool array::opEquals(const array &in other);
+	## Arguments:
+		* const array&in other: the array to compare.
+*/
+
+// Example:
+void main() {
+	string[] a = {"Apple", "Banana", "Cherry"};
+	string[] b = a;
+	if (a == b) alert("Equal", "We have two identical arrays. Hurray.");
+}

@@ -1,0 +1,13 @@
+/**
+	This property will be true if the previous function failed with a fatal error.
+	const bool bad;
+	## Remarks:
+		This is good for checking the success or failure of the last operation. It differs from fail in that this is generally set in unrecoverable errors (such as device failure or unreadable data).
+*/
+
+// Example:
+void main() {
+	datastream ds("Hi");
+	ds.read();
+	alert("example", ds.bad); // If this returns true, something is seriously wrong.
+}

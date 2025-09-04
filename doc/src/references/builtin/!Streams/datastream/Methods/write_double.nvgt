@@ -1,0 +1,14 @@
+/**
+	Write the value of a double into a stream.
+	uint write_double(double value);
+	## Arguments:
+		* value: The value that is to be written.
+	## Returns:
+		uint: the number of bytes written.
+*/
+
+// Example:
+void main() {
+	datastream ds;
+	ds.write_double(5.5);
+}

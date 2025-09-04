@@ -1,5 +1,5 @@
 /**
-	Converts a string to uppercase.
+	Converts a string to uppercase, modifying the calling string.
 	string& string::upper();
 	## Returns:
 		string&: a reference to the specified string in uppercase.

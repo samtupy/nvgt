@@ -1,0 +1,16 @@
+/**
+	Expands the box only if necessary to ensure the given point is contained within it. If the point is already inside, nothing changes.
+	void aabb::inflate_with_point(const vector&in point);
+	## Arguments:
+		point: The point to include.
+*/
+
+// Example:
+void main() {
+	aabb b;
+	b.min = vector(1, 3, 5);
+	b.max = vector(3, 5, 7);
+	b.inflate_with_point(vector(3, 6, 9)); // Only the max should change here.
+	alert("The bottom left corner of the box is located at", round(b.min.x, 0)+", "+round(b.min.y, 0)+", "+round(b.min.z, 0));
+	alert("The top right corner of the box is located at", round(b.max.x, 0)+", "+round(b.max.y, 0)+", "+round(b.max.z, 0));
+}
