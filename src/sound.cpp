@@ -630,7 +630,7 @@ public:
 		} else datastream_ref = ds;
 		return g_soundsystem_last_error == MA_SUCCESS;
 	}
-	virtual bool close() {
+	virtual bool close() override {
 		if (!decoder) return false;
 		if (datastream_ref) {
 			datastream_ref->release();
