@@ -1,7 +1,7 @@
 vcpkg_download_distfile(ARCHIVE
     URLS "https://github.com/ValveSoftware/steam-audio/releases/download/v${VERSION}/steamaudio_${VERSION}.zip"
     FILENAME "steamaudio_${VERSION}.zip"
-    SHA512 7f28262a5076f21c31a194796ceb438457995ff833dbc4f0d9f6ace64fc325d66f494234c920e70ac1b8095fef5d9ba508c903a23df41cae3595af3ac53cd8f0
+    SHA512 6d198ad139f84ca39c3731469c227bb159325b81f4ab65b4bed58dfaaa42cca785a6e9c99dc8dd3d3732ab8861cbf850929e127df85d1980055773019a9b53ea
 )
 vcpkg_extract_source_archive(
     SOURCE_PATH
