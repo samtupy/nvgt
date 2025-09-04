@@ -44,7 +44,7 @@
 #include "sound.h"
 #include <scriptarray.h>
 #include <system_error>
-#include <fast_float.h>
+#include <fast_float/fast_float.h>
 #include <Poco/StringTokenizer.h>
 #include <array>
 #include <algorithm>
