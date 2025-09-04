@@ -613,7 +613,7 @@ public:
 	virtual bool open(const std::string& filename, const pack_interface* pack_file, unsigned int sample_rate, unsigned int channels) override {
 		if (decoder && !close()) return false;
 		ma_decoder_config cfg = decoder_config_init(sample_rate, channels);
-		std::string triplet = g_sound_service->prepare_triplet(filename, pack_file ? g_pack_protocol_slot : 0, pack_file ? std::shared_ptr < const pack_interface > (pack_file->make_immutable()) : nullptr, 0, nullptr);
+		std::string triplet = g_sound_service->prepare_triplet(filename, pack_file && pack_file->get_is_active()? g_pack_protocol_slot : 0, pack_file && pack_file->get_is_active()? std::shared_ptr < const pack_interface > (pack_file->make_immutable()) : nullptr, 0, nullptr);
 		if ((g_soundsystem_last_error = ma_decoder_init_vfs(g_sound_service->get_vfs(), triplet.c_str(), &cfg, &*decoder)) != MA_SUCCESS) decoder.reset();
 		g_sound_service->cleanup_triplet(triplet);
 		return g_soundsystem_last_error == MA_SUCCESS;
@@ -1199,11 +1199,11 @@ public:
 		g_sound_service->cleanup_triplet(triplet);
 		return g_soundsystem_last_error == MA_SUCCESS;
 	}
-	bool load(const string &filename, const pack_interface *pack_file) override {
-		return load_special(filename, pack_file ? g_pack_protocol_slot : 0, pack_file ? std::shared_ptr < const pack_interface > (pack_file->make_immutable()) : nullptr, 0, nullptr, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC);
+	bool load(const string &filename, const pack_interface* pack_file) override {
+		return load_special(filename, pack_file && pack_file->get_is_active()? g_pack_protocol_slot : 0, pack_file && pack_file->get_is_active()? std::shared_ptr < const pack_interface > (pack_file->make_immutable()) : nullptr, 0, nullptr, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC);
 	}
-	bool stream(const std::string &filename, const pack_interface *pack_file) override {
-		return load_special(filename, pack_file ? g_pack_protocol_slot : 0, pack_file ? std::shared_ptr < const pack_interface > (pack_file->make_immutable()) : nullptr, 0, nullptr, MA_SOUND_FLAG_STREAM);
+	bool stream(const std::string &filename, const pack_interface* pack_file) override {
+		return load_special(filename, pack_file && pack_file->get_is_active()? g_pack_protocol_slot : 0, pack_file && pack_file->get_is_active()? std::shared_ptr < const pack_interface > (pack_file->make_immutable()) : nullptr, 0, nullptr, MA_SOUND_FLAG_STREAM);
 	}
 	bool seek_in_milliseconds(unsigned long long offset) override { return snd ? (g_soundsystem_last_error = ma_sound_seek_to_pcm_frame(&*snd, offset * ma_engine_get_sample_rate(engine->get_ma_engine()) / 1000)) == MA_SUCCESS : false; }
 	bool load_string(const std::string &data) override { return load_memory(data.data(), data.size()); }
