@@ -40,6 +40,7 @@
 #include "cppmath.h"
 #include "crypto.h"
 #include "datastreams.h"
+#include "events.h"
 #include "hash.h"
 #include "input.h"
 #include "internet.h"
@@ -446,6 +447,9 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_INPUT);
 	engine->BeginConfigGroup("input");
 	RegisterInput(engine);
+	engine->EndConfigGroup();
+	engine->BeginConfigGroup("events");
+	RegisterEvents(engine);
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("library");
 	RegisterScriptLibrary(engine);

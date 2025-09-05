@@ -1,0 +1,34 @@
+#include "speech.nvgt"
+void on_key_pressed(int k) {
+	speak("pressed " + get_key_name(k));
+}
+void on_key_released(int k) {
+	speak("released " + get_key_name(k));
+}
+void on_finger_move(uint64 id, touch_finger f, float dx, float dy) {
+	speak(id + ", " + f.id + ", " + f.x + ", " + f.y + ", " + dx + ", " + dy);
+}
+class test_listener : engine_key_event_listener {
+	sound ding;
+	test_listener() {
+		ding.load("../data/audio/sonar.ogg");
+	}
+	void on_key_press(int key) {
+		ding.stop();
+		ding.pitch = clamp(key * 3, 30, 300);
+		ding.play();
+	}
+	bool test(string char) { speak(char); return false; }
+}
+void main() {
+	test_listener test;
+	on_key_press += on_key_pressed;
+	on_key_press += test;
+	on_key_release += on_key_released;
+	on_characters += engine_character_event_callback(test.test);
+	on_touch_finger_move += on_finger_move;
+	show_window("test");
+	touch_finger f;
+	on_touch_finger_move(12, f, -0.2, 0.1);
+	while(key_up(KEY_ESCAPE)) wait(5);
+}

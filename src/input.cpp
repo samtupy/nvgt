@@ -29,6 +29,7 @@
 #include <vector>
 #include <algorithm>
 #include "nvgt_angelscript.h"
+#include "events.h"
 #include "input.h"
 #include "misc_functions.h"
 #include "nvgt.h"
@@ -135,20 +136,26 @@ void InputDestroy() {
 }
 bool InputEvent(SDL_Event* evt) {
 	if (evt->type == SDL_EVENT_KEY_DOWN) {
-		if (!evt->key.repeat)
-			g_KeysPressed[evt->key.scancode] = 1;
-		else
-			g_KeysRepeating[evt->key.scancode] = 1;
 		g_KeysReleased[evt->key.scancode] = 0;
 		if (!evt->key.repeat)
 			g_KeyboardStateChange = true;
+		if (!evt->key.repeat) {
+			g_KeysPressed[evt->key.scancode] = 1;
+			on_key_press(evt->key.scancode);
+		} else {
+			g_KeysRepeating[evt->key.scancode] = 1;
+			on_key_repeat(evt->key.scancode);
+		}
 	} else if (evt->type == SDL_EVENT_KEY_UP) {
 		g_KeysPressed[evt->key.scancode] = 0;
 		g_KeysRepeating[evt->key.scancode] = 0;
 		g_KeysReleased[evt->key.scancode] = 1;
 		g_KeyboardStateChange = true;
-	} else if (evt->type == SDL_EVENT_TEXT_INPUT)
+		on_key_release(evt->key.scancode);
+	} else if (evt->type == SDL_EVENT_TEXT_INPUT) {
 		g_UserInput += evt->text.text;
+		on_characters(evt->text.text);
+	}
 	else if (evt->type == SDL_EVENT_MOUSE_MOTION) {
 		g_MouseAbsX = evt->motion.x;
 		g_MouseAbsY = evt->motion.y;
@@ -160,9 +167,19 @@ bool InputEvent(SDL_Event* evt) {
 		g_MouseButtonsReleased[evt->button.button] = 1;
 	} else if (evt->type == SDL_EVENT_MOUSE_WHEEL)
 		g_MouseAbsZ += evt->wheel.y;
-	else if (evt->type == SDL_EVENT_FINGER_DOWN)
+	else if (evt->type == SDL_EVENT_FINGER_DOWN) {
 		g_TouchLastDevice = evt->tfinger.touchID;
-	else
+		on_touch_finger_down(evt->tfinger.touchID, {evt->tfinger.fingerID, evt->tfinger.x, evt->tfinger.y, evt->tfinger.pressure});
+	} else if (evt->type == SDL_EVENT_FINGER_UP) {
+		g_TouchLastDevice = evt->tfinger.touchID;
+		on_touch_finger_up(evt->tfinger.touchID, {evt->tfinger.fingerID, evt->tfinger.x, evt->tfinger.y, evt->tfinger.pressure});
+	} else if (evt->type == SDL_EVENT_FINGER_CANCELED) {
+		g_TouchLastDevice = evt->tfinger.touchID;
+		on_touch_finger_cancel(evt->tfinger.touchID, {evt->tfinger.fingerID, evt->tfinger.x, evt->tfinger.y, evt->tfinger.pressure});
+	} else if (evt->type == SDL_EVENT_FINGER_MOTION) {
+		g_TouchLastDevice = evt->tfinger.touchID;
+		on_touch_finger_move(evt->tfinger.touchID, {evt->tfinger.fingerID, evt->tfinger.x, evt->tfinger.y, evt->tfinger.pressure}, evt->tfinger.dx, evt->tfinger.dy);
+	} else
 		return false;
 	return true;
 }
