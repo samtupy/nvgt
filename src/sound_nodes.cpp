@@ -21,28 +21,43 @@
 
 using namespace std;
 
-// The following node acts as a simple passthrough, with a callback that does nothing. The purpose is for any object that exists between or in any way handles nodes to be able to exist in the node graph.
-// For example a reverb3d node acts as a high level API to applying reverb to 3d sounds. We want the user to be able to swap underlying reverb effect nodes that all sounds attached to the reverb3d objects are using, but prefferably without keeping track of sounds to reattach. Therefor, reverb3d acts as a passthrough node which all connected sounds are attached to, allowing us to swap the underlying reverb effect in one place rather than for all connected sounds.
+// This node allows easy creation of miniaudio nodes in C++.
 typedef struct {
 	ma_node_base base;
-} ma_passthrough_node;
-static void ma_passthrough_node_process_pcm_frames(ma_node* pNode, const float** ppFramesIn, ma_uint32* pFrameCountIn, float** ppFramesOut, ma_uint32* pFrameCountOut) {}
-static ma_node_vtable ma_passthrough_node_vtable = { ma_passthrough_node_process_pcm_frames, nullptr, 1, 1, MA_NODE_FLAG_PASSTHROUGH | MA_NODE_FLAG_CONTINUOUS_PROCESSING | MA_NODE_FLAG_ALLOW_NULL_INPUT };
-class passthrough_node_impl : public audio_node_impl, public virtual passthrough_node {
+	effect_node* node;
+} ma_effect_node;
+static void ma_effect_node_process_pcm_frames(ma_node* pNode, const float** ppFramesIn, ma_uint32* pFrameCountIn, float** ppFramesOut, ma_uint32* pFrameCountOut) {
+	ma_effect_node* node = (ma_effect_node*)pNode;
+	if (!node->node) return;
+	node->node->process(ppFramesIn, pFrameCountIn, ppFramesOut, pFrameCountOut);
+}
+class effect_node_impl : public audio_node_impl, public virtual effect_node {
+	ma_node_vtable vtable;
 	public:
-	unique_ptr<ma_passthrough_node> pn;
-	passthrough_node_impl(audio_engine* e) : pn(make_unique<ma_passthrough_node>()), audio_node_impl(nullptr, e) {
+	unique_ptr<ma_effect_node> n;
+	effect_node_impl(audio_engine* e, ma_uint8 input_channel_count, ma_uint8 output_channel_count, ma_uint8 input_bus_count, ma_uint8 output_bus_count, unsigned int flags) : n(make_unique<ma_effect_node>()), audio_node_impl(nullptr, e), vtable({&ma_effect_node_process_pcm_frames, nullptr, input_bus_count, output_bus_count, flags}) {
+		if (!input_channel_count) input_channel_count = e->get_channels();
+		if (!output_channel_count) output_channel_count = e->get_channels();
 		ma_node_config cfg = ma_node_config_init();
-		ma_uint32 channels = e->get_channels();
-		cfg.vtable          = &ma_passthrough_node_vtable;
-		cfg.pInputChannels  = &channels;
-		cfg.pOutputChannels = &channels;
-		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*pn)) != MA_SUCCESS) throw std::runtime_error("failed to create passthrough node");
-		node = (ma_node_base*)&*pn;
+		vector<ma_uint32> channels_in(input_bus_count, input_channel_count), channels_out(output_bus_count, output_channel_count);
+		cfg.vtable          = &vtable;
+		cfg.pInputChannels  = &channels_in[0];
+		cfg.pOutputChannels = &channels_out[0];
+		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*n)) != MA_SUCCESS) throw std::runtime_error("failed to create effect node");
+		n->node = this;
+		node = (ma_node_base*)&*n;
 	}
-	~passthrough_node_impl() {
-		if (pn) ma_node_uninit((ma_node_base*)&*pn, nullptr);
+	~effect_node_impl() {
+		if (n) ma_node_uninit((ma_node_base*)&*n, nullptr);
 	}
+	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) {} // override in subclasses.
+};
+
+// The following node acts as a simple passthrough, with a callback that does nothing. The purpose is for any object that exists between or in any way handles nodes to be able to exist in the node graph.
+// For example a reverb3d node acts as a high level API to applying reverb to 3d sounds. We want the user to be able to swap underlying reverb effect nodes that all sounds attached to the reverb3d objects are using, but prefferably without keeping track of sounds to reattach. Therefor, reverb3d acts as a passthrough node which all connected sounds are attached to, allowing us to swap the underlying reverb effect in one place rather than for all connected sounds.
+class passthrough_node_impl : public effect_node_impl, public virtual passthrough_node {
+	public:
+	passthrough_node_impl(audio_engine* e) : effect_node_impl(e, 0, 0, 1, 1, MA_NODE_FLAG_PASSTHROUGH | MA_NODE_FLAG_CONTINUOUS_PROCESSING | MA_NODE_FLAG_ALLOW_NULL_INPUT) {}
 };
 passthrough_node* passthrough_node::create(audio_engine* engine) { return new passthrough_node_impl(engine); }
 

@@ -50,6 +50,11 @@ public:
 	bool set_time(unsigned long long local_time) { return node ? (g_soundsystem_last_error = ma_node_set_time(node, local_time)) == MA_SUCCESS : false; }
 };
 
+class effect_node : public virtual audio_node {
+	public:
+	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
+};
+
 class passthrough_node : public virtual audio_node {
 	public:
 	static passthrough_node* create(audio_engine* engine);
