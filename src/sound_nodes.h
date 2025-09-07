@@ -13,6 +13,8 @@
 #include <exception>
 #include <angelscript.h> // asAtomic
 #include <miniaudio_phonon.h>
+#include <phonon.h>
+#include <unordered_map>
 #include "sound.h"
 
 class audio_node_impl : public virtual audio_node {
@@ -53,6 +55,7 @@ public:
 class effect_node : public virtual audio_node {
 	public:
 	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
+	virtual unsigned int required_input_frame_count(unsigned int output_frame_count) const = 0;
 };
 
 class passthrough_node : public virtual audio_node {
@@ -83,7 +86,6 @@ public:
 
 bool set_global_hrtf(bool enabled);
 bool get_global_hrtf();
-void set_sound_position_changed(); // Indicates to all hrtf nodes that they should update their positions, should be set if a listener moves.
 
 class phonon_binaural_node : public virtual audio_node {
 	public:
@@ -91,11 +93,6 @@ class phonon_binaural_node : public virtual audio_node {
 	virtual void set_direction(float x, float y, float z, float distance) = 0;
 	virtual void set_direction_vector(const reactphysics3d::Vector3& direction, float distance) = 0;
 	virtual void set_spatial_blend_max_distance(float max_distance) = 0;
-};
-class mixer_monitor_node : public virtual audio_node {
-	public:
-	static mixer_monitor_node* create(mixer* m);
-	virtual void set_position_changed() = 0;
 };
 class splitter_node : public virtual audio_node {
 	public:
@@ -217,3 +214,115 @@ public:
 	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
 	static plugin_node* create(audio_plugin_node_interface* impl, unsigned char input_bus_count, unsigned char output_bus_count, unsigned int flags, audio_engine* engine);
 };
+
+enum audio_spatializer_distance_model {
+	linear,
+	inverse,
+	exponential
+};
+struct audio_spatialization_parameters {
+	float listener_x;
+	float listener_y;
+	float listener_z;
+	float listener_direction_x;
+	float listener_direction_y;
+	float listener_direction_z;
+	float listener_distance;
+	float sound_x;
+	float sound_y;
+	float sound_z;
+	float min_distance;
+	float max_distance;
+	float min_volume;
+	float max_volume;
+	float rolloff;
+	float directional_attenuation_factor;
+	audio_spatializer_distance_model distance_model;
+};
+enum audio_spatializer_reverb3d_placement {
+	prepan,
+	postpan,
+	postattenuate
+};
+
+class spatializer_component_node;
+
+class audio_spatializer : public virtual audio_node_chain {
+public:
+	virtual void set_panner(spatializer_component_node* new_panner) = 0;
+	virtual spatializer_component_node* get_panner() const = 0;
+	virtual void set_attenuator(spatializer_component_node* new_attenuator) = 0;
+	virtual spatializer_component_node* get_attenuator() const = 0;
+	virtual void set_panner_by_id(int panner_id) = 0;
+	virtual void set_attenuator_by_id(int attenuator_id) = 0;
+	virtual int get_current_panner_id() const = 0;
+	virtual int get_current_attenuator_id() const = 0;
+	virtual int get_preferred_panner_id() const = 0;
+	virtual int get_preferred_attenuator_id() const = 0;
+	virtual void set_rolloff(float rolloff) = 0;
+	virtual float get_rolloff() const = 0;
+	virtual void set_directional_attenuation_factor(float factor) = 0;
+	virtual float get_directional_attenuation_factor() const = 0;
+	virtual void set_reverb3d(reverb3d* new_reverb, audio_spatializer_reverb3d_placement placement = postpan) = 0;
+	virtual reverb3d* get_reverb3d() const = 0;
+	virtual splitter_node* get_reverb3d_attachment() const = 0;
+	virtual audio_spatializer_reverb3d_placement get_reverb3d_placement() const = 0;
+	virtual mixer* get_mixer() const = 0;
+	virtual bool get_parameters(audio_spatialization_parameters& params) = 0;
+	virtual void on_panner_enabled_changed(int panner_id, bool enabled) = 0;
+	virtual void on_attenuator_enabled_changed(int attenuator_id, bool enabled) = 0;
+	static audio_spatializer* create(mixer* mixer, audio_engine* engine = nullptr);
+};
+
+class spatializer_component_node : public virtual audio_node {
+public:
+	virtual audio_spatializer* get_spatializer() const = 0;
+	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
+};
+
+class basic_panner : public virtual spatializer_component_node {
+public:
+	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
+};
+
+class phonon_hrtf_panner : public virtual spatializer_component_node {
+public:
+	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
+};
+
+class basic_attenuator : public virtual spatializer_component_node {
+public:
+	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
+};
+
+class phonon_attenuator : public virtual spatializer_component_node {
+public:
+	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
+};
+
+typedef spatializer_component_node* (*spatializer_component_node_factory)(audio_spatializer*, audio_engine*);
+
+struct spatializer_component {
+	spatializer_component_node_factory factory;
+	bool enabled;
+};
+
+int register_audio_panner(spatializer_component_node_factory factory, bool default_enabled = true);
+int register_audio_attenuator(spatializer_component_node_factory factory, bool default_enabled = true);
+spatializer_component_node* create_audio_panner(int id, audio_spatializer* spatializer, audio_engine* engine);
+spatializer_component_node* create_audio_attenuator(int id, audio_spatializer* spatializer, audio_engine* engine);
+void sound_set_default_3d_panner(int panner_id);
+int sound_get_default_3d_panner();
+void sound_set_default_3d_attenuator(int attenuator_id);
+int sound_get_default_3d_attenuator();
+void set_audio_panner_enabled(int id, bool enabled);
+void set_audio_attenuator_enabled(int id, bool enabled);
+bool get_audio_panner_enabled(int id);
+bool get_audio_attenuator_enabled(int id);
+bool sound_set_spatialization(int panner, int attenuator, bool disable_previous = false, bool set_default = true);
+
+
+extern int g_audio_basic_panner;
+extern int g_audio_phonon_hrtf_panner;
+extern int g_audio_basic_attenuator;
+extern int g_audio_phonon_attenuator;

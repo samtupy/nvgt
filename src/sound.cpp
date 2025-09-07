@@ -470,24 +470,21 @@ public:
 	void set_listener_position(unsigned int index, float x, float y, float z) override {
 		if (engine)
 			ma_engine_listener_set_position(&*engine, index, x, y, z);
-		set_sound_position_changed();
+		update_blocking_sound_shapes();
 	}
 	void set_listener_position_vector(unsigned int index, const reactphysics3d::Vector3 &position) override {
 		if (engine)
 			ma_engine_listener_set_position(&*engine, index, position.x, position.y, position.z);
-		set_sound_position_changed();
 		update_blocking_sound_shapes();
 	}
 	reactphysics3d::Vector3 get_listener_position(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_position(&*engine, index)) : reactphysics3d::Vector3(); }
 	void set_listener_direction(unsigned int index, float x, float y, float z) override {
 		if (engine)
 			ma_engine_listener_set_direction(&*engine, index, x, y, z);
-		set_sound_position_changed();
 	}
 	void set_listener_direction_vector(unsigned int index, const reactphysics3d::Vector3 &direction) override {
 		if (engine)
 			ma_engine_listener_set_direction(&*engine, index, direction.x, direction.y, direction.z);
-		set_sound_position_changed();
 	}
 	reactphysics3d::Vector3 get_listener_direction(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_direction(&*engine, index)) : reactphysics3d::Vector3(); }
 	void set_listener_velocity(unsigned int index, float x, float y, float z) override {
@@ -510,18 +507,15 @@ public:
 	void set_listener_world_up(unsigned int index, float x, float y, float z) override {
 		if (engine)
 			ma_engine_listener_set_world_up(&*engine, index, x, y, z);
-		set_sound_position_changed();
 	}
 	void set_listener_world_up_vector(unsigned int index, const reactphysics3d::Vector3 &world_up) override {
 		if (engine)
 			ma_engine_listener_set_world_up(&*engine, index, world_up.x, world_up.y, world_up.z);
-		set_sound_position_changed();
 	}
 	reactphysics3d::Vector3 get_listener_world_up(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_world_up(&*engine, index)) : reactphysics3d::Vector3(); }
 	void set_listener_enabled(unsigned int index, bool enabled) override {
 		if (engine)
 			ma_engine_listener_set_enabled(&*engine, index, enabled);
-		set_sound_position_changed();
 	}
 	bool get_listener_enabled(unsigned int index) const override { return ma_engine_listener_is_enabled(&*engine, index); }
 	sound* play(const string& path, const reactphysics3d::Vector3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) override {
@@ -533,10 +527,7 @@ public:
 			return nullptr;
 		}
 		if (mix) snd->set_mixer(mix);
-		if (position.x != FLT_MAX || position.y != FLT_MAX || position.z != FLT_MAX) {
-			snd->set_spatialization_enabled(true);
-			snd->set_position_3d_vector(position);
-		} else snd->set_spatialization_enabled(false);
+		if (position.x != FLT_MAX || position.y != FLT_MAX || position.z != FLT_MAX) snd->set_position_3d_vector(position);
 		snd->set_volume(volume);
 		snd->set_pan(pan);
 		snd->set_pitch(pitch);
@@ -665,44 +656,31 @@ class mixer_impl : public audio_node_impl, public virtual mixer {
 	// Furthermore ma_sound_group is just a typedef for ma_sound. As such, for the sake of less code and better inheritance, we will directly call the ma_sound APIs in this class even though it deals with sound groups and not sounds.
 protected:
 	unique_ptr<ma_sound> snd;
-	mutable mutex hrtf_toggle_mtx;
 	mixer *parent_mixer;
 	sound_shape* shape;
-	mixer_monitor_node *monitor;
-	phonon_binaural_node *hrtf;
-	reverb3d* reverb;
-	splitter_node* reverb_attachment;
+	mutable audio_spatializer *spatializer;
 	audio_node_chain* node_chain;
 	audio_node_chain* effects_chain;
-	bool hrtf_desired;
 public:
-	mixer_impl(audio_engine *e, bool sound_group = true) : audio_node_impl(nullptr, e), snd(nullptr), shape(nullptr), reverb(nullptr), reverb_attachment(nullptr), node_chain(audio_node_chain::create(nullptr, nullptr, e)), effects_chain(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {
+	mixer_impl(audio_engine *e, bool sound_group = true) : audio_node_impl(nullptr, e), snd(nullptr), shape(nullptr), node_chain(audio_node_chain::create(nullptr, nullptr, e)), effects_chain(nullptr), parent_mixer(nullptr), spatializer(nullptr) {
 		init_sound();
-		node_chain->add_node(monitor);
 		node_chain->set_endpoint(e->get_endpoint());
 		if (!sound_group) return;
 		snd = make_unique<ma_sound>();
 		ma_sound_group_init(e->get_ma_engine(), 0, nullptr, &*snd);
 		node = (ma_node_base *)&*snd;
-		set_attenuation_model(ma_attenuation_model_linear_db);
-		set_max_distance(70); // Max distance must be explicitly set for linear attenuation to function.
-		set_directional_attenuation_factor(1);
+		set_max_distance(70);
+		ma_sound_group_set_rolloff(&*snd, 0); // Our own spatializer controls attenuation.
+		ma_sound_group_set_directional_attenuation_factor(&*snd, 0); // Our spatializer also controls panning.
 		attach_output_bus(0, node_chain, 0);
 		play();
 	}
 	~mixer_impl() {
-		std::unique_lock<mutex> lock(hrtf_toggle_mtx); // Insure hrtf isn't getting toggled at the time we begin detaching nodes.
 		stop();
-		if (monitor)
-			monitor->release();
+		if (spatializer)
+			spatializer->release();
 		if (parent_mixer)
 			parent_mixer->release();
-		if (hrtf)
-			hrtf->release();
-		if (reverb_attachment)
-			reverb_attachment->release();
-		if (reverb)
-			reverb->release();
 		if (node_chain)
 			node_chain->release();
 		if (effects_chain)
@@ -713,6 +691,13 @@ public:
 		}
 		if (snd)
 			ma_sound_group_uninit(&*snd);
+	}
+	audio_spatializer* get_spatializer() const {
+		if (!spatializer) {
+			spatializer = audio_spatializer::create(const_cast<mixer_impl*>(this), get_engine());
+			node_chain->add_node(spatializer);
+		}
+		return spatializer;
 	}
 	inline void duplicate() override { audio_node_impl::duplicate(); }
 	inline void release() override { audio_node_impl::release(); }
@@ -734,35 +719,26 @@ public:
 		return false;
 	}
 	mixer *get_mixer() const override { return parent_mixer; }
-	bool set_hrtf_internal(bool enable) override {
-		unique_lock<mutex> lock(hrtf_toggle_mtx);
-		if (hrtf && enable or !hrtf && !enable)
-			return true;
-		if (enable) {
-			if ((hrtf = phonon_binaural_node::create(engine, engine->get_channels(), engine->get_sample_rate())) == nullptr)
-				return false;
-			if (!node_chain->add_node(hrtf, monitor)) {
-				hrtf->release();
-				hrtf = nullptr;
-				return false;
-			}
-			set_directional_attenuation_factor(0);
+	void set_3d_panner(int panner_id) override {
+		get_spatializer()->set_panner_by_id(panner_id);
+	}
+	int get_3d_panner() const override { return get_spatializer()->get_current_panner_id(); }
+	void set_3d_attenuator(int attenuator_id) override {
+		get_spatializer()->set_attenuator_by_id(attenuator_id);
+	}
+	int get_3d_attenuator() const override { return get_spatializer()->get_current_attenuator_id(); }
+	int get_preferred_3d_panner() const override { return get_spatializer()->get_preferred_panner_id(); }
+	int get_preferred_3d_attenuator() const override { return get_spatializer()->get_preferred_attenuator_id(); }
+	void set_hrtf(bool enabled) override {
+		if (enabled) {
+			get_spatializer()->set_panner_by_id(g_audio_phonon_hrtf_panner);
+			get_spatializer()->set_attenuator_by_id(g_audio_phonon_attenuator);
 		} else {
-			set_directional_attenuation_factor(1);
-			bool success = node_chain->remove_node(hrtf);
-			hrtf->release();
-			hrtf = nullptr;
-			if (!success) return false;
+			get_spatializer()->set_panner_by_id(g_audio_basic_panner);
+			get_spatializer()->set_attenuator_by_id(g_audio_basic_attenuator);
 		}
-		return true;
 	}
-	bool set_hrtf(bool enable) override {
-		hrtf_desired = enable;
-		return get_global_hrtf()? set_hrtf_internal(enable) : true;
-	}
-	bool get_hrtf() const override { return hrtf != nullptr; }
-	bool get_hrtf_desired() const override { return hrtf_desired; }
-	audio_node *get_hrtf_node() const override { return hrtf; }
+	bool get_hrtf() const override { return get_spatializer()->get_preferred_panner_id() == g_audio_phonon_hrtf_panner && get_spatializer()->get_preferred_attenuator_id() == g_audio_phonon_attenuator; }
 	bool set_shape(CScriptHandle* new_shape) override {
 		// release old shape.
 		sound_shape* old_shape = shape;
@@ -784,33 +760,9 @@ public:
 		return shape->get_shape();
 	}
 	sound_shape* get_shape_object() const override { return shape; }
-	void set_reverb3d(reverb3d* verb) override {
-		if (verb == reverb) return;
-		if (reverb) {
-			if (reverb_attachment) {
-				node_chain->remove_node(reverb_attachment);
-				reverb_attachment->release();
-				reverb_attachment = nullptr;
-			}
-			reverb->release();
-		}
-		if (verb) {
-			reverb_attachment = verb->create_attachment();
-			if (!reverb_attachment) {
-				verb->release();
-				return;
-			}
-			reverb_attachment->set_output_bus_volume(1, verb->get_volume_at(get_distance_to_listener()));
-			if (!node_chain->add_node(reverb_attachment, node_chain->last())) {
-				verb->release();
-				if (reverb_attachment) reverb_attachment->release();
-				reverb_attachment = nullptr;
-			}
-		}
-		reverb = verb;
-	}
-	reverb3d* get_reverb3d() const override { return reverb; }
-	splitter_node* get_reverb3d_attachment() const override { return reverb_attachment; }
+	void set_reverb3d(reverb3d* verb) override { get_spatializer()->set_reverb3d(verb); }
+	reverb3d* get_reverb3d() const override { return get_spatializer()->get_reverb3d(); }
+	splitter_node* get_reverb3d_attachment() const override { return get_spatializer()->get_reverb3d_attachment(); }
 	audio_node_chain* get_effects_chain() override {
 		if (!effects_chain) {
 			effects_chain = audio_node_chain::create(nullptr, nullptr, get_engine());
@@ -818,7 +770,28 @@ public:
 		}
 		return effects_chain;
 	}
-	audio_node_chain* get_internal_node_chain() const override { return node_chain; }
+	audio_node_chain* get_internal_node_chain() override { return node_chain; }
+	bool get_spatialization_parameters(audio_spatialization_parameters& params) override {
+		if (!snd || !get_spatialization_enabled()) return false;
+		reactphysics3d::Vector3 listener_pos = get_engine()->get_listener_position(get_listener()), listener_dir = get_direction_to_listener(), pos = get_position_3d();
+		params.listener_x = listener_pos.x;
+		params.listener_y = listener_pos.y;
+		params.listener_z = listener_pos.z;
+		params.listener_direction_x = listener_dir.x * -1;
+		params.listener_direction_y = listener_dir.y * -1;
+		params.listener_direction_z = listener_dir.z * -1;
+		params.listener_distance = get_distance_to_listener();
+		params.sound_x = pos.x;
+		params.sound_y = pos.y;
+		params.sound_z = pos.z;
+		params.min_distance = get_min_distance();
+		params.max_distance = get_max_distance();
+		params.min_volume = get_min_gain();
+		params.max_volume = get_max_gain();
+		params.rolloff = get_rolloff();
+		params.distance_model = linear;
+		return true;
+	}
 	bool play(bool reset_loop_state = true) override {
 		if (snd == nullptr)
 			return false;
@@ -864,7 +837,6 @@ public:
 	void set_spatialization_enabled(bool enabled) override {
 		if (snd)
 			ma_sound_set_spatialization_enabled(&*snd, enabled);
-		set_hrtf_internal(enabled && hrtf_desired && get_global_hrtf()); // If desired, enable HRTF if we are enabling spatialization.
 	}
 	bool get_spatialization_enabled() const override {
 		if (snd)
@@ -893,18 +865,16 @@ public:
 	void set_position_3d(float x, float y, float z) override {
 		if (!snd)
 			return;
+		set_spatialization_enabled(true);
+		if (sound_get_default_3d_panner() >= 0 && get_preferred_3d_panner() < 0) set_3d_panner(sound_get_default_3d_panner());
+		if (sound_get_default_3d_attenuator() >= 0 && get_preferred_3d_attenuator() < 0) set_3d_attenuator(sound_get_default_3d_attenuator());
 		if (shape) {
 			reactphysics3d::Vector3 pos(x, y, z);
 			reactphysics3d::Vector3 listener = get_engine()->get_listener_position(get_listener());
 			bool is_contained = shape->is_in_shape(listener, pos);
 			if (!is_contained) ma_sound_set_position(&*snd, pos.x, pos.y, pos.z);
 			else ma_sound_set_position(&*snd, listener.x, listener.y, listener.z);
-		} else {
-			set_spatialization_enabled(true);
-			ma_sound_set_position(&*snd, x, y, z);
-		}
-		if (monitor)
-			monitor->set_position_changed();
+		} else ma_sound_set_position(&*snd, x, y, z);
 	}
 	void set_position_3d_vector(const reactphysics3d::Vector3& position) override { set_position_3d(position.x, position.y, position.z); }
 	reactphysics3d::Vector3 get_position_3d() const override {
@@ -919,8 +889,6 @@ public:
 	void set_direction(float x, float y, float z) override {
 		if (!snd)
 			return;
-		if (monitor)
-			monitor->set_position_changed();
 		return ma_sound_set_direction(&*snd, x, y, z);
 	}
 	void set_direction_vector(const reactphysics3d::Vector3& direction) override { set_direction(direction.x, direction.y, direction.z); }
@@ -946,29 +914,15 @@ public:
 		res.setAllValues(vel.x, vel.y, vel.z);
 		return res;
 	}
-	void set_attenuation_model(ma_attenuation_model model) override {
-		if (snd)
-			ma_sound_set_attenuation_model(&*snd, model);
-	}
-	ma_attenuation_model get_attenuation_model() const override {
-		return snd ? ma_sound_get_attenuation_model(&*snd) : ma_attenuation_model_none;
-	}
 	void set_positioning(ma_positioning positioning) override {
 		if (snd)
 			ma_sound_set_positioning(&*snd, positioning);
-		if (monitor)
-			monitor->set_position_changed();
 	}
 	ma_positioning get_positioning() const override {
 		return snd ? ma_sound_get_positioning(&*snd) : ma_positioning_absolute;
 	}
-	void set_rolloff(float rolloff) override {
-		if (snd)
-			ma_sound_set_rolloff(&*snd, rolloff);
-	}
-	float get_rolloff() const override {
-		return snd ? ma_sound_get_rolloff(&*snd) : NAN;
-	}
+	void set_rolloff(float rolloff) override { get_spatializer()->set_rolloff(rolloff); }
+	float get_rolloff() const override { return get_spatializer()->get_rolloff(); }
 	void set_min_gain(float gain) override {
 		if (snd)
 			ma_sound_set_min_gain(&*snd, gain);
@@ -1020,13 +974,8 @@ public:
 	float get_doppler_factor() const override {
 		return snd ? ma_sound_get_doppler_factor(&*snd) : NAN;
 	}
-	void set_directional_attenuation_factor(float factor) override {
-		if (snd)
-			ma_sound_set_directional_attenuation_factor(&*snd, factor);
-	}
-	float get_directional_attenuation_factor() const override {
-		return snd ? ma_sound_get_directional_attenuation_factor(&*snd) : NAN;
-	}
+	void set_directional_attenuation_factor(float factor) override { get_spatializer()->set_directional_attenuation_factor(factor); }
+	float get_directional_attenuation_factor() const override { return get_spatializer()->get_directional_attenuation_factor(); }
 	void set_fade(float start_volume, float end_volume, ma_uint64 length) override {
 		if (!snd)
 			return;
@@ -1119,11 +1068,10 @@ class sound_impl final : public mixer_impl, public virtual sound {
 		loaded_filename = filename;
 		node = (ma_node_base *)&*snd;
 		set_spatialization_enabled(false);                  // The user must call set_position_3d or manually enable spatialization or else their ambience and UI sounds will be spatialized.
-		set_attenuation_model(ma_attenuation_model_linear_db); // If spatialization is enabled however lets use linear attenuation by default so that we focus more on hearing objects from further out in audio games that can still fade to silence as opposed to complete but hard to hear realism.
 		set_max_distance(70);
-		set_directional_attenuation_factor(1);
+		ma_sound_set_rolloff(&*snd, 0);
+		ma_sound_set_directional_attenuation_factor(&*snd, 0);
 		attach_output_bus(0, node_chain, 0);
-		monitor->set_state(ma_node_state_started);
 		// If we didn't load our sound asynchronously or if we streamed it, then we simply mark it as load_completed or we'll end up with a deadlock at destruction time.
 		if (!async_load)
 			load_completed.test_and_set();
@@ -1299,7 +1247,6 @@ public:
 		return load_completed.test();
 	}
 	bool close() override {
-		if (monitor) monitor->set_state(ma_node_state_stopped);
 		if (snd) {
 			// It's possible that this sound could still be loading in a job thread when we try to destroy it. Unfortunately there isn't a way to cancel this, so we have to just wait.
 			if (!load_completed.test())
@@ -1694,16 +1641,21 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	engine->RegisterObjectMethod(type.c_str(), "audio_engine@+ get_engine() const property", asFUNCTION((virtual_call < T, &T::get_engine, audio_engine * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_mixer(mixer@ parent_mixer)", asFUNCTION((virtual_call < T, &T::set_mixer, bool, mixer * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "mixer@+ get_mixer() const", asFUNCTION((virtual_call < T, &T::get_mixer, mixer * >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool set_hrtf(bool hrtf = true)", asFUNCTION((virtual_call < T, &T::set_hrtf, bool, bool >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_3d_panner(int panner_id)", asFUNCTION((virtual_call < T, &T::set_3d_panner, void, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "int get_3d_panner() const property", asFUNCTION((virtual_call < T, &T::get_3d_panner, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_3d_attenuator(int attenuator_id)", asFUNCTION((virtual_call < T, &T::set_3d_attenuator, void, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "int get_3d_attenuator() const property", asFUNCTION((virtual_call < T, &T::get_3d_attenuator, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "int get_preferred_3d_panner() const property", asFUNCTION((virtual_call < T, &T::get_preferred_3d_panner, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "int get_preferred_3d_attenuator() const property", asFUNCTION((virtual_call < T, &T::get_preferred_3d_attenuator, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_hrtf(bool enabled) property", asFUNCTION((virtual_call < T, &T::set_hrtf, void, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf() const property", asFUNCTION((virtual_call < T, &T::get_hrtf, bool >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf_desired() const property", asFUNCTION((virtual_call < T, &T::get_hrtf_desired, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_shape(ref@ shape)", asFUNCTION((virtual_call < T, &T::set_shape, bool, CScriptHandle*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "ref@ get_shape() const property", asFUNCTION((virtual_call < T, &T::get_shape, CScriptHandle*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_reverb3d(reverb3d@ reverb) property", asFUNCTION((virtual_call < T, &T::set_reverb3d, void, reverb3d*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "reverb3d@+ get_reverb3d() const property", asFUNCTION((virtual_call < T, &T::get_reverb3d, reverb3d*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_splitter_node@+ get_reverb3d_attachment() const property", asFUNCTION((virtual_call < T, &T::get_reverb3d_attachment, splitter_node*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_node_chain@+ get_effects_chain() property", asFUNCTION((virtual_call < T, &T::get_effects_chain, audio_node_chain*>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "audio_node_chain@+ get_internal_node_chain() const property", asFUNCTION((virtual_call < T, &T::get_internal_node_chain, audio_node_chain*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_node_chain@+ get_internal_node_chain() property", asFUNCTION((virtual_call < T, &T::get_internal_node_chain, audio_node_chain*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play(bool reset_loop_state = true)", asFUNCTION((virtual_call < T, &T::play, bool, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play_looped()", asFUNCTION((virtual_call < T, &T::play_looped, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool stop()", asFUNCTION((virtual_call < T, &T::stop, bool >)), asCALL_CDECL_OBJFIRST);
@@ -1731,8 +1683,6 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_velocity, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(const vector&in velocity)", asFUNCTION((virtual_call < T, &T::set_velocity_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "vector get_velocity() const", asFUNCTION((virtual_call < T, &T::get_velocity, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void set_attenuation_model(audio_attenuation_model model) property", asFUNCTION((virtual_call < T, &T::set_attenuation_model, void, ma_attenuation_model >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "audio_attenuation_model get_attenuation_model() const property", asFUNCTION((virtual_call < T, &T::get_attenuation_model, ma_attenuation_model >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_positioning(audio_positioning_mode mode) property", asFUNCTION((virtual_call < T, &T::set_positioning, void, ma_positioning >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_positioning_mode get_positioning() const property", asFUNCTION((virtual_call < T, &T::get_positioning, ma_positioning >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_rolloff(float rolloff) property", asFUNCTION((virtual_call < T, &T::set_rolloff, void, float >)), asCALL_CDECL_OBJFIRST);
@@ -1973,18 +1923,18 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterEnum("audio_positioning_mode");
 	engine->RegisterEnumValue("audio_positioning_mode", "AUDIO_POSITIONING_ABSOLUTE", ma_positioning_absolute);
 	engine->RegisterEnumValue("audio_positioning_mode", "AUDIO_POSITIONING_RELATIVE", ma_positioning_relative);
-	engine->RegisterEnum("audio_attenuation_model");
-	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_NONE", ma_attenuation_model_none);
-	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_INVERSE", ma_attenuation_model_inverse);
-	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_LINEAR", ma_attenuation_model_linear);
-	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_EXPONENTIAL", ma_attenuation_model_exponential);
-	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_LINEAR_DB", ma_attenuation_model_linear_db);
 	engine->RegisterEnum("audio_engine_flags");
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_DURATIONS_IN_FRAMES", audio_engine::DURATIONS_IN_FRAMES);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_AUTO_START", audio_engine::NO_AUTO_START);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_DEVICE", audio_engine::NO_DEVICE);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_CLIP", audio_engine::NO_CLIP);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_PERCENTAGE_ATTRIBUTES", audio_engine::PERCENTAGE_ATTRIBUTES);
+	engine->RegisterEnum("audio_panner");
+	engine->RegisterEnumValue("audio_panner", "audio_panner_basic", g_audio_basic_panner);
+	engine->RegisterEnumValue("audio_panner", "audio_panner_phonon_hrtf", g_audio_phonon_hrtf_panner);
+	engine->RegisterEnum("audio_attenuator");
+	engine->RegisterEnumValue("audio_attenuator", "audio_attenuator_basic", g_audio_basic_attenuator);
+	engine->RegisterEnumValue("audio_attenuator", "audio_attenuator_phonon", g_audio_phonon_attenuator);
 	RegisterSoundsystemAudioNode < audio_node > (engine, "audio_node");
 	RegisterSoundsystemEngine(engine);
 	RegisterSoundsystemAudioNode < audio_node_chain > (engine, "audio_node_chain");
@@ -2066,6 +2016,15 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("void set_sound_master_volume(float db) property", asFUNCTION(set_sound_master_volume), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float get_sound_master_volume() property", asFUNCTION(get_sound_master_volume), asCALL_CDECL);
 	engine->RegisterGlobalFunction("audio_error_state get_SOUNDSYSTEM_LAST_ERROR() property", asFUNCTION(get_soundsystem_last_error), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_default_3d_panner(int panner_id)", asFUNCTION(sound_set_default_3d_panner), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int get_sound_default_3d_panner() property", asFUNCTION(sound_get_default_3d_panner), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_default_3d_attenuator(int attenuator_id)", asFUNCTION(sound_set_default_3d_attenuator), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int get_sound_default_3d_attenuator() property", asFUNCTION(sound_get_default_3d_attenuator), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_3d_panner_enabled(int panner_id, bool enabled)", asFUNCTION(set_audio_panner_enabled), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool get_sound_3d_panner_enabled(int panner_id)", asFUNCTION(get_audio_panner_enabled), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_3d_attenuator_enabled(int attenuator_id, bool enabled)", asFUNCTION(set_audio_attenuator_enabled), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool get_sound_3d_attenuator_enabled(int attenuator_id)", asFUNCTION(get_audio_attenuator_enabled), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool sound_set_spatialization(int panner, int attenuator, bool disable_previous = false, bool set_default = true)", asFUNCTION(sound_set_spatialization), asCALL_CDECL);
 }
 void nvgt_audio_plugin_node_register(const string& nodename) { RegisterSoundsystemAudioNode<plugin_node>(g_ScriptEngine, nodename); }
 plugin_node* nvgt_audio_plugin_node_create(audio_plugin_node_interface* impl, unsigned char input_bus_count, unsigned char output_bus_count, unsigned int flags, audio_engine* engine) { return plugin_node::create(impl, input_bus_count, output_bus_count, flags, engine); }

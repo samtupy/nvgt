@@ -15,8 +15,10 @@ void main() {
 	snd.set_position_3d(5, 5, 0);
 	if (!snd.set_shape(sound_aabb_shape(0, 5, 0, 5, 0, 1))) alert("warning", "shape set fail");
 	@snd.reverb3d = verb;
+	verb.max_audible_distance = 200;
+	snd.rolloff = 0.3;
 	sound@ s = sound_play("C:/windows/media/Ring10.wav", mix = snd, autoplay = false);
-	snd.effects_chain.add_node(audio_high_pass_filter(1000, 2));
+	//snd.effects_chain.add_node(audio_high_pass_filter(1000, 2));
 	s.play_looped();
 	while (!key_pressed(KEY_ESCAPE)) {
 		wait(5);

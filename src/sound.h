@@ -30,6 +30,7 @@ class sound;
 class audio_node_chain;
 class splitter_node;
 class reverb3d;
+struct audio_spatialization_parameters;
 
 extern audio_engine *g_audio_engine;
 extern std::atomic<ma_result> g_soundsystem_last_error;
@@ -39,6 +40,7 @@ bool init_sound();
 void uninit_sound();
 bool refresh_audio_devices();
 void garbage_collect_inline_sounds();
+float pan_db_to_linear(float db);
 
 class audio_node {
 public:
@@ -165,11 +167,14 @@ public:
 	virtual ma_sound *get_ma_sound() const = 0;
 	virtual bool set_mixer(mixer *mix) = 0;
 	virtual mixer *get_mixer() const = 0;
-	virtual bool set_hrtf_internal(bool hrtf) = 0;
-	virtual bool set_hrtf(bool hrtf) = 0;      // This is what should be called by the user and is what updates the desired state of hrtf and not just hrtf itself.
-	virtual bool get_hrtf() const = 0;         // whether hrtf is currently enabled
-	virtual bool get_hrtf_desired() const = 0; // whether hrtf is desired by the user even if global hrtf is currently off
-	virtual audio_node *get_hrtf_node() const = 0;
+	virtual void set_3d_panner(int panner_id) = 0;
+	virtual int get_3d_panner() const = 0;
+	virtual void set_3d_attenuator(int attenuator_id) = 0;
+	virtual int get_3d_attenuator() const = 0;
+	virtual int get_preferred_3d_panner() const = 0;
+	virtual int get_preferred_3d_attenuator() const = 0;
+	virtual void set_hrtf(bool enabled) = 0;
+	virtual bool get_hrtf() const = 0;
 	virtual bool set_shape(CScriptHandle* shape) = 0;
 	virtual CScriptHandle* get_shape() const = 0;
 	virtual sound_shape* get_shape_object() const = 0;
@@ -177,7 +182,8 @@ public:
 	virtual reverb3d* get_reverb3d() const = 0;
 	virtual splitter_node* get_reverb3d_attachment() const = 0;
 	virtual audio_node_chain* get_effects_chain() = 0;
-	virtual audio_node_chain* get_internal_node_chain() const = 0;
+	virtual audio_node_chain* get_internal_node_chain() = 0;
+	virtual bool get_spatialization_parameters(audio_spatialization_parameters& params) = 0;
 	virtual bool play(bool reset_loop_state = true) = 0;
 	virtual bool play_looped() = 0;
 	virtual bool stop() = 0;
@@ -205,8 +211,6 @@ public:
 	virtual void set_velocity(float x, float y, float z) = 0;
 	virtual void set_velocity_vector(const reactphysics3d::Vector3& velocity) = 0;
 	virtual reactphysics3d::Vector3 get_velocity() const = 0;
-	virtual void set_attenuation_model(ma_attenuation_model model) = 0;
-	virtual ma_attenuation_model get_attenuation_model() const = 0;
 	virtual void set_positioning(ma_positioning positioning) = 0;
 	virtual ma_positioning get_positioning() const = 0;
 	virtual void set_rolloff(float rolloff) = 0;

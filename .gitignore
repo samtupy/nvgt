@@ -41,6 +41,7 @@ windev
 deps
 venv
 vcpkg/vcpkg_installed
+CLAUDE.md
 *.zip
 *.blake2b
 
