@@ -31,7 +31,11 @@ class audio_node_chain;
 class splitter_node;
 class reverb3d;
 struct audio_spatialization_parameters;
-enum audio_spatializer_reverb3d_placement;
+enum audio_spatializer_reverb3d_placement {
+	prepan,
+	postpan,
+	postattenuate
+};
 
 extern audio_engine *g_audio_engine;
 extern std::atomic<ma_result> g_soundsystem_last_error;

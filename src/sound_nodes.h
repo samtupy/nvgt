@@ -239,11 +239,6 @@ struct audio_spatialization_parameters {
 	float directional_attenuation_factor;
 	audio_spatializer_distance_model distance_model;
 };
-enum audio_spatializer_reverb3d_placement {
-	prepan,
-	postpan,
-	postattenuate
-};
 
 class spatializer_component_node;
 
