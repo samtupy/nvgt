@@ -456,8 +456,8 @@ delay_node* delay_node::create(unsigned int delay_in_frames, float decay, audio_
 class freeverb_node_impl : public audio_node_impl, public virtual freeverb_node {
 	unique_ptr<ma_reverb_node> rn;
 	public:
-	freeverb_node_impl(audio_engine* e, int channels) : rn(make_unique<ma_reverb_node>()), audio_node_impl(nullptr, e) {
-		ma_reverb_node_config cfg = ma_reverb_node_config_init(channels, g_audio_engine->get_sample_rate());
+	freeverb_node_impl(audio_engine* e) : rn(make_unique<ma_reverb_node>()), audio_node_impl(nullptr, e) {
+		ma_reverb_node_config cfg = ma_reverb_node_config_init(e->get_channels(), e->get_sample_rate());
 		if ((g_soundsystem_last_error = ma_reverb_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*rn)) != MA_SUCCESS) throw std::runtime_error("ma_reverb_node was not initialized");
 		node = (ma_node_base*)&*rn;
 	}
@@ -479,7 +479,7 @@ class freeverb_node_impl : public audio_node_impl, public virtual freeverb_node 
 	void set_frozen(bool frozen) override { if (rn) verblib_set_mode(&rn->reverb, frozen? 1 : 0); }
 	bool get_frozen() const override { return rn? verblib_get_mode(&rn->reverb) >= 0.5 : false; }
 };
-freeverb_node* freeverb_node::create(audio_engine* e, int channels) { return new freeverb_node_impl(e, channels); }
+freeverb_node* freeverb_node::create(audio_engine* e) { return new freeverb_node_impl(e); }
 
 class reverb3d_impl : public passthrough_node_impl, public virtual reverb3d {
 	audio_node* reverb;

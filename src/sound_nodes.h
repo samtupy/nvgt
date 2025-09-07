@@ -186,7 +186,7 @@ class freeverb_node : public virtual audio_node {
 	virtual float get_input_width() const = 0;
 	virtual void set_frozen(bool frozen) = 0;
 	virtual bool get_frozen() const = 0;
-	static freeverb_node* create(audio_engine* engine, int channels);
+	static freeverb_node* create(audio_engine* engine);
 };
 class reverb3d : public virtual passthrough_node {
 public:

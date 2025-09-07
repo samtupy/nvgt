@@ -149,7 +149,9 @@ class sound_pool_item {
 			true_pos.z = true_pos.y - true_pos.z;
 			true_pos.y -= true_pos.z;
 		}
-		handle.set_position_3d(true_pos.x * pan_step, true_pos.y * volume_step, true_pos.z * volume_step);
+		handle.directional_attenuation_factor = pan_step;
+		handle.rolloff = volume_step;
+		handle.set_position_3d(true_pos.x, true_pos.y, true_pos.z);
 		float pitch = start_pitch;
 		if (true_pos.y < 0) pitch -= behind_pitch_decrease;
 		if (true_pos.z < 0) pitch -= behind_pitch_decrease;
