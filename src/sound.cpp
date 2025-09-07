@@ -1251,8 +1251,11 @@ public:
 	bool close() override {
 		if (snd) {
 			// It's possible that this sound could still be loading in a job thread when we try to destroy it. Unfortunately there isn't a way to cancel this, so we have to just wait.
-			if (!load_completed.test())
-				ma_fence_wait(&fence);
+			if (!load_completed.test()) ma_fence_wait(&fence);
+			if (spatializer) {
+				spatializer->release();
+				spatializer = nullptr;
+			}
 			ma_sound_uninit(&*snd);
 			snd.reset();
 			node = nullptr;
