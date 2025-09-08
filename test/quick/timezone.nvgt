@@ -1,0 +1,41 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	
+	// Display current system timezone and time
+	string current_tz = get_current_timezone_name();
+	alert("Current System Timezone", "Timezone: " + current_tz + "\nCurrent time: " + TIME_HOUR + ":" + TIME_MINUTE + ":" + TIME_SECOND);
+	
+	// Set timezone to New York
+	if (set_timezone("America/New_York")) {
+		string ny_tz = get_current_timezone_name();
+		alert("New York Timezone", "Timezone: " + ny_tz + "\nTime: " + TIME_HOUR + ":" + TIME_MINUTE + ":" + TIME_SECOND);
+	} else {
+		alert("Error", "Failed to set New York timezone");
+	}
+	
+	// Set timezone to Tokyo
+	if (set_timezone("Asia/Tokyo")) {
+		string tokyo_tz = get_current_timezone_name();
+		alert("Tokyo Timezone", "Timezone: " + tokyo_tz + "\nTime: " + TIME_HOUR + ":" + TIME_MINUTE + ":" + TIME_SECOND);
+	} else {
+		alert("Error", "Failed to set Tokyo timezone");
+	}
+	
+	calendar cal;
+	cal.set(2024, 12, 25, 14, 30, 45); // Set Christmas 2024, 2:30:45 PM
+	alert("Calendar with Set Time", "Calendar maintains its time:\n" + cal.hour + ":" + cal.minute + ":" + cal.second + "\nDate: " + cal.day + "/" + cal.month + "/" + cal.year);
+	
+	cal.reset();
+	alert("Calendar After Reset", "Calendar after reset (current timezone):\n" + cal.hour + ":" + cal.minute + ":" + cal.second + "\nDate: " + cal.day + "/" + cal.month + "/" + cal.year);
+	
+	string[] timezones = list_available_timezones();
+	string timezone_list = "";
+	for (uint i = 0; i < timezones.length() && i < 10; i++) {
+		timezone_list += timezones[i] + "\n";
+	}
+	timezone_list += "... and " + (timezones.length() - 10) + " more";
+	alert("Available Timezones (" + timezones.length() + " total)", timezone_list);
+}
