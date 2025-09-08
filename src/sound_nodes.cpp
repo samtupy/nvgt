@@ -921,7 +921,7 @@ public:
 		ma_panner_config panner_config = ma_panner_config_init(ma_format_f32, 2);
 		if (ma_panner_init(&panner_config, &panner) != MA_SUCCESS) throw std::runtime_error("Failed to initialize panner");
 	}
-	~basic_panner_impl { destroy_node(); }
+	~basic_panner_impl() { destroy_node(); }
 	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
 		ma_uint32 frameCount = *frame_count_out;
 		if (!spatializer) goto fail;
