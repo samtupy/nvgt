@@ -722,7 +722,7 @@ private:
 		remove_node(reverb_attachment);
 		switch (reverb_placement) {
 			case prepan:
-				add_node_at(reverb_attachment, -1, 0);
+				add_node(reverb_attachment, nullptr, 0);
 				break;
 			case postpan:
 				if (panner) add_node(reverb_attachment, panner, 0);
@@ -782,7 +782,6 @@ public:
 			if (reverb_attachment && reverb_placement == prepan) add_node(panner, reverb_attachment, 0);
 			else add_node(panner, nullptr, 0);
 		}
-		position_reverb();
 	}
 	void set_attenuator(spatializer_component_node* new_attenuator) override {
 		if (attenuator) {
@@ -796,7 +795,6 @@ public:
 			else if (!panner && reverb_attachment && reverb_placement == prepan) add_node(attenuator, reverb_attachment, 0);
 			else add_node(attenuator, nullptr, 0);
 		}
-		position_reverb();
 	}
 	void set_reverb3d(reverb3d* new_reverb, audio_spatializer_reverb3d_placement placement = postpan) override {
 		if (new_reverb == reverb) return;
@@ -923,6 +921,7 @@ public:
 		ma_panner_config panner_config = ma_panner_config_init(ma_format_f32, 2);
 		if (ma_panner_init(&panner_config, &panner) != MA_SUCCESS) throw std::runtime_error("Failed to initialize panner");
 	}
+	~basic_panner_impl { destroy_node(); }
 	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
 		ma_uint32 frameCount = *frame_count_out;
 		if (!spatializer) goto fail;
@@ -952,9 +951,7 @@ public:
 		iplEffectParams.interpolation = IPL_HRTFINTERPOLATION_NEAREST;
 		iplEffectParams.spatialBlend = 1.0;
 		iplEffectParams.hrtf = g_phonon_hrtf;
-		if (iplBinauralEffectCreate(g_phonon_context, &g_phonon_audio_settings, &effectSettings, &iplEffect) != IPL_STATUS_SUCCESS) {
-			throw std::runtime_error("Failed to create binaural effect");
-		}
+		if (iplBinauralEffectCreate(g_phonon_context, &g_phonon_audio_settings, &effectSettings, &iplEffect) != IPL_STATUS_SUCCESS) throw std::runtime_error("Failed to create binaural effect");
 		ma_uint32 channelsIn = e->get_channels();
 		if (iplAudioBufferAllocate(g_phonon_context, channelsIn, g_phonon_audio_settings.frameSize, &inputBuffer) != IPL_STATUS_SUCCESS) {
 			iplBinauralEffectRelease(&iplEffect);

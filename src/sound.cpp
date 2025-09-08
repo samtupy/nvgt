@@ -659,6 +659,7 @@ protected:
 	mixer *parent_mixer;
 	sound_shape* shape;
 	mutable audio_spatializer *spatializer;
+	mutex spatialization_params_mutex;
 	audio_node_chain* node_chain;
 	audio_node_chain* effects_chain;
 public:
@@ -677,8 +678,11 @@ public:
 	}
 	~mixer_impl() {
 		stop();
-		if (spatializer)
+		unique_lock<mutex> lock(spatialization_params_mutex);
+		if (spatializer) {
+			node_chain->remove_node(spatializer);
 			spatializer->release();
+		}
 		if (parent_mixer)
 			parent_mixer->release();
 		if (node_chain)
@@ -774,7 +778,7 @@ public:
 	}
 	audio_node_chain* get_internal_node_chain() override { return node_chain; }
 	bool get_spatialization_parameters(audio_spatialization_parameters& params) override {
-		if (!snd || !get_spatialization_enabled()) return false;
+		if (!snd || !get_spatialization_enabled() || !spatialization_params_mutex.try_lock()) return false;
 		reactphysics3d::Vector3 listener_pos = get_engine()->get_listener_position(get_listener()), listener_dir = get_direction_to_listener(), pos = get_position_3d();
 		params.listener_x = listener_pos.x;
 		params.listener_y = listener_pos.y;
@@ -792,6 +796,7 @@ public:
 		params.max_volume = get_max_gain();
 		params.rolloff = get_rolloff();
 		params.distance_model = linear;
+		spatialization_params_mutex.unlock();
 		return true;
 	}
 	bool play(bool reset_loop_state = true) override {
@@ -1253,6 +1258,8 @@ public:
 			// It's possible that this sound could still be loading in a job thread when we try to destroy it. Unfortunately there isn't a way to cancel this, so we have to just wait.
 			if (!load_completed.test()) ma_fence_wait(&fence);
 			if (spatializer) {
+				unique_lock<mutex> lock(spatialization_params_mutex);
+				node_chain->remove_node(spatializer);
 				spatializer->release();
 				spatializer = nullptr;
 			}
