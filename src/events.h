@@ -108,13 +108,13 @@ public:
 };
 class engine_touch_event : public engine_event {
 public:
-	engine_touch_event(const std::string& name) : engine_event(name, "touch", "uint64 device, touch_finger finger", asMETHOD(engine_touch_event, operator())) {}
-	void operator()(Uint64 device, SDL_Finger finger) { fire<Uint64, SDL_Finger>(device, finger); }
+	engine_touch_event(const std::string& name) : engine_event(name, "touch", "uint64 device, const touch_finger& finger", asMETHOD(engine_touch_event, operator())) {}
+	void operator()(Uint64 device, const SDL_Finger& finger) { fire<Uint64, const SDL_Finger&>(device, finger); }
 };
 class engine_touch_motion_event : public engine_event {
 public:
-	engine_touch_motion_event(const std::string& name) : engine_event(name, "touch_motion", "uint64 device, touch_finger finger, float relative_x, float relative_y", asMETHOD(engine_touch_motion_event, operator())) {}
-	void operator()(Uint64 device, SDL_Finger finger, float relative_x, float relative_y) { fire<Uint64, SDL_Finger, float, float>(device, finger, relative_x, relative_y); }
+	engine_touch_motion_event(const std::string& name) : engine_event(name, "touch_motion", "uint64 device, const touch_finger& finger, float relative_x, float relative_y", asMETHOD(engine_touch_motion_event, operator())) {}
+	void operator()(Uint64 device, const SDL_Finger& finger, float relative_x, float relative_y) { fire<Uint64, const SDL_Finger&, float, float>(device, finger, relative_x, relative_y); }
 };
 
 // Event externs.
