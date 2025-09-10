@@ -854,9 +854,9 @@ public:
 	int get_current_attenuator_id() const override { return current_attenuator_id; }
 	int get_preferred_panner_id() const override { return preferred_panner_id; }
 	int get_preferred_attenuator_id() const override { return preferred_attenuator_id; }
-	void set_rolloff(float rolloff) override { spatialization_params.rolloff = rolloff; }
+	void set_rolloff(float rolloff) override { spatialization_params.rolloff = clamp(rolloff, 0.0f, 100.0f); }
 	float get_rolloff() const override { return spatialization_params.rolloff; }
-	void set_directional_attenuation_factor(float factor) override { spatialization_params.directional_attenuation_factor = factor; }
+	void set_directional_attenuation_factor(float factor) override { spatialization_params.directional_attenuation_factor = clamp(factor, 0.0f, 100.0f); }
 	float get_directional_attenuation_factor() const override { return spatialization_params.directional_attenuation_factor; }
 	bool get_parameters(audio_spatialization_parameters& params) override {
 		if (!parameters_valid) return false;
@@ -1077,9 +1077,10 @@ public:
 		if (!spatializer->get_parameters(params)) goto fail;
 		distanceModel.minDistance = params.min_distance;
 		distanceModel.type = IPL_DISTANCEATTENUATIONTYPE_INVERSEDISTANCE;
-		sourcePos = {params.sound_x, params.sound_y, params.sound_z};
-		listenerPos = {params.listener_x, params.listener_y, params.listener_z};
-		iplEffectParams.distanceAttenuation = clamp(iplDistanceAttenuationCalculate(g_phonon_context, sourcePos, listenerPos, &distanceModel) / params.rolloff, params.min_volume, params.max_volume);
+		params.rolloff *= 0.7; // Attenuators apply internal factors sometimes to try making it so that rolloff at a constant value will cause a similar volume reduction regardless of the attenuator in use.
+		sourcePos = {params.sound_x * params.rolloff, params.sound_y * params.rolloff, params.sound_z * params.rolloff};
+		listenerPos = {params.listener_x * params.rolloff, params.listener_y * params.rolloff, params.listener_z * params.rolloff};
+		iplEffectParams.distanceAttenuation = clamp(iplDistanceAttenuationCalculate(g_phonon_context, sourcePos, listenerPos, &distanceModel), params.min_volume, params.max_volume);
 		iplAirAbsorptionCalculate(g_phonon_context, sourcePos, listenerPos, &airAbsorptionModel, iplEffectParams.airAbsorption);
 		while (totalFramesProcessed < totalFramesToProcess) {
 			ma_uint32 framesToProcessThisIteration = totalFramesToProcess - totalFramesProcessed;

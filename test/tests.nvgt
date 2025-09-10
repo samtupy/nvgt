@@ -17,7 +17,7 @@
 #pragma console
 #include "case/*.nvgt"
 
-dictionary disabled_tests;
+dictionary disabled_tests, enabled_tests;
 bool verbose = false, nonfatal = false, console_available = is_console_available();
 script_module@ nvgt_game = script_get_module("nvgt_game");
 int tests_total, tests_skipped, tests_failed, tests_passed;
@@ -28,6 +28,7 @@ void help() {
 	outln("-v (verbose), print status information.");
 	outln("-n (nonfatal), Warn on failed test and continue rather than exiting.");
 	outln("-d (disable), do not run a given test (-dbase64).");
+	outln("-t (test), only run the specified tests (-tbase64 -tasync).");
 	outln("-h (help), Print this message and exit.");
 	abort();
 }
@@ -46,6 +47,7 @@ void main() {
 		else if (ARGS[i] == "-v") verbose = true;
 		else if (ARGS[i] == "-n") nonfatal = true;
 		else if (ARGS[i].starts_with("-d")) disabled_tests.set(ARGS[i].substr(2), true);
+		else if (ARGS[i].starts_with("-t")) enabled_tests.set(ARGS[i].substr(2), true);
 		else {
 			outln("unknown command line option " + ARGS[i]);
 			abort(64);
@@ -74,10 +76,9 @@ void main() {
 		
 		run_test(func, filename);
 	}
-	if (tests_failed == 0)
-		outln("%0 of %1 tests passed successfully in %2ms!".format(tests_passed, tests_total, timetracker.elapsed), "success");
-	else
-		outln("%0 of %1 tests have passed successfully, with %2 failures. Total time %3ms.".format(tests_passed, tests_total, tests_failed, timetracker.elapsed), "partial success");
+	if (tests_failed == 0) {
+		if (tests_passed > 0)outln("%0 of %1 tests passed successfully in %2ms!".format(tests_passed, tests_total, timetracker.elapsed), "success");
+	} else outln("%0 of %1 tests have passed successfully, with %2 failures. Total time %3ms.".format(tests_passed, tests_total, tests_failed, timetracker.elapsed), "partial success");
 	if (tests_skipped > 0) outln("%0 tests skipped.".format(tests_skipped));
 	display_ui_buffer();
 }
@@ -92,7 +93,12 @@ void run_test(script_function@ func, const string&in filename) {
 		tests_skipped++;
 		return;
 	}
-	
+	// Or if only specific tests are enabled and this one isn't among them, skip it silently.
+	if (!enabled_tests.empty() && !(enabled_tests.exists(func_name) || enabled_tests.exists(test_name) || enabled_tests.exists(filename))) {
+		tests_skipped++;
+		return;
+	}
+
 	// Check for skip variable
 	any@ v_skip = nvgt_game.get_global(nvgt_game.get_global_index_by_decl("bool %0_skip".format(func_name)));
 	bool b_skip = false;
