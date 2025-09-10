@@ -13,12 +13,16 @@
 #pragma once
 
 #include <sstream>
+#include <atomic>
 #include <angelscript.h>
 #include <Poco/BinaryReader.h>
 #include <Poco/BinaryWriter.h>
 #include <Poco/RefCountedObject.h>
 #include <Poco/SharedPtr.h>
-
+#include <Poco/Runnable.h>
+#include <Poco/Thread.h>
+#include <Poco/Mutex.h>
+#include <deque>
 // The base datastream class. This wraps either an iostream or an istream/ostream into a Poco BinaryReader/Writer. This Poco class has functionality extremely similar to Angelscript's scriptfile addon accept that it works on streams, meaning that it can work on much more than files. We also wrap some other basics of std streams.
 class datastream;
 typedef void (datastream_close_callback)(datastream*);
@@ -30,6 +34,32 @@ class datastream : public Poco::RefCountedObject {
 	std::ostream* _ostr;
 	datastream* ds; // If this object was created from another angelscript object, holds a reference to it so we can keep all parent streams alive until the close or destruction of this object.
 	datastream_close_callback* close_cb; // Some advanced streams may allocate some extra user data that needs to be destroyed when a stream is closed, this is such a stream's opertunity to destroy that data.
+	std::string _line_buffer;
+
+	class Reader : public Poco::Runnable {
+	public:
+		Reader(datastream* owner): _owner(owner) {}
+		void run() override {
+			try {
+				std::string line;
+				while (std::getline(*_owner->_istr, line)) {
+					Poco::ScopedLock<Poco::Mutex> lg(_owner->_queueMutex);
+					_owner->_lineQueue.push_back(line);
+				}
+			} catch (const std::exception& e) {
+			} catch (...) {
+			}
+			_owner->_reading = false;
+		}
+	private:
+		datastream* _owner;
+	};
+
+	std::deque<std::string> _lineQueue;
+	Poco::Mutex _queueMutex;
+	Poco::Thread _readerThread;
+	std::atomic<bool> _reading{false};
+	Reader _reader{this};
 public:
 	void* user; // Free for advanced streams to use.
 	bool no_close; // If set to true, the close function becomes a no-op for singleton streams like stdin/stdout.
@@ -81,7 +111,7 @@ public:
 		return _istr ? _istr->good() : _ostr ? _ostr->good() : false;
 	}
 	inline bool eof() {
-		return _istr ? _istr->eof() : _ostr ? _ostr->eof() : false;
+		return !_reading.load() && _lineQueue.empty();
 	}
 	inline bool bad() {
 		return _istr ? _istr->bad() : _ostr ? _ostr->bad() : false;
