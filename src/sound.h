@@ -72,6 +72,11 @@ public:
 	virtual unsigned long long get_time() = 0;
 	virtual bool set_time(unsigned long long local_time) = 0;
 };
+class effect_node : public virtual audio_node {
+	public:
+	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
+	virtual unsigned int required_input_frame_count(unsigned int output_frame_count) const = 0;
+};
 class audio_engine {
 public:
 	enum engine_flags {
@@ -320,6 +325,13 @@ public:
 	virtual bool get_data_format(ma_format *format, unsigned int *channels, unsigned int *sample_rate) = 0;
 	// A completely pointless API here, but needed for code that relies on legacy BGT includes. Always returns 0.
 	virtual double get_pitch_lower_limit() = 0;
+};
+class microphone : public virtual effect_node {
+public:
+	virtual bool set_state(ma_node_state state) override = 0;
+	virtual bool set_device(int device) = 0;
+	virtual int get_device() const = 0;
+	static microphone* create(int device, audio_engine* engine);
 };
 
 audio_engine *new_audio_engine(int flags, int sample_rate = 0, int channels = 0);

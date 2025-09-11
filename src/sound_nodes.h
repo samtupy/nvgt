@@ -51,11 +51,19 @@ public:
 	unsigned long long get_time() { return node ? ma_node_get_time(node) : 0; }
 	bool set_time(unsigned long long local_time) { return node ? (g_soundsystem_last_error = ma_node_set_time(node, local_time)) == MA_SUCCESS : false; }
 };
-
-class effect_node : public virtual audio_node {
+typedef struct {
+	ma_node_base base;
+	effect_node* node;
+} ma_effect_node;
+class effect_node_impl : public audio_node_impl, public virtual effect_node {
+	ma_node_vtable vtable;
 	public:
-	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
-	virtual unsigned int required_input_frame_count(unsigned int output_frame_count) const = 0;
+	std::unique_ptr<ma_effect_node> n;
+	effect_node_impl(audio_engine* e, ma_uint8 input_channel_count, ma_uint8 output_channel_count, ma_uint8 input_bus_count, ma_uint8 output_bus_count, unsigned int flags);
+	~effect_node_impl();
+	void destroy_node();
+	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override;
+	unsigned int required_input_frame_count(unsigned int output_frame_count) const override;
 };
 
 class passthrough_node : public virtual audio_node {

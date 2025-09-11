@@ -817,7 +817,7 @@ public:
 	bool stop() override { return snd ? (g_soundsystem_last_error = ma_sound_stop(&*snd)) == MA_SUCCESS : false; }
 	void set_volume(float volume) override {
 		if (snd)
-			ma_sound_set_volume(&*snd, std::min((get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_db_to_linear(volume) : volume), 1.0f));
+			ma_sound_set_volume(&*snd, get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES? ma_volume_db_to_linear(volume) : volume);
 	}
 	float get_volume() const override { return snd ? (get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_linear_to_db(ma_sound_get_volume(&*snd)) : ma_sound_get_volume(&*snd)) : NAN; }
 	void set_pan(float pan) override {
@@ -1438,6 +1438,87 @@ public:
 	}
 };
 
+class microphone_impl : public effect_node_impl, public virtual microphone {
+	unique_ptr<ma_device> capture_device;
+	int device_index;
+	ma_pcm_rb ring_buffer;
+	static void capture_data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
+		microphone_impl* node = (microphone_impl*)pDevice->pUserData;
+		if (node && pInput && frameCount > 0) {
+			ma_uint32 framesToWrite = frameCount;
+			void* pWriteBuffer;
+			if (ma_pcm_rb_acquire_write(&node->ring_buffer, &framesToWrite, &pWriteBuffer) == MA_SUCCESS) {
+				if (framesToWrite) ma_copy_pcm_frames(pWriteBuffer, pInput, framesToWrite, node->ring_buffer.format, node->ring_buffer.channels);
+				ma_pcm_rb_commit_write(&node->ring_buffer, framesToWrite);
+			}
+		}
+	}
+public:
+	microphone_impl(audio_engine* e, int device) : effect_node_impl(e, 0, 0, 0, 1, MA_NODE_FLAG_CONTINUOUS_PROCESSING), capture_device(make_unique<ma_device>()), device_index(device) {
+		ma_uint32 channels = e->get_channels();
+		if (ma_pcm_rb_init(ma_format_f32, channels, 8192, nullptr, nullptr, &ring_buffer) != MA_SUCCESS) throw std::runtime_error("failed to initialize ring buffer");
+		ma_device_config device_config = ma_device_config_init(ma_device_type_capture);
+		device_config.capture.format = ma_format_f32;
+		device_config.capture.channels = channels;
+		device_config.sampleRate = e->get_sample_rate();
+		device_config.dataCallback = capture_data_callback;
+		device_config.pUserData = this;
+		device_config.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE * 2;
+		device_config.capture.pDeviceID = (device >= 0 && device < g_sound_input_devices.size()) ? &g_sound_input_devices[device_index].id : nullptr;
+		if ((g_soundsystem_last_error = ma_device_init(nullptr, &device_config, &*capture_device)) != MA_SUCCESS) {
+			ma_pcm_rb_uninit(&ring_buffer);
+			throw std::runtime_error("failed to initialize capture device");
+		}
+		if ((g_soundsystem_last_error = ma_device_start(&*capture_device)) != MA_SUCCESS) audio_node_impl::set_state(ma_node_state_stopped);
+	}
+	~microphone_impl() {
+		destroy_node();
+		if (capture_device) ma_device_uninit(&*capture_device);
+		ma_pcm_rb_uninit(&ring_buffer);
+	}
+	bool set_device(int device) override {
+		if (device == device_index) return true;
+		if (device < -1 || device >= int(g_sound_input_devices.size())) return false;
+		if (capture_device) {
+			ma_device_stop(&*capture_device);
+			ma_device_uninit(&*capture_device);
+			capture_device.reset();
+		}
+		ma_device_config device_config = ma_device_config_init(ma_device_type_capture);
+		device_config.capture.format = ma_format_f32;
+		device_config.capture.channels = get_engine()->get_channels();
+		device_config.sampleRate = get_engine()->get_sample_rate();
+		device_config.dataCallback = capture_data_callback;
+		device_config.pUserData = this;
+		device_config.capture.pDeviceID = (device >= 0 && device < int(g_sound_input_devices.size())) ? &g_sound_input_devices[device].id : nullptr;
+		if ((g_soundsystem_last_error = ma_device_init(nullptr, &device_config, &*capture_device)) != MA_SUCCESS) return false;
+		device_index = device;
+		if ((g_soundsystem_last_error = ma_device_start(&*capture_device)) != MA_SUCCESS) {
+			audio_node_impl::set_state(ma_node_state_stopped);
+			return false;
+		}
+		return true;
+	}
+	int get_device() const override { return device_index; }
+	bool set_state(ma_node_state state) override {
+		bool ret = audio_node_impl::set_state(state);
+		if (!capture_device) return ret;
+		if (!ret) return false;
+		if (state == ma_node_state_stopped) return ma_device_stop(&*capture_device) == MA_SUCCESS;
+		else if (state == ma_node_state_started) {
+			ma_pcm_rb_reset(&ring_buffer);
+			return ma_device_start(&*capture_device) == MA_SUCCESS;
+		}
+		return false;
+	}
+	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
+		ma_uint64 totalFramesRead = 0;
+		ma_data_source_read_pcm_frames((ma_data_source*)&ring_buffer, frames_out[0], *frame_count_out, &totalFramesRead);
+		*frame_count_out = (ma_uint32)totalFramesRead;
+	}
+};
+microphone* microphone::create(int device, audio_engine* engine) { return new microphone_impl(engine, device); }
+
 audio_engine *new_audio_engine(int flags, int sample_rate, int channels) { return new audio_engine_impl(flags, sample_rate, channels); }
 mixer *new_mixer(audio_engine *engine) { return new mixer_impl(engine); }
 sound *new_sound(audio_engine *engine) { return new sound_impl(engine); }
@@ -1505,6 +1586,10 @@ const pack_interface *get_sound_default_storage() {
 	return obj->get_mutable();
 }
 int get_soundsystem_last_error() { return g_soundsystem_last_error; }
+string get_soundsystem_last_error_text() {
+	const char* msg = ma_result_description(g_soundsystem_last_error);
+	return msg? msg : "";
+}
 void set_sound_master_volume(float db) {
 	if (!g_soundsystem_initialized.test())
 		return;
@@ -1728,6 +1813,10 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	engine->RegisterObjectMethod(type.c_str(), "bool get_playing() const property", asFUNCTION((virtual_call < T, &T::get_playing, bool >)), asCALL_CDECL_OBJFIRST);
 }
 void RegisterSoundsystemNodes(asIScriptEngine *engine) {
+	RegisterSoundsystemAudioNode <microphone> (engine, "microphone");
+	engine->RegisterObjectBehaviour("microphone", asBEHAVE_FACTORY, "microphone@ m(int device = -1, audio_engine@ engine = sound_default_engine)", asFUNCTION(microphone::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("microphone", "bool set_device(int device)", asFUNCTION((virtual_call < microphone, &microphone::set_device, bool, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("microphone", "int get_device() const property", asFUNCTION((virtual_call < microphone, &microphone::get_device, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("audio_node_chain", asBEHAVE_FACTORY, "audio_node_chain@ c(audio_node@ source = null, audio_node@ endpoint = null, audio_engine@+ engine = sound_default_engine)", asFUNCTION(audio_node_chain::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_node_chain", "bool add_node(audio_node@+ node, audio_node@+ after = null, uint input_bus_index = 0)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::add_node, bool, audio_node*, audio_node*, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_node_chain", "bool add_node(audio_node@+ node, int after, uint input_bus_index = 0)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::add_node_at, bool, audio_node*, int, unsigned int>)), asCALL_CDECL_OBJFIRST);
@@ -2038,6 +2127,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("void set_sound_master_volume(float db) property", asFUNCTION(set_sound_master_volume), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float get_sound_master_volume() property", asFUNCTION(get_sound_master_volume), asCALL_CDECL);
 	engine->RegisterGlobalFunction("audio_error_state get_SOUNDSYSTEM_LAST_ERROR() property", asFUNCTION(get_soundsystem_last_error), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string get_SOUNDSYSTEM_LAST_ERROR_TEXT() property", asFUNCTION(get_soundsystem_last_error_text), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_3d_panner(int panner_id)", asFUNCTION(sound_set_default_3d_panner), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_sound_default_3d_panner() property", asFUNCTION(sound_get_default_3d_panner), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_3d_attenuator(int attenuator_id)", asFUNCTION(sound_set_default_3d_attenuator), asCALL_CDECL);
