@@ -7,6 +7,7 @@
 		"miniupnpc",
 		"libobfuscate",
 		"libogg",
+		"libopusenc",
 		"opus",
 		"opusfile",
 		"sdl3-image",
@@ -28,7 +29,9 @@
 		{
 			"name": "curl",
 			"default-features": false,
-			"features": ["openssl"]
+			"features": [
+				"openssl"
+			]
 		},
 		{
 			"name": "libplist",
@@ -36,18 +39,30 @@
 		},
 		{
 			"name": "sdl3",
-			"features": ["vulkan"],
+			"features": [
+				"vulkan"
+			],
 			"platform": "windows|osx|ios|android"
 		},
 		{
 			"name": "sdl3",
 			"platform": "linux",
-			"features": ["vulkan", "ibus", "wayland", "x11"]
+			"features": [
+				"vulkan",
+				"ibus",
+				"wayland",
+				"x11"
+			]
 		},
 		{
 			"name": "freetype",
 			"default-features": false,
-			"features": ["bzip2", "error-strings", "subpixel-rendering", "zlib"]
+			"features": [
+				"bzip2",
+				"error-strings",
+				"subpixel-rendering",
+				"zlib"
+			]
 		},
 		{
 			"name": "universalspeech",
@@ -56,19 +71,39 @@
 		{
 			"name": "poco",
 			"default-features": false,
-			"features": ["net", "netssl", "json", "util", "xml", "zip", "encodings", "mongodb", "redis", "jwt", "prometheus", "sevenzip"]
+			"features": [
+				"net",
+				"netssl",
+				"json",
+				"util",
+				"xml",
+				"zip",
+				"encodings",
+				"mongodb",
+				"redis",
+				"jwt",
+				"prometheus",
+				"sevenzip"
+			]
 		},
 		{
 			"name": "libgit2",
 			"default-features": false,
-			"features": ["pcre2"]
+			"features": [
+				"pcre2"
+			]
 		},
 		{
 			"name": "libarchive",
 			"default-features": false,
 			"platform": "windows|osx|linux",
-			"features": ["bzip2", "lz4", "lzma", "zstd"]
+			"features": [
+				"bzip2",
+				"lz4",
+				"lzma",
+				"zstd"
+			]
 		}
 	],
-	"builtin-baseline": "b1b19307e2d2ec1eefbdb7ea069de7d4bcd31f01"
+	"builtin-baseline": "7213cf8135c329c37c7e2778e40774489a0583a8"
 }

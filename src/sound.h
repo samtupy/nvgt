@@ -69,7 +69,7 @@ public:
 	virtual unsigned long long get_state_time(ma_node_state state) = 0;
 	virtual ma_node_state get_state_by_time(unsigned long long global_time) = 0;
 	virtual ma_node_state get_state_by_time_range(unsigned long long global_time_begin, unsigned long long global_time_end) = 0;
-	virtual unsigned long long get_time() = 0;
+	virtual unsigned long long get_time() const = 0;
 	virtual bool set_time(unsigned long long local_time) = 0;
 };
 class effect_node : public virtual audio_node {
@@ -77,7 +77,7 @@ class effect_node : public virtual audio_node {
 	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
 	virtual unsigned int required_input_frame_count(unsigned int output_frame_count) const = 0;
 };
-class audio_engine {
+class audio_engine : public virtual audio_node {
 public:
 	enum engine_flags {
 		DURATIONS_IN_FRAMES = 1,  // If set, all durations possible will expect a value in PCM frames rather than milliseconds unless explicitly specified.
@@ -86,8 +86,6 @@ public:
 		NO_CLIP = 8, // If set, disables miniaudio's sample clipping.
 		PERCENTAGE_ATTRIBUTES = 16 // If this is set, attributes for sounds will be in percentages such as 100 instead of decimals such as 1.0, ecentially a multiplication by 100 for backwards compatibility or preference. This also causes sound.volume to work in db.
 	};
-	virtual void duplicate() = 0; // reference counting
-	virtual void release() = 0;
 	virtual ~audio_engine() = default;
 	virtual int get_flags() const = 0;
 	virtual int get_device() const = 0;
@@ -98,8 +96,8 @@ public:
 	virtual CScriptArray *read_script(unsigned long long frame_count) = 0;
 	virtual void set_processing_callback(asIScriptFunction* cb) = 0;
 	virtual asIScriptFunction* get_processing_callback() const = 0;
-	virtual unsigned long long get_time() const = 0;
-	virtual bool set_time(unsigned long long time) = 0; // depends on DURATIONS_IN_FRAMES flag.
+	virtual unsigned long long get_time() const override = 0;
+	virtual bool set_time(unsigned long long time) override = 0; // depends on DURATIONS_IN_FRAMES flag.
 	virtual unsigned long long get_time_in_frames() const = 0;
 	virtual bool set_time_in_frames(unsigned long long time) = 0;
 	virtual unsigned long long get_time_in_milliseconds() const = 0;
@@ -135,20 +133,40 @@ public:
 	virtual mixer *new_mixer() = 0;
 	virtual sound *new_sound() = 0;
 };
-class audio_decoder {
+class audio_data_source : public virtual audio_node {
 public:
-	virtual void duplicate() const = 0;
-	virtual void release() const = 0;
+	virtual ma_data_source* get_ma_data_source() const = 0;
+	virtual unsigned long long read(void* buffer, unsigned long long frame_count) = 0;
+	virtual CScriptArray* read_script(unsigned long long frame_count) = 0;
+	virtual unsigned long long skip_frames(unsigned long long frame_count) = 0;
+	virtual float skip_milliseconds(float ms) = 0;
+	virtual bool seek_frames(unsigned long long frame_index) = 0;
+	virtual bool seek_milliseconds(float ms) = 0;
+	virtual unsigned long long get_cursor_frames() const = 0;
+	virtual float get_cursor_milliseconds() const = 0;
+	virtual unsigned long long get_length_frames() const = 0;
+	virtual float get_length_milliseconds() const = 0;
+	virtual bool set_looping(bool looping) = 0;
+	virtual bool get_looping() const = 0;
+	virtual bool set_range(unsigned long long start_frame, unsigned long long end_frame) = 0;
+	virtual void get_range(unsigned long long* start_frame, unsigned long long* end_frame) const = 0;
+	virtual bool set_loop_point(unsigned long long start_frame, unsigned long long end_frame) = 0;
+	virtual void get_loop_point(unsigned long long* start_frame, unsigned long long* end_frame) const = 0;
+	virtual bool set_current(audio_data_source* new_current) = 0;
+	virtual audio_data_source* get_current() const = 0;
+	virtual bool set_next(audio_data_source* new_next) = 0;
+	virtual audio_data_source* get_next() const = 0;
+	virtual bool get_active() const = 0;
+	virtual bool get_data_format(ma_format *format, unsigned int *channels, unsigned int *sample_rate) const = 0;
+};
+class audio_decoder : public virtual audio_data_source {
+public:
 	virtual bool open(const std::string& filename, const pack_interface* pack_file = nullptr, unsigned int sample_rate = 0, unsigned int channels = 0) = 0;
 	virtual bool open_stream(datastream* ds, unsigned int sample_rate = 0, unsigned int channels = 0) = 0;
 	virtual bool close() = 0;
-	virtual unsigned long long read(void* buffer, unsigned long long frame_count) = 0;
-	virtual CScriptArray* read_script(unsigned long long frame_count) = 0;
-	virtual bool seek(unsigned long long frame_index) = 0;
-	virtual unsigned long long get_cursor() const = 0;
 	virtual unsigned int get_sample_rate() const = 0;
 	virtual unsigned int get_channels() const = 0;
-	static audio_decoder* create();
+	static audio_decoder* create(audio_engine* e);
 };
 class sound_shape {
 	// This facility allows sounds to be attached to any arbitrary shape for positioning.
@@ -293,10 +311,12 @@ public:
 	virtual bool stream_pcm(const void* data, unsigned int size_in_frames, ma_format format = ma_format_unknown, unsigned int sample_rate = 0, unsigned int channels = 0, unsigned int buffer_size = 0) = 0;
 	virtual bool stream_pcm_script_array(CScriptArray *buffer, unsigned int samplerate, unsigned int channels, unsigned int buffer_size = 0) = 0;
 	virtual bool stream_pcm_script_memory_buffer(script_memory_buffer*buffer, unsigned int samplerate, unsigned int channels, unsigned int buffer_size = 0) = 0;
+	virtual bool open(audio_data_source* datasource) = 0;
 	virtual bool close() = 0;
 	virtual void set_autoclose(bool enabled = true) = 0;
 	virtual bool get_autoclose() const = 0;
 	virtual const std::string &get_loaded_filename() const = 0;
+	virtual audio_data_source* get_datasource() const = 0;
 	virtual bool get_active() = 0;
 	virtual bool get_paused() = 0;
 	virtual bool play_wait() = 0;
@@ -326,7 +346,7 @@ public:
 	// A completely pointless API here, but needed for code that relies on legacy BGT includes. Always returns 0.
 	virtual double get_pitch_lower_limit() = 0;
 };
-class microphone : public virtual effect_node {
+class microphone : public virtual audio_data_source {
 public:
 	virtual bool set_state(ma_node_state state) override = 0;
 	virtual bool set_device(int device) = 0;
