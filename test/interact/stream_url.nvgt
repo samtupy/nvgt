@@ -1,0 +1,16 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	show_window("loading...");
+	sound s;
+	if (!s.stream_url("https://nwm.streamguys1.com/ktis-fm")) {
+		alert("error", "initialize stream fail");
+		return;
+	}
+	s.volume = -15;
+	show_window("streaming");
+	s.play();
+	while(key_up(KEY_ESCAPE)) wait(5);
+}

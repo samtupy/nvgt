@@ -13,11 +13,37 @@
 #pragma once
 
 #include <sstream>
+#include <vector>
 #include <angelscript.h>
 #include <Poco/BinaryReader.h>
 #include <Poco/BinaryWriter.h>
 #include <Poco/RefCountedObject.h>
 #include <Poco/SharedPtr.h>
+#include <Poco/BufferedStreamBuf.h>
+
+// Prebuffered input stream for unseekable sources like internet radio
+class prebuffer_istreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_traits<char>> {
+	std::istream* source;
+	std::vector<char> prebuffer;
+	std::size_t prebuffer_size;
+	std::size_t prebuffer_pos;
+	bool prebuffer_discarded;
+	bool owns_source;
+	bool fill_prebuffer();
+public:
+	prebuffer_istreambuf(std::istream& source, std::size_t prebuffer_size = 1024);
+	~prebuffer_istreambuf();
+	void own_source(bool owns);
+	virtual int readFromDevice(char* buffer, std::streamsize length);
+	virtual std::streampos seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in);
+	virtual std::streampos seekpos(std::streampos pos, std::ios_base::openmode which = std::ios_base::in);
+};
+class prebuffer_istream : public std::istream {
+public:
+	prebuffer_istream(std::istream& source, std::size_t prebuffer_size = 8192);
+	~prebuffer_istream();
+	std::istream& own_source(bool owns = true);
+};
 
 // The base datastream class. This wraps either an iostream or an istream/ostream into a Poco BinaryReader/Writer. This Poco class has functionality extremely similar to Angelscript's scriptfile addon accept that it works on streams, meaning that it can work on much more than files. We also wrap some other basics of std streams.
 class datastream;

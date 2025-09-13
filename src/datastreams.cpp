@@ -45,6 +45,65 @@
 
 using namespace Poco;
 
+// Prebuffered input stream implementation
+prebuffer_istreambuf::prebuffer_istreambuf(std::istream& source, std::size_t prebuffer_size) : BasicBufferedStreamBuf(4096, std::ios_base::in), source(&source), prebuffer_size(prebuffer_size), prebuffer_pos(0), prebuffer_discarded(false), owns_source(false) {
+	if (!source.good()) throw std::invalid_argument("Source stream is invalid.");
+	prebuffer.reserve(prebuffer_size);
+}
+prebuffer_istreambuf::~prebuffer_istreambuf() { if (owns_source) delete source; }
+void prebuffer_istreambuf::own_source(bool owns) { owns_source = owns; }
+bool prebuffer_istreambuf::fill_prebuffer() {
+	if (!prebuffer.empty() || prebuffer_discarded) return true;
+	prebuffer.resize(prebuffer_size);
+	source->read(prebuffer.data(), prebuffer_size);
+	std::size_t bytes_read = source->gcount();
+	prebuffer.resize(bytes_read);
+	return bytes_read > 0;
+}
+int prebuffer_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
+	if (length <= 0) return 0;
+	std::streamsize bytes_read = 0;
+	if (prebuffer.empty() && !prebuffer_discarded) fill_prebuffer();
+	if (!prebuffer_discarded && prebuffer_pos < prebuffer.size()) {
+		std::size_t available_in_prebuffer = prebuffer.size() - prebuffer_pos;
+		std::size_t to_copy = std::min(static_cast<std::size_t>(length), available_in_prebuffer);
+		std::memcpy(buffer, prebuffer.data() + prebuffer_pos, to_copy);
+		prebuffer_pos += to_copy;
+		buffer += to_copy;
+		length -= to_copy;
+		bytes_read += to_copy;
+		if (prebuffer_pos >= prebuffer.size()) {
+			prebuffer.clear();
+			prebuffer.shrink_to_fit();
+			prebuffer_discarded = true;
+		}
+	}
+	if (length > 0) {
+		source->read(buffer, length);
+		std::streamsize source_bytes_read = source->gcount();
+		bytes_read += source_bytes_read;
+	}
+	return static_cast<int>(bytes_read);
+}
+std::streampos prebuffer_istreambuf::seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
+	if (dir == std::ios_base::beg && off == 0) return seekpos(0);
+	return -1;
+}
+std::streampos prebuffer_istreambuf::seekpos(std::streampos pos, std::ios_base::openmode which) {
+	if (pos != 0 || prebuffer_discarded) return -1;
+	if (prebuffer.empty()) fill_prebuffer();
+	prebuffer_pos = 0;
+	setg(nullptr, nullptr, nullptr);
+	return 0;
+}
+prebuffer_istream::prebuffer_istream(std::istream& source, std::size_t prebuffer_size) : basic_istream(new prebuffer_istreambuf(source, prebuffer_size)) {}
+prebuffer_istream::~prebuffer_istream() { delete rdbuf(); }
+std::istream& prebuffer_istream::own_source(bool owns) {
+	prebuffer_istreambuf* buf = static_cast<prebuffer_istreambuf*>(rdbuf());
+	if (buf != nullptr) buf->own_source(owns);
+	return *this;
+}
+
 // Global datastream singletons for cin, cout and cerr.
 datastream* ds_cout = nullptr;
 datastream* ds_cin = nullptr;

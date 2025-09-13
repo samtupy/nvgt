@@ -8,7 +8,7 @@
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
- */
+*/
 
 #pragma once
 
@@ -136,6 +136,7 @@ public:
 class audio_data_source : public virtual audio_node {
 public:
 	virtual ma_data_source* get_ma_data_source() const = 0;
+	virtual unsigned int get_advised_read_frame_count() const = 0;
 	virtual unsigned long long read(void* buffer, unsigned long long frame_count) = 0;
 	virtual CScriptArray* read_script(unsigned long long frame_count) = 0;
 	virtual unsigned long long skip_frames(unsigned long long frame_count) = 0;
@@ -158,6 +159,21 @@ public:
 	virtual audio_data_source* get_next() const = 0;
 	virtual bool get_active() const = 0;
 	virtual bool get_data_format(ma_format *format, unsigned int *channels, unsigned int *sample_rate) const = 0;
+	virtual unsigned int get_channels() const = 0;
+	virtual unsigned int get_sample_rate() const = 0;
+};
+class audio_ring_buffer : public virtual audio_data_source {
+public:
+	virtual void reset() = 0;
+	virtual unsigned int get_advised_read_frame_count() const override = 0;
+	virtual unsigned int write(const float* frames_in, unsigned int frame_count) = 0;
+	virtual unsigned int write_script_array(CScriptArray* frames) = 0;
+	virtual unsigned int write_script_memory_buffer(script_memory_buffer* frames) = 0;
+	virtual unsigned int get_available_read() const = 0;
+	virtual unsigned int get_available_write() const = 0;
+	virtual unsigned int get_channels() const override = 0;
+	virtual unsigned int get_sample_rate() const override = 0;
+	static audio_ring_buffer* create(unsigned int channels, unsigned int size, audio_engine* e);
 };
 class audio_decoder : public virtual audio_data_source {
 public:
@@ -294,6 +310,7 @@ public:
 	virtual bool load_special(const std::string &filename, const size_t protocol_slot = 0, directive_t protocol_directive = nullptr, const size_t filter_slot = 0, directive_t filter_directive = nullptr, ma_uint32 ma_flags = MA_SOUND_FLAG_DECODE) = 0;
 	virtual bool load(const std::string &filename, const pack_interface *pack_file = nullptr) = 0;
 	virtual bool stream(const std::string &filename, const pack_interface *pack_file = nullptr) = 0;
+	virtual bool stream_url(const std::string &url) = 0;
 	virtual bool load_string(const std::string &data) = 0;
 	virtual bool load_string_async(const std::string &data) = 0; // Makes an extra copy. Good for short sounds that need to start immediately. Used by speak_to_sound.
 	virtual bool load_memory(const void *buffer, unsigned int size) = 0;
@@ -346,7 +363,7 @@ public:
 	// A completely pointless API here, but needed for code that relies on legacy BGT includes. Always returns 0.
 	virtual double get_pitch_lower_limit() = 0;
 };
-class microphone : public virtual audio_data_source {
+class microphone : public virtual audio_ring_buffer {
 public:
 	virtual bool set_state(ma_node_state state) override = 0;
 	virtual bool set_device(int device) = 0;
