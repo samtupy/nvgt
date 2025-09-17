@@ -162,7 +162,7 @@ jobs:
         path: 'release'
 
   windows_package:
-    runs-on: windows-2019
+    runs-on: windows-2022
     needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v5
