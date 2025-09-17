@@ -1,0 +1,24 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	mixer master;
+	@sound_default_mixer = master;
+	audio_opus_encoder enc;
+	microphone mic;
+	mic.attach_output_bus(0, master, 0);
+	sound s;
+	s.load("C:\\windows\\media\\chord.wav");
+	s.play_looped();
+	master.effects_chain.add_node(enc);
+	enc.open(44100, 2);
+	alert("test", "recording");
+	enc.close();
+	string data = enc.read();
+	mic.detach_output_bus(0);
+	s.close();
+	s.load_memory(data);
+	s.play();
+	alert("playing", "press OK to stop");
+}

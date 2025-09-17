@@ -184,6 +184,50 @@ public:
 	virtual unsigned int get_channels() const = 0;
 	static audio_decoder* create(audio_engine* e);
 };
+class audio_encoder : public virtual effect_node {
+public:
+	enum encoder_flags { ENCODER_OVERWRITE = 1 << 0, ENCODER_DEFAULTS = 1 << 31 };
+	virtual unsigned int get_default_open_flags() const = 0;
+	virtual bool open_file(const std::string& filename, unsigned int sample_rate, unsigned int channels, unsigned int flags = ENCODER_DEFAULTS) = 0;
+	virtual bool open_stream(datastream* ds, unsigned int sample_rate, unsigned int channels, unsigned int flags = ENCODER_DEFAULTS) =0;
+	virtual bool open_pull(unsigned int sample_rate, unsigned int channels, unsigned int flags = ENCODER_DEFAULTS) = 0;
+	virtual bool close() = 0;
+	virtual bool get_active() const = 0;
+	virtual unsigned long long get_frames_written() const = 0;
+	virtual unsigned int write(const float* frames_in, unsigned int frame_count) = 0;
+	virtual unsigned int write_script_array(CScriptArray* frames) = 0;
+	virtual unsigned int write_script_memory_buffer(script_memory_buffer* frames) = 0;
+	virtual std::string read() = 0; // Only works in pull mode.
+	virtual std::string get_format() const = 0;
+	virtual unsigned int get_sample_rate() const = 0;
+	virtual unsigned int get_channels() const = 0;
+};
+class audio_wav_encoder : public virtual audio_encoder {
+public:
+	enum wav_encoder_flags { WAV_U8 = 1 << 1, WAV_S16 = 1 << 2, WAV_S24 = 1 << 3, WAV_S32 = 1 << 4, WAV_F32 = 1 << 5 };
+	virtual ma_format get_wav_format() const = 0;
+	static audio_wav_encoder* create(audio_engine* e);
+};
+class audio_opus_encoder : public virtual audio_encoder {
+public:
+	virtual int get_bitrate() const = 0;
+	virtual bool set_bitrate(int bitrate) = 0;
+	virtual int get_complexity() const = 0;
+	virtual bool set_complexity(int complexity) = 0;
+	virtual int get_signal_type() const = 0;
+	virtual bool set_signal_type(int signal_type) = 0;
+	virtual int get_application() const = 0;
+	virtual bool set_application(int application) = 0;
+	virtual int get_packet_loss_percent() const = 0;
+	virtual bool set_packet_loss_percent(int percent) = 0;
+	virtual bool get_vbr() const = 0;
+	virtual bool set_vbr(bool enabled) = 0;
+	virtual bool get_cvbr() const = 0;
+	virtual bool set_cvbr(bool enabled) = 0;
+	virtual bool get_dtx() const = 0;
+	virtual bool set_dtx(bool enabled) = 0;
+	static audio_opus_encoder* create(audio_engine* e);
+};
 class sound_shape {
 	// This facility allows sounds to be attached to any arbitrary shape for positioning.
 	// When a shape is attached to a sound or mixer, set_position_3d exhibits different functionality. if sound_shape::contains returns true based on whether listener_position is within the shape, spatialization is disabled on the sound. Otherwise, the sound's position is set to the sound_position vector passed to the contains callback, the callback can alter it to point at the nearest edge of the shape if needed and should be overridden by subclasses. Do not override is_in_shape as it's a base function which calls contains.
@@ -368,6 +412,8 @@ public:
 	virtual bool set_state(ma_node_state state) override = 0;
 	virtual bool set_device(int device) = 0;
 	virtual int get_device() const = 0;
+	virtual void set_volume(float volume) = 0;
+	virtual float get_volume() const = 0;
 	static microphone* create(int device, audio_engine* engine);
 };
 

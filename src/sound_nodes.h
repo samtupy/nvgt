@@ -25,7 +25,10 @@ protected:
 public:
 	audio_node_impl(ma_node_base *node, audio_engine *engine) : audio_node(), node(node), engine(engine), refcount(1) {
 		if (!init_sound()) throw std::runtime_error("sound system was not initialized");
+		if (!engine) this->engine = g_audio_engine;
+		if (dynamic_cast<audio_node_impl*>(this->engine) != this) this->engine->duplicate();
 	}
+	~audio_node_impl() { if (engine && dynamic_cast<audio_node_impl*>(this->engine) != this) engine->release(); }
 	void duplicate() { asAtomicInc(refcount); }
 	void release() {
 		if (asAtomicDec(refcount) < 1)
@@ -277,10 +280,9 @@ public:
 	static audio_spatializer* create(mixer* mixer, audio_engine* engine = nullptr);
 };
 
-class spatializer_component_node : public virtual audio_node {
+class spatializer_component_node : public virtual effect_node {
 public:
 	virtual audio_spatializer* get_spatializer() const = 0;
-	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
 };
 
 class basic_panner : public virtual spatializer_component_node {

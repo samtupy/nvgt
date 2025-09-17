@@ -622,6 +622,11 @@ std::string stringstream_str(datastream* ds) {
 	std::stringstream* ss = dynamic_cast<std::stringstream*>(ds->stream());
 	return ss ? ss->str() : "";
 }
+void stringstream_str_set(datastream* ds, const std::string& new_data) {
+	std::stringstream* ss = dynamic_cast<std::stringstream*>(ds->stream());
+	if (!ss) return;
+	ss->str(new_data);
+}
 // duplicating_reader/writer, in Poco known as TeeStream.
 void duplicating_stream_close(datastream* ds) {
 	std::vector<datastream*>* streams = (std::vector<datastream*>*)ds->user;
@@ -763,6 +768,7 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in initial_data, const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_factory), asCALL_CDECL);
 	engine->RegisterObjectMethod("datastream", "bool open(const string&in initial_data = \"\", const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_open), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datastream", "string str()", asFUNCTION(stringstream_str), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("datastream", "void str(const string&in new_data)", asFUNCTION(stringstream_str_set), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_TERMINAL);
 	engine->RegisterGlobalFunction("datastream@ get_cin() property", asFUNCTION(get_cin), asCALL_CDECL);
 	engine->RegisterGlobalFunction("datastream@ get_cout() property", asFUNCTION(get_cout), asCALL_CDECL);
