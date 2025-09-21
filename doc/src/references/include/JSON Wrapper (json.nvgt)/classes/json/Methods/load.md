@@ -1,8 +1,8 @@
 # load
 Load a JSON file / stream.
 
-1. `bool json::load(string filename);`
-2. `bool json::load(datastream@ f);`
+1. `bool json::loadf(string filename);`
+2. `bool json::loadds(datastream@ f);`
 
 ## Arguments (1):
 - `string filename`: The name of the JSON file to load.

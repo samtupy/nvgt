@@ -15,14 +15,14 @@ class json {
 		this.data = j;
 		return true;
 	}
-	bool load_file(string filename) {
+	bool loadf(string filename) {
 		file f;
 		if (!f.open(filename, "r")) return false;
 		string r = f.read();
 		f.close();
 		return this.loads(r);
 	}
-	bool load(datastream@ d) {
+	bool loadds(datastream@ d) {
 		if (@d == null || !d.active) return false;
 		return this.loads(d.read());
 	}
