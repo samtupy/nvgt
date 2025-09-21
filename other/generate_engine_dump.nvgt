@@ -2,7 +2,7 @@
 #pragma plugin git2nvgt
 #pragma plugin nvgt_sqlite
 #pragma plugin systemd_notify
-//#pragma plugin unicode
+#pragma plugin unicode
 string[] global_vars;
 class exported_enum {
 	dictionary properties;
