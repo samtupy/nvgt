@@ -15,7 +15,7 @@ class json {
 		this.data = j;
 		return true;
 	}
-	bool load(string filename) {
+	bool load_file(string filename) {
 		file f;
 		if (!f.open(filename, "r")) return false;
 		string r = f.read();
