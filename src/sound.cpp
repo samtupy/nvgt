@@ -838,6 +838,7 @@ public:
 	}
 	unsigned int get_default_open_flags() const override { return ENCODER_OVERWRITE; }
 	bool open_file(const string& filename, unsigned int sample_rate, unsigned int channels, unsigned int flags) override {
+		if (get_active()) close();
 		unique_lock<mutex> lock(write_mtx);
 		if (flags & ENCODER_DEFAULTS) flags = (flags & ~ENCODER_DEFAULTS) | get_default_open_flags();
 		if (flags & ENCODER_OVERWRITE && FileExists(filename)) FileDelete(filename);
@@ -845,6 +846,7 @@ public:
 	}
 	bool open_stream(datastream* ds, unsigned int sample_rate, unsigned int channels, unsigned int flags) override {
 		if (!ds) return false;
+		if (get_active()) close();
 		unique_lock<mutex> lock(write_mtx);
 		if (flags & ENCODER_DEFAULTS) flags = (flags & ~ENCODER_DEFAULTS) | get_default_open_flags();
 		if (!open_impl("", ds, sample_rate, channels, flags)) {
@@ -854,7 +856,10 @@ public:
 		output_stream = ds;
 		return true;
 	}
-	bool open_pull(unsigned int sample_rate, unsigned int channels, unsigned int flags) override { return open_stream(pull_stream = new datastream(new stringstream()), sample_rate, channels, flags); }
+	bool open_pull(unsigned int sample_rate, unsigned int channels, unsigned int flags) override {
+		if (pull_stream) pull_stream->release();
+		return open_stream(pull_stream = new datastream(new stringstream()), sample_rate, channels, flags);
+	}
 	bool close() override {
 		unique_lock<mutex> lock(write_mtx);
 		if (!close_impl()) return false;
@@ -907,7 +912,10 @@ public:
 		if (!pull_stringstream) return "";
 		string data = pull_stringstream->str();
 		if (get_active()) pull_stringstream->str("");
-		else pull_stream->release();
+		else {
+			pull_stream->release();
+			pull_stream = nullptr;
+		}
 		return data;
 	}
 	string get_format() const override { return ""; }

@@ -11,8 +11,8 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include "datastreams.h" // sdl_file_istream
 #include "pack.h"
-#include <Poco/FileStream.h>
 #include <Poco/StreamCopier.h>
 #include <Poco/Util/Application.h> // config
 #include <unordered_map> //For TOC in read mode.
@@ -286,9 +286,9 @@ pack::~pack() {
 }
 bool pack::create(const std::string& filename, const std::string& key) {
 	close();
-	Poco::FileOutputStream* file = NULL;
+	sdl_file_output_stream* file = NULL;
 	try {
-		file = new Poco::FileOutputStream(filename);
+		file = new sdl_file_output_stream(filename);
 		write = std::make_shared<write_mode_internals>(*file, key);
 	} catch (std::exception&) {
 		// Don't delete here; internals may have chained several mutations onto the stream before it failed, so trust that it cleaned up.
@@ -302,9 +302,9 @@ bool pack::open(const std::string& filename, const std::string& key, uint64_t pa
 	close();
 	std::string pack_filename = filename;
 	if (!pack_size) find_embedded_pack(pack_filename, pack_offset, pack_size);
-	Poco::FileInputStream* file = NULL;
+	sdl_file_input_stream* file = NULL;
 	try {
-		file = new Poco::FileInputStream(pack_filename);
+		file = new sdl_file_input_stream(pack_filename);
 		read = std::make_shared<read_mode_internals>(*file, key, pack_offset, pack_size);
 	} catch (std::exception&) {
 		// Don't delete here; internals may have chained several mutations onto the stream before it failed, so trust that it cleaned up.
@@ -334,7 +334,7 @@ bool pack::add_file(const std::string& filename, const std::string& internal_nam
 	if (open_mode != OPEN_WRITE)
 		return false;
 	try {
-		Poco::FileInputStream fs(filename);
+		sdl_file_input_stream fs(filename);
 		return write->put(fs, internal_name);
 	} catch (std::exception& e) { return false; }
 }
@@ -369,7 +369,7 @@ std::istream* pack::get_file(const std::string& filename) const {
 		return nullptr;
 	std::istream* fis = nullptr;
 	try {
-		fis = new Poco::FileInputStream(pack_name, std::ios_base::in);
+		fis = new sdl_file_input_stream(pack_name);
 		if (read->pack_offset != 0 || read->pack_size != 0)
 			fis = new section_istream(*fis, read->pack_offset, read->pack_size);
 		if (!key.empty())
@@ -429,7 +429,7 @@ bool pack::extract_file(const std::string& internal_name, const std::string& fil
 		return false;
 	bool result = false;
 	try {
-		Poco::FileOutputStream fos(file_on_disk, std::ios_base::out);
+		sdl_file_output_stream fos(file_on_disk);
 		Poco::StreamCopier::copyStream(*fis, fos);
 		result = true;
 	} catch (std::exception&) {
@@ -544,7 +544,7 @@ void write_embedded_packs(Poco::BinaryWriter& bw) {
 	bw.write7BitEncoded(uint32_t(embedding_packs.size()));
 	for (const auto& p : embedding_packs) {
 		bw << p.first;
-		Poco::FileInputStream fs(p.second);
+		sdl_file_input_stream fs(p.second);
 		bw << uint32_t(fs.size());
 		Poco::StreamCopier::copyStream(fs, bw.stream());
 		fs.close();

@@ -12,13 +12,12 @@
  */
 
 #include "sound_service.h"
-#include <Poco/FileStream.h>
 #include <Poco/URIStreamOpener.h>
 #include <vector>
 #include <cassert>
 #include <miniaudio.h>
 #include "crypto.h"
-#include "datastreams.h" // prebuffer_istream
+#include "datastreams.h" // sdl_file_stream, prebuffer_istream
 #include "misc_functions.h" // is_valid_utf8
 #include "pack.h"
 #include <Poco/StringTokenizer.h>
@@ -63,9 +62,9 @@ class sound_service_impl : public sound_service {
 			return &instance;
 		}
 		virtual std::istream *open_uri(const char *uri, const directive_t directive) const {
-			Poco::FileInputStream *stream;
+			sdl_file_input_stream* stream;
 			try {
-				stream = new Poco::FileInputStream(uri);
+				stream = new sdl_file_input_stream(uri);
 				return stream;
 			} catch (std::exception &) {
 				return NULL; // Likely out of memory.

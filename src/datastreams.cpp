@@ -45,6 +45,81 @@
 
 using namespace Poco;
 
+// SDL file stream implementation
+sdl_file_stream_buf::sdl_file_stream_buf() : BufferedBidirectionalStreamBuf(BUFFER_SIZE, std::ios::in | std::ios::out), _handle(nullptr) {}
+sdl_file_stream_buf::~sdl_file_stream_buf() { close(); }
+void sdl_file_stream_buf::open(const std::string& path, const std::string& mode) {
+	close();
+	_path = path;
+	_handle = SDL_IOFromFile(path.c_str(), mode.c_str());
+	if (!_handle) throw FileException("Cannot open file: " + path);
+}
+bool sdl_file_stream_buf::close() {
+	bool success = true;
+	if (_handle) {
+		success = SDL_CloseIO(_handle);
+		_handle = nullptr;
+	}
+	_path.clear();
+	return success;
+}
+SDL_IOStream* sdl_file_stream_buf::nativeHandle() const { return _handle; }
+UInt64 sdl_file_stream_buf::size() const { return _handle? SDL_GetIOSize(_handle) : 0; }
+void sdl_file_stream_buf::flushToDisk() { if (_handle) SDL_FlushIO(_handle); }
+int sdl_file_stream_buf::readFromDevice(char* buffer, std::streamsize length) {
+	if (!_handle) return -1;
+	size_t bytes_read = SDL_ReadIO(_handle, buffer, length);
+	if (bytes_read > 0) return bytes_read;
+	return SDL_GetIOStatus(_handle) == SDL_IO_STATUS_EOF? 0 : -1;
+}
+int sdl_file_stream_buf::writeToDevice(const char* buffer, std::streamsize length) {
+	if (!_handle) return -1;
+	size_t bytes_written = SDL_WriteIO(_handle, buffer, length);
+	if (bytes_written > 0) return bytes_written;
+	return SDL_GetIOStatus(_handle) != SDL_IO_STATUS_ERROR? 0 : -1;
+}
+std::streampos sdl_file_stream_buf::seekoff(std::streamoff off, std::ios::seekdir dir, std::ios::openmode mode) {
+	if (!_handle) return std::streampos(std::streamoff(-1));
+	if (getMode() & std::ios::out) sync();
+	if (dir == std::ios::cur && mode & std::ios::in) off -= static_cast<std::streamoff>(egptr() - gptr());
+	resetBuffers();
+	Sint64 new_pos = SDL_SeekIO(_handle, off, seekdir_to_whence(dir));
+	if (new_pos < 0) return -1;
+	return new_pos;
+}
+std::streampos sdl_file_stream_buf::seekpos(std::streampos pos, std::ios::openmode mode) {
+	if (!_handle) return -1;
+	if (getMode() & std::ios::out) sync();
+	resetBuffers();
+	Sint64 new_pos = SDL_SeekIO(_handle, pos, SDL_IO_SEEK_SET);
+	if (new_pos < 0) return -1;
+	return new_pos;
+}
+SDL_IOWhence sdl_file_stream_buf::seekdir_to_whence(std::ios::seekdir dir) const {
+	switch (dir) {
+		case std::ios::beg: return SDL_IO_SEEK_SET;
+		case std::ios::end: return SDL_IO_SEEK_END;
+		default: return SDL_IO_SEEK_CUR;
+	}
+}
+
+sdl_file_ios::sdl_file_ios() { poco_ios_init(&_buf); }
+void sdl_file_ios::open(const std::string& path, const std::string& mode) { clear(); _buf.open(path, mode); }
+void sdl_file_ios::close() { if (!_buf.close()) setstate(std::ios::badbit); }
+sdl_file_stream_buf* sdl_file_ios::rdbuf() { return &_buf; }
+sdl_file_ios::NativeHandle sdl_file_ios::nativeHandle() const { return _buf.nativeHandle(); }
+UInt64 sdl_file_ios::size() const { return _buf.size(); }
+void sdl_file_ios::flushToDisk() { _buf.flushToDisk(); }
+
+sdl_file_input_stream::sdl_file_input_stream() : std::istream(&_buf) {}
+sdl_file_input_stream::sdl_file_input_stream(const std::string& path, const std::string& mode) : std::istream(&_buf) { open(path, mode); }
+
+sdl_file_output_stream::sdl_file_output_stream() : std::ostream(&_buf) {}
+sdl_file_output_stream::sdl_file_output_stream(const std::string& path, const std::string& mode) : std::ostream(&_buf) { open(path, mode); }
+
+sdl_file_stream::sdl_file_stream() : std::iostream(&_buf) {}
+sdl_file_stream::sdl_file_stream(const std::string& path, const std::string& mode) : std::iostream(&_buf) { open(path, mode); }
+
 // Prebuffered input stream implementation
 prebuffer_istreambuf::prebuffer_istreambuf(std::istream& source, std::size_t prebuffer_size) : BasicBufferedStreamBuf(4096, std::ios_base::in), source(&source), prebuffer_size(prebuffer_size), prebuffer_pos(0), prebuffer_discarded(false), owns_source(false) {
 	if (!source.good()) throw std::invalid_argument("Source stream is invalid.");

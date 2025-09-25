@@ -20,6 +20,57 @@
 #include <Poco/RefCountedObject.h>
 #include <Poco/SharedPtr.h>
 #include <Poco/BufferedStreamBuf.h>
+#include <Poco/BufferedBidirectionalStreamBuf.h>
+#include <SDL3/SDL_iostream.h>
+
+// SDL file stream that wraps SDL_IOStream for file operations. We use this over Poco file streams because SDL is much more thorough about cross platform file access E. it's JNI layer allowing it to interface with Android assets.
+class sdl_file_stream_buf : public Poco::BufferedBidirectionalStreamBuf {
+	std::string _path;
+	SDL_IOStream* _handle;
+	SDL_IOWhence seekdir_to_whence(std::ios::seekdir dir) const;
+	enum { BUFFER_SIZE = 4096 };
+public:
+	sdl_file_stream_buf();
+	~sdl_file_stream_buf();
+	void open(const std::string& path, const std::string& mode);
+	bool close();
+	std::streampos seekoff(std::streamoff off, std::ios::seekdir dir, std::ios::openmode mode = std::ios::in | std::ios::out) override;
+	std::streampos seekpos(std::streampos pos, std::ios::openmode mode = std::ios::in | std::ios::out) override;
+	void flushToDisk();
+	Poco::UInt64 size() const;
+	SDL_IOStream* nativeHandle() const;
+protected:
+	int readFromDevice(char* buffer, std::streamsize length) override;
+	int writeToDevice(const char* buffer, std::streamsize length) override;
+};
+class sdl_file_ios : public virtual std::ios {
+public:
+	using NativeHandle = SDL_IOStream*;
+	sdl_file_ios();
+	virtual void open(const std::string& path, const std::string& mode);
+	void close();
+	sdl_file_stream_buf* rdbuf();
+	NativeHandle nativeHandle() const;
+	Poco::UInt64 size() const;
+	void flushToDisk();
+protected:
+	sdl_file_stream_buf _buf;
+};
+class sdl_file_input_stream : public sdl_file_ios, public std::istream {
+public:
+	sdl_file_input_stream();
+	sdl_file_input_stream(const std::string& path, const std::string& mode = "rb");
+};
+class sdl_file_output_stream : public sdl_file_ios, public std::ostream {
+public:
+	sdl_file_output_stream();
+	sdl_file_output_stream(const std::string& path, const std::string& mode = "wb");
+};
+class sdl_file_stream : public sdl_file_ios, public std::iostream {
+public:
+	sdl_file_stream();
+	sdl_file_stream(const std::string& path, const std::string& mode = "rb+");
+};
 
 // Prebuffered input stream for unseekable sources like internet radio
 class prebuffer_istreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_traits<char>> {
