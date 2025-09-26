@@ -46,17 +46,28 @@
 using namespace Poco;
 
 // SDL file stream implementation
-sdl_file_stream_buf::sdl_file_stream_buf() : BufferedBidirectionalStreamBuf(BUFFER_SIZE, std::ios::in | std::ios::out), _handle(nullptr) {}
+sdl_file_stream_buf::sdl_file_stream_buf() : BufferedBidirectionalStreamBuf(8192, std::ios::in | std::ios::out), _handle(nullptr) {}
 sdl_file_stream_buf::~sdl_file_stream_buf() { close(); }
 void sdl_file_stream_buf::open(const std::string& path, const std::string& mode) {
 	close();
+	resetBuffers();
 	_path = path;
 	_handle = SDL_IOFromFile(path.c_str(), mode.c_str());
 	if (!_handle) throw FileException("Cannot open file: " + path);
+	// Parse the mode string just to the extent that we can disable read or write features on the bidirectional buffer depending on stream type.
+	std::ios::openmode new_mode;
+	for (char c : mode) {
+		if (c == 'r') new_mode |= std::ios::in;
+		else if (c == 'w') new_mode |= std::ios::out;
+		else if (c == 'a') new_mode |= std::ios::out | std::ios::app;
+		else if (c == '+') new_mode |= std::ios::in | std::ios::out | std::ios::app;
+	}
+	setMode(new_mode);
 }
 bool sdl_file_stream_buf::close() {
 	bool success = true;
 	if (_handle) {
+		sync();
 		success = SDL_CloseIO(_handle);
 		_handle = nullptr;
 	}
@@ -65,7 +76,11 @@ bool sdl_file_stream_buf::close() {
 }
 SDL_IOStream* sdl_file_stream_buf::nativeHandle() const { return _handle; }
 UInt64 sdl_file_stream_buf::size() const { return _handle? SDL_GetIOSize(_handle) : 0; }
-void sdl_file_stream_buf::flushToDisk() { if (_handle) SDL_FlushIO(_handle); }
+void sdl_file_stream_buf::flushToDisk() {
+	if (!_handle) return;
+	if (getMode() & std::ios::out) sync();
+	SDL_FlushIO(_handle);
+}
 int sdl_file_stream_buf::readFromDevice(char* buffer, std::streamsize length) {
 	if (!_handle) return -1;
 	size_t bytes_read = SDL_ReadIO(_handle, buffer, length);

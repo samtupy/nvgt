@@ -28,7 +28,6 @@ class sdl_file_stream_buf : public Poco::BufferedBidirectionalStreamBuf {
 	std::string _path;
 	SDL_IOStream* _handle;
 	SDL_IOWhence seekdir_to_whence(std::ios::seekdir dir) const;
-	enum { BUFFER_SIZE = 4096 };
 public:
 	sdl_file_stream_buf();
 	~sdl_file_stream_buf();
