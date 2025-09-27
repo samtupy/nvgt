@@ -213,6 +213,7 @@ jobs:
       run: |
         rm -r release
         mv mac_release release
+        chmod +x release/nvgt
         cd doc
         pip3 install --user -r requirements.txt --break-system-packages
         cd OSL
@@ -262,6 +263,7 @@ jobs:
       run: |
         rm -r release
         mv linux_release release
+        chmod +x release/nvgt
         python3 -m venv venv --upgrade-deps
         chmod +x venv/bin/activate
         source ./venv/bin/activate
