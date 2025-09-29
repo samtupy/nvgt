@@ -85,6 +85,8 @@ public:
 	void RemoveAt(asUINT index);
 	void RemoveLast();
 	void RemoveRange(asUINT start, asUINT count);
+	void *Front();
+	void *Back();
 	void SortAsc();
 	void SortDesc();
 	void SortAsc(asUINT startAt, asUINT count);

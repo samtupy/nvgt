@@ -250,8 +250,6 @@ void anticheat_check() {
 
 void anticheat_deinit() {
 	#ifdef _WIN32
-	assert(pfn_ldr_unregister);
-	assert(ldr_dll_cookie);
 	if (pfn_ldr_unregister && ldr_dll_cookie) pfn_ldr_unregister(ldr_dll_cookie);
 	#endif
 }

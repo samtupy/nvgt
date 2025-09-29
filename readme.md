@@ -13,29 +13,15 @@ You will need a C++ build toolchain if you want to build NVGT from source. On Wi
 
 NVGT uses SCons, a Python build system. If you have Python, you can get it by running `pip install scons`.
 
-Other than SCons, the following libraries are needed to build NVGT's core:
-* AngelScript scripting library
-* bass, bassmix and bass-fx from un4seen if you wish to build the legacy sound system
-* Enet networking library - we use a custom fork called enet6 with IPV6 support
-* libplist to create MacOS bundles
-* ogg and opus codecs
-* Phonon / steam audio
-* Poco C++ portable components
-* Reactphysics3d
-* SDL3
-* Universal speech
+We provide prebuilt development libraries for NVGT, these are all of the dependencies required to make the project build. You should download the file that matches the platform you are building for.
+* [windev.zip](https://nvgt.gg/windev.zip)
+* [macosdev.zip](https://nvgt.gg/macosdev.zip)
+* [lindev.zip](https://nvgt.gg/lindev.zip)
+* [droidev.zip](https://nvgt.gg/droidev.zip)
 
-By default, NVGT will try to build all plugins contained within the plugin folder. Furthermore, if you check out the repository with submodules, the [nvgt_extra repository](https://github.com/samtupy/nvgt_extra) will be cloned into a subfolder called extra, in which case all plugins contained within extra/plugin/integrated will be automatically built by default as well. This means that unless you use the no_plugins=1 SCons switch or else the switches that disable individual plugins, you might also need the following dependencies.
-* Bass, bassmix and bass_fx from un4seen to build plugin/legacy_sound
-* libcurl to build extra/plugin/integrated/curl
-* libgit2 to build extra/plugin/integrated/git
+Extract the file you downloaded in the root of the NVGT repo, so that you have a directory structure that looks like, for example, nvgt/windev/include.
 
-For Linux and Mac-OS, scripts with build commands are in build/build_Linux.sh and build/build_macos.sh.
-
-For now only on Windows, the option exists to make the process of dealing with dependencies much simpler than hunting them down manually and setting up include/library paths. For those who want them, I've decided to provide my own build artifacts. This is a bin/include/lib directory structure that contains organized header files, link libraries (static when possible), and DLLs for distribution like Bass and Phonon which makes building NVGT as simple as pointing to this directory structure and running the build command. This download contains more than the libraries specifically required to build NVGT as A, it includes the libraries required to build plugins and B, it may include libraries that I use in other projects. If it gets giant, I'll provide a download just containing NVGT libraries. For now, you can 
-[download windev.zip here](https://nvgt.gg/windev.zip) and place an extracted version of it in the root of the NVGT repository, that is a folder called windev containing bin, include, lib, misc should exist in the root of the NVGT repository, as in nvgt/windev/bin, nvgt/windev/include etc.
-
-Though unlike the windev.zip file these only contain binaries for the bass and steam audio versions we are using at present, you can also [download macosdev.tar.gz](https://nvgt.gg/macosdev.tar.gz) for Mac-OS or [download lindev.tar.gz](https://nvgt.gg/lindev.tar.gz) for Linux to ease at least some of the dependency hunt.
+If you'd rather build the dependencies yourself, be sure to clone the repository with submodules and then use python to run the vcpkg/build_dependencies.py script. A separate readme is provided in the vcpkg directory for more information.
 
 Once dependencies are in place, you can now open a command prompt or terminal window up to the root of the NVGT repository and run `scons -s` to build NVGT.
 

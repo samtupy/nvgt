@@ -40,7 +40,13 @@ class menu {
 	private bool _allow_escape = true; // If set to false, the user must click on an option manually and will not be able to use escape to exit the menu.
 	private bool _allow_go_to_index = true; // If set to false, the user can no longer press ctrl+g to select a menu item by number.
 	private bool _allow_search = true; // If set to false, the user can no longer press ctrl+f to search for an item in the menu by text.
-	pack_file@ pack_file; // Optionally set this to a pack containing sounds.
+	#if plugin_legacy_sound
+	pack@ pack_file = null;
+	#endif
+	#if_not plugin_legacy_sound
+	pack_file@ pack_file = null;
+	#endif
+	bool first_letter_nav = true;
 	menu() {
 		reset();
 	}
@@ -76,6 +82,13 @@ class menu {
 		}
 	}
 	// Item IDs are entirely optional.
+	void set_first_letter_navigation(bool state) property {
+		first_letter_nav = state;
+		form.set_list_multinavigation(f_list, state, false);
+	}
+	bool get_first_letter_navigation() property {
+		return first_letter_nav;
+	}
 	int add_item(const string&in text, const string&in id = "", int position = -1) {
 		if (!form.add_list_item(f_list, text, id, position, false, focus_first_item)) return -1;
 		if (position == -1) position = form.get_list_count(f_list) -1;

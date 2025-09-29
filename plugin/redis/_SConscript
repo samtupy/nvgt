@@ -3,8 +3,8 @@ scriptarray = env.SharedObject("scriptarray", "#ASAddon/plugin/scriptarray.cpp")
 scriptdictionary = env.SharedObject("scriptdictionary", "#ASAddon/plugin/scriptdictionary.cpp")
 
 if ARGUMENTS.get("no_shared_plugins", "0") == "0":
-	libs = ["PocoRedis", "PocoNet", "PocoFoundation"] if env["PLATFORM"] != "win32" else ["PocoRedismt", "PocoNetmt", "PocoFoundationmt"]
+	libs = ["PocoRedis", "PocoNet", "PocoFoundation", "pcre2-8"]
 	env.SharedLibrary("#release/lib/redis", ["redis.cpp", scriptarray, scriptdictionary], LIBS = env["LIBS"] + libs)
-static = env.Object("redis_static", "redis.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "redis")])
+static = env.Object("redis_static", "redis.cpp", CPPDEFINES = env["CPPDEFINES"] + [("NVGT_PLUGIN_STATIC", "redis")])
 static = env.StaticLibrary("#build/lib/redis", [static])
 Return("static")

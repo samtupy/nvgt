@@ -1,5 +1,7 @@
 // Logic and much/most code from the SG_InputBox code project article, though modified quite a bit at this point. Currently multiple concurrent input boxes are not supported.
+#ifndef UNICODE
 #define UNICODE
+#endif
 #define _UNICODE
 
 #include <windows.h>

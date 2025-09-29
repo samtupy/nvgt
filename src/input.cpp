@@ -29,6 +29,7 @@
 #include <vector>
 #include <algorithm>
 #include "nvgt_angelscript.h"
+#include "events.h"
 #include "input.h"
 #include "misc_functions.h"
 #include "nvgt.h"
@@ -121,15 +122,12 @@ void InputInit() {
 	memset(g_KeysForced, 0, SDL_SCANCODE_COUNT);
 	memset(g_KeysReleased, 0, SDL_SCANCODE_COUNT);
 	// Initialize video and joystick/gamepad if not already initialized
-	Uint32 flags = SDL_INIT_VIDEO;
-	if (!(SDL_WasInit(0) & SDL_INIT_GAMEPAD))
-		flags |= SDL_INIT_GAMEPAD;
-	if (!(SDL_WasInit(0) & SDL_INIT_JOYSTICK))
-		flags |= SDL_INIT_JOYSTICK;
-	SDL_Init(flags);
+	SDL_Init(SDL_INIT_VIDEO);
 	g_KeysDown = SDL_GetKeyboardState(&g_KeysDownArrayLen);
 }
 void InputDestroy() {
+	if (SDL_WasInit(0) == 0)
+		return;
 	#ifdef _WIN32
 	uninstall_keyhook();
 	#endif
@@ -138,20 +136,26 @@ void InputDestroy() {
 }
 bool InputEvent(SDL_Event* evt) {
 	if (evt->type == SDL_EVENT_KEY_DOWN) {
-		if (!evt->key.repeat)
-			g_KeysPressed[evt->key.scancode] = 1;
-		else
-			g_KeysRepeating[evt->key.scancode] = 1;
 		g_KeysReleased[evt->key.scancode] = 0;
 		if (!evt->key.repeat)
 			g_KeyboardStateChange = true;
+		if (!evt->key.repeat) {
+			g_KeysPressed[evt->key.scancode] = 1;
+			on_key_press(evt->key.scancode);
+		} else {
+			g_KeysRepeating[evt->key.scancode] = 1;
+			on_key_repeat(evt->key.scancode);
+		}
 	} else if (evt->type == SDL_EVENT_KEY_UP) {
 		g_KeysPressed[evt->key.scancode] = 0;
 		g_KeysRepeating[evt->key.scancode] = 0;
 		g_KeysReleased[evt->key.scancode] = 1;
 		g_KeyboardStateChange = true;
-	} else if (evt->type == SDL_EVENT_TEXT_INPUT)
+		on_key_release(evt->key.scancode);
+	} else if (evt->type == SDL_EVENT_TEXT_INPUT) {
 		g_UserInput += evt->text.text;
+		on_characters(evt->text.text);
+	}
 	else if (evt->type == SDL_EVENT_MOUSE_MOTION) {
 		g_MouseAbsX = evt->motion.x;
 		g_MouseAbsY = evt->motion.y;
@@ -163,9 +167,19 @@ bool InputEvent(SDL_Event* evt) {
 		g_MouseButtonsReleased[evt->button.button] = 1;
 	} else if (evt->type == SDL_EVENT_MOUSE_WHEEL)
 		g_MouseAbsZ += evt->wheel.y;
-	else if (evt->type == SDL_EVENT_FINGER_DOWN)
+	else if (evt->type == SDL_EVENT_FINGER_DOWN) {
 		g_TouchLastDevice = evt->tfinger.touchID;
-	else
+		on_touch_finger_down(evt->tfinger.touchID, {evt->tfinger.fingerID, evt->tfinger.x, evt->tfinger.y, evt->tfinger.pressure});
+	} else if (evt->type == SDL_EVENT_FINGER_UP) {
+		g_TouchLastDevice = evt->tfinger.touchID;
+		on_touch_finger_up(evt->tfinger.touchID, {evt->tfinger.fingerID, evt->tfinger.x, evt->tfinger.y, evt->tfinger.pressure});
+	} else if (evt->type == SDL_EVENT_FINGER_CANCELED) {
+		g_TouchLastDevice = evt->tfinger.touchID;
+		on_touch_finger_cancel(evt->tfinger.touchID, {evt->tfinger.fingerID, evt->tfinger.x, evt->tfinger.y, evt->tfinger.pressure});
+	} else if (evt->type == SDL_EVENT_FINGER_MOTION) {
+		g_TouchLastDevice = evt->tfinger.touchID;
+		on_touch_finger_move(evt->tfinger.touchID, {evt->tfinger.fingerID, evt->tfinger.x, evt->tfinger.y, evt->tfinger.pressure}, evt->tfinger.dx, evt->tfinger.dy);
+	} else
 		return false;
 	return true;
 }
@@ -384,7 +398,7 @@ bool mouse_down(unsigned char button) {
 		return false;
 	if (!g_KeysDown)
 		return false;
-	return (SDL_GetMouseState(&g_MouseAbsX, &g_MouseAbsY) & SDL_BUTTON(button)) != 0;
+	return (SDL_GetMouseState(&g_MouseAbsX, &g_MouseAbsY) & SDL_BUTTON_MASK(button)) != 0;
 }
 bool MouseReleased(unsigned char button) {
 	if (button > 31)
@@ -441,6 +455,7 @@ static Poco::FastMutex g_joysticks_mutex;
 
 // Helper function to count joysticks
 int joystick_count(bool gamepads_only) {
+	JoystickInit();
 	if (gamepads_only) {
 		int count;
 		SDL_JoystickID* joysticks = SDL_GetGamepads(&count);
@@ -512,6 +527,7 @@ void joystick::update() {
 
 // BGT compatibility property implementations
 unsigned int joystick::get_joysticks() const {
+	JoystickInit();
 	int count;
 	SDL_JoystickID* joysticks = SDL_GetGamepads(&count);
 	if (joysticks) SDL_free(joysticks);
@@ -1084,8 +1100,6 @@ void joystick_power_info_destruct(void* mem) {
 }
 
 void RegisterInput(asIScriptEngine* engine) {
-	// Initialize joystick subsystem early so it works without requiring a window
-	JoystickInit();
 	engine->RegisterObjectType("touch_finger", sizeof(SDL_Finger), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<SDL_Finger>());
 	engine->RegisterObjectProperty("touch_finger", "const uint64 id", asOFFSET(SDL_Finger, id));
 	engine->RegisterObjectProperty("touch_finger", "const float x", asOFFSET(SDL_Finger, x));

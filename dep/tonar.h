@@ -7,9 +7,6 @@
 #include <math.h>
 #include <ctype.h>
 
-#define elz_tonar_begin 0xACC737A3
-#define elz_tonar_end 0xDC76AAED
-
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -17,6 +14,12 @@
 #ifndef M_PI_4
 #define M_PI_4 0.78539816339744830962
 #endif
+
+#define el_tonar_min_db -100
+#define el_tonar_max_db 0
+
+#define el_tonar_default_fade_start 8
+#define el_tonar_default_fade_end 12
 
 typedef enum
 {
@@ -42,6 +45,8 @@ int el_tonar_set_waveform(el_tonar* gen, int type);
 int el_tonar_get_waveform(el_tonar* gen);
 int el_tonar_set_volume(el_tonar* gen, double db);
 double el_tonar_get_volume(el_tonar* gen);
+int el_tonar_set_allow_silence(el_tonar* gen, int silence);
+int el_tonar_get_allow_silence(el_tonar* gen);
 int el_tonar_set_pan(el_tonar* gen, double pan);
 double el_tonar_get_pan(el_tonar* gen);
 int el_tonar_set_edge_fades(el_tonar* gen, int start, int end);
@@ -73,6 +78,9 @@ int el_tonar_output_buffer_size(el_tonar* gen);
 int el_tonar_output_buffer(el_tonar* gen, char* buffer, int size);
 int el_tonar_output_file(el_tonar* gen, char* fn);
 
+#define elz_tonar_begin 0xACC737A3
+#define elz_tonar_end 0xDC76AAED
+
 struct elz_tonar
 {
 int begin;
@@ -92,6 +100,7 @@ double volume;
 int fade_start;
 int fade_end;
 int waveform;
+int output_silence;
 int end;
 };
 
@@ -99,6 +108,7 @@ int elz_tonar_cleanup(el_tonar* gen);
 int elz_tonar_is_init(el_tonar* gen);
 int elz_tonar_is_empty(el_tonar* gen);
 int elz_tonar_is_silent(el_tonar* gen);
+int elz_tonar_can_output(el_tonar* gen);
 int elz_tonar_sequence(el_tonar* gen, double freq, double bend_amount, int length, int bend_start, int bend_length);
 int elz_tonar_ms_to_frames(el_tonar* gen, int ms);
 int elz_tonar_manage_buffer(el_tonar* gen, int samples);

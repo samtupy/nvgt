@@ -1,0 +1,20 @@
+/**
+	Write a string into a stream.
+	uint write_string(string content);
+	## Arguments:
+		* content: The content that is to be written.
+	## Returns:
+		uint: the number of bytes written.
+	## Remarks:
+		This method behaves differently depending on the binary flag:
+			* If binary is true, it prepends the number of bytes to write as a uint8.
+			* If binary is false, it will merely write the entire string.
+*/
+
+// Example:
+void main() {
+	datastream ds;
+	ds.binary=true;
+	ds.write_string("Hello");
+	alert("Test", ds.read());
+}

@@ -44,7 +44,7 @@
 #include "obfuscate.h"
 #include "input.h"
 #include "misc_functions.h"
-#include <fast_float.h>
+#include <fast_float/fast_float.h>
 #include <system_error>
 
 BOOL ChDir(const std::string& d) {

@@ -1,0 +1,13 @@
+/**
+	Resets the profiler.
+	void reset_profiler();
+*/
+
+// Example:
+void main() {
+	start_profiling();
+	wait(1000);
+	reset_profiler(); // Profiler is still running.
+	wait(1000);
+	alert("Profile", generate_profile());
+}

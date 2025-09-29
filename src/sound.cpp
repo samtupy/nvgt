@@ -22,13 +22,17 @@
 #include <angelscript.h>
 #include <scriptarray.h>
 #include <scripthandle.h>
+#include "filesystem.h" // FileExists, FileDelete
 #include "misc_functions.h" // script_memory_buffer
 #include "nvgt.h" // g_ScriptEngine
 #include "nvgt_angelscript.h" // get_array_type
 #include "nvgt_plugin.h"      // pack_interface
 #include "sound.h"
+#include <opus/opus.h>
+#include <opus/opusenc.h>
 #include "sound_nodes.h"
 #include "pack.h"
+#include "datastreams.h"
 #include <miniaudio_wdl_resampler.h>
 #include <atomic>
 #include <unordered_map>
@@ -36,6 +40,7 @@
 #include <utility>
 #include <cstdint>
 #include <miniaudio_libvorbis.h>
+#include <miniaudio_libopus.h>
 #include <iostream>
 using namespace std;
 
@@ -44,13 +49,16 @@ void wait(int ms);
 // Globals, currently NVGT does not support instanciating multiple miniaudio contexts and NVGT provides a global sound engine.
 static ma_context g_sound_context;
 audio_engine *g_audio_engine = nullptr;
+mixer* g_audio_mixer = nullptr;
 static std::atomic_flag g_soundsystem_initialized;
 std::atomic<ma_result> g_soundsystem_last_error = MA_SUCCESS;
+static unordered_map<ma_data_source*, audio_data_source*> g_data_sources_map; // Only allow one audio_data_source wrapper per ma_data_source, should never be populated enough to be a performance hit.
 static std::unique_ptr<sound_service> g_sound_service;
 // These slots are what you use to refer to protocols (which are data sources like archives) and filters (which are transformations like encryption) after they've been plugged into the sound service.
 static size_t g_encryption_filter_slot = 0;
 static size_t g_pack_protocol_slot = 0;
 static size_t g_memory_protocol_slot = 0;
+static size_t g_netstream_protocol_slot = 0;
 static std::vector<ma_decoding_backend_vtable *> g_decoders;
 bool add_decoder(ma_decoding_backend_vtable *vtable) {
 	try {
@@ -75,11 +83,13 @@ bool init_sound() {
 	// And access to packs, et al:
 	g_sound_service->register_protocol(pack_protocol::get_instance(), g_pack_protocol_slot);
 	g_sound_service->register_protocol(memory_protocol::get_instance(), g_memory_protocol_slot);
+	g_sound_service->register_protocol(netstream_protocol::get_instance(), g_netstream_protocol_slot);
 	// Install default decoders into miniaudio.
 	add_decoder(ma_decoding_backend_libvorbis);
+	add_decoder(ma_decoding_backend_libopus);
 	g_soundsystem_initialized.test_and_set();
 	refresh_audio_devices();
-	g_audio_engine = new_audio_engine(audio_engine::PERCENTAGE_ATTRIBUTES);
+	g_audio_engine = new_audio_engine(audio_engine::PERCENTAGE_ATTRIBUTES | audio_engine::NO_CLIP);
 	return true;
 }
 void uninit_sound() {
@@ -252,7 +262,7 @@ public:
 sound_aabb_shape* create_sound_aabb_shape(int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range) { return new sound_aabb_shape(left_range, right_range, backward_range, forward_range, lower_range, upper_range); }
 
 // Miniaudio objects must be allocated on the heap as nvgt's API introduces the concept of an uninitialized sound, which a stack based system would make more difficult to implement.
-class audio_engine_impl final : public audio_engine {
+class audio_engine_impl final : public audio_node_impl, public virtual audio_engine {
 	std::unique_ptr<ma_engine> engine;
 	std::unique_ptr<ma_resource_manager> resource_manager;
 	std::unique_ptr<ma_device> device;
@@ -277,31 +287,24 @@ class audio_engine_impl final : public audio_engine {
 			}
 			ctx->Execute(); // Really not sure what to do about exceptions and errors taking place in the audio thread yet as we don't have a fully established logging facility set up.
 			g_ScriptEngine->ReturnContext(ctx);
-			engine->release();
 		}
+		engine->release();
 	}
 
 public:
 	engine_flags flags;
-	audio_engine_impl(int flags)
-		: audio_engine(),
-		  engine(nullptr),
-		  resource_manager(nullptr),
-		  script_data_callback(nullptr),
-		  engine_endpoint(nullptr),
-		  flags(static_cast<engine_flags>(flags)),
-		  refcount(1) {
+	audio_engine_impl(int flags, int sample_rate, int channels) : audio_node_impl(nullptr, this), engine(nullptr), resource_manager(nullptr), script_data_callback(nullptr), engine_endpoint(nullptr), flags(static_cast<engine_flags>(flags)) {
+		if (channels > MA_MAX_CHANNELS) throw runtime_error(Poco::format("exceeded maximum channel count of %d", MA_MAX_CHANNELS));
 		init_sound();
 		engine = std::make_unique<ma_engine>();
 		// We need a self-managed device because at least on Windows, we can't meet low-latency requirements without specific configurations.
 		if ((flags & NO_DEVICE) == 0) {
 			device = std::make_unique<ma_device>();
 			ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
-			// Just set to some hard-coded defaults for now.
-			cfg.playback.channels = 2;
+			cfg.playback.channels = channels;
 			cfg.playback.format = ma_format_f32;
-			cfg.sampleRate = 0; // Let the device decide.
-			cfg.noClip = MA_TRUE;
+			cfg.sampleRate = sample_rate;
+			cfg.noClip = (flags & engine_flags::NO_CLIP)? MA_TRUE : MA_FALSE;
 			cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE;
 
 			// Hook up high quality resampling, because we want the app to accommodate the device's sample rate, not the other way around.
@@ -313,10 +316,9 @@ public:
 			cfg.pUserData = this;
 			g_soundsystem_last_error = ma_device_init(&g_sound_context, &cfg, &*device);
 			if (g_soundsystem_last_error != MA_SUCCESS) {
-
 				engine.reset();
 				device.reset();
-				return;
+				throw runtime_error(Poco::format("failed to initialize sound engine device %d", int(g_soundsystem_last_error)));
 			}
 		}
 
@@ -326,7 +328,7 @@ public:
 			// Attach the resource manager to the sound service so that it can receive audio from custom sources.
 			cfg.pVFS = g_sound_service->get_vfs();
 			// This is the sample rate that sounds will be resampled to if necessary during loading. We set this equal to whatever sample rate the device got. This is maximally efficient as long as the user doesn't switch devices to one that runs at a different rate. When they do, a single resampler kicks in.
-			cfg.decodedSampleRate = device ? device->playback.internalSampleRate : 48000; // Todo: get rid of this magic number and set up a constructor argument.
+			cfg.decodedSampleRate = device && !sample_rate? device->playback.internalSampleRate : sample_rate;
 			// Set the resampler used during decoding to a high quality one. At the time of writing this, this is relying on support that I added to MiniAudio myself and has not yet been merged upstream.
 			cfg.resampling.algorithm = ma_resample_algorithm_custom;
 			cfg.resampling.pBackendVTable = &wdl_resampler_backend_vtable;
@@ -341,20 +343,25 @@ public:
 				device.reset();
 				engine.reset();
 				resource_manager.reset();
-				return;
+				throw runtime_error(Poco::format("failed to initialize sound engine resource manager %d", int(g_soundsystem_last_error)));
 			}
 		}
 		ma_engine_config cfg = ma_engine_config_init();
-		cfg.pContext = &g_sound_context; // Miniaudio won't let us quickly uninitilize then reinitialize a device sometimes when using the same context, so we won't manage it until we figure that out.
+		cfg.pContext = &g_sound_context;
 		cfg.pResourceManager = &*resource_manager;
 		cfg.noAutoStart = (flags & NO_AUTO_START) ? MA_TRUE : MA_FALSE;
 		cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE; // Steam Audio requires fixed sized updates. We can make this not be a magic constant if anyone has some reason for wanting to change it.
 		if ((flags & NO_DEVICE) == 0) cfg.pDevice = &*device;
-		else cfg.noDevice = MA_TRUE;
+		else {
+			cfg.noDevice = MA_TRUE;
+			cfg.channels = channels;
+			cfg.sampleRate = sample_rate;
+		}
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS) {
 			engine.reset();
-			return;
+			throw runtime_error(Poco::format("failed to initialize sound engine %d", int(g_soundsystem_last_error)));
 		}
+		node = (ma_node_base*)&*engine;
 		// Set some default properties for spatialization.
 		set_listener_direction(0, 0, 1, 0); // Y forward
 		set_listener_world_up(0, 0, 0, 1);  // Z up
@@ -377,11 +384,6 @@ public:
 		}
 		if (resource_manager)
 			ma_resource_manager_uninit(&*resource_manager);
-	}
-	void duplicate() override { asAtomicInc(refcount); }
-	void release() override {
-		if (asAtomicDec(refcount) < 1)
-			delete this;
 	}
 	ma_engine *get_ma_engine() const override { return engine.get(); }
 	audio_node *get_endpoint() const override { return engine_endpoint; }
@@ -463,24 +465,21 @@ public:
 	void set_listener_position(unsigned int index, float x, float y, float z) override {
 		if (engine)
 			ma_engine_listener_set_position(&*engine, index, x, y, z);
-		set_sound_position_changed();
+		update_blocking_sound_shapes();
 	}
 	void set_listener_position_vector(unsigned int index, const reactphysics3d::Vector3 &position) override {
 		if (engine)
 			ma_engine_listener_set_position(&*engine, index, position.x, position.y, position.z);
-		set_sound_position_changed();
 		update_blocking_sound_shapes();
 	}
 	reactphysics3d::Vector3 get_listener_position(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_position(&*engine, index)) : reactphysics3d::Vector3(); }
 	void set_listener_direction(unsigned int index, float x, float y, float z) override {
 		if (engine)
 			ma_engine_listener_set_direction(&*engine, index, x, y, z);
-		set_sound_position_changed();
 	}
 	void set_listener_direction_vector(unsigned int index, const reactphysics3d::Vector3 &direction) override {
 		if (engine)
 			ma_engine_listener_set_direction(&*engine, index, direction.x, direction.y, direction.z);
-		set_sound_position_changed();
 	}
 	reactphysics3d::Vector3 get_listener_direction(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_direction(&*engine, index)) : reactphysics3d::Vector3(); }
 	void set_listener_velocity(unsigned int index, float x, float y, float z) override {
@@ -503,18 +502,15 @@ public:
 	void set_listener_world_up(unsigned int index, float x, float y, float z) override {
 		if (engine)
 			ma_engine_listener_set_world_up(&*engine, index, x, y, z);
-		set_sound_position_changed();
 	}
 	void set_listener_world_up_vector(unsigned int index, const reactphysics3d::Vector3 &world_up) override {
 		if (engine)
 			ma_engine_listener_set_world_up(&*engine, index, world_up.x, world_up.y, world_up.z);
-		set_sound_position_changed();
 	}
 	reactphysics3d::Vector3 get_listener_world_up(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_world_up(&*engine, index)) : reactphysics3d::Vector3(); }
 	void set_listener_enabled(unsigned int index, bool enabled) override {
 		if (engine)
 			ma_engine_listener_set_enabled(&*engine, index, enabled);
-		set_sound_position_changed();
 	}
 	bool get_listener_enabled(unsigned int index) const override { return ma_engine_listener_is_enabled(&*engine, index); }
 	sound* play(const string& path, const reactphysics3d::Vector3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) override {
@@ -526,10 +522,7 @@ public:
 			return nullptr;
 		}
 		if (mix) snd->set_mixer(mix);
-		if (position.x != FLT_MAX || position.y != FLT_MAX || position.z != FLT_MAX) {
-			snd->set_spatialization_enabled(true);
-			snd->set_position_3d_vector(position);
-		} else snd->set_spatialization_enabled(false);
+		if (position.x != FLT_MAX || position.y != FLT_MAX || position.z != FLT_MAX) snd->set_position_3d_vector(position);
 		snd->set_volume(volume);
 		snd->set_pan(pan);
 		snd->set_pitch(pitch);
@@ -540,50 +533,568 @@ public:
 	mixer *new_mixer() override { return ::new_mixer(this); }
 	sound *new_sound() override { return ::new_sound(this); }
 };
+class audio_data_source_impl;
+audio_data_source* audio_data_source_get(ma_data_source* ptr, audio_engine* engine);
+class audio_data_source_impl : public audio_node_impl, public virtual audio_data_source {
+	unique_ptr<ma_data_source_node> src;
+	audio_data_source* src_cur;
+	audio_data_source* src_next;
+protected:
+	bool set_ma_data_source(ma_data_source* new_src) {
+		reset();
+		if (!new_src) return true;
+		src = make_unique<ma_data_source_node>();
+		ma_format format;
+		ma_data_source_get_data_format(new_src, &format, nullptr, nullptr, nullptr, 0);
+		ma_data_source_node_config cfg = ma_data_source_node_config_init(new_src);
+		if (format != ma_format_f32) {
+			// Node doesn't provide samples in floatingpoint, we can still get and set info on it but can't read it or turn it into a node without a bit of extra work that is yet to be done.
+			src->pDataSource = new_src; // Note that all other members of src are null/uninitialized, that's fine so long as continuing awareness of the possibility is maintained.
+		} else if ((g_soundsystem_last_error = ma_data_source_node_init((ma_node_graph*)get_engine()->get_ma_engine(), &cfg, nullptr, &*src)) != MA_SUCCESS) {
+			reset();
+			return false;
+		}
+		if (format == ma_format_f32) node = (ma_node_base*)&*src;
+		g_data_sources_map[new_src] = this;
+		return true;
+	}
+	void reset() {	
+		if (src) {
+			auto it = g_data_sources_map.find(src->pDataSource);
+			if (it != g_data_sources_map.end()) g_data_sources_map.erase(it);
+			if (node) ma_data_source_node_uninit(&*src, nullptr);
+			node = nullptr;
+			src.reset();
+		}
+		src_cur = src_next = nullptr;
+	}
+public:
+	audio_data_source_impl(audio_engine* e, ma_data_source* initial_src = nullptr) : audio_node_impl(nullptr, e), src_cur(nullptr), src_next(nullptr), src(nullptr) { if (initial_src) set_ma_data_source(initial_src); }
+	ma_data_source* get_ma_data_source() const override { return src? src->pDataSource : nullptr; }
+	unsigned int get_advised_read_frame_count() const override { return SOUNDSYSTEM_FRAMESIZE; }
+	unsigned long long read(void* buffer, unsigned long long frame_count) override {
+		if (!src || !detach_all_output_buses()) return 0;
+		if (!frame_count) frame_count = get_advised_read_frame_count();
+		if (!frame_count) return 0;
+		ma_uint64 frames_read = 0;
+		if ((g_soundsystem_last_error = ma_data_source_read_pcm_frames(src->pDataSource, buffer, frame_count, &frames_read)) != MA_SUCCESS) return 0;
+		return frames_read;
+	}
+	CScriptArray* read_script(unsigned long long frame_count) override {
+		if (!frame_count) frame_count = get_advised_read_frame_count();
+		CScriptArray* array = CScriptArray::Create(get_array_type("array<float>"), frame_count * get_channels());
+		if (!frame_count) return array;
+		unsigned long long frames_read = read(array->GetBuffer(), frame_count);
+		array->Resize(frames_read * get_channels());
+		return array;
+	}
+	unsigned long long skip_frames(unsigned long long frame_count) override {
+		ma_uint64 frames_skipped;
+		if (!src) return 0;
+		if ((g_soundsystem_last_error = ma_data_source_seek_pcm_frames(src->pDataSource, frame_count, &frames_skipped)) != MA_SUCCESS) return 0;
+		return frames_skipped;
+	}
+	float skip_milliseconds(float ms) override {
+		float skipped;
+		if (!src) return 0;
+		if ((g_soundsystem_last_error = ma_data_source_seek_seconds(src->pDataSource, ms / 1000, &skipped)) != MA_SUCCESS) return 0;
+		return skipped * 1000;
+	}
+	bool seek_frames(unsigned long long frame_index) override { return src? (g_soundsystem_last_error = ma_data_source_seek_to_pcm_frame(src->pDataSource, frame_index)) == MA_SUCCESS : false; }
+	bool seek_milliseconds(float ms) override { return src? (g_soundsystem_last_error = ma_data_source_seek_to_second(src->pDataSource, ms / 1000)) == MA_SUCCESS : false; }
+	unsigned long long get_cursor_frames() const override {
+		ma_uint64 cursor;
+		return (g_soundsystem_last_error = ma_data_source_get_cursor_in_pcm_frames(src->pDataSource, &cursor)) == MA_SUCCESS? cursor : 0;
+	}
+	float get_cursor_milliseconds() const override {
+		float cursor;
+		return (g_soundsystem_last_error = ma_data_source_get_cursor_in_seconds(src->pDataSource, &cursor)) == MA_SUCCESS? cursor * 1000 : 0;
+	}
+	unsigned long long get_length_frames() const override {
+		ma_uint64 length;
+		return (g_soundsystem_last_error = ma_data_source_get_length_in_pcm_frames(src->pDataSource, &length)) == MA_SUCCESS? length : 0;
+	}
+	float get_length_milliseconds() const override {
+		float length;
+		return (g_soundsystem_last_error = ma_data_source_get_length_in_seconds(src->pDataSource, &length)) == MA_SUCCESS? length * 1000 : 0;
+	}
+	bool set_looping(bool looping) override { return src? (g_soundsystem_last_error = ma_data_source_set_looping(src->pDataSource, looping)) == MA_SUCCESS : false; }
+	bool get_looping() const override { return src? ma_data_source_is_looping(src->pDataSource) : false; }
+	bool set_range(unsigned long long start_frame, unsigned long long end_frame) override { return src? (g_soundsystem_last_error = ma_data_source_set_range_in_pcm_frames(src->pDataSource, start_frame, end_frame)) == MA_SUCCESS : false; }
+	void get_range(unsigned long long* start_frame, unsigned long long* end_frame) const override { if (src) ma_data_source_get_range_in_pcm_frames(src->pDataSource, start_frame, end_frame); }
+	bool set_loop_point(unsigned long long start_frame, unsigned long long end_frame) override { return src? (g_soundsystem_last_error = ma_data_source_set_loop_point_in_pcm_frames(src->pDataSource, start_frame, end_frame)) == MA_SUCCESS : false; }
+	void get_loop_point(unsigned long long* start_frame, unsigned long long* end_frame) const override { if (src) ma_data_source_get_loop_point_in_pcm_frames(src->pDataSource, start_frame, end_frame); }
+	bool set_current(audio_data_source* new_current) override {
+		if (!src) return false;
+		if ((g_soundsystem_last_error = ma_data_source_set_current(src->pDataSource, new_current? new_current->get_ma_data_source() : nullptr)) != MA_SUCCESS) {
+			if (new_current) new_current->release();
+			return false;
+		}
+		if (src_cur) src_cur->release();
+		src_cur = new_current;
+		return true;
+	}
+	audio_data_source* get_current() const override {  return src_cur? src_cur : src? audio_data_source_get(ma_data_source_get_current(src->pDataSource), get_engine()) : nullptr; }
+	bool set_next(audio_data_source* new_next) override {
+		if (!src) return false;
+		if ((g_soundsystem_last_error = ma_data_source_set_next(src->pDataSource, new_next? new_next->get_ma_data_source() : nullptr)) != MA_SUCCESS) {
+			if (new_next) new_next->release();
+			return false;
+		}
+		if (src_next) src_next->release();
+		src_next = new_next;
+		return true;
+	}
+	audio_data_source* get_next() const override {  return src_next? src_next : src? audio_data_source_get(ma_data_source_get_next(src->pDataSource), get_engine()) : nullptr; }
+	bool get_data_format(ma_format *format, unsigned int *channels, unsigned int *sample_rate) const override { return src? (g_soundsystem_last_error = ma_data_source_get_data_format(src->pDataSource, format, channels, sample_rate, nullptr, 0)) == MA_SUCCESS : false; }
+	unsigned int get_channels() const override {
+		unsigned int channels;
+		return get_data_format(nullptr, &channels, nullptr)? channels : 0;
+	}
+	unsigned int get_sample_rate() const override {
+		unsigned int sample_rate;
+		return get_data_format(nullptr, nullptr, &sample_rate)? sample_rate : 0;
+	}
+	bool get_active() const override { return src != nullptr; }
+};
+audio_data_source* audio_data_source_get(ma_data_source* ptr, audio_engine* engine) {
+	if (!ptr) return nullptr;
+	if (!engine) engine = g_audio_engine;
+	auto it = g_data_sources_map.find(ptr);
+	if (it != g_data_sources_map.end()) {
+		it->second->duplicate();
+		return it->second;
+	}
+	return new audio_data_source_impl(engine, ptr);
+}
+class audio_ring_buffer_impl : public audio_data_source_impl, public virtual audio_ring_buffer {
+	unique_ptr<ma_pcm_rb> rb;
+public:
+	audio_ring_buffer_impl(unsigned int channels, unsigned int size, audio_engine * e) : audio_data_source_impl(e, nullptr), rb(make_unique<ma_pcm_rb>()) {
+		if (ma_pcm_rb_init(ma_format_f32, channels, size, nullptr, nullptr, &*rb) != MA_SUCCESS) throw std::runtime_error("failed to initialize ring buffer");
+		set_ma_data_source((ma_data_source*)&*rb);
+	}
+	~audio_ring_buffer_impl() {
+		if (rb) ma_pcm_rb_uninit(&*rb);
+	}
+	void reset() override { if (rb) ma_pcm_rb_reset(&*rb); }
+	unsigned int get_advised_read_frame_count() const override { return get_available_read(); }
+	unsigned int write(const float* frames_in, unsigned int frame_count) override {
+		if (!rb) return 0;
+		void* pWriteBuffer;
+		if (ma_pcm_rb_acquire_write(&*rb, &frame_count, &pWriteBuffer) != MA_SUCCESS) return 0;
+		if (frame_count) ma_copy_pcm_frames(pWriteBuffer, frames_in,frame_count, rb->format, rb->channels);
+		ma_pcm_rb_commit_write(&*rb, frame_count);
+		return frame_count;
+	}
+	unsigned int write_script_array(CScriptArray *frames) override {
+		if (!frames || !get_channels()) return 0;
+		return write((float*)frames->GetBuffer(), frames->GetSize() / get_channels());
+	}
+	unsigned int write_script_memory_buffer(script_memory_buffer* frames) override {
+		if (!frames || !get_channels()) return false;
+		return write((float*)frames->ptr, frames->size / get_channels());
+	}
+	unsigned int get_available_read() const override { return rb? ma_pcm_rb_available_read(&*rb) : 0; }
+	unsigned int get_available_write() const override { return rb? ma_pcm_rb_available_write(&*rb) : 0; }
+	unsigned int get_channels() const override { return rb? ma_pcm_rb_get_channels(&*rb) : 0; }
+	unsigned int get_sample_rate() const override { return rb? ma_pcm_rb_get_sample_rate(&*rb) : 0; }
+};
+audio_ring_buffer* audio_ring_buffer::create(unsigned int channels, unsigned int size, audio_engine* e) { return new audio_ring_buffer_impl(channels, size, e); }
+class audio_decoder_impl : public audio_data_source_impl, public virtual audio_decoder {
+	unique_ptr<ma_decoder> decoder;
+	datastream* datastream_ref; // If the user opens a datastream, we must maintain a reference to it encase the user drops their handle.
+	static ma_result on_read_datastream(ma_decoder *pDecoder, void *pDst, size_t sizeInBytes, size_t *pBytesRead) {
+		if (pBytesRead) *pBytesRead = 0;
+		datastream* ds = static_cast<datastream*>(pDecoder->pUserData);
+		if (!ds) return MA_ERROR;
+		istream* stream = ds->get_istr();
+		if (!stream) return MA_ERROR;
+		if (!stream->good()) return MA_AT_END;
+		stream->read((char *)pDst, sizeInBytes);
+		if (pBytesRead) *pBytesRead = stream->gcount();
+		return MA_SUCCESS;
+	}
+	static ma_result on_seek_datastream(ma_decoder *pDecoder, ma_int64 offset, ma_seek_origin origin) {
+		datastream* ds = static_cast<datastream*>(pDecoder->pUserData);
+		if (!ds) return MA_ERROR;
+		istream* stream = ds->get_istr();
+		if (!stream) return MA_ERROR;
+		stream->clear();
+		std::ios_base::seekdir dir;
+		switch (origin) {
+			case ma_seek_origin_start:
+				dir = stream->beg;
+				break;
+			case ma_seek_origin_current:
+				dir = stream->cur;
+				break;
+			case ma_seek_origin_end:
+				dir = stream->end;
+				break;
+			default: // Should never get here.
+				return MA_ERROR;
+		}
+		stream->seekg(offset, dir);
+		return MA_SUCCESS;
+	}
+	static ma_result on_tell_datastream(ma_decoder *pDecoder, ma_int64 *pCursor) {
+		datastream* ds = static_cast<datastream*>(pDecoder->pUserData);
+		if (!ds) return MA_ERROR;
+		istream* stream = ds->get_istr();
+		if (!stream) return MA_ERROR;
+		*pCursor = stream->tellg();
+		return MA_SUCCESS;
+	}
+	ma_decoder_config decoder_config_init(unsigned int sample_rate, unsigned int channels) {
+		init_sound();
+		ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, channels, sample_rate);
+		cfg.resampling.algorithm = ma_resample_algorithm_custom;
+		cfg.resampling.pBackendVTable = &wdl_resampler_backend_vtable;
+		if (!g_decoders.empty()) {
+			cfg.ppCustomBackendVTables = &g_decoders[0];
+			cfg.customBackendCount = g_decoders.size();
+		}
+		if (!decoder) decoder = make_unique<ma_decoder>();
+		return cfg;
+	}
+public:
+	audio_decoder_impl(audio_engine* e) : audio_data_source_impl(nullptr, e), decoder(nullptr), datastream_ref(nullptr) {}
+	~audio_decoder_impl() { close(); }
+	virtual bool open(const std::string& filename, const pack_interface* pack_file, unsigned int sample_rate, unsigned int channels) override {
+		if (decoder && !close()) return false;
+		ma_decoder_config cfg = decoder_config_init(sample_rate, channels);
+		std::string triplet = g_sound_service->prepare_triplet(filename, pack_file && pack_file->get_is_active()? g_pack_protocol_slot : 0, pack_file && pack_file->get_is_active()? std::shared_ptr < const pack_interface > (pack_file->make_immutable()) : nullptr, 0, nullptr);
+		if ((g_soundsystem_last_error = ma_decoder_init_vfs(g_sound_service->get_vfs(), triplet.c_str(), &cfg, &*decoder)) != MA_SUCCESS) decoder.reset();
+		else set_ma_data_source((ma_data_source*)&*decoder);
+		g_sound_service->cleanup_triplet(triplet);
+		return g_soundsystem_last_error == MA_SUCCESS;
+	}
+	virtual bool open_stream(datastream* ds, unsigned int sample_rate = 0, unsigned int channels = 0) override {
+		if (!ds || !ds->get_istr() || decoder && !close()) {
+			if (ds) ds->release();
+			return false;
+		}
+		ma_decoder_config cfg = decoder_config_init(sample_rate, channels);
+		if ((g_soundsystem_last_error = ma_decoder_init(on_read_datastream, on_seek_datastream, on_tell_datastream, ds, &cfg, &*decoder)) != MA_SUCCESS) {
+			decoder.reset();
+			ds->release();
+		} else {
+			datastream_ref = ds;
+			set_ma_data_source((ma_data_source*)&*decoder);
+		}
+		return g_soundsystem_last_error == MA_SUCCESS;
+	}
+	virtual bool close() override {
+		reset();
+		if (!decoder) return false;
+		if (datastream_ref) {
+			datastream_ref->release();
+			datastream_ref = nullptr;
+		}
+		if ((g_soundsystem_last_error = ma_decoder_uninit(&*decoder)) != MA_SUCCESS ) return false;
+		decoder.reset();
+		return true;
+	}
+	virtual unsigned int get_sample_rate() const override { return decoder? decoder->outputSampleRate : 0; }
+	virtual unsigned int get_channels() const override { return decoder? decoder->outputChannels : 0; }
+};
+audio_decoder* audio_decoder::create(audio_engine* e) { return new audio_decoder_impl(e); }
+class audio_encoder_impl : public effect_node_impl, public virtual audio_encoder {
+	unique_ptr<ma_data_converter> dc;
+	unsigned int sample_rate, channels;
+	unsigned long long frames_written;
+	mutex write_mtx;
+protected:
+	datastream* output_stream; // Child classes need not manage the stream's refcount.
+	datastream* pull_stream; // Convenience feature which queues newly encoded data to be pulled by the user in a threadsafe manner.
+	bool streamable_pulling; // If true read can be called any time in pull mode, otherwise only once after stream is closed.
+	virtual bool open_impl(const string& filename, datastream* ds, unsigned int sample_rate, unsigned int channels, unsigned int flags) { return false; } // Override in subclasses to initialize encoder state, one of either ds or filename will be set.
+	virtual unsigned int write_impl(const void* buffer, unsigned int size) { return 0; } // Override in subclasses, send given buffer to encoder.
+	virtual bool close_impl() { return true; } // override in subclasses, free any encoder state.
+	bool postsetup(unsigned int target_sample_rate, unsigned int target_channels, ma_format target_format = ma_format_f32) {
+		// Encoder subclasses should usually return from open overrides by calling this funcction.
+		if (get_active()) return false;
+		sample_rate = target_sample_rate;
+		channels = target_channels;
+		if (!dc && (target_format != ma_format_f32 || sample_rate != get_engine()->get_sample_rate() || channels != get_engine()->get_channels())) {
+			dc = make_unique<ma_data_converter>();
+			ma_data_converter_config cfg = ma_data_converter_config_init(ma_format_f32, target_format, get_engine()->get_channels(), target_channels, get_engine()->get_sample_rate(), target_sample_rate);
+			cfg.resampling.algorithm = ma_resample_algorithm_custom;
+			cfg.resampling.pBackendVTable = &wdl_resampler_backend_vtable;
+			if ((g_soundsystem_last_error = ma_data_converter_init(&cfg, nullptr, &*dc)) != MA_SUCCESS) {
+				close();
+				return false;
+			}
+		}
+		return true;
+	}
+	ma_data_converter* get_dc() const { return &*dc; }
+public:
+	audio_encoder_impl(audio_engine* e, bool streamable_pulling = true) : effect_node_impl(e, 0, 0, 1, 1, MA_NODE_FLAG_PASSTHROUGH), output_stream(nullptr), pull_stream(nullptr), streamable_pulling(streamable_pulling), sample_rate(0), channels(0), frames_written(0) {}
+	~audio_encoder_impl() {
+		close();
+		if (pull_stream) pull_stream->release();
+	}
+	unsigned int get_default_open_flags() const override { return ENCODER_OVERWRITE; }
+	bool open_file(const string& filename, unsigned int sample_rate, unsigned int channels, unsigned int flags) override {
+		if (get_active()) close();
+		unique_lock<mutex> lock(write_mtx);
+		if (flags & ENCODER_DEFAULTS) flags = (flags & ~ENCODER_DEFAULTS) | get_default_open_flags();
+		if (flags & ENCODER_OVERWRITE && FileExists(filename)) FileDelete(filename);
+		return open_impl(filename, nullptr, sample_rate, channels, flags);
+	}
+	bool open_stream(datastream* ds, unsigned int sample_rate, unsigned int channels, unsigned int flags) override {
+		if (!ds) return false;
+		if (get_active()) close();
+		unique_lock<mutex> lock(write_mtx);
+		if (flags & ENCODER_DEFAULTS) flags = (flags & ~ENCODER_DEFAULTS) | get_default_open_flags();
+		if (!open_impl("", ds, sample_rate, channels, flags)) {
+			ds->release();
+			return false;
+		}
+		output_stream = ds;
+		return true;
+	}
+	bool open_pull(unsigned int sample_rate, unsigned int channels, unsigned int flags) override {
+		if (pull_stream) pull_stream->release();
+		return open_stream(pull_stream = new datastream(new stringstream()), sample_rate, channels, flags);
+	}
+	bool close() override {
+		unique_lock<mutex> lock(write_mtx);
+		if (!close_impl()) return false;
+		if (dc) {
+			ma_data_converter_uninit(&*dc, nullptr);
+			dc.reset();
+		}
+		if (output_stream && output_stream != pull_stream) output_stream->release();
+		output_stream = nullptr;
+		frames_written = sample_rate = channels = 0;
+		return true;
+	}
+	bool get_active() const override { return sample_rate && channels; }
+	unsigned long long get_frames_written() const override { return frames_written; }
+	unsigned int write(const float* frames_in, unsigned int frame_count) override {
+		unique_lock<mutex> lock(write_mtx);
+		if (!frames_in || !frame_count || !get_active()) return 0;
+		if (!dc) {
+			unsigned int frames = write_impl(frames_in, frame_count);
+			frames_written += frames;
+			return frames;
+		}
+		unsigned int dc_bufsize = 1024; // frames
+		vector<char> dc_buffer(dc_bufsize * ma_get_bytes_per_frame(dc->formatOut, dc->channelsOut));
+		ma_uint64 total_processed = 0, total_written = 0;
+		while (frame_count) {
+			ma_uint64 frame_count_in = frame_count, frame_count_out = dc_bufsize;
+			if (ma_data_converter_process_pcm_frames(&*dc, ma_offset_pcm_frames_ptr_f32((float*)frames_in, total_processed, get_channels()), &frame_count_in, &dc_buffer[0], &frame_count_out) != MA_SUCCESS) return 0;
+			total_processed += frame_count_in;
+			frames_written += frame_count_in;
+			frame_count -= frame_count_in;
+			total_written += write_impl(dc_buffer.data(), frame_count_out);
+		}
+		return total_written;
+	}
+	unsigned int write_script_array(CScriptArray *frames) override {
+		if (!frames || !get_channels()) return 0;
+		return write((float*)frames->GetBuffer(), frames->GetSize() / get_channels());
+	}
+	unsigned int write_script_memory_buffer(script_memory_buffer* frames) override {
+		if (!frames || !get_channels()) return false;
+		return write((float*)frames->ptr, frames->size / get_channels());
+	}
+	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override { write(*frames_in, *frame_count_in); }
+	string read() override {
+		unique_lock<mutex> lock(write_mtx);
+		if (!pull_stream) return "";
+		if (!streamable_pulling && get_active()) return "";
+		stringstream* pull_stringstream = dynamic_cast<stringstream*>(pull_stream->stream());
+		if (!pull_stringstream) return "";
+		string data = pull_stringstream->str();
+		if (get_active()) pull_stringstream->str("");
+		else {
+			pull_stream->release();
+			pull_stream = nullptr;
+		}
+		return data;
+	}
+	string get_format() const override { return ""; }
+	unsigned int get_sample_rate() const override { return sample_rate; }
+	unsigned int get_channels() const override { return channels; }
+};
+class audio_wav_encoder_impl : public audio_encoder_impl, public virtual audio_wav_encoder {
+	unique_ptr<ma_encoder> encoder;
+protected:
+	bool open_impl(const string& filename, datastream* ds, unsigned int sample_rate, unsigned int channels, unsigned int flags) override {
+		ma_format target_format;
+		if (flags & WAV_S16) target_format = ma_format_s16;
+		else if (flags & WAV_S24) target_format = ma_format_s24;
+		else if (flags & WAV_U8) target_format = ma_format_u8;
+		else if (flags & WAV_S32) target_format = ma_format_s32;
+		else if (flags & WAV_F32) target_format = ma_format_f32;
+		else throw runtime_error("pcm format not given");
+		encoder = make_unique<ma_encoder>();
+		ma_encoder_config cfg = ma_encoder_config_init(ma_encoding_format_wav, target_format, channels, sample_rate);
+		if (ds && ds->can_write()) g_soundsystem_last_error = ma_encoder_init(wav_write_proc, wav_seek_proc, ds->get_ostr(), &cfg, &*encoder);
+		else if (!filename.empty()) g_soundsystem_last_error = ma_encoder_init_file(filename.c_str(), &cfg, &*encoder);
+		else throw runtime_error("no encoding output source provided");
+		if (g_soundsystem_last_error != MA_SUCCESS) {
+			encoder.reset();
+			return false;
+		}
+		return postsetup(sample_rate, channels, target_format);
+	}
+	unsigned int write_impl(const void* buffer, unsigned int size) override {
+		ma_uint64 frames_written;
+		if (!encoder || (g_soundsystem_last_error = ma_encoder_write_pcm_frames(&*encoder, buffer, size, &frames_written)) != MA_SUCCESS) return 0;
+		return frames_written;
+	}
+	bool close_impl() override {
+		if (!encoder) return false;
+		ma_encoder_uninit(&*encoder);
+		encoder.reset();
+		return true;
+	}
+public:
+	audio_wav_encoder_impl(audio_engine* e) : audio_encoder_impl(e, false), encoder(nullptr) {}
+	unsigned int get_default_open_flags() const override { return audio_encoder_impl::get_default_open_flags() | WAV_S16; }
+	string get_format() const override { return "wav"; }
+	ma_format get_wav_format() const override { return get_dc()? get_dc()->formatOut : ma_format_f32; }
+};
+audio_wav_encoder* audio_wav_encoder::create(audio_engine* e) { return new audio_wav_encoder_impl(e); }
+class audio_opus_encoder_impl : public audio_encoder_impl, public virtual audio_opus_encoder {
+	OggOpusEnc* encoder;
+	OggOpusComments* comments;
+	int bitrate, complexity, signal_type, application, packet_loss_percent;
+	bool vbr, cvbr, dtx;
+	static int write_callback(void* user_data, const unsigned char* ptr, opus_int32 len) {
+		ostream* ostr = static_cast<ostream*>(user_data);
+		if (!ostr) return 1;
+		ostr->write((const char*)ptr, len);
+		return ostr->good()? 0 : 1;
+	}
+	static int close_callback(void* user_data) { return 0; }
+protected:
+	bool open_impl(const string& filename, datastream* ds, unsigned int sample_rate, unsigned int channels, unsigned int flags) override {
+		int error;
+		comments = ope_comments_create();
+		if (!comments) return false;
+		if (ds && ds->can_write()) {
+			OpusEncCallbacks callbacks = {write_callback, close_callback};
+			encoder = ope_encoder_create_callbacks(&callbacks, ds->get_ostr(), comments, sample_rate, channels, 0, &error);
+		} else if (!filename.empty()) encoder = ope_encoder_create_file(filename.c_str(), comments, sample_rate, channels, 0, &error);
+		if (!encoder) return false;
+		ope_encoder_ctl(encoder, OPUS_SET_BITRATE(bitrate));
+		ope_encoder_ctl(encoder, OPUS_SET_COMPLEXITY(complexity));
+		ope_encoder_ctl(encoder, OPUS_SET_SIGNAL(signal_type));
+		ope_encoder_ctl(encoder, OPUS_SET_APPLICATION(application));
+		ope_encoder_ctl(encoder, OPUS_SET_PACKET_LOSS_PERC(packet_loss_percent));
+		ope_encoder_ctl(encoder, OPUS_SET_VBR(vbr ? 1 : 0));
+		ope_encoder_ctl(encoder, OPUS_SET_VBR_CONSTRAINT(cvbr ? 1 : 0));
+		ope_encoder_ctl(encoder, OPUS_SET_DTX(dtx ? 1 : 0));
+		return postsetup(sample_rate, channels, ma_format_f32);
+	}
+	unsigned int write_impl(const void* buffer, unsigned int frame_count) override {
+		if (!encoder) return 0;
+		int result = ope_encoder_write_float(encoder, (const float*)buffer, frame_count);
+		return (result == OPE_OK) ? frame_count : 0;
+	}
+	bool close_impl() override {
+		if (!encoder) return false;
+		ope_encoder_drain(encoder);
+		ope_encoder_destroy(encoder);
+		encoder = nullptr;
+		if (comments) {
+			ope_comments_destroy(comments);
+			comments = nullptr;
+		}
+		return true;
+	}
+public:
+	audio_opus_encoder_impl(audio_engine* e) : audio_encoder_impl(e), encoder(nullptr), comments(nullptr), bitrate(128000), complexity(10), signal_type(OPUS_AUTO), application(OPUS_APPLICATION_AUDIO), packet_loss_percent(0), vbr(true), cvbr(false), dtx(false) {}
+	string get_format() const override { return "opus"; }
+	int get_bitrate() const override { return bitrate; }
+	bool set_bitrate(int new_bitrate) override {
+		if (new_bitrate < 6000 || new_bitrate > 510000) return false;
+		bitrate = new_bitrate;
+		return encoder? ope_encoder_ctl(encoder, OPUS_SET_BITRATE(bitrate)) == OPE_OK : true;
+	}
+	int get_complexity() const override { return complexity; }
+	bool set_complexity(int new_complexity) override {
+		if (new_complexity < 0 || new_complexity > 10) return false;
+		complexity = new_complexity;
+		return encoder? ope_encoder_ctl(encoder, OPUS_SET_COMPLEXITY(complexity)) == OPE_OK : true;
+	}
+	int get_signal_type() const override { return signal_type; }
+	bool set_signal_type(int new_signal_type) override {
+		if (new_signal_type != OPUS_AUTO && new_signal_type != OPUS_SIGNAL_VOICE && new_signal_type != OPUS_SIGNAL_MUSIC) return false;
+		signal_type = new_signal_type;
+		return encoder? ope_encoder_ctl(encoder, OPUS_SET_SIGNAL(signal_type)) == OPE_OK : true;
+	}
+	int get_application() const override { return application; }
+	bool set_application(int new_application) override {
+		if (new_application != OPUS_APPLICATION_VOIP && new_application != OPUS_APPLICATION_AUDIO && new_application != OPUS_APPLICATION_RESTRICTED_LOWDELAY) return false;
+		application = new_application;
+		return encoder? ope_encoder_ctl(encoder, OPUS_SET_APPLICATION(application)) == OPE_OK : true;
+	}
+	int get_packet_loss_percent() const override { return packet_loss_percent; }
+	bool set_packet_loss_percent(int percent) override {
+		if (percent < 0 || percent > 100) return false;
+		packet_loss_percent = percent;
+		return encoder? ope_encoder_ctl(encoder, OPUS_SET_PACKET_LOSS_PERC(packet_loss_percent)) == OPE_OK : true;
+	}
+	bool get_vbr() const override { return vbr; }
+	bool set_vbr(bool enabled) override {
+		vbr = enabled;
+		return encoder? ope_encoder_ctl(encoder, OPUS_SET_VBR(vbr ? 1 : 0)) == OPE_OK : true;
+	}
+	bool get_cvbr() const override { return cvbr; }
+	bool set_cvbr(bool enabled) override {
+		cvbr = enabled;
+		return encoder? ope_encoder_ctl(encoder, OPUS_SET_VBR_CONSTRAINT(cvbr ? 1 : 0)) == OPE_OK : true;
+	}
+	bool get_dtx() const override { return dtx; }
+	bool set_dtx(bool enabled) override {
+		dtx = enabled;
+		return encoder? ope_encoder_ctl(encoder, OPUS_SET_DTX(dtx ? 1 : 0)) == OPE_OK : true;
+	}
+};
+audio_opus_encoder* audio_opus_encoder::create(audio_engine* e) { return new audio_opus_encoder_impl(e); }
 class mixer_impl : public audio_node_impl, public virtual mixer {
 	friend class audio_node_impl;
 	// In miniaudio, a sound_group is really just a sound. A typical ma_sound_group_x function looks like float ma_sound_group_get_pan(const ma_sound_group* pGroup) { return ma_sound_get_pan(pGroup); }.
 	// Furthermore ma_sound_group is just a typedef for ma_sound. As such, for the sake of less code and better inheritance, we will directly call the ma_sound APIs in this class even though it deals with sound groups and not sounds.
 protected:
 	unique_ptr<ma_sound> snd;
-	mutable mutex hrtf_toggle_mtx;
 	mixer *parent_mixer;
 	sound_shape* shape;
-	mixer_monitor_node *monitor;
-	phonon_binaural_node *hrtf;
-	reverb3d* reverb;
-	splitter_node* reverb_attachment;
+	mutable audio_spatializer *spatializer;
+	mutex spatialization_params_mutex;
 	audio_node_chain* node_chain;
 	audio_node_chain* effects_chain;
-	bool hrtf_desired;
 public:
-	mixer_impl(audio_engine *e, bool sound_group = true) : audio_node_impl(nullptr, e), snd(nullptr), shape(nullptr), reverb(nullptr), reverb_attachment(nullptr), node_chain(audio_node_chain::create(nullptr, nullptr, e)), effects_chain(nullptr), parent_mixer(nullptr), monitor(mixer_monitor_node::create(this)), hrtf(nullptr), hrtf_desired(true) {
+	mixer_impl(audio_engine *e, bool sound_group = true) : audio_node_impl(nullptr, e), snd(nullptr), shape(nullptr), node_chain(audio_node_chain::create(nullptr, nullptr, e)), effects_chain(nullptr), parent_mixer(nullptr), spatializer(nullptr) {
 		init_sound();
-		node_chain->add_node(monitor);
 		node_chain->set_endpoint(e->get_endpoint());
 		if (!sound_group) return;
 		snd = make_unique<ma_sound>();
 		ma_sound_group_init(e->get_ma_engine(), 0, nullptr, &*snd);
 		node = (ma_node_base *)&*snd;
-		set_attenuation_model(ma_attenuation_model_linear_db);
-		set_max_distance(70); // Max distance must be explicitly set for linear attenuation to function.
-		set_directional_attenuation_factor(1);
+		set_max_distance(70);
+		ma_sound_group_set_rolloff(&*snd, 0); // Our own spatializer controls attenuation.
+		ma_sound_group_set_directional_attenuation_factor(&*snd, 0); // Our spatializer also controls panning.
 		attach_output_bus(0, node_chain, 0);
 		play();
 	}
 	~mixer_impl() {
-		std::unique_lock<mutex> lock(hrtf_toggle_mtx); // Insure hrtf isn't getting toggled at the time we begin detaching nodes.
 		stop();
-		if (monitor)
-			monitor->release();
+		unique_lock<mutex> lock(spatialization_params_mutex);
+		if (spatializer) {
+			node_chain->remove_node(spatializer);
+			spatializer->release();
+		}
 		if (parent_mixer)
 			parent_mixer->release();
-		if (hrtf)
-			hrtf->release();
-		if (reverb_attachment)
-			reverb_attachment->release();
-		if (reverb)
-			reverb->release();
 		if (node_chain)
 			node_chain->release();
 		if (effects_chain)
@@ -594,6 +1105,13 @@ public:
 		}
 		if (snd)
 			ma_sound_group_uninit(&*snd);
+	}
+	audio_spatializer* get_spatializer() const {
+		if (!spatializer) {
+			spatializer = audio_spatializer::create(const_cast<mixer_impl*>(this), get_engine());
+			node_chain->add_node(spatializer);
+		}
+		return spatializer;
 	}
 	inline void duplicate() override { audio_node_impl::duplicate(); }
 	inline void release() override { audio_node_impl::release(); }
@@ -615,35 +1133,26 @@ public:
 		return false;
 	}
 	mixer *get_mixer() const override { return parent_mixer; }
-	bool set_hrtf_internal(bool enable) override {
-		unique_lock<mutex> lock(hrtf_toggle_mtx);
-		if (hrtf && enable or !hrtf && !enable)
-			return true;
-		if (enable) {
-			if ((hrtf = phonon_binaural_node::create(engine, engine->get_channels(), engine->get_sample_rate())) == nullptr)
-				return false;
-			if (!node_chain->add_node(hrtf, monitor)) {
-				hrtf->release();
-				hrtf = nullptr;
-				return false;
-			}
-			set_directional_attenuation_factor(0);
+	void set_3d_panner(int panner_id) override {
+		get_spatializer()->set_panner_by_id(panner_id);
+	}
+	int get_3d_panner() const override { return get_spatializer()->get_current_panner_id(); }
+	void set_3d_attenuator(int attenuator_id) override {
+		get_spatializer()->set_attenuator_by_id(attenuator_id);
+	}
+	int get_3d_attenuator() const override { return get_spatializer()->get_current_attenuator_id(); }
+	int get_preferred_3d_panner() const override { return get_spatializer()->get_preferred_panner_id(); }
+	int get_preferred_3d_attenuator() const override { return get_spatializer()->get_preferred_attenuator_id(); }
+	void set_hrtf(bool enabled) override {
+		if (enabled) {
+			get_spatializer()->set_panner_by_id(g_audio_phonon_hrtf_panner);
+			get_spatializer()->set_attenuator_by_id(g_audio_phonon_attenuator);
 		} else {
-			set_directional_attenuation_factor(1);
-			bool success = node_chain->remove_node(hrtf);
-			hrtf->release();
-			hrtf = nullptr;
-			if (!success) return false;
+			get_spatializer()->set_panner_by_id(g_audio_basic_panner);
+			get_spatializer()->set_attenuator_by_id(g_audio_basic_attenuator);
 		}
-		return true;
 	}
-	bool set_hrtf(bool enable) override {
-		hrtf_desired = enable;
-		return get_global_hrtf()? set_hrtf_internal(enable) : true;
-	}
-	bool get_hrtf() const override { return hrtf != nullptr; }
-	bool get_hrtf_desired() const override { return hrtf_desired; }
-	audio_node *get_hrtf_node() const override { return hrtf; }
+	bool get_hrtf() const override { return get_spatializer()->get_preferred_panner_id() == g_audio_phonon_hrtf_panner && get_spatializer()->get_preferred_attenuator_id() == g_audio_phonon_attenuator; }
 	bool set_shape(CScriptHandle* new_shape) override {
 		// release old shape.
 		sound_shape* old_shape = shape;
@@ -665,33 +1174,11 @@ public:
 		return shape->get_shape();
 	}
 	sound_shape* get_shape_object() const override { return shape; }
-	void set_reverb3d(reverb3d* verb) override {
-		if (verb == reverb) return;
-		if (reverb) {
-			if (reverb_attachment) {
-				node_chain->remove_node(reverb_attachment);
-				reverb_attachment->release();
-				reverb_attachment = nullptr;
-			}
-			reverb->release();
-		}
-		if (verb) {
-			reverb_attachment = verb->create_attachment();
-			if (!reverb_attachment) {
-				verb->release();
-				return;
-			}
-			reverb_attachment->set_output_bus_volume(1, verb->get_volume_at(get_distance_to_listener()));
-			if (!node_chain->add_node(reverb_attachment, node_chain->last())) {
-				verb->release();
-				if (reverb_attachment) reverb_attachment->release();
-				reverb_attachment = nullptr;
-			}
-		}
-		reverb = verb;
-	}
-	reverb3d* get_reverb3d() const override { return reverb; }
-	splitter_node* get_reverb3d_attachment() const override { return reverb_attachment; }
+	void set_reverb3d(reverb3d* verb) override { get_spatializer()->set_reverb3d(verb); }
+	void set_reverb3d_at(reverb3d* verb, audio_spatializer_reverb3d_placement placement) override { get_spatializer()->set_reverb3d(verb, placement); }
+	reverb3d* get_reverb3d() const override { return get_spatializer()->get_reverb3d(); }
+	splitter_node* get_reverb3d_attachment() const override { return get_spatializer()->get_reverb3d_attachment(); }
+	audio_spatializer_reverb3d_placement get_reverb3d_placement() const override { return get_spatializer()->get_reverb3d_placement(); }
 	audio_node_chain* get_effects_chain() override {
 		if (!effects_chain) {
 			effects_chain = audio_node_chain::create(nullptr, nullptr, get_engine());
@@ -699,7 +1186,29 @@ public:
 		}
 		return effects_chain;
 	}
-	audio_node_chain* get_internal_node_chain() const override { return node_chain; }
+	audio_node_chain* get_internal_node_chain() override { return node_chain; }
+	bool get_spatialization_parameters(audio_spatialization_parameters& params) override {
+		if (!snd || !get_spatialization_enabled() || !spatialization_params_mutex.try_lock()) return false;
+		reactphysics3d::Vector3 listener_pos = get_engine()->get_listener_position(get_listener()), listener_dir = get_direction_to_listener(), pos = get_position_3d();
+		params.listener_x = listener_pos.x;
+		params.listener_y = listener_pos.y;
+		params.listener_z = listener_pos.z;
+		params.listener_direction_x = listener_dir.x * -1;
+		params.listener_direction_y = listener_dir.y * -1;
+		params.listener_direction_z = listener_dir.z * -1;
+		params.listener_distance = get_distance_to_listener();
+		params.sound_x = pos.x;
+		params.sound_y = pos.y;
+		params.sound_z = pos.z;
+		params.min_distance = get_min_distance();
+		params.max_distance = get_max_distance();
+		params.min_volume = get_min_gain();
+		params.max_volume = get_max_gain();
+		params.rolloff = get_rolloff();
+		params.distance_model = linear;
+		spatialization_params_mutex.unlock();
+		return true;
+	}
 	bool play(bool reset_loop_state = true) override {
 		if (snd == nullptr)
 			return false;
@@ -718,7 +1227,7 @@ public:
 	bool stop() override { return snd ? (g_soundsystem_last_error = ma_sound_stop(&*snd)) == MA_SUCCESS : false; }
 	void set_volume(float volume) override {
 		if (snd)
-			ma_sound_set_volume(&*snd, std::min((get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_db_to_linear(volume) : volume), 1.0f));
+			ma_sound_set_volume(&*snd, get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES? ma_volume_db_to_linear(volume) : volume);
 	}
 	float get_volume() const override { return snd ? (get_engine()->get_flags() & audio_engine::PERCENTAGE_ATTRIBUTES ? ma_volume_linear_to_db(ma_sound_get_volume(&*snd)) : ma_sound_get_volume(&*snd)) : NAN; }
 	void set_pan(float pan) override {
@@ -745,7 +1254,6 @@ public:
 	void set_spatialization_enabled(bool enabled) override {
 		if (snd)
 			ma_sound_set_spatialization_enabled(&*snd, enabled);
-		set_hrtf_internal(enabled && hrtf_desired && get_global_hrtf()); // If desired, enable HRTF if we are enabling spatialization.
 	}
 	bool get_spatialization_enabled() const override {
 		if (snd)
@@ -774,18 +1282,16 @@ public:
 	void set_position_3d(float x, float y, float z) override {
 		if (!snd)
 			return;
+		set_spatialization_enabled(true);
+		if (sound_get_default_3d_panner() >= 0 && get_preferred_3d_panner() < 0) set_3d_panner(sound_get_default_3d_panner());
+		if (sound_get_default_3d_attenuator() >= 0 && get_preferred_3d_attenuator() < 0) set_3d_attenuator(sound_get_default_3d_attenuator());
 		if (shape) {
 			reactphysics3d::Vector3 pos(x, y, z);
 			reactphysics3d::Vector3 listener = get_engine()->get_listener_position(get_listener());
 			bool is_contained = shape->is_in_shape(listener, pos);
 			if (!is_contained) ma_sound_set_position(&*snd, pos.x, pos.y, pos.z);
 			else ma_sound_set_position(&*snd, listener.x, listener.y, listener.z);
-		} else {
-			set_spatialization_enabled(true);
-			ma_sound_set_position(&*snd, x, y, z);
-		}
-		if (monitor)
-			monitor->set_position_changed();
+		} else ma_sound_set_position(&*snd, x, y, z);
 	}
 	void set_position_3d_vector(const reactphysics3d::Vector3& position) override { set_position_3d(position.x, position.y, position.z); }
 	reactphysics3d::Vector3 get_position_3d() const override {
@@ -800,8 +1306,6 @@ public:
 	void set_direction(float x, float y, float z) override {
 		if (!snd)
 			return;
-		if (monitor)
-			monitor->set_position_changed();
 		return ma_sound_set_direction(&*snd, x, y, z);
 	}
 	void set_direction_vector(const reactphysics3d::Vector3& direction) override { set_direction(direction.x, direction.y, direction.z); }
@@ -827,29 +1331,15 @@ public:
 		res.setAllValues(vel.x, vel.y, vel.z);
 		return res;
 	}
-	void set_attenuation_model(ma_attenuation_model model) override {
-		if (snd)
-			ma_sound_set_attenuation_model(&*snd, model);
-	}
-	ma_attenuation_model get_attenuation_model() const override {
-		return snd ? ma_sound_get_attenuation_model(&*snd) : ma_attenuation_model_none;
-	}
 	void set_positioning(ma_positioning positioning) override {
 		if (snd)
 			ma_sound_set_positioning(&*snd, positioning);
-		if (monitor)
-			monitor->set_position_changed();
 	}
 	ma_positioning get_positioning() const override {
 		return snd ? ma_sound_get_positioning(&*snd) : ma_positioning_absolute;
 	}
-	void set_rolloff(float rolloff) override {
-		if (snd)
-			ma_sound_set_rolloff(&*snd, rolloff);
-	}
-	float get_rolloff() const override {
-		return snd ? ma_sound_get_rolloff(&*snd) : NAN;
-	}
+	void set_rolloff(float rolloff) override { get_spatializer()->set_rolloff(rolloff); }
+	float get_rolloff() const override { return get_spatializer()->get_rolloff(); }
 	void set_min_gain(float gain) override {
 		if (snd)
 			ma_sound_set_min_gain(&*snd, gain);
@@ -901,13 +1391,8 @@ public:
 	float get_doppler_factor() const override {
 		return snd ? ma_sound_get_doppler_factor(&*snd) : NAN;
 	}
-	void set_directional_attenuation_factor(float factor) override {
-		if (snd)
-			ma_sound_set_directional_attenuation_factor(&*snd, factor);
-	}
-	float get_directional_attenuation_factor() const override {
-		return snd ? ma_sound_get_directional_attenuation_factor(&*snd) : NAN;
-	}
+	void set_directional_attenuation_factor(float factor) override { get_spatializer()->set_directional_attenuation_factor(factor); }
+	float get_directional_attenuation_factor() const override { return get_spatializer()->get_directional_attenuation_factor(); }
 	void set_fade(float start_volume, float end_volume, ma_uint64 length) override {
 		if (!snd)
 			return;
@@ -996,24 +1481,24 @@ class sound_impl final : public mixer_impl, public virtual sound {
 	unique_ptr<ma_pcm_rb> pcm_stream;
 	bool paused;
 	bool should_autoclose; // If this is true, the release method defers sound destruction until playback has complete.
+	mutable audio_data_source* datasource; // Avoid the need to keep looking up the pointer to the c++ ma_data_source wrapper associated with this sound.
 	inline void postload(const string& filename, bool async_load = false) {
 		loaded_filename = filename;
 		node = (ma_node_base *)&*snd;
 		set_spatialization_enabled(false);                  // The user must call set_position_3d or manually enable spatialization or else their ambience and UI sounds will be spatialized.
-		set_attenuation_model(ma_attenuation_model_linear_db); // If spatialization is enabled however lets use linear attenuation by default so that we focus more on hearing objects from further out in audio games that can still fade to silence as opposed to complete but hard to hear realism.
 		set_max_distance(70);
-		set_directional_attenuation_factor(1);
+		ma_sound_set_rolloff(&*snd, 0);
+		ma_sound_set_directional_attenuation_factor(&*snd, 0);
 		attach_output_bus(0, node_chain, 0);
 		// If we didn't load our sound asynchronously or if we streamed it, then we simply mark it as load_completed or we'll end up with a deadlock at destruction time.
-		if (!async_load)
-			load_completed.test_and_set();
+		if (!async_load) load_completed.test_and_set();
 	}
 public:
 	static void async_notification_callback(ma_async_notification *pNotification) {
 		async_notification_callbacks *anc = (async_notification_callbacks *)pNotification;
 		anc->pAtomicFlag->test_and_set();
 	}
-	sound_impl(audio_engine *e) : paused(false), should_autoclose(false), pcm_stream(nullptr), mixer_impl(static_cast < audio_engine_impl * > (e), false), pcm_buffer(), sound() {
+	sound_impl(audio_engine *e) : paused(false), should_autoclose(false), datasource(nullptr), pcm_stream(nullptr), mixer_impl(dynamic_cast <audio_engine_impl*> (e), false), pcm_buffer() {
 		init_sound();
 		snd = nullptr;
 		ma_fence_init(&fence);
@@ -1079,13 +1564,15 @@ public:
 		g_sound_service->cleanup_triplet(triplet);
 		return g_soundsystem_last_error == MA_SUCCESS;
 	}
-	bool load(const string &filename, const pack_interface *pack_file) override {
-		return load_special(filename, pack_file ? g_pack_protocol_slot : 0, pack_file ? std::shared_ptr < const pack_interface > (pack_file->make_immutable()) : nullptr, 0, nullptr, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC);
+	bool load(const string &filename, const pack_interface* pack_file) override {
+		return load_special(filename, pack_file && pack_file->get_is_active()? g_pack_protocol_slot : 0, pack_file && pack_file->get_is_active()? std::shared_ptr < const pack_interface > (pack_file->make_immutable()) : nullptr, 0, nullptr, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC);
 	}
-	bool stream(const std::string &filename, const pack_interface *pack_file) override {
-		return load_special(filename, pack_file ? g_pack_protocol_slot : 0, pack_file ? std::shared_ptr < const pack_interface > (pack_file->make_immutable()) : nullptr, 0, nullptr, MA_SOUND_FLAG_STREAM);
+	bool stream(const std::string &filename, const pack_interface* pack_file) override {
+		return load_special(filename, pack_file && pack_file->get_is_active()? g_pack_protocol_slot : 0, pack_file && pack_file->get_is_active()? std::shared_ptr < const pack_interface > (pack_file->make_immutable()) : nullptr, 0, nullptr, MA_SOUND_FLAG_STREAM);
 	}
-	bool seek_in_milliseconds(unsigned long long offset) override { return snd ? (g_soundsystem_last_error = ma_sound_seek_to_pcm_frame(&*snd, offset * ma_engine_get_sample_rate(engine->get_ma_engine()) / 1000)) == MA_SUCCESS : false; }
+	bool stream_url(const std::string &url) override {
+		return load_special(url, g_netstream_protocol_slot, nullptr, 0, nullptr, MA_SOUND_FLAG_STREAM | MA_SOUND_FLAG_UNKNOWN_LENGTH);
+	}
 	bool load_string(const std::string &data) override { return load_memory(data.data(), data.size()); }
 	bool load_string_async(const std::string &data) override {
 		// Same as load_pcm, but without the setup.
@@ -1123,10 +1610,10 @@ public:
 		if (format == ma_format_unknown) return false;
 		return load_pcm(buffer->ptr, buffer->size * buffer->get_element_size(), format, samplerate, channels);
 	}
-	bool stream_pcm(const void* data, unsigned int size_in_frames, ma_format format, unsigned int sample_rate, unsigned int channels, unsigned int buffer_size) {
+	bool stream_pcm(const void* data, unsigned int size_in_frames, ma_format format, unsigned int sample_rate, unsigned int channels, unsigned int buffer_size) override {
 		if (format != ma_format_unknown) {
 			if (snd) close();
-			if (!buffer_size) buffer_size = size_in_frames + 2;
+			if (!buffer_size) buffer_size = size_in_frames * 2;
 			if (!buffer_size) return false;
 			if (!channels) channels = get_engine()->get_channels();
 			if (!sample_rate) sample_rate = get_engine()->get_sample_rate();
@@ -1175,30 +1662,53 @@ public:
 		int nchannels = pcm_stream? ma_pcm_rb_get_channels(&*pcm_stream) : channels? channels : get_engine()->get_channels();
 		return stream_pcm(buffer->ptr, buffer->size / nchannels, format, sample_rate, channels, buffer_size);
 	}
+	bool open(audio_data_source* ds) override {
+		if (!ds || !ds->get_active()) return false;
+		if (snd) close();
+		snd = make_unique<ma_sound>();
+		if ((g_soundsystem_last_error = ma_sound_init_from_data_source(get_engine()->get_ma_engine(), ds->get_ma_data_source(), 0, nullptr, &*snd)) != MA_SUCCESS) {
+			snd.reset();
+			return false;
+		}
+		datasource = ds;
+		postload(":datasource", false);
+		return true;
+	}
 	bool is_load_completed() const override {
 		return load_completed.test();
 	}
 	bool close() override {
-		if (snd) {
-			// It's possible that this sound could still be loading in a job thread when we try to destroy it. Unfortunately there isn't a way to cancel this, so we have to just wait.
-			if (!load_completed.test())
-				ma_fence_wait(&fence);
-			ma_sound_uninit(&*snd);
-			snd.reset();
-			node = nullptr;
-			if (pcm_stream) ma_pcm_rb_uninit(&*pcm_stream);
-			pcm_stream.reset();
-			pcm_buffer.resize(0);
-			loaded_filename.clear();
-			load_completed.clear();
-			paused = should_autoclose = false;
-			return true;
+		if (!snd) return false;
+		// It's possible that this sound could still be loading in a job thread when we try to destroy it. Unfortunately there isn't a way to cancel this, so we have to just wait.
+		if (!load_completed.test()) ma_fence_wait(&fence);
+		if (spatializer) {
+			unique_lock<mutex> lock(spatialization_params_mutex);
+			node_chain->remove_node(spatializer);
+			spatializer->release();
+			spatializer = nullptr;
 		}
-		return false;
+		ma_sound_uninit(&*snd);
+		snd.reset();
+		if (datasource) {
+			datasource->release();
+			datasource = nullptr;
+		}
+		node = nullptr;
+		if (pcm_stream) ma_pcm_rb_uninit(&*pcm_stream);
+		pcm_stream.reset();
+		pcm_buffer.resize(0);
+		loaded_filename.clear();
+		load_completed.clear();
+		paused = should_autoclose = false;
+		return true;
 	}
 	void set_autoclose(bool enabled) override { should_autoclose = enabled; }
 	bool get_autoclose() const override { return should_autoclose; }
 	const std::string &get_loaded_filename() const override { return loaded_filename; }
+	audio_data_source* get_datasource() const override {
+		if (!datasource && snd && (datasource = audio_data_source_get(snd->pDataSource, get_engine())) == nullptr) return nullptr;
+		return datasource;
+	}
 	bool get_active() override {
 		return snd ? true : false;
 	}
@@ -1284,22 +1794,11 @@ public:
 	bool get_at_end() override {
 		return snd ? ma_sound_at_end(&*snd) : false;
 	}
-	bool seek(unsigned long long position) override {
-		if (get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES)
-			return seek_in_frames(position);
-		else
-			return seek_in_milliseconds(position);
-	}
-	bool seek_in_frames(unsigned long long position) override {
-		if (snd) {
-			g_soundsystem_last_error = ma_sound_seek_to_pcm_frame(&*snd, position);
-			return g_soundsystem_last_error == MA_SUCCESS;
-		}
-		return false;
-	}
+	bool seek(unsigned long long position) override { return get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES? seek_in_frames(position) : seek_in_milliseconds(position); }
+	bool seek_in_frames(unsigned long long position) override { return get_length_in_frames() && (g_soundsystem_last_error = ma_sound_seek_to_pcm_frame(&*snd, position)) == MA_SUCCESS; }
+	bool seek_in_milliseconds(unsigned long long offset) override { return seek_in_frames((offset * ma_engine_get_sample_rate(engine->get_ma_engine())) / 1000); }
 	unsigned long long get_position() override {
-		if (!snd)
-			return 0;
+		if (!snd) return 0;
 		if (get_engine()->get_flags() & audio_engine::DURATIONS_IN_FRAMES)
 			return get_position_in_frames();
 		else
@@ -1358,7 +1857,70 @@ public:
 	}
 };
 
-audio_engine *new_audio_engine(int flags) { return new audio_engine_impl(flags); }
+class microphone_impl : public audio_ring_buffer_impl, public virtual microphone {
+	unique_ptr<ma_device> capture_device;
+	int device_index;
+	static void capture_data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
+		microphone_impl* node = (microphone_impl*)pDevice->pUserData;
+		if (node && pInput && frameCount > 0) node->write((float*)pInput, frameCount);
+	}
+public:
+	microphone_impl(audio_engine* e, int device) : audio_ring_buffer_impl(e->get_channels(), 8192, e), capture_device(make_unique<ma_device>()), device_index(device) {
+		ma_device_config device_config = ma_device_config_init(ma_device_type_capture);
+		device_config.capture.format = ma_format_f32;
+		device_config.capture.channels = e->get_channels();
+		device_config.sampleRate = e->get_sample_rate();
+		device_config.dataCallback = capture_data_callback;
+		device_config.pUserData = this;
+		device_config.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE * 2;
+		device_config.capture.pDeviceID = (device >= 0 && device < g_sound_input_devices.size()) ? &g_sound_input_devices[device_index].id : nullptr;
+		if ((g_soundsystem_last_error = ma_device_init(nullptr, &device_config, &*capture_device)) != MA_SUCCESS) throw std::runtime_error("failed to initialize capture device");
+		if ((g_soundsystem_last_error = ma_device_start(&*capture_device)) != MA_SUCCESS) audio_node_impl::set_state(ma_node_state_stopped);
+	}
+	~microphone_impl() {
+		if (capture_device) ma_device_uninit(&*capture_device);
+	}
+	bool set_device(int device) override {
+		if (device == device_index) return true;
+		if (device < -1 || device >= int(g_sound_input_devices.size())) return false;
+		if (capture_device) {
+			ma_device_stop(&*capture_device);
+			ma_device_uninit(&*capture_device);
+			capture_device.reset();
+		}
+		ma_device_config device_config = ma_device_config_init(ma_device_type_capture);
+		device_config.capture.format = ma_format_f32;
+		device_config.capture.channels = get_engine()->get_channels();
+		device_config.sampleRate = get_engine()->get_sample_rate();
+		device_config.dataCallback = capture_data_callback;
+		device_config.pUserData = this;
+		device_config.capture.pDeviceID = (device >= 0 && device < int(g_sound_input_devices.size())) ? &g_sound_input_devices[device].id : nullptr;
+		if ((g_soundsystem_last_error = ma_device_init(nullptr, &device_config, &*capture_device)) != MA_SUCCESS) return false;
+		device_index = device;
+		if ((g_soundsystem_last_error = ma_device_start(&*capture_device)) != MA_SUCCESS) {
+			audio_node_impl::set_state(ma_node_state_stopped);
+			return false;
+		}
+		return true;
+	}
+	int get_device() const override { return device_index; }
+	bool set_state(ma_node_state state) override {
+		bool ret = audio_node_impl::set_state(state);
+		if (!capture_device) return ret;
+		if (!ret) return false;
+		if (state == ma_node_state_stopped) return ma_device_stop(&*capture_device) == MA_SUCCESS;
+		else if (state == ma_node_state_started) {
+			this->reset();
+			return ma_device_start(&*capture_device) == MA_SUCCESS;
+		}
+		return false;
+	}
+	void set_volume(float volume) override { if (capture_device) g_soundsystem_last_error = ma_device_set_master_volume_db(&*capture_device, volume); }
+	float get_volume() const override { float result; return capture_device && (g_soundsystem_last_error = ma_device_get_master_volume_db(&*capture_device, &result)) == MA_SUCCESS? result : 0; }
+};
+microphone* microphone::create(int device, audio_engine* engine) { return new microphone_impl(engine, device); }
+
+audio_engine *new_audio_engine(int flags, int sample_rate, int channels) { return new audio_engine_impl(flags, sample_rate, channels); }
 mixer *new_mixer(audio_engine *engine) { return new mixer_impl(engine); }
 sound *new_sound(audio_engine *engine) { return new sound_impl(engine); }
 mixer *new_global_mixer() {
@@ -1367,7 +1929,10 @@ mixer *new_global_mixer() {
 }
 sound *new_global_sound() {
 	init_sound();
-	return new sound_impl(g_audio_engine);
+	sound* s = new sound_impl(g_audio_engine);
+	if (!s) return nullptr;
+	if (g_audio_mixer) s->set_mixer(g_audio_mixer);
+	return s;
 }
 int get_sound_output_device() {
 	init_sound();
@@ -1422,6 +1987,10 @@ const pack_interface *get_sound_default_storage() {
 	return obj->get_mutable();
 }
 int get_soundsystem_last_error() { return g_soundsystem_last_error; }
+string get_soundsystem_last_error_text() {
+	const char* msg = ma_result_description(g_soundsystem_last_error);
+	return msg? msg : "";
+}
 void set_sound_master_volume(float db) {
 	if (!g_soundsystem_initialized.test())
 		return;
@@ -1433,6 +2002,16 @@ float get_sound_master_volume() {
 	if (!g_soundsystem_initialized.test())
 		return 0;
 	return ma_volume_linear_to_db(ma_engine_get_volume(g_audio_engine->get_ma_engine()));
+}
+audio_engine* get_sound_default_engine() {
+	init_sound();
+	return g_audio_engine;
+}
+void set_sound_default_engine(audio_engine* engine) {
+	if (!g_soundsystem_initialized.test()) throw runtime_error("soundsystem not initialized");
+	if (!engine) throw runtime_error("a default audio engine must exist");
+	if (g_audio_engine) g_audio_engine->release();
+	g_audio_engine = engine;
 }
 bool sound::pcm_to_wav(const void *buffer, unsigned int size, ma_format format, int samplerate, int channels, void *output) {
 	int frame_size = 0;
@@ -1475,12 +2054,78 @@ template < class T, auto Function, typename ReturnType, typename... Args >
 ReturnType virtual_call(T *object, Args... args) {
 	return (object->*Function)(std::forward < Args > (args)...);
 }
+template < class T > inline void RegisterSoundsystemAudioNode(asIScriptEngine *engine, const std::string &type) {
+	engine->RegisterObjectType(type.c_str(), 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call < T, &T::duplicate, void >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call < T, &T::release, void >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_input_bus_count() const property", asFUNCTION((virtual_call < T, &T::get_input_bus_count, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_output_bus_count() const property", asFUNCTION((virtual_call < T, &T::get_output_bus_count, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_input_channels(uint bus) const", asFUNCTION((virtual_call < T, &T::get_input_channels, unsigned int, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_output_channels(uint bus) const", asFUNCTION((virtual_call < T, &T::get_output_channels, unsigned int, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool attach_output_bus(uint output_bus, audio_node@ destination, uint destination_input_bus)", asFUNCTION((virtual_call < T, &T::attach_output_bus, bool, unsigned int, audio_node *, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool detach_output_bus(uint bus)", asFUNCTION((virtual_call < T, &T::detach_output_bus, bool, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool detach_all_output_buses()", asFUNCTION((virtual_call < T, &T::detach_all_output_buses, bool >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_output_bus_volume(uint bus, float volume)", asFUNCTION((virtual_call < T, &T::set_output_bus_volume, bool, unsigned int, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float get_output_bus_volume(uint bus)", asFUNCTION((virtual_call < T, &T::get_output_bus_volume, float, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_state(audio_node_state state)", asFUNCTION((virtual_call < T, &T::set_state, bool, ma_node_state >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_node_state get_state()", asFUNCTION((virtual_call < T, &T::get_state, ma_node_state >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_state_time(audio_node_state state, uint64 time)", asFUNCTION((virtual_call < T, &T::set_state_time, bool, ma_node_state, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint64 get_state_time(uint64 global_time)", asFUNCTION((virtual_call < T, &T::get_state_time, unsigned long long, ma_node_state >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_node_state get_state_by_time(uint64 global_time)", asFUNCTION((virtual_call < T, &T::get_state_by_time, ma_node_state, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_node_state get_state_by_time_range(uint64 global_time_begin, uint64 global_time_end)", asFUNCTION((virtual_call < T, &T::get_state_by_time_range, ma_node_state, unsigned long long, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint64 get_time() const", asFUNCTION((virtual_call < T, &T::get_time, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_time(uint64 local_time)", asFUNCTION((virtual_call < T, &T::set_time, bool, ma_node_state >)), asCALL_CDECL_OBJFIRST);
+	if constexpr (!std::is_same < T, audio_node >::value) {
+		engine->RegisterObjectMethod(type.c_str(), "audio_node@ opImplCast()", asFUNCTION((op_cast < T, audio_node >)), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectMethod("audio_node", Poco::format("%s@ opCast()", type).c_str(), asFUNCTION((op_cast < audio_node, T >)), asCALL_CDECL_OBJFIRST);
+	}
+}
+template <class T> inline void RegisterSoundsystemDataSource(asIScriptEngine *engine, const std::string &type) {
+	RegisterSoundsystemAudioNode<T>(engine, type);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_advised_read_frame_count() const property", asFUNCTION((virtual_call<T, &T::get_advised_read_frame_count, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float[]@ read(uint64 frame_count = 0)", asFUNCTION((virtual_call<T, &T::read_script, CScriptArray*, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint64 skip_frames(uint64 frame_count)", asFUNCTION((virtual_call<T, &T::skip_frames, unsigned long long, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float skip_milliseconds(float ms)", asFUNCTION((virtual_call<T, &T::skip_milliseconds, float, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool seek_frames(uint64 frame_index)", asFUNCTION((virtual_call<T, &T::seek_frames, bool, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint64 get_cursor_frames() const property", asFUNCTION((virtual_call<T, &T::get_cursor_frames, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool seek_milliseconds(float ms)", asFUNCTION((virtual_call<T, &T::seek_milliseconds, bool, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float get_cursor_milliseconds() const property", asFUNCTION((virtual_call<T, &T::get_cursor_milliseconds, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint64 get_length_frames() const property", asFUNCTION((virtual_call<T, &T::get_length_frames, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "float get_length_milliseconds() const property", asFUNCTION((virtual_call<T, &T::get_length_milliseconds, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_looping(bool looping)", asFUNCTION((virtual_call<T, &T::set_looping, bool, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_looping() const property", asFUNCTION((virtual_call<T, &T::get_looping, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_range(uint64 start_frame, uint64 end_frame)", asFUNCTION((virtual_call<T, &T::set_range, bool, unsigned long long, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void get_range(uint64&out start_frame, uint64&out end_frame) const", asFUNCTION((virtual_call<T, &T::get_range, void, unsigned long long*, unsigned long long*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_loop_point(uint64 start_frame, uint64 end_frame)", asFUNCTION((virtual_call<T, &T::set_loop_point, bool, unsigned long long, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void get_loop_point(uint64&out start_frame, uint64&out end_frame) const", asFUNCTION((virtual_call<T, &T::get_loop_point, void, unsigned long long*, unsigned long long*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_current(audio_data_source@ new_current)", asFUNCTION((virtual_call<T, &T::set_current, bool, audio_data_source*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_data_source@+ get_current() const property", asFUNCTION((virtual_call<T, &T::get_current, audio_data_source*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_next(audio_data_source@ new_next)", asFUNCTION((virtual_call<T, &T::set_next, bool, audio_data_source*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_data_source@+ get_next() const property", asFUNCTION((virtual_call<T, &T::get_next, audio_data_source*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_channels() const property", asFUNCTION((virtual_call<T, &T::get_channels, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_sample_rate() const property", asFUNCTION((virtual_call<T, &T::get_sample_rate, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_active() const property", asFUNCTION((virtual_call<T, &T::get_active, bool>)), asCALL_CDECL_OBJFIRST);
+	if constexpr (!std::is_same < T, audio_data_source >::value) {
+		engine->RegisterObjectMethod(type.c_str(), "audio_data_source@ opImplCast()", asFUNCTION((op_cast<T, audio_data_source>)), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectMethod("audio_data_source", Poco::format("%s@ opCast()", type).c_str(), asFUNCTION((op_cast<audio_data_source, T>)), asCALL_CDECL_OBJFIRST);
+	}
+}
+template<class T> inline void RegisterSoundsystemRingBuffer(asIScriptEngine* engine, const std::string& type) {
+	RegisterSoundsystemDataSource<T>(engine, type);
+	engine->RegisterObjectMethod(type.c_str(), "void reset()", asFUNCTION((virtual_call<T, &T::reset, void>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint write(const float[]@ frames)", asFUNCTION((virtual_call<T, &T::write_script_array, unsigned int, CScriptArray*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint write(const memory_buffer<float>& frames)", asFUNCTION((virtual_call<T, &T::write_script_memory_buffer, unsigned int, script_memory_buffer*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_available_read() const property", asFUNCTION((virtual_call<T, &T::get_available_read, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_available_write() const property", asFUNCTION((virtual_call<T, &T::get_available_write, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	if constexpr (!std::is_same < T, audio_ring_buffer >::value) {
+		engine->RegisterObjectMethod(type.c_str(), "audio_ring_buffer@ opImplCast()", asFUNCTION((op_cast<T, audio_ring_buffer>)), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectMethod("audio_ring_buffer", Poco::format("%s@ opCast()", type).c_str(), asFUNCTION((op_cast<audio_ring_buffer, T>)), asCALL_CDECL_OBJFIRST);
+	}
+}
 void RegisterSoundsystemEngine(asIScriptEngine *engine) {
-	engine->RegisterObjectType("audio_engine", 0, asOBJ_REF);
+	RegisterSoundsystemAudioNode<audio_engine>(engine, "audio_engine");
 	engine->RegisterFuncdef("void audio_engine_processing_callback(audio_engine@ engine, memory_buffer<float>& data, uint64 frames)");
-	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_FACTORY, "audio_engine@ e(int flags)", asFUNCTION(new_audio_engine), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call < audio_engine, &audio_engine::duplicate, void >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call < audio_engine, &audio_engine::release, void >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("audio_engine", asBEHAVE_FACTORY, "audio_engine@ e(int flags, int sample_rate = 0, int channels = 0)", asFUNCTION(new_audio_engine), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_engine", "int get_flags() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_flags, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "int get_device() const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_device, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "bool set_device(int device)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_device, bool, int >)), asCALL_CDECL_OBJFIRST);
@@ -1488,8 +2133,6 @@ void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "float[]@ read(uint64 frame_count)", asFUNCTION((virtual_call < audio_engine, &audio_engine::read_script, CScriptArray *, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_processing_callback(audio_engine_processing_callback@ cb) property", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_processing_callback, void, asIScriptFunction*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "audio_engine_processing_callback@+ get_processing_callback() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_processing_callback, asIScriptFunction* >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "uint64 get_time() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_time, unsigned long long >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "bool set_time(uint64 time)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_time, bool, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "uint64 get_time_in_frames() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_time_in_frames, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "bool set_time_in_frames(uint64 time_frames)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_time_in_frames, bool, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "uint64 get_time_in_milliseconds() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_time_in_milliseconds, unsigned long long >)), asCALL_CDECL_OBJFIRST);
@@ -1521,51 +2164,108 @@ void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "vector get_listener_world_up(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_world_up, reactphysics3d::Vector3, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_enabled(int index, bool enabled)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_enabled, void, int, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "bool get_listener_enabled(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_enabled, bool, int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterGlobalProperty("audio_engine@ sound_default_engine", (void*)&g_audio_engine);
+	engine->RegisterGlobalFunction("void set_sound_default_engine(audio_engine@ engine) property", asFUNCTION(set_sound_default_engine), asCALL_CDECL);
+	engine->RegisterGlobalFunction("audio_engine@+ get_sound_default_engine() property", asFUNCTION(get_sound_default_engine), asCALL_CDECL);
 }
-template < class T >
-inline void RegisterSoundsystemAudioNode(asIScriptEngine *engine, const std::string &type) {
-	engine->RegisterObjectType(type.c_str(), 0, asOBJ_REF);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call < T, &T::duplicate, void >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_RELEASE, "void f()", asFUNCTION((virtual_call < T, &T::release, void >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "uint get_input_bus_count() const property", asFUNCTION((virtual_call < T, &T::get_input_bus_count, unsigned int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "uint get_output_bus_count() const property", asFUNCTION((virtual_call < T, &T::get_output_bus_count, unsigned int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "uint get_input_channels(uint bus) const", asFUNCTION((virtual_call < T, &T::get_input_channels, unsigned int, unsigned int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "uint get_output_channels(uint bus) const", asFUNCTION((virtual_call < T, &T::get_output_channels, unsigned int, unsigned int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool attach_output_bus(uint output_bus, audio_node@+ destination, uint destination_input_bus)", asFUNCTION((virtual_call < T, &T::attach_output_bus, bool, unsigned int, audio_node *, unsigned int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool detach_output_bus(uint bus)", asFUNCTION((virtual_call < T, &T::detach_output_bus, bool, unsigned int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool detach_all_output_buses()", asFUNCTION((virtual_call < T, &T::detach_all_output_buses, bool >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool set_output_bus_volume(uint bus, float volume)", asFUNCTION((virtual_call < T, &T::set_output_bus_volume, bool, unsigned int, float >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "float get_output_bus_volume(uint bus)", asFUNCTION((virtual_call < T, &T::get_output_bus_volume, float, unsigned int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool set_state(audio_node_state state)", asFUNCTION((virtual_call < T, &T::set_state, bool, ma_node_state >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "audio_node_state get_state()", asFUNCTION((virtual_call < T, &T::get_state, ma_node_state >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool set_state_time(audio_node_state state, uint64 time)", asFUNCTION((virtual_call < T, &T::set_state_time, bool, ma_node_state, unsigned long long >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "uint64 get_state_time(uint64 global_time)", asFUNCTION((virtual_call < T, &T::get_state_time, unsigned long long, ma_node_state >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "audio_node_state get_state_by_time(uint64 global_time)", asFUNCTION((virtual_call < T, &T::get_state_by_time, ma_node_state, unsigned long long >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "audio_node_state get_state_by_time_range(uint64 global_time_begin, uint64 global_time_end)", asFUNCTION((virtual_call < T, &T::get_state_by_time_range, ma_node_state, unsigned long long, unsigned long long >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "uint64 get_time() const", asFUNCTION((virtual_call < T, &T::get_time, unsigned long long >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool set_time(uint64 local_time)", asFUNCTION((virtual_call < T, &T::set_time, bool, ma_node_state >)), asCALL_CDECL_OBJFIRST);
-	if constexpr (!std::is_same < T, audio_node >::value) {
-		engine->RegisterObjectMethod(type.c_str(), "audio_node@ opImplCast()", asFUNCTION((op_cast < T, audio_node >)), asCALL_CDECL_OBJFIRST);
-		engine->RegisterObjectMethod("audio_node", Poco::format("%s@ opCast()", type).c_str(), asFUNCTION((op_cast < audio_node, T >)), asCALL_CDECL_OBJFIRST);
+void RegisterSoundsystemDataSources(asIScriptEngine* engine) {
+	RegisterSoundsystemDataSource<audio_data_source>(engine, "audio_data_source");
+	RegisterSoundsystemDataSource<audio_decoder>(engine, "audio_decoder");
+	engine->RegisterObjectBehaviour("audio_decoder", asBEHAVE_FACTORY, "audio_decoder@ d(audio_engine@ engine = sound_default_engine)", asFUNCTION(audio_decoder::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("audio_decoder", "bool open(const string&in filename, const pack_interface@+ pack_file = sound_default_pack, uint sample_rate = 0, uint channels = 0)", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::open, bool, const string&, const pack_interface*, unsigned int, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_decoder", "bool open(datastream@ stream, uint sample_rate = 0, uint channels = 0)", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::open_stream, bool, datastream*, unsigned int, unsigned int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_decoder", "bool close()", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::close, bool >)), asCALL_CDECL_OBJFIRST);
+	RegisterSoundsystemRingBuffer<audio_ring_buffer>(engine, "audio_ring_buffer");
+	engine->RegisterObjectBehaviour("audio_ring_buffer", asBEHAVE_FACTORY, "audio_ring_buffer@ r(uint channels, uint size, audio_engine@ engine = sound_default_engine)", asFUNCTION(audio_ring_buffer::create), asCALL_CDECL);
+	RegisterSoundsystemRingBuffer<microphone>(engine, "microphone");
+	engine->RegisterObjectBehaviour("microphone", asBEHAVE_FACTORY, "microphone@ m(int device = -1, audio_engine@ engine = sound_default_engine)", asFUNCTION(microphone::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("microphone", "bool set_device(int device)", asFUNCTION((virtual_call < microphone, &microphone::set_device, bool, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("microphone", "int get_device() const property", asFUNCTION((virtual_call < microphone, &microphone::get_device, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("microphone", "void set_volume(float volume)", asFUNCTION((virtual_call < microphone, &microphone::set_volume, void, float>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("microphone", "float get_volume() const property", asFUNCTION((virtual_call < microphone, &microphone::get_volume, float>)), asCALL_CDECL_OBJFIRST);
+}
+template <class T> void RegisterSoundsystemEncoder(asIScriptEngine* engine, const std::string& type) {
+	RegisterSoundsystemAudioNode<T>(engine, type);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_default_open_flags() const property", asFUNCTION((virtual_call<T, &T::get_default_open_flags, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool open(uint sample_rate, uint channels, uint flags = AUDIO_ENCODER_DEFAULTS)", asFUNCTION((virtual_call<T, &T::open_pull, bool, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool open(const string&in filename, uint sample_rate, uint channels, uint flags = AUDIO_ENCODER_DEFAULTS)", asFUNCTION((virtual_call<T, &T::open_file, bool, const string&, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool open(datastream@ stream, uint sample_rate, uint channels, uint flags = AUDIO_ENCODER_DEFAULTS)", asFUNCTION((virtual_call<T, &T::open_stream, bool, datastream*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool close()", asFUNCTION((virtual_call<T, &T::close, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool get_active() const property", asFUNCTION((virtual_call<T, &T::get_active, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint64 get_frames_written() const property", asFUNCTION((virtual_call<T, &T::get_frames_written, unsigned long long>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint write(const float[]@ frames)", asFUNCTION((virtual_call<T, &T::write_script_array, unsigned int, CScriptArray*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint write(const memory_buffer<float>& frames)", asFUNCTION((virtual_call<T, &T::write_script_memory_buffer, unsigned int, script_memory_buffer*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "string read()", asFUNCTION((virtual_call<T, &T::read, string>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "string get_format() const property", asFUNCTION((virtual_call<T, &T::get_format, string>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_sample_rate() const property", asFUNCTION((virtual_call<T, &T::get_sample_rate, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint get_channels() const property", asFUNCTION((virtual_call<T, &T::get_channels, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	if constexpr (!std::is_same < T, audio_encoder >::value) {
+		engine->RegisterObjectMethod(type.c_str(), "audio_encoder@ opImplCast()", asFUNCTION((op_cast<T, audio_encoder>)), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectMethod("audio_encoder", Poco::format("%s@ opCast()", type).c_str(), asFUNCTION((op_cast<audio_encoder, T>)), asCALL_CDECL_OBJFIRST);
 	}
 }
-template < class T >
-void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
+void RegisterSoundsystemEncoders(asIScriptEngine* engine) {
+	engine->RegisterEnum("audio_encoder_flags");
+	engine->RegisterEnumValue("audio_encoder_flags", "AUDIO_ENCODER_OVERWRITE", audio_encoder::ENCODER_OVERWRITE);
+	engine->RegisterEnumValue("audio_encoder_flags", "AUDIO_ENCODER_DEFAULTS", audio_encoder::ENCODER_DEFAULTS);
+	RegisterSoundsystemEncoder<audio_encoder>(engine, "audio_encoder");
+	engine->RegisterEnum("audio_wav_encoder_flags");
+	engine->RegisterEnumValue("audio_wav_encoder_flags", "AUDIO_ENCODER_WAV_U8", audio_wav_encoder::WAV_U8);
+	engine->RegisterEnumValue("audio_wav_encoder_flags", "AUDIO_ENCODER_WAV_S16", audio_wav_encoder::WAV_S16);
+	engine->RegisterEnumValue("audio_wav_encoder_flags", "AUDIO_ENCODER_WAV_S24", audio_wav_encoder::WAV_S24);
+	engine->RegisterEnumValue("audio_wav_encoder_flags", "AUDIO_ENCODER_WAV_S32", audio_wav_encoder::WAV_S32);
+	engine->RegisterEnumValue("audio_wav_encoder_flags", "AUDIO_ENCODER_WAV_F32", audio_wav_encoder::WAV_F32);
+	RegisterSoundsystemEncoder<audio_wav_encoder>(engine, "audio_wav_encoder");
+	engine->RegisterObjectBehaviour("audio_wav_encoder", asBEHAVE_FACTORY, "audio_wav_encoder@ e(audio_engine@ engine = sound_default_engine)", asFUNCTION(audio_wav_encoder::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("audio_wav_encoder", "audio_format get_wav_format() const property", asFUNCTION((virtual_call<audio_wav_encoder, &audio_wav_encoder::get_wav_format, ma_format>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterEnum("opus_signal_type");
+	engine->RegisterEnumValue("opus_signal_type", "OPUS_AUTO", OPUS_AUTO);
+	engine->RegisterEnumValue("opus_signal_type", "OPUS_SIGNAL_VOICE", OPUS_SIGNAL_VOICE);
+	engine->RegisterEnumValue("opus_signal_type", "OPUS_SIGNAL_MUSIC", OPUS_SIGNAL_MUSIC);
+	engine->RegisterEnum("opus_application_type");
+	engine->RegisterEnumValue("opus_application_type", "OPUS_APPLICATION_VOIP", OPUS_APPLICATION_VOIP);
+	engine->RegisterEnumValue("opus_application_type", "OPUS_APPLICATION_AUDIO", OPUS_APPLICATION_AUDIO);
+	engine->RegisterEnumValue("opus_application_type", "OPUS_APPLICATION_RESTRICTED_LOWDELAY", OPUS_APPLICATION_RESTRICTED_LOWDELAY);
+	RegisterSoundsystemEncoder<audio_opus_encoder>(engine, "audio_opus_encoder");
+	engine->RegisterObjectBehaviour("audio_opus_encoder", asBEHAVE_FACTORY, "audio_opus_encoder@ e(audio_engine@ engine = sound_default_engine)", asFUNCTION(audio_opus_encoder::create), asCALL_CDECL);
+	engine->RegisterObjectMethod("audio_opus_encoder", "int get_bitrate() const property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::get_bitrate, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "void set_bitrate(int bitrate) property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::set_bitrate, bool, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "int get_complexity() const property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::get_complexity, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "void set_complexity(int complexity) property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::set_complexity, bool, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "int get_signal_type() const property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::get_signal_type, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "void set_signal_type(int signal_type) property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::set_signal_type, bool, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "int get_application() const property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::get_application, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "void set_application(int application) property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::set_application, bool, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "int get_packet_loss_percent() const property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::get_packet_loss_percent, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "void set_packet_loss_percent(int percent) property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::set_packet_loss_percent, bool, int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "bool get_vbr() const property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::get_vbr, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "void set_vbr(bool enabled) property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::set_vbr, bool, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "bool get_cvbr() const property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::get_cvbr, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "void set_cvbr(bool enabled) property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::set_cvbr, bool, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "bool get_dtx() const property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::get_dtx, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_opus_encoder", "void set_dtx(bool enabled) property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::set_dtx, bool, bool>)), asCALL_CDECL_OBJFIRST);
+}
+template<class T> void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	RegisterSoundsystemAudioNode < T > (engine, type);
 	engine->RegisterObjectMethod(type.c_str(), "audio_engine@+ get_engine() const property", asFUNCTION((virtual_call < T, &T::get_engine, audio_engine * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_mixer(mixer@ parent_mixer)", asFUNCTION((virtual_call < T, &T::set_mixer, bool, mixer * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "mixer@+ get_mixer() const", asFUNCTION((virtual_call < T, &T::get_mixer, mixer * >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool set_hrtf(bool hrtf = true)", asFUNCTION((virtual_call < T, &T::set_hrtf, bool, bool >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_3d_panner(int panner_id)", asFUNCTION((virtual_call < T, &T::set_3d_panner, void, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "int get_3d_panner() const property", asFUNCTION((virtual_call < T, &T::get_3d_panner, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_3d_attenuator(int attenuator_id)", asFUNCTION((virtual_call < T, &T::set_3d_attenuator, void, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "int get_3d_attenuator() const property", asFUNCTION((virtual_call < T, &T::get_3d_attenuator, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "int get_preferred_3d_panner() const property", asFUNCTION((virtual_call < T, &T::get_preferred_3d_panner, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "int get_preferred_3d_attenuator() const property", asFUNCTION((virtual_call < T, &T::get_preferred_3d_attenuator, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_hrtf(bool enabled) property", asFUNCTION((virtual_call < T, &T::set_hrtf, void, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf() const property", asFUNCTION((virtual_call < T, &T::get_hrtf, bool >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf_desired() const property", asFUNCTION((virtual_call < T, &T::get_hrtf_desired, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_shape(ref@ shape)", asFUNCTION((virtual_call < T, &T::set_shape, bool, CScriptHandle*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "ref@ get_shape() const property", asFUNCTION((virtual_call < T, &T::get_shape, CScriptHandle*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_reverb3d(reverb3d@ reverb) property", asFUNCTION((virtual_call < T, &T::set_reverb3d, void, reverb3d*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_reverb3d_at(reverb3d@ reverb, reverb3d_placement placement)", asFUNCTION((virtual_call < T, &T::set_reverb3d_at, void, reverb3d*, audio_spatializer_reverb3d_placement>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "reverb3d@+ get_reverb3d() const property", asFUNCTION((virtual_call < T, &T::get_reverb3d, reverb3d*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_splitter_node@+ get_reverb3d_attachment() const property", asFUNCTION((virtual_call < T, &T::get_reverb3d_attachment, splitter_node*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "reverb3d_placement get_reverb3d_placement() const property", asFUNCTION((virtual_call < T, &T::get_reverb3d_placement, audio_spatializer_reverb3d_placement>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_node_chain@+ get_effects_chain() property", asFUNCTION((virtual_call < T, &T::get_effects_chain, audio_node_chain*>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "audio_node_chain@+ get_internal_node_chain() const property", asFUNCTION((virtual_call < T, &T::get_internal_node_chain, audio_node_chain*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_node_chain@+ get_internal_node_chain() property", asFUNCTION((virtual_call < T, &T::get_internal_node_chain, audio_node_chain*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play(bool reset_loop_state = true)", asFUNCTION((virtual_call < T, &T::play, bool, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool play_looped()", asFUNCTION((virtual_call < T, &T::play_looped, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool stop()", asFUNCTION((virtual_call < T, &T::stop, bool >)), asCALL_CDECL_OBJFIRST);
@@ -1593,8 +2293,6 @@ void RegisterSoundsystemMixer(asIScriptEngine *engine, const string &type) {
 	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_velocity, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(const vector&in velocity)", asFUNCTION((virtual_call < T, &T::set_velocity_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "vector get_velocity() const", asFUNCTION((virtual_call < T, &T::get_velocity, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void set_attenuation_model(audio_attenuation_model model) property", asFUNCTION((virtual_call < T, &T::set_attenuation_model, void, ma_attenuation_model >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "audio_attenuation_model get_attenuation_model() const property", asFUNCTION((virtual_call < T, &T::get_attenuation_model, ma_attenuation_model >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_positioning(audio_positioning_mode mode) property", asFUNCTION((virtual_call < T, &T::set_positioning, void, ma_positioning >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_positioning_mode get_positioning() const property", asFUNCTION((virtual_call < T, &T::get_positioning, ma_positioning >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_rolloff(float rolloff) property", asFUNCTION((virtual_call < T, &T::set_rolloff, void, float >)), asCALL_CDECL_OBJFIRST);
@@ -1700,7 +2398,7 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_delay_node", "void set_decay(float decay) property", asFUNCTION((virtual_call < delay_node, &delay_node::set_decay, void, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_delay_node", "float get_decay() const property", asFUNCTION((virtual_call < delay_node, &delay_node::get_decay, float >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemAudioNode <freeverb_node> (engine, "audio_freeverb_node");
-	engine->RegisterObjectBehaviour("audio_freeverb_node", asBEHAVE_FACTORY, "audio_freeverb_node@ n(audio_engine@ engine, int channels)", asFUNCTION(freeverb_node::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_freeverb_node", asBEHAVE_FACTORY, "audio_freeverb_node@ n(audio_engine@ engine = sound_default_engine)", asFUNCTION(freeverb_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_freeverb_node", "void set_room_size(float size) property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::set_room_size, void, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_freeverb_node", "float get_room_size() const property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::get_room_size, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_freeverb_node", "void set_damping(float damping) property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::set_damping, void, float >)), asCALL_CDECL_OBJFIRST);
@@ -1835,17 +2533,22 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterEnum("audio_positioning_mode");
 	engine->RegisterEnumValue("audio_positioning_mode", "AUDIO_POSITIONING_ABSOLUTE", ma_positioning_absolute);
 	engine->RegisterEnumValue("audio_positioning_mode", "AUDIO_POSITIONING_RELATIVE", ma_positioning_relative);
-	engine->RegisterEnum("audio_attenuation_model");
-	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_NONE", ma_attenuation_model_none);
-	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_INVERSE", ma_attenuation_model_inverse);
-	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_LINEAR", ma_attenuation_model_linear);
-	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_EXPONENTIAL", ma_attenuation_model_exponential);
-	engine->RegisterEnumValue("audio_attenuation_model", "AUDIO_ATTENUATION_MODEL_LINEAR_DB", ma_attenuation_model_linear_db);
 	engine->RegisterEnum("audio_engine_flags");
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_DURATIONS_IN_FRAMES", audio_engine::DURATIONS_IN_FRAMES);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_AUTO_START", audio_engine::NO_AUTO_START);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_DEVICE", audio_engine::NO_DEVICE);
+	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_NO_CLIP", audio_engine::NO_CLIP);
 	engine->RegisterEnumValue("audio_engine_flags", "AUDIO_ENGINE_PERCENTAGE_ATTRIBUTES", audio_engine::PERCENTAGE_ATTRIBUTES);
+	engine->RegisterEnum("audio_panner");
+	engine->RegisterEnumValue("audio_panner", "audio_panner_basic", g_audio_basic_panner);
+	engine->RegisterEnumValue("audio_panner", "audio_panner_phonon_hrtf", g_audio_phonon_hrtf_panner);
+	engine->RegisterEnum("audio_attenuator");
+	engine->RegisterEnumValue("audio_attenuator", "audio_attenuator_basic", g_audio_basic_attenuator);
+	engine->RegisterEnumValue("audio_attenuator", "audio_attenuator_phonon", g_audio_phonon_attenuator);
+	engine->RegisterEnum("reverb3d_placement");
+	engine->RegisterEnumValue("reverb3d_placement", "reverb3d_prepan", prepan);
+	engine->RegisterEnumValue("reverb3d_placement", "reverb3d_postpan", postpan);
+	engine->RegisterEnumValue("reverb3d_placement", "reverb3d_postattenuate", postattenuate);
 	RegisterSoundsystemAudioNode < audio_node > (engine, "audio_node");
 	RegisterSoundsystemEngine(engine);
 	RegisterSoundsystemAudioNode < audio_node_chain > (engine, "audio_node_chain");
@@ -1857,11 +2560,14 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "sound@ play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@ mix = null, const pack_interface@ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION((virtual_call < audio_engine, &audio_engine::play, sound*, const string &, const reactphysics3d::Vector3&, float, float, float, mixer*, const pack_interface*, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "mixer@ mixer()", asFUNCTION((virtual_call < audio_engine, &audio_engine::new_mixer, mixer * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "sound@ sound()", asFUNCTION((virtual_call < audio_engine, &audio_engine::new_sound, sound * >)), asCALL_CDECL_OBJFIRST);
+	RegisterSoundsystemDataSources(engine);
 	RegisterSoundsystemNodes(engine);
+	RegisterSoundsystemEncoders(engine);
 	RegisterSoundsystemShapes(engine);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
 	engine->RegisterObjectMethod("sound", "bool load(const string&in filename, const pack_interface@ pack = null)", asFUNCTION((virtual_call < sound, &sound::load, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool stream(const string&in filename, const pack_interface@ pack = null)", asFUNCTION((virtual_call < sound, &sound::stream, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_url(const string&in url)", asFUNCTION((virtual_call < sound, &sound::stream_url, bool, const string&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool load_memory(const string&in data)", asFUNCTION((virtual_call < sound, &sound::load_string, bool, const string & >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool load_pcm(const float[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool load_pcm(const int[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
@@ -1879,10 +2585,12 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("sound", "bool stream_pcm(const memory_buffer<int>&in data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_memory_buffer, bool, script_memory_buffer*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool stream_pcm(const memory_buffer<int16>&in data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_memory_buffer, bool, script_memory_buffer*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool stream_pcm(const memory_buffer<uint8>&in data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_memory_buffer, bool, script_memory_buffer*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool open(audio_data_source@ datasource)", asFUNCTION((virtual_call<sound, &sound::open, bool, audio_data_source*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool close()", asFUNCTION((virtual_call < sound, &sound::close, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "void set_autoclose(bool enabled = true) property", asFUNCTION((virtual_call < sound, &sound::set_autoclose, void, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_autoclose() const property", asFUNCTION((virtual_call < sound, &sound::get_autoclose, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "const string& get_loaded_filename() const property", asFUNCTION((virtual_call < sound, &sound::get_loaded_filename, const std::string & >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "audio_data_source@+ get_datasource() const property", asFUNCTION((virtual_call < sound, &sound::get_datasource, audio_data_source*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_load_complete() const property", asFUNCTION((virtual_call < sound, &sound::is_load_completed, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_active() const property", asFUNCTION((virtual_call < sound, &sound::get_active, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_paused() const property", asFUNCTION((virtual_call < sound, &sound::get_paused, bool >)), asCALL_CDECL_OBJFIRST);
@@ -1914,6 +2622,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("const string[]@+ get_sound_input_devices() property", asFUNCTION(get_sound_input_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("const string[]@+ get_sound_output_devices() property", asFUNCTION(get_sound_output_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);
+	engine->RegisterGlobalProperty("mixer@ sound_default_mixer", (void*)&g_audio_mixer);
 	engine->RegisterGlobalFunction("void set_sound_output_device(int device) property", asFUNCTION(set_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("sound@ sound_play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@ mix = null, const pack_interface@ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION(sound_play), asCALL_CDECL);
 	engine->RegisterGlobalFunction("vector sound_get_listener_position(uint listener_index = 0)", asFUNCTION(sound_get_listener_position), asCALL_CDECL);
@@ -1925,6 +2634,16 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("void set_sound_master_volume(float db) property", asFUNCTION(set_sound_master_volume), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float get_sound_master_volume() property", asFUNCTION(get_sound_master_volume), asCALL_CDECL);
 	engine->RegisterGlobalFunction("audio_error_state get_SOUNDSYSTEM_LAST_ERROR() property", asFUNCTION(get_soundsystem_last_error), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string get_SOUNDSYSTEM_LAST_ERROR_TEXT() property", asFUNCTION(get_soundsystem_last_error_text), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_default_3d_panner(int panner_id)", asFUNCTION(sound_set_default_3d_panner), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int get_sound_default_3d_panner() property", asFUNCTION(sound_get_default_3d_panner), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_default_3d_attenuator(int attenuator_id)", asFUNCTION(sound_set_default_3d_attenuator), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int get_sound_default_3d_attenuator() property", asFUNCTION(sound_get_default_3d_attenuator), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_3d_panner_enabled(int panner_id, bool enabled)", asFUNCTION(set_audio_panner_enabled), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool get_sound_3d_panner_enabled(int panner_id)", asFUNCTION(get_audio_panner_enabled), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_3d_attenuator_enabled(int attenuator_id, bool enabled)", asFUNCTION(set_audio_attenuator_enabled), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool get_sound_3d_attenuator_enabled(int attenuator_id)", asFUNCTION(get_audio_attenuator_enabled), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool sound_set_spatialization(int panner, int attenuator, bool disable_previous = false, bool set_default = true)", asFUNCTION(sound_set_spatialization), asCALL_CDECL);
 }
 void nvgt_audio_plugin_node_register(const string& nodename) { RegisterSoundsystemAudioNode<plugin_node>(g_ScriptEngine, nodename); }
 plugin_node* nvgt_audio_plugin_node_create(audio_plugin_node_interface* impl, unsigned char input_bus_count, unsigned char output_bus_count, unsigned int flags, audio_engine* engine) { return plugin_node::create(impl, input_bus_count, output_bus_count, flags, engine); }

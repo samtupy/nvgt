@@ -40,6 +40,10 @@ macosdev
 windev
 deps
 venv
+vcpkg/vcpkg_installed
+CLAUDE.md
+*.zip
+*.blake2b
 
 # website builds
 web/public_html
@@ -50,3 +54,6 @@ web/src/docs
 
 # Compilation databases; easy to generate
 compile_commands.json
+
+# Generated engine dumps.
+other/nvgtexport/

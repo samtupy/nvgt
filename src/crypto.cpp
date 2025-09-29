@@ -38,6 +38,7 @@ void string_unpad(std::string& str) {
 	str.resize(new_size);
 }
 std::string string_aes_encrypt(const std::string& original_text, std::string key) {
+	if (original_text.empty()) return "";
 	std::string text = original_text;
 	Poco::SHA2Engine hash;
 	hash.update(key);
@@ -62,7 +63,7 @@ std::string string_aes_encrypt_r(const std::string& text, std::string& key) {
 	return t;
 }
 std::string string_aes_decrypt(const std::string& original_text, std::string key) {
-	if (original_text.size() % 16 != 0) return "";
+	if (original_text.empty() || original_text.size() % 16 != 0) return "";
 	std::string text = original_text;
 	Poco::SHA2Engine hash;
 	hash.update(key);

@@ -40,6 +40,7 @@
 #include "cppmath.h"
 #include "crypto.h"
 #include "datastreams.h"
+#include "events.h"
 #include "hash.h"
 #include "input.h"
 #include "internet.h"
@@ -447,6 +448,9 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->BeginConfigGroup("input");
 	RegisterInput(engine);
 	engine->EndConfigGroup();
+	engine->BeginConfigGroup("events");
+	RegisterEvents(engine);
+	engine->EndConfigGroup();
 	engine->BeginConfigGroup("library");
 	RegisterScriptLibrary(engine);
 	engine->EndConfigGroup();
@@ -602,7 +606,7 @@ int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
 	if (mod)
 		mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
 	try {
-		if (builder.AddSectionFromFile(Path(scriptFile).makeAbsolute().toString().c_str()) < 0)
+		if (builder.AddSectionFromFile(scriptFile.c_str()) < 0)
 			return -1;
 		for (unsigned int i = 0; i < g_IncludeScripts.size(); i++) {
 			if (builder.AddSectionFromFile(g_IncludeScripts[i].c_str()) < 0)
@@ -715,7 +719,7 @@ public:
 				else
 					cout << status << endl;
 			}
-			refresh_window();
+			if (isUI) refresh_window();
 		}
 		return !fail;
 	}

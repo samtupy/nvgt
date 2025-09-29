@@ -1,0 +1,12 @@
+void test_message_header() {
+	name_value_collection n;
+	n["test"] = "haha";
+	internet_message_header n2({{"key1", "value1"}, {"key2", "value2"}});
+	n2["test"] = "haha2";
+	n2.add("test", "haha3");
+	n2["key"] = 123;
+	n = n2;
+	assert(n.name_at(1) == "key2");
+	assert(n.value_at(2) == "haha2");
+	assert(n["test"] == "haha2");
+}

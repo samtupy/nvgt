@@ -1,0 +1,34 @@
+diff --git a/android-project/app/src/main/java/org/libsdl/app/SDLActivity.java b/android-project/app/src/main/java/org/libsdl/app/SDLActivity.java
+index 361688d68..ec8bdf74c 100644
+--- a/android-project/app/src/main/java/org/libsdl/app/SDLActivity.java
++++ b/android-project/app/src/main/java/org/libsdl/app/SDLActivity.java
+@@ -495,7 +495,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
+         // Get filename from "Open with" of another application
+         Intent intent = getIntent();
+         if (intent != null && intent.getData() != null) {
+-            String filename = intent.getData().getPath();
++            String filename = intent.getData().toString();
+             if (filename != null) {
+                 Log.v(TAG, "Got filename: " + filename);
+                 SDLActivity.onNativeDropFile(filename);
+@@ -1690,7 +1690,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
+         final SparseArray<Button> mapping = new SparseArray<Button>();
+ 
+         LinearLayout buttons = new LinearLayout(this);
+-        buttons.setOrientation(LinearLayout.HORIZONTAL);
++        buttons.setOrientation(buttonTexts.length < 3? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+         buttons.setGravity(Gravity.CENTER);
+         for (int i = 0; i < buttonTexts.length; ++i) {
+             Button button = new Button(this);
+diff --git a/src/core/android/SDL_android.c b/src/core/android/SDL_android.c
+index 1cc9ccdb4..94da42e81 100644
+--- a/src/core/android/SDL_android.c
++++ b/src/core/android/SDL_android.c
+@@ -574,6 +574,7 @@ void checkJNIReady(void)
+     }
+ 
+     SDL_SetMainReady();
++    SDL_InitEvents();
+ }
+ 
+ // Get SDL version -- called before SDL_main() to verify JNI bindings

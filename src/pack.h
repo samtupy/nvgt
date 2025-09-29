@@ -64,7 +64,7 @@ public:
 	std::istream* get_file(const std::string& filename) const override;
 	// Returns a datastream for script that points to the requested file.
 	datastream* get_file_script(const std::string& filename, const std::string& encoding, int byteorder);
-	bool get_active();
+	bool get_is_active() const override;
 	int64_t get_file_count();
 	bool extract_file(const std::string& internal_name, const std::string& file_on_disk);
 

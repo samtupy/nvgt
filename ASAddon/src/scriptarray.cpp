@@ -341,6 +341,8 @@ static void RegisterScriptArray_Native(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("array<T>", "void sort_ascending(uint startAt, uint count)", asMETHODPR(CScriptArray, SortAsc, (asUINT, asUINT), void), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void sort_descending()", asMETHODPR(CScriptArray, SortDesc, (), void), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void sort_descending(uint startAt, uint count)", asMETHODPR(CScriptArray, SortDesc, (asUINT, asUINT), void), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("array<T>", "T &front()", asMETHOD(CScriptArray, Front), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("array<T>", "T &back()", asMETHOD(CScriptArray, Back), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void reverse()", asMETHOD(CScriptArray, Reverse), asCALL_THISCALL); assert( r >= 0 );
 	// The token 'if_handle_then_const' tells the engine that if the type T is a handle, then it should refer to a read-only object
 	r = engine->RegisterObjectMethod("array<T>", "int find(const T&in if_handle_then_const value) const", asMETHODPR(CScriptArray, Find, (void*) const, int), asCALL_THISCALL); assert( r >= 0 );
@@ -981,6 +983,15 @@ const void *CScriptArray::At(asINT64 index) const
 void *CScriptArray::At(asINT64 index)
 {
 	return const_cast<void*>(const_cast<const CScriptArray *>(this)->At(index));
+}
+
+void *CScriptArray::Front()
+{
+	return this->At(0);
+}
+void *CScriptArray::Back()
+{
+	return this->At(-1);
 }
 
 void *CScriptArray::GetBuffer()
@@ -2088,6 +2099,18 @@ static void ScriptArrayAt_Generic(asIScriptGeneric *gen)
 	gen->SetReturnAddress(self->At(index));
 }
 
+static void ScriptArrayFront_Generic(asIScriptGeneric *gen)
+{
+	CScriptArray *self = (CScriptArray*)gen->GetObject();
+	gen->SetReturnAddress(self->Front());
+}
+
+static void ScriptArrayBack_Generic(asIScriptGeneric *gen)
+{
+	CScriptArray *self = (CScriptArray*)gen->GetObject();
+	gen->SetReturnAddress(self->Back());
+}
+
 static void ScriptArrayInsertAt_Generic(asIScriptGeneric *gen)
 {
 	asUINT index = gen->GetArgDWord(0);
@@ -2273,6 +2296,8 @@ static void RegisterScriptArray_Generic(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("array<T>", "void remove_at(uint index)", asFUNCTION(ScriptArrayRemoveAt_Generic), asCALL_GENERIC); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void remove_last()", asFUNCTION(ScriptArrayRemoveLast_Generic), asCALL_GENERIC); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void remove_range(uint start, uint count)", asFUNCTION(ScriptArrayRemoveRange_Generic), asCALL_GENERIC); assert(r >= 0);
+	r = engine->RegisterObjectMethod("array<T>", "T &front()", asFUNCTION(ScriptArrayFront_Generic), asCALL_GENERIC); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("array<T>", "T &back()", asFUNCTION(ScriptArrayBack_Generic), asCALL_GENERIC); assert( r >= 0 );
 #if AS_USE_ACCESSORS != 1
 	r = engine->RegisterObjectMethod("array<T>", "uint length() const", asFUNCTION(ScriptArrayLength_Generic), asCALL_GENERIC); assert( r >= 0 );
 #endif

@@ -1,0 +1,15 @@
+/**
+	Retrieve the last element in the array.
+	T& array::back();
+	## Returns:
+		The last value in the array.
+	## Remarks:
+		This method is functionally equivalent to `array[-1]`.
+	An exception will be thrown if the array is empty.
+*/
+
+// Example:
+void main() {
+	string[] items = {"Blah", "Bleh", "Blur"};
+	alert("Last item", items.back());
+}

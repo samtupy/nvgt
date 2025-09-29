@@ -434,7 +434,7 @@ return sbz_com_set_init_flag(com);
 int sbz_com_load(sbz_com* com)
 {
 if(!com) return 0;
-com->ole=LoadLibrary("Ole32.dll");
+com->ole=LoadLibraryW(L"Ole32.dll");
 if(!com->ole) return 0;
 com->CoInitializeEx=(HRESULT(WINAPI*)(LPVOID, DWORD)) GetProcAddress(com->ole, "CoInitializeEx");
 if(!com->CoInitializeEx)

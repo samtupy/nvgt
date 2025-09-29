@@ -1,0 +1,11 @@
+/**
+	Represents the maximum coordinates (top right corner) of the box.
+	vector aabb::max const;
+*/
+
+// Example:
+void main() {
+	aabb b;
+	b.max = vector(5, 3, 7);
+	alert("The top right corner of the box is located at", round(b.max.x, 0)+", "+round(b.max.y, 0)+", "+round(b.max.z, 0));
+}

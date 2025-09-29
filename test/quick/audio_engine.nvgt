@@ -3,7 +3,8 @@
 // License: zlib (see license.md in the root of the NVGT distribution)
 
 void main() {
-	audio_engine e(AUDIO_ENGINE_NO_DEVICE);
+	sound(); // Insure sound system is initialized so we have a sample rate and channel cound to access.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, sound_default_engine.sample_rate, sound_default_engine.channels);
 	sound@ s1 = e.sound();
 	if (!s1.load("c:\\windows\\media\\ding.wav")) alert("oops", "can't load ding");
 	sound@ s2 = e.sound();
@@ -13,7 +14,6 @@ void main() {
 	s2.play();
 	float[]@ pcm = e.read(e.sample_rate);
 	sound player;
-	if (!player.load_pcm(pcm, e.sample_rate, e.channels)) alert("oops", "can't load pcm");
-	player.play();
+	if (!player.stream_pcm(pcm, e.sample_rate, e.channels)) alert("oops", "can't stream pcm");
 	wait(1000);
 }

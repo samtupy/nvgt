@@ -3,5 +3,5 @@
 # Remember this file is an example, you must place any values you actually want to take effect in Custom.mk itself.
 
 # the following will alter the path of NVGT's droidev folder in it's entirety, for example
-LIBPATH := G:/droidev/libs/$(TARGET_ARCH_ABI)
+LIBPATH := G:/droidev/lib
 LOCAL_C_INCLUDES += G:/droidev/include

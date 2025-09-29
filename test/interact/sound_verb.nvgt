@@ -5,19 +5,19 @@
 void main() {
 	show_window("test");
 	set_sound_global_hrtf(true);
-	audio_freeverb_node freeverb(sound_default_engine, 2);
+	audio_freeverb_node freeverb;
 	freeverb.width = 0.7;
 	freeverb.room_size = 0.7;
 	freeverb.input_width = 0.2;
 	freeverb.damping = 1;
 	reverb3d verb(freeverb);
-	mixer snd;
+	sound@ snd = sound_play("C:/windows/media/Ring10.wav", autoplay = false);
 	snd.set_position_3d(5, 5, 0);
 	if (!snd.set_shape(sound_aabb_shape(0, 5, 0, 5, 0, 1))) alert("warning", "shape set fail");
 	@snd.reverb3d = verb;
-	sound@ s = sound_play("C:/windows/media/Ring10.wav", mix = snd, autoplay = false);
-	snd.effects_chain.add_node(audio_high_pass_filter(1000, 2));
-	s.play_looped();
+	verb.max_audible_distance = 200;
+	//snd.effects_chain.add_node(audio_high_pass_filter(1000, 2));
+	snd.play_looped();
 	while (!key_pressed(KEY_ESCAPE)) {
 		wait(5);
 		vector l = sound_get_listener_position();

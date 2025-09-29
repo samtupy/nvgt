@@ -1,0 +1,13 @@
+/**
+	Returns any data stored in the profiler.
+	string generate_profile(bool reset = true);
+	#Arguments
+		* reset: If true, resets profile data.
+*/
+
+// Example:
+void main() {
+	start_profiling();
+	wait(1000);
+	alert("Profile", generate_profile());
+}
