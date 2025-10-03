@@ -458,6 +458,8 @@ class nvgt_compilation_output_android : public nvgt_compilation_output_impl {
 	TemporaryFile workplace;
 	Path final_output_path, android_jar, apksigner_jar;
 	int do_install; // 0 no, 1 ask, 2 always.
+	unsigned int install_transport_id; // ADB transport ID of device to install to.
+	string install_device_name; // Used for UI display to report device installed to.
 	Clock install_timer;
 	string sign_cert, sign_password;
 	using nvgt_compilation_output_impl::nvgt_compilation_output_impl;
@@ -534,6 +536,49 @@ class nvgt_compilation_output_android : public nvgt_compilation_output_impl {
 		// For better or worse, we've done what we can and if we haven't found build tools by now the end user must have some real whacked out system or Android SDK installation.
 		if (!android_sdk_tools_exist(path)) throw Exception(format("unable to find all Android development tools in detected SDK installation directories %s", buildtools_bin));
 	}
+	unsigned int parse_adb_devices_l(const string& line, string& device_description) {
+		// Parses a line of output from `adb devices -l` and returns important information.
+		StringTokenizer parts(line, " ");
+		string host, model, product;
+		unsigned int transport_id = 0;
+		for (const string& part : parts) {
+			if (host.empty()) host = part;
+				else if (trim(part) == "offline") return 0;
+			else if (part.starts_with("product:")) product = trim(part.substr(8));
+			else if (part.starts_with("model:")) model = trim(part.substr(6));
+			else if (part.starts_with("transport_id:")) transport_id = parse_float(trim(part.substr(13)));
+		}
+		if (!transport_id) return 0;
+		if (product.empty() && model.empty()) device_description = host;
+		else if (!product.empty() && !model.empty()) device_description = format("%s (%s)", model, product);
+		else device_description = !product.empty()? product : model;
+		return transport_id;
+	}
+	unsigned int get_install_device(bool quiet) {
+		// Determine a device to install the generated APK to. If multiple devices are connected in debug mode, choose one if we can or else let the user select one.
+		install_transport_id = 0;
+		install_device_name.clear();
+		string sout, serr;
+		if (!system_command(exe("adb"), {"devices", "-l"}, sout, serr)) return 0;
+		StringTokenizer cout_lines(sout, "\n");
+		if (cout_lines.count() < 2) return 0; // no devices
+		unsigned int transport_id;
+		string device_description;
+		vector<pair<string, unsigned int>> devices;
+		for (const string& line : cout_lines) {
+			transport_id = parse_adb_devices_l(line, device_description);
+			if (!transport_id) continue;
+			devices.push_back(make_pair(device_description, transport_id));
+		}
+		if (devices.empty()) return 0; // no available devices
+		vector<string> buttons;
+		for (auto d : devices) buttons.push_back(buttons.empty()? "`"s + d.first : d.first);
+		buttons.push_back("~skip installation");
+		int result = devices.size() == 1 && (do_install == 2 || quiet)? 0 : !quiet? (message_box("install app", "1 or more Android devices are connected to this computer in debug mode. Would you like to install the generated APK on to one of these devices?", buttons) -1) : -1;
+		if (result < 0 || result >= devices.size()) return 0; // installation skipped
+		install_device_name = devices[result].first;
+		return install_transport_id = devices[result].second;
+	}
 protected:
 	void alter_output_path(Path& output_path) override {
 		final_output_path = output_path;
@@ -607,10 +652,10 @@ protected:
 	}
 	void postbuild_interface(bool after_postbuild) override {
 		bool quiet = config.hasOption("application.quiet") || config.hasOption("application.QUIET");
-		if (!after_postbuild) {
-			do_install = do_install > 0 && system_command(exe("adb"), {"shell", "-n"}) && (do_install == 2 || !quiet && question("install app", "An android device is connected to this computer in debug mode, do you want to install the generated APK onto it?") == 1)? 2 : 0;
+		if (!after_postbuild) {	
+			do_install = do_install > 0 && (install_transport_id = get_install_device(quiet))? 2 : 0;
 		} else {
-			if (do_install == 2 && !quiet) message(format("The application %s (%s) was installed on all connected devices in %ums.", config.getString("build.product_name"), config.getString("build.product_identifier"), uint32_t(install_timer.elapsed() / 1000)), "Success!");
+			if (do_install == 2 && !quiet) message(format("The application %s (%s) was installed on %s in %ums.", config.getString("build.product_name"), config.getString("build.product_identifier"), install_device_name, uint32_t(install_timer.elapsed() / 1000)), "Success!");
 		}
 	}
 	void postbuild(const Path& output_path) override {
@@ -618,7 +663,7 @@ protected:
 		string sout, serr;
 		set_status("installing APK...");
 		install_timer.update();
-		if (!system_command(exe("adb"), {"install", "-f", output_path.toString()}, sout, serr)) throw Exception(format("Unable to install APK onto connected device, %s", serr));
+		if (!system_command(exe("adb"), {"-t", format("%u", install_transport_id), "install", "-f", output_path.toString()}, sout, serr)) throw Exception(format("Unable to install APK onto %s, %s", install_device_name, serr));
 	}
 };
 nvgt_compilation_output* nvgt_init_compilation(const string& input_file, bool auto_prepare) {

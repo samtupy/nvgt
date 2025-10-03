@@ -266,7 +266,7 @@ toc_map& pack::write_mode_internals::get_toc_map() {
 	return toc;
 }
 void pack::set_pack_name(const std::string& name) {
-	pack_name = Poco::Path(name).absolute().toString();
+	pack_name = name;
 }
 pack::pack() : mutable_ptr(nullptr) {
 	open_mode = OPEN_NOT;

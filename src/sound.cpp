@@ -1593,7 +1593,6 @@ public:
 			return false;
 		// At this point we can just use the sound service to load this. We use the low level API though because we need to be clear that no filters apply.
 		// Also, our PCM buffer is a permanent class property so we can enjoy the speed of async loading.
-		// Sam: Actually nno we can't right now, this causes the game to crash in the vfs read function on startup if sounds are playing while tts speaks. Haven't had time to debug this as I discovered it hours before an intended release.
 		return load_special(":pcm", g_memory_protocol_slot, memory_protocol::directive(&pcm_buffer[0], pcm_buffer.size()), sound_service::null_filter_slot, nullptr, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC);
 	}
 	bool load_pcm_script_array(CScriptArray *buffer, int samplerate, int channels) override {
