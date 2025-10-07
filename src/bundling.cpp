@@ -663,7 +663,7 @@ protected:
 		string sout, serr;
 		set_status("installing APK...");
 		install_timer.update();
-		if (!system_command(exe("adb"), {"-t", format("%u", install_transport_id), "install", "-f", output_path.toString()}, sout, serr)) throw Exception(format("Unable to install APK onto %s, %s", install_device_name, serr));
+		if (!system_command(exe("adb"), {"-t", format("%u", install_transport_id), "install", "-r", "-f", output_path.toString()}, sout, serr)) throw Exception(format("Unable to install APK onto %s, %s", install_device_name, serr));
 	}
 };
 nvgt_compilation_output* nvgt_init_compilation(const string& input_file, bool auto_prepare) {
