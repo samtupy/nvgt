@@ -35,6 +35,10 @@ static CScriptArray *StringSplit(const string &delim, bool full, bool allow_blan
 
 	// Create the array object
 	CScriptArray *array = CScriptArray::Create(StringArrayType);
+
+	// Fix: Previously a 1-length array was always returned from an empty string.
+	if (!allow_blanks && str == "") return array; // Nothing to split.
+
 	if (delim == "")
 	{
 		array->InsertLast((void *)&str);
