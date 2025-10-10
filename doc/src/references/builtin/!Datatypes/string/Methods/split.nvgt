@@ -1,15 +1,29 @@
 /**
 	Splits a string into an array at a given delimiter.
-	string[]@ string::split(const string&in delimiter);
+	string[]@ string::split(const string&in delimiter, bool full = true, bool allow_blanks = false);
 	## Arguments:
 		* const string&in delimiter: the delimiter to split at.
+		* bool full: Use all or any of the delimiter characters.
+		* bool allow_blanks: Specifies whether to allow empty fields.
 	## Returns:
 		string[]@: a handle to an array containing each part of the split string.
+	## Remarks:
+		* The full parameter decides how to treat delimiter strings with multiple characters (such as "\r\n"). If enabled, the entire string is treated as a single delimiter ("\r\n"). If disabled, any character in the string counts as a delimiter ("\r" or "\n"). If the delimiter string is a single character this parameter is effectively meaningless.
+		* The allow_blanks parameter decides how to treat consecutive delimiters. See the example for how this works in practice.
+		* If the input string is empty, the output depends on the allow_blanks parameter. If true, an array with the blank string as the only element is returned. If false, an empty array is returned.
 */
 
 // Example:
 void main() {
+	// basic split/join example
 	string test = "welcome to the example";
 	string[]@ parts = test.split(" ");
 	alert("Parts", join(parts, ", "));
+	// Blank fields test
+	string test2="Humphrey,Eccleston,,50";
+	alert("New string", test2);
+	parts=test2.split(",", true, false);
+	alert("Fields with data", parts.length()); // Should output 3.
+	parts=test2.split(",", true, true);
+	alert("Total fields", parts.length()); // Should output 4.
 }
