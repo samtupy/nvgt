@@ -115,6 +115,7 @@ static string StringJoin(const CScriptArray &array, const string &delim, int sta
 	if (count < -1 || count == 0) return "";
 	int end = start + count;
 	if (end < start) end = size;
+	if(end > size) end = size;
 	int n = start;
 	for (n = start; n < end - 1; n++)
 	{
