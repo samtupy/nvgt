@@ -23,13 +23,13 @@
 #include <Poco/Timezone.h>
 #include <SDL3/SDL.h>
 #include <obfuscate.h>
-#include <scriptarray.h> 
+#include <scriptarray.h>
 #include <chrono>
 #include <cstring>
 #include <ctime>
 #include <fstream>
 #include <iostream>
-#include <string> 
+#include <string>
 #include "nvgt.h"
 #include "pocostuff.h"  // angelscript_refcounted
 #include "scriptstuff.h"
@@ -41,6 +41,363 @@ Poco::Timestamp g_secure_clock;
 Poco::Timestamp g_time_cache;
 Poco::DateTime g_time_values;
 Poco::FastMutex g_time_mutex;
+
+// Global timezone management
+static int g_custom_timezone_offset = INT_MAX; static std::string g_custom_timezone_name = "";
+static int g_last_timezone_offset = INT_MIN; // Using a different value for the first update
+// Official PHP timezone identifiers with UTC offsets in seconds (standard time)
+static std::unordered_map<std::string, int> timezone_map = {
+	// UTC base
+	{"UTC", 0},
+	{"GMT", 0},
+
+	// Africa
+	{"Africa/Abidjan", 0},
+	{"Africa/Algiers", 3600},
+	{"Africa/Bissau", 0},
+	{"Africa/Cairo", 7200},
+	{"Africa/Casablanca", 3600},
+	{"Africa/Ceuta", 3600},
+	{"Africa/El_Aaiun", 3600},
+	{"Africa/Johannesburg", 7200},
+	{"Africa/Juba", 7200},
+	{"Africa/Khartoum", 7200},
+	{"Africa/Lagos", 3600},
+	{"Africa/Maputo", 7200},
+	{"Africa/Monrovia", 0},
+	{"Africa/Nairobi", 10800},
+	{"Africa/Ndjamena", 3600},
+	{"Africa/Sao_Tome", 0},
+	{"Africa/Tripoli", 7200},
+	{"Africa/Tunis", 3600},
+	{"Africa/Windhoek", 7200},
+
+	// America
+	{"America/Adak", -36000},
+	{"America/Anchorage", -32400},
+	{"America/Araguaina", -10800},
+	{"America/Argentina/Buenos_Aires", -10800},
+	{"America/Argentina/Catamarca", -10800},
+	{"America/Argentina/Cordoba", -10800},
+	{"America/Argentina/Jujuy", -10800},
+	{"America/Argentina/La_Rioja", -10800},
+	{"America/Argentina/Mendoza", -10800},
+	{"America/Argentina/Rio_Gallegos", -10800},
+	{"America/Argentina/Salta", -10800},
+	{"America/Argentina/San_Juan", -10800},
+	{"America/Argentina/San_Luis", -10800},
+	{"America/Argentina/Tucuman", -10800},
+	{"America/Argentina/Ushuaia", -10800},
+	{"America/Asuncion", -10800},
+	{"America/Bahia", -10800},
+	{"America/Bahia_Banderas", -21600},
+	{"America/Barbados", -14400},
+	{"America/Belem", -10800},
+	{"America/Belize", -21600},
+	{"America/Boa_Vista", -14400},
+	{"America/Bogota", -18000},
+	{"America/Boise", -25200},
+	{"America/Cambridge_Bay", -25200},
+	{"America/Campo_Grande", -14400},
+	{"America/Cancun", -18000},
+	{"America/Caracas", -14400},
+	{"America/Cayenne", -10800},
+	{"America/Chicago", -21600},
+	{"America/Chihuahua", -21600},
+	{"America/Ciudad_Juarez", -25200},
+	{"America/Costa_Rica", -21600},
+	{"America/Coyhaique", -10800},
+	{"America/Creston", -25200},
+	{"America/Cuiaba", -14400},
+	{"America/Danmarkshavn", 0},
+	{"America/Dawson", -25200},
+	{"America/Dawson_Creek", -25200},
+	{"America/Denver", -25200},
+	{"America/Detroit", -18000},
+	{"America/Edmonton", -25200},
+	{"America/Eirunepe", -18000},
+	{"America/El_Salvador", -21600},
+	{"America/Fort_Nelson", -25200},
+	{"America/Fortaleza", -10800},
+	{"America/Glace_Bay", -14400},
+	{"America/Goose_Bay", -14400},
+	{"America/Grand_Turk", -18000},
+	{"America/Guatemala", -21600},
+	{"America/Guayaquil", -18000},
+	{"America/Guyana", -14400},
+	{"America/Halifax", -14400},
+	{"America/Havana", -18000},
+	{"America/Hermosillo", -25200},
+	{"America/Indiana/Indianapolis", -18000},
+	{"America/Indiana/Knox", -21600},
+	{"America/Indiana/Marengo", -18000},
+	{"America/Indiana/Petersburg", -18000},
+	{"America/Indiana/Tell_City", -21600},
+	{"America/Indiana/Vevay", -18000},
+	{"America/Indiana/Vincennes", -18000},
+	{"America/Indiana/Winamac", -18000},
+	{"America/Inuvik", -25200},
+	{"America/Iqaluit", -18000},
+	{"America/Jamaica", -18000},
+	{"America/Juneau", -32400},
+	{"America/Kentucky/Louisville", -18000},
+	{"America/Kentucky/Monticello", -18000},
+	{"America/La_Paz", -14400},
+	{"America/Lima", -18000},
+	{"America/Los_Angeles", -28800},
+	{"America/Maceio", -10800},
+	{"America/Managua", -21600},
+	{"America/Manaus", -14400},
+	{"America/Martinique", -14400},
+	{"America/Matamoros", -21600},
+	{"America/Mazatlan", -25200},
+	{"America/Menominee", -21600},
+	{"America/Merida", -21600},
+	{"America/Metlakatla", -32400},
+	{"America/Mexico_City", -21600},
+	{"America/Miquelon", -10800},
+	{"America/Moncton", -14400},
+	{"America/Monterrey", -21600},
+	{"America/Montevideo", -10800},
+	{"America/Nassau", -18000},
+	{"America/New_York", -18000},
+	{"America/Nome", -32400},
+	{"America/Noronha", -7200},
+	{"America/North_Dakota/Beulah", -21600},
+	{"America/North_Dakota/Center", -21600},
+	{"America/North_Dakota/New_Salem", -21600},
+	{"America/Nuuk", -10800},
+	{"America/Ojinaga", -21600},
+	{"America/Panama", -18000},
+	{"America/Paramaribo", -10800},
+	{"America/Phoenix", -25200},
+	{"America/Port-au-Prince", -18000},
+	{"America/Porto_Velho", -14400},
+	{"America/Puerto_Rico", -14400},
+	{"America/Punta_Arenas", -10800},
+	{"America/Rankin_Inlet", -21600},
+	{"America/Recife", -10800},
+	{"America/Regina", -21600},
+	{"America/Resolute", -21600},
+	{"America/Rio_Branco", -18000},
+	{"America/Santarem", -10800},
+	{"America/Santiago", -14400},
+	{"America/Santo_Domingo", -14400},
+	{"America/Sao_Paulo", -10800},
+	{"America/Scoresbysund", -7200},
+	{"America/Sitka", -32400},
+	{"America/St_Johns", -12600},
+	{"America/Swift_Current", -21600},
+	{"America/Tegucigalpa", -21600},
+	{"America/Thule", -14400},
+	{"America/Tijuana", -28800},
+	{"America/Toronto", -18000},
+	{"America/Vancouver", -28800},
+	{"America/Whitehorse", -25200},
+	{"America/Winnipeg", -21600},
+	{"America/Yakutat", -32400},
+
+	// Antarctica
+	{"Antarctica/Casey", 39600},
+	{"Antarctica/Davis", 25200},
+	{"Antarctica/Mawson", 18000},
+	{"Antarctica/Palmer", -10800},
+	{"Antarctica/Rothera", -10800},
+	{"Antarctica/Troll", 0},
+
+	// Asia
+	{"Asia/Almaty", 21600},
+	{"Asia/Amman", 7200},
+	{"Asia/Anadyr", 43200},
+	{"Asia/Aqtau", 18000},
+	{"Asia/Aqtobe", 18000},
+	{"Asia/Ashgabat", 18000},
+	{"Asia/Atyrau", 18000},
+	{"Asia/Baghdad", 10800},
+	{"Asia/Baku", 14400},
+	{"Asia/Bangkok", 25200},
+	{"Asia/Barnaul", 25200},
+	{"Asia/Beirut", 7200},
+	{"Asia/Bishkek", 21600},
+	{"Asia/Brunei", 28800},
+	{"Asia/Chita", 32400},
+	{"Asia/Choibalsan", 28800},
+	{"Asia/Colombo", 19800},
+	{"Asia/Damascus", 7200},
+	{"Asia/Dhaka", 21600},
+	{"Asia/Dili", 32400},
+	{"Asia/Dubai", 14400},
+	{"Asia/Dushanbe", 18000},
+	{"Asia/Famagusta", 7200},
+	{"Asia/Gaza", 7200},
+	{"Asia/Hebron", 7200},
+	{"Asia/Ho_Chi_Minh", 25200},
+	{"Asia/Hong_Kong", 28800},
+	{"Asia/Hovd", 25200},
+	{"Asia/Irkutsk", 28800},
+	{"Asia/Jakarta", 25200},
+	{"Asia/Jayapura", 32400},
+	{"Asia/Jerusalem", 7200},
+	{"Asia/Kabul", 16200},
+	{"Asia/Kamchatka", 43200},
+	{"Asia/Karachi", 18000},
+	{"Asia/Kathmandu", 20700},
+	{"Asia/Khandyga", 32400},
+	{"Asia/Kolkata", 19800},
+	{"Asia/Krasnoyarsk", 25200},
+	{"Asia/Kuala_Lumpur", 28800},
+	{"Asia/Kuching", 28800},
+	{"Asia/Macau", 28800},
+	{"Asia/Magadan", 39600},
+	{"Asia/Makassar", 28800},
+	{"Asia/Manila", 28800},
+	{"Asia/Nicosia", 7200},
+	{"Asia/Novokuznetsk", 25200},
+	{"Asia/Novosibirsk", 25200},
+	{"Asia/Omsk", 21600},
+	{"Asia/Oral", 18000},
+	{"Asia/Pontianak", 25200},
+	{"Asia/Pyongyang", 32400},
+	{"Asia/Qatar", 10800},
+	{"Asia/Qostanay", 21600},
+	{"Asia/Qyzylorda", 18000},
+	{"Asia/Riyadh", 10800},
+	{"Asia/Sakhalin", 39600},
+	{"Asia/Samarkand", 18000},
+	{"Asia/Seoul", 32400},
+	{"Asia/Shanghai", 28800},
+	{"Asia/Singapore", 28800},
+	{"Asia/Srednekolymsk", 39600},
+	{"Asia/Taipei", 28800},
+	{"Asia/Tashkent", 18000},
+	{"Asia/Tbilisi", 14400},
+	{"Asia/Tehran", 12600},
+	{"Asia/Thimphu", 21600},
+	{"Asia/Tokyo", 32400},
+	{"Asia/Tomsk", 25200},
+	{"Asia/Ulaanbaatar", 28800},
+	{"Asia/Urumqi", 21600},
+	{"Asia/Ust-Nera", 36000},
+	{"Asia/Vladivostok", 36000},
+	{"Asia/Yakutsk", 32400},
+	{"Asia/Yangon", 23400},
+	{"Asia/Yekaterinburg", 18000},
+	{"Asia/Yerevan", 14400},
+
+	// Atlantic
+	{"Atlantic/Azores", -3600},
+	{"Atlantic/Bermuda", -14400},
+	{"Atlantic/Canary", 0},
+	{"Atlantic/Cape_Verde", -3600},
+	{"Atlantic/Faroe", 0},
+	{"Atlantic/Madeira", 0},
+	{"Atlantic/Reykjavik", 0},
+	{"Atlantic/South_Georgia", -7200},
+	{"Atlantic/Stanley", -10800},
+
+	// Australia
+	{"Australia/Adelaide", 34200},
+	{"Australia/Brisbane", 36000},
+	{"Australia/Broken_Hill", 34200},
+	{"Australia/Darwin", 34200},
+	{"Australia/Eucla", 31500},
+	{"Australia/Hobart", 36000},
+	{"Australia/Lindeman", 36000},
+	{"Australia/Lord_Howe", 37800},
+	{"Australia/Melbourne", 36000},
+	{"Australia/Perth", 28800},
+	{"Australia/Sydney", 36000},
+
+	// Europe
+	{"Europe/Amsterdam", 3600},
+	{"Europe/Andorra", 3600},
+	{"Europe/Astrakhan", 14400},
+	{"Europe/Athens", 7200},
+	{"Europe/Belgrade", 3600},
+	{"Europe/Berlin", 3600},
+	{"Europe/Brussels", 3600},
+	{"Europe/Bucharest", 7200},
+	{"Europe/Budapest", 3600},
+	{"Europe/Chisinau", 7200},
+	{"Europe/Copenhagen", 3600},
+	{"Europe/Dublin", 0},
+	{"Europe/Gibraltar", 3600},
+	{"Europe/Helsinki", 7200},
+	{"Europe/Istanbul", 10800},
+	{"Europe/Kaliningrad", 7200},
+	{"Europe/Kirov", 10800},
+	{"Europe/Kiev", 7200},
+	{"Europe/Lisbon", 0},
+	{"Europe/London", 0},
+	{"Europe/Luxembourg", 3600},
+	{"Europe/Madrid", 3600},
+	{"Europe/Malta", 3600},
+	{"Europe/Minsk", 10800},
+	{"Europe/Monaco", 3600},
+	{"Europe/Moscow", 10800},
+	{"Europe/Oslo", 3600},
+	{"Europe/Paris", 3600},
+	{"Europe/Prague", 3600},
+	{"Europe/Riga", 7200},
+	{"Europe/Rome", 3600},
+	{"Europe/Samara", 14400},
+	{"Europe/Saratov", 14400},
+	{"Europe/Simferopol", 10800},
+	{"Europe/Sofia", 7200},
+	{"Europe/Stockholm", 3600},
+	{"Europe/Tallinn", 7200},
+	{"Europe/Tirane", 3600},
+	{"Europe/Ulyanovsk", 14400},
+	{"Europe/Vienna", 3600},
+	{"Europe/Vilnius", 7200},
+	{"Europe/Volgograd", 10800},
+	{"Europe/Warsaw", 3600},
+	{"Europe/Zurich", 3600},
+
+	// Indian Ocean
+	{"Indian/Chagos", 21600},
+	{"Indian/Christmas", 25200},
+	{"Indian/Cocos", 23400},
+	{"Indian/Kerguelen", 18000},
+	{"Indian/Mahe", 14400},
+	{"Indian/Maldives", 18000},
+	{"Indian/Mauritius", 14400},
+	{"Indian/Reunion", 14400},
+
+	// Pacific
+	{"Pacific/Apia", 46800},
+	{"Pacific/Auckland", 43200},
+	{"Pacific/Bougainville", 39600},
+	{"Pacific/Chatham", 45900},
+	{"Pacific/Easter", -21600},
+	{"Pacific/Efate", 39600},
+	{"Pacific/Fakaofo", 46800},
+	{"Pacific/Fiji", 43200},
+	{"Pacific/Funafuti", 43200},
+	{"Pacific/Galapagos", -21600},
+	{"Pacific/Gambier", -32400},
+	{"Pacific/Guadalcanal", 39600},
+	{"Pacific/Guam", 36000},
+	{"Pacific/Honolulu", -36000},
+	{"Pacific/Kanton", 46800},
+	{"Pacific/Kiritimati", 50400},
+	{"Pacific/Kosrae", 39600},
+	{"Pacific/Kwajalein", 43200},
+	{"Pacific/Majuro", 43200},
+	{"Pacific/Marquesas", -34200},
+	{"Pacific/Nauru", 43200},
+	{"Pacific/Niue", -39600},
+	{"Pacific/Norfolk", 39600},
+	{"Pacific/Noumea", 39600},
+	{"Pacific/Pago_Pago", -39600},
+	{"Pacific/Palau", 32400},
+	{"Pacific/Pitcairn", -28800},
+	{"Pacific/Port_Moresby", 36000},
+	{"Pacific/Rarotonga", -36000},
+	{"Pacific/Tahiti", -36000},
+	{"Pacific/Tarawa", 43200},
+	{"Pacific/Tongatapu", 46800}
+};
 
 static asIScriptContext* callback_ctx = NULL;
 timer_queue_item::timer_queue_item(timer_queue *parent, const std::string &id, asIScriptFunction *callback, const std::string &callback_data, int timeout, bool repeating) : parent(parent), id(id), callback(callback), callback_data(callback_data), timeout(timeout), repeating(repeating), is_scheduled(true) {}
@@ -91,7 +448,7 @@ void timer_queue_item::execute() {
 			parent->erase(id);
 	}
 }
-timer_queue::timer_queue() : RefCount(1), last_looped(ticks()), open_tick(false) {
+timer_queue::timer_queue() : RefCount(1), last_looped(ticks(true)), open_tick(false) {
 }
 void timer_queue::add_ref() {
 	asAtomicInc(RefCount);
@@ -209,7 +566,7 @@ void timer_queue::flush() {
 		delete i;
 	}
 	deleting_timers.clear();
-	last_looped = ticks();
+	last_looped = ticks(true);
 }
 bool timer_queue::loop(int max_timers, int max_catchup) {
 	for (auto i : deleting_timers) {
@@ -218,7 +575,7 @@ bool timer_queue::loop(int max_timers, int max_catchup) {
 		delete i;
 	}
 	deleting_timers.clear();
-	uint64_t t = !open_tick ? ticks() - last_looped : 0;
+	uint64_t t = !open_tick ? ticks(true) - last_looped : 0;
 	if (t > max_catchup)
 		t = max_catchup;
 	if (!open_tick && t <= 0)
@@ -231,12 +588,18 @@ bool timer_queue::loop(int max_timers, int max_catchup) {
 
 void update_tm() {
 	Timestamp ts;
-	if (ts.epochTime() == g_time_cache.epochTime())
+	bool timezone_changed = (g_custom_timezone_offset != g_last_timezone_offset);
+	if (ts.epochTime() == g_time_cache.epochTime() && !timezone_changed)
 		return;
 	FastMutex::ScopedLock l(g_time_mutex);
 	g_time_cache = ts;
 	g_time_values = ts;
-	g_time_values.makeLocal(Poco::Timezone::tzd());
+	g_last_timezone_offset = g_custom_timezone_offset;
+	if (g_custom_timezone_offset != INT_MAX) {
+		g_time_values.makeUTC(0);
+		g_time_values += Timespan(g_custom_timezone_offset * Timespan::SECONDS);
+	} else
+		g_time_values.makeLocal(Poco::Timezone::tzd());
 }
 
 int get_date_year() {
@@ -309,7 +672,7 @@ asINT64 system_running_milliseconds() {
 // timer class
 uint64_t timer_default_accuracy = Timespan::MILLISECONDS;
 uint64_t TIMESPAN_MICROSECONDS = 1;  // This so that all timer accuracies can have a constant named after them, Poco starts these at milliseconds.
-timer::timer() : value(microticks()), accuracy(timer_default_accuracy), paused(false), secure(speedhack_protection) {}
+timer::timer() : value(microticks(true)), accuracy(timer_default_accuracy), paused(false), secure(speedhack_protection) {}
 timer::timer(bool secure) : value(microticks(secure)), accuracy(timer_default_accuracy), paused(false), secure(secure) {}
 timer::timer(int64_t initial_value, bool secure) : value(int64_t(microticks(secure)) - initial_value * timer_default_accuracy), accuracy(timer_default_accuracy), paused(false), secure(secure) {}
 timer::timer(int64_t initial_value, uint64_t initial_accuracy, bool secure) : value(int64_t(microticks(secure)) - initial_value * initial_accuracy), accuracy(initial_accuracy), paused(false), secure(secure) {}
@@ -638,6 +1001,67 @@ template <class t> void register_date_time_extensions(asIScriptEngine *engine, s
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_valid() const property", asFUNCTION(is_valid<t>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_leap_year()", asFUNCTION(is_leap_year<t>), asCALL_CDECL_OBJFIRST);
 }
+
+// Timezone management functions
+bool set_timezone(const std::string& timezone_id) {
+	auto it = timezone_map.find(timezone_id);
+	if (it == timezone_map.end())
+		return false;
+	g_custom_timezone_offset = it->second;
+	g_custom_timezone_name = timezone_id;
+	return true;
+}
+
+void reset_timezone() {
+	g_custom_timezone_offset = INT_MAX;
+	g_custom_timezone_name = "";
+}
+
+std::string get_current_timezone_name() {
+	if (g_custom_timezone_offset == INT_MAX)
+		return "system";
+	return g_custom_timezone_name;
+}
+
+int get_current_timezone_offset() {
+	if (g_custom_timezone_offset == INT_MAX) {
+		Poco::Timezone tz;
+		return tz.utcOffset();
+	}
+	return g_custom_timezone_offset;
+}
+
+CScriptArray* list_available_timezones() {
+	asIScriptEngine* engine = asGetActiveContext()->GetEngine();
+	asITypeInfo* arrayType = engine->GetTypeInfoByDecl("array<string>");
+	CScriptArray* arr = CScriptArray::Create(arrayType);
+	arr->Reserve(timezone_map.size());
+	for (const auto& tz : timezone_map) {
+		std::string name = tz.first;
+		arr->InsertLast(&name);
+	}
+	return arr;
+}
+
+LocalDateTime* calendar_factory_timezone_aware() {
+	LocalDateTime* cal = angelscript_refcounted_factory<LocalDateTime>();
+	if (g_custom_timezone_offset != INT_MAX) {
+		DateTime utc_now;
+		DateTime adjusted = utc_now + Timespan(g_custom_timezone_offset * Timespan::SECONDS);
+		*cal = LocalDateTime(adjusted);
+	}
+	return cal;
+}
+
+void calendar_reset_timezone_aware(LocalDateTime* cal) {
+	if (g_custom_timezone_offset != INT_MAX) {
+		DateTime utc_now;
+		DateTime adjusted = utc_now + Timespan(g_custom_timezone_offset * Timespan::SECONDS);
+		*cal = LocalDateTime(adjusted);
+	} else
+		*cal = LocalDateTime();
+}
+
 void RegisterScriptTimestuff(asIScriptEngine *engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
 	engine->RegisterGlobalFunction("int get_DATE_YEAR() property", asFUNCTION(get_date_year), asCALL_CDECL);
@@ -816,7 +1240,7 @@ void RegisterScriptTimestuff(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("bool datetime_is_leap_year(int year)", asFUNCTION(DateTime::isLeapYear), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int datetime_days_of_month(int year, int month)", asFUNCTION(DateTime::daysOfMonth), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool datetime_is_valid(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION(DateTime::isValid), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("calendar", asBEHAVE_FACTORY, "calendar@ f()", asFUNCTION(angelscript_refcounted_factory<LocalDateTime>), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("calendar", asBEHAVE_FACTORY, "calendar@ f()", asFUNCTION(calendar_factory_timezone_aware), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("calendar", asBEHAVE_FACTORY, "calendar@ f(double julian_day)", asFUNCTION((angelscript_refcounted_factory<LocalDateTime, double>)), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("calendar", asBEHAVE_FACTORY, "calendar@ f(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, int millisecond = 0, int microsecond = 0)", asFUNCTION((angelscript_refcounted_factory<LocalDateTime, int, int, int, int, int, int, int, int>)), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("calendar", asBEHAVE_FACTORY, "calendar@ f(const datetime&in)", asFUNCTION((angelscript_refcounted_factory<LocalDateTime, const DateTime&>)), asCALL_CDECL);
@@ -851,7 +1275,7 @@ void RegisterScriptTimestuff(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("calendar", "timespan opSub(const calendar&in) const", asMETHODPR(LocalDateTime, operator-, (const LocalDateTime&) const, Timespan), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "calendar& opAddAssign(const timespan&in)", asMETHODPR(LocalDateTime, operator+=, (const Timespan&), LocalDateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "calendar& opSubAssign(const timespan&in)", asMETHODPR(LocalDateTime, operator-=, (const Timespan&), LocalDateTime&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("calendar", "void reset()", asFUNCTION(timestuff_reset<LocalDateTime>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("calendar", "void reset()", asFUNCTION(calendar_reset_timezone_aware), asCALL_CDECL_OBJFIRST);
 	register_date_time_extensions<LocalDateTime>(engine, "calendar");
 	register_date_time_extensions<DateTime>(engine, "datetime");
 	engine->RegisterObjectMethod("timestamp", "string format(const string&in fmt, int tzd = 0xffff)", asFUNCTIONPR(DateTimeFormatter::format, (const Timestamp&, const std::string&, int), std::string), asCALL_CDECL_OBJFIRST);
@@ -879,4 +1303,10 @@ void RegisterScriptTimestuff(asIScriptEngine *engine) {
 	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_SORTABLE", (void*)&DateTimeFormat::SORTABLE_REGEX);
 	engine->RegisterGlobalFunction("bool datetime_is_valid_format_string(const string&in fmt)", asFUNCTION(DateTimeFormat::hasFormat), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool datetime_is_valid_format(const string&in datetime)", asFUNCTION(DateTimeFormat::isValid), asCALL_CDECL);
+	// Timezone management functions
+	engine->RegisterGlobalFunction("bool set_timezone(const string&in timezone_id)", asFUNCTION(set_timezone), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void reset_timezone()", asFUNCTION(reset_timezone), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string get_current_timezone_name()", asFUNCTION(get_current_timezone_name), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int get_current_timezone_offset()", asFUNCTION(get_current_timezone_offset), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string[]@ list_available_timezones()", asFUNCTION(list_available_timezones), asCALL_CDECL);
 }
