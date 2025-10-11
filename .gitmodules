@@ -5,3 +5,6 @@
 [submodule "vcpkg/bin"]
 	path = vcpkg/bin
 	url = https://github.com/microsoft/vcpkg
+[submodule "vcpkg/Implib.so"]
+	path = vcpkg/Implib.so
+	url = https://github.com/yugr/Implib.so

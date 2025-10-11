@@ -9,8 +9,10 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import platform
 
 vcpkg_path = Path(__file__, "..", "bin", "vcpkg" if sys.platform != "win32" else "vcpkg.exe").resolve()
+implib_gen_path = Path(__file__, "..", "implib.so", "implib-gen.py")
 vcpkg_installed_path = Path(__file__, "..", "vcpkg_installed").resolve()
 repo_path = Path(__file__).parents[1]
 
@@ -23,11 +25,14 @@ def bootstrap_vcpkg():
 		subprocess.check_output(vcpkg_path.parent / "bootstrap-vcpkg.sh")
 def build(triplet = "", do_archive = False, out_dir = ""):
 	if not triplet:
-		# Try to determine, logic probably could be improved
-		if sys.platform == "win32": triplet = "x64-windows"
-		elif sys.platform == "darwin": triplet = "arm64-osx"
-		elif sys.platform == "linux": triplet = "x64-linux"
-		else: sys.exit("unable to determine platform, please pass a triplet explicitly.")
+		machine = platform.machine().lower()
+		if machine in ("x86_64", "amd64", "x64"): arch = "x64"
+		elif machine in ("arm64", "aarch64"): arch = "arm64"
+		else: sys.exit(f"Error: Unsupported architecture: {machine}")
+		if sys.platform == "win32": triplet = f"{arch}-windows"
+		elif sys.platform == "darwin": triplet = f"{arch}-osx"
+		elif sys.platform == "linux": triplet = f"{arch}-linux"
+		else: sys.exit("Unable to determine platform, please pass a triplet explicitly.")
 	bootstrap_vcpkg()
 	try: subprocess.check_output([vcpkg_path, "install", "--triplet", triplet, "--x-manifest-root", vcpkg_path.parents[1]])
 	except subprocess.CalledProcessError as cpe: sys.exit(f"Building packages for {triplet} failed with error code {cpe.returncode}.\n{cpe.output.decode()}")
