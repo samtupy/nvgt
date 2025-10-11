@@ -93,3 +93,14 @@ std::string apple_input_box(const std::string& title, const std::string& message
 	else if (result == NSAlertSecondButtonReturn) return "\xff"; // nvgt value for cancel for the moment.
 	return "\xff"; // Either an error or we can't determine what was pressed. Should we throw an exception or something?
 }
+
+bool screen_reader_load() { return true; }
+void screen_reader_unload() { voice_over_speech_shutdown(); }
+std::string screen_reader_detect() { return voice_over_is_running() ? "VoiceOver" : ""; }
+bool screen_reader_has_speech() { return voice_over_is_running(); }
+bool screen_reader_has_braille() { return false; }
+bool screen_reader_is_speaking() { return false; }
+bool screen_reader_output(const std::string& text, bool interrupt) { return voice_over_speak(text, interrupt); }
+bool screen_reader_speak(const std::string& text, bool interrupt) { return voice_over_speak(text, interrupt); }
+bool screen_reader_braille(const std::string& text) { return false; }
+bool screen_reader_silence() { return voice_over_speak("", true); }

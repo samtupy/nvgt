@@ -1,7 +1,7 @@
-/* apple.h - header included on all apple platforms
+/* win.h - header exposing windows only functions and classes
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
+ * Copyright (c) 2022-2025 Sam Tupy
  * https://nvgt.gg
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
@@ -11,29 +11,17 @@
 */
 
 #pragma once
-#include <string>
 #include "tts.h"
-class asIScriptEngine;
-class CScriptArray;
+#include <sapibridge.h>
 
-bool voice_over_is_running();
-bool voice_over_speak(const std::string& message, bool interrupt = true);
-void voice_over_window_created();
-void voice_over_speech_shutdown();
-std::string apple_input_box(const std::string& title, const std::string& message, const std::string& default_value = "", bool secure = false, bool readonly = false);
-
-// Definition for AVTTSVoice class created by Gruia Chiscop on 6/6/24.
-class AVTTSVoice : public tts_engine_impl {
+class sapi5_engine : public tts_engine_impl {
+	sb_sapi *inst;
 public:
-	AVTTSVoice();
-	~AVTTSVoice();
+	sapi5_engine();
+	virtual ~sapi5_engine();
 	virtual bool is_available() override;
 	virtual tts_pcm_generation_state get_pcm_generation_state() override;
-	virtual bool speak(const std::string& text, bool interrupt = false, bool blocking = false) override;
 	virtual tts_audio_data* speak_to_pcm(const std::string &text) override;
-	virtual void free_pcm(tts_audio_data* data) override;
-	virtual bool is_speaking() override;
-	virtual bool stop() override;
 	virtual float get_rate() override;
 	virtual float get_pitch() override;
 	virtual float get_volume() override;
@@ -48,22 +36,5 @@ public:
 	virtual std::string get_voice_language(int index) override;
 	virtual bool set_voice(int voice) override;
 	virtual int get_current_voice() override;
-	bool speakWait(const std::string& text, bool interrupt);
-	bool stopSpeech();
-	bool pauseSpeech();
-	CScriptArray* getAllVoices() const;
-	CScriptArray* getVoicesByLanguage(const std::string& language) const;
-	std::string getCurrentVoice() const;
-	bool isPaused() const;
-	void setVoiceByName(const std::string& name);
-	void setVoiceByLanguage(const std::string& language);
-	std::string getCurrentLanguage() const;
-	uint64_t getVoicesCount() const;
-	int getVoiceIndex(const std::string& name) const;
-	bool setVoiceByIndex(uint64_t index);
-	std::string getVoiceName(uint64_t index);
-private:
-	class Impl;
-	Impl* impl;
-	int RefCount;
 };
+

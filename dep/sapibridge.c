@@ -141,6 +141,17 @@ if(!sb_sapi_refresh_voices(sapi)) return NULL;
 if((id<0)||(id>=sapi->voice_count)) return NULL;
 return sapi->voices[id].name;
 }
+char* sb_sapi_get_voice_language(sb_sapi* sapi, int id)
+{
+if(!sb_sapi_refresh_voices(sapi)) return NULL;
+if((id<0)||(id>=sapi->voice_count)) return NULL;
+WCHAR wbuffer[LOCALE_NAME_MAX_LENGTH];
+if(LCIDToLocaleName(MAKELCID(sapi->voices[id].langid, SORT_DEFAULT), wbuffer, LOCALE_NAME_MAX_LENGTH, 0) == 0) return NULL;
+char* result=sbz_wchar_to_char(wbuffer);
+if(!result) return NULL;
+for(char* p=result; *p; p++) *p=tolower(*p);
+return result;
+}
 int sb_sapi_set_voice(sb_sapi* sapi, int id)
 {
 if(!sb_sapi_refresh_voices(sapi)) return 0;
@@ -161,9 +172,25 @@ ISpObjectToken* current=NULL;
 if(FAILED(sapi->voice->lpVtbl->GetVoice(sapi->voice, &current))) return -1;
 for(int x=0; x<sapi->voice_count; x++)
 {
-if(sapi->voices[x].token!=current) continue;
+if(sapi->voices[x].token!=current && sapi->voices[x].default_token!=current) continue;
 current->lpVtbl->Release(current);
 return x;
+}
+// Sam: Otherwise we're probably dealing with the default voice, in which case the current token will not have been allocated within the refresh voices enumeration and thus can't be direct compared with voices[x].token.
+// We fall back to name comparison only once, then cache the default token for much quicker comparison in future calls.
+WCHAR* name = NULL;
+if(!FAILED(current->lpVtbl->GetStringValue(current, NULL, &name)))
+{
+char* utf8=sbz_wchar_to_char(name);
+sbz_com_free_memory(&sapi->com, name);
+for(int x=0; x<sapi->voice_count; x++)
+{
+if(strcmp(sapi->voices[x].name, utf8)) continue;
+sapi->voices[x].default_token = current;
+free(utf8);
+return x; // We don't release the token in this case as it will be done at voice cache clean.
+}
+free(utf8);
 }
 current->lpVtbl->Release(current);
 return -1;
@@ -266,8 +293,19 @@ if(!utf8)
 token->lpVtbl->Release(token);
 continue;
 }
+WCHAR* lang_str=NULL;
+LANGID langid=0x0409;
+if(SUCCEEDED(token->lpVtbl->GetStringValue(token, L"Language", &lang_str)))
+{
+if(lang_str) {
+langid=(LANGID)wcstoul(lang_str, NULL, 16);
+sbz_com_free_memory(&sapi->com, lang_str);
+}
+}
 voice[x].token=token;
+voice[x].default_token=NULL;
 voice[x].name=utf8;
+voice[x].langid=langid;
 }
 sapi->voices=voice;
 sapi->voice_count=count;
@@ -390,6 +428,7 @@ if(!sapi) return;
 for(int x=0; x<sapi->voice_count; x++)
 {
 sapi->voices[x].token->lpVtbl->Release(sapi->voices[x].token);
+if(sapi->voices[x].default_token) sapi->voices[x].default_token->lpVtbl->Release(sapi->voices[x].default_token);
 free(sapi->voices[x].name);
 }
 if(sapi->voices) free(sapi->voices);

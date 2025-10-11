@@ -33,6 +33,7 @@ int sb_sapi_get_pitch(sb_sapi* sapi);
 int sb_sapi_refresh_voices(sb_sapi* sapi);
 int sb_sapi_count_voices(sb_sapi* sapi);
 char* sb_sapi_get_voice_name(sb_sapi* sapi, int id);
+char* sb_sapi_get_voice_language(sb_sapi* sapi, int id);
 int sb_sapi_set_voice(sb_sapi* sapi, int id);
 int sb_sapi_get_voice(sb_sapi* sapi);
 int sb_sapi_get_channels(sb_sapi* sapi);
@@ -63,7 +64,9 @@ sbz_com;
 typedef struct
 {
 ISpObjectToken* token;
+ISpObjectToken* default_token;
 char* name;
+LANGID langid;
 }
 sbz_sapi_voice;
 

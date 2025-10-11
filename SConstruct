@@ -97,6 +97,8 @@ if env["PLATFORM"] == "win32": env.Append(LIBS = ["UniversalSpeechStatic"])
 # nvgt itself
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
 if "android.cpp" in sources: sources.remove("android.cpp")
+if env["PLATFORM"] != "win32" and "win.cpp" in sources: sources.remove("win.cpp")
+if env["PLATFORM"] != "posix" and "linux.cpp" in sources: sources.remove("linux.cpp")
 if "version.cpp" in sources: sources.remove("version.cpp")
 env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
 version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.

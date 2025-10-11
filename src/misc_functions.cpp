@@ -84,8 +84,16 @@ asQWORD timestamp() {
 std::string get_command_line() {
 	return g_CommandLine;
 }
-double Round(double n, int p) {
+float fRound(float n, int p) {
 	int P = powf(10, fabs(p));
+	if (p > 0)
+		return roundf(n * P) / P;
+	else if (p < 0)
+		return roundf(n / P) * P;
+	return roundf(n);
+}
+double Round(double n, int p) {
+	int P = pow(10, abs(p));
 	if (p > 0)
 		return round(n * P) / P;
 	else if (p < 0)
@@ -162,6 +170,13 @@ int get_last_error() {
 
 double range_convert(double old_value, double old_min, double old_max, double new_min, double new_max) {
 	return ((old_value - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min;
+}
+float range_convert(float old_value, float old_min, float old_max, float new_min, float new_max) {
+	return ((old_value - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min;
+}
+float range_convert_midpoint(float old_value, float old_min, float old_midpoint, float old_max, float new_min, float new_midpoint, float new_max) {
+	if (old_value < old_midpoint) return range_convert(old_value, old_min, old_midpoint, new_min, new_midpoint);
+	else return range_convert(old_value, old_midpoint, old_max, new_midpoint, new_max);
 }
 std::string float_to_bytes(float f) {
 	return std::string((char*)&f, 4);
