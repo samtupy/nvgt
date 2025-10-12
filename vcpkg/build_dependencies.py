@@ -12,7 +12,8 @@ import sys
 import platform
 import os
 from xml.etree.ElementTree import ParseError, parse
-from gi.repository import Gio
+if sys.platform == "linux":
+	from gi.repository import Gio
 
 vcpkg_path = Path(__file__, "..", "bin", "vcpkg" if sys.platform != "win32" else "vcpkg.exe").resolve()
 implib_gen_path = Path(__file__, "..", "Implib.so")
@@ -118,28 +119,29 @@ def build(triplet = "", do_archive = False, out_dir = ""):
 		shutil.rmtree(out_dir / "debug" / "lib" / "cmake")
 		shutil.rmtree(out_dir / "debug" / "lib" / "pkgconfig")
 	except FileNotFoundError: pass
-	implib_archs = ["x86_64-linux-gnu", "aarch64-linux-gnu"]
-	oldcwd = os.getcwd()
-	for arch in implib_archs:
-		out_dir_arch = out_dir / "autogen" / "arch" / arch
-		out_dir_arch.mkdir(parents = True, exist_ok = True)
-		os.chdir(str(implib_gen_path.resolve()))
-		for f in (out_dir / "lib").glob("*.so", recurse_symlinks=True):
+	if sys.platform == "linux":
+		implib_archs = ["x86_64-linux-gnu", "aarch64-linux-gnu"]
+		oldcwd = os.getcwd()
+		for arch in implib_archs:
+			out_dir_arch = out_dir / "autogen" / "arch" / arch
+			out_dir_arch.mkdir(parents = True, exist_ok = True)
+			os.chdir(str(implib_gen_path.resolve()))
+			for f in (out_dir / "lib").glob("*.so", recurse_symlinks=True):
+				try:
+					subprocess.check_output([sys.executable, "implib-gen.py", "--target", arch, "--dlopen-callback", "nvgt_dlopen", "--dlsym-callback", "nvgt_dlsym", "-o", str(out_dir_arch.resolve()), str(f.resolve())], stderr=subprocess.STDOUT)
+				except subprocess.CalledProcessError as cpe:
+					print(f"Warning: could not generate implib for {f} for arch {arch}: implib-gen returned {cpe.returncode}", file=sys.stderr)
+					print (f"Warning: if generated, implib for {f} may be incomplete")
 			try:
-				subprocess.check_output([sys.executable, "implib-gen.py", "--target", arch, "--dlopen-callback", "nvgt_dlopen", "--dlsym-callback", "nvgt_dlsym", "-o", str(out_dir_arch.resolve()), str(f.resolve())], stderr=subprocess.STDOUT)
+				subprocess.check_output([sys.executable, "implib-gen.py", "--target", arch, "--dlopen-callback", "nvgt_dlopen", "--dlsym-callback", "nvgt_dlsym", "-o", str(out_dir_arch.resolve()), "/usr/lib/libspeechd.so"], stderr=subprocess.STDOUT)
 			except subprocess.CalledProcessError as cpe:
-				print(f"Warning: could not generate implib for {f} for arch {arch}: implib-gen returned {cpe.returncode}", file=sys.stderr)
-				print (f"Warning: if generated, implib for {f} may be incomplete")
-		try:
-			subprocess.check_output([sys.executable, "implib-gen.py", "--target", arch, "--dlopen-callback", "nvgt_dlopen", "--dlsym-callback", "nvgt_dlsym", "-o", str(out_dir_arch.resolve()), "/usr/lib/libspeechd.so"], stderr=subprocess.STDOUT)
-		except subprocess.CalledProcessError as cpe:
-			sys.exit(f"Warning: could not generate implib for {f} for arch {arch}: implib-gen returned {cpe.returncode}")
-	os.chdir(oldcwd)
-	out_dir_dbus = out_dir / "autogen" / "dbus"
-	out_dir_dbus.mkdir(parents = True, exist_ok = True)
-	dbus_interfaces = ["org.freedesktop.login1.Manager", "org.freedesktop.login1.Session", "org.freedesktop.login1.Seat", "org.freedesktop.login1.User"]
-	for dbus_interface in dbus_interfaces:
-		generate_gdbus_code(Path(f"/usr/share/dbus-1/interfaces/{dbus_interface}.xml"), out_dir_dbus)
+				sys.exit(f"Warning: could not generate implib for {f} for arch {arch}: implib-gen returned {cpe.returncode}")
+		os.chdir(oldcwd)
+		out_dir_dbus = out_dir / "autogen" / "dbus"
+		out_dir_dbus.mkdir(parents = True, exist_ok = True)
+		dbus_interfaces = ["org.freedesktop.login1.Manager", "org.freedesktop.login1.Session", "org.freedesktop.login1.Seat", "org.freedesktop.login1.User"]
+		for dbus_interface in dbus_interfaces:
+			generate_gdbus_code(Path(f"/usr/share/dbus-1/interfaces/{dbus_interface}.xml"), out_dir_dbus)
 	if do_archive:
 		shutil.make_archive(out_dir, format = "zip", root_dir = out_dir)
 		with out_dir.with_suffix(".zip").open("rb") as f, out_dir.with_suffix(".zip.blake2b").open("w") as hf:
