@@ -10,11 +10,16 @@ import shutil
 import subprocess
 import sys
 import platform
+import os
+from xml.etree.ElementTree import ParseError, parse
+from gi.repository import Gio
 
 vcpkg_path = Path(__file__, "..", "bin", "vcpkg" if sys.platform != "win32" else "vcpkg.exe").resolve()
-implib_gen_path = Path(__file__, "..", "implib.so", "implib-gen.py")
+implib_gen_path = Path(__file__, "..", "Implib.so")
 vcpkg_installed_path = Path(__file__, "..", "vcpkg_installed").resolve()
 repo_path = Path(__file__).parents[1]
+glib_min_required = "2.70"
+gdbus_codegen = "gdbus-codegen"
 
 def bootstrap_vcpkg():
 	if vcpkg_path.exists() and vcpkg_path.is_file():
@@ -23,6 +28,59 @@ def bootstrap_vcpkg():
 		subprocess.check_output(vcpkg_path.parent / "bootstrap-vcpkg.bat")
 	else:
 		subprocess.check_output(vcpkg_path.parent / "bootstrap-vcpkg.sh")
+
+def is_well_formed(xml_path: Path) -> bool:
+	try:
+		parse(xml_path)
+		return True
+	except ParseError:
+		print(f"Warning: Skipping {xml_path}: not well-formed XML", file=sys.stderr)
+		return False
+
+def has_interfaces(xml_bytes: bytes) -> bool:
+	try:
+		node = Gio.DBusNodeInfo.new_for_xml(xml_bytes.decode())
+		return bool(node.interfaces)
+	except Exception as e:
+		print(f"Warning: Skipping XML: {e}", file=sys.stderr)
+		return False
+
+def derive_c_paths(xml_path: Path, out_base: Path) -> tuple[Path, Path]:
+	parts = xml_path.stem.split('.')
+	if len(parts) < 2:
+		raise ValueError(f"Unexpected XML filename format: {xml_path.name!r}")
+	namespace, iface = parts[:-1], parts[-1]
+	target_dir = out_base
+	target_dir = target_dir.joinpath(*namespace)
+	return (target_dir / f"{iface}.h", target_dir / f"{iface}.c")
+
+def run_gdbus_codegen(iface: str, target_dir: Path, xml_spec: Path) -> None:
+	common_args = [gdbus_codegen, "--pragma-once", "--c-generate-object-manager", "--c-generate-autocleanup", "all", "--glib-min-required", glib_min_required]
+	subprocess.run([*common_args, "--header", "--output", str(target_dir / f"{iface}.h"), str(xml_spec)], check=True)
+	subprocess.run([*common_args, "--body", "--output", str(target_dir / f"{iface}.c"), str(xml_spec)], check=True)
+
+def generate_gdbus_code(xml_path: Path, out_base: Path) -> None:
+	if not is_well_formed(xml_path):
+		return
+	xml_bytes = xml_path.read_bytes()
+	if not has_interfaces(xml_bytes):
+		return
+	iface_name = xml_path.stem.split('.')[-1]
+	try:
+		c_header_path, c_source_path = derive_c_paths(xml_path, out_base)
+	except ValueError as e:
+		print(e, file=sys.stderr)
+		return
+	c_header_path.parent.mkdir(parents=True, exist_ok=True)
+	if c_header_path.exists() and c_source_path.exists():
+		print(f"Skipping invocation of gdbus-codegen for {xml_path}: outputs already exist")
+	else:
+		try:
+			run_gdbus_codegen(iface_name, c_header_path.parent, xml_path)
+		except subprocess.CalledProcessError as e:
+			print(f"gdbus-codegen failed for {xml_path}: {e}", file=sys.stderr)
+			sys.exit(1)
+
 def build(triplet = "", do_archive = False, out_dir = ""):
 	if not triplet:
 		machine = platform.machine().lower()
@@ -60,6 +118,28 @@ def build(triplet = "", do_archive = False, out_dir = ""):
 		shutil.rmtree(out_dir / "debug" / "lib" / "cmake")
 		shutil.rmtree(out_dir / "debug" / "lib" / "pkgconfig")
 	except FileNotFoundError: pass
+	implib_archs = ["x86_64-linux-gnu", "aarch64-linux-gnu"]
+	oldcwd = os.getcwd()
+	for arch in implib_archs:
+		out_dir_arch = out_dir / "autogen" / "arch" / arch
+		out_dir_arch.mkdir(parents = True, exist_ok = True)
+		os.chdir(str(implib_gen_path.resolve()))
+		for f in (out_dir / "lib").glob("*.so", recurse_symlinks=True):
+			try:
+				subprocess.check_output([sys.executable, "implib-gen.py", "--target", arch, "--dlopen-callback", "nvgt_dlopen", "--dlsym-callback", "nvgt_dlsym", "-o", str(out_dir_arch.resolve()), str(f.resolve())], stderr=subprocess.STDOUT)
+			except subprocess.CalledProcessError as cpe:
+				print(f"Warning: could not generate implib for {f} for arch {arch}: implib-gen returned {cpe.returncode}", file=sys.stderr)
+				print (f"Warning: if generated, implib for {f} may be incomplete")
+		try:
+			subprocess.check_output([sys.executable, "implib-gen.py", "--target", arch, "--dlopen-callback", "nvgt_dlopen", "--dlsym-callback", "nvgt_dlsym", "-o", str(out_dir_arch.resolve()), "/usr/lib/libspeechd.so"], stderr=subprocess.STDOUT)
+		except subprocess.CalledProcessError as cpe:
+			sys.exit(f"Warning: could not generate implib for {f} for arch {arch}: implib-gen returned {cpe.returncode}")
+	os.chdir(oldcwd)
+	out_dir_dbus = out_dir / "autogen" / "dbus"
+	out_dir_dbus.mkdir(parents = True, exist_ok = True)
+	dbus_interfaces = ["org.freedesktop.login1.Manager", "org.freedesktop.login1.Session", "org.freedesktop.login1.Seat", "org.freedesktop.login1.User"]
+	for dbus_interface in dbus_interfaces:
+		generate_gdbus_code(Path(f"/usr/share/dbus-1/interfaces/{dbus_interface}.xml"), out_dir_dbus)
 	if do_archive:
 		shutil.make_archive(out_dir, format = "zip", root_dir = out_dir)
 		with out_dir.with_suffix(".zip").open("rb") as f, out_dir.with_suffix(".zip.blake2b").open("w") as hf:
@@ -79,11 +159,13 @@ def fix_debug(out_dir):
 	"""Several debug libraries frustratingly have different filenames to their release counterparts, which just makes build scripts more complicated. We'll just fix it here. Usually a d is just tacked on to the end of the filename which we'll get rid of as well as a hifen that sometimes appears."""
 	excludes = ["reactphysics3d", "zstd"]
 	for f in (out_dir / "debug" / "lib").iterdir():
-		if not f.stem.lower().endswith("d"): continue
-		exclude = f.stem if not f.stem.startswith("lib") else f.stem[3:]
-		if exclude in excludes: continue
-		count = 1 if not f.stem.lower().endswith("-d") else 2
-		f.replace(f.with_stem(f.stem[:-count]))
+		try:
+			if not f.stem.lower().endswith("d"): continue
+			exclude = f.stem if not f.stem.startswith("lib") else f.stem[3:]
+			if exclude in excludes: continue
+			count = 1 if not f.stem.lower().endswith("-d") else 2
+			f.replace(f.with_stem(f.stem[:-count]))
+		except: continue
 def windows_lib_rename(out_dir):
 	"""Sometimes windows libraries get built with annoying names that complicate build scripts. We have to handle them somewhere, may as well be here. Temporarily we'll also copy angelscript as angelscript-nc."""
 	renames = [
