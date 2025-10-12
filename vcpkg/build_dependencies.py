@@ -126,7 +126,7 @@ def build(triplet = "", do_archive = False, out_dir = ""):
 			out_dir_arch = out_dir / "autogen" / "arch" / arch
 			out_dir_arch.mkdir(parents = True, exist_ok = True)
 			os.chdir(str(implib_gen_path.resolve()))
-			for f in (out_dir / "lib").glob("*.so", recurse_symlinks=True):
+			for f in (out_dir / "lib").glob("*.so"):
 				try:
 					subprocess.check_output([sys.executable, "implib-gen.py", "--target", arch, "--dlopen-callback", "nvgt_dlopen", "--dlsym-callback", "nvgt_dlsym", "-o", str(out_dir_arch.resolve()), str(f.resolve())], stderr=subprocess.STDOUT)
 				except subprocess.CalledProcessError as cpe:
