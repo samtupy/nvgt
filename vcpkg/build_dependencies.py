@@ -135,7 +135,7 @@ def build(triplet = "", do_archive = False, out_dir = ""):
 			try:
 				subprocess.check_output([sys.executable, "implib-gen.py", "--target", arch, "--dlopen-callback", "nvgt_dlopen", "--dlsym-callback", "nvgt_dlsym", "-o", str(out_dir_arch.resolve()), "/usr/lib/libspeechd.so"], stderr=subprocess.STDOUT)
 			except subprocess.CalledProcessError as cpe:
-				sys.exit(f"Warning: could not generate implib for {f} for arch {arch}: implib-gen returned {cpe.returncode}")
+				sys.exit(f"Warning: could not generate implib for /usr/lib/libspeechd.so for arch {arch}: implib-gen returned {cpe.returncode}")
 		os.chdir(oldcwd)
 		out_dir_dbus = out_dir / "autogen" / "dbus"
 		out_dir_dbus.mkdir(parents = True, exist_ok = True)
