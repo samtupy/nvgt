@@ -143,11 +143,11 @@ elif env["PLATFORM"] == "posix":
 			break
 	if ('target_triplet' in env and env['target_triplet'] is None) or ('target_triplet' not in env):
 		env.Exit(1, f"Unsupported target triple '{detected}'; must be one of: " + ", ".join([t for _, t in mappings]))
-	sources.extend([str(f) for f in Glob(f"lindev/autogen/arch/{env['target_triplet']}/**.c")])
-	sources.extend([str(f) for f in Glob(f"lindev/autogen/arch/{env['target_triplet']}/**.S")])
-	VariantDir("build/obj_src/autogen/arch", "lindev/autogen/arch", duplicate=0)
-	sources.extend([str(f) for f in Glob(f"lindev/autogen/dbus/**.c")])
-	VariantDir("build/obj_src/autogen/dbus", "lindev/autogen/dbus", duplicate=0)
+	sources.extend(Glob(f"#lindev/autogen/arch/{env['target_triplet']}/*.c", strings=True))
+	sources.extend(Glob(f"#lindev/autogen/arch/{env['target_triplet']}/*.S", strings=True))
+	VariantDir("#build/obj_src/autogen/arch", "#lindev/autogen/arch", duplicate=0)
+	sources.extend(Glob(f"#lindev/autogen/dbus/*.c", strings=True))
+	VariantDir("#build/obj_src/autogen/dbus", "#lindev/autogen/dbus", duplicate=0)
 	env.ParseConfig('pkg-config --cflags gtk4')
 	env.ParseConfig('pkg-config --cflags glib-2.0')
 	env.ParseConfig('pkg-config --cflags dbus-1')
