@@ -26,9 +26,9 @@
 #elif defined(__ANDROID__)
 	#include <android/native_window.h>
 #else
-	// Following commented includes are for determining user idle time using x11 screensaver extension. Disabled for now until viability of linking with this library is established or until we fix the idle_ticks() function to use dlopen/dlsym and friends.
-	//#include <X11/Xlib.h>
-	//#include <X11/extensions/scrnsaver.h>
+#include "linux.h"
+#include <gio/gio.h>
+#include <dbus/org/freedesktop/login1/Seat.h>
 #endif
 #ifndef _WIN32
 	#include <sys/time.h>
@@ -214,6 +214,13 @@ std::string input_box(const std::string& title, const std::string& text, const s
 		return "";
 	}
 	return r;
+#elif !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
+const auto r = posix_input_box(nullptr, title, text, default_value, false);
+	if (r == "\xff") {
+		g_LastError = -12;
+		return "";
+	}
+return r;
 	#else
 	return "";
 	#endif
@@ -228,6 +235,8 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 	#elif defined(__APPLE__)
 	apple_input_box(title, text, value, false, false);
 	return true;
+	#elif !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
+	return posix_info_box(nullptr, title, text, value);
 	#else
 	return false;
 	#endif
@@ -370,6 +379,7 @@ void wait(int ms) {
 
 
 // The following function contributed to NVGT by silak
+// Extra bits contributed by ethindp
 uint64_t idle_ticks() {
 	#ifdef _WIN32
 	LASTINPUTINFO lii = { sizeof(LASTINPUTINFO) };
@@ -396,16 +406,26 @@ uint64_t idle_ticks() {
 		IOObjectRelease(entry);
 	}
 	return -1;
+	#elif !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
+		// We use the org.freedesktop.login1.Seat interface here because it works across (all) sessions, regardless of being in a GUI or not.
+		// The disadvantage here is that this does (NOT) work on non-systemd systems like devuan.
+		// To do: do we throw exceptions on DBus errors, or just return an invalid value?
+		g_autoptr(GError ) error = nullptr;
+		g_autoptr(GDBusConnection) conn = g_bus_get_sync (G_BUS_TYPE_SYSTEM, nullptr, &error);
+		if (!conn) {
+			return -1;
+		}
+		g_autoptr(OrgFreedesktopLogin1Seat) seat = org_freedesktop_login1_seat_proxy_new_for_bus_sync (G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_NONE, "org.freedesktop.login1", "/org/freedesktop/login1/seat/self", nullptr, &error);
+		if (!seat) {
+			return -1;
+		}
+		gboolean idle = org_freedesktop_login1_seat_get_idle_hint (seat);
+		if (idle) {
+			guint64 ts_us = org_freedesktop_login1_seat_get_idle_since_hint_monotonic (seat);
+			return ts_us / 1000ULL;
+		}
+		return 0;
 	#else
-	/* Probably switch this to use dlopen instead of direct linkage at least until we can verify that it safely does not compromise portability.
-	Display* dpy = XOpenDisplay(NULL);
-	if (!dpy) return -1;
-	XScreenSaverInfo info;
-	XScreenSaverQueryInfo(dpy, DefaultRootWindow(dpy), &info);
-	uint64_t idleTime = info.idle;
-	XCloseDisplay(dpy);
-	return idleTime;
-	*/
 	return 0; // currently unsupported
 	#endif
 }

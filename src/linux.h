@@ -13,12 +13,15 @@
 #pragma once
 #include <string>
 #include "tts.h"
+#if !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
+#include <gtk/gtk.h>
+#include <libspeechd.h>
+#endif
 
 bool screen_reader_is_speaking();
 
 class speechd_engine : public tts_engine_impl {
 	void* connection;
-	bool loaded;
 public:
 	speechd_engine();
 	virtual ~speechd_engine();
@@ -27,3 +30,6 @@ public:
 	virtual bool is_speaking() override;
 	virtual bool stop() override;
 };
+
+[[nodiscard]] std::string posix_input_box(GtkWindow*         parent, std::string const& title, std::string const& prompt, std::string const& default_text = "", bool secure = false);
+[[nodiscard]] bool posix_info_box(GtkWindow*         parent, std::string const& title, std::string const& prompt, std::string const& text);

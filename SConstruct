@@ -3,7 +3,24 @@
 # Copyright (c) 2022-2024 Sam Tupy
 # license: zlib
 
-import os, multiprocessing, tempfile
+import os, multiprocessing, tempfile, subprocess, re
+
+def raw_triplet_from_cc(cc):
+	name = os.path.basename(cc)
+	flag = '-print-target-triple' if 'clang' in name else '-dumpmachine'
+	try:
+		out = subprocess.check_output([cc, flag], stderr=subprocess.DEVNULL, universal_newlines=True)
+		return out.strip()
+	except (OSError, subprocess.CalledProcessError):
+		return None
+
+def raw_triplet_from_name(cc):
+	# This method differs from the above one by looking at the basename of the compiler
+	# Cross-compilers, or specific targeting compilers, usually start with `target_triple-gcc`, for example
+	# This function is a bit brittle, hence it's use as a fallback
+	name = os.path.basename(cc)
+	m = re.match(r'(.+?)-(?:g(pp?|cc))$', name)
+	return m.group(1) if m else None
 
 Help("""
 	Available custom build switches for NVGT:
@@ -93,7 +110,6 @@ if len(static_plugins) > 0:
 # Project libraries
 env.Append(LIBS = ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoCrypto", "PocoZip", "PocoFoundation", "expat", "z", "angelscript", "SDL3", "phonon", "enet", "reactphysics3d", "ssl", "crypto", "utf8proc", "pcre2-8", "ASAddon", "deps", "vorbisfile", "vorbisenc", "vorbis", "ogg", "opusfile", "opusenc", "opus", "tinyexpr", "tiny-aes-c"])
 if env["PLATFORM"] == "win32": env.Append(LIBS = ["UniversalSpeechStatic"])
-
 # nvgt itself
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
 if "android.cpp" in sources: sources.remove("android.cpp")
@@ -116,6 +132,27 @@ elif env["PLATFORM"] == "darwin":
 	env.Append(LINKFLAGS = ["-Wl,-rpath,'@loader_path',-rpath,'@loader_path/lib',-rpath,'@loader_path/../Frameworks',-dead_strip_dylibs", "-mmacosx-version-min=14.0"])
 elif env["PLATFORM"] == "posix":
 	env.Append(LINKFLAGS = ["-Wl,-rpath,'$$ORIGIN/.',-rpath,'$$ORIGIN/lib'"])
+	detected = (raw_triplet_from_cc(env['CC']) or raw_triplet_from_name(env['CC']) or env.Exit(1, f"Can't detect target triple from CC={env['CC']}"))
+	mappings = [
+		(r'^aarch64-.*-linux-gnu$',            'aarch64-linux-gnu'),
+		(r'^x86_64-.*-linux-gnu$',             'x86_64-linux-gnu'),
+	]
+	for pattern, canon in mappings:
+		if re.match(pattern, detected):
+			env['target_triplet'] = canon
+			break
+	if ('target_triplet' in env and env['target_triplet'] is None) or ('target_triplet' not in env):
+		env.Exit(1, f"Unsupported target triple '{detected}'; must be one of: " + ", ".join([t for _, t in mappings]))
+	sources.extend([str(f) for f in Glob(f"lindev/autogen/arch/{env['target_triplet']}/**.c")])
+	sources.extend([str(f) for f in Glob(f"lindev/autogen/arch/{env['target_triplet']}/**.S")])
+	VariantDir("build/obj_src/autogen/arch", "lindev/autogen/arch", duplicate=0)
+	sources.extend([str(f) for f in Glob(f"lindev/autogen/dbus/**.c")])
+	VariantDir("build/obj_src/autogen/dbus", "lindev/autogen/dbus", duplicate=0)
+	env.ParseConfig('pkg-config --cflags gtk4')
+	env.ParseConfig('pkg-config --cflags glib-2.0')
+	env.ParseConfig('pkg-config --cflags dbus-1')
+	env.ParseConfig('pkg-config --cflags x11')
+	env.ParseConfig('pkg-config --cflags speech-dispatcher')
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
 		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
