@@ -31,7 +31,7 @@
 
 using namespace std;
 
-speechd_engine::speechd_engine() : tts_engine_impl("Speech Dispatcher"), connection(nullptr), loaded(false) {
+speechd_engine::speechd_engine() : tts_engine_impl("Speech Dispatcher"), connection(nullptr) {
 	const auto *addr = spd_get_default_address(nullptr);
 	if (!addr) return;
 	connection = spd_open2("NVGT", nullptr, nullptr, SPD_MODE_THREADED, addr, true, nullptr);

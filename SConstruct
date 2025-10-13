@@ -119,8 +119,7 @@ if "version.cpp" in sources: sources.remove("version.cpp")
 env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
 version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.
 VariantDir("build/obj_src", "src", duplicate = 0)
-VariantDir("build/obj_src/autogen/arch", "#lindev/autogen/arch",    duplicate=0)
-VariantDir("build/obj_src/autogen/dbus", "#lindev/autogen/dbus",    duplicate=0)
+lindev_sources = []
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"])
 if env["PLATFORM"] == "win32":
 	deb_rel_flags = ["/DEBUG", "/INCREMENTAL:NO"] if ARGUMENTS.get("debug", "0") == "1" else ["/OPT:ICF=3"]
@@ -145,12 +144,11 @@ elif env["PLATFORM"] == "posix":
 			break
 	if ('target_triplet' in env and env['target_triplet'] is None) or ('target_triplet' not in env):
 		env.Exit(1, f"Unsupported target triple '{detected}'; must be one of: " + ", ".join([t for _, t in mappings]))
-	arch_sources = []
-	arch_sources += Glob(f"#build/obj_src/autogen/arch/{env['target_triplet']}/*.c", strings=True)
-	arch_sources += Glob(f"#build/obj_src/autogen/arch/{env['target_triplet']}/*.S", strings=True)
-	dbus_sources = Glob("#build/obj_src/autogen/dbus/*.c", strings=True)
-	sources.extend(arch_sources)
-	sources.extend(dbus_sources)
+	VariantDir("#build/obj_lindev/autogen/arch", "#lindev/autogen/arch",     duplicate = 0)
+	VariantDir("#build/obj_lindev/autogen/dbus", "#lindev/autogen/dbus",     duplicate = 0)
+	lindev_sources.extend(Glob(f"#build/obj_lindev/autogen/arch/{env['target_triplet']}/*.c", strings=True))
+	lindev_sources.extend(Glob(f"#build/obj_lindev/autogen/arch/{env['target_triplet']}/*.S", strings=True))
+	lindev_sources.extend(Glob("#build/obj_lindev/autogen/dbus/*.c", strings=True))
 	env.ParseConfig('pkg-config --cflags gtk4')
 	env.ParseConfig('pkg-config --cflags glib-2.0')
 	env.ParseConfig('pkg-config --cflags dbus-1')
@@ -171,7 +169,7 @@ env.Append(LIBS = ["plist-2.0"])
 extra_objects = [version_object]
 if static_plugins_object: extra_objects.append(static_plugins_object)
 if ARGUMENTS.get("debug", "0") == "1": env["PDB"] = "#build/debug/nvgt.pdb"
-nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + extra_objects)
+nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + env.Object(lindev_sources) + extra_objects)
 if env["PLATFORM"] == "darwin":
 	# On Mac OS, we need to run install_name_tool to modify the paths of any dynamic libraries we link.
 	env.AddPostAction(nvgt, lambda target, source, env: env.Execute("install_name_tool -change lib/libplist-2.0.dylib @rpath/libplist-2.0.dylib " + str(target[0])))

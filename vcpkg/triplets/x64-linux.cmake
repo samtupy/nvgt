@@ -1,6 +1,6 @@
 set(VCPKG_TARGET_ARCHITECTURE x64)
 set(VCPKG_CRT_LINKAGE dynamic)
-set(PORTS_THAT_MUST_BE_BUILT_DYNAMICALLY libgit2 libplist libarchive glib gtk gtk3 pango atk gdk-pixbuf cairo pixman graphene libepoxy harfbuzz fribidi fontconfig gobject-introspection gtkmm glibmm pangomm cairomm atkmm libadwaita librsvg libsoup libsecret json-glib glib-networking gstreamer gst-rtsp-server at-spi2-core at-spi2-atk appstream-glib gmime libffi)
+set(PORTS_THAT_MUST_BE_BUILT_DYNAMICALLY libgit2 libplist libarchive glib gtk gtk3 pango atk gdk-pixbuf cairo pixman graphene libepoxy harfbuzz fribidi fontconfig gobject-introspection gtkmm glibmm pangomm cairomm atkmm libadwaita librsvg libsoup libsecret json-glib glib-networking gstreamer gst-rtsp-server at-spi2-core at-spi2-atk appstream-glib gmime libffi zlib bzip2 libpng liblzma freetype Brotli pcre2)
 if(PORT IN_LIST PORTS_THAT_MUST_BE_BUILT_DYNAMICALLY)
 	set(VCPKG_LIBRARY_LINKAGE dynamic)
 	set(VCPKG_FIXUP_ELF_RPATH ON)
