@@ -160,7 +160,6 @@ static void on_close(GtkButton*, gpointer ud) {
 	gtk_window_set_title	 (win, title.c_str());
 	gtk_window_set_modal	 (win, TRUE);
 	gtk_window_set_transient_for(win, parent);
-	gtk_window_set_destroy_with_parent(win, TRUE);
 	auto *vbox = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 8));
 	assert(vbox);
 	gtk_widget_set_margin_top   (GTK_WIDGET(vbox),  12);
@@ -189,13 +188,13 @@ static void on_close(GtkButton*, gpointer ud) {
 	gtk_box_append				 (vbox, GTK_WIDGET(ent));
 	auto *b_ok = GTK_BUTTON(gtk_button_new_with_mnemonic("_OK"));
 	assert(b_ok);
-	gtk_widget_set_can_focus (GTK_WIDGET(b_ok), TRUE);
+	gtk_widget_set_focusable (GTK_WIDGET(b_ok), TRUE);
 	gtk_window_set_default_widget (GTK_WINDOW(win), GTK_WIDGET(b_ok));
 	gtk_widget_add_css_class (GTK_WIDGET(b_ok), "suggested-action");
 	gtk_box_append			(vbox, GTK_WIDGET(b_ok));
 	auto *b_cancel = GTK_BUTTON(gtk_button_new_with_mnemonic("_Cancel"));
 	assert(b_cancel);
-	gtk_widget_set_can_focus   (GTK_WIDGET(b_cancel), TRUE);
+	gtk_widget_set_focusable (GTK_WIDGET(b_cancel), TRUE);
 	gtk_box_append			  (vbox, GTK_WIDGET(b_cancel));
 	input_data data;
 	data.loop  = g_main_loop_new(nullptr, FALSE);
@@ -208,7 +207,8 @@ static void on_close(GtkButton*, gpointer ud) {
 	gtk_window_present(win);
 	g_main_loop_run  (data.loop);
 	g_main_loop_unref(data.loop);
-	gtk_window_destroy(win);
+	gtk_window_close(win);
+	g_object_unref(win);
 	return data.result;
 }
 
@@ -223,7 +223,6 @@ static void on_close(GtkButton*, gpointer ud) {
 	gtk_window_set_title	 (win, title.c_str());
 	gtk_window_set_modal	 (win, TRUE);
 	gtk_window_set_transient_for(win, parent);
-	gtk_window_set_destroy_with_parent(win, TRUE);
 	auto *vbox = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 8));
 	assert(vbox);
 	gtk_widget_set_margin_top   (GTK_WIDGET(vbox),  12);
@@ -250,7 +249,7 @@ static void on_close(GtkButton*, gpointer ud) {
 	gtk_box_append(vbox, GTK_WIDGET(sw));
 	auto *b_close = GTK_BUTTON(gtk_button_new_with_mnemonic("_Close"));
 	assert(b_close);
-	gtk_widget_set_can_focus(GTK_WIDGET(b_close), TRUE);
+	gtk_widget_set_focusable (GTK_WIDGET(b_close), TRUE);
 	gtk_box_append(vbox, GTK_WIDGET(b_close));
 	info_data data;
 	data.loop = g_main_loop_new(nullptr, FALSE);
@@ -261,7 +260,8 @@ static void on_close(GtkButton*, gpointer ud) {
 	gtk_window_present(win);
 	g_main_loop_run  (data.loop);
 	g_main_loop_unref(data.loop);
-	gtk_window_destroy(win);
+	gtk_window_close(win);
+	g_object_unref(win);
 	return true;
 }
 
