@@ -177,7 +177,7 @@ if env["PLATFORM"] == "win32":
 	# Only on windows we must go through the frustrating hastle of compiling a version of nvgt with no console E. the windows subsystem. It is at least set up so that we only need to recompile one object
 	if "nvgt.cpp" in sources: sources.remove("nvgt.cpp")
 	if ARGUMENTS.get("debug", "0") == "1": env["PDB"] = "#build/debug/nvgtw.pdb"
-	nvgtw = env.Program("release/nvgtw", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [env.Object("build/obj_src/nvgtw", "build/obj_src/nvgt.cpp", CPPDEFINES = ["$CPPDEFINES", "NVGT_WIN_APP"]), extra_objects], LINKFLAGS = ["$LINKFLAGS", "/subsystem:windows"])
+	nvgtw = env.Program("release/nvgtw", env.Object([os.path.join("build/obj_src", s) for s in sources]) + env.Object(lindev_sources) + [env.Object("build/obj_src/nvgtw", "build/obj_src/nvgt.cpp", CPPDEFINES = ["$CPPDEFINES", "NVGT_WIN_APP"]), extra_objects], LINKFLAGS = ["$LINKFLAGS", "/subsystem:windows"])
 	sources.append("nvgt.cpp")
 	# Todo: Properly implement the install target on other platforms
 	env.Install("c:/nvgt", nvgt)
@@ -205,7 +205,7 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
 	if env["PLATFORM"] == "win32": stub_env.Append(LINKFLAGS = ["/subsystem:windows"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
-	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + extra_objects
+	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + stub_env.Object(lindev_sources) + extra_objects
 	if ARGUMENTS.get("debug", "0") == "1": stub_env["PDB"] = "#build/debug/nvgt_windows.pdb"
 	stub = stub_env.Program(f"release/stub/nvgt_{stub_platform}", stub_objects)
 	if env["PLATFORM"] == "win32": env.Install("c:/nvgt/stub", stub)
