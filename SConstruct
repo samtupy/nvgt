@@ -119,6 +119,8 @@ if "version.cpp" in sources: sources.remove("version.cpp")
 env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
 version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.
 VariantDir("build/obj_src", "src", duplicate = 0)
+VariantDir("build/obj_src/autogen/arch", "#lindev/autogen/arch",    duplicate=0)
+VariantDir("build/obj_src/autogen/dbus", "#lindev/autogen/dbus",    duplicate=0)
 env.Append(CPPDEFINES = ["NVGT_BUILDING", "NO_OBFUSCATE"])
 if env["PLATFORM"] == "win32":
 	deb_rel_flags = ["/DEBUG", "/INCREMENTAL:NO"] if ARGUMENTS.get("debug", "0") == "1" else ["/OPT:ICF=3"]
@@ -143,11 +145,12 @@ elif env["PLATFORM"] == "posix":
 			break
 	if ('target_triplet' in env and env['target_triplet'] is None) or ('target_triplet' not in env):
 		env.Exit(1, f"Unsupported target triple '{detected}'; must be one of: " + ", ".join([t for _, t in mappings]))
-	sources.extend(Glob(f"#lindev/autogen/arch/{env['target_triplet']}/*.c", strings=True))
-	sources.extend(Glob(f"#lindev/autogen/arch/{env['target_triplet']}/*.S", strings=True))
-	VariantDir("#build/obj_src/autogen/arch", "#lindev/autogen/arch", duplicate=0)
-	sources.extend(Glob(f"#lindev/autogen/dbus/*.c", strings=True))
-	VariantDir("#build/obj_src/autogen/dbus", "#lindev/autogen/dbus", duplicate=0)
+	arch_sources = []
+	arch_sources += Glob(f"#build/obj_src/autogen/arch/{env['target_triplet']}/*.c", strings=True)
+	arch_sources += Glob(f"#build/obj_src/autogen/arch/{env['target_triplet']}/*.S", strings=True)
+	dbus_sources = Glob("#build/obj_src/autogen/dbus/*.c", strings=True)
+	sources.extend(arch_sources)
+	sources.extend(dbus_sources)
 	env.ParseConfig('pkg-config --cflags gtk4')
 	env.ParseConfig('pkg-config --cflags glib-2.0')
 	env.ParseConfig('pkg-config --cflags dbus-1')
