@@ -151,7 +151,6 @@ elif env["PLATFORM"] == "posix":
 	env.ParseConfig('pkg-config --cflags gtk4')
 	env.ParseConfig('pkg-config --cflags glib-2.0')
 	env.ParseConfig('pkg-config --cflags dbus-1')
-	env.ParseConfig('pkg-config --cflags x11')
 	env.ParseConfig('pkg-config --cflags speech-dispatcher')
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
