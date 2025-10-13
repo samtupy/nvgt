@@ -12,6 +12,7 @@ import sys
 import platform
 import os
 from xml.etree.ElementTree import ParseError, parse
+import re
 if sys.platform == "linux":
 	from gi.repository import Gio
 
@@ -82,6 +83,18 @@ def generate_gdbus_code(xml_path: Path, out_base: Path) -> None:
 			print(f"gdbus-codegen failed for {xml_path}: {e}", file=sys.stderr)
 			sys.exit(1)
 
+def find_library_path(lib_name):
+	try:
+		result = subprocess.run(['ldconfig', '-p'], capture_output=True, text=True, check=True)
+		pattern = rf'\s+lib{lib_name}\.so[^\s]*\s+\([^)]+\)\s+=>\s+(\S+)'
+		for line in result.stdout.splitlines():
+			match = re.search(pattern, line)
+			if match:
+				return match.group(1)
+		return None
+	except (subprocess.CalledProcessError, FileNotFoundError):
+		return None
+
 def build(triplet = "", do_archive = False, out_dir = ""):
 	if not triplet:
 		machine = platform.machine().lower()
@@ -132,10 +145,12 @@ def build(triplet = "", do_archive = False, out_dir = ""):
 				except subprocess.CalledProcessError as cpe:
 					print(f"Warning: could not generate implib for {f} for arch {arch}: implib-gen returned {cpe.returncode}", file=sys.stderr)
 					print (f"Warning: if generated, implib for {f} may be incomplete")
+			libspeechd_path = find_library_path("speechd")
+			libspeechd_path = re.sub(r'\.so\.[\d.]+$', '.so', libspeechd_path)
 			try:
-				subprocess.check_output([sys.executable, "implib-gen.py", "--target", arch, "--dlopen-callback", "nvgt_dlopen", "--dlsym-callback", "nvgt_dlsym", "-o", str(out_dir_arch.resolve()), "/usr/lib/libspeechd.so"], stderr=subprocess.STDOUT)
+				subprocess.check_output([sys.executable, "implib-gen.py", "--target", arch, "--dlopen-callback", "nvgt_dlopen", "--dlsym-callback", "nvgt_dlsym", "-o", str(out_dir_arch.resolve()), libspeechd_path], stderr=subprocess.STDOUT)
 			except subprocess.CalledProcessError as cpe:
-				sys.exit(f"Warning: could not generate implib for /usr/lib/libspeechd.so for arch {arch}: implib-gen returned {cpe.returncode}")
+				sys.exit(f"Error: could not generate implib for {libspeechd_path} for arch {arch}: implib-gen returned {cpe.returncode}")
 		os.chdir(oldcwd)
 		out_dir_dbus = out_dir / "autogen" / "dbus"
 		out_dir_dbus.mkdir(parents = True, exist_ok = True)
