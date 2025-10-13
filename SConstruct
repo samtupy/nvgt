@@ -205,7 +205,7 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
 	if env["PLATFORM"] == "win32": stub_env.Append(LINKFLAGS = ["/subsystem:windows"])
 	if ARGUMENTS.get("stub_obfuscation", "0") == "1": stub_env["CPPDEFINES"].remove("NO_OBFUSCATE")
-	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + stub_env.Object(lindev_sources) + extra_objects
+	stub_objects = stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + env.Object(lindev_sources) + extra_objects
 	if ARGUMENTS.get("debug", "0") == "1": stub_env["PDB"] = "#build/debug/nvgt_windows.pdb"
 	stub = stub_env.Program(f"release/stub/nvgt_{stub_platform}", stub_objects)
 	if env["PLATFORM"] == "win32": env.Install("c:/nvgt/stub", stub)
