@@ -148,7 +148,10 @@ elif env["PLATFORM"] == "posix":
 	VariantDir("#build/obj_lindev/autogen/dbus", "#lindev/autogen/dbus",     duplicate = 0)
 	lindev_sources.extend(Glob(f"#build/obj_lindev/autogen/arch/{env['target_triplet']}/*.c", strings=True))
 	lindev_sources.extend(Glob(f"#build/obj_lindev/autogen/arch/{env['target_triplet']}/*.S", strings=True))
-	lindev_sources.extend(Glob("#build/obj_lindev/autogen/dbus/**.c", strings=True))
+	for root, dirs, files in os.walk(Dir("#lindev/autogen/dbus").abspath):
+		for file in files:
+			rel_path = os.path.relpath(os.path.join(root, file), Dir("#lindev/autogen/dbus").abspath)
+			lindev_sources.append(os.path.join("#build/obj_lindev/autogen/dbus", rel_path))
 	env.ParseConfig('pkg-config --cflags gtk4')
 	env.ParseConfig('pkg-config --cflags glib-2.0')
 	env.ParseConfig('pkg-config --cflags dbus-1')
