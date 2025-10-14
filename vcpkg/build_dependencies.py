@@ -56,12 +56,12 @@ def derive_c_paths(xml_path: Path, out_base: Path) -> tuple[Path, Path]:
 	target_dir = target_dir.joinpath(*namespace)
 	return (target_dir / f"{iface}.h", target_dir / f"{iface}.c")
 
-def run_gdbus_codegen(iface: str, target_dir: Path, xml_spec: Path) -> None:
-	common_args = [gdbus_codegen, "--pragma-once", "--c-generate-object-manager", "--c-generate-autocleanup", "all", "--glib-min-required", glib_min_required]
+def run_gdbus_codegen(iface: str, target_dir: Path, xml_spec: Path, c_namespace: str) -> None:
+	common_args = [gdbus_codegen, "--c-generate-object-manager", "--pragma-once", "--c-generate-autocleanup", "all", "--glib-min-required", glib_min_required, "--c-namespace", c_namespace]
 	subprocess.run([*common_args, "--header", "--output", str(target_dir / f"{iface}.h"), str(xml_spec)], check=True)
 	subprocess.run([*common_args, "--body", "--output", str(target_dir / f"{iface}.c"), str(xml_spec)], check=True)
 
-def generate_gdbus_code(xml_path: Path, out_base: Path) -> None:
+def generate_gdbus_code(xml_path: Path, out_base: Path, c_namespace: str) -> None:
 	if not is_well_formed(xml_path):
 		return
 	xml_bytes = xml_path.read_bytes()
@@ -78,7 +78,7 @@ def generate_gdbus_code(xml_path: Path, out_base: Path) -> None:
 		print(f"Skipping invocation of gdbus-codegen for {xml_path}: outputs already exist")
 	else:
 		try:
-			run_gdbus_codegen(iface_name, c_header_path.parent, xml_path)
+			run_gdbus_codegen(iface_name, c_header_path.parent, xml_path, c_namespace)
 		except subprocess.CalledProcessError as e:
 			print(f"gdbus-codegen failed for {xml_path}: {e}", file=sys.stderr)
 			sys.exit(1)
@@ -158,7 +158,8 @@ def build(triplet = "", do_archive = False, out_dir = ""):
 		out_dir_dbus.mkdir(parents = True, exist_ok = True)
 		dbus_interfaces = ["org.freedesktop.login1.Manager", "org.freedesktop.login1.Session", "org.freedesktop.login1.Seat", "org.freedesktop.login1.User"]
 		for dbus_interface in dbus_interfaces:
-			generate_gdbus_code(Path(f"/usr/share/dbus-1/interfaces/{dbus_interface}.xml"), out_dir_dbus)
+			namespace = dbus_interface.replace('.', '_')
+			generate_gdbus_code(Path(f"/usr/share/dbus-1/interfaces/{dbus_interface}.xml"), out_dir_dbus,namespace )
 	if do_archive:
 		shutil.make_archive(out_dir, format = "zip", root_dir = out_dir)
 		with out_dir.with_suffix(".zip").open("rb") as f, out_dir.with_suffix(".zip.blake2b").open("w") as hf:

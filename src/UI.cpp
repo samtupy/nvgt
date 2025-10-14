@@ -415,13 +415,13 @@ uint64_t idle_ticks() {
 		if (!conn) {
 			return -1;
 		}
-		g_autoptr(OrgFreedesktopLogin1Seat) seat = org_freedesktop_login1_seat_proxy_new_for_bus_sync (G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_NONE, "org.freedesktop.login1", "/org/freedesktop/login1/seat/self", nullptr, &error);
+		g_autoptr(orgfreedesktoplogin1SeatOrgFreedesktopLogin1Seat) seat = org_freedesktop_login1_seat_org_freedesktop_login1_seat_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_NONE, "org.freedesktop.login1", "/org/freedesktop/login1/seat/self", nullptr, &error);
 		if (!seat) {
 			return -1;
 		}
-		gboolean idle = org_freedesktop_login1_seat_get_idle_hint (seat);
+		gboolean idle = org_freedesktop_login1_seat_org_freedesktop_login1_seat_get_idle_hint(seat);
 		if (idle) {
-			guint64 ts_us = org_freedesktop_login1_seat_get_idle_since_hint_monotonic (seat);
+			guint64 ts_us = org_freedesktop_login1_seat_org_freedesktop_login1_seat_get_idle_since_hint_monotonic(seat);
 			return ts_us / 1000ULL;
 		}
 		return 0;
