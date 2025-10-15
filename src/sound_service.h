@@ -140,3 +140,10 @@ public:
 	virtual const std::string get_suffix(const directive_t &directive) const;
 	static const protocol *get_instance();
 };
+class netstream_protocol : public sound_service::protocol {
+	static const netstream_protocol instance;
+public:
+	virtual std::istream *open_uri(const char *uri, const directive_t directive) const;
+	virtual const std::string get_suffix(const directive_t &directive) const;
+	static const protocol *get_instance();
+};

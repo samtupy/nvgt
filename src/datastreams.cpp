@@ -45,6 +45,155 @@
 
 using namespace Poco;
 
+// SDL file stream implementation
+sdl_file_stream_buf::sdl_file_stream_buf() : BufferedBidirectionalStreamBuf(8192, std::ios::in | std::ios::out), _handle(nullptr) {}
+sdl_file_stream_buf::~sdl_file_stream_buf() { close(); }
+void sdl_file_stream_buf::open(const std::string& path, const std::string& mode) {
+	close();
+	resetBuffers();
+	_path = path;
+	_handle = SDL_IOFromFile(path.c_str(), mode.c_str());
+	if (!_handle) throw FileException("Cannot open file: " + path);
+	// Parse the mode string just to the extent that we can disable read or write features on the bidirectional buffer depending on stream type.
+	std::ios::openmode new_mode;
+	for (char c : mode) {
+		if (c == 'r') new_mode |= std::ios::in;
+		else if (c == 'w') new_mode |= std::ios::out;
+		else if (c == 'a') new_mode |= std::ios::out | std::ios::app;
+		else if (c == '+') new_mode |= std::ios::in | std::ios::out | std::ios::app;
+	}
+	setMode(new_mode);
+}
+bool sdl_file_stream_buf::close() {
+	bool success = true;
+	if (_handle) {
+		sync();
+		success = SDL_CloseIO(_handle);
+		_handle = nullptr;
+	}
+	_path.clear();
+	return success;
+}
+SDL_IOStream* sdl_file_stream_buf::nativeHandle() const { return _handle; }
+UInt64 sdl_file_stream_buf::size() const { return _handle? SDL_GetIOSize(_handle) : 0; }
+void sdl_file_stream_buf::flushToDisk() {
+	if (!_handle) return;
+	if (getMode() & std::ios::out) sync();
+	SDL_FlushIO(_handle);
+}
+int sdl_file_stream_buf::readFromDevice(char* buffer, std::streamsize length) {
+	if (!_handle) return -1;
+	size_t bytes_read = SDL_ReadIO(_handle, buffer, length);
+	if (bytes_read > 0) return bytes_read;
+	return SDL_GetIOStatus(_handle) == SDL_IO_STATUS_EOF? 0 : -1;
+}
+int sdl_file_stream_buf::writeToDevice(const char* buffer, std::streamsize length) {
+	if (!_handle) return -1;
+	size_t bytes_written = SDL_WriteIO(_handle, buffer, length);
+	if (bytes_written > 0) return bytes_written;
+	return SDL_GetIOStatus(_handle) != SDL_IO_STATUS_ERROR? 0 : -1;
+}
+std::streampos sdl_file_stream_buf::seekoff(std::streamoff off, std::ios::seekdir dir, std::ios::openmode mode) {
+	if (!_handle) return std::streampos(std::streamoff(-1));
+	if (getMode() & std::ios::out) sync();
+	if (dir == std::ios::cur && mode & std::ios::in) off -= static_cast<std::streamoff>(egptr() - gptr());
+	resetBuffers();
+	Sint64 new_pos = SDL_SeekIO(_handle, off, seekdir_to_whence(dir));
+	if (new_pos < 0) return -1;
+	return new_pos;
+}
+std::streampos sdl_file_stream_buf::seekpos(std::streampos pos, std::ios::openmode mode) {
+	if (!_handle) return -1;
+	if (getMode() & std::ios::out) sync();
+	resetBuffers();
+	Sint64 new_pos = SDL_SeekIO(_handle, pos, SDL_IO_SEEK_SET);
+	if (new_pos < 0) return -1;
+	return new_pos;
+}
+SDL_IOWhence sdl_file_stream_buf::seekdir_to_whence(std::ios::seekdir dir) const {
+	switch (dir) {
+		case std::ios::beg: return SDL_IO_SEEK_SET;
+		case std::ios::end: return SDL_IO_SEEK_END;
+		default: return SDL_IO_SEEK_CUR;
+	}
+}
+
+sdl_file_ios::sdl_file_ios() { poco_ios_init(&_buf); }
+void sdl_file_ios::open(const std::string& path, const std::string& mode) { clear(); _buf.open(path, mode); }
+void sdl_file_ios::close() { if (!_buf.close()) setstate(std::ios::badbit); }
+sdl_file_stream_buf* sdl_file_ios::rdbuf() { return &_buf; }
+sdl_file_ios::NativeHandle sdl_file_ios::nativeHandle() const { return _buf.nativeHandle(); }
+UInt64 sdl_file_ios::size() const { return _buf.size(); }
+void sdl_file_ios::flushToDisk() { _buf.flushToDisk(); }
+
+sdl_file_input_stream::sdl_file_input_stream() : std::istream(&_buf) {}
+sdl_file_input_stream::sdl_file_input_stream(const std::string& path, const std::string& mode) : std::istream(&_buf) { open(path, mode); }
+
+sdl_file_output_stream::sdl_file_output_stream() : std::ostream(&_buf) {}
+sdl_file_output_stream::sdl_file_output_stream(const std::string& path, const std::string& mode) : std::ostream(&_buf) { open(path, mode); }
+
+sdl_file_stream::sdl_file_stream() : std::iostream(&_buf) {}
+sdl_file_stream::sdl_file_stream(const std::string& path, const std::string& mode) : std::iostream(&_buf) { open(path, mode); }
+
+// Prebuffered input stream implementation
+prebuffer_istreambuf::prebuffer_istreambuf(std::istream& source, std::size_t prebuffer_size) : BasicBufferedStreamBuf(4096, std::ios_base::in), source(&source), prebuffer_size(prebuffer_size), prebuffer_pos(0), prebuffer_discarded(false), owns_source(false) {
+	if (!source.good()) throw std::invalid_argument("Source stream is invalid.");
+	prebuffer.reserve(prebuffer_size);
+}
+prebuffer_istreambuf::~prebuffer_istreambuf() { if (owns_source) delete source; }
+void prebuffer_istreambuf::own_source(bool owns) { owns_source = owns; }
+bool prebuffer_istreambuf::fill_prebuffer() {
+	if (!prebuffer.empty() || prebuffer_discarded) return true;
+	prebuffer.resize(prebuffer_size);
+	source->read(prebuffer.data(), prebuffer_size);
+	std::size_t bytes_read = source->gcount();
+	prebuffer.resize(bytes_read);
+	return bytes_read > 0;
+}
+int prebuffer_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
+	if (length <= 0) return 0;
+	std::streamsize bytes_read = 0;
+	if (prebuffer.empty() && !prebuffer_discarded) fill_prebuffer();
+	if (!prebuffer_discarded && prebuffer_pos < prebuffer.size()) {
+		std::size_t available_in_prebuffer = prebuffer.size() - prebuffer_pos;
+		std::size_t to_copy = std::min(static_cast<std::size_t>(length), available_in_prebuffer);
+		std::memcpy(buffer, prebuffer.data() + prebuffer_pos, to_copy);
+		prebuffer_pos += to_copy;
+		buffer += to_copy;
+		length -= to_copy;
+		bytes_read += to_copy;
+		if (prebuffer_pos >= prebuffer.size()) {
+			prebuffer.clear();
+			prebuffer.shrink_to_fit();
+			prebuffer_discarded = true;
+		}
+	}
+	if (length > 0) {
+		source->read(buffer, length);
+		std::streamsize source_bytes_read = source->gcount();
+		bytes_read += source_bytes_read;
+	}
+	return static_cast<int>(bytes_read);
+}
+std::streampos prebuffer_istreambuf::seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
+	if (dir == std::ios_base::beg && off == 0) return seekpos(0);
+	return -1;
+}
+std::streampos prebuffer_istreambuf::seekpos(std::streampos pos, std::ios_base::openmode which) {
+	if (pos != 0 || prebuffer_discarded) return -1;
+	if (prebuffer.empty()) fill_prebuffer();
+	prebuffer_pos = 0;
+	setg(nullptr, nullptr, nullptr);
+	return 0;
+}
+prebuffer_istream::prebuffer_istream(std::istream& source, std::size_t prebuffer_size) : basic_istream(new prebuffer_istreambuf(source, prebuffer_size)) {}
+prebuffer_istream::~prebuffer_istream() { delete rdbuf(); }
+std::istream& prebuffer_istream::own_source(bool owns) {
+	prebuffer_istreambuf* buf = static_cast<prebuffer_istreambuf*>(rdbuf());
+	if (buf != nullptr) buf->own_source(owns);
+	return *this;
+}
+
 // Global datastream singletons for cin, cout and cerr.
 datastream* ds_cout = nullptr;
 datastream* ds_cin = nullptr;
@@ -563,6 +712,11 @@ std::string stringstream_str(datastream* ds) {
 	std::stringstream* ss = dynamic_cast<std::stringstream*>(ds->stream());
 	return ss ? ss->str() : "";
 }
+void stringstream_str_set(datastream* ds, const std::string& new_data) {
+	std::stringstream* ss = dynamic_cast<std::stringstream*>(ds->stream());
+	if (!ss) return;
+	ss->str(new_data);
+}
 // duplicating_reader/writer, in Poco known as TeeStream.
 void duplicating_stream_close(datastream* ds) {
 	std::vector<datastream*>* streams = (std::vector<datastream*>*)ds->user;
@@ -704,6 +858,7 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in initial_data, const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_factory), asCALL_CDECL);
 	engine->RegisterObjectMethod("datastream", "bool open(const string&in initial_data = \"\", const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_open), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datastream", "string str()", asFUNCTION(stringstream_str), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("datastream", "void str(const string&in new_data)", asFUNCTION(stringstream_str_set), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_TERMINAL);
 	engine->RegisterGlobalFunction("datastream@ get_cin() property", asFUNCTION(get_cin), asCALL_CDECL);
 	engine->RegisterGlobalFunction("datastream@ get_cout() property", asFUNCTION(get_cout), asCALL_CDECL);

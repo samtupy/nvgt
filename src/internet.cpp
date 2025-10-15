@@ -32,6 +32,9 @@
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/Net/HTTPRequest.h>
 #include <Poco/Net/HTTPSClientSession.h>
+#include <Poco/Net/FTPStreamFactory.h>
+#include <Poco/Net/HTTPSStreamFactory.h>
+#include <Poco/Net/HTTPStreamFactory.h>
 #include <Poco/Net/MessageHeader.h>
 #include <Poco/Net/SSLManager.h>
 #include <Poco/Net/WebSocket.h>
@@ -773,6 +776,9 @@ string url_post(const string& url, const string& data, HTTPResponse* resp) { ret
 
 void RegisterInternet(asIScriptEngine* engine) {
 	SSLManager::instance().initializeClient(NULL, new AcceptCertificateHandler(false), new Context(Context::TLS_CLIENT_USE, ""));
+	FTPStreamFactory::registerFactory();
+	HTTPStreamFactory::registerFactory();
+	HTTPSStreamFactory::registerFactory();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
 	map<string, int> http_statuses({
 		{"HTTP_CONTINUE", 100}, {"HTTP_SWITCHING_PROTOCOLS", 101}, {"HTTP_PROCESSING", 102}, {"HTTP_OK", 200}, {"HTTP_CREATED", 201}, {"HTTP_ACCEPTED", 202}, {"HTTP_NONAUTHORITATIVE", 203}, {"HTTP_NO_CONTENT", 204}, {"HTTP_RESET_CONTENT", 205}, {"HTTP_PARTIAL_CONTENT", 206}, {"HTTP_MULTI_STATUS", 207}, {"HTTP_ALREADY_REPORTED", 208}, {"HTTP_IM_USED", 226},

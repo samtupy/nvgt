@@ -50,7 +50,7 @@
 #include "random_interface.h"    // cleanup_default_random()
 #include "serialize.h" // current location of g_StringTypeid (subject to change)
 #include "sound.h"
-#include "srspeech.h"
+#include "tts.h"
 #include "UI.h" // message
 #include "version.h"
 #include "xplatform.h"
@@ -357,7 +357,7 @@ protected:
 		#ifdef _WIN32
 		timeEndPeriod(1);
 		#endif
-		ScreenReaderUnload();
+		screen_reader_unload();
 		InputDestroy();
 		uninit_sound();
 		anticheat_deinit();

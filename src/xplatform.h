@@ -21,6 +21,7 @@
 class asIScriptEngine;
 
 bool running_on_mobile();
+void register_native_tts(); // Actual function exists in either android.cpp, apple.mm, linux.cpp or win.cpp, of which only one will be built.
 #ifndef NVGT_STUB
 void determine_compile_platform();
 void xplatform_correct_path_to_stubs(Poco::Path& stubpath);

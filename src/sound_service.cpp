@@ -12,11 +12,12 @@
  */
 
 #include "sound_service.h"
-#include <Poco/FileStream.h>
+#include <Poco/URIStreamOpener.h>
 #include <vector>
 #include <cassert>
 #include <miniaudio.h>
 #include "crypto.h"
+#include "datastreams.h" // sdl_file_stream, prebuffer_istream
 #include "misc_functions.h" // is_valid_utf8
 #include "pack.h"
 #include <Poco/StringTokenizer.h>
@@ -27,6 +28,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <mutex>
+
 /**
  * The VFS is the glue between the sound service and MiniAudio.
  * We have an opaque structure -- in this case a pointer to the sound_service implementation -- and a series of callbacks which provide MiniAudio an interface to it.
@@ -60,9 +62,9 @@ class sound_service_impl : public sound_service {
 			return &instance;
 		}
 		virtual std::istream *open_uri(const char *uri, const directive_t directive) const {
-			Poco::FileInputStream *stream;
+			sdl_file_input_stream* stream;
 			try {
-				stream = new Poco::FileInputStream(uri);
+				stream = new sdl_file_input_stream(uri);
 				return stream;
 			} catch (std::exception &) {
 				return NULL; // Likely out of memory.
@@ -347,19 +349,24 @@ private:
 				return MA_ERROR;
 		}
 		stream->seekg(offset, dir);
-
-		return MA_SUCCESS;
+		return stream->good()? MA_SUCCESS : MA_NOT_IMPLEMENTED;
 	}
 	static ma_result onTell(ma_vfs *pVFS, ma_vfs_file file, ma_int64 *pCursor) {
 		file_cast(file);
-		*pCursor = stream->tellg();
-		return MA_SUCCESS;
+		ma_int64 result = stream->tellg();
+		*pCursor = result != -1? result : 0;
+		return result != -1? MA_SUCCESS : MA_NOT_IMPLEMENTED;
 	}
 	static ma_result onInfo(ma_vfs *pVFS, ma_vfs_file file, ma_file_info *pInfo) {
 		file_cast(file);
 		stream->clear();
 		size_t cursor = stream->tellg();
 		stream->seekg(0, stream->end);
+		if (stream->fail()) {
+			pInfo->sizeInBytes = 0;
+			stream->clear();
+			return MA_NOT_IMPLEMENTED;
+		}
 		pInfo->sizeInBytes = stream->tellg();
 		stream->seekg(cursor, stream->beg);
 		return MA_SUCCESS;
@@ -449,3 +456,16 @@ const pack_protocol pack_protocol::instance;
 const sound_service::protocol *pack_protocol::get_instance() {
 	return &instance;
 }
+
+// internet stream sound service protocol, combining Poco::UriStreamOpener with our prebuffer_istream.
+std::istream *netstream_protocol::open_uri(const char *uri, const directive_t directive) const {
+	try {
+		std::istream *stream = Poco::URIStreamOpener::defaultOpener().open(uri);
+		if (!stream) return nullptr; // Likely invalid URI. Figure out how to provide info about this to user?
+		return &(new prebuffer_istream(*stream))->own_source();
+	} catch(std::exception&) {} // Again figure out how to let user see exception details.
+	return nullptr;
+}
+const std::string netstream_protocol::get_suffix(const directive_t &directive) const { return "URI"; }
+const netstream_protocol netstream_protocol::instance;
+const sound_service::protocol *netstream_protocol::get_instance() { return &instance; }

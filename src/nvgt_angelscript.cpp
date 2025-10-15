@@ -65,7 +65,6 @@
 #include "scriptstuff.h"
 #include "serialize.h"
 #include "sound.h"
-#include "srspeech.h"
 #include "system_fingerprint.h"
 #include "threading.h"
 #include "timestuff.h"
@@ -466,7 +465,6 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_SPEECH);
 	engine->BeginConfigGroup("screen_reader");
-	RegisterScreenReaderSpeech(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_FS);
 	engine->BeginConfigGroup("pack");

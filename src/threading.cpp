@@ -23,6 +23,7 @@
 #include <Poco/ScopedLock.h>
 #include <Poco/Thread.h>
 #include <Poco/ThreadPool.h>
+#include <SDL3/SDL_init.h>
 #include <angelscript.h>
 #include <scriptdictionary.h>
 #include <scripthelper.h>
@@ -401,6 +402,7 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("thread_priority", "THREAD_PRIORITY_HIGH", Thread::Priority::PRIO_HIGH);
 	engine->RegisterEnumValue("thread_priority", "THREAD_PRIORITY_HIGHEST", Thread::Priority::PRIO_HIGHEST);
 	angelscript_refcounted_register<Thread>(engine, "thread");
+	engine->RegisterGlobalFunction("bool get_thread_is_main() property", asFUNCTION(SDL_IsMainThread), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint thread_current_id()"), asFUNCTION(Thread::currentOsTid), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void thread_yield()"), asFUNCTION(Thread::yield), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool thread_sleep(uint ms)"), asFUNCTION(Thread::trySleep), asCALL_CDECL);

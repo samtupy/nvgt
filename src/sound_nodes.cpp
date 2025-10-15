@@ -23,10 +23,6 @@
 using namespace std;
 
 // This node allows easy creation of miniaudio nodes in C++.
-typedef struct {
-	ma_node_base base;
-	effect_node* node;
-} ma_effect_node;
 static void ma_effect_node_process_pcm_frames(ma_node* pNode, const float** ppFramesIn, ma_uint32* pFrameCountIn, float** ppFramesOut, ma_uint32* pFrameCountOut) {
 	ma_effect_node* node = (ma_effect_node*)pNode;
 	if (!node->node) return;
@@ -38,30 +34,25 @@ static ma_result ma_effect_node_get_required_input_frame_count(ma_node* pNode, m
 	*input_frame_count = node->node->required_input_frame_count(outputFrameCount);
 	return MA_SUCCESS;
 }
-class effect_node_impl : public audio_node_impl, public virtual effect_node {
-	ma_node_vtable vtable;
-	public:
-	unique_ptr<ma_effect_node> n;
-	effect_node_impl(audio_engine* e, ma_uint8 input_channel_count, ma_uint8 output_channel_count, ma_uint8 input_bus_count, ma_uint8 output_bus_count, unsigned int flags) : n(make_unique<ma_effect_node>()), audio_node_impl(nullptr, e), vtable({&ma_effect_node_process_pcm_frames, &ma_effect_node_get_required_input_frame_count, input_bus_count, output_bus_count, flags}) {
-		if (!input_channel_count) input_channel_count = e->get_channels();
-		if (!output_channel_count) output_channel_count = e->get_channels();
-		ma_node_config cfg = ma_node_config_init();
-		vector<ma_uint32> channels_in(input_bus_count, input_channel_count), channels_out(output_bus_count, output_channel_count);
-		cfg.vtable          = &vtable;
-		cfg.pInputChannels  = &channels_in[0];
-		cfg.pOutputChannels = &channels_out[0];
-		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*n)) != MA_SUCCESS) throw std::runtime_error("failed to create effect node");
-		n->node = this;
-		node = (ma_node_base*)&*n;
-	}
-	~effect_node_impl() { destroy_node(); }
-	void destroy_node() {
-		if (n) ma_node_uninit((ma_node_base*)&*n, nullptr);
-		n.reset();
-	}
-	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {} // override in subclasses.
-	unsigned int required_input_frame_count(unsigned int output_frame_count) const override { return output_frame_count; }
-};
+effect_node_impl::effect_node_impl(audio_engine* e, ma_uint8 input_channel_count, ma_uint8 output_channel_count, ma_uint8 input_bus_count, ma_uint8 output_bus_count, unsigned int flags) : n(make_unique<ma_effect_node>()), audio_node_impl(nullptr, e), vtable({&ma_effect_node_process_pcm_frames, &ma_effect_node_get_required_input_frame_count, input_bus_count, output_bus_count, flags}) {
+	if (!input_channel_count) input_channel_count = e->get_channels();
+	if (!output_channel_count) output_channel_count = e->get_channels();
+	ma_node_config cfg = ma_node_config_init();
+	vector<ma_uint32> channels_in(input_bus_count, input_channel_count), channels_out(output_bus_count, output_channel_count);
+	cfg.vtable          = &vtable;
+	if (input_bus_count > 0) cfg.pInputChannels  = &channels_in[0];
+	if (output_bus_count > 0) cfg.pOutputChannels = &channels_out[0];
+	if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*n)) != MA_SUCCESS) throw std::runtime_error("failed to create effect node");
+	n->node = this;
+	node = (ma_node_base*)&*n;
+}
+effect_node_impl::~effect_node_impl() { destroy_node(); }
+void effect_node_impl::destroy_node() {
+	if (n) ma_node_uninit((ma_node_base*)&*n, nullptr);
+	n.reset();
+}
+void effect_node_impl::process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) {} // override in subclasses.
+unsigned int effect_node_impl::required_input_frame_count(unsigned int output_frame_count) const { return output_frame_count; }
 
 // The following node acts as a simple passthrough, with a callback that does nothing. The purpose is for any object that exists between or in any way handles nodes to be able to exist in the node graph.
 // For example a reverb3d node acts as a high level API to applying reverb to 3d sounds. We want the user to be able to swap underlying reverb effect nodes that all sounds attached to the reverb3d objects are using, but prefferably without keeping track of sounds to reattach. Therefor, reverb3d acts as a passthrough node which all connected sounds are attached to, allowing us to swap the underlying reverb effect in one place rather than for all connected sounds.
@@ -722,7 +713,7 @@ private:
 		remove_node(reverb_attachment);
 		switch (reverb_placement) {
 			case prepan:
-				add_node_at(reverb_attachment, -1, 0);
+				add_node(reverb_attachment, nullptr, 0);
 				break;
 			case postpan:
 				if (panner) add_node(reverb_attachment, panner, 0);
@@ -782,7 +773,6 @@ public:
 			if (reverb_attachment && reverb_placement == prepan) add_node(panner, reverb_attachment, 0);
 			else add_node(panner, nullptr, 0);
 		}
-		position_reverb();
 	}
 	void set_attenuator(spatializer_component_node* new_attenuator) override {
 		if (attenuator) {
@@ -796,7 +786,6 @@ public:
 			else if (!panner && reverb_attachment && reverb_placement == prepan) add_node(attenuator, reverb_attachment, 0);
 			else add_node(attenuator, nullptr, 0);
 		}
-		position_reverb();
 	}
 	void set_reverb3d(reverb3d* new_reverb, audio_spatializer_reverb3d_placement placement = postpan) override {
 		if (new_reverb == reverb) return;
@@ -856,9 +845,9 @@ public:
 	int get_current_attenuator_id() const override { return current_attenuator_id; }
 	int get_preferred_panner_id() const override { return preferred_panner_id; }
 	int get_preferred_attenuator_id() const override { return preferred_attenuator_id; }
-	void set_rolloff(float rolloff) override { spatialization_params.rolloff = rolloff; }
+	void set_rolloff(float rolloff) override { spatialization_params.rolloff = clamp(rolloff, 0.0f, 100.0f); }
 	float get_rolloff() const override { return spatialization_params.rolloff; }
-	void set_directional_attenuation_factor(float factor) override { spatialization_params.directional_attenuation_factor = factor; }
+	void set_directional_attenuation_factor(float factor) override { spatialization_params.directional_attenuation_factor = clamp(factor, 0.0f, 100.0f); }
 	float get_directional_attenuation_factor() const override { return spatialization_params.directional_attenuation_factor; }
 	bool get_parameters(audio_spatialization_parameters& params) override {
 		if (!parameters_valid) return false;
@@ -923,6 +912,7 @@ public:
 		ma_panner_config panner_config = ma_panner_config_init(ma_format_f32, 2);
 		if (ma_panner_init(&panner_config, &panner) != MA_SUCCESS) throw std::runtime_error("Failed to initialize panner");
 	}
+	~basic_panner_impl() { destroy_node(); }
 	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
 		ma_uint32 frameCount = *frame_count_out;
 		if (!spatializer) goto fail;
@@ -952,9 +942,7 @@ public:
 		iplEffectParams.interpolation = IPL_HRTFINTERPOLATION_NEAREST;
 		iplEffectParams.spatialBlend = 1.0;
 		iplEffectParams.hrtf = g_phonon_hrtf;
-		if (iplBinauralEffectCreate(g_phonon_context, &g_phonon_audio_settings, &effectSettings, &iplEffect) != IPL_STATUS_SUCCESS) {
-			throw std::runtime_error("Failed to create binaural effect");
-		}
+		if (iplBinauralEffectCreate(g_phonon_context, &g_phonon_audio_settings, &effectSettings, &iplEffect) != IPL_STATUS_SUCCESS) throw std::runtime_error("Failed to create binaural effect");
 		ma_uint32 channelsIn = e->get_channels();
 		if (iplAudioBufferAllocate(g_phonon_context, channelsIn, g_phonon_audio_settings.frameSize, &inputBuffer) != IPL_STATUS_SUCCESS) {
 			iplBinauralEffectRelease(&iplEffect);
@@ -1080,9 +1068,10 @@ public:
 		if (!spatializer->get_parameters(params)) goto fail;
 		distanceModel.minDistance = params.min_distance;
 		distanceModel.type = IPL_DISTANCEATTENUATIONTYPE_INVERSEDISTANCE;
-		sourcePos = {params.sound_x, params.sound_y, params.sound_z};
-		listenerPos = {params.listener_x, params.listener_y, params.listener_z};
-		iplEffectParams.distanceAttenuation = clamp(iplDistanceAttenuationCalculate(g_phonon_context, sourcePos, listenerPos, &distanceModel) / params.rolloff, params.min_volume, params.max_volume);
+		params.rolloff *= 0.7; // Attenuators apply internal factors sometimes to try making it so that rolloff at a constant value will cause a similar volume reduction regardless of the attenuator in use.
+		sourcePos = {params.sound_x * params.rolloff, params.sound_y * params.rolloff, params.sound_z * params.rolloff};
+		listenerPos = {params.listener_x * params.rolloff, params.listener_y * params.rolloff, params.listener_z * params.rolloff};
+		iplEffectParams.distanceAttenuation = params.listener_distance <= params.max_distance? clamp(iplDistanceAttenuationCalculate(g_phonon_context, sourcePos, listenerPos, &distanceModel), params.min_volume, params.max_volume) : params.min_volume;
 		iplAirAbsorptionCalculate(g_phonon_context, sourcePos, listenerPos, &airAbsorptionModel, iplEffectParams.airAbsorption);
 		while (totalFramesProcessed < totalFramesToProcess) {
 			ma_uint32 framesToProcessThisIteration = totalFramesToProcess - totalFramesProcessed;

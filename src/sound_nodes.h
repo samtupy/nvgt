@@ -25,7 +25,10 @@ protected:
 public:
 	audio_node_impl(ma_node_base *node, audio_engine *engine) : audio_node(), node(node), engine(engine), refcount(1) {
 		if (!init_sound()) throw std::runtime_error("sound system was not initialized");
+		if (!engine) this->engine = g_audio_engine;
+		if (dynamic_cast<audio_node_impl*>(this->engine) != this) this->engine->duplicate();
 	}
+	~audio_node_impl() { if (engine && dynamic_cast<audio_node_impl*>(this->engine) != this) engine->release(); }
 	void duplicate() { asAtomicInc(refcount); }
 	void release() {
 		if (asAtomicDec(refcount) < 1)
@@ -48,14 +51,22 @@ public:
 	unsigned long long get_state_time(ma_node_state state) { return node ? ma_node_get_state_time(node, state) : static_cast<unsigned long long>(ma_node_state_stopped); }
 	ma_node_state get_state_by_time(unsigned long long global_time) { return node ? ma_node_get_state_by_time(node, global_time) : ma_node_state_stopped; }
 	ma_node_state get_state_by_time_range(unsigned long long global_time_begin, unsigned long long global_time_end) { return node ? ma_node_get_state_by_time_range(node, global_time_begin, global_time_end) : ma_node_state_stopped; }
-	unsigned long long get_time() { return node ? ma_node_get_time(node) : 0; }
+	unsigned long long get_time() const { return node ? ma_node_get_time(node) : 0; }
 	bool set_time(unsigned long long local_time) { return node ? (g_soundsystem_last_error = ma_node_set_time(node, local_time)) == MA_SUCCESS : false; }
 };
-
-class effect_node : public virtual audio_node {
+typedef struct {
+	ma_node_base base;
+	effect_node* node;
+} ma_effect_node;
+class effect_node_impl : public audio_node_impl, public virtual effect_node {
+	ma_node_vtable vtable;
 	public:
-	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
-	virtual unsigned int required_input_frame_count(unsigned int output_frame_count) const = 0;
+	std::unique_ptr<ma_effect_node> n;
+	effect_node_impl(audio_engine* e, ma_uint8 input_channel_count, ma_uint8 output_channel_count, ma_uint8 input_bus_count, ma_uint8 output_bus_count, unsigned int flags);
+	~effect_node_impl();
+	void destroy_node();
+	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override;
+	unsigned int required_input_frame_count(unsigned int output_frame_count) const override;
 };
 
 class passthrough_node : public virtual audio_node {
@@ -269,10 +280,9 @@ public:
 	static audio_spatializer* create(mixer* mixer, audio_engine* engine = nullptr);
 };
 
-class spatializer_component_node : public virtual audio_node {
+class spatializer_component_node : public virtual effect_node {
 public:
 	virtual audio_spatializer* get_spatializer() const = 0;
-	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
 };
 
 class basic_panner : public virtual spatializer_component_node {

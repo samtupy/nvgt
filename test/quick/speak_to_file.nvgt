@@ -12,7 +12,7 @@ void main() {
 	f.open("speak_to_file.wav", "wb");
 	f.write(audio);
 	f.close();
-	if (!s.push_memory(audio, true)) {
+	if (!s.load_memory(audio)) {
 		alert("test", audio.length());
 		return;
 	}
