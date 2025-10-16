@@ -179,7 +179,7 @@ void RegisterScriptLibrary(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("library"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(library, add_ref), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("library"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(library, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("bool load(const string&in filename)"), asMETHOD(library, load), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("library"), _O("bool unload()"), asMETHOD(library, load), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("library"), _O("bool unload()"), asMETHOD(library, unload), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("bool get_active() const property"), asMETHOD(library, is_active), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("dictionary@ call(const string&in signature, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null)"), asFUNCTION(library_call_generic), asCALL_GENERIC);
 	engine->RegisterGlobalFunction("string string_create_from_pointer(uint64 ptr, uint64 length)", asFUNCTION(string_create_from_pointer), asCALL_CDECL);
