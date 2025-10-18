@@ -30,8 +30,8 @@ jobs:
     - name: publish dependencies
       if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
       run: |
-        curl -u "${{secrets.CIFTP}}" -s -T macosdev.zip ftp://nvgt.gg
-        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/devlibs_update.php"
+        curl -u "${{secrets.CIFTP}}" -s -T macosdev.zip ftp://nvgt.dev
+        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.dev/ci/devlibs_update.php"
     - name: build
       run: |
         cp build/build_macos.sh .
@@ -63,8 +63,8 @@ jobs:
     - name: publish dependencies
       if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
       run: |
-        curl -u "${{secrets.CIFTP}}" -s -T lindev.zip ftp://nvgt.gg
-        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/devlibs_update.php"
+        curl -u "${{secrets.CIFTP}}" -s -T lindev.zip ftp://nvgt.dev
+        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.dev/ci/devlibs_update.php"
     - name: build
       run: |
         pip3 install scons
@@ -102,8 +102,8 @@ jobs:
     - name: publish dependencies
       if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
       run: |
-        curl -u "${{secrets.CIFTP}}" -s -T droidev.zip ftp://nvgt.gg
-        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/devlibs_update.php"
+        curl -u "${{secrets.CIFTP}}" -s -T droidev.zip ftp://nvgt.dev
+        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.dev/ci/devlibs_update.php"
     - name: keystore_official
       if: github.event.repository.fork == false
       run: |
@@ -150,8 +150,8 @@ jobs:
     - name: publish dependencies
       if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
       run: |
-        curl -u "${{secrets.CIFTP}}" -s -T windev.zip ftp://nvgt.gg
-        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/devlibs_update.php"
+        curl -u "${{secrets.CIFTP}}" -s -T windev.zip ftp://nvgt.dev
+        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.dev/ci/devlibs_update.php"
     - name: build
       run: |
         pip3 install scons
@@ -340,11 +340,11 @@ jobs:
       run: |
         mkdir android_package
         mv android_release/nvgt.apk android_package/nvgt_android_$nvgt_version.apk
-        curl -u "${{secrets.CIFTP}}" -s -T "android_package/nvgt_$nvgt_version.apk" ftp://nvgt.gg
-        curl -u "${{secrets.CIFTP}}" -s -T "linux_package/nvgt_$nvgt_version.tar.gz" ftp://nvgt.gg
-        curl -u "${{secrets.CIFTP}}" -s -T "mac_package/nvgt_$nvgt_version.dmg" ftp://nvgt.gg
-        curl -u "${{secrets.CIFTP}}" -s -T "windows_package/nvgt_$nvgt_version.exe" ftp://nvgt.gg
-        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.gg/ci/release_complete.php?ver=$nvgt_version"
+        curl -u "${{secrets.CIFTP}}" -s -T "android_package/nvgt_$nvgt_version.apk" ftp://nvgt.dev
+        curl -u "${{secrets.CIFTP}}" -s -T "linux_package/nvgt_$nvgt_version.tar.gz" ftp://nvgt.dev
+        curl -u "${{secrets.CIFTP}}" -s -T "mac_package/nvgt_$nvgt_version.dmg" ftp://nvgt.dev
+        curl -u "${{secrets.CIFTP}}" -s -T "windows_package/nvgt_$nvgt_version.exe" ftp://nvgt.dev
+        curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.dev/ci/release_complete.php?ver=$nvgt_version"
     - uses: ghalactic/github-release-from-tag@v5
       with:
         checksumGenerateAssets: "false"

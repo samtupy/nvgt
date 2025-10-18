@@ -1,6 +1,6 @@
 # NVGT's Documentation generator. This script is not designed to be particularly fast, pretty or configurable, as it should run infrequently and at this time we cannot imagine other ways in which we would like to generate our docs. Just run the script in the same directory as the doc/src folder and if there are no errors, the docs are generated. Requires the mistune module for rendering markdown from pip and the html help workshop from microsoft to create the .chm file.
-# NVGT - NonVisual Gaming Toolkit (https://nvgt.gg)
-# Copyright (c) 2022-2024 Sam Tupy
+# NVGT - NonVisual Gaming Toolkit (https://nvgt.dev)
+# Copyright (c) 2022-2025 Sam Tupy
 # license: zlib
 
 import json

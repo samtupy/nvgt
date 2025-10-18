@@ -1,8 +1,8 @@
 /* nvgt.cpp - program entry point
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -211,7 +211,7 @@ protected:
 	}
 	std::string UILauncher() {
 		// If the user launches NVGT's compiler without a terminal, let them select what to do from various options provided by simple dialogs. Currently the choice selection is one-shot and then we exit, but it might be turned into some sort of do-loop later so that the user can perform multiple selections in one application run.
-		std::vector<string> options = {"`Run a script", "Compile a script in release mode", "Compile a script in debug mode", "View version information", "View command line options", "Visit nvgt.gg on the web", "~Exit"};
+		std::vector<string> options = {"`Run a script", "Compile a script in release mode", "Compile a script in debug mode", "View version information", "View command line options", "Visit nvgt.dev on the web", "~Exit"};
 		#ifdef NVGT_MOBILE
 		options[1].insert(options[1].begin(), '\0');
 		options[2].insert(options[2].begin(), '\0');
@@ -250,7 +250,7 @@ protected:
 			return "";
 		} else if (option == 6) {
 			mode = NVGT_EXIT;
-			urlopen("https://nvgt.gg");
+			urlopen("https://nvgt.dev");
 			return "";
 		}
 		return ""; // How did we get here?

@@ -1,7 +1,7 @@
 # The purpose of this script is to encrypt and decrypt data in a way that is compatible with NVGT's encryption system.
 # This means you can encrypt data in Python, pass it to NVGT for decryption, and vice versa, especially if you wish to use a bridge between the two.
 # Written by Tunmi for
-# NVGT - NonVisual Gaming Toolkit (https://nvgt.gg)
+# NVGT - NonVisual Gaming Toolkit (https://nvgt.dev)
 # Copyright (c) 2022-2025 Sam Tupy
 # license: zlib
 

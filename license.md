@@ -1,6 +1,6 @@
 # NVGT - NonVisual Gaming Toolkit
-Copyright (c) 2022-2024 Sam Tupy
-[nvgt.gg](https://nvgt.gg)
+Copyright (c) 2022-2025 Sam Tupy
+[nvgt.dev](https://nvgt.dev)
 
 This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
 
