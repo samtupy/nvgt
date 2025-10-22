@@ -107,6 +107,7 @@ protected:
 			config().setString("application.gui", "");
 		}
 		#ifndef NVGT_STUB
+		string resources_dir = Path(config.getString("application.dir")).parent().pushDirectory("Resources").toString();
 		if (File(resources_dir).exists())
 			g_IncludeDirs.push_back(Path(resources_dir).pushDirectory("include").toString());
 		#endif
