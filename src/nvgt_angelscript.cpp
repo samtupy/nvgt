@@ -387,7 +387,7 @@ void auto_chdir() {
 		#elif defined(__APPLE__)
 		// Change to the resources directory if a bundled app, else executable's current dir.
 		if (Environment::has("MACOS_BUNDLED_APP")) ChDir(Path(config.getString("application.dir")).parent().pushDirectory("Resources").toString());
-		else CHDir(config.getString("application.dir"));
+		else ChDir(config.getString("application.dir"));
 		#elif !defined(NVGT_MOBILE)
 		ChDir(config.getString("application.dir"));
 		#endif
