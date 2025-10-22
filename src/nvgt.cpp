@@ -102,13 +102,9 @@ protected:
 		SetDllDirectoryW(dir_u.c_str());
 		CreateMutexW(nullptr, false, L"NVGTApplication"); // This mutex will automatically be freed by the OS on process termination so we don't need a handle to it, this exists only so the NVGT windows installer or anything else on windows can tell that NVGT is running without process enumeration.
 		#elif defined(__APPLE__)
-		std::string resources_dir = Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString();
 		if (Environment::has("MACOS_BUNDLED_APP")) {
-			// Use GUI instead of stdout and chdir to Resources directory.
+			// Use GUI instead of stdout.
 			config().setString("application.gui", "");
-			#ifdef NVGT_STUB
-			ChDir(resources_dir);
-			#endif
 		}
 		#ifndef NVGT_STUB
 		if (File(resources_dir).exists())
@@ -236,14 +232,8 @@ protected:
 				mode = NVGT_EXIT;
 				return "";
 			}
-			if (option > 1)
-				g_debug = option == 3;
+			if (option > 1) g_debug = option == 3;
 			mode = option == 1 ? NVGT_RUN : NVGT_COMPILE;
-			try {
-				// Try to change to the directory containing the selected script.
-				ChDir(Poco::Path(script).parent().toString());
-			} catch (...) {
-			} // If it fails, so be it.
 			return script;
 		} else if (option == 4 || option == 5) {
 			mode = option == 4 ? NVGT_VERSIONINFO : NVGT_HELP;

@@ -99,6 +99,7 @@ void ExceptionHandlerCallback(asIScriptContext *ctx, void* obj);
 
 using namespace std;
 using namespace Poco;
+using namespace Poco::Util;
 
 CContextMgr* g_ctxMgr = nullptr;
 #ifndef NVGT_STUB
@@ -375,6 +376,24 @@ asUINT GetTimeCallback() {
 	return ticks();
 }
 
+// By default, NVGT tries to change the process's current working directory to something sane such as the script or executable's containing folder, the resources directory in a compiled MacOS app etc.
+void auto_chdir() {
+	LayeredConfiguration &config = Application::instance().config();
+	if (config.has("app.no_auto_chdir")) return;
+	try {
+		#ifndef NVGT_STUB
+		// Try to change to the directory containing the selected script.
+		ChDir(g_scriptpath);
+		#elif defined(__APPLE__)
+		// Change to the resources directory if a bundled app, else executable's current dir.
+		if (Environment::has("MACOS_BUNDLED_APP")) ChDir(Path(config.getString("application.dir")).parent().pushDirectory("Resources").toString());
+		else CHDir(config.getString("application.dir"));
+		#elif !defined(NVGT_MOBILE)
+		ChDir(config.getString("application.dir"));
+		#endif
+	} catch (...) {} // If it fails, so be it.
+}
+
 // A user may want to namespace an enntire NVGT subsystem, for example to replace it with a plugin, for code organization etc.
 std::string get_system_namespace(const std::string& system) {
 	if (g_system_namespaces.find(system) != g_system_namespaces.end()) return g_system_namespaces[system];
@@ -544,7 +563,7 @@ int ConfigureEngine(asIScriptEngine *engine) {
 #ifndef NVGT_STUB
 // The following function translates various configuration options into Angelscript engine properties.
 void ConfigureEngineOptions(asIScriptEngine *engine) {
-	Util::LayeredConfiguration &config = Util::Application::instance().config();
+	LayeredConfiguration &config = Application::instance().config();
 	if (config.hasOption("scripting.allow_multiline_strings"))
 		engine->SetEngineProperty(asEP_ALLOW_MULTILINE_STRINGS, true);
 	if (config.hasOption("scripting.allow_unicode_identifiers"))
@@ -648,6 +667,7 @@ int SaveCompiledScript(asIScriptEngine *engine, unsigned char** output) {
 	for (int i = 0; i < asEP_LAST_PROPERTY; i++)
 		bw.write7BitEncoded(UInt64(engine->GetEngineProperty(asEEngineProp(i))));
 	bw << Timestamp().raw();
+	bw << Application::instance().config().has("app.no_auto_chdir");
 	if (mod->SaveByteCode(&codestream, !g_debug) < 0)
 		return -1;
 	return codestream.get(output);
@@ -768,6 +788,9 @@ int LoadCompiledScript(asIScriptEngine *engine, unsigned char* code, asUINT size
 	Int64 build_time;
 	br >> build_time;
 	g_script_build_time = build_time;
+	bool no_auto_chdir;
+	br >> no_auto_chdir;
+	if (no_auto_chdir) Application::instance().config().setString("app.no_auto_chdir", "");
 	codestream.reset_cursor(); // Angelscript can produce bytecode load failures as a result of user misconfigurations or bugs, and such failures only include an offset of bytes read maintained by Angelscript internally. The solution in such cases is to breakpoint NVGTBytecodeStream::Read if cursor is greater than the offset given, then one can get more debug info. For that to work, we make sure that the codestream's variable that tracks number of bytes written does not include the count of those written by engine properties, plugins etc. We could theoretically store such data at the end of the stream instead of the beginning and avoid this, but then we are trusting Angelscript to read exactly the number of bytes it's written, and since I don't know how much of a gamble that is, I opted for this instead.
 	if (mod->LoadByteCode(&codestream, &g_debug) < 0)
 		return -1;
@@ -818,6 +841,7 @@ int LoadCompiledExecutable(asIScriptEngine *engine) {
 }
 #endif
 int ExecuteScript(asIScriptEngine *engine, const string &scriptFile) {
+	auto_chdir();
 	asIScriptModule *mod = engine->GetModule("nvgt_game", asGM_ONLY_IF_EXISTS);
 	if (!mod)
 		return -1;
@@ -906,7 +930,7 @@ int ExecuteScript(asIScriptEngine *engine, const string &scriptFile) {
 #ifndef NVGT_STUB
 int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*userParam*/) {
 	asIScriptEngine *engine = builder.GetEngine();
-	Util::LayeredConfiguration &config = Util::Application::instance().config();
+	LayeredConfiguration &config = Application::instance().config();
 	asUINT pos = 0;
 	asUINT length = 0;
 	string cleanText;
@@ -958,8 +982,8 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*us
 		int space = ns.rfind(" ");
 		if (space == string::npos) return -1;
 		g_system_namespaces[ns.substr(0, space)] = ns.substr(space + 1);
-	} else if (cleanText == "console")
-		config.setString("build.windowsConsole", "");
+	} else if (cleanText == "console") config.setString("build.windowsConsole", "");
+	else if (cleanText == "no_auto_chdir") config.setString("app.no_auto_chdir", "");
 	else
 		return -1;
 	return 0;
