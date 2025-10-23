@@ -71,6 +71,12 @@ bool load_nvgt_plugin(const std::string& name, std::string* errmsg, void* user) 
 	}
 	nvgt_plugin_shared* shared = (nvgt_plugin_shared*)malloc(sizeof(nvgt_plugin_shared));
 	prepare_plugin_shared(shared, g_ScriptEngine, user);
+std::fprintf(stderr, "=== NVGT's view of shared struct ===\n");
+std::fprintf(stderr, "Address of shared: %p\n", (void*)shared);
+std::fprintf(stderr, "shared->version: %d\n", shared->version);
+std::fprintf(stderr, "Address of f_asGetLibraryVersion: %p (value: %p)\n", (void*)&shared->f_asGetLibraryVersion, (void*)shared->f_asGetLibraryVersion);
+std::fprintf(stderr, "Address of f_asGetLibraryOptions: %p (value: %p)\n", (void*)&shared->f_asGetLibraryOptions, (void*)shared->f_asGetLibraryOptions);
+std::fprintf(stderr, "Offset between them: %td bytes\n", (char*)&shared->f_asGetLibraryOptions - (char*)&shared->f_asGetLibraryVersion);
 	if (!entry || !entry(shared)) {
 		free(shared);
 		if (obj) SDL_UnloadObject(obj);

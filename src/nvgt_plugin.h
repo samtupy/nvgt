@@ -20,6 +20,10 @@
 #include <angelscript.h>
 #include <iostream>
 #include <string>
+#include <cstdint>
+#include <cassert>
+#include <cstdio>
+
 class plugin_node;
 class audio_plugin_node_interface;
 class audio_engine;
@@ -93,7 +97,7 @@ NVGT_PLUGIN_FUNCTIONS
 #undef X
 
 typedef struct {
-	int version;
+	std::uint32_t version;
 	#define X(ret, name, args) t_##name* f_##name;
 	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
 	NVGT_PLUGIN_FUNCTIONS
@@ -155,8 +159,22 @@ typedef int nvgt_plugin_version_func();
 // Pass a pointer to an nvgt_plugin_shared structure to this function, making Angelscript available for use in any file that includes nvgt_plugin.h after calling this function.
 inline bool prepare_plugin(nvgt_plugin_shared* shared) {
 	if (shared->version != NVGT_PLUGIN_API_VERSION) return false;
+std::fprintf(stderr, "=== Plugin's view of shared struct ===\n");
+std::fprintf(stderr, "Address of shared: %p\n", (void*)shared);
+std::fprintf(stderr, "Address of f_asGetLibraryVersion: %p (value: %p)\n", (void*)&shared->f_asGetLibraryVersion, (void*)shared->f_asGetLibraryVersion);
+std::fprintf(stderr, "Address of f_asGetLibraryOptions: %p (value: %p)\n", (void*)&shared->f_asGetLibraryOptions, (void*)shared->f_asGetLibraryOptions);
 	#ifndef NVGT_PLUGIN_STATIC // If a static plugin, the following symbols are available by default as well as the thread manager.
-	#define X(ret, name, args) name = shared->f_##name;
+#define X(ret, name, args) \
+    std::fprintf(stderr, "About to read " #name " from %p\n", (void*)&shared->f_##name); \
+    std::fflush(stderr); \
+    t_##name* temp_##name = shared->f_##name; \
+    std::fprintf(stderr, "Got value %p for " #name "\n", (void*)temp_##name); \
+    std::fflush(stderr); \
+    std::fprintf(stderr, "About to assign to global " #name "\n"); \
+    std::fflush(stderr); \
+    name = temp_##name; \
+    std::fprintf(stderr, "Successfully assigned " #name "\n"); \
+    std::fflush(stderr);
 	NVGT_PLUGIN_EXTERNAL_FUNCTIONS
 	NVGT_PLUGIN_FUNCTIONS
 	#undef X
