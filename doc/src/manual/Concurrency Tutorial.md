@@ -44,7 +44,7 @@ Async is the first type of concurrency, and one of the easiest to use. It is als
 Unlike the other two forms of concurrency, the engine insulates you (mostly) from the problems and mistakes of concurrency that you may make. This is particularly true for functions like `url_get` and `url_post` where the engine can complete the request while you do other things, or in any case that involves writing an asyncronous function that does not share any state with the rest of your program. Take, for example, this code:
 
 ```nvgt
-async<string> result(url_get, "https://nvgt.gg");
+async<string> result(url_get, "https://nvgt.dev");
 ```
 
 This class is known as a templated class. Though it is beyond the scope of this article, the `string` part is the most important, besides the arguments of the constructor, which specify both the function to be executed and its arguments. When you create (or instantiate) a class that is templated, NVGT generates the code for that specific class automatically for you, using the types you specify in the angle brackets. This is done on the fly and does not harm performance in any manner.

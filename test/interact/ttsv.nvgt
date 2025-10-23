@@ -1,11 +1,10 @@
 // NonVisual Gaming Toolkit (NVGT)
-// Copyright (C) 2022-2024 Sam Tupy
+// Copyright (C) 2022-2025 Sam Tupy
 // License: zlib (see license.md in the root of the NVGT distribution)
 
 void main() {
 	tts_voice v;
 	string[] voices = v.list_voices();
-	int voice = 0;
 	show_window("test");
 	while (true) {
 		wait(5);
@@ -22,17 +21,13 @@ void main() {
 		if (key_pressed(KEY_RIGHT)) v.speak("right arrow", true);
 		if (key_repeating(KEY_RETURN)) v.speak("I am now speaking a somewhat longer string. I wonder how responsive this will be!", true);
 		if (key_pressed(KEY_BACK)) {
-			if (keyboard_modifiers & KEYMOD_SHIFT != 0) {
-				if (v.set_voice(0)) v.speak_interrupt("Switched to default voice maybe?");
-				else screen_reader_speak("cannot switch to default voice", true);
-				continue;
-			}
-			voice += 1;
+			int voice = v.voice + (keyboard_modifiers & KEYMOD_SHIFT != 0? -1 : 1);
+			if (voice < 0) voice = voices.length() -1;
 			if (voice >= voices.length()) voice = 0;
-			v.speak_wait("switching to " + voices[voice]);
+			if (keyboard_modifiers & KEYMOD_CTRL != 0) v.speak_wait("switching to " + voices[voice]);
 			if (v.set_voice(voice)) {
 				v.rate = 5;
-				v.speak_interrupt(voices[voice]);
+				v.speak_interrupt(voices[voice] + ", " + v.get_voice_language(voice));
 			} else
 				screen_reader_speak(voices[voice] + " failed to load", true);
 		}
@@ -40,7 +35,7 @@ void main() {
 			v.set_voice(voices.find("Alex"));
 			v.speak_interrupt("test");
 		}
-		key_code[] k = keys_pressed();
+		int[]@ k = keys_pressed();
 		for (uint i = 0; i < k.length(); i++) {
 			if (k[i] == KEY_SPACE)
 				v.speak_interrupt("this happens to be another string!");

@@ -1,8 +1,8 @@
 /* library.cpp - code for the dll call/library object
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -179,7 +179,7 @@ void RegisterScriptLibrary(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("library"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(library, add_ref), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("library"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(library, release), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("bool load(const string&in filename)"), asMETHOD(library, load), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("library"), _O("bool unload()"), asMETHOD(library, load), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("library"), _O("bool unload()"), asMETHOD(library, unload), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("bool get_active() const property"), asMETHOD(library, is_active), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("library"), _O("dictionary@ call(const string&in signature, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null, ?&in=null)"), asFUNCTION(library_call_generic), asCALL_GENERIC);
 	engine->RegisterGlobalFunction("string string_create_from_pointer(uint64 ptr, uint64 length)", asFUNCTION(string_create_from_pointer), asCALL_CDECL);

@@ -1,5 +1,5 @@
 # SConscript file that either downloads or builds NVGT's dependencies as an argument to the build process.
-# NVGT - NonVisual Gaming Toolkit (https://nvgt.gg)
+# NVGT - NonVisual Gaming Toolkit (https://nvgt.dev)
 # Copyright (c) 2022-2025 Sam Tupy
 # license: zlib
 
@@ -11,7 +11,7 @@ import build_dependencies
 Import("env")
 
 def download_deps():
-	"""Downloads prebuilt dependencies from nvgt.gg."""
+	"""Downloads prebuilt dependencies from nvgt.dev."""
 	osdev_path = Path(env["NVGT_OSDEV_PATH"])
 	last_update = -1
 	ts_file = osdev_path / "timestamp"
@@ -20,10 +20,10 @@ def download_deps():
 		except: last_update = 0 if (osdev_path / "include").exists() and (osdev_path / "lib").exists() else -1
 	if not last_update: return # Given directory looks valid but contains no timestamp, thus is not managed by us
 	latest = 0
-	with urlopen(f"https://nvgt.gg/{env['NVGT_OSDEV_NAME']}.zip.timestamp") as f: latest = int(f.read().decode())
+	with urlopen(f"https://nvgt.dev/{env['NVGT_OSDEV_NAME']}.zip.timestamp") as f: latest = int(f.read().decode())
 	if last_update >= latest: return # deps are up to date
 	if osdev_path.exists(): shutil.rmtree(osdev_path)
-	zip_path, _ = urlretrieve(f"https://nvgt.gg/{env['NVGT_OSDEV_NAME']}.zip")
+	zip_path, _ = urlretrieve(f"https://nvgt.dev/{env['NVGT_OSDEV_NAME']}.zip")
 	with zipfile.ZipFile(zip_path, "r") as f: f.extractall(osdev_path)
 	ts_file.write_text(str(latest))
 

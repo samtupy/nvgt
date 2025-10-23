@@ -12,7 +12,7 @@ It should be noted that this engine was only released to the public on May 31st 
 
 ## offline documentation
 The latest version of this documentation can be downloaded for offline viewing in several formats using the following links.
-* [nvgt.chm (compressed html help file)](https://nvgt.gg/docs/nvgt.chm)
-* [nvgt-html.zip (rendered html)](https://nvgt.gg/docs/nvgt-html.zip)
-* [nvgt-markdown.zip (github flavored markdown)](https://nvgt.gg/docs/nvgt-markdown.zip)
-* [nvgt.txt (plain text)](https://nvgt.gg/docs/nvgt.txt)
+* [nvgt.chm (compressed html help file)](https://nvgt.dev/docs/nvgt.chm)
+* [nvgt-html.zip (rendered html)](https://nvgt.dev/docs/nvgt-html.zip)
+* [nvgt-markdown.zip (github flavored markdown)](https://nvgt.dev/docs/nvgt-markdown.zip)
+* [nvgt.txt (plain text)](https://nvgt.dev/docs/nvgt.txt)

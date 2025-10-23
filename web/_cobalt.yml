@@ -5,7 +5,7 @@ template_extensions: [md, liquid, lphp]
 site:
  title: The Nonvisual Gaming Toolkit
  description: website for the NonVisual Gaming Toolkit (nvgt) audiogame creation engine
- base_url: https://nvgt.gg
+ base_url: https://nvgt.dev
  sitemap: sitemap.xml
  data:
   nav:
@@ -15,7 +15,7 @@ site:
    - [Downloads, "/downloads"]
    - [Source code on Github, "https://github.com/samtupy/nvgt"]
    - [Community on discord, "https://discord.gg/pJjRBXDxzw"]
-   - [Community Forum, "https://forum.nvgt.gg"]
+   - [Community Forum, "https://forum.nvgt.dev"]
 
 posts:
  title: The NVGT blog

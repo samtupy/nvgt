@@ -3,7 +3,7 @@ Contributions to NVGT are extremely welcome and are what help the project grow. 
 
 ## issues
 If you've discovered a bug, please open a GitHub issue so we can try to fix it. However, please keep the following in mind when you do so:
-1. Please check the [Blog](https://nvgt.gg/blog/), the todo list and the existing list of issues and pull requests in case a record of the problem already exists, avoiding duplicate reports is appreciated.
+1. Please check the [Blog](https://nvgt.dev/blog/), the todo list and the existing list of issues and pull requests in case a record of the problem already exists, avoiding duplicate reports is appreciated.
 2. Please avoid 1 or 2 sentence issues such as "The speak function isn't working" or "Compiled script won't run on my Mac." At the moment there is not much strictness in how issues must be written, however it is asked that you please put some effort into your issue descriptions E. if code doesn't work how you expect, please provide preferably a sample or at least steps to reproduce, or if something won't run, please provide preferably debug output like a stack trace or at least platform details and/or an exact error message.
 3. Please keep your issue comments strictly on topic, and try editing them rather than double posting if you come up with an amendment to your comment shortly after posting it. Avoid repeated queries.
 4. If you have a question rather than a bug to report, please open a discussion rather than an issue.

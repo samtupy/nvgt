@@ -15,7 +15,7 @@
 void main() {
 	// Fetch the latest version of NVGT.
 	http h;
-	if (!h.get("http://nvgt.gg/downloads/latest_version")) {
+	if (!h.get("http://nvgt.dev/downloads/latest_version")) {
 		alert("oops", "request failed"); // This class will contain more detailed error management facilities in the near future.
 		return;
 	}

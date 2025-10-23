@@ -1,8 +1,8 @@
 /* xplatform.h - header for various cross platform macros and routines
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -21,6 +21,7 @@
 class asIScriptEngine;
 
 bool running_on_mobile();
+void register_native_tts(); // Actual function exists in either android.cpp, apple.mm, linux.cpp or win.cpp, of which only one will be built.
 #ifndef NVGT_STUB
 void determine_compile_platform();
 void xplatform_correct_path_to_stubs(Poco::Path& stubpath);

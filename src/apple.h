@@ -1,8 +1,8 @@
 /* apple.h - header included on all apple platforms
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -12,6 +12,7 @@
 
 #pragma once
 #include <string>
+#include "tts.h"
 class asIScriptEngine;
 class CScriptArray;
 
@@ -22,28 +23,38 @@ void voice_over_speech_shutdown();
 std::string apple_input_box(const std::string& title, const std::string& message, const std::string& default_value = "", bool secure = false, bool readonly = false);
 
 // Definition for AVTTSVoice class created by Gruia Chiscop on 6/6/24.
-class AVTTSVoice {
+class AVTTSVoice : public tts_engine_impl {
 public:
 	AVTTSVoice();
-	AVTTSVoice(const std::string& name);
 	~AVTTSVoice();
-	void init();
-	void deinit();
-	bool speak(const std::string& text, bool interrupt);
+	virtual bool is_available() override;
+	virtual tts_pcm_generation_state get_pcm_generation_state() override;
+	virtual bool speak(const std::string& text, bool interrupt = false, bool blocking = false) override;
+	virtual tts_audio_data* speak_to_pcm(const std::string &text) override;
+	virtual void free_pcm(tts_audio_data* data) override;
+	virtual bool is_speaking() override;
+	virtual bool stop() override;
+	virtual float get_rate() override;
+	virtual float get_pitch() override;
+	virtual float get_volume() override;
+	virtual void set_rate(float rate) override;
+	virtual void set_pitch(float pitch) override;
+	virtual void set_volume(float volume) override;
+	virtual bool get_rate_range(float& minimum, float& midpoint, float& maximum) override;
+	virtual bool get_pitch_range(float& minimum, float& midpoint, float& maximum) override;
+	virtual bool get_volume_range(float& minimum, float& midpoint, float& maximum) override;
+	virtual int get_voice_count() override;
+	virtual std::string get_voice_name(int index) override;
+	virtual std::string get_voice_language(int index) override;
+	virtual bool set_voice(int voice) override;
+	virtual int get_current_voice() override;
 	bool speakWait(const std::string& text, bool interrupt);
 	bool stopSpeech();
 	bool pauseSpeech();
 	CScriptArray* getAllVoices() const;
 	CScriptArray* getVoicesByLanguage(const std::string& language) const;
 	std::string getCurrentVoice() const;
-	bool isSpeaking() const;
 	bool isPaused() const;
-	void setRate(float rate);
-	float getRate() const;
-	void setVolume(float volume);
-	float getVolume() const;
-	void setPitch(float pitch);
-	float getPitch() const;
 	void setVoiceByName(const std::string& name);
 	void setVoiceByLanguage(const std::string& language);
 	std::string getCurrentLanguage() const;

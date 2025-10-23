@@ -1,6 +1,6 @@
 # Build script for NVGT using the scons build system.
-# NVGT - NonVisual Gaming Toolkit (https://nvgt.gg)
-# Copyright (c) 2022-2024 Sam Tupy
+# NVGT - NonVisual Gaming Toolkit (https://nvgt.dev)
+# Copyright (c) 2022-2025 Sam Tupy
 # license: zlib
 
 import os, multiprocessing, tempfile
@@ -9,7 +9,7 @@ Help("""
 	Available custom build switches for NVGT:
 		copylibs=0 or 1 (default 1): Copy shared libraries to release/lib after building?
 		debug=0 or 1 (default 0): Include debug symbols in the resulting binaries?
-		deps=build, download, or unmanaged (default download): How to fetch dependencies required to build NVGT? build = use vcpkg to build from source, download = download prebuilt binaries from nvgt.gg if newer than existing, unmanaged = assume dependencies are in place.
+		deps=build, download, or unmanaged (default download): How to fetch dependencies required to build NVGT? build = use vcpkg to build from source, download = download prebuilt binaries from nvgt.dev if newer than existing, unmanaged = assume dependencies are in place.
 		deps_path=path: Optional location where dependencies are stored? Defaults to a folder named after the platform in the repository root.
 		no_upx=0 or 1 (default 1): Disable UPX stubs?
 		no_plugins=0 or 1 (default 0): Disable the plugin system entirely?
@@ -97,6 +97,8 @@ if env["PLATFORM"] == "win32": env.Append(LIBS = ["UniversalSpeechStatic"])
 # nvgt itself
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
 if "android.cpp" in sources: sources.remove("android.cpp")
+if env["PLATFORM"] != "win32" and "win.cpp" in sources: sources.remove("win.cpp")
+if env["PLATFORM"] != "posix" and "linux.cpp" in sources: sources.remove("linux.cpp")
 if "version.cpp" in sources: sources.remove("version.cpp")
 env.Command(target = "src/version.cpp", source = ["src/" + i for i in sources], action = env["generate_version"])
 version_object = env.Object("build/obj_src/version", "src/version.cpp") # Things get weird if we do this after VariantDir.

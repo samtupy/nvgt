@@ -1,6 +1,6 @@
 # Script to build all of NVGT's dependencies with vcpkg, setting them up for NVGT builds and optionally creating redistributable archives for the dependencies.
 # This only supports the triplets that we currently use as well as IOS.
-# NVGT - NonVisual Gaming Toolkit (https://nvgt.gg)
+# NVGT - NonVisual Gaming Toolkit (https://nvgt.dev)
 # Copyright (c) 2022-2025 Sam Tupy
 # license: zlib
 

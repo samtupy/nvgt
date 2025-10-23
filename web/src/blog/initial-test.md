@@ -10,4 +10,4 @@ Since the plan is for this website to remain super simple, the decision has been
 
 If more advanced features are added to this website, we can simply plop more directories in the webroot than what Cobalt generates.
 
-This is just a test to make sure all is working, and I guess to denote the creation date of nvgt.gg or something.
+This is just a test to make sure all is working, and I guess to denote the creation date of nvgt.dev or something.

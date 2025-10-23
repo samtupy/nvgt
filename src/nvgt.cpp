@@ -1,8 +1,8 @@
 /* nvgt.cpp - program entry point
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -50,7 +50,7 @@
 #include "random_interface.h"    // cleanup_default_random()
 #include "serialize.h" // current location of g_StringTypeid (subject to change)
 #include "sound.h"
-#include "srspeech.h"
+#include "tts.h"
 #include "UI.h" // message
 #include "version.h"
 #include "xplatform.h"
@@ -102,15 +102,12 @@ protected:
 		SetDllDirectoryW(dir_u.c_str());
 		CreateMutexW(nullptr, false, L"NVGTApplication"); // This mutex will automatically be freed by the OS on process termination so we don't need a handle to it, this exists only so the NVGT windows installer or anything else on windows can tell that NVGT is running without process enumeration.
 		#elif defined(__APPLE__)
-		std::string resources_dir = Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString();
 		if (Environment::has("MACOS_BUNDLED_APP")) {
-			// Use GUI instead of stdout and chdir to Resources directory.
+			// Use GUI instead of stdout.
 			config().setString("application.gui", "");
-			#ifdef NVGT_STUB
-			ChDir(resources_dir);
-			#endif
 		}
 		#ifndef NVGT_STUB
+		string resources_dir = Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString();
 		if (File(resources_dir).exists())
 			g_IncludeDirs.push_back(Path(resources_dir).pushDirectory("include").toString());
 		#endif
@@ -211,7 +208,7 @@ protected:
 	}
 	std::string UILauncher() {
 		// If the user launches NVGT's compiler without a terminal, let them select what to do from various options provided by simple dialogs. Currently the choice selection is one-shot and then we exit, but it might be turned into some sort of do-loop later so that the user can perform multiple selections in one application run.
-		std::vector<string> options = {"`Run a script", "Compile a script in release mode", "Compile a script in debug mode", "View version information", "View command line options", "Visit nvgt.gg on the web", "~Exit"};
+		std::vector<string> options = {"`Run a script", "Compile a script in release mode", "Compile a script in debug mode", "View version information", "View command line options", "Visit nvgt.dev on the web", "~Exit"};
 		#ifdef NVGT_MOBILE
 		options[1].insert(options[1].begin(), '\0');
 		options[2].insert(options[2].begin(), '\0');
@@ -236,21 +233,15 @@ protected:
 				mode = NVGT_EXIT;
 				return "";
 			}
-			if (option > 1)
-				g_debug = option == 3;
+			if (option > 1) g_debug = option == 3;
 			mode = option == 1 ? NVGT_RUN : NVGT_COMPILE;
-			try {
-				// Try to change to the directory containing the selected script.
-				ChDir(Poco::Path(script).parent().toString());
-			} catch (...) {
-			} // If it fails, so be it.
 			return script;
 		} else if (option == 4 || option == 5) {
 			mode = option == 4 ? NVGT_VERSIONINFO : NVGT_HELP;
 			return "";
 		} else if (option == 6) {
 			mode = NVGT_EXIT;
-			urlopen("https://nvgt.gg");
+			urlopen("https://nvgt.dev");
 			return "";
 		}
 		return ""; // How did we get here?
@@ -357,7 +348,7 @@ protected:
 		#ifdef _WIN32
 		timeEndPeriod(1);
 		#endif
-		ScreenReaderUnload();
+		screen_reader_unload();
 		InputDestroy();
 		uninit_sound();
 		anticheat_deinit();

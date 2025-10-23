@@ -1,6 +1,6 @@
 # Build miscellaneous dependencies
-# NVGT - NonVisual Gaming Toolkit (https://nvgt.gg)
-# Copyright (c) 2022-2024 Sam Tupy
+# NVGT - NonVisual Gaming Toolkit (https://nvgt.dev)
+# Copyright (c) 2022-2025 Sam Tupy
 # license: zlib
 
 Import("env")
@@ -8,5 +8,5 @@ Import("env")
 
 sources = ["cmp.c", "entities.cpp", "ma_reverb_node.c", "micropather.cpp", "miniaudio.c", "miniaudio_libopus.c", "miniaudio_libvorbis.c", "miniaudio_phonon.c", "miniaudio_wdl_resampler.cpp", "monocypher.c", "resample.cpp", "rng_get_bytes.c", "singleheader.cpp", "sonic.c", "uncompr.c", "tonar.c"]
 if env["PLATFORM"] == "win32":
-	sources += ["blastspeak.c", "InputBox.cpp", "vs_version.cpp", "windows_process_watcher.cpp"]
+	sources += ["InputBox.cpp", "sapibridge.c", "vs_version.cpp", "windows_process_watcher.cpp"]
 env.StaticLibrary("#build/lib/deps", sources, CPPDEFINES = list(env["CPPDEFINES"]) + ["_LIB"])
