@@ -1,0 +1,18 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	audio_wav_encoder wav;
+	if (!wav.open("../tmp/encode_wav_test.wav", 44100, 2)) {
+		alert("oops", "can't create output file " + SOUNDSYSTEM_LAST_ERROR_TEXT);
+		return;
+	}
+	wav.set_output_bus_volume(0, 0);
+	microphone m;
+	m.attach_output_bus(0, wav, 0);
+	wav.attach_output_bus(0, sound_default_engine.get_endpoint(), 0);
+	alert("recording", "press ok to stop");
+	wav.close();
+	}
+	

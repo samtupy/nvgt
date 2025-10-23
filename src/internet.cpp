@@ -32,11 +32,15 @@
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/Net/HTTPRequest.h>
 #include <Poco/Net/HTTPSClientSession.h>
+#include <Poco/Net/FTPStreamFactory.h>
+#include <Poco/Net/HTTPSStreamFactory.h>
+#include <Poco/Net/HTTPStreamFactory.h>
 #include <Poco/Net/MessageHeader.h>
 #include <Poco/Net/SSLManager.h>
 #include <Poco/Net/WebSocket.h>
 #include <scriptarray.h>
 #include <scriptdictionary.h>
+#include <entities.h>
 #include "datastreams.h"
 #include "internet.h"
 #include "nvgt.h"
@@ -47,6 +51,12 @@
 using namespace std;
 using namespace Poco;
 using namespace Poco::Net;
+
+string html_entities_decode(const string& input) {
+	vector<char> buffer(input.size() + 1, '\0');
+	decode_html_entities_utf8(buffer.data(), input.c_str());
+	return string(buffer.data());
+}
 
 string url_encode(const string& url, const string& reserved) {
 	string result;
@@ -182,7 +192,8 @@ template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, con
 	engine->RegisterObjectMethod(type.c_str(), "bool exists(const string&in) const", asMETHOD(T, has), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool empty() const", asMETHOD(T, empty), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "uint64 size() const", asMETHOD(T, size), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void erase(const string&in)", asMETHOD(T, erase), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void erase(const string&in)", asMETHODPR(T, erase, (const std::string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void secure_erase(const string&in)", asMETHODPR(T, secureErase, (const std::string&), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void clear()", asMETHOD(T, clear), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& name_at(uint) const", asFUNCTION(name_value_collection_name_at<T>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "const string& value_at(uint) const", asFUNCTION(name_value_collection_value_at<T>), asCALL_CDECL_OBJFIRST);
@@ -487,11 +498,11 @@ template <class T> void RegisterStreamSocket(asIScriptEngine* engine, const std:
 		engine->RegisterObjectMethod(type.c_str(), "bool bind(const socket_address&in address, bool reuse_address = false, bool IPv6_only = false)", asMETHOD(T, bind), asCALL_THISCALL);
 	}
 	engine->RegisterObjectMethod(type.c_str(), "void shutdown_receive()", asMETHOD(T, shutdownReceive), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void shutdown_send()", asMETHOD(T, shutdownSend), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void shutdown()", asMETHOD(T, shutdown), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int shutdown_send()", asMETHOD(T, shutdownSend), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int shutdown()", asMETHODPR(T, shutdown, (), int), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "int send_bytes(const string&in data, int flags = 0)", asFUNCTION(socket_send_bytes<T>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "string receive_bytes(int length, int flags = 0)", asFUNCTION(socket_receive_bytes<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "string receive_bytes(int flags = 0, const timespan& timeout = 100000)", asFUNCTION(socket_receive_bytes_buf<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "string receive_bytes(int flags = 0, const timespan&in timeout = 100000)", asFUNCTION(socket_receive_bytes_buf<T>), asCALL_CDECL_OBJFIRST);
 }
 void RegisterWebSocket(asIScriptEngine* engine) {
 	engine->RegisterEnum("web_socket_mode");
@@ -537,7 +548,7 @@ void RegisterWebSocket(asIScriptEngine* engine) {
 	RegisterStreamSocket<WebSocket>(engine, "web_socket");
 	engine->RegisterObjectBehaviour("web_socket", asBEHAVE_FACTORY, "web_socket@ s(http_client& cs, http_request& request, http_response& response)", asFUNCTION((angelscript_refcounted_factory<WebSocket, HTTPClientSession&, HTTPRequest&, HTTPResponse&>)), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("web_socket", asBEHAVE_FACTORY, "web_socket@ s(http_client& cs, http_request& request, http_response& response, http_credentials& credentials)", asFUNCTION((angelscript_refcounted_factory<WebSocket, HTTPClientSession&, HTTPRequest&, HTTPResponse&, HTTPCredentials&>)), asCALL_CDECL);
-	engine->RegisterObjectMethod("web_socket", "void shutdown(uint16 status_code, const string&in status_message = \"\")", asMETHODPR(WebSocket, shutdown, (UInt16, const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("web_socket", "int shutdown(uint16 status_code, const string&in status_message = \"\")", asMETHODPR(WebSocket, shutdown, (UInt16, const string&), int), asCALL_THISCALL);
 	engine->RegisterObjectMethod("web_socket", "int send_frame(const string&in data, int flags = WS_FRAME_TEXT)", asFUNCTION(websocket_send_frame), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("web_socket", "string receive_frame(int&out flags)", asFUNCTION(websocket_receive_frame), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("web_socket", "web_socket_mode get_mode() const property", asMETHOD(WebSocket, mode), asCALL_THISCALL);
@@ -614,6 +625,7 @@ public:
 	void run() {
 		bool authorize = false;
 		int tries = _max_retries;
+		string download_buffer(1024 * 32, '\0'); // Should the user be able to configure this, larger buffer = faster download?
 		while (tries && !tryWait(_retry_delay)) {
 			tries--;
 			try {
@@ -652,12 +664,11 @@ public:
 					continue;
 				}
 				unlock();
-				string buffer(512, '\0');
 				while (istr.good() && !tryWait(0)) {
-					istr.read(buffer.data(), 512);
+					istr.read(download_buffer.data(), download_buffer.size());
 					streamsize count = istr.gcount();
 					ScopedLock lock(*this);
-					_response_body.append(buffer.begin(), buffer.begin() + count);
+					_response_body.append(download_buffer.begin(), download_buffer.begin() + count); // Todo: avoid extra copy, and in get_response_body, return a blank string if mutex is locked.
 					_bytes_downloaded += count;
 				}
 				break;
@@ -765,6 +776,9 @@ string url_post(const string& url, const string& data, HTTPResponse* resp) { ret
 
 void RegisterInternet(asIScriptEngine* engine) {
 	SSLManager::instance().initializeClient(NULL, new AcceptCertificateHandler(false), new Context(Context::TLS_CLIENT_USE, ""));
+	FTPStreamFactory::registerFactory();
+	HTTPStreamFactory::registerFactory();
+	HTTPSStreamFactory::registerFactory();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
 	map<string, int> http_statuses({
 		{"HTTP_CONTINUE", 100}, {"HTTP_SWITCHING_PROTOCOLS", 101}, {"HTTP_PROCESSING", 102}, {"HTTP_OK", 200}, {"HTTP_CREATED", 201}, {"HTTP_ACCEPTED", 202}, {"HTTP_NONAUTHORITATIVE", 203}, {"HTTP_NO_CONTENT", 204}, {"HTTP_RESET_CONTENT", 205}, {"HTTP_PARTIAL_CONTENT", 206}, {"HTTP_MULTI_STATUS", 207}, {"HTTP_ALREADY_REPORTED", 208}, {"HTTP_IM_USED", 226},
@@ -799,6 +813,7 @@ void RegisterInternet(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("socket_select_mode", "SOCKET_SELECT_READ", Socket::SELECT_READ);
 	engine->RegisterEnumValue("socket_select_mode", "SOCKET_SELECT_WRITE", Socket::SELECT_WRITE);
 	engine->RegisterEnumValue("socket_select_mode", "SOCKET_SELECT_ERROR", Socket::SELECT_ERROR);
+	engine->RegisterGlobalFunction(_O("string html_entities_decode(const string&in input)"), asFUNCTION(html_entities_decode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string url_encode(const string&in url, const string&in reserved = \"\")"), asFUNCTION(url_encode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string url_decode(const string&in url, bool plus_as_space = true)"), asFUNCTION(url_decode), asCALL_CDECL);
 	RegisterNameValueCollection<NameValueCollection>(engine, "name_value_collection");

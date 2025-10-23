@@ -47,6 +47,7 @@ public:
 	asITypeInfo *GetArrayObjectType() const;
 	int          GetArrayTypeId() const;
 	int          GetElementTypeId() const;
+	int GetElementSize() const;
 
 	// Get the current size
 	asUINT GetSize() const;
@@ -84,6 +85,8 @@ public:
 	void RemoveAt(asUINT index);
 	void RemoveLast();
 	void RemoveRange(asUINT start, asUINT count);
+	void *Front();
+	void *Back();
 	void SortAsc();
 	void SortDesc();
 	void SortAsc(asUINT startAt, asUINT count);

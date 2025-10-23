@@ -1,0 +1,13 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	mixer output;
+	microphone mic;
+	mic.attach_output_bus(0, output, 0);
+	set_sound_global_hrtf(true);
+	output.set_position_3d(-8, 6, 8);
+	show_window("test");
+	while (!key_pressed(KEY_ESCAPE)) wait(5);
+}

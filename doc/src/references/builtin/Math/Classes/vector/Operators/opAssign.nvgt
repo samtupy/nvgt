@@ -1,8 +1,8 @@
 /**
 	Overloads the = operator, allowing you to assign a vector to another, already existing one.
-	vector& opAssign(const vector &in other);
+	vector& vector::opAssign(const vector &in other);
 	## Arguments:
-		* const vector&in other: the vector to assign to.
+		* const vector&in other: the vector to assign.
 */
 
 // Example:

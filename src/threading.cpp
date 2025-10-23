@@ -23,6 +23,7 @@
 #include <Poco/ScopedLock.h>
 #include <Poco/Thread.h>
 #include <Poco/ThreadPool.h>
+#include <SDL3/SDL_init.h>
 #include <angelscript.h>
 #include <scriptdictionary.h>
 #include <scripthelper.h>
@@ -327,10 +328,10 @@ void RegisterAtomics(asIScriptEngine* engine) {
 	engine->RegisterObjectType("atomic_flag", sizeof(std::atomic_flag), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<std::atomic_flag>());
 	engine->RegisterObjectBehaviour("atomic_flag", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(atomics_construct<std::atomic_flag>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("atomic_flag", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(atomics_destruct<std::atomic_flag>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("atomic_flag", "bool test(memory_order order = MEMORY_ORDER_SEQ_CST)", asMETHODPR(std::atomic_flag, test, (std::memory_order) const noexcept, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("atomic_flag", "bool test(memory_order order = MEMORY_ORDER_SEQ_CST) const", asMETHODPR(std::atomic_flag, test, (std::memory_order) const noexcept, bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("atomic_flag", "void clear(memory_order order = MEMORY_ORDER_SEQ_CST)", asMETHODPR(std::atomic_flag, clear, (std::memory_order), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("atomic_flag", "bool test_and_set(memory_order order = MEMORY_ORDER_SEQ_CST)", asMETHODPR(std::atomic_flag, test_and_set, (std::memory_order) noexcept, bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod("atomic_flag", "void wait(bool old, memory_order order = MEMORY_ORDER_SEQ_CST)", asMETHODPR(std::atomic_flag, wait, (bool, std::memory_order) const noexcept, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("atomic_flag", "void wait(bool old, memory_order order = MEMORY_ORDER_SEQ_CST) const", asMETHODPR(std::atomic_flag, wait, (bool, std::memory_order) const noexcept, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("atomic_flag", "void notify_one()", asMETHOD(std::atomic_flag, notify_one), asCALL_THISCALL);
 	engine->RegisterObjectMethod("atomic_flag", "void notify_all()", asMETHOD(std::atomic_flag, notify_all), asCALL_THISCALL);
 	register_atomic_type<std::atomic_int, int>(engine, "atomic_int", "int");
@@ -401,6 +402,7 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("thread_priority", "THREAD_PRIORITY_HIGH", Thread::Priority::PRIO_HIGH);
 	engine->RegisterEnumValue("thread_priority", "THREAD_PRIORITY_HIGHEST", Thread::Priority::PRIO_HIGHEST);
 	angelscript_refcounted_register<Thread>(engine, "thread");
+	engine->RegisterGlobalFunction("bool get_thread_is_main() property", asFUNCTION(SDL_IsMainThread), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint thread_current_id()"), asFUNCTION(Thread::currentOsTid), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void thread_yield()"), asFUNCTION(Thread::yield), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool thread_sleep(uint ms)"), asFUNCTION(Thread::trySleep), asCALL_CDECL);

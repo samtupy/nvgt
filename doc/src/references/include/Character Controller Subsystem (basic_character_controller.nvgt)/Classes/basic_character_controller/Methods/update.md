@@ -8,7 +8,7 @@ void update(const float delta_time) final;
 
 ## Parameters
 
-* `const float delta_time`: the difference between the time of the previous frame and this new frame. This value should be reasonably consistant; drastic changes will cause dramatic changes in the controller's internal state.
+* `const float delta_time`: the difference between the time of the previous frame and this new frame. This value should be reasonably consistent; drastic changes will cause dramatic changes in the controller's internal state.
 
 ## Remarks
 

@@ -1,0 +1,21 @@
+/**
+	Read a string from a stream.
+	string read_string();
+	## Arguments:
+		None.
+	## Returns:
+		string: The data that was read from the stream or an empty string on failure.
+	## Remarks:
+		This method behaves differently depending on the binary flag:
+			* If binary is true, it expects the number of bytes to read to be prepended to the string as a uint8.
+			* If binary is false, it will read a single word from the string using any whitespace as its boundary.
+		Typically it is only useful to call this function if the good property on the stream is true, therefor you can query the stream's good property in a loop to see if you should continue reading data if you are trying to perform some sort of buffered reading of a stream.
+*/
+
+// Example:
+void main() {
+	datastream ds("Hello there,\nI am a string wrapped in a sstream!");
+	ds.binary=false;
+	alert("example", ds.read_string()); // Returns "Hello".
+	alert("example", ds.read_string()); // Returns "there,".
+}

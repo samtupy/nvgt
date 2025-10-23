@@ -1,0 +1,37 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	show_window("test");
+	set_sound_global_hrtf(true);
+	audio_freeverb_node freeverb;
+	freeverb.width = 0.7;
+	freeverb.room_size = 0.7;
+	freeverb.input_width = 0.2;
+	freeverb.damping = 1;
+	reverb3d verb(freeverb);
+	sound@ snd = sound_play("C:/windows/media/Ring10.wav", autoplay = false);
+	snd.set_position_3d(5, 5, 0);
+	if (!snd.set_shape(sound_aabb_shape(0, 5, 0, 5, 0, 1))) alert("warning", "shape set fail");
+	@snd.reverb3d = verb;
+	verb.max_audible_distance = 200;
+	//snd.effects_chain.add_node(audio_high_pass_filter(1000, 2));
+	snd.play_looped();
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		vector l = sound_get_listener_position();
+		bool moved = true;
+		if (key_pressed(KEY_LEFT)) l.x--;
+		else if (key_pressed(KEY_RIGHT)) l.x++;
+		else if (key_pressed(KEY_DOWN)) l.y--;
+		else if (key_pressed(KEY_UP)) l.y++;
+		else moved = false;
+		if (moved) {
+			sound_set_listener_position(l);
+			sound@ step = sound_play("C:/windows/media/chord.wav", autoplay = false);
+			@step.reverb3d = verb;
+			step.play();
+		}
+	}
+}

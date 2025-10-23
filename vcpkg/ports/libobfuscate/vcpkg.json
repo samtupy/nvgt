@@ -1,0 +1,8 @@
+{
+  "name": "libobfuscate",
+  "version-date": "2024-07-10",
+  "port-version": 1,
+  "description": "Guaranteed compile-time string literal obfuscation header-only library for C++14 with _O macro.",
+  "homepage": "https://github.com/adamyaxley/Obfuscate",
+  "license": "Unlicense"
+}

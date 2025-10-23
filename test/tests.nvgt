@@ -1,6 +1,6 @@
 /* tests.nvgt - main test runner application
  * In our case, it's actually better to write our tests directly in Angelscript, as any specific parts of the c++ code will be tested by loading and executing this Angelscript code which can test engine features in the same way as end-users will be employing them.
- * To add a test, create a .nvgt script in the case folder with a function that returns void, takes no arguments and is named after the basename of the test script prepended with the word "test_", for example void test_foo() for foo.nvgt. A test should throw an exception if it fails, if the function returns successfully the test is considered to have passed.
+ * To add a test, create a .nvgt script in the case folder with function(s) that return void, takes no arguments and is prepended with the word "test_", for example void test_foo(), test_bar(). The function names need not match the basename of the file. A test should throw an exception if it fails, if the function returns successfully the test is considered to have passed.
  * If a test case relies on any static files, those should go in the data folder.
  * If a test case produces any temporary data to work with, it should go in the tmp folder so as to be ignored by git.
  *
@@ -17,7 +17,7 @@
 #pragma console
 #include "case/*.nvgt"
 
-dictionary disabled_tests;
+dictionary disabled_tests, enabled_tests;
 bool verbose = false, nonfatal = false, console_available = is_console_available();
 script_module@ nvgt_game = script_get_module("nvgt_game");
 int tests_total, tests_skipped, tests_failed, tests_passed;
@@ -28,6 +28,7 @@ void help() {
 	outln("-v (verbose), print status information.");
 	outln("-n (nonfatal), Warn on failed test and continue rather than exiting.");
 	outln("-d (disable), do not run a given test (-dbase64).");
+	outln("-t (test), only run the specified tests (-tbase64 -tasync).");
 	outln("-h (help), Print this message and exit.");
 	abort();
 }
@@ -46,66 +47,98 @@ void main() {
 		else if (ARGS[i] == "-v") verbose = true;
 		else if (ARGS[i] == "-n") nonfatal = true;
 		else if (ARGS[i].starts_with("-d")) disabled_tests.set(ARGS[i].substr(2), true);
+		else if (ARGS[i].starts_with("-t")) enabled_tests.set(ARGS[i].substr(2), true);
 		else {
 			outln("unknown command line option " + ARGS[i]);
 			abort(64);
 		}
 	}
 	if (!directory_exists("tmp")) directory_create("tmp");
-	// These tests are either intended to run from source or along side the source.
-	string[]@ files = find_files("case/*.nvgt");
-	for (uint i = 0; i < files.length(); i++)
-		test(spec::path(files[i]).basename);
-	if (tests_failed == 0)
-		outln("%0 of %1 tests passed successfully in %2ms!".format(tests_passed, tests_total, timetracker.elapsed), "success");
-	else
-		outln("%0 of %1 tests have passed successfully, with %2 failures. Total time %3ms.".format(tests_passed, tests_total, tests_failed, timetracker.elapsed), "partial success");
+	
+	tests_total = 0;
+	for (uint i = 0; i < nvgt_game.get_function_count(); i++) {
+		script_function@ func = nvgt_game.get_function_by_index(i);
+		if (@func == null) continue;
+		
+		string func_name = func.get_name();
+		if (!func_name.starts_with("test_")) continue;
+		
+		tests_total++;
+		
+		string filename = func.script;
+		
+		if (filename.find_last("/") >= 0) {
+			filename = filename.substr(filename.find_last("/") + 1);
+		}
+		if (filename.find_last("\\") >= 0) {
+			filename = filename.substr(filename.find_last("\\") + 1);
+		}
+		
+		run_test(func, filename);
+	}
+	if (tests_failed == 0) {
+		if (tests_passed > 0)outln("%0 of %1 tests passed successfully in %2ms!".format(tests_passed, tests_total, timetracker.elapsed), "success");
+	} else outln("%0 of %1 tests have passed successfully, with %2 failures. Total time %3ms.".format(tests_passed, tests_total, tests_failed, timetracker.elapsed), "partial success");
 	if (tests_skipped > 0) outln("%0 tests skipped.".format(tests_skipped));
 	display_ui_buffer();
 }
-void test(const string&in testcase) {
-	tests_total++;
-	if (disabled_tests.exists(testcase)) {
-		if (verbose) outln("Skipping %0 (commandline)".format(testcase));
+
+void run_test(script_function@ func, const string&in filename) {
+	string func_name = func.get_name();
+	string test_name = func_name.substr(5);
+	
+	// Check if this specific test is disabled
+	if (disabled_tests.exists(func_name) || disabled_tests.exists(test_name) || disabled_tests.exists(filename)) {
+		if (verbose) outln("Skipping %0::%1 (commandline)".format(filename, func_name));
 		tests_skipped++;
 		return;
 	}
-	// It is possible to skip a test by creating a global variable in the test case called bool test_<case>_skip = true;
-	any@ v_skip = nvgt_game.get_global(nvgt_game.get_global_index_by_decl("bool test_%0_skip".format(testcase)));
+	// Or if only specific tests are enabled and this one isn't among them, skip it silently.
+	if (!enabled_tests.empty() && !(enabled_tests.exists(func_name) || enabled_tests.exists(test_name) || enabled_tests.exists(filename))) {
+		tests_skipped++;
+		return;
+	}
+
+	// Check for skip variable
+	any@ v_skip = nvgt_game.get_global(nvgt_game.get_global_index_by_decl("bool %0_skip".format(func_name)));
 	bool b_skip = false;
 	if (@v_skip != null and v_skip.retrieve(b_skip) and b_skip) {
-		if (verbose) outln("Skipping %0 (script)".format(testcase));
+		if (verbose) outln("Skipping %0::%1 (script)".format(filename, func_name));
 		tests_skipped++;
 		return;
 	}
-	script_function@ func = nvgt_game.get_function_by_decl("void test_%0()".format(testcase));
-	if (@func == null) {
-		outln("Error, test case %0 is badly formatted, can't find void test_%0()".format(testcase));
+	
+	string decl = func.get_decl();
+	if (!decl.starts_with("void " + func_name + "()")) {
+		outln("Error, test function %0 has wrong signature, expected void %0()".format(func_name));
 		tests_failed++;
 		if (nonfatal) return;
 		else abort(64);
 	}
+	
 	string[] errors;
-	if (verbose) outp("Testing %0... ".format(testcase));
+	if (verbose) outp("Testing %0::%1... ".format(filename, func_name));
+	
 	// Give test cases the freedom to safely manipulate the current working directory.
 	string current_dir = cwdir();
 	timer test_clock(0, 1);
 	func({}, errors);
 	chdir(current_dir);
+	
 	if (errors.length() < 1) {
 		if (verbose) outln("OK (" + (test_clock.elapsed / double(MILLISECONDS)) + "ms)");
 		tests_passed++;
 		return;
 	}
+	
 	tests_failed++;
 	if (verbose) outln("FAILED!");
-	else outln("TEST %0 FAILED!".format(testcase));
+	else outln("TEST %0::%1 FAILED!".format(filename, func_name));
 	if (!nonfatal) { // Only print full callstacks if we exit on test fail rather than warn where we just print the exception and last frame instead.
 		for (uint i = 1; i < errors.length(); i++) outln(errors[i]); // We start at offset 1 in order to move the exception itself to the bottom of the output to avoid waiding through the call stack when unwanted.
 	}
 	outln(errors[0]);
-	if (nonfatal) return;
-	else abort(1);
+	if (!nonfatal) abort(1);
 }
 
 // utility functions:

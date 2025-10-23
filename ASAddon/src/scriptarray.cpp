@@ -244,6 +244,29 @@ static bool ScriptArrayTemplateCallback(asITypeInfo *ti, bool &dontGarbageCollec
 	return true;
 }
 
+asINT64 CScriptArray_opForBegin(const CScriptArray*)
+{
+	return 0;
+}
+
+bool CScriptArray_opForEnd(asINT64 iter, const CScriptArray*arr)
+{
+	if (arr == 0 || arr->GetSize() <= iter)
+		return true;
+
+	return false;
+}
+
+asINT64 CScriptArray_opForNext(asINT64 iter, const CScriptArray*)
+{
+	return iter + 1;
+}
+
+asINT64 CScriptArray_opForValue1(asINT64 iter, const CScriptArray*)
+{
+	return iter;
+}
+
 // Registers the template array type
 void RegisterScriptArray(asIScriptEngine *engine, bool defaultArray)
 {
@@ -289,6 +312,13 @@ static void RegisterScriptArray_Native(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("array<T>", "T &opIndex(int64 index)", asMETHODPR(CScriptArray, At, (asINT64), void*), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "const T &opIndex(int64 index) const", asMETHODPR(CScriptArray, At, (asINT64) const, const void*), asCALL_THISCALL); assert( r >= 0 );
 
+	// Support for foreach
+	r = engine->RegisterObjectMethod("array<T>", "int64 opForBegin() const", asFUNCTIONPR(CScriptArray_opForBegin, (const CScriptArray *), asINT64), asCALL_CDECL_OBJLAST); assert(r >= 0);
+	r = engine->RegisterObjectMethod("array<T>", "bool opForEnd(int64) const", asFUNCTIONPR(CScriptArray_opForEnd, (asINT64, const CScriptArray*), bool), asCALL_CDECL_OBJLAST); assert(r >= 0);
+	r = engine->RegisterObjectMethod("array<T>", "int64 opForNext(int64) const", asFUNCTIONPR(CScriptArray_opForNext, (asINT64, const CScriptArray*), asINT64), asCALL_CDECL_OBJLAST); assert(r >= 0);
+	r = engine->RegisterObjectMethod("array<T>", "const T &opForValue0(int64 index) const", asMETHODPR(CScriptArray, At, (asINT64) const, const void*), asCALL_THISCALL); assert(r >= 0);
+	r = engine->RegisterObjectMethod("array<T>", "int64 opForValue1(int64 index) const", asFUNCTIONPR(CScriptArray_opForValue1, (asINT64, const CScriptArray*), asINT64), asCALL_CDECL_OBJLAST); assert(r >= 0);
+
 	// The assignment operator
 	r = engine->RegisterObjectMethod("array<T>", "array<T> &opAssign(const array<T>&in)", asMETHOD(CScriptArray, operator=), asCALL_THISCALL); assert( r >= 0 );
 
@@ -311,6 +341,8 @@ static void RegisterScriptArray_Native(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("array<T>", "void sort_ascending(uint startAt, uint count)", asMETHODPR(CScriptArray, SortAsc, (asUINT, asUINT), void), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void sort_descending()", asMETHODPR(CScriptArray, SortDesc, (), void), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void sort_descending(uint startAt, uint count)", asMETHODPR(CScriptArray, SortDesc, (asUINT, asUINT), void), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("array<T>", "T &front()", asMETHOD(CScriptArray, Front), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("array<T>", "T &back()", asMETHOD(CScriptArray, Back), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void reverse()", asMETHOD(CScriptArray, Reverse), asCALL_THISCALL); assert( r >= 0 );
 	// The token 'if_handle_then_const' tells the engine that if the type T is a handle, then it should refer to a read-only object
 	r = engine->RegisterObjectMethod("array<T>", "int find(const T&in if_handle_then_const value) const", asMETHODPR(CScriptArray, Find, (void*) const, int), asCALL_THISCALL); assert( r >= 0 );
@@ -822,6 +854,11 @@ int CScriptArray::GetElementTypeId() const
 	return subTypeId;
 }
 
+int CScriptArray::GetElementSize() const
+{
+	return elementSize;
+}
+
 void CScriptArray::InsertAt(asUINT index, void *value)
 {
 	if( index > buffer->numElements )
@@ -946,6 +983,15 @@ const void *CScriptArray::At(asINT64 index) const
 void *CScriptArray::At(asINT64 index)
 {
 	return const_cast<void*>(const_cast<const CScriptArray *>(this)->At(index));
+}
+
+void *CScriptArray::Front()
+{
+	return this->At(0);
+}
+void *CScriptArray::Back()
+{
+	return this->At(-1);
 }
 
 void *CScriptArray::GetBuffer()
@@ -2053,6 +2099,18 @@ static void ScriptArrayAt_Generic(asIScriptGeneric *gen)
 	gen->SetReturnAddress(self->At(index));
 }
 
+static void ScriptArrayFront_Generic(asIScriptGeneric *gen)
+{
+	CScriptArray *self = (CScriptArray*)gen->GetObject();
+	gen->SetReturnAddress(self->Front());
+}
+
+static void ScriptArrayBack_Generic(asIScriptGeneric *gen)
+{
+	CScriptArray *self = (CScriptArray*)gen->GetObject();
+	gen->SetReturnAddress(self->Back());
+}
+
 static void ScriptArrayInsertAt_Generic(asIScriptGeneric *gen)
 {
 	asUINT index = gen->GetArgDWord(0);
@@ -2238,6 +2296,8 @@ static void RegisterScriptArray_Generic(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("array<T>", "void remove_at(uint index)", asFUNCTION(ScriptArrayRemoveAt_Generic), asCALL_GENERIC); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void remove_last()", asFUNCTION(ScriptArrayRemoveLast_Generic), asCALL_GENERIC); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("array<T>", "void remove_range(uint start, uint count)", asFUNCTION(ScriptArrayRemoveRange_Generic), asCALL_GENERIC); assert(r >= 0);
+	r = engine->RegisterObjectMethod("array<T>", "T &front()", asFUNCTION(ScriptArrayFront_Generic), asCALL_GENERIC); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("array<T>", "T &back()", asFUNCTION(ScriptArrayBack_Generic), asCALL_GENERIC); assert( r >= 0 );
 #if AS_USE_ACCESSORS != 1
 	r = engine->RegisterObjectMethod("array<T>", "uint length() const", asFUNCTION(ScriptArrayLength_Generic), asCALL_GENERIC); assert( r >= 0 );
 #endif

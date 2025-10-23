@@ -7,13 +7,15 @@
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
         android:theme="@style/AppTheme"
+        android:extractNativeLibs="true"
+        android:enableOnBackInvokedCallback="false"
         android:hardwareAccelerated="true" >
         <meta-data android:name="SDL_ENV.SDL_ANDROID_TRAP_BACK_BUTTON" android:value="1"/>
         <activity android:name="NVGTGame"
             android:label="%APP_LABEL%"
             android:alwaysRetainTaskState="true"
             android:launchMode="singleInstance"
-            android:configChanges="layoutDirection|locale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
+            android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:preferMinimalPostProcessing="true"
             android:exported="true"
             >

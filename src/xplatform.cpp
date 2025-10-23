@@ -22,6 +22,7 @@
 #include <Poco/File.h>
 #include <Poco/Path.h>
 #include <Poco/Thread.h>
+#include <Poco/Util/Application.h>
 #include <obfuscate.h>
 #include <angelscript.h>
 #include "nvgt.h"
@@ -73,6 +74,18 @@ std::string get_nvgt_lib_directory(const std::string& platform) {
 	#endif
 	result.pushDirectory(dir);
 	return result.toString();
+}
+#else // NVGT_STUB
+std::string get_data_location() {
+	std::string executable = Poco::Util::Application::instance().commandPath();
+	#if defined(__ANDROID__)
+	return android_get_main_shared_object();
+	#elif defined(__APPLE__)
+		Path payload_file = Path(Util::Application::instance().commandPath()).makeParent().makeParent().append("Resources/exec");
+		return Poco::Environment::has("MACOS_BUNDLED_APP") && File(payload_file).exists()? payload_file.toString() : executable;
+	#else
+		return executable;
+	#endif
 }
 #endif
 

@@ -1,0 +1,15 @@
+/**
+	Stops and resets the profiler.
+	void stop_profiling();
+*/
+
+// Example:
+void main() {
+	start_profiling();
+	wait(1000);
+	stop_profiling();
+	wait(1000);
+	start_profiling();
+	wait(1000);
+	alert("Profile", generate_profile());
+}

@@ -6,3 +6,8 @@ Insert a string into another string at a given position.
 ## Arguments:
 * uint pos: the index to insert the other string at.
 * const string&in other: the string to insert.
+
+## Remarks
+Please note this modifies the calling string. To keep the original you will need to make a copy.
+
+If pos is out of bounds, an exception is thrown.

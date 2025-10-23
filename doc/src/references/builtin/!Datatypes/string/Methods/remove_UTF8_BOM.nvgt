@@ -1,0 +1,20 @@
+/**
+	Remove the UTF-8 BOM from a string.
+	string string::remove_UTF8_BOM();
+	## Arguments:
+		None.
+	## Returns:
+		None.
+	## Remarks
+		A BOM (Byte Order Mark) is a special marker used at the beginning of a text file to indicate the byte order of multi-byte character encodings, such as UTF-16 or UTF-32. Byte order refers to how multi-byte values are stored in memory, for example, little-endian (least significant byte first) or big-endian (most significant byte first).
+		While UTF-8 does not require a BOM due to its self-synchronizing, byte-based encoding, some older applications rely on it to detect that a file is encoded in UTF-8.
+		In UTF-8, the BOM is represented as the byte sequence \xEF\xBB\xBF. If present, it appears at the very beginning of the string or file.
+		Note: This modifies the calling string. If you need to preserve the BOM for later, you will need to make a copy of the string before processing or else reconstruct it manually.
+*/
+
+// Example:
+void main() {
+	string test="\xEF\xBB\xBFtest";
+	test.remove_UTF8_BOM();
+	alert("No BOM", test);
+}

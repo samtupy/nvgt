@@ -166,9 +166,9 @@ shared double calculate_x_y_angle(double x1, double y1, double x2, double y2, do
 }
 shared double calculate_clamped_x_y_angle(vector current, vector min, vector max, double deg, bool at_least_1_tile = true, bool floor_deg = true) {
 	// Clamp current.x to be within the range [min.x, max.x]
-	double clamped_x = (current.x < min.x) ? min.x : (current.x > max.x) ? max.x : current.x;
+	double clamped_x = clamp(current.x, min.x, max.x);
 	// Clamp current.y to be within the range [min.y, max.y]
-	double clamped_y = (current.y < min.y) ? min.y : (current.y > max.y) ? max.y : current.y;
+	double clamped_y = clamp(current.y, min.y, max.y);
 	// Calculate 2D distance between the current point and the clamped point
 	if (at_least_1_tile && get_2d_distance(current.x, current.y, clamped_x, clamped_y) < 1)
 		return 0;

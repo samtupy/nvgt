@@ -3,27 +3,33 @@
 // License: zlib (see license.md in the root of the NVGT distribution)
 
 #include "bgt_compat.nvgt"
-#include "sound_pool.nvgt"
-sound_pool p;
 timer_queue timers;
 test t;
 class test {
+	sound@s;
 	uint tq_callback(string tid, string data) {
 		if (tid != "3")
 			screen_reader_speak_interrupt(NVDA, data);
 		if (tid == "3")
-			p.play_stationary("C:\\windows\\media\\ding.wav", false);
+			this.play("C:\\windows\\media\\ding.wav");
 		if (tid == "1") {
 			timers.set("4", @timer_callback(t.tq_callback), "stuff!", 2000, true);
 			return 1000;
 		} else
 			return 0;
 	}
+	void play(const string&in filename) {
+		if(@this.s == null) @this.s = sound();
+		this.s.load(filename);
+		this.s.play();
+	}
 }
 void main() {
 	timers.set("1", @timer_callback(t.tq_callback), "bla?", 1000);
 	timers.set("2", @timer_callback(t.tq_callback), "meh", 1250, true);
 	timers.set("3", @timer_callback(t.tq_callback), "Yay!", 500, true);
+	string[]@list = timers.list_timers();
+	alert(list.length()+" timers", join(list, ", "));
 	show_game_window("test");
 	while (!key_pressed(KEY_ESCAPE)) {
 		wait(5);

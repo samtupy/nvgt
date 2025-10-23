@@ -1,0 +1,14 @@
+/**
+	This property will be true if the previous function failed.
+	const bool fail;
+	## Remarks:
+		This is good for checking the success or failure of the last operation. It differs from bad in that this is generally set in recoverable errors (EOF, type mismatch and so on).
+*/
+
+// Example:
+void main() {
+	datastream ds;
+	alert("example", ds.fail); // Will display false because we haven't done anything yet.
+	ds.read(); // Error, nothing there.
+	alert("example", ds.fail); // Will now display true because there was an error reading.
+}

@@ -1,0 +1,12 @@
+/**
+	Checks if a vector is 0.
+	bool vector::is_zero const;
+	## Remarks
+		This method is more accurate than checking each axis for 0 directly, as it takes into account the inaccuracies that can be caused by floating point arithmetic.
+*/
+
+// Example:
+void main() {
+	vector v(0, 0, 0);
+	alert("Is zero?", v.is_zero);
+}
