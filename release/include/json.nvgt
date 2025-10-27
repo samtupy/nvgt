@@ -29,6 +29,14 @@ class json {
 	string dump(int indent = 0, int step = -1) {
 		return this.data.stringify(indent, step);
 	}
+	bool save(string filename, int indent = 0, int step = -1) {
+		file f;
+		if (!f.open(filename, "w")) return false;
+		if (this.size < 1) return false;
+		f.write(this.dump(indent, step));
+		f.close();
+		return true;
+	}
 	var@ get(string key, var@ def = null) {
 		return this.data.get(key, def);
 	}
