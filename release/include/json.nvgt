@@ -32,7 +32,7 @@ class json {
 	bool save(string filename, int indent = 0, int step = -1) {
 		file f;
 		if (!f.open(filename, "w")) return false;
-		if (this.size < 1) return false;
+		if (this.size() < 1) return false;
 		f.write(this.dump(indent, step));
 		f.close();
 		return true;
