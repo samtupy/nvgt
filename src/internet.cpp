@@ -598,7 +598,7 @@ public:
 		if (!url.getUserInfo().empty()) _creds.fromURI(url);
 		_request_body = body;
 		if (headers) {
-			for (const auto& header : *headers) _request.add(header.first, header.second);
+			for (const auto& header : *headers) _request.set(header.first, header.second);
 		}
 		worker.start(*this);
 		return true;
