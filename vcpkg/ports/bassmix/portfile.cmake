@@ -12,7 +12,7 @@ elseif(VCPKG_TARGET_IS_IOS)
 	set(FILE_SUFFIX "-ios")
 	set(FILE_HASH "cb88a311aa00f89874a7a187cd4dcf9c40699007311d8e474914815399877c4ff4b6498fc1012956c7db13fca3e85aace98dc25942e9b0930ee9caca73c6e814")
 else()
-	set(FILE_HASH "8d5693919ed61584b4b666d53663c02be87dd5db49e1508f3dcfdd0abc45a49c173ab4f7a08af72fa9d4844bae2967c0ff7fd77cf4923bb09fc265243d1ad9bd")
+	set(FILE_HASH "e7f062c824abe26f02b6a98ff8ced19afdc43add2f3bcb2ca86c78985691e9ee2228aee4e660300e30b7b48de123bb95c51aa98f8e3b0d4fc55a5ddd008f6b59")
 endif()
 vcpkg_download_distfile(ARCHIVE
     URLS "https://www.un4seen.com/files/bassmix${VERSION}${FILE_SUFFIX}.zip"
