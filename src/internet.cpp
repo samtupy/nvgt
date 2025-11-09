@@ -613,7 +613,7 @@ public:
 		_creds.clear();
 		_request = HTTPRequest(HTTPMessage::HTTP_1_1);
 		_request.setContentLength(0);
-		_request.set("User-Agent", "nvgt " + NVGT_VERSION);
+		_request.set("User-Agent", _user_agent);
 		_response.clear();
 		_max_retries = 10;
 		_bytes_downloaded = _retry_delay = 0;
