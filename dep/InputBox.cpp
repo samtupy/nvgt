@@ -25,7 +25,6 @@
 #define FONT_NAME                   _T("Times")
 #define SetFontToControl(n)         SendMessage((n), WM_SETFONT, (WPARAM)m_hFont, 0);
 #define SOFT_BLUE RGB(206,214,240)
-void setTextAlignment(HWND hwnd, int textalignment);
 #define REPORTERROR ReportError(__FUNCTION__)
 void ReportError(const char *CallingFunction);
 
@@ -39,6 +38,26 @@ HWND m_hWndCancel = NULL;
 HWND m_hWndPrompt = NULL;
 bool infobox = false;
 static HBRUSH hbrBkgnd = NULL;
+
+// Control alignment helper
+void SetControlAlignment(HWND h, int align) {
+	if (!h) return;
+	wchar_t c[32];
+	GetClassName(h, c, 32);
+	bool isStatic = wcscmp(c, L"Static") == 0;
+	bool isEdit = wcscmp(c, L"Edit") == 0 || wcscmp(c, RICHEDIT_CLASS) == 0;
+	if (!isStatic && !isEdit) return;
+	LONG_PTR s = GetWindowLongPtr(h, GWL_STYLE);
+	if (isStatic) {
+		s &= ~(SS_LEFT | SS_CENTER | SS_RIGHT);
+		s |= (align==0?SS_LEFT:align==1?SS_CENTER:SS_RIGHT);
+	} else if (isEdit) {
+		s &= ~(ES_LEFT | ES_CENTER | ES_RIGHT);
+		s |= (align==0?ES_LEFT:align==1?ES_CENTER:ES_RIGHT);
+	}
+	SetWindowLongPtr(h, GWL_STYLE, s);
+	SetWindowPos(h, NULL, 0,0,0,0, SWP_NOZORDER|SWP_NOSIZE|SWP_NOMOVE|SWP_NOACTIVATE|SWP_FRAMECHANGED);
+}
 
 // This function makes richedit controls stop making a sound if you try to scroll past their borders, imported into NVGT from pipe2textbox. Thanks to https://stackoverflow.com/questions/55884687/how-to-eliminate-the-messagebeep-from-the-richedit-control
 void disable_richedit_beeps(HMODULE richedit_module, HWND richedit_control) {
@@ -134,7 +153,7 @@ LRESULT CALLBACK InputBoxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 				FreeLibrary(m_hRicheditModule);
 				m_hRicheditModule = NULL;
 			}
-break;
+		break;
 		case WM_COMMAND:
 			switch (HIWORD(wParam)) {
 				case BN_CLICKED:
@@ -193,10 +212,10 @@ HWND InputBoxCreateWindow(const std::wstring& szCaption, const std::wstring& szP
 		REPORTERROR;
 		return NULL;
 	}
-	setTextAlignment(m_hWndPrompt, SS_CENTER);
+	SetControlAlignment(m_hWndPrompt, 1);
 	//SetWindowTitle(m_hWndEdit, szPrompt);
 	SetWindowText(m_hWndPrompt, szPrompt.c_str());
-	setTextAlignment(m_hWndEdit, SS_CENTER);
+	SetControlAlignment(m_hWndEdit, 1);
 	SetForegroundWindow(m_hWndInputBox);
 	// Set default button
 	if (m_hWndOK) SendMessage((HWND)m_hWndOK, BM_SETSTYLE, (WPARAM)LOWORD(BS_DEFPUSHBUTTON), MAKELPARAM(TRUE, 0));
@@ -248,45 +267,6 @@ std::wstring InputBoxMessageLoop() {
 	return result;
 }
 
-void setTextAlignment(HWND hwnd, int intTextAlignment) {
-	LONG_PTR s;
-	LONG_PTR textalignment = GetWindowLongPtr(hwnd, GWL_STYLE);
-	if (textalignment != intTextAlignment) {
-		//delete the last text alignment
-		if (intTextAlignment == 0) {
-			s = GetWindowLongPtr(hwnd, GWL_STYLE);
-			s = s & ~(SS_LEFT);
-			SetWindowLongPtr(hwnd, GWL_STYLE, (LONG_PTR)s);
-		} else if (intTextAlignment == 1) {
-			s = GetWindowLongPtr(hwnd, GWL_STYLE);
-			s = s & ~(SS_CENTER);
-			SetWindowLongPtr(hwnd, GWL_STYLE, (LONG_PTR)s);
-		} else if (intTextAlignment == 2) {
-			s = GetWindowLongPtr(hwnd, GWL_STYLE);
-			s = s & ~(SS_RIGHT);
-			SetWindowLongPtr(hwnd, GWL_STYLE, (LONG_PTR)s);
-		}
-
-		textalignment = intTextAlignment;
-
-		//put the new text alignment
-		if (textalignment == 0) {
-			s = GetWindowLongPtr(hwnd, GWL_STYLE);
-			s = s | (SS_LEFT);
-			SetWindowLongPtr(hwnd, GWL_STYLE, (LONG_PTR)s);
-		} else if (textalignment == 1) {
-			s = GetWindowLongPtr(hwnd, GWL_STYLE);
-			s = s | (SS_CENTER);
-			SetWindowLongPtr(hwnd, GWL_STYLE, (LONG_PTR)s);
-		} else if (textalignment == 2) {
-			s = GetWindowLongPtr(hwnd, GWL_STYLE);
-			s = s | (SS_RIGHT);
-			SetWindowLongPtr(hwnd, GWL_STYLE, (LONG_PTR)s);
-		}
-		SetWindowPos(hwnd, 0, 0, 0, 0, 0,
-		             SWP_NOZORDER | SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOCOPYBITS | SWP_DRAWFRAME);
-	}
-}
 void ReportError(const char *CallingFunction) {
 	DWORD error = GetLastError();
 	LPVOID lpMsgBuf;
