@@ -118,11 +118,13 @@ LRESULT CALLBACK InputBoxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 			SetFocus(m_hWndEdit);
 			break;
 		case WM_DESTROY:
+			if (hbrBkgnd) {
+				DeleteObject(hbrBkgnd);
+				hbrBkgnd = NULL;
+			}
 			DeleteObject(m_hFont);
 			//EnableWindow(m_hWndParent, TRUE);
 			//SetForegroundWindow(m_hWndParent);
-			DestroyWindow(hWnd);
-			PostQuitMessage(0);
 			break;
 		case WM_COMMAND:
 			switch (HIWORD(wParam)) {
@@ -207,7 +209,9 @@ HWND InputBoxCreateWindow(const std::wstring& szCaption, const std::wstring& szP
 std::wstring InputBoxMessageLoop() {
 	std::wstring result = _T("");
 	MSG msg;
-	while (GetMessage(&msg, NULL, 0, 0)) {
+	while (true) {
+		if (!IsWindow(m_hWndInputBox)) break;
+		if (!GetMessage(&msg, NULL, 0, 0)) break;
 		if (msg.message == WM_KEYDOWN) {
 			if (msg.wParam == VK_TAB) {
 				HWND hWndFocused = GetFocus();
@@ -215,7 +219,7 @@ std::wstring InputBoxMessageLoop() {
 				SetFocus(GetNextDlgTabItem(m_hWndInputBox, hWndFocused, prev));
 			}
 			if (msg.wParam == VK_ESCAPE) {
-				SendMessage(m_hWndInputBox, WM_DESTROY, 0, 0);
+				DestroyWindow(m_hWndInputBox);
 				result = _T("\xff");
 			}
 			if (msg.wParam == VK_RETURN) {
@@ -224,7 +228,7 @@ std::wstring InputBoxMessageLoop() {
 				result.resize(nCount);
 				GetWindowText(m_hWndEdit, &result.front(), nCount);
 				result.resize(nCount - 1);
-				SendMessage(m_hWndInputBox, WM_DESTROY, 0, 0);
+				DestroyWindow(m_hWndInputBox);
 			}
 		}
 		if (!IsDialogMessage(m_hWndInputBox, &msg)) {
