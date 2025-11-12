@@ -170,7 +170,7 @@ HWND InputBoxCreateWindow(const std::wstring& szCaption, const std::wstring& szP
 		wcex.hInstance = hInst;
 		wcex.hIcon = NULL;//LoadIcon(hInst, (LPCTSTR)IDI_MYINPUTBOX);
 		wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW);
+		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
 		wcex.lpszMenuName = NULL;
 		wcex.lpszClassName = CLASSNAME;
 		wcex.hIconSm = NULL;
@@ -190,14 +190,14 @@ HWND InputBoxCreateWindow(const std::wstring& szCaption, const std::wstring& szP
 	setTextAlignment(m_hWndEdit, SS_CENTER);
 	SetForegroundWindow(m_hWndInputBox);
 	// Set default button
-	SendMessage((HWND)m_hWndOK, BM_SETSTYLE, (WPARAM)LOWORD(BS_DEFPUSHBUTTON), MAKELPARAM(TRUE, 0));
+	if (m_hWndOK) SendMessage((HWND)m_hWndOK, BM_SETSTYLE, (WPARAM)LOWORD(BS_DEFPUSHBUTTON), MAKELPARAM(TRUE, 0));
 	SendMessage((HWND)m_hWndCancel, BM_SETSTYLE, (WPARAM)LOWORD(BS_PUSHBUTTON), MAKELPARAM(TRUE, 0));
 	// Set default text
 	SendMessage(m_hWndEdit, EM_SETSEL, 0, -1);
 	SendMessage(m_hWndEdit, EM_REPLACESEL, 0, (LPARAM)szText.c_str());
 	if (szText.size() > 0) SendMessage(m_hWndEdit, EM_SETSEL, 0, -1);
 	if (infobox) {
-		SendMessage(m_hWndEdit, EM_SETREADONLY, ES_READONLY, 0);
+		SendMessage(m_hWndEdit, EM_SETREADONLY, TRUE, 0);
 		SendMessage(m_hWndEdit, EM_SETSEL, 0, 0);
 	}
 	SetFocus(m_hWndEdit);
