@@ -122,10 +122,19 @@ LRESULT CALLBACK InputBoxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 				DeleteObject(hbrBkgnd);
 				hbrBkgnd = NULL;
 			}
-			DeleteObject(m_hFont);
+			if (m_hFont) {
+				DeleteObject(m_hFont);
+				m_hFont = NULL;
+			}
 			//EnableWindow(m_hWndParent, TRUE);
 			//SetForegroundWindow(m_hWndParent);
 			break;
+		case WM_NCDESTROY:
+			if (m_hRicheditModule) {
+				FreeLibrary(m_hRicheditModule);
+				m_hRicheditModule = NULL;
+			}
+break;
 		case WM_COMMAND:
 			switch (HIWORD(wParam)) {
 				case BN_CLICKED:
