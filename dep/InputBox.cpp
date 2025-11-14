@@ -39,19 +39,64 @@ HWND m_hWndPrompt = NULL;
 bool infobox = false;
 static HBRUSH hbrBkgnd = NULL;
 
+// Get the type of control (used in clipboard preservation and alignment helpers)
+int GetRelevantControlType(HWND window) {
+	if (!window) return -1;
+	if (!IsWindow(window)) return -1;
+	wchar_t c[32];
+	GetClassName(window, c, 32);
+	if (wcscmp(c, L"Static") == 0) return 1;
+	if (wcscmp(c, L"Edit") == 0) return 2;
+	if (wcscmp(c, RICHEDIT_CLASS) == 0) return 3;
+return 0;
+}
+
+// Richedit controls use delayed rendering techniques when accessing the clipboard. This helper function copies the actual bytes back into the clipboard so we should always be able to access any data that this dialog puts there.
+void PreserveClipboard() {
+	if (!OpenClipboard(NULL)) return;
+	UINT TextType = CF_UNICODETEXT;
+	HANDLE hData = GetClipboardData(TextType);
+	if (!hData) {
+		TextType = CF_TEXT;
+		hData = GetClipboardData(TextType);
+	}
+	if (!hData) {
+		CloseClipboard();
+		return; // Unable to grab any text.
+}
+	SIZE_T cb = GlobalSize(hData);
+	if (cb <= 0) {
+		CloseClipboard();
+		return;
+	}
+	HGLOBAL hCopy = GlobalAlloc(GMEM_MOVEABLE, cb);
+	if (!hCopy) {
+		CloseClipboard();
+		return;
+	}
+	void* pSrc = GlobalLock(hData);
+	void* pDest = GlobalLock(hCopy);
+	if (pSrc && pDest) memcpy(pDest, pSrc, cb);
+	if (pDest) GlobalUnlock(hCopy);
+	if (pSrc)  GlobalUnlock(hData);
+
+	// At this point, hCopy contains the exact same bytes the clipboard just gave us.
+	EmptyClipboard();
+	SetClipboardData(TextType, hCopy);
+	// Clipboard owns hCopy now; don't free it.
+	CloseClipboard();
+}
+
 // Control alignment helper
 void SetControlAlignment(HWND h, int align) {
 	if (!h) return;
-	wchar_t c[32];
-	GetClassName(h, c, 32);
-	bool isStatic = wcscmp(c, L"Static") == 0;
-	bool isEdit = wcscmp(c, L"Edit") == 0 || wcscmp(c, RICHEDIT_CLASS) == 0;
-	if (!isStatic && !isEdit) return;
+	int type=GetRelevantControlType(h);
+	if (type < 1) return; // Not valid control.
 	LONG_PTR s = GetWindowLongPtr(h, GWL_STYLE);
-	if (isStatic) {
+	if (type == 1) {
 		s &= ~(SS_LEFT | SS_CENTER | SS_RIGHT);
 		s |= (align==0?SS_LEFT:align==1?SS_CENTER:SS_RIGHT);
-	} else if (isEdit) {
+	} else {
 		s &= ~(ES_LEFT | ES_CENTER | ES_RIGHT);
 		s |= (align==0?ES_LEFT:align==1?ES_CENTER:ES_RIGHT);
 	}
@@ -137,6 +182,7 @@ LRESULT CALLBACK InputBoxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 			SetFocus(m_hWndEdit);
 			break;
 		case WM_DESTROY:
+	PreserveClipboard();
 			if (hbrBkgnd) {
 				DeleteObject(hbrBkgnd);
 				hbrBkgnd = NULL;
