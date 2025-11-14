@@ -622,6 +622,12 @@ public:
 	bool get(const URI& url, const NameValueCollection* headers, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_GET, url, headers, "", creds); }
 	bool head(const URI& url, const NameValueCollection* headers, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_HEAD, url, headers, "", creds); }
 	bool post(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_POST, url, headers, body, creds); }
+	bool put(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_PUT, url, headers, body, creds); }
+	bool options(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_OPTIONS, url, headers, body, creds); }
+	bool delete_(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_DELETE, url, headers, body, creds); }
+	bool trace(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_TRACE, url, headers, body, creds); }
+	bool connect(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_CONNECT, url, headers, body, creds); }
+	bool patch(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_PATCH, url, headers, body, creds); }
 	void run() {
 		bool authorize = false;
 		int tries = _max_retries;
@@ -744,6 +750,12 @@ void RegisterHTTP(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("http", "bool get(const spec::uri&in url, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, get), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "bool head(const spec::uri&in url, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, head), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "bool post(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, post), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool put(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, put), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool options(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, options), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool delete(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, delete_), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool trace(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, trace), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool connect(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, connect), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool patch(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, patch), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "http_response@ get_response_headers() property", asMETHOD(http, get_response_headers), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "string get_response_body() property", asMETHOD(http, get_response_body), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "string request()", asMETHOD(http, get_response_body), asCALL_THISCALL);
