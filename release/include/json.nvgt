@@ -1,0 +1,109 @@
+class json {
+	json_object data;
+	json() {
+		this.reset();
+	}
+	void reset() {
+		this.data = json_object();
+	}
+	bool loads(string str) {
+		json_object@ j = null;
+		try {
+			@j = parse_json(str);
+		} catch {}
+		if (@j == null) return false;
+		this.data = j;
+		return true;
+	}
+	bool loadf(string filename) {
+		file f;
+		if (!f.open(filename, "r")) return false;
+		string r = f.read();
+		f.close();
+		return this.loads(r);
+	}
+	bool loadds(datastream@ d) {
+		if (@d == null || !d.active) return false;
+		return this.loads(d.read());
+	}
+	string dump(int indent = 0, int step = -1) {
+		return this.data.stringify(indent, step);
+	}
+	bool save(string filename, int indent = 0, int step = -1) {
+		file f;
+		if (!f.open(filename, "w")) return false;
+		if (this.size() < 1) return false;
+		f.write(this.dump(indent, step));
+		f.close();
+		return true;
+	}
+	var@ get(string key, var@ def = null) {
+		return this.data.get(key, def);
+	}
+	bool set(string key, var@ value) {
+		this.data.set(key, value);
+		return true;
+	}
+	bool exists(string key) {
+		return this.data.exists(key);
+	}
+	bool remove(string key) {
+		if (!this.exists(key)) return false;
+		this.data.remove(key);
+		return true;
+	}
+	void clear() {
+		this.data.clear();
+	}
+	uint size() {
+		return this.data.size();
+	}
+	string[] get_keys() property {
+		return this.data.get_keys();
+	}
+	string[] get_keys_recursive() property{
+		string[] f = this.list_keys_recursive("", @this.data, true);
+		for (uint i = 0; i < f.length(); i++) {
+			if (!this.is_object(f[i])) continue;
+			json_object@ j = this.get(f[i]);
+			if (@j == null) continue;
+			f.extend(this.list_keys_recursive(f[i], @j, false));
+		}
+		return f;
+	}
+	bool is_array(string key) {
+		return this.data.is_array(key);
+	}
+	bool is_null(string key) {
+		return this.data.is_null(key);
+	}
+	bool is_object(string key) {
+		return this.data.is_object(key);
+	}
+	var@ opCall(string path, var@ def = null) {
+		return this.data(path, def);
+	}
+	var@ get_opIndex(string key) property {
+		return this.data.get_opIndex(key);
+	}
+	void set_opIndex(string key, var@ value) property {
+		this.data.set_opIndex(key, value);
+	}
+	private string[] list_keys_recursive(string key, json_object@ v, bool top = true) {
+		string[] f;
+		string[] k = v.get_keys();
+		if (top) f = k;
+		else {
+			for (uint i = 0; i < k.length(); i++) {
+				if (!v.is_object(k[i])) {
+					f.insert_last(key + "." + k[i]);
+				} else {
+					json_object@ j = v.get(k[i]);
+					if (@j == null) continue;
+					f.extend(this.list_keys_recursive(key + "." + k[i], @j, false));
+				}
+			}
+		}
+		return f;
+	}
+}
