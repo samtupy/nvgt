@@ -1,5 +1,5 @@
 # compare_exchange_weak:
-Atomically compares the value representation of this atomic object with that of `expected`. If both are bitwise-equal, performs an atomic read-modify-write operation on this atomic object with `desired` (that is, replaces the current value of this atomic object with `desired`); otherwise, performs an atomic load of this atomic object and places it's actual value into `expected`. If failure is either `MEMORY_ORDER_RELEASE` or `MEMORY_ORDER_ACQ_REL`, the behavior is undefined. 
+Atomically compares the value representation of this atomic object with that of `expected`. If both are bitwise-equal, performs an atomic read-modify-write operation on this atomic object with `desired` (that is, replaces the current value of this atomic object with `desired`); otherwise, performs an atomic load of this atomic object and places its actual value into `expected`. If failure is either `MEMORY_ORDER_RELEASE` or `MEMORY_ORDER_ACQ_REL`, the behavior is undefined. 
 
 ```nvgt
 bool compare_exchange_weak(T& expected, T desired, memory_order success, memory_order failure);

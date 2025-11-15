@@ -3,7 +3,7 @@
 	1. bool array::empty();
 	2. bool array::is_empty();
 	## Returns:
-		bool: true if the array is empty, false if not.
+		bool: true if the array is empty, false otherwise.
 	## Remarks:
 		This method is functionally equivalent to `array.length() == 0`.
 */
