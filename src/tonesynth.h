@@ -21,6 +21,8 @@ extern "C" {
 #include <angelscript.h>
 
 // Forward declare a few things so they'll work.
+class CScriptArray;
+class asIScriptEngine;
 class sound;
 
 class tone_synth {
@@ -65,8 +67,10 @@ public:
 	bool seek_ms(int position);
 	bool rewind(double amount);
 	bool rewind_ms(int amount);
-
+	int get_sample_rate();
+	int get_channels();
 	sound* generate_sound();
+	CScriptArray* write_samples();
 	bool generate_file(const std::string& filename);
 
 private:

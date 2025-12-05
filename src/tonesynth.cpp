@@ -16,7 +16,10 @@
 */
 
 #include "tonesynth.h"
+#include <angelscript.h>
+#include <scriptarray.h>
 #include "sound.h"
+#include "nvgt.h" // g_ScriptEngine
 
 tone_synth::tone_synth() {
 	gen = new elz_tonar{};
@@ -141,6 +144,12 @@ bool tone_synth::rewind(double amount) {
 bool tone_synth::rewind_ms(int amount) {
 	return el_tonar_rewind_ms(gen, amount)? true: false;
 }
+int tone_synth::get_sample_rate() {
+	return el_tonar_get_sample_rate(gen);
+}
+int tone_synth::get_channels() {
+	return el_tonar_get_channels(gen);
+}
 sound* tone_synth::generate_sound() {
 init_sound();
 	int size = el_tonar_output_buffer_size(gen);
@@ -163,6 +172,18 @@ init_sound();
 		return nullptr;
 	}
 	return s;
+}
+CScriptArray* tone_synth::write_samples() {
+	int size = el_tonar_output_sample_count(gen);
+	if (size <= 0) return NULL;
+	CScriptArray* arr = CScriptArray::Create(g_ScriptEngine->GetTypeInfoByDecl("int16[]"), size);
+	if (!arr) return nullptr;
+	short* data = reinterpret_cast<short*>(arr->At(0));
+	if (!el_tonar_output_samples(gen, data, size)) {
+		arr->Release();
+		return nullptr;
+	}
+	return arr;
 }
 bool tone_synth::generate_file(const std::string& filename) {
 	return el_tonar_output_file(gen, const_cast<char*> (filename.c_str()))? true: false;
@@ -216,6 +237,9 @@ void RegisterScriptTonesynth(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("tone_synth", "bool freq_bend_ms(double freq, int bend_amount, int length, int bend_start, int bend_length)", asMETHOD(tone_synth, freq_ms), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool rest(double length)", asMETHOD(tone_synth, rest), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool rest_ms(int ms)", asMETHOD(tone_synth, rest_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "int get_sample_rate() property", asMETHOD(tone_synth, get_sample_rate), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "int get_channels() property", asMETHOD(tone_synth, get_channels), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "sound@ write_wave_sound()", asMETHOD(tone_synth, generate_sound), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "int16[]@ write_samples()", asMETHOD(tone_synth, write_samples), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool write_wave_file(const string &in filename)", asMETHOD(tone_synth, generate_file), asCALL_THISCALL);
 }

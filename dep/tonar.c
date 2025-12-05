@@ -226,6 +226,14 @@ int el_tonar_rewind_ms(el_tonar* gen, int amount)
 {
 return el_tonar_seek(gen, el_tonar_get_position(gen)-amount);
 }
+int el_tonar_get_sample_rate(el_tonar* gen)
+{
+return gen->sample_rate;
+}
+int el_tonar_get_channels(el_tonar* gen)
+{
+return gen->channels;
+}
 int el_tonar_output_buffer_size(el_tonar* gen)
 {
 if(!elz_tonar_can_output(gen)) return 0;
@@ -244,6 +252,24 @@ double new_sample=elz_tonar_normalise_sample(gen, x);
 short output_sample=elz_tonar_float_to_sample(new_sample);
 memcpy(buffer, &output_sample, sizeof(output_sample));
 buffer+=sizeof(output_sample);
+}
+return 1;
+}
+int el_tonar_output_sample_count(el_tonar* gen)
+{
+if(!elz_tonar_can_output(gen)) return 0;
+return gen->length;
+}
+int el_tonar_output_samples(el_tonar* gen, short* samples, int size)
+{
+int needed=el_tonar_output_sample_count(gen);
+if(needed<=0) return 0;
+if(size<needed) return 0;
+for(int x=0; x<gen->length; x++)
+{
+double new_sample=elz_tonar_normalise_sample(gen, x);
+short output_sample=elz_tonar_float_to_sample(new_sample);
+samples[x]=output_sample;
 }
 return 1;
 }
