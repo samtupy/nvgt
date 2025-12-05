@@ -74,8 +74,12 @@ int el_tonar_seek(el_tonar* gen, double position);
 int el_tonar_seek_ms(el_tonar* gen, int position);
 int el_tonar_rewind(el_tonar* gen, double amount);
 int el_tonar_rewind_ms(el_tonar* gen, int amount);
+int el_tonar_get_sample_rate(el_tonar* gen);
+int el_tonar_get_channels(el_tonar* gen);
 int el_tonar_output_buffer_size(el_tonar* gen);
 int el_tonar_output_buffer(el_tonar* gen, char* buffer, int size);
+int el_tonar_output_sample_count(el_tonar* gen);
+int el_tonar_output_samples(el_tonar* gen, short* samples, int size);
 int el_tonar_output_file(el_tonar* gen, char* fn);
 
 #define elz_tonar_begin 0xACC737A3
