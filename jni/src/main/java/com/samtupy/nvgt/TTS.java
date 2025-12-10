@@ -33,7 +33,8 @@ public class TTS {
 	public static boolean isScreenReaderActive() {
 		Context context = SDL.getContext();
 		AccessibilityManager am = (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
-		if (am != null && am.isEnabled()) {
+		// Check for TouchExploration to avoid false positives from password managers/antivirus
+		if (am != null && am.isEnabled() && am.isTouchExplorationEnabled()) {
 			List<AccessibilityServiceInfo> serviceInfoList = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_SPOKEN);
 			if (!serviceInfoList.isEmpty()) return true;
 		}
@@ -43,7 +44,7 @@ public class TTS {
 	public static String screenReaderDetect() {
 		Context context = SDL.getContext();
 		AccessibilityManager am = (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
-		if (am != null && am.isEnabled()) {
+		if (am != null && am.isEnabled() && am.isTouchExplorationEnabled()) {
 			List<AccessibilityServiceInfo> serviceInfoList = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_SPOKEN);
 			if (serviceInfoList.isEmpty()) return "";
 			return serviceInfoList.get(0).getId();
@@ -76,12 +77,18 @@ public class TTS {
 
 	public static List<String> getEnginePackages() {
 		Context context = SDL.getContext();
-		TextToSpeech tempTts = new TextToSpeech(context, null);
-		List<TextToSpeech.EngineInfo> engines = tempTts.getEngines();
-		List<String> packages = new ArrayList<>();
-		for (TextToSpeech.EngineInfo engine : engines) packages.add(engine.name);
-		tempTts.shutdown();
-		return packages;
+		try {
+			TextToSpeech tempTts = new TextToSpeech(context, status -> {});
+			List<TextToSpeech.EngineInfo> engines = tempTts.getEngines();
+			List<String> packages = new ArrayList<>();
+			if (engines != null) {
+				for (TextToSpeech.EngineInfo engine : engines) packages.add(engine.name);
+			}
+			tempTts.shutdown();
+			return packages;
+		} catch (Exception e) {
+			return new ArrayList<>();
+		}
 	}
 
 	// Then, the instantiable object that interfaces directly with the Android TextToSpeech system.
@@ -115,7 +122,9 @@ public class TTS {
 			public void onInit(int status) {
 				if (status == TextToSpeech.SUCCESS) {
 					isTTSInitialized = true;
-					tts.setLanguage(Locale.getDefault());
+					try {
+						tts.setLanguage(Locale.getDefault());
+					} catch (Exception e) {}
 					tts.setPitch(1.0f);
 					tts.setSpeechRate(1.0f);
 					AudioAttributes audioAttributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build();
@@ -129,7 +138,8 @@ public class TTS {
 		};
 		tts = enginePackage != null? new TextToSpeech(context, listener, enginePackage) : new TextToSpeech(context, listener);
 		try {
-			isTTSInitializedLatch.await(1000, TimeUnit.MILLISECONDS);
+			// Changed from 1000ms to 10 seconds to fix race condition on slower devices/cold starts
+			isTTSInitializedLatch.await(10, TimeUnit.SECONDS);
 		} catch (InterruptedException e) {}
 	}
 	public TTS() { this(null); }
@@ -146,7 +156,10 @@ public class TTS {
 		return tts.speak(text, interrupt? TextToSpeech.QUEUE_FLUSH : TextToSpeech.QUEUE_ADD, params, null) == TextToSpeech.SUCCESS;
 	}
 	public boolean silence() { return isActive()? tts.stop() == TextToSpeech.SUCCESS : false; }
-	public String getVoice() { return isActive()? tts.getVoice().getName() : null; }
+	public String getVoice() { 
+		if (!isActive() || tts.getVoice() == null) return null;
+		return tts.getVoice().getName(); 
+	}
 
 	public boolean setRate(float rate) {
 		if (!isActive()) return false;
@@ -174,10 +187,14 @@ public class TTS {
 		super.finalize();
 	}
 
-	public List<String> getVoices() { return isActive()? tts.getVoices().stream().map(Voice::getName).collect(Collectors.toList()) : null; }
+	public List<String> getVoices() { 
+		if (!isActive() || tts.getVoices() == null) return new ArrayList<>();
+		return tts.getVoices().stream().map(Voice::getName).collect(Collectors.toList()); 
+	}
 	public boolean setVoice(String name) {
 		if (!isActive()) return false;
 		Set<Voice> voices = tts.getVoices();
+		if (voices == null) return false;
 		Optional<Voice> desiredVoice = voices.stream().filter(voice -> voice.getName().equals(name)).findFirst();
 		if (desiredVoice.isPresent()) return tts.setVoice(desiredVoice.get()) == TextToSpeech.SUCCESS;
 		return false;
@@ -192,17 +209,17 @@ public class TTS {
 	private void initializeVoices() {
 		if (!isActive()) return;
 		availableVoices = new ArrayList<>();
-		Set<Voice> voices = tts.getVoices();
-		if (voices != null) {
-			for (Voice voice : voices) {
-				if (!voice.isNetworkConnectionRequired() && !voice.getFeatures().contains("notInstalled"))
-					availableVoices.add(voice);
+		try {
+			Set<Voice> voices = tts.getVoices();
+			if (voices != null) {
+				for (Voice voice : voices) {
+					if (!voice.isNetworkConnectionRequired() && !voice.getFeatures().contains("notInstalled"))
+						availableVoices.add(voice);
+				}
 			}
-		}
-		currentVoiceIndex = 0;
-		if (!availableVoices.isEmpty()) {
-			Voice currentVoice = tts.getVoice();
-			if (currentVoice != null) {
+			currentVoiceIndex = 0;
+			if (!availableVoices.isEmpty() && tts.getVoice() != null) {
+				Voice currentVoice = tts.getVoice();
 				for (int i = 0; i < availableVoices.size(); i++) {
 					if (availableVoices.get(i).getName().equals(currentVoice.getName())) {
 						currentVoiceIndex = i;
@@ -210,7 +227,7 @@ public class TTS {
 					}
 				}
 			}
-		}
+		} catch (Exception e) {}
 	}
 
 	// Set up permanent UtteranceProgressListener for PCM synthesis
@@ -306,6 +323,7 @@ public class TTS {
 		Bundle params = new Bundle();
 		params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, ttsVolume);
 		params.putFloat(TextToSpeech.Engine.KEY_PARAM_PAN, ttsPan);
+		params.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC);
 
 		// Start synthesis - using speak with synthesis callbacks
 		int result = tts.synthesizeToFile(text, params, new File(SDL.getContext().getCacheDir(), "nvgt_speech.wav"), currentPcmUtteranceId);
