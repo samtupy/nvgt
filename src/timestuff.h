@@ -24,6 +24,12 @@ class CScriptArray;
 uint64_t ticks(bool secure = true);
 uint64_t microticks(bool secure = true);
 
+bool set_timezone(const std::string& timezone_name);
+void reset_timezone();
+std::string get_current_timezone_name();
+int get_current_timezone_offset();
+CScriptArray* list_available_timezones();
+
 class timer_queue;
 class timer_queue_item : public TimerEventInterface {
 public:
