@@ -345,6 +345,16 @@ bool file_put_contents(const std::string& filename, const std::string& contents,
 	return result;
 }
 
+bool FileTouch(const string& filePath, const Timestamp& newTime) {
+	try {
+		Poco::File file(filePath);
+		if (!file.exists()) return false;
+		file.setLastModified(newTime);
+		return true;
+	} catch (...) {
+		return false;
+	}
+}
 
 void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
 	engine->RegisterEnum("glob_options");
@@ -371,4 +381,5 @@ void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("string DIRECTORY_PREFERENCES(const string&in company_name, const string&in application_name)", asFUNCTION(get_preferences_path), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string file_get_contents(const string&in filename)", asFUNCTION(file_get_contents), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_put_contents(const string&in filename, const string&in contents, bool append = false)", asFUNCTION(file_put_contents), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool file_touch(const string& in path, const timestamp& in new_time = timestamp())", asFUNCTION(FileTouch), asCALL_CDECL);
 }
