@@ -222,7 +222,7 @@ class menu {
 	#if_not plugin_legacy_sound
 	bool play(const string&in soundpath) {
 		if (soundpath.empty()) return false;
-		return  sound_play(sounds_prefix + soundpath + sounds_suffix, pack_file = pack_file) != null;
+		return  sound_play(sounds_prefix + soundpath + sounds_suffix, pack_file = (@pack_file != null? pack_file : sound_default_pack)) != null;
 	}
 	#endif
 	private int on_form_list_event(audio_form@ f, int c, control_event_type event, dictionary@ args) {
