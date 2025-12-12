@@ -9,8 +9,18 @@ import android.view.ViewGroup;
 import android.widget.*;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.io.StringWriter;
+import java.io.PrintWriter;
 
 public final class DialogUtils {
+	public static String getExceptionInfo(Throwable t) {
+		if (t == null) return "Unknown Error";
+		StringWriter sw = new StringWriter();
+		PrintWriter pw = new PrintWriter(sw);
+		t.printStackTrace(pw);
+		return sw.toString();
+	}
+
 	public static CompletableFuture<String> inputBox(Activity activity, String caption, String prompt, String defaultText) {
 		Objects.requireNonNull(activity, "activity");
 		Objects.requireNonNull(caption, "caption");
@@ -41,10 +51,12 @@ public final class DialogUtils {
 		return result;
 	}
 
-	/**
+
+/**
 	 * Displays a modal information dialog with title, prompt, and multi-line text.
 	 * Resolves when the user taps "Close".
 	 */
+
 	public static CompletableFuture<Void> infoBox(Activity activity, String caption, String prompt, String text) {
 		Objects.requireNonNull(activity, "activity");
 		Objects.requireNonNull(caption, "caption");

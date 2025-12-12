@@ -20,24 +20,79 @@
 #include <stdexcept>
 #include <memory>
 
+// Define global error variable so linker can find it
+extern int g_LastError;
+
 static jclass TTSClass = nullptr;
+static jclass DialogUtilsClass = nullptr;
 static jmethodID midIsScreenReaderActive = nullptr;
 static jmethodID midScreenReaderDetect = nullptr;
 static jmethodID midScreenReaderSpeak = nullptr;
 static jmethodID midScreenReaderSilence = nullptr;
 static jmethodID midTTSGetEnginePackages = nullptr;
+static jmethodID midGetExceptionInfo = nullptr;
+
 void android_setup_jni() {
-	if (TTSClass) return;
+	if (TTSClass && DialogUtilsClass) return;
 	JNIEnv* env = (JNIEnv*)SDL_GetAndroidJNIEnv();
 	if (!env) throw Poco::Exception("cannot retrieve JNI environment");
+	
 	TTSClass = env->FindClass("com/samtupy/nvgt/TTS");
 	if (!TTSClass) throw Poco::Exception("cannot find TTS class");
 	TTSClass = (jclass)env->NewGlobalRef(TTSClass);
+	
+	DialogUtilsClass = env->FindClass("com/samtupy/nvgt/DialogUtils");
+	if (!DialogUtilsClass) throw Poco::Exception("cannot find DialogUtils class");
+	DialogUtilsClass = (jclass)env->NewGlobalRef(DialogUtilsClass);
+
 	midIsScreenReaderActive = env->GetStaticMethodID(TTSClass, "isScreenReaderActive", "()Z");
 	midScreenReaderDetect = env->GetStaticMethodID(TTSClass, "screenReaderDetect", "()Ljava/lang/String;");
 	midScreenReaderSpeak = env->GetStaticMethodID(TTSClass, "screenReaderSpeak", "(Ljava/lang/String;Z)Z");
 	midScreenReaderSilence = env->GetStaticMethodID(TTSClass, "screenReaderSilence", "()Z");
 	midTTSGetEnginePackages = env->GetStaticMethodID(TTSClass, "getEnginePackages", "()Ljava/util/List;");
+	midGetExceptionInfo = env->GetStaticMethodID(DialogUtilsClass, "getExceptionInfo", "(Ljava/lang/Throwable;)Ljava/lang/String;");
+}
+
+std::string get_java_exception_details(JNIEnv* env, jthrowable ex) {
+	if (!midGetExceptionInfo) {
+		try {
+			android_setup_jni();
+		} catch(...) {
+			return "CRITICAL: Unable to setup JNI to print exception.";
+		}
+	}
+	jstring jdetails = (jstring)env->CallStaticObjectMethod(DialogUtilsClass, midGetExceptionInfo, ex);
+	if (!jdetails) return "Unknown Java Exception (null details)";
+	
+	const char* utf = env->GetStringUTFChars(jdetails, nullptr);
+	if (!utf) return "Unknown Java Exception (utf error)";
+	std::string details(utf);
+	env->ReleaseStringUTFChars(jdetails, utf);
+	return details;
+}
+
+void check_jni_exception(JNIEnv* env, const std::string& context) {
+	if (env->ExceptionCheck()) {
+		LocalRef<jthrowable> ex(env, env->ExceptionOccurred());
+		env->ExceptionClear();
+		std::string details = get_java_exception_details(env, ex.get());
+		throw JNIException(Poco::format("JNI exception:\nContext: %s\nException details: %s", context, details));
+	}
+}
+
+// Utility function to convert jstring to std::string
+// Removes duplicated code across many functions
+inline std::string from_jstring(JNIEnv* env, jstring jstr) {
+	if (!jstr) return "";
+	const char* utf = env->GetStringUTFChars(jstr, nullptr);
+	if (!utf) {
+		// If we can't get chars, clear exception if any and return empty
+		if (env->ExceptionCheck()) env->ExceptionClear();
+		return "";
+	}
+	std::string result(utf);
+	env->ReleaseStringUTFChars(jstr, utf);
+	return result;
 }
 
 bool android_is_screen_reader_active() {
@@ -49,15 +104,9 @@ bool android_is_screen_reader_active() {
 std::string android_screen_reader_detect() {
 	android_setup_jni();
 	JNIEnv* env = (JNIEnv*)SDL_GetAndroidJNIEnv();
-	std::string result;
 	jstring jreader = (jstring)env->CallStaticObjectMethod(TTSClass, midScreenReaderDetect);
-	if (!jreader) return "";
-	const char* utf = env->GetStringUTFChars(jreader, 0);
-	if (utf) {
-		result = utf;
-		env->ReleaseStringUTFChars(jreader, utf);
-	}
-	env->DeleteLocalRef(jreader);
+	std::string result = from_jstring(env, jreader);
+	if (jreader) env->DeleteLocalRef(jreader);
 	return result;
 }
 
@@ -74,6 +123,54 @@ bool android_screen_reader_silence() {
 	android_setup_jni();
 	JNIEnv* env = (JNIEnv*)SDL_GetAndroidJNIEnv();
 	return env->CallStaticBooleanMethod(TTSClass, midScreenReaderSilence);
+}
+
+std::string android_input_box(const std::string& title, const std::string& text, const std::string& default_value) {
+	android_setup_jni();
+	JNIEnv* env = (JNIEnv*)SDL_GetAndroidJNIEnv();
+	
+	jmethodID mid = env->GetStaticMethodID(DialogUtilsClass, "inputBoxSync", "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+	if (!mid) {
+		check_jni_exception(env, "GetStaticMethodID inputBoxSync");
+		throw JNIException("Unable to find inputBoxSync method");
+	}
+
+	LocalRef<jobject> activity(env, (jobject)SDL_GetAndroidActivity());
+	LocalRef<jstring> caption(env, env->NewStringUTF(title.c_str()));
+	LocalRef<jstring> prompt(env, env->NewStringUTF(text.c_str()));
+	LocalRef<jstring> default_text(env, env->NewStringUTF(default_value.c_str()));
+
+	LocalRef<jstring> jresult(env, static_cast<jstring>(env->CallStaticObjectMethod(DialogUtilsClass, mid, activity.get(), caption.get(), prompt.get(), default_text.get())));
+	check_jni_exception(env, "CallStaticObjectMethod inputBoxSync");
+	
+	std::string result = from_jstring(env, jresult.get());
+	
+	// FIX: Check for UTF-8 encoded 'ÿ' (\xC3\xBF) which is returned on cancel
+	if (result == "\xC3\xBF") {
+		g_LastError = -12;
+		return "";
+	}
+	return result;
+}
+
+bool android_info_box(const std::string& title, const std::string& text, const std::string& value) {
+	android_setup_jni();
+	JNIEnv* env = (JNIEnv*)SDL_GetAndroidJNIEnv();
+
+	jmethodID mid = env->GetStaticMethodID(DialogUtilsClass, "infoBoxSync", "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+	if (!mid) {
+		check_jni_exception(env, "GetStaticMethodID infoBoxSync");
+		throw JNIException("Unable to find infoBoxSync method");
+	}
+
+	LocalRef<jobject> activity(env, (jobject)SDL_GetAndroidActivity());
+	LocalRef<jstring> caption(env, env->NewStringUTF(title.c_str()));
+	LocalRef<jstring> prompt(env, env->NewStringUTF(text.c_str()));
+	LocalRef<jstring> info(env, env->NewStringUTF(value.c_str()));
+
+	env->CallStaticVoidMethod(DialogUtilsClass, mid, activity.get(), caption.get(), prompt.get(), info.get());
+	check_jni_exception(env, "CallStaticVoidMethod infoBoxSync");
+	return true;
 }
 
 std::vector<std::string> android_get_tts_engine_packages() {
@@ -107,11 +204,7 @@ std::vector<std::string> android_get_tts_engine_packages() {
 	for (int i = 0; i < size; i++) {
 		jstring jpackage = (jstring)env->CallObjectMethod(jpackageList, midGet, i);
 		if (jpackage) {
-			const char *pkg = env->GetStringUTFChars(jpackage, NULL);
-			if (pkg) {
-				result.push_back(std::string(pkg));
-				env->ReleaseStringUTFChars(jpackage, pkg);
-			}
+			result.push_back(from_jstring(env, jpackage));
 			env->DeleteLocalRef(jpackage);
 		}
 	}
@@ -233,22 +326,16 @@ int android_tts_engine::get_voice_count() {
 std::string android_tts_engine::get_voice_name(int index) {
 	if (!env || !TTSObj) return "";
 	jstring jvoiceName = (jstring)env->CallObjectMethod(TTSObj, midGetVoiceName, index);
-	if (!jvoiceName) return "";
-	const char *voiceName = env->GetStringUTFChars(jvoiceName, NULL);
-	std::string result(voiceName);
-	env->ReleaseStringUTFChars(jvoiceName, voiceName);
-	env->DeleteLocalRef(jvoiceName);
+	std::string result = from_jstring(env, jvoiceName);
+	if (jvoiceName) env->DeleteLocalRef(jvoiceName);
 	return result;
 }
 
 std::string android_tts_engine::get_voice_language(int index) {
 	if (!env || !TTSObj) return "";
 	jstring jlang = (jstring)env->CallObjectMethod(TTSObj, midGetVoiceLanguage, index);
-	if (!jlang) return "";
-	const char *lang = env->GetStringUTFChars(jlang, NULL);
-	std::string result(lang);
-	env->ReleaseStringUTFChars(jlang, lang);
-	env->DeleteLocalRef(jlang);
+	std::string result = from_jstring(env, jlang);
+	if (jlang) env->DeleteLocalRef(jlang);
 	return result;
 }
 

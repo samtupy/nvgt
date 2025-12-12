@@ -27,6 +27,7 @@
 	#include <android/native_window.h>
 	#include <jni.h>
 	#include <stdexcept>
+	#include "android.h"
 #else
 	// Following commented includes are for determining user idle time using x11 screensaver extension. Disabled for now until viability of linking with this library is established or until we fix the idle_ticks() function to use dlopen/dlsym and friends.
 	//#include <X11/Xlib.h>
@@ -57,70 +58,6 @@
 	#include <cstdio>
 #endif
 #include "anticheat.h"
-
-#if defined(__ANDROID__)
-// Todo: consider moving this into the android.cpp/.h?
-class JNIException : public std::runtime_error {
-public:
-	explicit JNIException(const std::string& msg): std::runtime_error(msg) {}
-};
-
-template<typename T>
-class LocalRef {
-	JNIEnv* env;
-	T ref;
-public:
-	LocalRef(JNIEnv* e, T r) : env(e), ref(r) {}
-	~LocalRef() {
-		if (ref) env->DeleteLocalRef(ref);
-	}
-	T get() const { return ref; }
-	operator T() const { return ref; }
-};
-
-static std::string get_java_exception_details(JNIEnv* env, jthrowable ex) {
-	// Is this way too complicated? Or is there a better way? This is quite the complicated way to do this...
-	LocalRef<jclass> string_writer_class(env, env->FindClass("java/io/StringWriter"));
-	if (!string_writer_class) return "<cannot load StringWriter>";
-	jmethodID string_writer_constructor = env->GetMethodID(string_writer_class, "<init>", "()V");
-	if (!string_writer_constructor) return "<cannot find StringWriter.<init>()>";
-	LocalRef<jobject> string_writer(env, env->NewObject(string_writer_class, string_writer_constructor));
-	if (!string_writer) return "<cannot instantiate StringWriter>";
-	LocalRef<jclass> print_writer_class(env, env->FindClass("java/io/PrintWriter"));
-	if (!print_writer_class) return "<cannot load PrintWriter>";
-	jmethodID print_writer_constructor = env->GetMethodID(print_writer_class, "<init>", "(Ljava/io/Writer;)V");
-	if (!print_writer_constructor) return "<cannot find PrintWriter.<init>(Writer)>";
-	LocalRef<jobject> print_writer(env, env->NewObject(print_writer_class, print_writer_constructor, string_writer.get()));
-	if (!print_writer) return "<cannot instantiate PrintWriter>";
-	LocalRef<jclass> ex_class(env, env->GetObjectClass(ex));
-	if (!ex_class) return "<cannot get exception class>";
-	jmethodID pst_mid = env->GetMethodID(ex_class, "printStackTrace", "(Ljava/io/PrintWriter;)V");
-	if (!pst_mid) return "<cannot find Throwable.printStackTrace(PrintWriter)>";
-	env->CallVoidMethod(ex, pst_mid, print_writer.get());
-	if (env->ExceptionCheck()) {
-		env->ExceptionClear();
-		return "<exception during printStackTrace>";
-	}
-	jmethodID to_string_mid = env->GetMethodID(string_writer_class, "toString", "()Ljava/lang/String;");
-	if (!to_string_mid) return "<cannot find StringWriter.toString()>";
-	LocalRef<jstring> jtrace(env, (jstring)env->CallObjectMethod(string_writer, to_string_mid));
-	if (!jtrace) return "<toString() returned null>";
-	const char* utf = env->GetStringUTFChars(jtrace, nullptr);
-	if (!utf) return "<cannot get UTF chars>";
-	std::string trace(utf);
-	env->ReleaseStringUTFChars(jtrace, utf);
-	return trace;
-}
-
-static inline void check_jni_exception(JNIEnv* env, const std::string& context) {
-	if (env->ExceptionCheck()) {
-		LocalRef<jthrowable> ex(env, env->ExceptionOccurred());
-		env->ExceptionClear();
-		std::string details = get_java_exception_details(env, ex.get());
-		throw JNIException(Poco::format("JNI exception:\nContext: %s\nException details: %s", context, details));
-	}
-}
-#endif
 
 int message_box(const std::string& title, const std::string& text, const std::vector<std::string>& buttons, unsigned int mb_flags) {
 	// Start with the buttons.
@@ -282,50 +219,7 @@ std::string input_box(const std::string& title, const std::string& text, const s
 	}
 	return r;
 	#elif defined(__ANDROID__)
-	JNIEnv* env = (JNIEnv*)SDL_GetAndroidJNIEnv();
-	LocalRef<jclass> du_cls(env, env->FindClass("com/samtupy/nvgt/DialogUtils"));
-	if (!du_cls) {
-		check_jni_exception(env, "FindClass DialogUtils");
-		throw JNIException("Unable to find DialogUtils class");
-	}
-	jmethodID mid = env->GetStaticMethodID(du_cls, "inputBoxSync", "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
-	if (!mid) {
-		check_jni_exception(env, "GetStaticMethodID inputBoxSync");
-		throw JNIException("Unable to find inputBoxSync method");
-	}
-	LocalRef<jobject> activity(env, (jobject)SDL_GetAndroidActivity()); // Todo: confirm that this is actually safe
-	LocalRef<jstring> caption(env, env->NewStringUTF(title.c_str()));
-	if (!caption) {
-		check_jni_exception(env, "NewStringUTF(caption)");
-		throw JNIException("Failed to create caption string");
-	}
-	LocalRef<jstring> prompt(env, env->NewStringUTF(text.c_str()));
-	if (!prompt) {
-		check_jni_exception(env, "NewStringUTF(prompt)");
-		throw JNIException("Failed to create prompt string");
-	}
-	LocalRef<jstring> default_text(env, env->NewStringUTF(default_value.c_str()));
-	if (!default_text) {
-		check_jni_exception(env, "NewStringUTF(default)");
-		throw JNIException("Failed to create default text string");
-	}
-	LocalRef<jstring> jresult(env, static_cast<jstring>(env->CallStaticObjectMethod(du_cls, mid, activity.get(), caption.get(), prompt.get(), default_text.get())));
-	check_jni_exception(env, "CallStaticObjectMethod inputBoxSync");
-	if (!jresult) {
-		throw JNIException("inputBoxSync returned null");
-	}
-	const char* utf = env->GetStringUTFChars(jresult, nullptr);
-	if (!utf) {
-		check_jni_exception(env, "GetStringUTFChars");
-		throw JNIException("Failed to retrieve result chars");
-	}
-	std::string result(utf);
-	env->ReleaseStringUTFChars(jresult, utf);
-	if (result == "\xff") {
-		g_LastError = -12;
-		return "";
-	}
-	return result;
+	return android_input_box(title, text, default_value);
 	#else
 	return "";
 	#endif
@@ -341,36 +235,7 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 	apple_input_box(title, text, value, false, false);
 	return true;
 	#elif defined(__ANDROID__)
-	JNIEnv* env = (JNIEnv*)SDL_GetAndroidJNIEnv();
-	LocalRef<jclass> du_cls(env, env->FindClass("com/samtupy/nvgt/DialogUtils"));
-	if (!du_cls) {
-		check_jni_exception(env, "FindClass DialogUtils");
-		throw JNIException("Unable to find DialogUtils class");
-	}
-	jmethodID mid = env->GetStaticMethodID(du_cls, "infoBoxSync", "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
-	if (!mid) {
-		check_jni_exception(env, "GetStaticMethodID inputBoxSync");
-		throw JNIException("Unable to find inputBoxSync method");
-	}
-	LocalRef<jobject> activity(env, (jobject)SDL_GetAndroidActivity()); // Todo: confirm that this is actually safe
-	LocalRef<jstring> caption(env, env->NewStringUTF(title.c_str()));
-	if (!caption) {
-		check_jni_exception(env, "NewStringUTF(caption)");
-		throw JNIException("Failed to create caption string");
-	}
-	LocalRef<jstring> prompt(env, env->NewStringUTF(text.c_str()));
-	if (!prompt) {
-		check_jni_exception(env, "NewStringUTF(prompt)");
-		throw JNIException("Failed to create prompt string");
-	}
-	LocalRef<jstring> info(env, env->NewStringUTF(value.c_str()));
-	if (!info) {
-		check_jni_exception(env, "NewStringUTF(value)");
-		throw JNIException("Failed to create value text string");
-	}
-	env->CallStaticVoidMethod(du_cls, mid, activity.get(), caption.get(), prompt.get(), info.get());
-	check_jni_exception(env, "CallStaticObjectMethod inputBoxSync");
-	return true;
+	return android_info_box(title, text, value);
 	#else
 	return false;
 	#endif
@@ -533,7 +398,7 @@ uint64_t idle_ticks() {
 			int64_t idleTimeNanoSeconds = 0;
 			CFNumberGetValue(obj, kCFNumberSInt64Type, &idleTimeNanoSeconds);
 			CFRelease(obj);
-			return idleTimeNanoSeconds / 1000000; 
+			return idleTimeNanoSeconds / 1000000; 
 		}
 		IOObjectRelease(entry);
 	}
