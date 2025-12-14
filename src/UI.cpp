@@ -398,7 +398,7 @@ uint64_t idle_ticks() {
 			int64_t idleTimeNanoSeconds = 0;
 			CFNumberGetValue(obj, kCFNumberSInt64Type, &idleTimeNanoSeconds);
 			CFRelease(obj);
-			return idleTimeNanoSeconds / 1000000; 
+			return idleTimeNanoSeconds / 1000000;
 		}
 		IOObjectRelease(entry);
 	}
