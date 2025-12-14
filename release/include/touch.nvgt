@@ -2,9 +2,9 @@
  * This allows a user to detect gestures and convert them into keyboard input or other events, including multi-finger swipes and taps over configurable areas of the screen.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2025 Sam Tupy
- * https://nvgt.dev
- * touch.nvgt - Copyright (C) 2024 Ivan Soto
+ * Copyright (c) 2022-2024 Sam Tupy
+ * https://nvgt.gg
+ * touch.nvgt - Copyright (C) 2024 Ivan Soto 2025 aryan choudhary
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -12,368 +12,714 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-enum swipe_touch_directions {
-	swipe_touch_direction_left = 0, swipe_touch_direction_right, swipe_touch_direction_up, swipe_touch_direction_down
+array<touch_gesture_manager@>@ _g_active_touch_managers = null;
+
+void _touch_manager_register(touch_gesture_manager@ mgr) {
+	if (@_g_active_touch_managers == null) {
+		@_g_active_touch_managers = array<touch_gesture_manager@>();
+	}
+	_g_active_touch_managers.insert_last(mgr);
+	
+	if (_g_active_touch_managers.length() == 1) {
+		on_touch_finger_down += _touch_evt_down;
+		on_touch_finger_up += _touch_evt_up;
+		on_touch_finger_move += _touch_evt_move;
+		on_touch_finger_cancel += _touch_evt_cancel;
+	}
 }
-funcdef void tap_func(touch_screen_finger@finger);
+
+void _touch_manager_unregister(touch_gesture_manager@ mgr) {
+	if (@_g_active_touch_managers != null) {
+		int idx = _g_active_touch_managers.find(mgr);
+		if (idx > -1) _g_active_touch_managers.remove_at(idx);
+
+		if (_g_active_touch_managers.length() == 0) {
+			on_touch_finger_down -= _touch_evt_down;
+			on_touch_finger_up -= _touch_evt_up;
+			on_touch_finger_move -= _touch_evt_move;
+			on_touch_finger_cancel -= _touch_evt_cancel;
+		}
+	}
+}
+
+bool _touch_evt_down(uint64 device, const touch_finger&inout finger) {
+	if (@_g_active_touch_managers == null) return true;
+	uint64 now = ticks();
+	for(int i = int(_g_active_touch_managers.length()) - 1; i >= 0; i--) {
+		touch_gesture_manager@ m = _g_active_touch_managers[i];
+		if (now - m.last_monitor_call_time < 250) {
+			m.internal_on_down(finger);
+		}
+	}
+	return true;
+}
+
+bool _touch_evt_up(uint64 device, const touch_finger&inout finger) {
+	if (@_g_active_touch_managers == null) return true;
+	uint64 now = ticks();
+	for(int i = int(_g_active_touch_managers.length()) - 1; i >= 0; i--) {
+		touch_gesture_manager@ m = _g_active_touch_managers[i];
+		if (now - m.last_monitor_call_time < 250 || m.current_finger_count > 0) {
+			m.internal_on_up(finger);
+		}
+	}
+	return true;
+}
+
+bool _touch_evt_move(uint64 device, const touch_finger&inout finger, float dx, float dy) {
+	if (@_g_active_touch_managers == null) return true;
+	uint64 now = ticks();
+	for(int i = int(_g_active_touch_managers.length()) - 1; i >= 0; i--) {
+		touch_gesture_manager@ m = _g_active_touch_managers[i];
+		if (now - m.last_monitor_call_time < 250) {
+			m.internal_on_move(finger, dx, dy);
+		}
+	}
+	return true;
+}
+
+bool _touch_evt_cancel(uint64 device, const touch_finger&inout finger) {
+	if (@_g_active_touch_managers == null) return true;
+	for(int i = int(_g_active_touch_managers.length()) - 1; i >= 0; i--) {
+		_g_active_touch_managers[i].internal_on_cancel(finger);
+	}
+	return true;
+}
+
+bool touch_enable_8_way_swipes = false;
+
+enum swipe_touch_directions {
+	swipe_touch_direction_left = 0, 
+	swipe_touch_direction_right, 
+	swipe_touch_direction_up, 
+	swipe_touch_direction_down,
+	swipe_touch_direction_up_left, 
+	swipe_touch_direction_up_right, 
+	swipe_touch_direction_down_left, 
+	swipe_touch_direction_down_right
+}
+
+funcdef void tap_func(touch_screen_finger@finger, uint tap_count, uint finger_count);
 const float TOUCH_UNCOORDINATED = -10.0f;
+
+int detect_swipe_direction(vector diff) {
+	if (diff.x == 0 && diff.y == 0) return -1;
+	
+	if (!touch_enable_8_way_swipes) {
+		if (abs(diff.x) > abs(diff.y)) {
+			if (diff.x > 0) return swipe_touch_direction_right;
+			else return swipe_touch_direction_left;
+		} else {
+			if (diff.y > 0) return swipe_touch_direction_down;
+			else return swipe_touch_direction_up;
+		}
+	}
+
+	double angle = atan2(diff.y, diff.x) * 180.0 / 3.1415926535;
+	if (angle < 0) angle += 360.0;
+	
+	int sector = int(((angle + 22.5) % 360.0) / 45.0);
+
+	switch(sector) {
+		case 0: return swipe_touch_direction_right;
+		case 1: return swipe_touch_direction_down_right;
+		case 2: return swipe_touch_direction_down;
+		case 3: return swipe_touch_direction_down_left;
+		case 4: return swipe_touch_direction_left;
+		case 5: return swipe_touch_direction_up_left;
+		case 6: return swipe_touch_direction_up;
+		case 7: return swipe_touch_direction_up_right;
+	}
+	return -1;
+}
+
+string get_swipe_name(int dir) {
+	switch(dir) {
+		case swipe_touch_direction_left: return "left";
+		case swipe_touch_direction_right: return "right";
+		case swipe_touch_direction_up: return "up";
+		case swipe_touch_direction_down: return "down";
+		case swipe_touch_direction_up_left: return "up_left";
+		case swipe_touch_direction_up_right: return "up_right";
+		case swipe_touch_direction_down_left: return "down_left";
+		case swipe_touch_direction_down_right: return "down_right";
+	}
+	return "";
+}
+
+bool simulate_keys_down(int[] keys) {
+	bool result = true;
+	for (uint i = 0; i < keys.length(); i++) {
+		if (!simulate_key_down(keys[i])) result = false;
+	}
+	return result;
+}
+
+bool simulate_keys_up(int[] keys) {
+	bool result = true;
+	for (uint i = 0; i < keys.length(); i++) {
+		if (!simulate_key_up(keys[i])) result = false;
+	}
+	return result;
+}
+
 class touch_interface {
-	touch_gesture_manager@parent;
+	touch_gesture_manager@ parent;
 	float minx, maxx, miny, maxy;
 	bool coordinated = false;
-	touch_interface(touch_gesture_manager@parent, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED) {
+	bool allow_passthrough = false;
+	uint tap_count = 0;
+	uint64 last_tap_time = 0;
+	vector last_tap_pos;
+	tap_func@ last_tap_func;
+	touch_screen_finger@ last_tapped_finger;
+	uint current_tap_finger_count = 0;
+	
+	int current_fingers_in_bounds = 0;
+	int max_fingers_in_sequence = 0;
+	
+	touch_interface(touch_gesture_manager@ parent, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED) {
 		@this.parent = parent;
 		this.minx = minx;
 		this.maxx = maxx;
 		this.miny = miny;
 		this.maxy = maxy;
-		if (this.minx != TOUCH_UNCOORDINATED or this.maxx != TOUCH_UNCOORDINATED or this.miny != TOUCH_UNCOORDINATED or this.maxy != TOUCH_UNCOORDINATED) this.coordinated = true;
+		if (this.minx != TOUCH_UNCOORDINATED) this.coordinated = true;
 	}
-	void on_double_tap(touch_screen_finger@finger) {
+	
+	void on_tap(touch_screen_finger@ finger, uint tap_count, uint finger_count) {
+		if (tap_count == 1) on_single_tap(finger, finger_count);
+		else if (tap_count == 2) on_double_tap(finger, finger_count);
+		else if (tap_count == 3) on_tripple_tap(finger, finger_count);
 	}
-	void on_tripple_tap(touch_screen_finger@finger) {
+
+	void on_single_tap(touch_screen_finger@ f, uint fc) {}
+	void on_double_tap(touch_screen_finger@ f, uint fc) {}
+	void on_tripple_tap(touch_screen_finger@ f, uint fc) {}
+	void on_long_press(touch_screen_finger@ f, uint fc) {}
+	void on_hold(touch_screen_finger@ f, uint fc) {}
+
+	void on_swipe(touch_screen_finger@ finger, int direction) {
+		if (direction == swipe_touch_direction_left) on_swipe_left(finger);
+		else if (direction == swipe_touch_direction_right) on_swipe_right(finger);
+		else if (direction == swipe_touch_direction_up) on_swipe_up(finger);
+		else if (direction == swipe_touch_direction_down) on_swipe_down(finger);
+		else if (direction == swipe_touch_direction_up_left) on_swipe_up_left(finger);
+		else if (direction == swipe_touch_direction_up_right) on_swipe_up_right(finger);
+		else if (direction == swipe_touch_direction_down_left) on_swipe_down_left(finger);
+		else if (direction == swipe_touch_direction_down_right) on_swipe_down_right(finger);
 	}
+	
+	void on_flick(touch_screen_finger@ f, int d, float v) {}
+	void on_compound_swipe(touch_screen_finger@ f, int[] d) {}
+	
+	void on_swipe_left(touch_screen_finger@ f) {}
+	void on_swipe_right(touch_screen_finger@ f) {}
+	void on_swipe_up(touch_screen_finger@ f) {}
+	void on_swipe_down(touch_screen_finger@ f) {}
+	void on_swipe_up_left(touch_screen_finger@ f) {}
+	void on_swipe_up_right(touch_screen_finger@ f) {}
+	void on_swipe_down_left(touch_screen_finger@ f) {}
+	void on_swipe_down_right(touch_screen_finger@ f) {}
+	
+	void on_released_finger(touch_screen_finger@ f) {}
+	
+	void force_release_all() {}
+	bool is_tap_chain_supported(uint s, uint f) { return false; }
 
 	bool in_bounds(float x, float y) {
 		if (!this.coordinated) return true;
-		if ((x<this.minx or x>this.maxx) or (y<this.miny or y>this.maxy)) return false;
+		if (x < this.minx || x > this.maxx || y < this.miny || y > this.maxy) return false;
 		return true;
 	}
-	void on_swipe_left(touch_screen_finger@finger) {
+	void _process_tap(touch_screen_finger@ finger) {
+		uint64 now = ticks();
+		float dist_sq = 0.0f;
+		
+		if (this.tap_count > 0) {
+			dist_sq = (this.last_tap_pos - finger.start_pos).length_square();
+		}
+
+		float allowed_dist = 0.0225f;
+		if (this.max_fingers_in_sequence > 1) allowed_dist = 1000.0f;
+
+		if (now - this.last_tap_time > this.parent.multi_tap_timeout || dist_sq > allowed_dist) {
+			this.tap_count = 0;
+		}
+		
+		this.tap_count++;
+		this.last_tap_time = now;
+		this.last_tap_pos = finger.start_pos;
+		
+		@this.last_tapped_finger = finger;
+		this.current_tap_finger_count = (this.max_fingers_in_sequence > 0) ? this.max_fingers_in_sequence : 1;
+		
+		bool next_is_supported = false;
+		if (this.is_tap_chain_supported(this.tap_count + 1, this.current_tap_finger_count)) {
+			next_is_supported = true;
+		}
+		
+		if (!next_is_supported) {
+			this._exec_tap(this.last_tapped_finger, this.tap_count, this.current_tap_finger_count);
+			this.tap_count = 0;
+			@this.last_tap_func = null;
+		} else {
+			@this.last_tap_func = tap_func(this._exec_tap);
+		}
 	}
-	void on_swipe_right(touch_screen_finger@finger) {
+	
+	void _exec_tap(touch_screen_finger@ finger, uint tap_count, uint finger_count) {
+		this.on_tap(finger, tap_count, finger_count);
 	}
-	void on_swipe_up(touch_screen_finger@finger) {
+	void _track_finger_down() {
+		this.current_fingers_in_bounds++;
+		if (this.current_fingers_in_bounds > this.max_fingers_in_sequence) {
+			this.max_fingers_in_sequence = this.current_fingers_in_bounds;
+		}
 	}
-	void on_swipe_down(touch_screen_finger@finger) {
+	
+	void _track_finger_up() {
+		if (this.current_fingers_in_bounds > 0) this.current_fingers_in_bounds--;
+		if (this.current_fingers_in_bounds == 0) this.max_fingers_in_sequence = 0;
 	}
-	void on_released_finger(touch_screen_finger@finger) {
+	void _monitor() {
+		if (@this.last_tap_func != null) {
+			if (ticks() - this.last_tap_time >= this.parent.tap_max_delay) {
+				this.last_tap_func(this.last_tapped_finger, this.tap_count, this.current_tap_finger_count);
+				@this.last_tap_func = null;
+				@this.last_tapped_finger = null;
+				this.tap_count = 0; 
+			}
+		}
 	}
 }
-class touch_keyboard_interface: touch_interface {
+
+class touch_keyboard_interface : touch_interface {
 	dictionary keymap;
-	touch_keyboard_interface(touch_gesture_manager@parent, dictionary@map, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED) {
-		super(parent, minx, maxx, miny, maxy);
-		this.keymap = map;
+	int[] active_pressed_keys;
+	
+	touch_keyboard_interface(touch_gesture_manager@ p, dictionary@ m, float minx = TOUCH_UNCOORDINATED, float maxx = TOUCH_UNCOORDINATED, float miny = TOUCH_UNCOORDINATED, float maxy = TOUCH_UNCOORDINATED) {
+		super(p, minx, maxx, miny, maxy);
+		this.keymap = m;
 	}
-	bool attempt_key_simulate(string&in dir, bool swipe = true, int[] & out key_codes = void) {
-		uint size = this.parent.last_finger_size;
-		if (swipe) size = this.parent.finger_map.get_size();
+	
+	string get_tap_key_name(uint tap_count, uint finger_count) {
+		if (finger_count == 0) finger_count = 1;
+		string prefix = "";
+		if (tap_count == 1) prefix = "single_tap";
+		else if (tap_count == 2) prefix = "double_tap";
+		else if (tap_count == 3) prefix = "tripple_tap";
+		else prefix = tap_count + "_tap";
+		return prefix + finger_count + "f";
+	}
+
+	bool is_tap_chain_supported(uint start_check_from, uint finger_count) {
+		for (uint i = start_check_from; i <= 5; i++) {
+			string key = get_tap_key_name(i, finger_count);
+			if (this.keymap.exists(key)) return true;
+		}
+		return false;
+	}
+	
+	bool simulate_mapped_key(string keyname, int[] & out key_codes = void) {
 		int key;
-		string keyname = (swipe ? "swipe_" : "") + dir + size + "f";
 		if (this.keymap.get(keyname, key)) {
 			if (simulate_key_down(key)) {
 				key_codes.insert_last(key);
+				active_pressed_keys.insert_last(key); 
 				return true;
 			}
 		}
-		//check to see if it's an array of keys.
 		int[] keys;
 		if (this.keymap.get(keyname, keys)) {
 			if (simulate_keys_down(keys)) {
 				key_codes = keys;
+				for(uint i=0; i<keys.length(); i++) active_pressed_keys.insert_last(keys[i]);
 				return true;
 			}
 		}
 		return false;
 	}
-	void on_swipe_left(touch_screen_finger@finger) {
-		if (@finger == null) return;
-		int[] keycodes;
-		if (this.attempt_key_simulate("left", true, keycodes)) finger.last_keys_pressed = keycodes;
+	
+	bool trigger_mapped_key(string base_name, uint fingers, int[] & out result_codes = void) {
+		if (fingers == 0) fingers = 1;
+		return this.simulate_mapped_key(base_name + fingers + "f", result_codes);
 	}
-	void on_swipe_right(touch_screen_finger@finger) {
-		if (@finger == null) return;
+	
+	void on_swipe(touch_screen_finger@ finger, int direction) {
+		string dirName = get_swipe_name(direction);
+		if (dirName == "") return;
+		
+		uint f_count = (this.max_fingers_in_sequence > 0) ? this.max_fingers_in_sequence : 1;
+
 		int[] keycodes;
-		if (this.attempt_key_simulate("right", true, keycodes)) finger.last_keys_pressed = keycodes;
-	}
-	void on_swipe_up(touch_screen_finger@finger) {
-		if (@finger == null) return;
-		int[] keycodes;
-		if (this.attempt_key_simulate("up", true, keycodes)) finger.last_keys_pressed = keycodes;
-	}
-	void on_swipe_down(touch_screen_finger@finger) {
-		if (@finger == null) return;
-		int[] keycodes;
-		if (this.attempt_key_simulate("down", true, keycodes)) finger.last_keys_pressed = keycodes;
-	}
-	void on_double_tap(touch_screen_finger@finger) {
-		if (@finger == null) return;
-		int[] keycodes;
-		if (this.attempt_key_simulate("double_tap", false, keycodes))
+		if (this.trigger_mapped_key("swipe_" + dirName, f_count, keycodes)) {
 			finger.last_keys_pressed = keycodes;
-	}
-	void on_tripple_tap(touch_screen_finger@finger) {
-		if (@finger == null) return;
-		int[] keycodes;
-		if (this.attempt_key_simulate("tripple_tap", false, keycodes)) finger.last_keys_pressed = keycodes;
-	}
-	void on_released_finger(touch_screen_finger@finger) {
-		if (@finger != null) {
-			if (finger.has_swiped and finger.last_keys_pressed.length() > 0) simulate_keys_up(finger.last_keys_pressed);
+			return;
 		}
-	}
-}
-class touch_gesture_manager {
-	tap_func@last_tap_func;
-	bool no_touch = true;
-	timer input_timer, tap_timer;
-	double doubletap_threshold = 500;
-	int taps = 0;
-	dictionary finger_map;
-	uint last_finger_size = 0;
-	touch_interface@[] interfaces;
-	touch_screen_finger@last_tapped_finger;
-	timer updatetimer;
-	touch_gesture_manager() {
-	}
-	bool is_available() {
-		uint64[]@ dev = get_touch_devices();
-		return dev.length() > 0;
-	}
-	bool get_available() property {
-		return is_available();
-	}
-	bool add_touch_interface(touch_interface@i) {
-		if (@i == null) return false;
-		this.interfaces.insert_last(i);
-		return true;
-	}
-	bool set_touch_interfaces(touch_interface@[] interfaces, bool append = false) {
-		if(!append) {
-			this.interfaces = interfaces;
-			return true;
-		}
-			else {
-			if(interfaces.length()<=0) return false;
-			this.interfaces.extend(interfaces);
-		}
-		return true;
-	}
-	void clear_touch_interfaces() {
-		this.interfaces.resize(0);
-	}
-	touch_interface@get_touch_interface(float x, float y) {
-		uint len = this.interfaces.length();
-		if (len <= 0) return null;
-		touch_interface@global;
-		for (int i = len-1; i >= 0; i -= 1) {
-			if (!this.interfaces[i].coordinated and @global == null) @global = this.interfaces[i];
-			else if (this.interfaces[i].coordinated and this.interfaces[i].in_bounds(x, y)) return this.interfaces[i];
-		}
-		return global;
-	}
-	bool set_last_tap_func(tap_func@f, touch_screen_finger@finger) {
-		if (@f == null or @finger == null) return false;
-		@this.last_tap_func = f;
-		@this.last_tapped_finger = finger;
-		if (this.tap_timer.elapsed >= 50) this.last_finger_size = this.finger_map.get_size();
-		this.tap_timer.restart();
-		return true;
-	}
-	void monitor() {
-		touch_finger[]@ temp = query_touch_device();
-		if (this.finger_map.get_size() != temp.length()) this.update(temp);
-		else this.update_finger_positions(temp);
-		if (this.tap_timer.elapsed >= 250 and @this.last_tap_func != null and @this.last_tapped_finger != null) {
-			this.last_tap_func(this.last_tapped_finger);
-			@this.last_tapped_finger = null;
-			@this.last_tap_func = null;
-			this.tap_timer.restart();
-			this.last_finger_size = 0;
-		}
-	}
-	touch_screen_finger@[] get_touch_finger_list() {
-		touch_screen_finger@[] result;
-		string[]@ k = this.finger_map.get_keys();
-		if (k.length() <= 0) return result;
-		for (uint i = 0; i < k.length(); i += 1) {
-			touch_screen_finger@finger;
-			this.finger_map.get(k[i], @finger);
-			result.insert_last(finger);
-		}
-		return result;
-	}
-	void clear_finger_list() {
-		touch_screen_finger@[]fingers = this.get_touch_finger_list();
-		touch_finger[] rem;
-		for (int i = 0; i < fingers.length(); i += 1) rem.insert_last(fingers[i].internal_finger);
-		this.remove_fingers(rem);
-	}
-	void update(touch_finger[]@ current) {
-		uint finger_size = this.get_touch_finger_list().length();
-		this.no_touch = false;
-		if (current.length() > finger_size) {
-			// A finger was added
-			this.add_fingers(current);
-		} else if (current.length() < finger_size) {
-			// A finger was removed
-			this.remove_fingers(current);
-		}
-		if (current.length() <= 0 and finger_size > 0) {
-			this.no_touch = true;
-			this.clear_finger_list();
-		}
-	}
-	void add_fingers(touch_finger[]@ new_fingers) {
-		for (uint i = 0; i < new_fingers.length(); i++) {
-			touch_screen_finger temp(new_fingers[i]);
-			this.finger_map.set(new_fingers[i].id, @temp);
-			this.on_finger_added(new_fingers[i]);
-			if (this.input_timer.elapsed > 50) {
-				this.taps += 1;
-				this.input_timer.restart();
+		
+		if (touch_enable_8_way_swipes) {
+			string fallback = "";
+			vector diff = finger.current_pos - finger.last_swipe_pos;
+			if (abs(diff.x) > abs(diff.y)) {
+				if (diff.x > 0) fallback = "right"; else fallback = "left";
+			} else {
+				if (diff.y > 0) fallback = "down"; else fallback = "up";
 			}
-		}
-	}
-	void check_taps(touch_screen_finger@finger) {
-		if (finger.has_swiped) return;
-		if (this.tap_timer.elapsed >= 300) this.taps = 1;
-		if (this.taps == 2)
-			this.set_last_tap_func(tap_func(this.on_double_tap), finger);
-		else if (this.taps == 3)
-			this.set_last_tap_func(tap_func(this.on_tripple_tap), finger);
-		this.tap_timer.restart();
-	}
-	void remove_fingers(touch_finger[]@ current) {
-		for (uint i = 0; i < current.length(); i++) {
-			touch_screen_finger@finger = this.lookup_finger(current[i].id);
-			if (@finger != null) {
-				this.check_taps(finger);
-				touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
-				if (@temp != null) temp.on_released_finger(finger);
-				this.finger_map.delete(finger.id);
-				this.on_finger_removed(finger.internal_finger);
-			}
-		}
-	}
-	bool check_swipe(touch_screen_finger@finger) {
-		int swipe = detect_swipe(finger.start_x, finger.start_y, finger.x, finger.y);
-		if (swipe > -1 and finger.active_time < 500 and !finger.has_swiped) {
-			finger.has_swiped = true;
-			if (swipe == swipe_touch_direction_right) this.on_swipe_right(finger);
-			else if (swipe == swipe_touch_direction_left) this.on_swipe_left(finger);
-			else if (swipe == swipe_touch_direction_up) this.on_swipe_up(finger);
-			else if (swipe == swipe_touch_direction_down) this.on_swipe_down(finger);
-			return true;
-		}
-		return false;
-	}
-	void update_finger_positions(touch_finger[]@ current) {
-		if (this.updatetimer.elapsed < 50) return;
-		this.updatetimer.restart();
-		touch_screen_finger@[] f = this.get_touch_finger_list();
-		bool swiped = false;
-		for (uint i = 0; i < current.length(); i++) {
-			for (uint j = 0; j < f.length(); j++) {
-				if (current[i].id == f[j].id) {
-					float old_x = f[j].x;
-					float old_y = f[j].y;
-					if (round(current[i].x, 1) != round(old_x, 1) or round(current[i].y, 1) != round(old_y, 1)) {
-						// Handle finger movement
-						f[j].internal_finger = current[i];
-						if (!swiped) swiped = this.check_swipe(f[j]);
-						this.on_finger_moved(current[i]);
-					}
-					break;
+			
+			if (fallback != "") {
+				if (this.trigger_mapped_key("swipe_" + fallback, f_count, keycodes)) {
+					finger.last_keys_pressed = keycodes;
 				}
 			}
 		}
 	}
-	touch_screen_finger@ lookup_finger(uint id) {
-		if (!this.finger_map.exists(id))
-			return null;
-		touch_screen_finger@ tf;
-		this.finger_map.get(id, @tf);
-		return tf;
+	
+	void on_flick(touch_screen_finger@ finger, int direction, float velocity) {
+		string dirName = get_swipe_name(direction);
+		int[] keycodes;
+		if (this.trigger_mapped_key("flick_" + dirName, 1, keycodes)) {
+			finger.last_keys_pressed = keycodes;
+		} else {
+			this.on_swipe(finger, direction);
+		}
 	}
-	void on_finger_added(touch_finger finger) {
+	
+	void on_compound_swipe(touch_screen_finger@ finger, int[] directions) {
+		string dirString = "";
+		for(uint i=0; i<directions.length(); i++) {
+			string name = get_swipe_name(directions[i]);
+			if (i > 0) dirString += "_";
+			dirString += name;
+		}
+		int[] keycodes;
+		if (this.trigger_mapped_key("swipe_" + dirString, 1, keycodes)) {
+			finger.last_keys_pressed = keycodes;
+		}
 	}
-	void on_finger_removed(touch_finger finger) {
+	
+	void on_long_press(touch_screen_finger@ finger, uint finger_count) {
+		int[] keycodes;
+		if (this.trigger_mapped_key("long_press", finger_count, keycodes)) {
+			finger.last_keys_pressed = keycodes;
+		}
 	}
-	void on_finger_moved(touch_finger finger) {
+
+	void on_tap(touch_screen_finger@ finger, uint tap_count, uint finger_count) {
+		int[] keycodes;
+		string keyname = get_tap_key_name(tap_count, finger_count);
+		if (this.simulate_mapped_key(keyname, keycodes)) finger.last_keys_pressed = keycodes;
 	}
-	void on_swipe_left(touch_screen_finger@finger) {
-		touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
-		if (@temp != null) temp.on_swipe_left(finger);
+	
+	void on_released_finger(touch_screen_finger@ finger) {
+		if (@finger != null && finger.last_keys_pressed.length() > 0) {
+			simulate_keys_up(finger.last_keys_pressed);
+			for(uint k=0; k<finger.last_keys_pressed.length(); k++) {
+				int target = finger.last_keys_pressed[k];
+				int idx = active_pressed_keys.find(target);
+				if (idx > -1) active_pressed_keys.remove_at(idx);
+			}
+		}
 	}
-	void on_swipe_right(touch_screen_finger@finger) {
-		touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
-		if (@temp != null) temp.on_swipe_right(finger);
-	}
-	void on_swipe_up(touch_screen_finger@finger) {
-		touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
-		if (@temp != null) temp.on_swipe_up(finger);
-	}
-	void on_swipe_down(touch_screen_finger@finger) {
-		touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
-		if (@temp != null) temp.on_swipe_down(finger);
-	}
-	void on_double_tap(touch_screen_finger@finger) {
-		touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
-		if (@temp != null) temp.on_double_tap(finger);
-	}
-	void on_tripple_tap(touch_screen_finger@finger) {
-		touch_interface@temp = this.get_touch_interface(finger.x, finger.y);
-		if (@temp != null) temp.on_tripple_tap(finger);
+	
+	void force_release_all() {
+		if (active_pressed_keys.length() > 0) {
+			simulate_keys_up(active_pressed_keys);
+			active_pressed_keys.resize(0);
+		}
 	}
 }
+
+class touch_gesture_manager {
+	dictionary finger_map;
+	touch_interface@[] interfaces;
+	
+	uint tap_max_delay = 250; 
+	uint multi_tap_timeout = 600; 
+	uint long_press_time = 600; 
+	
+	float swipe_min_dist = 0.1f;
+	float hold_jitter_threshold = 0.05f;
+	float swipe_segment_threshold = 0.1f;
+	float flick_velocity_threshold = 1.5f;
+	
+	uint current_finger_count = 0;
+	uint64 last_monitor_call_time = 0;
+
+	touch_gesture_manager() {
+		sdl_set_hint("SDL_TOUCH_MOUSE_EVENTS", "0");
+		sdl_set_hint("SDL_MOUSE_TOUCH_EVENTS", "0");
+		
+		_touch_manager_register(this);
+	}
+	
+	~touch_gesture_manager() {
+		_touch_manager_unregister(this);
+		this.finger_map.delete_all();
+		this.interfaces.resize(0);
+	}
+
+	bool is_available() { return get_touch_devices().length() > 0; }
+	bool get_available() property { return is_available(); }
+
+	bool add_touch_interface(touch_interface@ i) {
+		if (@i == null) return false;
+		this.interfaces.insert_last(i);
+		return true;
+	}
+
+	bool set_touch_interfaces(touch_interface@[] interfaces, bool append = false) {
+		if (!append) this.interfaces = interfaces;
+		else {
+			if (interfaces.length() <= 0) return false;
+			this.interfaces.extend(interfaces);
+		}
+		return true;
+	}
+
+	void clear_touch_interfaces() { this.interfaces.resize(0); }
+
+	void dispatch_release(touch_screen_finger@ finger) {
+		uint len = this.interfaces.length();
+		for (int i = len - 1; i >= 0; i--) {
+			touch_interface@ iface = this.interfaces[i];
+			bool in_bounds = !iface.coordinated || iface.in_bounds(finger.start_pos.x, finger.start_pos.y);
+			
+			if (in_bounds) {
+				iface.on_released_finger(finger);
+				if (!iface.allow_passthrough) return;
+			}
+		}
+	}
+
+	bool internal_on_down(const touch_finger&inout raw_finger) {
+		if (this.finger_map.exists("" + raw_finger.id)) return false;
+
+		touch_screen_finger new_finger(raw_finger);
+		this.finger_map.set("" + raw_finger.id, @new_finger);
+		this.current_finger_count++;
+		
+		uint len = this.interfaces.length();
+		for (int i = len - 1; i >= 0; i--) {
+			touch_interface@ iface = this.interfaces[i];
+			if (!iface.coordinated || iface.in_bounds(new_finger.start_pos.x, new_finger.start_pos.y)) {
+				iface._track_finger_down();
+				if (!iface.allow_passthrough) break;
+			}
+		}
+		
+		return true;
+	}
+	
+	bool internal_on_cancel(const touch_finger&inout raw_finger) {
+		string key = "" + raw_finger.id;
+		if (this.finger_map.exists(key)) {
+			touch_screen_finger@ finger;
+			this.finger_map.get(key, @finger);
+			
+			if (!finger.has_swiped && finger.active_time < 500) {
+				this.internal_on_up(raw_finger); 
+				return true;
+			}
+			
+			this.dispatch_release(finger);
+			
+			uint len = this.interfaces.length();
+			for (int i = len - 1; i >= 0; i--) {
+				touch_interface@ iface = this.interfaces[i];
+				if (!iface.coordinated || iface.in_bounds(finger.start_pos.x, finger.start_pos.y)) {
+					iface._track_finger_up();
+					if (!iface.allow_passthrough) break;
+				}
+			}
+			
+			this.finger_map.delete(key);
+			if (this.current_finger_count > 0) this.current_finger_count--;
+			return true;
+		}
+		return false;
+	}
+
+	bool internal_on_up(const touch_finger&inout raw_finger) {
+		string key = "" + raw_finger.id;
+		if (this.finger_map.exists(key)) {
+			touch_screen_finger@ finger;
+			this.finger_map.get(key, @finger);
+			
+			uint len = this.interfaces.length();
+			
+			for (int i = len - 1; i >= 0; i--) {
+				touch_interface@ iface = this.interfaces[i];
+				bool in_bounds = !iface.coordinated || iface.in_bounds(finger.start_pos.x, finger.start_pos.y);
+				
+				if (in_bounds) {
+					bool event_handled = false;
+					
+					if (finger.swipe_sequence.length() > 1) { 
+						iface.on_compound_swipe(finger, finger.swipe_sequence);
+						event_handled = true;
+					}
+					else if (!finger.has_swiped && !finger.is_long_press_triggered) {
+						if (finger.swipe_sequence.length() <= 1) {
+							if (iface.current_fingers_in_bounds == 1) {
+								iface._process_tap(finger);
+							}
+						}
+						event_handled = true; 
+					}
+					
+					iface._track_finger_up(); 
+					
+					if (event_handled && !iface.allow_passthrough) break;
+				}
+			}
+			
+			this.dispatch_release(finger);
+			this.finger_map.delete(key);
+			if (this.current_finger_count > 0) this.current_finger_count--;
+			return true;
+		}
+		return false;
+	}
+
+	bool internal_on_move(const touch_finger&inout raw_finger, float dx, float dy) {
+		string key = "" + raw_finger.id;
+		if (this.finger_map.exists(key)) {
+			touch_screen_finger@ finger;
+			this.finger_map.get(key, @finger);
+			
+			if (finger.current_pos.x == raw_finger.x && finger.current_pos.y == raw_finger.y) return true;
+
+			finger.update_position(raw_finger.x, raw_finger.y, raw_finger.pressure);
+			
+			uint len = this.interfaces.length();
+			for (int i = len - 1; i >= 0; i--) {
+				touch_interface@ iface = this.interfaces[i];
+				bool in_bounds = !iface.coordinated || iface.in_bounds(finger.start_pos.x, finger.start_pos.y);
+				if (in_bounds) {
+					// Removed on_touch_drag call here
+					if (!iface.allow_passthrough) break;
+				}
+			}
+
+			float dist_sq_start = (finger.start_pos - finger.current_pos).length_square();
+			if (dist_sq_start > (this.hold_jitter_threshold * this.hold_jitter_threshold)) 
+				finger.is_moving_too_much_for_hold = true;
+
+			float dist_sq_chunk = (finger.last_swipe_pos - finger.current_pos).length_square();
+			if (dist_sq_chunk > (this.swipe_segment_threshold * this.swipe_segment_threshold)) { 
+				vector diff = finger.current_pos - finger.last_swipe_pos;
+				int swipe_dir = detect_swipe_direction(diff);
+				
+				if (swipe_dir > -1) {
+					finger.has_swiped = true;
+					int last_dir = -1;
+					if (finger.swipe_sequence.length() > 0) {
+						last_dir = finger.swipe_sequence[finger.swipe_sequence.length() - 1];
+					}
+
+					if (last_dir == -1 || swipe_dir != last_dir) {
+						finger.swipe_sequence.insert_last(swipe_dir);
+						
+						if (finger.swipe_sequence.length() == 1) {
+							float time_s = (float(ticks() - finger.creation_time)) / 1000.0f;
+							if(time_s <= 0.001f) time_s = 0.001f;
+							
+							float velocity = (finger.current_pos - finger.start_pos).length() / time_s;
+							
+							len = this.interfaces.length();
+							for (int i = len - 1; i >= 0; i--) {
+								touch_interface@ iface = this.interfaces[i];
+								bool in_bounds = !iface.coordinated || iface.in_bounds(finger.start_pos.x, finger.start_pos.y);
+								
+								if (in_bounds) {
+									if (velocity > this.flick_velocity_threshold)
+										iface.on_flick(finger, swipe_dir, velocity);
+									else
+										iface.on_swipe(finger, swipe_dir);
+										
+									iface.tap_count = 0;
+									if (!iface.allow_passthrough) break;
+								}
+							}
+						}
+					}
+					finger.last_swipe_pos = finger.current_pos;
+				}
+			}
+		}
+		return true;
+	}
+
+	void monitor() {
+		this.last_monitor_call_time = ticks();
+		
+		string[]@ known_keys = this.finger_map.get_keys();
+		for(uint i=0; i<known_keys.length(); i++) {
+			touch_screen_finger@ finger;
+			this.finger_map.get(known_keys[i], @finger);
+			
+			if (!finger.has_swiped && !finger.is_moving_too_much_for_hold) {
+				if (finger.get_active_time() >= this.long_press_time) {
+					uint len = this.interfaces.length();
+					for (int k = len - 1; k >= 0; k--) {
+						touch_interface@ iface = this.interfaces[k];
+						if ((!iface.coordinated || iface.in_bounds(finger.start_pos.x, finger.start_pos.y))) {
+							
+							if (!finger.is_long_press_triggered) {
+								uint f_count = (iface.max_fingers_in_sequence > 0) ? iface.max_fingers_in_sequence : 1;
+								iface.on_long_press(finger, f_count);
+							}
+							
+							uint f_count_hold = (iface.max_fingers_in_sequence > 0) ? iface.max_fingers_in_sequence : 1;
+							iface.on_hold(finger, f_count_hold);
+							if (!iface.allow_passthrough) break;
+						}
+					}
+					if (!finger.is_long_press_triggered) finger.is_long_press_triggered = true; 
+				}
+			}
+		}
+		
+		for (uint i = 0; i < this.interfaces.length(); i++) {
+			this.interfaces[i]._monitor();
+		}
+	}
+}
+
 class touch_screen_finger {
 	touch_finger internal_finger;
-	timer main_timer;
-	float start_x, start_y;
+	vector start_pos;
+	vector current_pos; 
+	vector last_swipe_pos;
+	
+	int[] swipe_sequence; 
+	
 	int64 id;
 	int[] last_keys_pressed;
 	bool has_swiped = false;
-	touch_screen_finger(touch_finger internal) {
+	
+	bool is_moving_too_much_for_hold = false;
+	bool is_long_press_triggered = false;
+	
+	uint64 creation_time;
+
+	touch_screen_finger(const touch_finger&in internal) {
 		this.internal_finger = internal;
-		this.start_x = internal.x;
-		this.start_y = internal.y;
+		this.start_pos.set(internal.x, internal.y, 0); 
+		this.current_pos = this.start_pos;
+		this.last_swipe_pos = this.start_pos;
+		
 		this.id = internal.id;
+		this.creation_time = ticks();
 	}
-	float get_x() property {
-		return this.internal_finger.x;
+	
+	void update_position(float nx, float ny, float pressure) {
+		this.current_pos.set(nx, ny, 0);
 	}
-	float get_y() property {
-		return this.internal_finger.y;
-	}
-	float get_pressure() property {
-		return this.internal_finger.pressure;
-	}
-	int64 get_active_time() const property {
-		return this.main_timer.elapsed;
-	}
-}
-int detect_swipe(float start_x, float start_y, float end_x, float end_y, float min_swipe_distance = 0.1f) {
-	float delta_x = end_x - start_x;
-	float delta_y = end_y - start_y;
-	if (fabs(delta_x) > fabs(delta_y)) {
-		if (delta_x > min_swipe_distance)
-			return swipe_touch_direction_right;
-		else if (delta_x < -min_swipe_distance)
-			return swipe_touch_direction_left;
-	} else {
-		if (delta_y > min_swipe_distance)
-			return swipe_touch_direction_down;
-		else if (delta_y < -min_swipe_distance)
-			return swipe_touch_direction_up;
-	}
-	return -1;
-}
-float fabs(float value) {
-	return float(abs(value));
-}
-bool simulate_keys_down(int[] keys) {
-	bool result = true;
-	for (int i = 0; i < keys.length(); i += 1) {
-		if (!simulate_key_down(keys[i])) result = false;
-	}
-	return result;
-}
-bool simulate_keys_up(int[] keys) {
-	bool result = true;
-	for (int i = 0; i < keys.length(); i += 1) {
-		if (!simulate_key_up(keys[i])) result = false;
-	}
-	return result;
+
+	float get_x() property { return this.current_pos.x; }
+	float get_y() property { return this.current_pos.y; }
+	float get_pressure() property { return this.internal_finger.pressure; }
+	int64 get_active_time() const property { return ticks() - this.creation_time; }
 }
