@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fallback
+      - file_touch
     tags:
       - "*"
     paths-ignore:
