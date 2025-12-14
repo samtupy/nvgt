@@ -25,6 +25,9 @@
 	#include "apple.h"
 #elif defined(__ANDROID__)
 	#include <android/native_window.h>
+	#include <jni.h>
+	#include <stdexcept>
+	#include "android.h"
 #else
 	// Following commented includes are for determining user idle time using x11 screensaver extension. Disabled for now until viability of linking with this library is established or until we fix the idle_ticks() function to use dlopen/dlsym and friends.
 	//#include <X11/Xlib.h>
@@ -44,6 +47,7 @@
 #include <Poco/Thread.h>
 #include <Poco/UnicodeConverter.h>
 #include <Poco/Util/Application.h>
+#include <Poco/Format.h>
 #include "input.h"
 #include "misc_functions.h"
 #include "scriptstuff.h"
@@ -214,6 +218,8 @@ std::string input_box(const std::string& title, const std::string& text, const s
 		return "";
 	}
 	return r;
+	#elif defined(__ANDROID__)
+	return android_input_box(title, text, default_value);
 	#else
 	return "";
 	#endif
@@ -228,6 +234,8 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 	#elif defined(__APPLE__)
 	apple_input_box(title, text, value, false, false);
 	return true;
+	#elif defined(__ANDROID__)
+	return android_info_box(title, text, value);
 	#else
 	return false;
 	#endif
@@ -331,7 +339,7 @@ void refresh_window() {
 	process_keyhook_commands();
 	#endif
 	SDL_PumpEvents();
-	update_joysticks();  // Update all active joystick instances
+	update_joysticks(); // Update all active joystick instances
 	SDL_Event evt;
 	std::unordered_set<int> keys_pressed_this_frame;
 	while (SDL_PollEvent(&evt)) {
@@ -368,7 +376,6 @@ void wait(int ms) {
 	refresh_window();
 }
 
-
 // The following function contributed to NVGT by silak
 uint64_t idle_ticks() {
 	#ifdef _WIN32
@@ -391,7 +398,7 @@ uint64_t idle_ticks() {
 			int64_t idleTimeNanoSeconds = 0;
 			CFNumberGetValue(obj, kCFNumberSInt64Type, &idleTimeNanoSeconds);
 			CFRelease(obj);
-			return idleTimeNanoSeconds / 1000000; // Convert nanoseconds to milliseconds
+			return idleTimeNanoSeconds / 1000000; 
 		}
 		IOObjectRelease(entry);
 	}
