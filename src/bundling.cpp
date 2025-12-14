@@ -630,7 +630,7 @@ protected:
 		TemporaryFile zip_out_location;
 		FileOutputStream zip_out(zip_out_location.path());
 		Zip::Compress zcpr(zip_out, true);
-		zcpr.setStoreExtensions({"arsc"});
+		zcpr.setStoreExtensions({"arsc", "dat"});
 		zcpr.addRecursive(workplace.path(), Zip::ZipCommon::CM_AUTO);
 		zcpr.close();
 		// Now we need to align the zip file we just created using the Android sdk's zipalign tool, this will also be responsible for creating our final actual output file as it's the last operation that cannot be performed in place.
