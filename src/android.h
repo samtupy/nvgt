@@ -15,12 +15,36 @@
 #include <vector>
 #include "tts.h"
 #include <jni.h>
+#include <stdexcept>
 
 bool android_is_screen_reader_active();
 std::string android_screen_reader_detect();
 bool android_screen_reader_speak(const std::string& text, bool interrupt);
 bool android_screen_reader_silence();
 std::vector<std::string> android_get_tts_engine_packages();
+
+// New functions moved from UI.cpp
+std::string android_input_box(const std::string& title, const std::string& text, const std::string& default_value);
+bool android_info_box(const std::string& title, const std::string& text, const std::string& value);
+
+// JNI Helpers
+class JNIException : public std::runtime_error {
+public:
+	explicit JNIException(const std::string& msg): std::runtime_error(msg) {}
+};
+
+template<typename T>
+class LocalRef {
+	JNIEnv* env;
+	T ref;
+public:
+	LocalRef(JNIEnv* e, T r) : env(e), ref(r) {}
+	~LocalRef() {
+		if (ref) env->DeleteLocalRef(ref);
+	}
+	T get() const { return ref; }
+	operator T() const { return ref; }
+};
 
 class android_tts_engine : public tts_engine_impl {
 	jclass TTSClass;
