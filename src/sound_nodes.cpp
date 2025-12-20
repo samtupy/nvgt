@@ -918,7 +918,7 @@ public:
 		if (!spatializer) goto fail;
 		audio_spatialization_parameters params;
 		if (!spatializer->get_parameters(params)) goto fail;
-		ma_panner_set_pan(&panner, pan_db_to_linear((params.sound_x - params.listener_x) * params.directional_attenuation_factor * 1.75));
+		ma_panner_set_pan(&panner, pan_db_to_linear((params.listener_direction_x * params.listener_distance) * params.directional_attenuation_factor * 1.75));
 		if (frameCount > *frame_count_in) frameCount = *frame_count_in;
 		ma_panner_process_pcm_frames(&panner, frames_out[0], frames_in[0], frameCount);
 		return;
