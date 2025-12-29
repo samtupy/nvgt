@@ -33,6 +33,11 @@ void main() {
 	address.set("location", loc);
 	author.set("address", address); // Set it to author.
 	t.set("author", author); // Sets the JSON object.
+	// Can even set to another JSON wrapper object.
+	json other;
+	other.set("name", "Harry");
+	other.set("info", "JSON Wrapper");
+	t.set("owner", other); // Success.
 	alert("Keys r", join(t.keys_recursive, ", "));
 	alert("Info", "\n\n" + t.dump(2));
 }

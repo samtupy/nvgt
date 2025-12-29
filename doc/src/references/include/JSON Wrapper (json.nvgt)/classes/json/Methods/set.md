@@ -1,7 +1,8 @@
 # set
 Set a value in the JSON data.
 
-`bool json::set(string key, var@ value);`
+1. `bool json::set(string key, var@ value);`
+2. `bool json::set(string key, json@ value);`
 
 ## Arguments:
 - `string key`: The key to set.

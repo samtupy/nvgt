@@ -44,6 +44,10 @@ class json {
 		this.data.set(key, value);
 		return true;
 	}
+	bool set(string key, json@ value) {
+		if (@value == null || value.size() < 1) return false;
+		return this.set(key, value.data);
+	}
 	bool exists(string key) {
 		return this.data.exists(key);
 	}
