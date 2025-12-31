@@ -26,6 +26,7 @@ std::vector<std::string> android_get_tts_engine_packages();
 // New functions moved from UI.cpp
 std::string android_input_box(const std::string& title, const std::string& text, const std::string& default_value);
 bool android_info_box(const std::string& title, const std::string& text, const std::string& value);
+bool android_is_window_active();
 
 // JNI Helpers
 class JNIException : public std::runtime_error {

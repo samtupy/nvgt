@@ -173,6 +173,23 @@ bool android_info_box(const std::string& title, const std::string& text, const s
 	return true;
 }
 
+bool android_is_window_active() {
+	android_setup_jni();
+	JNIEnv* env = (JNIEnv*)SDL_GetAndroidJNIEnv();
+
+	jmethodID mid = env->GetStaticMethodID(DialogUtilsClass, "isWindowActive", "(Landroid/app/Activity;)Z");
+	if (!mid) {
+		check_jni_exception(env, "GetStaticMethodID isWindowActive");
+		return false;
+	}
+
+	LocalRef<jobject> activity(env, (jobject)SDL_GetAndroidActivity());
+	bool result = env->CallStaticBooleanMethod(DialogUtilsClass, mid, activity.get());
+	check_jni_exception(env, "CallStaticBooleanMethod isWindowActive");
+	
+	return result;
+}
+
 std::vector<std::string> android_get_tts_engine_packages() {
 	try {
 		android_setup_jni();

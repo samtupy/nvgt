@@ -307,8 +307,12 @@ BOOL FocusNVGTWindow() {
 	return true;
 }
 bool WindowIsFocused() {
+#ifdef __ANDROID__
+	return android_is_window_active();
+#else
 	if (!g_WindowHandle) return false;
 	return g_WindowHandle == SDL_GetKeyboardFocus();
+#endif
 }
 bool WindowIsHidden() {
 	if (!g_WindowHandle) return false;
