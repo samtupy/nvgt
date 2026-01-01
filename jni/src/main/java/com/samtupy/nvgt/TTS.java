@@ -33,10 +33,14 @@ public class TTS {
 	public static boolean isScreenReaderActive() {
 		Context context = SDL.getContext();
 		AccessibilityManager am = (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
-		// Check for TouchExploration to avoid false positives from password managers/antivirus
-		if (am != null && am.isEnabled() && am.isTouchExplorationEnabled()) {
+		if (am != null && am.isEnabled()) {
 			List<AccessibilityServiceInfo> serviceInfoList = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_SPOKEN);
-			if (!serviceInfoList.isEmpty()) return true;
+			if (serviceInfoList.isEmpty()) return false;
+			// Check for TouchExploration to avoid false positives from password managers/antivirus
+			if (am.isTouchExplorationEnabled()) return true;
+			for (AccessibilityServiceInfo info : serviceInfoList) {
+				if (info.getId().contains("com.nirenr.talkman")) return true;
+			}
 		}
 		return false;
 	}
@@ -44,10 +48,13 @@ public class TTS {
 	public static String screenReaderDetect() {
 		Context context = SDL.getContext();
 		AccessibilityManager am = (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
-		if (am != null && am.isEnabled() && am.isTouchExplorationEnabled()) {
+		if (am != null && am.isEnabled()) {
 			List<AccessibilityServiceInfo> serviceInfoList = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_SPOKEN);
 			if (serviceInfoList.isEmpty()) return "";
-			return serviceInfoList.get(0).getId();
+			if (am.isTouchExplorationEnabled()) return serviceInfoList.get(0).getId();
+			for (AccessibilityServiceInfo info : serviceInfoList) {
+				if (info.getId().contains("com.nirenr.talkman")) return info.getId();
+			}
 		}
 		return "";
 	}
