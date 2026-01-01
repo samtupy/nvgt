@@ -11,6 +11,9 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.io.StringWriter;
 import java.io.PrintWriter;
+import android.os.PowerManager;
+import android.content.Context;
+import org.libsdl.app.SDLActivity;
 
 public final class DialogUtils {
 	public static String getExceptionInfo(Throwable t) {
@@ -103,5 +106,12 @@ public final class DialogUtils {
 		try {
 			infoBox(activity, caption, prompt, text).get();
 		} catch (Exception ignored) { }
+	}
+
+	public static boolean isWindowActive(Activity activity) {
+		if (activity == null) return false;
+		PowerManager pm = (PowerManager)activity.getSystemService(Context.POWER_SERVICE);
+		boolean screenOn = pm == null || pm.isInteractive();
+		return activity.hasWindowFocus() && SDLActivity.mIsResumedCalled && screenOn;
 	}
 }
