@@ -73,22 +73,16 @@ void timer_queue_item::execute() {
 	ctx->SetArgObject(1, &callback_data);
 	int xr = ctx->Execute();
 	int ms = 0;
-	if (xr == asEXECUTION_FINISHED)
-		ms = ctx->GetReturnDWord();
-	else if (!is_scheduled || xr == asEXECUTION_EXCEPTION)
-		repeating = false;
-	if (repeating && ms < 1)
-		ms = timeout;
-	if (new_context)
-		g_ScriptEngine->ReturnContext(ctx);
-	else
-		ctx->PopState();
+	if (xr == asEXECUTION_FINISHED) ms = ctx->GetReturnDWord();
+	else if (!is_scheduled || xr == asEXECUTION_EXCEPTION) repeating = false;
+	if (repeating && ms < 1) ms = timeout;
+	if (new_context) g_ScriptEngine->ReturnContext(ctx);
+	else ctx->PopState();
 	if (!is_scheduled) {
 		if (ms > 0) {
 			parent->schedule(this, ms);
 			is_scheduled = true;
-		} else
-			parent->erase(id);
+		} else parent->erase(id);
 	}
 }
 timer_queue::timer_queue() : RefCount(1), last_looped(ticks()), open_tick(false) {
@@ -104,33 +98,22 @@ void timer_queue::release() {
 }
 void timer_queue::reset() {
 	for (auto it = timer_objects.begin(); it != timer_objects.end(); it++) {
-		if (it->second->callback)
-			it->second->callback->Release();
-		if (it->second->is_scheduled)
-			it->second->cancel();
+		if (it->second->callback) it->second->callback->Release();
+		if (it->second->is_scheduled) it->second->cancel();
 		delete it->second;
 	}
 	timer_objects.clear();
-	for (auto i : deleting_timers) {
-		if (i->callback)
-			i->callback->Release();
-		delete i;
-	}
-	deleting_timers.clear();
+	flush();
 }
 CScriptArray* timer_queue::list_timers() {
 	asIScriptContext *context = asGetActiveContext();
-	if (context == nullptr)
-		return nullptr;
+	if (context == nullptr) return nullptr;
 	asIScriptEngine *engine = context->GetEngine();
-	if (engine == nullptr)
-		return nullptr;
+	if (engine == nullptr) return nullptr;
 	asITypeInfo *string_array = engine->GetTypeInfoByDecl("string[]");
-	if (string_array == nullptr)
-		return nullptr;
+	if (string_array == nullptr) return nullptr;
 	CScriptArray *array = CScriptArray::Create(string_array);
-	if (array == nullptr)
-		return nullptr;
+	if (array == nullptr) return nullptr;
 	for (auto it = timer_objects.begin(); it != timer_objects.end(); ++it) {
 		std::string id = it->first;
 		array->InsertLast(&id);
@@ -138,10 +121,10 @@ CScriptArray* timer_queue::list_timers() {
 	return array;
 }
 void timer_queue::set(const std::string &id, asIScriptFunction *callback, const std::string &callback_data, uint64_t timeout, bool repeating) {
+	if (timeout < 1) timeout = 1;
 	auto it = timer_objects.find(id);
 	if (it != timer_objects.end()) {
-		if (it->second->callback)
-			it->second->callback->Release();
+		if (it->second->callback) it->second->callback->Release();
 		it->second->callback = callback;
 		it->second->callback_data = callback_data;
 		it->second->timeout = timeout;
@@ -156,20 +139,17 @@ void timer_queue::set(const std::string &id, asIScriptFunction *callback, const 
 }
 uint64_t timer_queue::elapsed(const std::string &id) {
 	auto it = timer_objects.find(id);
-	if (it == timer_objects.end())
-		return 0;
+	if (it == timer_objects.end()) return 0;
 	return timers.now() - it->second->scheduled_at();
 }
 uint64_t timer_queue::timeout(const std::string &id) {
 	auto it = timer_objects.find(id);
-	if (it == timer_objects.end())
-		return 0;
+	if (it == timer_objects.end()) return 0;
 	return it->second->timeout;
 }
 bool timer_queue::restart(const std::string &id) {
 	auto it = timer_objects.find(id);
-	if (it == timer_objects.end())
-		return false;
+	if (it == timer_objects.end()) return false;
 	it->second->is_scheduled = true;
 	it->second->cancel();
 	timers.schedule(it->second, it->second->timeout);
@@ -177,14 +157,12 @@ bool timer_queue::restart(const std::string &id) {
 }
 bool timer_queue::is_repeating(const std::string &id) {
 	auto it = timer_objects.find(id);
-	if (it == timer_objects.end())
-		return false;
+	if (it == timer_objects.end()) return false;
 	return it->second->repeating;
 }
 bool timer_queue::set_timeout(const std::string &id, uint64_t timeout, bool repeating) {
 	auto it = timer_objects.find(id);
-	if (it == timer_objects.end())
-		return false;
+	if (it == timer_objects.end()) return false;
 	it->second->timeout = timeout;
 	it->second->repeating = repeating;
 	if (timeout > 0 || repeating) {
@@ -195,8 +173,7 @@ bool timer_queue::set_timeout(const std::string &id, uint64_t timeout, bool repe
 }
 bool timer_queue::erase(const std::string &id) {
 	auto it = timer_objects.find(id);
-	if (it == timer_objects.end())
-		return false;
+	if (it == timer_objects.end()) return false;
 	it->second->cancel();
 	deleting_timers.insert(it->second);
 	timer_objects.erase(it);
@@ -204,8 +181,7 @@ bool timer_queue::erase(const std::string &id) {
 }
 void timer_queue::flush() {
 	for (auto i : deleting_timers) {
-		if (i->callback)
-			i->callback->Release();
+		if (i->callback) i->callback->Release();
 		delete i;
 	}
 	deleting_timers.clear();
@@ -213,19 +189,15 @@ void timer_queue::flush() {
 }
 bool timer_queue::loop(int max_timers, int max_catchup) {
 	for (auto i : deleting_timers) {
-		if (i->callback)
-			i->callback->Release();
+		if (i->callback) i->callback->Release();
 		delete i;
 	}
 	deleting_timers.clear();
 	uint64_t t = !open_tick ? ticks() - last_looped : 0;
-	if (t > max_catchup)
-		t = max_catchup;
-	if (!open_tick && t <= 0)
-		return true;
+	if (t > max_catchup) t = max_catchup;
+	if (!open_tick && t <= 0) return true;
 	open_tick = !(max_timers > 0 ? timers.advance(t, max_timers) : timers.advance(t));
-	if (!open_tick)
-		last_looped += t;
+	if (!open_tick) last_looped += t;
 	return !open_tick;
 }
 
