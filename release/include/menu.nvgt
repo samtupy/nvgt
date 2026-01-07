@@ -100,6 +100,9 @@ class menu {
 	bool delete_item(int index, bool reset_cursor = true) {
 		return form.delete_list_item(f_list, index, reset_cursor, false);
 	}
+	bool delete_all_items() {
+		return form.clear_list(f_list);
+	}
 	// Call this function to produce the intro sequence for the menu. You don't need to call it at all, if you like.
 	void intro() {
 		if (intro_text.empty()) {
