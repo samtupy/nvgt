@@ -776,7 +776,8 @@ public:
 			return false;
 		}
 		ma_decoder_config cfg = decoder_config_init(sample_rate, channels);
-		if ((g_soundsystem_last_error = ma_decoder_init(on_read_datastream, on_seek_datastream, on_tell_datastream, ds, &cfg, &*decoder)) != MA_SUCCESS) {
+		// Note: We used to pass on_tell_datastream here until miniaudio update Jan 8 2026, if something breaks with raw decoders and end checking, look here.
+		if ((g_soundsystem_last_error = ma_decoder_init(on_read_datastream, on_seek_datastream, ds, &cfg, &*decoder)) != MA_SUCCESS) {
 			decoder.reset();
 			ds->release();
 		} else {
