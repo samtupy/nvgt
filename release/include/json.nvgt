@@ -3,6 +3,10 @@ class json {
 	json() {
 		this.reset();
 	}
+	json(var@ v) {
+		this.reset();
+		this.data = v;
+	}
 	void reset() {
 		this.data = json_object();
 	}
@@ -46,7 +50,8 @@ class json {
 	}
 	bool set(string key, json@ value) {
 		if (@value == null || value.size() < 1) return false;
-		return this.set(key, value.data);
+		var@ j = value.data;
+		return this.set(key, j);
 	}
 	bool exists(string key) {
 		return this.data.exists(key);
