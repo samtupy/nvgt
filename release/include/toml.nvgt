@@ -1,6 +1,6 @@
 /* toml.nvgt - TOML reader and writer
  *
- * Copyright (c) 2025 [Harry Min Khant](https://github.com/harrymkt), under the same license as the NVGT:
+ * Copyright (c) 2025-2026 [Harry Min Khant](https://github.com/harrymkt), under the same license as the NVGT:
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2025 Sam Tupy
@@ -49,7 +49,7 @@ class toml {
 	}
 	void parse(string d) {
 		this.sections.resize(0);
-		toml_section@ t = this.initialize_section("", true);
+		toml_section@ t = this.initialize_section("", true); // Create the main section.
 		d.replace_this("\r\n", "\n");
 		string[] lines = d.split("\n");
 		if (lines.length() < 1) return;
@@ -140,7 +140,10 @@ class toml {
 		if (@t == null) return false;
 		if (key != "") return t.remove(key);
 		int x = this.section_index[t.name];
-		if (x > -1) this.sections.remove_at(x);
+		if (x > -1) {
+			@this.sections[x] = null;
+			this.sections.remove_at(x);
+		}
 		return this.section_index[t.name] < 0;
 	}
 }
