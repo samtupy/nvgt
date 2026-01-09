@@ -1,0 +1,6 @@
+#include "json.nvgt"
+void main() {
+	json j;
+	j.set("hello", "Hello, world!");
+	alert("E", j("hello"));
+}
