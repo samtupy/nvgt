@@ -15,7 +15,7 @@ else()
 	set(FILE_HASH "fc9fed9cd7f67fde40a0a49d420976e8564e8436cd5826d40b339f3fbe9c951d0476d81bb12fb132fe4d61d40b5dcc0ac88973dfb9f132dc3710fac4f6507844")
 endif()
 vcpkg_download_distfile(ARCHIVE
-    URLS "https://www.un4seen.com/files/z/0/bass_fx${VERSION}${FILE_SUFFIX}.zip"
+    URLS "https://nvgt.dev/downloads/bass/bass_fx${VERSION}${FILE_SUFFIX}.zip"
     FILENAME "bass_fx${VERSION}${FILE_SUFFIX}.zip"
     SHA512 ${FILE_HASH}
 )
