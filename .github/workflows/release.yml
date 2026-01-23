@@ -88,7 +88,7 @@ jobs:
         cache: 'gradle'
     - uses: nttld/setup-ndk@v1
       with:
-        ndk-version: r25c
+        ndk-version: r27d
         link-to-sdk: true
         add-to-path: true
     - uses: actions/cache@v4
