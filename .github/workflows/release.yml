@@ -88,13 +88,13 @@ jobs:
         cache: 'gradle'
     - uses: nttld/setup-ndk@v1
       with:
-        ndk-version: r29
+        ndk-version: r25b
         link-to-sdk: true
         add-to-path: true
     - uses: actions/cache@v4
       with:
         path: droidev
-        key: droidev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
+        key: droidev-${{ hashFiles('.github/workflows/release.yml', 'vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
       id: cache
     - name: build dependencies
       if: ${{ steps.cache.outputs.cache-hit != 'true' }}
