@@ -87,14 +87,17 @@ jobs:
         java-version: '17'
         cache: 'gradle'
     - uses: nttld/setup-ndk@v1
+      id: setup-ndk
       with:
-        ndk-version: r27d
+        ndk-version: r25b
         link-to-sdk: true
         add-to-path: true
+    - name: set ndk environ
+      run: echo "ANDROID_NDK_HOME=${{steps.setup-ndk.outputs.ndk-path}}" >> $GITHUB_ENV
     - uses: actions/cache@v4
       with:
         path: droidev
-        key: droidev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
+        key: droidev-${{ hashFiles('.github/workflows/release.yml', 'vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
       id: cache
     - name: build dependencies
       if: ${{ steps.cache.outputs.cache-hit != 'true' }}

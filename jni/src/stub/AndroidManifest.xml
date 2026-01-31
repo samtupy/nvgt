@@ -11,6 +11,7 @@
         android:enableOnBackInvokedCallback="false"
         android:hardwareAccelerated="true" >
         <meta-data android:name="SDL_ENV.SDL_ANDROID_TRAP_BACK_BUTTON" android:value="1"/>
+        <meta-data android:name="dev.nvgt.capability.DIRECT_TOUCH" android:value="true" />
         <activity android:name="NVGTGame"
             android:label="%APP_LABEL%"
             android:alwaysRetainTaskState="true"
