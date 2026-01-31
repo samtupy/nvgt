@@ -6,7 +6,7 @@
 Import("env")
 #env.Append(CPPDEFINES = ["WDL_ALLOW_UNSIGNED_DEFAULT_CHAR"])
 
-sources = ["cmp.c", "entities.cpp", "ma_reverb_node.c", "micropather.cpp", "miniaudio.c", "miniaudio_libopus.c", "miniaudio_libvorbis.c", "miniaudio_phonon.c", "miniaudio_wdl_resampler.cpp", "monocypher.c", "resample.cpp", "rng_get_bytes.c", "singleheader.cpp", "sonic.c", "uncompr.c", "tonar.c"]
+sources = ["cmp.c", "entities.cpp", "ma_reverb_node.c", "micropather.cpp", "miniaudio_libopus.c", "miniaudio_libvorbis.c", "miniaudio_phonon.c", "miniaudio_wdl_resampler.cpp", "monocypher.c", "resample.cpp", "rng_get_bytes.c", "singleheader.cpp", "sonic.c", "uncompr.c", "tonar.c"]
 if env["PLATFORM"] == "win32":
 	sources += ["InputBox.cpp", "sapibridge.c", "vs_version.cpp", "windows_process_watcher.cpp"]
 env.StaticLibrary("#build/lib/deps", sources, CPPDEFINES = list(env["CPPDEFINES"]) + ["_LIB"])

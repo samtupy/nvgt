@@ -30,6 +30,9 @@ constexpr int bit_width( T x ) noexcept {
 	return std::numeric_limits<T>::digits - std::countl_zero(x);
 }
 
+float flerp(float a, float b, float c) { return std::lerp(a, b, c); }
+double dlerp(double a, double b, double c) { return std::lerp(a, b, c); }
+
 struct floating_point_characteristics;
 
 static std::unique_ptr<floating_point_characteristics> fp_characteristics = nullptr;
@@ -470,7 +473,7 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("float fmax(float a, float b)", asFUNCTIONPR(std::fmax, (float, float), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float fmin(float a, float b)", asFUNCTIONPR(std::fmin, (float, float), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float fdim(float a, float b)", asFUNCTIONPR(std::fdim, (float, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float lerp(float a, float b, float c)", asFUNCTIONPR(std::lerp, (float, float, float), float), asCALL_CDECL);
+	engine->RegisterGlobalFunction("float lerp(float a, float b, float c)", asFUNCTION(flerp), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float exp(float a)", asFUNCTIONPR(std::exp, (float), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float exp2(float a)", asFUNCTIONPR(std::exp2, (float), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float expm1(float a)", asFUNCTIONPR(std::expm1, (float), float), asCALL_CDECL);
@@ -535,7 +538,7 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("double dmax(double a, double b)", asFUNCTIONPR(std::fmax, (double, double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double dmin(double a, double b)", asFUNCTIONPR(std::fmin, (double, double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double fdim(double a, double b)", asFUNCTIONPR(std::fdim, (double, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double lerp(double a, double b, double c)", asFUNCTIONPR(std::lerp, (double, double, double), double), asCALL_CDECL);
+	engine->RegisterGlobalFunction("double lerp(double a, double b, double c)", asFUNCTION(dlerp), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double exp(double a)", asFUNCTIONPR(std::exp, (double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double exp2(double a)", asFUNCTIONPR(std::exp2, (double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double expm1(double a)", asFUNCTIONPR(std::expm1, (double), double), asCALL_CDECL);

@@ -27,6 +27,8 @@
 #include "bl_number_to_words.h"
 #define DBGTOOLS_IMPLEMENTATION
 #include "dbgtools.h"
+#define MINIAUDIO_IMPLEMENTATION
+#include <miniaudio.h>
 #define RND_IMPLEMENTATION
 #include "rnd.h"
 #define SPEECH_IMPLEMENTATION

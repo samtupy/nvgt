@@ -26,8 +26,8 @@ elif os.path.isdir(os.path.join("build", "intermediates", "dex", variant, "merge
 			if not f.endswith(".dex"): continue
 			zip_out.write(os.path.join(root, f), "classes" + (str(dex_counter) if dex_counter > 1 else "") + ".dex")
 			dex_counter += 1
-zip_out.write(os.path.join(build_dir, "intermediates", "merged_manifests", variant, "AndroidManifest.xml"),"AndroidManifest.xml")
-native_libpath = os.path.join(build_dir, "intermediates", "stripped_native_libs", variant, "out", "lib")
+zip_out.write(os.path.join(build_dir, "intermediates", "merged_manifests", variant, f"process{variant_cap}Manifest", "AndroidManifest.xml"),"AndroidManifest.xml")
+native_libpath = os.path.join(build_dir, "intermediates", "stripped_native_libs", variant, f"strip{variant_cap}DebugSymbols", "out", "lib")
 for root, dirs, files in os.walk(native_libpath):
 	for f in files:
 		zip_out.write(os.path.join(root, f), os.path.join(root[len(native_libpath)-3:], f))

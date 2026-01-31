@@ -89,7 +89,7 @@ jobs:
     - uses: nttld/setup-ndk@v1
       id: setup-ndk
       with:
-        ndk-version: r25b
+        ndk-version: r27
         link-to-sdk: true
         add-to-path: true
     - name: set ndk environ

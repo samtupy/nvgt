@@ -4,7 +4,7 @@ buildscript {
 		google()
 	}
 	dependencies {
-		classpath 'com.android.tools.build:gradle:8.1.1'
+		classpath 'com.android.tools.build:gradle:8.7.3'
 	}
 }
 
@@ -19,14 +19,14 @@ apply plugin: 'com.android.application'
 
 android {
 	namespace "com.samtupy.nvgt"
-	compileSdkVersion 34
+	compileSdkVersion 35
 	aaptOptions {
 		cruncherEnabled = false  
 	}
 	flavorDimensions "version"
 	defaultConfig {
 		minSdkVersion 28
-		targetSdkVersion 34
+		targetSdkVersion 35
 		versionCode 1
 		versionName "1.0"
 		externalNativeBuild {
