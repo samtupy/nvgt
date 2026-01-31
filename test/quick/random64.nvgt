@@ -1,0 +1,10 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2024 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	random_xorshift r;
+	int64 result = random64(8000000000, 15000000000);
+	alert("Random64 test 1", result);
+	alert("Random64 test 2", r.next64());
+}
