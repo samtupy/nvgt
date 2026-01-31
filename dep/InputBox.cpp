@@ -25,7 +25,6 @@
 #define FONT_NAME                   _T("Times")
 #define SetFontToControl(n)         SendMessage((n), WM_SETFONT, (WPARAM)m_hFont, 0);
 #define SOFT_BLUE RGB(206,214,240)
-void setTextAlignment(HWND hwnd, int textalignment);
 #define REPORTERROR ReportError(__FUNCTION__)
 void ReportError(const char *CallingFunction);
 
@@ -39,6 +38,71 @@ HWND m_hWndCancel = NULL;
 HWND m_hWndPrompt = NULL;
 bool infobox = false;
 static HBRUSH hbrBkgnd = NULL;
+
+// Get the type of control (used in clipboard preservation and alignment helpers)
+int GetRelevantControlType(HWND window) {
+	if (!window) return -1;
+	if (!IsWindow(window)) return -1;
+	wchar_t c[32];
+	GetClassName(window, c, 32);
+	if (wcscmp(c, L"Static") == 0) return 1;
+	if (wcscmp(c, L"Edit") == 0) return 2;
+	if (wcscmp(c, RICHEDIT_CLASS) == 0) return 3;
+return 0;
+}
+
+// Richedit controls use delayed rendering techniques when accessing the clipboard. This helper function copies the actual bytes back into the clipboard so we should always be able to access any data that this dialog puts there.
+void PreserveClipboard() {
+	if (!OpenClipboard(NULL)) return;
+	UINT TextType = CF_UNICODETEXT;
+	HANDLE hData = GetClipboardData(TextType);
+	if (!hData) {
+		TextType = CF_TEXT;
+		hData = GetClipboardData(TextType);
+	}
+	if (!hData) {
+		CloseClipboard();
+		return; // Unable to grab any text.
+}
+	SIZE_T cb = GlobalSize(hData);
+	if (cb <= 0) {
+		CloseClipboard();
+		return;
+	}
+	HGLOBAL hCopy = GlobalAlloc(GMEM_MOVEABLE, cb);
+	if (!hCopy) {
+		CloseClipboard();
+		return;
+	}
+	void* pSrc = GlobalLock(hData);
+	void* pDest = GlobalLock(hCopy);
+	if (pSrc && pDest) memcpy(pDest, pSrc, cb);
+	if (pDest) GlobalUnlock(hCopy);
+	if (pSrc)  GlobalUnlock(hData);
+
+	// At this point, hCopy contains the exact same bytes the clipboard just gave us.
+	EmptyClipboard();
+	SetClipboardData(TextType, hCopy);
+	// Clipboard owns hCopy now; don't free it.
+	CloseClipboard();
+}
+
+// Control alignment helper
+void SetControlAlignment(HWND h, int align) {
+	if (!h) return;
+	int type=GetRelevantControlType(h);
+	if (type < 1) return; // Not valid control.
+	LONG_PTR s = GetWindowLongPtr(h, GWL_STYLE);
+	if (type == 1) {
+		s &= ~(SS_LEFT | SS_CENTER | SS_RIGHT);
+		s |= (align==0?SS_LEFT:align==1?SS_CENTER:SS_RIGHT);
+	} else {
+		s &= ~(ES_LEFT | ES_CENTER | ES_RIGHT);
+		s |= (align==0?ES_LEFT:align==1?ES_CENTER:ES_RIGHT);
+	}
+	SetWindowLongPtr(h, GWL_STYLE, s);
+	SetWindowPos(h, NULL, 0,0,0,0, SWP_NOZORDER|SWP_NOSIZE|SWP_NOMOVE|SWP_NOACTIVATE|SWP_FRAMECHANGED);
+}
 
 // This function makes richedit controls stop making a sound if you try to scroll past their borders, imported into NVGT from pipe2textbox. Thanks to https://stackoverflow.com/questions/55884687/how-to-eliminate-the-messagebeep-from-the-richedit-control
 void disable_richedit_beeps(HMODULE richedit_module, HWND richedit_control) {
@@ -118,12 +182,24 @@ LRESULT CALLBACK InputBoxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 			SetFocus(m_hWndEdit);
 			break;
 		case WM_DESTROY:
-			DeleteObject(m_hFont);
+	PreserveClipboard();
+			if (hbrBkgnd) {
+				DeleteObject(hbrBkgnd);
+				hbrBkgnd = NULL;
+			}
+			if (m_hFont) {
+				DeleteObject(m_hFont);
+				m_hFont = NULL;
+			}
 			//EnableWindow(m_hWndParent, TRUE);
 			//SetForegroundWindow(m_hWndParent);
-			DestroyWindow(hWnd);
-			PostQuitMessage(0);
 			break;
+		case WM_NCDESTROY:
+			if (m_hRicheditModule) {
+				FreeLibrary(m_hRicheditModule);
+				m_hRicheditModule = NULL;
+			}
+		break;
 		case WM_COMMAND:
 			switch (HIWORD(wParam)) {
 				case BN_CLICKED:
@@ -168,7 +244,7 @@ HWND InputBoxCreateWindow(const std::wstring& szCaption, const std::wstring& szP
 		wcex.hInstance = hInst;
 		wcex.hIcon = NULL;//LoadIcon(hInst, (LPCTSTR)IDI_MYINPUTBOX);
 		wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW);
+		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
 		wcex.lpszMenuName = NULL;
 		wcex.lpszClassName = CLASSNAME;
 		wcex.hIconSm = NULL;
@@ -182,20 +258,20 @@ HWND InputBoxCreateWindow(const std::wstring& szCaption, const std::wstring& szP
 		REPORTERROR;
 		return NULL;
 	}
-	setTextAlignment(m_hWndPrompt, SS_CENTER);
+	SetControlAlignment(m_hWndPrompt, 1);
 	//SetWindowTitle(m_hWndEdit, szPrompt);
 	SetWindowText(m_hWndPrompt, szPrompt.c_str());
-	setTextAlignment(m_hWndEdit, SS_CENTER);
+	SetControlAlignment(m_hWndEdit, 1);
 	SetForegroundWindow(m_hWndInputBox);
 	// Set default button
-	SendMessage((HWND)m_hWndOK, BM_SETSTYLE, (WPARAM)LOWORD(BS_DEFPUSHBUTTON), MAKELPARAM(TRUE, 0));
+	if (m_hWndOK) SendMessage((HWND)m_hWndOK, BM_SETSTYLE, (WPARAM)LOWORD(BS_DEFPUSHBUTTON), MAKELPARAM(TRUE, 0));
 	SendMessage((HWND)m_hWndCancel, BM_SETSTYLE, (WPARAM)LOWORD(BS_PUSHBUTTON), MAKELPARAM(TRUE, 0));
 	// Set default text
 	SendMessage(m_hWndEdit, EM_SETSEL, 0, -1);
 	SendMessage(m_hWndEdit, EM_REPLACESEL, 0, (LPARAM)szText.c_str());
 	if (szText.size() > 0) SendMessage(m_hWndEdit, EM_SETSEL, 0, -1);
 	if (infobox) {
-		SendMessage(m_hWndEdit, EM_SETREADONLY, ES_READONLY, 0);
+		SendMessage(m_hWndEdit, EM_SETREADONLY, TRUE, 0);
 		SendMessage(m_hWndEdit, EM_SETSEL, 0, 0);
 	}
 	SetFocus(m_hWndEdit);
@@ -207,7 +283,9 @@ HWND InputBoxCreateWindow(const std::wstring& szCaption, const std::wstring& szP
 std::wstring InputBoxMessageLoop() {
 	std::wstring result = _T("");
 	MSG msg;
-	while (GetMessage(&msg, NULL, 0, 0)) {
+	while (true) {
+		if (!IsWindow(m_hWndInputBox)) break;
+		if (!GetMessage(&msg, NULL, 0, 0)) break;
 		if (msg.message == WM_KEYDOWN) {
 			if (msg.wParam == VK_TAB) {
 				HWND hWndFocused = GetFocus();
@@ -215,7 +293,7 @@ std::wstring InputBoxMessageLoop() {
 				SetFocus(GetNextDlgTabItem(m_hWndInputBox, hWndFocused, prev));
 			}
 			if (msg.wParam == VK_ESCAPE) {
-				SendMessage(m_hWndInputBox, WM_DESTROY, 0, 0);
+				DestroyWindow(m_hWndInputBox);
 				result = _T("\xff");
 			}
 			if (msg.wParam == VK_RETURN) {
@@ -224,7 +302,7 @@ std::wstring InputBoxMessageLoop() {
 				result.resize(nCount);
 				GetWindowText(m_hWndEdit, &result.front(), nCount);
 				result.resize(nCount - 1);
-				SendMessage(m_hWndInputBox, WM_DESTROY, 0, 0);
+				DestroyWindow(m_hWndInputBox);
 			}
 		}
 		if (!IsDialogMessage(m_hWndInputBox, &msg)) {
@@ -235,45 +313,6 @@ std::wstring InputBoxMessageLoop() {
 	return result;
 }
 
-void setTextAlignment(HWND hwnd, int intTextAlignment) {
-	LONG_PTR s;
-	LONG_PTR textalignment = GetWindowLongPtr(hwnd, GWL_STYLE);
-	if (textalignment != intTextAlignment) {
-		//delete the last text alignment
-		if (intTextAlignment == 0) {
-			s = GetWindowLongPtr(hwnd, GWL_STYLE);
-			s = s & ~(SS_LEFT);
-			SetWindowLongPtr(hwnd, GWL_STYLE, (LONG_PTR)s);
-		} else if (intTextAlignment == 1) {
-			s = GetWindowLongPtr(hwnd, GWL_STYLE);
-			s = s & ~(SS_CENTER);
-			SetWindowLongPtr(hwnd, GWL_STYLE, (LONG_PTR)s);
-		} else if (intTextAlignment == 2) {
-			s = GetWindowLongPtr(hwnd, GWL_STYLE);
-			s = s & ~(SS_RIGHT);
-			SetWindowLongPtr(hwnd, GWL_STYLE, (LONG_PTR)s);
-		}
-
-		textalignment = intTextAlignment;
-
-		//put the new text alignment
-		if (textalignment == 0) {
-			s = GetWindowLongPtr(hwnd, GWL_STYLE);
-			s = s | (SS_LEFT);
-			SetWindowLongPtr(hwnd, GWL_STYLE, (LONG_PTR)s);
-		} else if (textalignment == 1) {
-			s = GetWindowLongPtr(hwnd, GWL_STYLE);
-			s = s | (SS_CENTER);
-			SetWindowLongPtr(hwnd, GWL_STYLE, (LONG_PTR)s);
-		} else if (textalignment == 2) {
-			s = GetWindowLongPtr(hwnd, GWL_STYLE);
-			s = s | (SS_RIGHT);
-			SetWindowLongPtr(hwnd, GWL_STYLE, (LONG_PTR)s);
-		}
-		SetWindowPos(hwnd, 0, 0, 0, 0, 0,
-		             SWP_NOZORDER | SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOCOPYBITS | SWP_DRAWFRAME);
-	}
-}
 void ReportError(const char *CallingFunction) {
 	DWORD error = GetLastError();
 	LPVOID lpMsgBuf;
