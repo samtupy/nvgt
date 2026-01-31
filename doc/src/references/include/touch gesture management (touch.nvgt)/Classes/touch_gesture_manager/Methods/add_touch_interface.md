@@ -1,9 +1,7 @@
 # add_touch_interface
 Adds a single interface to the list of interfaces that will receive touch events.
 
-```
-bool add_touch_interface(touch_interface@ interface);
-```
+```bool add_touch_interface(touch_interface@ interface);```
 
 ## Arguments:
 * touch_interface@ interface: The interface to add to the manager.

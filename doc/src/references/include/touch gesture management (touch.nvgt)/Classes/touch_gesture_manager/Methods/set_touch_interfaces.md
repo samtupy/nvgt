@@ -1,9 +1,7 @@
 # set_touch_interfaces
 Sets the list of interfaces that will receive touch events.
 
-```
-bool set_touch_interfaces(touch_interface@[] interfaces, bool append = false);
-```
+```bool set_touch_interfaces(touch_interface@[] interfaces, bool append = false);```
 
 ## Arguments:
 * touch_interface@[]@ interfaces: A list of interfaces that will receive touch events.
