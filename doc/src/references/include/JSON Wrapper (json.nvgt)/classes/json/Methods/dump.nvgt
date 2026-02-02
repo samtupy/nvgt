@@ -1,0 +1,43 @@
+/**
+	Dump all loaded data into a string.
+	`string dump(int indent = 0, int step = -1);`
+	## Arguments:
+		- `int indent = 0`: Specifies how many spaces to use to indent the JSON. If 0, no indentation or formatting is performed.
+		- `int step = -1`: The outwards indentation step, for example setting it to two would cause your outdents to only be two spaces. -1 (the default) keeps it how it is, normally you don't need to use this parameter.
+	## Returns:
+		`string`: The JSON object as a string.
+*/
+
+// Example:
+#include "json.nvgt"
+void main() {
+	json t;
+	t.set("main_key", "Hello, world!");
+	t.set("int_key", 23);
+	t.set("float_key", 10.5);
+	t.set("boolean_key", false);
+	t.set("boolean_key2", true);
+	// subsection.
+	json_object author;
+	author.set("name", "Jon");
+	author.set("email", "jon@gmail.com");
+	author.set("age", 30);
+	// Another sub subsection.
+	json_object address;
+	address.set("city", "Yangon");
+	address.set("country", "Myanmar");
+	address.set("number", "+959xxx");
+	json_object loc;
+	loc.set("lat", 16.18);
+	loc.set("lon", 38.14);
+	address.set("location", loc);
+	author.set("address", address); // Set it to author.
+	t.set("author", author); // Sets the JSON object.
+	// Can even set to another JSON wrapper object.
+	json other;
+	other.set("name", "Harry");
+	other.set("info", "JSON Wrapper");
+	t.set("owner", other); // Success.
+	alert("Keys r", join(t.keys_recursive, ", "));
+	alert("Info", "\n\n" + t.dump(2));
+}
