@@ -110,7 +110,7 @@ def windows_lib_rename(out_dir):
 	for lib in ["debug/lib", "lib"]:
 		for r in renames:
 			if (out_dir / lib / (r[0] + ".lib")).exists(): (out_dir / lib / (r[0] + ".lib")).replace(out_dir / lib / (r[1] + ".lib"))
-		shutil.copyfile(out_dir / lib / "angelscript.lib", out_dir / lib / "angelscript-nc.lib")
+		shutil.copyfile(out_dir / lib / "angelscript_nc.lib", out_dir / lib / "angelscript-nc.lib")
 def remove_duplicates(out_dir):
 	"""A couple libraries on Linux and MacOS might have created duplicate versions of themselves because of symlinks, lets get rid of them."""
 	for lib in ["libarchive", "libgit2"]:
