@@ -10,7 +10,7 @@ class json {
 	void reset() {
 		this.data = json_object();
 	}
-	bool loads(string str) {
+	bool loads(const string&in str) {
 		json_object@ j = null;
 		try {
 			@j = parse_json(str);
@@ -19,7 +19,7 @@ class json {
 		this.data = j;
 		return true;
 	}
-	bool loadf(string filename) {
+	bool loadf(const string&in filename) {
 		file f;
 		if (!f.open(filename, "r")) return false;
 		string r = f.read();
@@ -30,10 +30,10 @@ class json {
 		if (@d == null || !d.active) return false;
 		return this.loads(d.read());
 	}
-	string dump(int indent = 0, int step = -1) {
+	string dump(int indent = 0, int step = -1) const {
 		return this.data.stringify(indent, step);
 	}
-	bool save(string filename, int indent = 0, int step = -1) {
+	bool save(const string&in filename, int indent = 0, int step = -1) {
 		file f;
 		if (!f.open(filename, "w")) return false;
 		if (this.size() < 1) return false;
@@ -41,22 +41,22 @@ class json {
 		f.close();
 		return true;
 	}
-	var@ get(string key, var@ def = null) {
+	var@ get(const string&in key, var@ def = null) const {
 		return this.data.get(key, def);
 	}
-	bool set(string key, var@ value) {
+	bool set(const string&in key, var@ value) {
 		this.data.set(key, value);
 		return true;
 	}
-	bool set(string key, json@ value) {
+	bool set(const string&in key, json@ value) {
 		if (@value == null || value.size() < 1) return false;
 		var@ j = value.data;
 		return this.set(key, j);
 	}
-	bool exists(string key) {
+	bool exists(const string&in key) const {
 		return this.data.exists(key);
 	}
-	bool remove(string key) {
+	bool remove(const string&in key) {
 		if (!this.exists(key)) return false;
 		this.data.remove(key);
 		return true;
@@ -64,13 +64,13 @@ class json {
 	void clear() {
 		this.data.clear();
 	}
-	uint size() {
+	uint size() const {
 		return this.data.size();
 	}
-	string[] get_keys() property {
+	string[] get_keys() const property {
 		return this.data.get_keys();
 	}
-	string[] get_keys_recursive() property{
+	string[] get_keys_recursive() const property {
 		string[] f = this.list_keys_recursive("", @this.data, true);
 		for (uint i = 0; i < f.length(); i++) {
 			if (!this.is_object(f[i])) continue;
@@ -80,25 +80,25 @@ class json {
 		}
 		return f;
 	}
-	bool is_array(string key) {
+	bool is_array(const string&in key) const {
 		return this.data.is_array(key);
 	}
-	bool is_null(string key) {
+	bool is_null(const string&in key) const {
 		return this.data.is_null(key);
 	}
-	bool is_object(string key) {
+	bool is_object(const string&in key) const {
 		return this.data.is_object(key);
 	}
-	var@ opCall(string path, var@ def = null) {
+	var@ opCall(const string&in path, var@ def = null) const {
 		return this.data(path, def);
 	}
-	var@ get_opIndex(string key) property {
+	var@ get_opIndex(const string&in key) const property {
 		return this.data.get_opIndex(key);
 	}
-	void set_opIndex(string key, var@ value) property {
+	void set_opIndex(const string&in key, var@ value) property {
 		this.data.set_opIndex(key, value);
 	}
-	private string[] list_keys_recursive(string key, json_object@ v, bool top = true) {
+	private string[] list_keys_recursive(const string&in key, const json_object@ v, bool top = true) const {
 		string[] f;
 		string[] k = v.get_keys();
 		if (top) f = k;
