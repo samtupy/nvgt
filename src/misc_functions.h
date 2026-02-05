@@ -38,11 +38,12 @@ public:
 	}
 };
 struct script_memory_buffer {
+	int RefCount;
 	void* ptr;
 	size_t size;
 	asITypeInfo* subtype;
 	int subtypeid;
-	script_memory_buffer(asITypeInfo* subtype, void* ptr, size_t size) : ptr(ptr), size(size), subtype(subtype), subtypeid(subtype->GetSubTypeId()) {}
+	script_memory_buffer(asITypeInfo* subtype, void* ptr, size_t size) : RefCount(1), ptr(ptr), size(size), subtype(subtype), subtypeid(subtype->GetSubTypeId()) {}
 	const void* at(size_t index) const;
 	void* at(size_t index);
 	CScriptArray* to_array() const;
@@ -54,5 +55,11 @@ struct script_memory_buffer {
 	static bool verify(asITypeInfo *subtype, bool& no_gc);
 	static script_memory_buffer* create(asITypeInfo* subtype, void* ptr, uint64_t size);
 	static void angelscript_register(asIScriptEngine* engine);
+	void AddRef() {
+		asAtomicInc(RefCount);
+	}
+	void Release() {
+		if (asAtomicDec(RefCount) < 1) delete this;
+	}
 };
 void RegisterMiscFunctions(asIScriptEngine* engine);

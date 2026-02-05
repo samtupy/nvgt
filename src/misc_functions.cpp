@@ -11,6 +11,7 @@
 */
 
 #define NOMINMAX
+#include <cstdint> // uint64_t
 #include <string>
 #include <algorithm>
 #include <vector>
@@ -362,19 +363,19 @@ script_memory_buffer& script_memory_buffer::from_array(CScriptArray* array) {
 	return *this;
 }
 int script_memory_buffer::get_element_size() const {return g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid); }
-void script_memory_buffer::make(script_memory_buffer* mem, asITypeInfo* subtype, void* ptr, int size) { new(mem) script_memory_buffer(subtype, ptr, size); }
-void script_memory_buffer::copy(script_memory_buffer* mem, asITypeInfo* subtype, const script_memory_buffer& other) { new(mem) script_memory_buffer(other); }
-void script_memory_buffer::destroy(script_memory_buffer* mem) { mem->~script_memory_buffer(); }
+script_memory_buffer* script_memory_buffer::make(asITypeInfo* subtype, uint64_t ptr, uint64_t size) { return new script_memory_buffer(subtype, ptr, size); }
+script_memory_buffer* script_memory_buffer::copy(asITypeInfo* subtype, const script_memory_buffer& other) { return new script_memory_buffer(other.ptr, other.size); }
 bool script_memory_buffer::verify(asITypeInfo *subtype, bool& no_gc) {
 	if (subtype->GetSubTypeId() & asTYPEID_MASK_OBJECT ) return false;
 	return no_gc = true;
 }
 void script_memory_buffer::angelscript_register(asIScriptEngine* engine) {
-	engine->RegisterObjectType("memory_buffer<class T>", sizeof(script_memory_buffer), asOBJ_VALUE | asOBJ_TEMPLATE | asGetTypeTraits<script_memory_buffer>());
-	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_CONSTRUCT, "void f(int&in subtype, uint64 ptr, uint64 size)", asFUNCTION(make), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_CONSTRUCT, "void f(int&in subtype, const memory_buffer<T>&in other)", asFUNCTION(copy), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectType("memory_buffer<class T>", 0, asOBJ_REF | asOBJ_TEMPLATE);
+	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_FACTORY, "memory_buffer<T>@ f(int&in subtype, uint64 ptr, uint64 size)", asFUNCTION(make), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_FACTORY, "memory_buffer<T>@ f(int&in subtype, const memory_buffer<T>&in other)", asFUNCTION(copy), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_ADDREF, "void f()", asMETHOD(script_memory_buffer, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_RELEASE, "void f()", asMETHOD(script_memory_buffer, Release), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_TEMPLATE_CALLBACK, "bool f(int&in subtype, bool&out no_gc)", asFUNCTION(verify), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(destroy), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectProperty("memory_buffer<T>", "uint64 address", asOFFSET(script_memory_buffer, ptr));
 	engine->RegisterObjectProperty("memory_buffer<T>", "uint64 size", asOFFSET(script_memory_buffer, size));
 	engine->RegisterObjectMethod("memory_buffer<T>", "T& opIndex(uint64 index)", asMETHODPR(script_memory_buffer, at, (size_t), void*), asCALL_THISCALL);
