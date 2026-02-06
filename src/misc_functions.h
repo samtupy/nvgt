@@ -49,8 +49,8 @@ struct script_memory_buffer {
 	CScriptArray* to_array() const;
 	script_memory_buffer& from_array(CScriptArray* array);
 	int get_element_size() const;
-	static void make(script_memory_buffer* mem, asITypeInfo* subtype, void* ptr, int size);
-	static void copy(script_memory_buffer* mem, asITypeInfo* subtype, const script_memory_buffer& other);
+	static script_memory_buffer* make(asITypeInfo* subtype, void* ptr, int size);
+	static script_memory_buffer* copy(asITypeInfo* subtype, const script_memory_buffer& other);
 	static void destroy(script_memory_buffer* mem);
 	static bool verify(asITypeInfo *subtype, bool& no_gc);
 	static script_memory_buffer* create(asITypeInfo* subtype, void* ptr, uint64_t size);
