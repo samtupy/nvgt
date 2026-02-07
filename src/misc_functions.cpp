@@ -363,7 +363,7 @@ script_memory_buffer& script_memory_buffer::from_array(CScriptArray* array) {
 	return *this;
 }
 int script_memory_buffer::get_element_size() const {return g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid); }
-script_memory_buffer* script_memory_buffer::make(asITypeInfo* subtype, uint64_t ptr, uint64_t size) { return new script_memory_buffer(subtype, ptr, size); }
+void script_memory_buffer::make(script_memory_buffer* mem, asITypeInfo* subtype, void* ptr, int size) { new(mem) script_memory_buffer(subtype, ptr, size); }
 void script_memory_buffer::copy(script_memory_buffer* mem, asITypeInfo* subtype, const script_memory_buffer& other) { new(mem) script_memory_buffer(other); }
 bool script_memory_buffer::verify(asITypeInfo *subtype, bool& no_gc) {
 	if (subtype->GetSubTypeId() & asTYPEID_MASK_OBJECT ) return false;
