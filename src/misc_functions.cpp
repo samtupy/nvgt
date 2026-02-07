@@ -370,7 +370,7 @@ bool script_memory_buffer::verify(asITypeInfo *subtype, bool& no_gc) {
 	return no_gc = true;
 }
 void script_memory_buffer::angelscript_register(asIScriptEngine* engine) {
-	engine->RegisterObjectType("memory_buffer<class T>", 0, asOBJ_REF | asOBJ_TEMPLATE);
+	engine->RegisterObjectType("memory_buffer<class T>", sizeof(script_memory_buffer), asOBJ_REF | asOBJ_TEMPLATE | asGetTypeTraits<script_memory_buffer>());
 	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_FACTORY, "memory_buffer<T>@ f(int&in subtype, uint64 ptr, uint64 size)", asFUNCTION(make), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_FACTORY, "memory_buffer<T>@ f(int&in subtype, const memory_buffer<T>&in other)", asFUNCTION(copy), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_ADDREF, "void f()", asMETHOD(script_memory_buffer, AddRef), asCALL_THISCALL);
