@@ -11,7 +11,6 @@
 */
 
 #define NOMINMAX
-#include <cstdint> // uint64_t
 #include <string>
 #include <algorithm>
 #include <vector>
@@ -372,7 +371,7 @@ bool script_memory_buffer::verify(asITypeInfo *subtype, bool& no_gc) {
 }
 void script_memory_buffer::angelscript_register(asIScriptEngine* engine) {
 	engine->RegisterObjectType("memory_buffer<class T>", sizeof(script_memory_buffer), asOBJ_VALUE | asOBJ_TEMPLATE | asGetTypeTraits<script_memory_buffer>());
-	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_CONSTRUCT, "void f(int&in subtype, uint64 ptr, uint64 size)", asFUNCTION(make), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_CONSTRUCT, "void f(int&in subtype, uint64 ptr = 0, uint64 size = 0)", asFUNCTION(make), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_CONSTRUCT, "void f(int&in subtype, const memory_buffer<T>&in other)", asFUNCTION(copy), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_TEMPLATE_CALLBACK, "bool f(int&in subtype, bool&out no_gc)", asFUNCTION(verify), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("memory_buffer<T>", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(destroy), asCALL_CDECL_OBJFIRST);
