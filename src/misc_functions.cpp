@@ -11,6 +11,7 @@
 */
 
 #define NOMINMAX
+#include <cstdint>
 #include <string>
 #include <algorithm>
 #include <vector>
@@ -343,13 +344,13 @@ double parse_double(const std::string& val) {
 
 // Small wrapper which allows statically typed read-write access to an arbitrary memory buffer from scripts.
 // It should be implicitly understood by the scripter that this interface is low level, contains minimal handholding and is not subject to sandboxing!
-const void* script_memory_buffer::at(size_t index) const {
-	if (!ptr) throw std::invalid_argument("memory buffer null pointer access");
+const void* script_memory_buffer::at(uint64_t index) const {
+	if (ptr == nullptr) throw std::invalid_argument("memory buffer null pointer access");
 	int typesize = g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid);
 	if (size && index >= size) throw std::out_of_range("index out of bounds");
 	return (void*)(((char*)ptr) + (index * typesize));
 }
-void* script_memory_buffer::at(size_t index) { return const_cast<void*>(const_cast<const script_memory_buffer*>(this)->at(index)); }
+void* script_memory_buffer::at(uint64_t index) { return const_cast<void*>(const_cast<const script_memory_buffer*>(this)->at(index)); }
 CScriptArray* script_memory_buffer::to_array() const {
 	CScriptArray* array = CScriptArray::Create(g_ScriptEngine->GetTypeInfoByDecl(Poco::format("array<%s>", std::string(g_ScriptEngine->GetTypeDeclaration(subtypeid, false))).c_str()), size);
 	if (!array) return nullptr;
@@ -361,8 +362,8 @@ script_memory_buffer& script_memory_buffer::from_array(CScriptArray* array) {
 	else std::memcpy(ptr, array->GetBuffer(), (array->GetSize() < size? array->GetSize() : size) * g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid));
 	return *this;
 }
-int script_memory_buffer::get_element_size() const {return g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid); }
-void script_memory_buffer::make(script_memory_buffer* mem, asITypeInfo* subtype, void* ptr, int size) { new(mem) script_memory_buffer(subtype, ptr, size); }
+uint64_t script_memory_buffer::get_element_size() const {return g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid); }
+void script_memory_buffer::make(script_memory_buffer* mem, asITypeInfo* subtype, void* ptr, uint64_t size) { new(mem) script_memory_buffer(subtype, ptr, size); }
 void script_memory_buffer::copy(script_memory_buffer* mem, asITypeInfo* subtype, const script_memory_buffer& other) { new(mem) script_memory_buffer(other); }
 void script_memory_buffer::destroy(script_memory_buffer* mem) { mem->~script_memory_buffer(); }
 bool script_memory_buffer::verify(asITypeInfo *subtype, bool& no_gc) {
