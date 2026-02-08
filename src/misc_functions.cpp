@@ -363,6 +363,12 @@ script_memory_buffer& script_memory_buffer::from_array(CScriptArray* array) {
 	return *this;
 }
 uint64_t script_memory_buffer::get_element_size() const {return g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid); }
+bool script_memory_buffer::is_active() { return (ptr != nullptr && size < 1); }
+bool script_memory_buffer::update(void* new_ptr, uint64_t new_size) {
+	ptr = new_ptr;
+	size = new_size;
+	return is_active();
+}
 void script_memory_buffer::make(script_memory_buffer* mem, asITypeInfo* subtype, void* ptr, uint64_t size) { new(mem) script_memory_buffer(subtype, ptr, size); }
 void script_memory_buffer::copy(script_memory_buffer* mem, asITypeInfo* subtype, const script_memory_buffer& other) { new(mem) script_memory_buffer(other); }
 void script_memory_buffer::destroy(script_memory_buffer* mem) { mem->~script_memory_buffer(); }
@@ -383,6 +389,8 @@ void script_memory_buffer::angelscript_register(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("memory_buffer<T>", "array<T>@ opImplConv() const", asMETHOD(script_memory_buffer, to_array), asCALL_THISCALL);
 	engine->RegisterObjectMethod("memory_buffer<T>", "memory_buffer<T>& opAssign(array<T>@ array)", asMETHOD(script_memory_buffer, from_array), asCALL_THISCALL);
 	engine->RegisterObjectMethod("memory_buffer<T>", "int get_element_size() const property", asMETHOD(script_memory_buffer, get_element_size), asCALL_THISCALL);
+	engine->RegisterObjectMethod("memory_buffer<T>", "bool get_active() const property", asMETHOD(script_memory_buffer, is_active), asCALL_THISCALL);
+	engine->RegisterObjectMethod("memory_buffer<T>", "bool update(uint64 address = 0, uint64 size = 0)", asMETHOD(script_memory_buffer, update), asCALL_THISCALL);
 }
 void* string_get_address(std::string& str) {
 	if (str.size() < 1) return nullptr;
