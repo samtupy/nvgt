@@ -850,9 +850,9 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("regexp", _O("int subst(string&, const string&in, int = RE_UTF8) const"), asFUNCTIONPR(poco_regular_expression_subst, (RegularExpression*, std::string&, const std::string&, int), int), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("regexp", _O("string[]@ split(const string&in, uint64 = 0) const"), asFUNCTIONPR(poco_regular_expression_split, (RegularExpression*, const std::string&, std::string::size_type), CScriptArray*), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("regexp", _O("string[]@ split(const string&in, uint64, int) const"), asFUNCTIONPR(poco_regular_expression_split, (RegularExpression*, const std::string&, std::string::size_type, int), CScriptArray*), asCALL_CDECL_OBJFIRST);
-	engine->RegisterGlobalFunction(_O("bool regexp_match(const string&in, const string&in, int = RE_UTF8)"), asFUNCTION(poco_regular_expression_match), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool regexp_search(const string&in, const string&in, int = RE_UTF8)"), asFUNCTION(poco_regular_expression_search), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string regexp_replace(const string&in, const string&in, const string&in, int = RE_UTF8)"), asFUNCTION(poco_regular_expression_replace), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool regexp_match(const string&in subject, const string&in pattern, int options = RE_UTF8)"), asFUNCTION(poco_regular_expression_match), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool regexp_search(const string&in subject, const string&in pattern, int options = RE_UTF8)"), asFUNCTION(poco_regular_expression_search), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string regexp_replace(const string&in subject, const string&in pattern, const string&in replacement, int options = RE_UTF8)"), asFUNCTION(poco_regular_expression_replace), asCALL_CDECL);
 	engine->SetDefaultNamespace("spec");
 	engine->RegisterEnum("path_style");
 	engine->RegisterEnumValue(_O("path_style"), _O("PATH_STYLE_UNIX"), Path::PATH_UNIX);
