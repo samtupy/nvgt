@@ -1,0 +1,28 @@
+/**
+	Dump all loaded data into a string.
+	`string toml::dump(bool indent = true, bool empty_sections = true);`
+	## Arguments:
+		- `bool indent = true`: If this is set to true, all keys in every section will be proceeded with a tab character in the output. This indent number will increase if you have nested subsections, e.g. `game.server.name` will have 2 tabs on its key, `name`.
+		- `bool empty_sections = true`: Should the data include empty sections? Default is usually ok.
+	## Returns:
+		`string`: The entire TOML data as a string.
+*/
+
+// Example:
+#include "toml.nvgt"
+void main() {
+	toml t;
+	// Lets set all the possible types of supported values.
+	t.set("", "main_key", "Hello, world!");
+	t.set("", "int_key", 23);
+	t.set("", "float_key", 10.5);
+	t.set("", "boolean_key", false);
+	t.set("", "boolean_key2", true);
+	// Lets completely set another section.
+	t.set("owner", "name", "Jon");
+	t.set("owner", "age", 20);
+	// Subsections?
+	t.set("owner.contact", "telegram", "bla_bla_bla");
+	t.set("owner.contact", "facebook", "bla_bla_bla_book");
+	alert("Info", "\n\n" + t.dump());
+}
