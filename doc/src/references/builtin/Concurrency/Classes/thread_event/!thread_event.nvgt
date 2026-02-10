@@ -5,7 +5,7 @@
 		thread_event_type type: The type of handling to perform when a waiting thread detects that the event has been set (see remarks).
 	## Remarks:
 		This primative can be used to make one thread inexpensively sleep until another thread wakes it up, or can more simply be used for some threads to monitor when a condition has been completed on another thread in a safe manner.
-		It is not a good idea to just use standard booleans in multithreaded situations where you want one thread to know when another thread has completed it's work because threads could be reading from the boolean as it is being written to by a worker thread, causing an undefined result. The thread_event object is one way around this issue, as it can signal when a standard boolean is safe to access or sometimes avoid their usage entirely.
+		It is not a good idea to just use standard booleans in multithreaded situations where you want one thread to know when another thread has completed its work because threads could be reading from the boolean as it is being written to by a worker thread, causing an undefined result. The thread_event object is one way around this issue, as it can signal when a standard boolean is safe to access or sometimes avoid their usage entirely.
 		Quite simply one thread can call the set() method on an event, and if another thread has previously called the wait() method on the same event, that wait method will return thus resuming the first thread. If the event was created with the THREAD_EVENT_AUTO_RESET type, the event will also be set to unsignaled as the waiting thread wakes up. Otherwise, the reset() method must be called manually.
 */
 

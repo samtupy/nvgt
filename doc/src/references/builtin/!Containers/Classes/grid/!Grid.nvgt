@@ -1,5 +1,5 @@
 /**
-	This type is essentially just a more convenient 2d array. One place it's super useful is when representing a game board.
+	This type is essentially just a more convenient 2d array. One place it is super useful is when representing a game board.
 	In this documentation, "T" refers to the dynamic type that a grid was instanciated with.
 	1. `grid<T>();`
 	2. `grid<T>(uint width, uint height);`
@@ -7,7 +7,7 @@
 		* uint width: the width of the grid.
 		* uint height: the height of the grid.
 	## Remarks:
-		One of the things that makes this class especially convenient is its opIndex overload. It's possible to index into a grid like:
+		One of the things that makes this class especially convenient is its opIndex overload. It is possible to index into a grid like:
 		`my_grid[1, 2];`
 		to access the value at (1, 2) on your grid.
 		Besides the constructors listed above, you can also make a grid using the brace syntax, similar to arrays, like this:

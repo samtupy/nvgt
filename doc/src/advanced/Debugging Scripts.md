@@ -1,5 +1,5 @@
 # Debugging Scripts
-One very useful feature of NVGT is the ability to debug the scripts that you write. This means being able to pause script execution at any time (either triggered manually or automatically), view what's going on and even make changes or inject code, and then resume the execution. You can even execute one statement in your code at a time to get an idea of exactly what it is doing.
+One very useful feature of NVGT is the ability to debug the scripts that you write. This means being able to pause script execution at any time (either triggered manually or automatically), view what is going on and even make changes or inject code, and then resume the execution. You can even execute one statement in your code at a time to get an idea of exactly what it is doing.
 
 ## The -d or --debug option
 To debug a script in nvgt, it is required that you use the command line version of nvgt (nvgt.exe). On platforms other than Windows, only a command line version is available.
@@ -17,7 +17,7 @@ If you press enter here without first typing a command, the last major debugger 
 
 Pressing ctrl+c while the debug interpreter is open will exit out of nvgt completely similar to how it works if the debugger is not attached. Pressing this keystroke while the interpreter is not active will perform a user break into the debugger, meaning that your script will immediately stop executing and the debug interpreter will appear.
 
-To list all available commands, type h and enter. We won't talk about all of the commands here, but will discuss a few useful ones.
+To list all available commands, type h and enter. We will not talk about all of the commands here, but will discuss a few useful ones.
 
 ## Useful debugging commands
 * c: set debugger action to continue, execute until next breakpoint or manual break
@@ -38,7 +38,7 @@ This function will do nothing if called without a debugger attached or from a co
 You can also programmatically add file and function breakpoints with the functions `void debug_add_file_breakpoint(string filename, int line_number)` and `void debug_add_func_breakpoint(string function_name)`.
 
 ## breakpoints
-To describe breakpoints, we'll break (pun intended) the word into it's 2 parts and describe what the words mean in this context.
+To describe breakpoints, we will break (pun intended) the word into 2 parts and describe what the words mean in this context.
 * When debugging, a break means pausing your script's execution and running the debugging interpreter.
 * In this context, a point is either a file/line number combo or a function name which, if reached, will cause a debugger break.
 
@@ -47,5 +47,5 @@ For example if you type the debug command "b mygame.nvgt:31" and continue execut
 It is also possible to break into the debugger whenever a function is about to execute, simply by passing a function name instead of a file:line combo to the b debug command.
 
 ## notes
-* It is worth noting that when the debugger interpreter is active, your script's execution is completely blocked. This means that any window you have shown will not be processing messages. Some screen readers don't like unresponsive windows that well, so be careful when breaking into the debugger while your game window is showing! Maybe in the future we can consider a setting that hides the game window whenever a debug break takes place.
-* This debugger has not been tested very well in a multi-threaded context, for example we do not know what happens at this time if 2 threads call the debug_break() function at the same time. We intend to investigate this, but for now it's best to debug on the main thread of your application. In particular no commands exist as of yet to give contextual thread information.
+* It is worth noting that when the debugger interpreter is active, your script's execution is completely blocked. This means that any window you have shown will not be processing messages. Some screen readers do not like unresponsive windows that well, so be careful when breaking into the debugger while your game window is showing! Maybe in the future we can consider a setting that hides the game window whenever a debug break takes place.
+* This debugger has not been tested very well in a multi-threaded context, for example we do not know what happens at this time if 2 threads call the debug_break() function at the same time. We intend to investigate this, but for now it is best to debug on the main thread of your application. In particular no commands exist as of yet to give contextual thread information.
