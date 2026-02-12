@@ -41,6 +41,7 @@ Poco::Timestamp g_secure_clock;
 Poco::Timestamp g_time_cache;
 Poco::DateTime g_time_values;
 Poco::FastMutex g_time_mutex;
+static bool g_time_cache_initialized = false;
 
 static asIScriptContext* callback_ctx = NULL;
 timer_queue_item::timer_queue_item(timer_queue *parent, const std::string &id, asIScriptFunction *callback, const std::string &callback_data, int timeout, bool repeating) : parent(parent), id(id), callback(callback), callback_data(callback_data), timeout(timeout), repeating(repeating), is_scheduled(true) {}
@@ -203,12 +204,13 @@ bool timer_queue::loop(int max_timers, int max_catchup) {
 
 void update_tm() {
 	Timestamp ts;
-	if (ts.epochTime() == g_time_cache.epochTime())
+	if (g_time_cache_initialized && ts.epochTime() == g_time_cache.epochTime())
 		return;
 	FastMutex::ScopedLock l(g_time_mutex);
 	g_time_cache = ts;
 	g_time_values = ts;
 	g_time_values.makeLocal(Poco::Timezone::tzd());
+	g_time_cache_initialized = true;
 }
 
 int get_date_year() {
