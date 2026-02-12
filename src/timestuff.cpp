@@ -610,7 +610,7 @@ template <class t> void register_date_time_extensions(asIScriptEngine *engine, s
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_valid() const property", asFUNCTION(is_valid<t>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_leap_year()", asFUNCTION(is_leap_year<t>), asCALL_CDECL_OBJFIRST);
 }
-void RegisterScriptTimestuff(asIScriptEngine *engine) {
+void RegisterScriptTimeGlobals(asIScriptEngine *engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
 	engine->RegisterGlobalFunction("int get_DATE_YEAR() property", asFUNCTION(get_date_year), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_DATE_MONTH() property", asFUNCTION(get_date_month), asCALL_CDECL);
@@ -621,6 +621,10 @@ void RegisterScriptTimestuff(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("int get_TIME_HOUR() property", asFUNCTION(get_time_hour), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_TIME_MINUTE() property", asFUNCTION(get_time_minute), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_TIME_SECOND() property", asFUNCTION(get_time_second), asCALL_CDECL);
+}
+
+void RegisterScriptTimestuffCore(asIScriptEngine *engine) {
+	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
 	engine->RegisterGlobalFunction(_O("uint64 ticks(bool secure = false)"), asFUNCTION(ticks), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64 secure_ticks()"), asFUNCTION(secure_ticks), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64 microticks(bool secure = false)"), asFUNCTION(microticks), asCALL_CDECL);
@@ -851,4 +855,9 @@ void RegisterScriptTimestuff(asIScriptEngine *engine) {
 	engine->RegisterGlobalProperty("const string DATE_TIME_REGEX_SORTABLE", (void*)&DateTimeFormat::SORTABLE_REGEX);
 	engine->RegisterGlobalFunction("bool datetime_is_valid_format_string(const string&in fmt)", asFUNCTION(DateTimeFormat::hasFormat), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool datetime_is_valid_format(const string&in datetime)", asFUNCTION(DateTimeFormat::isValid), asCALL_CDECL);
+}
+
+void RegisterScriptTimestuff(asIScriptEngine *engine) {
+	RegisterScriptTimestuffCore(engine);
+	RegisterScriptTimeGlobals(engine);
 }
