@@ -128,6 +128,7 @@ bool g_make_console = false;
 std::unordered_map<std::string, asITypeInfo*> g_TypeInfoCache;
 Timestamp g_script_build_time;
 unordered_map<string, string> g_system_namespaces;
+vector<string> g_pending_plugins;
 
 class NVGTBytecodeStream : public asIBinaryStream {
 	unsigned char* content;
@@ -530,7 +531,10 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	RegisterThreading(engine);
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("time");
-	RegisterScriptTimestuff(engine);
+	RegisterScriptTimestuffCore(engine);
+	engine->EndConfigGroup();
+	engine->BeginConfigGroup("time_globals");
+	RegisterScriptTimeGlobals(engine);
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("internet");
 	RegisterInternet(engine);
@@ -606,6 +610,7 @@ void ConfigureEngineOptions(asIScriptEngine *engine) {
 	engine->SetEngineProperty(asEP_MEMBER_INIT_MODE, config.getInt("scripting.member_init_mode", 0));
 }
 int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
+	g_pending_plugins.clear();
 	Path global_include(Path(Path::self()).parent().append("include"));
 	g_IncludeDirs.push_back(global_include.toString());
 	if (!g_debug)
@@ -630,6 +635,14 @@ int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
 				return -1;
 		}
 		if (ConfigureEngine(engine) < 0) return -1;
+		for (const auto& plugin_name : g_pending_plugins) {
+			string errmsg = "failed to load plugin";
+			if (!load_nvgt_plugin(plugin_name, &errmsg)) {
+				engine->WriteMessage(plugin_name.c_str(), -1, -1, asMSGTYPE_ERROR, errmsg.c_str());
+				return -1;
+			}
+		}
+		g_pending_plugins.clear();
 		if (builder.BuildModule() < 0) {
 			engine->WriteMessage(scriptFile.c_str(), 0, 0, asMSGTYPE_ERROR, "Script failed to build");
 			return -1;
@@ -964,10 +977,10 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*us
 	else if (cleanText.starts_with("document"))
 		add_game_asset_to_bundle(cleanText.substr(9), GAME_ASSET_DOCUMENT);
 	else if (cleanText.starts_with("plugin ")) {
-		string errmsg = "failed to load plugin";
-		if (!load_nvgt_plugin(cleanText.substr(7), &errmsg))
-			engine->WriteMessage(cleanText.substr(7).c_str(), -1, -1, asMSGTYPE_ERROR, errmsg.c_str());
-		else builder.DefineWord(Poco::format("plugin_%s", cleanText.substr(7)).c_str());
+		string plugin_name = cleanText.substr(7);
+		if (find(g_pending_plugins.begin(), g_pending_plugins.end(), plugin_name) == g_pending_plugins.end())
+			g_pending_plugins.push_back(plugin_name);
+		builder.DefineWord(Poco::format("plugin_%s", plugin_name).c_str());
 	} else if (cleanText.starts_with("compiled_basename ")) {
 		string bn = cleanText.substr(18);
 		if (bn == "*")

@@ -101,3 +101,5 @@ public:
 };
 
 void RegisterScriptTimestuff(asIScriptEngine* engine);
+void RegisterScriptTimestuffCore(asIScriptEngine* engine);
+void RegisterScriptTimeGlobals(asIScriptEngine* engine);
