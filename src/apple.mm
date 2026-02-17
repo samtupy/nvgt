@@ -31,7 +31,9 @@ public:
 	float pitch;
 	AVSpeechSynthesizer* synth;
 	AVSpeechSynthesisVoice* currentVoice;
+	NSArray<AVSpeechSynthesisVoice *> *voices;
 	Impl() {
+		voices = [[AVSpeechSynthesisVoice speechVoices] retain];
 		currentVoice = [AVSpeechSynthesisVoice voiceWithLanguage:@"en-US"];
 		AVSpeechUtterance* utterance = [[AVSpeechUtterance alloc] initWithString:@""];
 		rate = utterance.rate;
@@ -40,6 +42,7 @@ public:
 		synth = [[AVSpeechSynthesizer alloc] init];
 	}
 	Impl(const std::string& language) {
+		voices = [[AVSpeechSynthesisVoice speechVoices] retain];
 		NSString *nslanguage = [NSString stringWithUTF8String:language.c_str()];
 		AVSpeechSynthesisVoice *voice = [AVSpeechSynthesisVoice voiceWithLanguage:nslanguage];
 		currentVoice = voice? voice : [AVSpeechSynthesisVoice voiceWithLanguage:@"en-US"];
@@ -48,6 +51,9 @@ public:
 		volume = utterance.volume;
 		pitch = utterance.pitchMultiplier;
 		synth = [[AVSpeechSynthesizer alloc] init];
+	}
+	~Impl() {
+		if (voices) [voices release];
 	}
 	bool speak(const std::string& text, bool interrupt) {
 		if ((interrupt || text.empty()) && synth.isSpeaking)[synth stopSpeakingAtBoundary:AVSpeechBoundaryImmediate];
@@ -76,7 +82,6 @@ public:
 	bool isSpeaking() const { return synth.isSpeaking; }
 	std::string getCurrentVoice() const { return [currentVoice.name UTF8String]; }
 	CScriptArray* getAllVoices() const {
-		NSArray<AVSpeechSynthesisVoice *> *voices = [AVSpeechSynthesisVoice speechVoices];
 		asITypeInfo* arrayTipe = asGetActiveContext()->GetEngine()->GetTypeInfoByDecl("array<string>");
 		CScriptArray* voiceNames = CScriptArray::Create(arrayTipe, (int)0);
 		for (AVSpeechSynthesisVoice *voice in voices) {
@@ -87,7 +92,6 @@ public:
 		return voiceNames;
 	}
 	CScriptArray* getVoicesByLanguage(const std::string& language) const {
-		NSArray<AVSpeechSynthesisVoice *> *voices = [AVSpeechSynthesisVoice speechVoices];
 		NSString *nslanguage = [NSString stringWithUTF8String:language.c_str()];
 		asITypeInfo* arrayTipe = asGetActiveContext()->GetEngine()->GetTypeInfoByDecl("array<string>");
 		CScriptArray* voiceNames = CScriptArray::Create(arrayTipe, (int)0);
@@ -101,7 +105,6 @@ public:
 	}
 	void selectVoiceByName(const std::string& name) {
 		NSString *nsname = [NSString stringWithUTF8String:name.c_str()];
-		NSArray<AVSpeechSynthesisVoice *> *voices = [AVSpeechSynthesisVoice speechVoices];
 		for (AVSpeechSynthesisVoice *voice in voices) {
 			if (![voice.name isEqualToString:nsname]) continue;
 			currentVoice = voice;
@@ -109,7 +112,6 @@ public:
 		}
 	}
 	void selectVoiceByLanguage(const std::string& language) {
-		NSArray<AVSpeechSynthesisVoice *> *voices = [AVSpeechSynthesisVoice speechVoices];
 		NSString *nslanguage = [NSString stringWithUTF8String:language.c_str()];
 		for (AVSpeechSynthesisVoice *voice in voices) {
 			if (![voice.language isEqualToString:nslanguage]) continue;
@@ -118,16 +120,14 @@ public:
 		}
 	}
 	std::string getCurrentLanguage() const { return [currentVoice.language UTF8String]; }
-	NSUInteger getVoicesCount() const { return [AVSpeechSynthesisVoice speechVoices].count; }
+	NSUInteger getVoicesCount() const { return voices.count; }
 	int getVoiceIndex(const std::string& name) {
-		NSArray<AVSpeechSynthesisVoice *> *voices = [AVSpeechSynthesisVoice speechVoices];
 		AVSpeechSynthesisVoice *voice = getVoiceObject([NSString stringWithUTF8String:name.c_str()]);
 		if (!voice) return -1;
 		NSUInteger result = [voices indexOfObject:voice];
 		return result == NSNotFound? -1 : result;
 	}
 	bool setVoiceByIndex(NSUInteger index) {
-		NSArray<AVSpeechSynthesisVoice *> *voices = [AVSpeechSynthesisVoice speechVoices];
 		AVSpeechSynthesisVoice *oldVoice = currentVoice;
 		@try {
 			currentVoice = [voices objectAtIndex:index];
@@ -138,12 +138,10 @@ public:
 		}
 	}
 	std::string getVoiceName(NSUInteger index) {
-		NSArray<AVSpeechSynthesisVoice *> *voices = [AVSpeechSynthesisVoice speechVoices];
 		@try { return [[voices objectAtIndex:index].name UTF8String]; }
 		@catch (NSException *exception) { return ""; }
 	}
 	std::string getVoiceLanguage(NSUInteger index) {
-		NSArray<AVSpeechSynthesisVoice *> *voices = [AVSpeechSynthesisVoice speechVoices];
 		@try {
 			AVSpeechSynthesisVoice *voice = [voices objectAtIndex:index];
 			std::string lang([voice.language UTF8String]);
@@ -153,7 +151,6 @@ public:
 	}
 private:
 	AVSpeechSynthesisVoice *getVoiceObject(NSString *name) {
-		NSArray<AVSpeechSynthesisVoice *> *voices = [AVSpeechSynthesisVoice speechVoices];
 		for (AVSpeechSynthesisVoice *v in voices) {
 			if ([v.name isEqualToString:name]) return v;
 		}
@@ -258,8 +255,8 @@ tts_audio_data* AVTTSVoice::speak_to_pcm(const std::string &text) {
 	if (@available(iOS 13.0, macOS 10.15, *)) {} else return nullptr;
 	__block NSMutableData *audioData = [[NSMutableData alloc] init];
 	__block BOOL synthesisDone = NO;
-	__block AVAudioFormat *sourceFormat = nil;
 	__block AVAudioFormat *targetFormat = nil;
+	__block AVAudioConverter *converter = nil;
 	NSString *nstext = [NSString stringWithUTF8String:text.c_str()];
 	AVSpeechUtterance *utterance = [[AVSpeechUtterance alloc] initWithString:nstext];
 	utterance.rate = impl->rate;
@@ -267,38 +264,44 @@ tts_audio_data* AVTTSVoice::speak_to_pcm(const std::string &text) {
 	utterance.pitchMultiplier = impl->pitch;
 	utterance.voice = impl->currentVoice;
 	[impl->synth writeUtterance:utterance toBufferCallback:^(AVAudioBuffer * _Nonnull buffer) {
-		if (![buffer isKindOfClass:[AVAudioPCMBuffer class]]) return;
-		AVAudioPCMBuffer *pcmBuffer = (AVAudioPCMBuffer *)buffer;
-		if (pcmBuffer.frameLength == 0) { synthesisDone = YES; return; }
-		if (!sourceFormat && pcmBuffer.frameLength > 0) {
-			sourceFormat = pcmBuffer.format;
-			targetFormat = [[AVAudioFormat alloc] initWithCommonFormat:AVAudioPCMFormatInt16 sampleRate:sourceFormat.sampleRate channels:sourceFormat.channelCount interleaved:YES];
+		@autoreleasepool {
+			if (![buffer isKindOfClass:[AVAudioPCMBuffer class]]) return;
+			AVAudioPCMBuffer *pcmBuffer = (AVAudioPCMBuffer *)buffer;
+			if (pcmBuffer.frameLength == 0) { synthesisDone = YES; return; }
+			if (!converter) {
+				AVAudioFormat *sourceFormat = pcmBuffer.format;
+				if (!sourceFormat) return;
+				targetFormat = [[AVAudioFormat alloc] initWithCommonFormat:AVAudioPCMFormatInt16 sampleRate:sourceFormat.sampleRate channels:sourceFormat.channelCount interleaved:YES];
+				if (!targetFormat) return;
+				converter = [[AVAudioConverter alloc] initFromFormat:sourceFormat toFormat:targetFormat];
+				if (!converter) { [targetFormat release]; targetFormat = nil; return; }
+			}
+			AVAudioPCMBuffer *convertedBuffer = [[AVAudioPCMBuffer alloc] initWithPCMFormat:targetFormat frameCapacity:pcmBuffer.frameLength];
+			if (!convertedBuffer) return;
+			__block BOOL inputProvided = NO;
+			AVAudioConverterInputBlock inputBlock = ^AVAudioBuffer *(AVAudioPacketCount inNumberOfPackets, AVAudioConverterInputStatus *outStatus) {
+				if (inputProvided) { *outStatus = AVAudioConverterInputStatus_NoDataNow; return nil; }
+				inputProvided = YES;
+				*outStatus = AVAudioConverterInputStatus_HaveData;
+				return pcmBuffer;
+			};
+			NSError *error = nil;
+			AVAudioConverterOutputStatus status = [converter convertToBuffer:convertedBuffer error:&error withInputFromBlock:inputBlock];
+			if (status == AVAudioConverterOutputStatus_HaveData && convertedBuffer.frameLength > 0) {
+				NSUInteger bytesToAppend = convertedBuffer.frameLength * targetFormat.channelCount * sizeof(int16_t);
+				[audioData appendBytes:convertedBuffer.int16ChannelData[0] length:bytesToAppend];
+			}
 		}
-		AVAudioConverter *converter = [[AVAudioConverter alloc] initFromFormat:sourceFormat toFormat:targetFormat];
-		if (!converter) return;
-		AVAudioPCMBuffer *convertedBuffer = [[AVAudioPCMBuffer alloc] initWithPCMFormat:targetFormat frameCapacity:pcmBuffer.frameLength];
-		if (!convertedBuffer) { [converter release]; return; }
-		__block BOOL inputProvided = NO;
-		AVAudioConverterInputBlock inputBlock = ^AVAudioBuffer *(AVAudioPacketCount inNumberOfPackets, AVAudioConverterInputStatus *outStatus) {
-			if (inputProvided) { *outStatus = AVAudioConverterInputStatus_NoDataNow; return nil; }
-			inputProvided = YES;
-			*outStatus = AVAudioConverterInputStatus_HaveData;
-			return pcmBuffer;
-		};
-		NSError *error = nil;
-		AVAudioConverterOutputStatus status = [converter convertToBuffer:convertedBuffer error:&error withInputFromBlock:inputBlock];
-		[converter release];
-		if (status == AVAudioConverterOutputStatus_HaveData && convertedBuffer.frameLength > 0) {
-			NSUInteger bytesToAppend = convertedBuffer.frameLength * targetFormat.channelCount * sizeof(int16_t);
-			[audioData appendBytes:convertedBuffer.int16ChannelData[0] length:bytesToAppend];
-		}
-		[convertedBuffer release];
 	}];
 	NSDate *timeout = [NSDate dateWithTimeIntervalSinceNow:10.0];
 	while (!synthesisDone && [[NSDate date] compare:timeout] == NSOrderedAscending) [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
-	if (!synthesisDone || !targetFormat || audioData.length == 0) return nullptr;
+	if (converter) [converter release];
+	if (targetFormat) [targetFormat release];
+	if (!synthesisDone || audioData.length == 0) return nullptr;
+	unsigned int sampleRate = targetFormat ? (unsigned int)targetFormat.sampleRate : 22050;
+	unsigned int channelCount = targetFormat ? (unsigned int)targetFormat.channelCount : 1;
 	[audioData retain];
-	return new tts_audio_data(this, (void*)audioData.bytes, (unsigned int)audioData.length, (unsigned int)targetFormat.sampleRate, (unsigned int)targetFormat.channelCount, 16, (void*)audioData);
+	return new tts_audio_data(this, (void*)audioData.bytes, (unsigned int)audioData.length, sampleRate, channelCount, 16, (void*)audioData);
 }
 
 void AVTTSVoice::free_pcm(tts_audio_data* data) {
