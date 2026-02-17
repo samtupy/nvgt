@@ -445,6 +445,7 @@ class touch_gesture_manager {
 	
 	uint current_finger_count = 0;
 	uint64 last_monitor_call_time = 0;
+	private uint64 _last_input_time = 0;
 
 	touch_gesture_manager() {
 		sdl_set_hint("SDL_TOUCH_MOUSE_EVENTS", "0");
@@ -460,7 +461,10 @@ class touch_gesture_manager {
 	}
 
 	bool is_available() { return get_touch_devices().length() > 0; }
-	bool get_available() property { return is_available(); }
+	bool get_available() const property { return is_available(); }
+
+	bool get_was_last_instant_input() const property { return _last_input_time > 0 and ticks() - _last_input_time < 100; }
+	int64 get_last_input_time() const property { return _last_input_time > 0? _last_input_time : -1; }
 
 	bool add_touch_interface(touch_interface@ i) {
 		if (@i == null) return false;
@@ -494,7 +498,7 @@ class touch_gesture_manager {
 
 	bool internal_on_down(const touch_finger&inout raw_finger) {
 		if (this.finger_map.exists("" + raw_finger.id)) return false;
-
+		this._last_input_time = ticks();
 		touch_screen_finger new_finger(raw_finger);
 		this.finger_map.set("" + raw_finger.id, @new_finger);
 		this.current_finger_count++;
@@ -514,6 +518,7 @@ class touch_gesture_manager {
 	bool internal_on_cancel(const touch_finger&inout raw_finger) {
 		string key = "" + raw_finger.id;
 		if (this.finger_map.exists(key)) {
+			this._last_input_time = ticks();
 			touch_screen_finger@ finger;
 			this.finger_map.get(key, @finger);
 			
@@ -543,6 +548,7 @@ class touch_gesture_manager {
 	bool internal_on_up(const touch_finger&inout raw_finger) {
 		string key = "" + raw_finger.id;
 		if (this.finger_map.exists(key)) {
+			this._last_input_time = ticks();
 			touch_screen_finger@ finger;
 			this.finger_map.get(key, @finger);
 			
@@ -585,6 +591,7 @@ class touch_gesture_manager {
 	bool internal_on_move(const touch_finger&inout raw_finger, float dx, float dy) {
 		string key = "" + raw_finger.id;
 		if (this.finger_map.exists(key)) {
+			this._last_input_time = ticks();
 			touch_screen_finger@ finger;
 			this.finger_map.get(key, @finger);
 			
@@ -665,7 +672,7 @@ class touch_gesture_manager {
 					for (int k = len - 1; k >= 0; k--) {
 						touch_interface@ iface = this.interfaces[k];
 						if ((!iface.coordinated || iface.in_bounds(finger.start_pos.x, finger.start_pos.y))) {
-							
+							this._last_input_time = ticks();
 							if (!finger.is_long_press_triggered) {
 								uint f_count = (iface.max_fingers_in_sequence > 0) ? iface.max_fingers_in_sequence : 1;
 								iface.on_long_press(finger, f_count);
