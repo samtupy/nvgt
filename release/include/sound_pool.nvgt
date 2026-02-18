@@ -630,22 +630,55 @@ class sound_pool {
 		}
 		return true;
 	}
+bool set_sound_volume(int slot, float volume) {
+		if (verify_slot(slot) == false) return false;
+		items[slot].start_volume = volume;
+		if (items[slot].handle.active) {
+			items[slot].handle.set_volume(volume);
+		}
+		return true;
+	}
 
-	bool update_sound_start_values(int slot, float start_pan, float start_volume, float start_pitch) {
-		if (verify_slot(slot) == false)
-			return false;
-		items[slot].start_pan = start_pan;
-		items[slot].start_volume = start_volume;
-		items[slot].start_pitch = start_pitch;
-		if (@items[slot].handle != null) {
-			items[slot].handle.set_pan(start_pan);
-			items[slot].handle.set_volume(start_volume);
-			items[slot].handle.set_pitch(start_pitch);
+	bool set_sound_pan(int slot, float pan) {
+		if (verify_slot(slot) == false) return false;
+		items[slot].start_pan = pan;
+		if (items[slot].handle.active) {
+			items[slot].handle.set_pan(pan);
+		}
+		return true;
+	}
+
+	bool set_sound_pitch(int slot, float pitch) {
+		if (verify_slot(slot) == false) return false;
+		items[slot].start_pitch = pitch;
+		if (items[slot].handle.active) {
+			items[slot].update(last_listener_x, last_listener_y, last_listener_z, last_listener_rotation, max_distance);
+		}
+		return true;
+	}
+
+float get_sound_volume(int slot) {
+		if (verify_slot(slot) == false) return -100.0f; // Возвращаем тишину или ошибку
+		return items[slot].start_volume;
+	}
+
+	float get_sound_pan(int slot) {
+		if (verify_slot(slot) == false) return 0.0f;
+		return items[slot].start_pan;
+	}
+
+	float get_sound_pitch(int slot) {
+		if (verify_slot(slot) == false) return 100.0f;
+		return items[slot].start_pitch;
+	}
+
+bool update_sound_start_values(int slot, float start_pan, float start_volume, float start_pitch) {
+		if (set_sound_volume(slot, start_volume) &&
+		    set_sound_pan(slot, start_pan) &&
+		    set_sound_pitch(slot, start_pitch)) {
 			return true;
 		}
-		if (items[slot].is_3d == false and items[slot].handle.get_pitch() != start_pitch)
-			items[slot].handle.set_pitch(start_pitch);
-		return true;
+		return false;
 	}
 
 	bool update_sound_range_1d(int slot, int left_range, int right_range) {
