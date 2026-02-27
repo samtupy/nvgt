@@ -222,6 +222,7 @@ protected:
 		set_status("bundling assets...");
 		for (const game_asset& g : g_game_assets) {
 			Path p = Path(g.bundled_path).makeAbsolute(g.flags & GAME_ASSET_DOCUMENT? document_path : resource_path);
+			if (File(p).exists()) File(p).remove(true);
 			if (!File(p.parent()).exists()) File(p.parent()).createDirectories();
 			File(Path(g.filesystem_path).makeAbsolute(Path(get_input_file()).makeParent()).toString()).copyTo(p.toString());
 		}
@@ -366,7 +367,7 @@ protected:
 		bw.writeRaw("\xCA\xFE");
 		if (bundle_mode) {
 			fs.close();
-			fs.open(Path(workplace.path()).append("Contents/resources/exec").toString(), std::ios::out); // App bundles must store their embedded packs and bytecode as a resource so the app bundle can be signed.
+			fs.open(Path(workplace.path()).append("Contents/resources/exec").toString(), std::ios::out | std::ios::trunc); // App bundles must store their embedded packs and bytecode as a resource so the app bundle can be signed.
 		}
 	}
 	void finalize_output_stream() override {
