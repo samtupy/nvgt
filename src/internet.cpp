@@ -22,6 +22,7 @@
 #include <Poco/Thread.h>
 #include <Poco/URI.h>
 #include <Poco/URIStreamOpener.h>
+#include <Poco/UUIDGenerator.h>
 #include <Poco/Net/AcceptCertificateHandler.h>
 #include <Poco/Net/Context.h>
 #include <Poco/Net/DNS.h>
@@ -575,13 +576,15 @@ class http : public RefCountedObject, Runnable, public SynchronizedObject {
 	HTTPRequest _request;
 	HTTPResponse _response;
 	HTTPCredentials _creds;
+	UUID _uuid;
 	string _request_body, _response_body, _user_agent;
 	Thread worker;
 	URI _url;
 	streamsize _bytes_downloaded;
-	atomic<int> _max_retries, _retry_delay;
+	atomic<bool> _keepalive;
+	atomic<unsigned int> _max_retries, _retry_delay, _connect_timeout, _send_timeout, _receive_timeout, _keepalive_timeout;
 public:
-	http() : _session(nullptr), _bytes_downloaded(0), _max_retries(10), _retry_delay(0) { set_user_agent(); }
+	http() : _session(nullptr), _uuid(UUIDGenerator::defaultGenerator().createOne()), _bytes_downloaded(0), _max_retries(10), _retry_delay(0), _keepalive(false), _connect_timeout(30000), _send_timeout(60000), _receive_timeout(60000),  _keepalive_timeout(10000) { set_user_agent(); }
 	bool request(const string& method, const URI& url, const NameValueCollection* headers, const string& body, const HTTPCredentials* creds = nullptr) {
 		if (worker.isRunning()) return false;
 		if (url.getScheme() != "http" && url.getScheme() != "https") return false;
@@ -604,7 +607,7 @@ public:
 		return true;
 	}
 	~http() { reset(); }
-	void reset() {
+	void reset(bool configuration = false) {
 		if (worker.isRunning()) {
 			notify();
 			worker.join();
@@ -617,6 +620,12 @@ public:
 		_response.clear();
 		_max_retries = 10;
 		_bytes_downloaded = _retry_delay = 0;
+		if (configuration) {
+			_keepalive = false;
+			_connect_timeout = 30000;
+			_send_timeout = _receive_timeout = 60000;
+			_keepalive_timeout = 30000;
+		}
 		tryWait(0); // Try making sure the event is not signaled.
 	}
 	bool get(const URI& url, const NameValueCollection* headers, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_GET, url, headers, "", creds); }
@@ -647,6 +656,9 @@ public:
 				HTTPResponse tmp_response = _response;
 				if (!_session) _session = _url.getScheme() == "http"? new HTTPClientSession(_url.getHost(), _url.getPort()) : new HTTPSClientSession(_url.getHost(), _url.getPort());
 				if (authorize) _creds.authenticate(req, tmp_response);
+				_session->setKeepAlive(_keepalive);
+				_session->setTimeout(_connect_timeout * 1000, _send_timeout * 1000, _receive_timeout * 1000);
+				_session->setKeepAliveTimeout(_keepalive_timeout * 1000);
 				std::ostream& ostr = _session->sendRequest(req);
 				unlock();;
 				if (tryWait(0)) break;
@@ -721,15 +733,26 @@ public:
 		ScopedLock lock(*this);
 		return _url;
 	}
+	const UUID& get_uuid() const { return _uuid; }
 	string get_user_agent() const { return _user_agent; }
 	void set_user_agent(const string& agent = "") {
 		if (agent.empty()) _user_agent = "nvgt " + NVGT_VERSION;
 		else _user_agent = agent;
 	}
-	int get_max_retries() const { return _max_retries; }
-	void set_max_retries(int retries) { _max_retries = retries; }
-	int get_retry_delay() const { return _retry_delay; }
-	void set_retry_delay(int delay = 0) { _retry_delay = delay; }
+	unsigned int get_max_retries() const { return _max_retries; }
+	void set_max_retries(unsigned int retries) { _max_retries = retries; }
+	unsigned int get_retry_delay() const { return _retry_delay; }
+	void set_retry_delay(unsigned int delay = 0) { _retry_delay = delay; }
+	bool get_keepalive() const { return _keepalive; }
+	void set_keepalive(bool enabled) { _keepalive = enabled; }
+	unsigned int get_connect_timeout() const { return _connect_timeout; }
+	void set_connect_timeout(unsigned int timeout) { _connect_timeout = timeout; }
+	unsigned int get_send_timeout() const { return _send_timeout; }
+	void set_send_timeout(unsigned int timeout) { _send_timeout = timeout; }
+	unsigned int get_receive_timeout() const { return _receive_timeout; }
+	void set_receive_timeout(unsigned int timeout) { _receive_timeout = timeout; }
+	unsigned int get_keepalive_timeout() const { return _keepalive_timeout; }
+	void set_keepalive_timeout(unsigned int timeout) { _keepalive_timeout = timeout; }
 	void wait() {
 		if (!worker.isRunning()) return;
 		return worker.join();
@@ -761,18 +784,29 @@ void RegisterHTTP(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("http", "string request()", asMETHOD(http, get_response_body), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "string opIndex(const string&in key)", asMETHOD(http, operator[]), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "spec::uri get_url() property", asMETHOD(http, get_url), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "const uuid& get_uuid() const property", asMETHOD(http, get_uuid), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "float get_progress() property", asMETHOD(http, get_progress), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "int get_status_code() property", asMETHOD(http, get_status_code), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "string get_user_agent() const property", asMETHOD(http, get_user_agent), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "void set_user_agent(const string&in agent = \"\") property", asMETHOD(http, set_user_agent), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http", "int get_max_retries() const property", asMETHOD(http, get_max_retries), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http", "void set_max_retries(int retries) property", asMETHOD(http, set_max_retries), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http", "int get_retry_delay() const property", asMETHOD(http, get_retry_delay), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http", "void set_retry_delay(int delay = 0) property", asMETHOD(http, set_retry_delay), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "uint get_max_retries() const property", asMETHOD(http, get_max_retries), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_max_retries(uint retries) property", asMETHOD(http, set_max_retries), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "uint get_retry_delay() const property", asMETHOD(http, get_retry_delay), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_retry_delay(uint delay = 0) property", asMETHOD(http, set_retry_delay), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool get_keepalive() const property", asMETHOD(http, get_keepalive), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_keepalive(bool enabled) property", asMETHOD(http, set_keepalive), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "uint get_connect_timeout() const property", asMETHOD(http, get_connect_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_connect_timeout(uint timeout) property", asMETHOD(http, set_connect_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "uint get_send_timeout() const property", asMETHOD(http, get_send_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_send_timeout(uint timeout) property", asMETHOD(http, set_send_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "uint get_receive_timeout() const property", asMETHOD(http, get_receive_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_receive_timeout(uint timeout) property", asMETHOD(http, set_receive_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "uint get_keepalive_timeout() const property", asMETHOD(http, get_keepalive_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_keepalive_timeout(uint timeout) property", asMETHOD(http, set_keepalive_timeout), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "bool get_complete() property", asMETHOD(http, is_complete), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "bool get_running() property", asMETHOD(http, is_running), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "void wait()", asMETHOD(http, wait), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http", "void reset()", asMETHOD(http, reset), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void reset(bool configuration = false)", asMETHOD(http, reset), asCALL_THISCALL);
 }
 
 // NVGT's highest level HTTP.
