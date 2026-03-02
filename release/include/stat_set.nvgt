@@ -252,11 +252,21 @@ class stat_set {
 		for (uint i = 0; i < ln.length(); i++) {
 			string[]@ p = ln[i].split("=");
 			if (p.length() != 2) continue;
-			double number = parse_double(p[1]);
-			if (number != 0 or p[0] == "0") update(p[0], number);
+			if (string_is_number(p[1])) update(p[0], parse_double(p[1]));
 			else update(p[0], p[1]);
 			found_value = true;
 		}
 		return found_value;
+	}
+	private bool string_is_number(const string&in str) {
+		// to help with deserialize_linear.
+		if (str.empty()) return false;
+		if (str.is_digits()) return true;
+		uint l = str.length();
+		for (uint i = 0; i < l; i++) {
+			if (str[i].is_digits() or str[i] == "." or i == 0 and str[i] == "-") continue;
+			return false;
+		}
+		return true;
 	}
 }
