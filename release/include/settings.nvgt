@@ -51,7 +51,7 @@ class settings_helper {
 		this.company_name = company;
 		this.product = product;
 		this.local_path = local_path;
-		bool ensure = ensure_data_path(this.get_data_path(), true);
+		bool ensure = ensure_data_path(this.get_data_path(), !local_path);
 		if (ensure) return this.open();
 		else return false;
 	}
@@ -111,7 +111,7 @@ class settings_helper {
 	bool dump() {
 		if (!this.active) return false;
 		string filepath = this.get_data_path();
-		if (!ensure_data_path(filepath, (this.local_path?false:true))) return false;
+		if (!ensure_data_path(filepath, !this.local_path)) return false;
 		string final_data = this.raw_dump();
 		file tempfile;
 		if (!tempfile.open(filepath, "wb")) return false;
@@ -510,22 +510,8 @@ class settings {
 }
 bool ensure_data_path(const string&in filename, bool absolute = true) {
 	spec::path filePath;
-	if (!filePath.parse(filename)) {
-		return false;
-	}
+	if (!filePath.parse(filename)) return false;
 	filePath.make_file();
-	spec::path dirPath;
-	if(!absolute)  dirPath = filePath.get_parent();
-	else dirPath = filePath.absolute();
-	spec::path currentPath;
-	for (int i = 0; i < dirPath.depth; i++) {
-		currentPath.push_directory(dirPath[i]);
-		string fullPath = (system_is_windows and absolute? currentPath.device+"\\":"") + currentPath.to_string(spec::PATH_STYLE_NATIVE);
-		if (!directory_exists(fullPath)) {
-			if (!directory_create(fullPath)) {
-				return false;
-			}
-		}
-	}
-	return true;
+	if (!absolute) directory_create(filePath.parent); // otherwise handled by DIRECTORY_PREFERENCES
+	return directory_exists(filePath.parent);
 }
