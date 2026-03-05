@@ -102,34 +102,28 @@ double Round(double n, int p) {
 }
 bool run(const std::string& filename, const std::string& cmdline, bool wait_for_completion, bool background) {
 	#ifdef _WIN32
-	PROCESS_INFORMATION info;
-	STARTUPINFO si;
-	ZeroMemory(&si, sizeof(si));
+	std::wstring exe;
+	std::wstring args;
+	Poco::UnicodeConverter::convert(filename, exe);
+	Poco::UnicodeConverter::convert(cmdline, args);
+	std::wstring full = L"\"" + exe + L"\"";
+	if (!args.empty()) {
+		full += L" ";
+		full += args;
+	}
+	std::vector<wchar_t> buffer(full.begin(), full.end());
+	buffer.push_back(L'\0');
+	STARTUPINFOW si{};
 	si.cb = sizeof(si);
 	si.dwFlags = STARTF_USESHOWWINDOW;
-	si.wShowWindow = (background ? SW_HIDE : SW_SHOW);
-	char c_cmdline[32768];
-	c_cmdline[0] = 0;
-	if (cmdline.size() > 0) {
-		std::string tmp = "\"";
-		tmp += filename;
-		tmp += "\" ";
-		tmp += cmdline;
-		strncpy(c_cmdline, tmp.c_str(), tmp.size());
-		c_cmdline[tmp.size()] = 0;
-	}
-	std::wstring filename_u, cmdline_u;
-	Poco::UnicodeConverter::convert(filename, filename_u);
-	Poco::UnicodeConverter::convert(c_cmdline, cmdline_u);
-	BOOL r = CreateProcess(filename_u.c_str(), &cmdline_u[0], NULL, NULL, FALSE, INHERIT_CALLER_PRIORITY, NULL, NULL, &si, &info);
-	if (r == FALSE)
-		return false;
-	if (wait_for_completion) {
-		while (WaitForSingleObject(info.hProcess, 0) == WAIT_TIMEOUT)
-			wait(5);
-	}
-	CloseHandle(info.hProcess);
-	CloseHandle(info.hThread);
+	si.wShowWindow = background ? SW_HIDE : SW_SHOW;
+	PROCESS_INFORMATION pi{};
+	DWORD flags = background ? CREATE_NO_WINDOW : 0;
+	BOOL ok = CreateProcessW(nullptr, buffer.data(), nullptr, nullptr, FALSE, flags, nullptr, nullptr, &si, &pi);
+	if (!ok) return false;
+	if (wait_for_completion) WaitForSingleObject(pi.hProcess, INFINITE);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
 	return true;
 	#else
 	int status;
