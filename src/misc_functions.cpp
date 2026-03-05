@@ -161,6 +161,13 @@ int get_last_error() {
 	g_LastError = 0;
 	return e;
 }
+asQWORD get_process_id() {
+	#ifdef _WIN32
+	return GetCurrentProcessId();
+	#else
+	return getpid();
+	#endif
+}
 
 double range_convert(double old_value, double old_min, double old_max, double new_min, double new_max) {
 	return ((old_value - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min;
@@ -397,6 +404,7 @@ void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool run(const string& in filename, const string& in arguments, bool wait_for_completion, bool background)"), asFUNCTION(run), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool is_debugger_present()"), asFUNCTION(debugger_present), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int get_last_error()"), asFUNCTION(get_last_error), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 get_process_id()"), asFUNCTION(get_process_id), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->RegisterGlobalFunction(_O("double round(double number, int place)"), asFUNCTION(Round), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("double tinyexpr(const string &in expression)"), asFUNCTION(tinyexpr), asCALL_CDECL);
