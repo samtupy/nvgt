@@ -56,7 +56,7 @@ HMODULE ole;
 HRESULT(WINAPI* CoInitializeEx)(LPVOID, DWORD);
 HRESULT(WINAPI* CoCreateInstance)(REFCLSID, LPUNKNOWN, DWORD, REFIID, LPVOID*);
 void(WINAPI* CoTaskMemFree)(void*);
-HRESULT(WINAPI* CoUninitialize)(void);
+void(WINAPI* CoUninitialize)(void);
 int end;
 }
 sbz_com;

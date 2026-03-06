@@ -496,7 +496,7 @@ FreeLibrary(com->ole);
 sbz_com_reset(com);
 return 0;
 }
-com->CoUninitialize=(HRESULT(WINAPI*)(void)) GetProcAddress(com->ole, "CoUninitialize");
+com->CoUninitialize=(void(WINAPI*)(void)) GetProcAddress(com->ole, "CoUninitialize");
 if(!com->CoUninitialize)
 {
 FreeLibrary(com->ole);
