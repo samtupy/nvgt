@@ -389,22 +389,18 @@ void compute_fp_characteristics() {
 // functions for converting float values to IEEE 754 formatted values etc. This also allow us to 
 // provide a platform agnostic representation to the script so the scripts don't have to worry
 // about whether the CPU uses IEEE 754 floats or some other representation
-float fpFromIEEE(asUINT raw)
-{
+float fpFromIEEE(asUINT raw) {
 	// TODO: Identify CPU family to provide proper conversion
 	//        if the CPU doesn't natively use IEEE style floats
 	return *(reinterpret_cast<float*>(&raw));
 }
-asUINT fpToIEEE(float fp)
-{
+asUINT fpToIEEE(float fp) {
 	return *(reinterpret_cast<asUINT*>(&fp));
 }
-double fpFromIEEE(asQWORD raw)
-{
+double fpFromIEEE(asQWORD raw) {
 	return *(reinterpret_cast<double*>(&raw));
 }
-asQWORD fpToIEEE(double fp)
-{
+asQWORD fpToIEEE(double fp) {
 	return *(reinterpret_cast<asQWORD*>(&fp));
 }
 
@@ -418,8 +414,7 @@ asQWORD fpToIEEE(double fp)
 //
 // ref: http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 // ref: http://www.gamedev.net/topic/653449-scriptmath-and-closeto/
-bool closeTo(float a, float b, float epsilon)
-{
+bool closeTo(float a, float b, float epsilon) {
 	// Equal numbers and infinity will return immediately
 	if( a == b ) return true;
 
@@ -427,24 +422,22 @@ bool closeTo(float a, float b, float epsilon)
 	float diff = std::abs(a - b);
 	if( (a == 0 || b == 0) && (diff < epsilon) )
 		return true;
-	
+
 	// Otherwise we need to use relative comparison to account for precision
 	return diff / (std::abs(a) + std::abs(b)) < epsilon;
 }
 
-bool closeTo(double a, double b, double epsilon)
-{
+bool closeTo(double a, double b, double epsilon) {
 	if( a == b ) return true;
 
 	double diff = std::abs(a - b);
 	if( (a == 0 || b == 0) && (diff < epsilon) )
 		return true;
-	
+
 	return diff / (std::abs(a) + std::abs(b)) < epsilon;
 }
 
-void RegisterScriptMath(asIScriptEngine *engine)
-{
+void RegisterScriptMath(asIScriptEngine *engine) {
 	compute_fp_characteristics();
 	using int8 = std::int8_t;
 	using int16 = std::int16_t;
@@ -455,14 +448,14 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	using uint32 = std::uint32_t;
 	using uint64 = std::uint64_t;
 	// Conversion between floating point and IEEE bits representations
-	engine->RegisterGlobalFunction("float fp_from_IEEE(uint)", asFUNCTIONPR(fpFromIEEE, (asUINT), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint fp_to_IEEE(float)", asFUNCTIONPR(fpToIEEE, (float), asUINT), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double fpFromIEEE(uint64)", asFUNCTIONPR(fpFromIEEE, (asQWORD), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint64 fpToIEEE(double)", asFUNCTIONPR(fpToIEEE, (double), asQWORD), asCALL_CDECL);
+	engine->RegisterGlobalFunction("float fp_from_IEEE(uint raw)", asFUNCTIONPR(fpFromIEEE, (asUINT), float), asCALL_CDECL);
+	engine->RegisterGlobalFunction("uint fp_to_IEEE(float fp)", asFUNCTIONPR(fpToIEEE, (float), asUINT), asCALL_CDECL);
+	engine->RegisterGlobalFunction("double fpFromIEEE(uint64 raw)", asFUNCTIONPR(fpFromIEEE, (asQWORD), double), asCALL_CDECL);
+	engine->RegisterGlobalFunction("uint64 fpToIEEE(double fp)", asFUNCTIONPR(fpToIEEE, (double), asQWORD), asCALL_CDECL);
 
-	// Close to comparison with epsilon 
-	engine->RegisterGlobalFunction("bool close_to(float, float, float = 0.00001f)", asFUNCTIONPR(closeTo, (float, float, float), bool), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool close_to(double, double, double = 0.0000000001)", asFUNCTIONPR(closeTo, (double, double, double), bool), asCALL_CDECL);
+	// Close to comparison with epsilon
+	engine->RegisterGlobalFunction("bool close_to(float a, float b, float epsilon = 0.00001f)", asFUNCTIONPR(closeTo, (float, float, float), bool), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool close_to(double a, double b, double epsilon = 0.0000000001)", asFUNCTIONPR(closeTo, (double, double, double), bool), asCALL_CDECL);
 
 	// Mathematical functions
 	engine->RegisterGlobalFunction("float absf(float v)", asFUNCTIONPR(std::abs, (float), float), asCALL_CDECL);
