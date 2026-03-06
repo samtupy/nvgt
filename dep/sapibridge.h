@@ -114,6 +114,10 @@ void sbz_com_cleanup(sbz_com* com);
 WCHAR* sbz_char_to_wchar(char* text);
 char* sbz_wchar_to_char(WCHAR* text);
 int sbz_validate_waveformatex(WAVEFORMATEX* wf);
+WCHAR* sbz_form_message(char* text, int pitch);
+WCHAR* sbz_xml_escape(WCHAR* text);
+int sbz_xml_escape_size(WCHAR c);
+WCHAR* sbz_xml_escape_text(WCHAR c);
 
 #ifdef __cplusplus
 }
