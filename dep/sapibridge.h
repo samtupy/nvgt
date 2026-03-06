@@ -59,6 +59,7 @@ HRESULT(WINAPI* CoInitializeEx)(LPVOID, DWORD);
 HRESULT(WINAPI* CoCreateInstance)(REFCLSID, LPUNKNOWN, DWORD, REFIID, LPVOID*);
 void(WINAPI* CoTaskMemFree)(void*);
 void(WINAPI* CoUninitialize)(void);
+int self_init;
 int end;
 }
 sbz_com;
@@ -105,7 +106,7 @@ void sbz_sapi_reset(sb_sapi* sapi);
 int sbz_com_initialise(sbz_com* com);
 int sbz_com_load(sbz_com* com);
 int sbz_com_is_init(sbz_com* com);
-int sbz_com_set_init_flag(sbz_com* com);
+int sbz_com_set_init_flag(sbz_com* com, int flag);
 int sbz_com_create_instance(sbz_com* com, CLSID* clsid, IID* iid, void** data);
 int sbz_com_free_memory(sbz_com* com, void* data);
 void sbz_com_reset(sbz_com* com);

@@ -468,13 +468,14 @@ if(sbz_com_is_init(com)) return 0;
 sbz_com_reset(com);
 if(!sbz_com_load(com)) return 0;
 HRESULT hr=com->CoInitializeEx(NULL, COINIT_MULTITHREADED);
+if(hr==RPC_E_CHANGED_MODE) return sbz_com_set_init_flag(com, 0);
 if(FAILED(hr))
 {
 FreeLibrary(com->ole);
 sbz_com_reset(com);
 return 0;
 }
-return sbz_com_set_init_flag(com);
+return sbz_com_set_init_flag(com, 1);
 }
 int sbz_com_load(sbz_com* com)
 {
@@ -518,11 +519,12 @@ if(com->begin!=sbz_com_begin) return 0;
 if(com->end!=sbz_com_end) return 0;
 return 1;
 }
-int sbz_com_set_init_flag(sbz_com* com)
+int sbz_com_set_init_flag(sbz_com* com, int flag)
 {
 if(!com) return 0;
 com->begin=sbz_com_begin;
 com->end=sbz_com_end;
+com->self_init=flag;
 return 1;
 }
 int sbz_com_create_instance(sbz_com* com, CLSID* clsid, IID* iid, void** data)
@@ -547,12 +549,13 @@ com->CoCreateInstance=NULL;
 com->CoTaskMemFree=NULL;
 com->CoUninitialize=NULL;
 com->begin=0;
+com->self_init=0;
 com->end=0;
 }
 void sbz_com_cleanup(sbz_com* com)
 {
 if(!sbz_com_is_init(com)) return;
-com->CoUninitialize();
+if(com->self_init) com->CoUninitialize();
 FreeLibrary(com->ole);
 sbz_com_reset(com);
 }
