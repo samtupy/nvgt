@@ -276,6 +276,7 @@ int sbz_sapi_populate_voices_from_tokens(sb_sapi* sapi, IEnumSpObjectTokens** en
 if(!sapi) return 0;
 sbz_sapi_voice* voice=malloc(sizeof(sbz_sapi_voice)*count);
 if(!voice) return 0;
+int written=0;
 for(int x=0; x<count; x++)
 {
 ISpObjectToken* token = NULL;
@@ -302,13 +303,14 @@ langid=(LANGID)wcstoul(lang_str, NULL, 16);
 sbz_com_free_memory(&sapi->com, lang_str);
 }
 }
-voice[x].token=token;
-voice[x].default_token=NULL;
-voice[x].name=utf8;
-voice[x].langid=langid;
+voice[written].token=token;
+voice[written].default_token=NULL;
+voice[written].name=utf8;
+voice[written].langid=langid;
+written++;
 }
 sapi->voices=voice;
-sapi->voice_count=count;
+sapi->voice_count=written;
 return 1;
 }
 int sbz_sapi_speak_to_memory(sb_sapi* sapi, char* text, void** buffer, int* size)
