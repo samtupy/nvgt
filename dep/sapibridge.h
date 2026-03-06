@@ -7,6 +7,8 @@ extern "C" {
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <wchar.h>
 
 #include <windows.h>
 #include <sapi.h>
