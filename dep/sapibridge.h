@@ -66,6 +66,7 @@ typedef struct
 ISpObjectToken* token;
 ISpObjectToken* default_token;
 char* name;
+char* language;
 LANGID langid;
 }
 sbz_sapi_voice;

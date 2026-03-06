@@ -145,12 +145,7 @@ char* sb_sapi_get_voice_language(sb_sapi* sapi, int id)
 {
 if(!sb_sapi_refresh_voices(sapi)) return NULL;
 if((id<0)||(id>=sapi->voice_count)) return NULL;
-WCHAR wbuffer[LOCALE_NAME_MAX_LENGTH];
-if(LCIDToLocaleName(MAKELCID(sapi->voices[id].langid, SORT_DEFAULT), wbuffer, LOCALE_NAME_MAX_LENGTH, 0) == 0) return NULL;
-char* result=sbz_wchar_to_char(wbuffer);
-if(!result) return NULL;
-for(char* p=result; *p; p++) *p=tolower(*p);
-return result;
+return sapi->voices[id].language;
 }
 int sb_sapi_set_voice(sb_sapi* sapi, int id)
 {
@@ -295,11 +290,14 @@ token->lpVtbl->Release(token);
 continue;
 }
 WCHAR* lang_str=NULL;
+char* lang=NULL;
 LANGID langid=0x0409;
 if(SUCCEEDED(token->lpVtbl->GetStringValue(token, L"Language", &lang_str)))
 {
-if(lang_str) {
+if(lang_str)
+{
 langid=(LANGID)wcstoul(lang_str, NULL, 16);
+lang=sbz_wchar_to_char(lang_str);
 sbz_com_free_memory(&sapi->com, lang_str);
 }
 }
@@ -307,6 +305,7 @@ voice[written].token=token;
 voice[written].default_token=NULL;
 voice[written].name=utf8;
 voice[written].langid=langid;
+voice[written].language=lang;
 written++;
 }
 sapi->voices=voice;
