@@ -352,7 +352,12 @@ IID IID_ISpStream={0x12E3CCA9, 0x7518, 0x44C5, {0xA5, 0xE7, 0xBA, 0x5A, 0x79, 0x
 *stream=NULL;
 if(!sbz_com_create_instance(&sapi->com, &CLSID_SpMemoryStream, &IID_ISpStream, (void**) stream)) return 0;
 HRESULT hr=sapi->voice->lpVtbl->SetOutput(sapi->voice, (IUnknown*) (*stream), TRUE);
-if(FAILED(hr)) return 0;
+if(FAILED(hr))
+{
+(*stream)->lpVtbl->Release(*stream);
+*stream=NULL;
+return 0;
+}
 return 1;
 }
 int sbz_sapi_capture_stream_output(sb_sapi* sapi, ISpStream* stream, void** buffer, int* size)
