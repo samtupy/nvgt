@@ -123,7 +123,8 @@ bool screen_reader_speak(const std::string& text, bool interrupt) {
 }
 bool screen_reader_braille(const std::string& text) {
 	if (!screen_reader_load()) return false;
-	std::wstring textW(text.begin(), text.end());
+	std::wstring textW;
+	Poco::UnicodeConverter::convert(text, textW);
 	return brailleDisplay(textW.c_str()) != 0;
 }
 bool screen_reader_silence() {
