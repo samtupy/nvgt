@@ -38,7 +38,11 @@ static bool g_speechd_lib_loaded = false;
 static bool load_speechd_library() {
 	if (g_speechd_lib_loaded) return true;
 	try {
-		g_speechd_lib.load("libspeechd.so");
+		try {
+			g_speechd_lib.load("libspeechd.so.2");
+		} catch (Poco::Exception&) {
+			g_speechd_lib.load("libspeechd.so");
+		}
 		*(void**)&spd_get_default_address = g_speechd_lib.getSymbol("spd_get_default_address");
 		*(void**)&spd_open2 = g_speechd_lib.getSymbol("spd_open2");
 		*(void**)&spd_close = g_speechd_lib.getSymbol("spd_close");
