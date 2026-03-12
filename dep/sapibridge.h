@@ -7,6 +7,8 @@ extern "C" {
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <wchar.h>
 
 #include <windows.h>
 #include <sapi.h>
@@ -56,7 +58,8 @@ HMODULE ole;
 HRESULT(WINAPI* CoInitializeEx)(LPVOID, DWORD);
 HRESULT(WINAPI* CoCreateInstance)(REFCLSID, LPUNKNOWN, DWORD, REFIID, LPVOID*);
 void(WINAPI* CoTaskMemFree)(void*);
-HRESULT(WINAPI* CoUninitialize)(void);
+void(WINAPI* CoUninitialize)(void);
+int self_init;
 int end;
 }
 sbz_com;
@@ -66,6 +69,7 @@ typedef struct
 ISpObjectToken* token;
 ISpObjectToken* default_token;
 char* name;
+char* language;
 LANGID langid;
 }
 sbz_sapi_voice;
@@ -102,7 +106,7 @@ void sbz_sapi_reset(sb_sapi* sapi);
 int sbz_com_initialise(sbz_com* com);
 int sbz_com_load(sbz_com* com);
 int sbz_com_is_init(sbz_com* com);
-int sbz_com_set_init_flag(sbz_com* com);
+int sbz_com_set_init_flag(sbz_com* com, int flag);
 int sbz_com_create_instance(sbz_com* com, CLSID* clsid, IID* iid, void** data);
 int sbz_com_free_memory(sbz_com* com, void* data);
 void sbz_com_reset(sbz_com* com);
@@ -111,6 +115,10 @@ void sbz_com_cleanup(sbz_com* com);
 WCHAR* sbz_char_to_wchar(char* text);
 char* sbz_wchar_to_char(WCHAR* text);
 int sbz_validate_waveformatex(WAVEFORMATEX* wf);
+WCHAR* sbz_form_message(char* text, int pitch);
+WCHAR* sbz_xml_escape(WCHAR* text);
+int sbz_xml_escape_size(WCHAR c);
+WCHAR* sbz_xml_escape_text(WCHAR c);
 
 #ifdef __cplusplus
 }

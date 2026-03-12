@@ -31,11 +31,11 @@ int sb_sapi_speak(sb_sapi* sapi, char* text, int interrupt)
 {
 if(!sbz_sapi_is_init(sapi)) return 0;
 if((!text)||(!*text)) return 0;
-WCHAR* text_compat=sbz_char_to_wchar(text);
-if(!text_compat) return 0;
+WCHAR* speak=sbz_form_message(text, sapi->pitch);
+if(!speak) return 0;
 if(interrupt) sb_sapi_stop(sapi);
-HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, text_compat, SPF_DEFAULT|SPF_ASYNC, NULL);
-free(text_compat);
+HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, speak, SPF_IS_XML|SPF_ASYNC, NULL);
+free(speak);
 if(FAILED(hr)) return 0;
 return 1;
 }
@@ -145,12 +145,7 @@ char* sb_sapi_get_voice_language(sb_sapi* sapi, int id)
 {
 if(!sb_sapi_refresh_voices(sapi)) return NULL;
 if((id<0)||(id>=sapi->voice_count)) return NULL;
-WCHAR wbuffer[LOCALE_NAME_MAX_LENGTH];
-if(LCIDToLocaleName(MAKELCID(sapi->voices[id].langid, SORT_DEFAULT), wbuffer, LOCALE_NAME_MAX_LENGTH, 0) == 0) return NULL;
-char* result=sbz_wchar_to_char(wbuffer);
-if(!result) return NULL;
-for(char* p=result; *p; p++) *p=tolower(*p);
-return result;
+return sapi->voices[id].language;
 }
 int sb_sapi_set_voice(sb_sapi* sapi, int id)
 {
@@ -276,6 +271,7 @@ int sbz_sapi_populate_voices_from_tokens(sb_sapi* sapi, IEnumSpObjectTokens** en
 if(!sapi) return 0;
 sbz_sapi_voice* voice=malloc(sizeof(sbz_sapi_voice)*count);
 if(!voice) return 0;
+int written=0;
 for(int x=0; x<count; x++)
 {
 ISpObjectToken* token = NULL;
@@ -294,21 +290,26 @@ token->lpVtbl->Release(token);
 continue;
 }
 WCHAR* lang_str=NULL;
+char* lang=NULL;
 LANGID langid=0x0409;
 if(SUCCEEDED(token->lpVtbl->GetStringValue(token, L"Language", &lang_str)))
 {
-if(lang_str) {
+if(lang_str)
+{
 langid=(LANGID)wcstoul(lang_str, NULL, 16);
+lang=sbz_wchar_to_char(lang_str);
 sbz_com_free_memory(&sapi->com, lang_str);
 }
 }
-voice[x].token=token;
-voice[x].default_token=NULL;
-voice[x].name=utf8;
-voice[x].langid=langid;
+voice[written].token=token;
+voice[written].default_token=NULL;
+voice[written].name=utf8;
+voice[written].langid=langid;
+voice[written].language=lang;
+written++;
 }
 sapi->voices=voice;
-sapi->voice_count=count;
+sapi->voice_count=written;
 return 1;
 }
 int sbz_sapi_speak_to_memory(sb_sapi* sapi, char* text, void** buffer, int* size)
@@ -316,16 +317,16 @@ int sbz_sapi_speak_to_memory(sb_sapi* sapi, char* text, void** buffer, int* size
 *buffer=NULL;
 *size=0;
 if(!sapi) return 0;
-WCHAR* wtext=sbz_char_to_wchar(text);
-if(!wtext) return 0;
+WCHAR* speak=sbz_form_message(text, sapi->pitch);
+if(!speak) return 0;
 ISpStream* stream=NULL;
 if(!sbz_sapi_create_memory_stream(sapi, &stream))
 {
-free(wtext);
+free(speak);
 return 0;
 }
-HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, wtext, SPF_DEFAULT, NULL);
-free(wtext);
+HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, speak, SPF_IS_XML, NULL);
+free(speak);
 if(FAILED(hr))
 {
 sapi->voice->lpVtbl->SetOutput(sapi->voice, NULL, TRUE);
@@ -351,7 +352,12 @@ IID IID_ISpStream={0x12E3CCA9, 0x7518, 0x44C5, {0xA5, 0xE7, 0xBA, 0x5A, 0x79, 0x
 *stream=NULL;
 if(!sbz_com_create_instance(&sapi->com, &CLSID_SpMemoryStream, &IID_ISpStream, (void**) stream)) return 0;
 HRESULT hr=sapi->voice->lpVtbl->SetOutput(sapi->voice, (IUnknown*) (*stream), TRUE);
-if(FAILED(hr)) return 0;
+if(FAILED(hr))
+{
+(*stream)->lpVtbl->Release(*stream);
+*stream=NULL;
+return 0;
+}
 return 1;
 }
 int sbz_sapi_capture_stream_output(sb_sapi* sapi, ISpStream* stream, void** buffer, int* size)
@@ -462,13 +468,14 @@ if(sbz_com_is_init(com)) return 0;
 sbz_com_reset(com);
 if(!sbz_com_load(com)) return 0;
 HRESULT hr=com->CoInitializeEx(NULL, COINIT_MULTITHREADED);
+if(hr==RPC_E_CHANGED_MODE) return sbz_com_set_init_flag(com, 0);
 if(FAILED(hr))
 {
 FreeLibrary(com->ole);
 sbz_com_reset(com);
 return 0;
 }
-return sbz_com_set_init_flag(com);
+return sbz_com_set_init_flag(com, 1);
 }
 int sbz_com_load(sbz_com* com)
 {
@@ -496,7 +503,7 @@ FreeLibrary(com->ole);
 sbz_com_reset(com);
 return 0;
 }
-com->CoUninitialize=(HRESULT(WINAPI*)(void)) GetProcAddress(com->ole, "CoUninitialize");
+com->CoUninitialize=(void(WINAPI*)(void)) GetProcAddress(com->ole, "CoUninitialize");
 if(!com->CoUninitialize)
 {
 FreeLibrary(com->ole);
@@ -512,11 +519,12 @@ if(com->begin!=sbz_com_begin) return 0;
 if(com->end!=sbz_com_end) return 0;
 return 1;
 }
-int sbz_com_set_init_flag(sbz_com* com)
+int sbz_com_set_init_flag(sbz_com* com, int flag)
 {
 if(!com) return 0;
 com->begin=sbz_com_begin;
 com->end=sbz_com_end;
+com->self_init=flag;
 return 1;
 }
 int sbz_com_create_instance(sbz_com* com, CLSID* clsid, IID* iid, void** data)
@@ -541,12 +549,13 @@ com->CoCreateInstance=NULL;
 com->CoTaskMemFree=NULL;
 com->CoUninitialize=NULL;
 com->begin=0;
+com->self_init=0;
 com->end=0;
 }
 void sbz_com_cleanup(sbz_com* com)
 {
 if(!sbz_com_is_init(com)) return;
-com->CoUninitialize();
+if(com->self_init) com->CoUninitialize();
 FreeLibrary(com->ole);
 sbz_com_reset(com);
 }
@@ -554,10 +563,10 @@ WCHAR* sbz_char_to_wchar(char* text)
 {
 if((!text)||(!*text)) return NULL;
 int source_length=strlen(text);
-int destination_length=MultiByteToWideChar(CP_ACP, 0, text, source_length, NULL, 0);
+int destination_length=MultiByteToWideChar(CP_UTF8, 0, text, source_length, NULL, 0);
 WCHAR* wtext=malloc((destination_length+1)*sizeof(WCHAR));
 if(!wtext) return NULL;
-MultiByteToWideChar(CP_ACP, 0, text, source_length, wtext, destination_length);
+MultiByteToWideChar(CP_UTF8, 0, text, source_length, wtext, destination_length);
 wtext[destination_length]=0;
 return wtext;
 }
@@ -579,4 +588,69 @@ if((wf->nChannels!=1)&&(wf->nChannels!=2)) return 0;
 if((wf->wBitsPerSample!=8)&&(wf->wBitsPerSample!=16)) return 0;
 if((wf->nSamplesPerSec<8000)||(wf->nSamplesPerSec>192000)) return 0;
 return 1;
+}
+WCHAR* sbz_form_message(char* text, int pitch)
+{
+if((!text)||(!*text)) return NULL;
+WCHAR* text_compat=sbz_char_to_wchar(text);
+if(!text_compat) return NULL;
+WCHAR* escaped=sbz_xml_escape(text_compat);
+free(text_compat);
+if(!escaped) return NULL;
+int needed=_scwprintf(L"<pitch absmiddle=\"%d\">%ls</pitch>", pitch, escaped);
+if(needed<0)
+{
+free(escaped);
+return NULL;
+}
+WCHAR* buffer=malloc(sizeof(WCHAR)*(needed+1));
+if(!buffer)
+{
+free(escaped);
+return NULL;
+}
+swprintf(buffer, needed+1, L"<pitch absmiddle=\"%d\">%ls</pitch>", pitch, escaped);
+free(escaped);
+return buffer;
+}
+WCHAR* sbz_xml_escape(WCHAR* text)
+{
+if((!text)||(!*text)) return NULL;
+int needed=0;
+for(WCHAR* p=text; *p; p++)
+{
+needed+=sbz_xml_escape_size(*p);
+}
+WCHAR* out=malloc(sizeof(WCHAR)*(needed+1));
+if(!out) return NULL;
+WCHAR* esc=out;
+for(WCHAR* p=text; *p; p++)
+{
+WCHAR* entity=sbz_xml_escape_text(*p);
+if(!entity)
+{
+*esc=*p;
+esc++;
+continue;
+}
+wcscpy(esc, entity);
+esc+=sbz_xml_escape_size(*p);
+}
+*esc=L'\0';
+return out;
+}
+int sbz_xml_escape_size(WCHAR c)
+{
+WCHAR* entity=sbz_xml_escape_text(c);
+if(!entity) return 1;
+return wcslen(entity);
+}
+WCHAR* sbz_xml_escape_text(WCHAR c)
+{
+if(c==L'&') return L"&amp;";
+if(c==L'<') return L"&lt;";
+if(c==L'>') return L"&gt;";
+if(c==L'"') return L"&quot;";
+if(c==L'\'') return L"&apos;";
+return NULL;
 }
