@@ -172,9 +172,13 @@ std::string simple_file_dialog(const std::string& filters, const std::string& de
 	end.name = nullptr;
 	end.pattern = nullptr;
 	nvgt_file_dialog_info fdi;
-	if (type == DIALOG_TYPE_OPEN) SDL_ShowOpenFileDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, filter_objects.data(), filter_objects.size() - 1, default_location.empty() ? nullptr : default_location.c_str(), false);
-	else if (type == DIALOG_TYPE_SAVE) SDL_ShowSaveFileDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, filter_objects.data(), filter_objects.size() - 1, default_location.empty() ? nullptr : default_location.c_str());
-	else if (type == DIALOG_TYPE_FOLDER) SDL_ShowOpenFolderDialog(nvgt_file_dialog_callback, &fdi, g_WindowHandle, default_location.empty() ? nullptr : default_location.c_str(), false);
+	SDL_Window* parent_window = g_WindowHandle;
+#ifdef _WIN32
+	parent_window = nullptr; // Passing nullptr for the parent window on Windows prevents the OS from attaching the background thread's input queue to the main thread's, And it seems to fix the extreme lag in the open and save as dialogs As the wait(5); doesn't effect the dialogs. 
+#endif
+	if (type == DIALOG_TYPE_OPEN) SDL_ShowOpenFileDialog(nvgt_file_dialog_callback, &fdi, parent_window, filter_objects.data(), filter_objects.size() - 1, default_location.empty() ? nullptr : default_location.c_str(), false);
+	else if (type == DIALOG_TYPE_SAVE) SDL_ShowSaveFileDialog(nvgt_file_dialog_callback, &fdi, parent_window, filter_objects.data(), filter_objects.size() - 1, default_location.empty() ? nullptr : default_location.c_str());
+	else if (type == DIALOG_TYPE_FOLDER) SDL_ShowOpenFolderDialog(nvgt_file_dialog_callback, &fdi, parent_window, default_location.empty() ? nullptr : default_location.c_str(), false);
 	while (!fdi.tryWait(5)) SDL_PumpEvents();
 	return fdi.data;
 }
