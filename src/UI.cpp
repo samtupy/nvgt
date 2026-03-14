@@ -263,7 +263,7 @@ static std::vector<SDL_Event> post_events; // holds events that should be proces
 bool set_application_name(const std::string& name) {
 	return SDL_SetHintWithPriority(SDL_HINT_APP_NAME, name.c_str(), SDL_HINT_OVERRIDE);
 }
-bool ShowNVGTWindow(const std::string& window_title) {
+bool ShowNVGTWindow(const std::string& window_title, unsigned int flags) {
 	if (g_WindowHandle) {
 		SDL_SetWindowTitle(g_WindowHandle, window_title.c_str());
 		if (g_WindowHidden) {
@@ -274,7 +274,7 @@ bool ShowNVGTWindow(const std::string& window_title) {
 		return true;
 	}
 	InputInit();
-	g_WindowHandle = SDL_CreateWindow(window_title.c_str(), 640, 640, 0);
+	g_WindowHandle = SDL_CreateWindow(window_title.c_str(), 640, 640, flags);
 	if (!g_WindowHandle) return false;
 	if (!SDL_HasScreenKeyboardSupport()) SDL_StartTextInput(g_WindowHandle);
 	SDL_PropertiesID window_props = SDL_GetWindowProperties(g_WindowHandle);
@@ -325,6 +325,18 @@ bool WindowIsHidden() {
 bool set_window_fullscreen(bool fullscreen) {
 	if (!g_WindowHandle) return false;
 	return SDL_SetWindowFullscreen(g_WindowHandle, fullscreen);
+}
+int get_window_width() {
+	if (!g_WindowHandle) return 0;
+	int w, h;
+	SDL_GetWindowSize(g_WindowHandle, &w, &h);
+	return w;
+}
+int get_window_height() {
+	if (!g_WindowHandle) return 0;
+	int w, h;
+	SDL_GetWindowSize(g_WindowHandle, &w, &h);
+	return h;
 }
 std::string get_window_text() {
 	if (!g_WindowHandle) return "";
@@ -452,6 +464,14 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("sdl_hint_priority", "SDL_HINT_DEFAULT", SDL_HINT_DEFAULT);
 	engine->RegisterEnumValue("sdl_hint_priority", "SDL_HINT_NORMAL", SDL_HINT_NORMAL);
 	engine->RegisterEnumValue("sdl_hint_priority", "SDL_HINT_OVERRIDE", SDL_HINT_OVERRIDE);
+	engine->RegisterEnum("window_flags");
+	engine->RegisterEnumValue("window_flags", "WINDOW_FLAG_FULLSCREEN", SDL_WINDOW_FULLSCREEN);
+	engine->RegisterEnumValue("window_flags", "WINDOW_FLAG_RESIZABLE", SDL_WINDOW_RESIZABLE);
+	engine->RegisterEnumValue("window_flags", "WINDOW_FLAG_MAXIMIZED", SDL_WINDOW_MAXIMIZED);
+	engine->RegisterEnumValue("window_flags", "WINDOW_FLAG_MINIMIZED", SDL_WINDOW_MINIMIZED);
+	engine->RegisterEnumValue("window_flags", "WINDOW_FLAG_HIDDEN", SDL_WINDOW_HIDDEN);
+	engine->RegisterEnumValue("window_flags", "WINDOW_FLAG_BORDERLESS", SDL_WINDOW_BORDERLESS);
+	engine->RegisterEnumValue("window_flags", "WINDOW_FLAG_ALWAYS_ON_TOP", SDL_WINDOW_ALWAYS_ON_TOP);
 	engine->RegisterGlobalFunction(_O("bool sdl_set_hint(const string&in hint, const string&in value, int priority = SDL_HINT_NORMAL)"), asFUNCTION(sdl_set_hint), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string sdl_get_hint(const string&in hint)"), asFUNCTION(sdl_get_hint), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int message_box(const string& in title, const string& in message, string[]@ buttons, uint flags = 0)"), asFUNCTION(message_box_script), asCALL_CDECL);
@@ -470,13 +490,15 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool info_box(const string& in title, const string& in caption, const string& in text, uint64 flags = 0)"), asFUNCTION(info_box), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void next_keyboard_layout()"), asFUNCTION(next_keyboard_layout), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool set_application_name(const string& in name)", asFUNCTION(set_application_name), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool show_window(const string& in title)", asFUNCTION(ShowNVGTWindow), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool show_window(const string& in title, uint flags = 0)", asFUNCTION(ShowNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool destroy_window()", asFUNCTION(DestroyNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool hide_window()", asFUNCTION(HideNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool focus_window()", asFUNCTION(FocusNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_window_active()", asFUNCTION(WindowIsFocused), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool is_window_hidden()", asFUNCTION(WindowIsHidden), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool set_window_fullscreen(bool fullscreen)", asFUNCTION(set_window_fullscreen), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int get_window_width()", asFUNCTION(get_window_width), asCALL_CDECL);
+	engine->RegisterGlobalFunction("int get_window_height()", asFUNCTION(get_window_height), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_window_text()", asFUNCTION(get_window_text), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 get_window_os_handle()", asFUNCTION(get_window_os_handle), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void refresh_window()", asFUNCTION(refresh_window), asCALL_CDECL);
