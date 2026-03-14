@@ -13,7 +13,7 @@
 // Example:
 void main() {
 	alert("Info", "Press escape to close the window.");
-	show_window("Example", window_flag_resizable | window_flag_maximized);
+	show_window("Example", WINDOW_FLAG_RESIZABLE | WINDOW_FLAG_MAXIMIZED);
 	while (true) {
 		wait(5); // Don't hog all the CPU.
 		if (key_pressed(KEY_ESCAPE))
