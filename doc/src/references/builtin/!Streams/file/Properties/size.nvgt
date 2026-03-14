@@ -3,7 +3,7 @@
 	const uint64 size;
 	## Remarks:
 		This property will be 0 if no file is associated with this stream, in which case you can use the datastream::active property on it to check the difference between a 0 byte file and an eronious result.
-		When files are opened in write mode, there could be periods where the written data has not yet been flushed to disk in which case this property may have a value which is a little bit behind. Experiments seem to indicate that this rarely if never happens, however it's worth putting the note here just encase anyone runs into it.
+		When files are opened in write mode, there could be periods where the written data has not yet been flushed to disk in which case this property may have a value which is a little bit behind. Experiments seem to indicate that this rarely if never happens, however it is worth putting the note here just encase anyone runs into it.
 		Note that a file_get_size() function exists in the engine which is usually better than this property unless you need to do more with a file than just get it's size.
 */
 

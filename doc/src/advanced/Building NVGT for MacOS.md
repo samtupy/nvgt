@@ -31,7 +31,7 @@ chmod +x build_macos.sh
 
 
 ## Building NVGT manually
-If you wish to build manually, some rather old instructions are below. At this time, it would probably be much more beneficial to read the `build_macos.sh` script or [readme.md](https://github.com/samtupy/nvgt) for much more updated commands; the below commands are here for reference and aren't updated often.
+If you wish to build manually, some rather old instructions are below. At this time, it would probably be much more beneficial to read the `build_macos.sh` script or [readme.md](https://github.com/samtupy/nvgt) for much more updated commands; the below commands are here for reference and are not updated often.
 
 Assuming xcode and homebrew are installed:
 

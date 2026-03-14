@@ -6,7 +6,7 @@ permalink: /downloads/index.php
 
 <?php
 $versions = [];
-// We'll probably do this a better way later, but for now, every version contains a windows installer.
+// We will probably do this a better way later, but for now, every version contains a windows installer.
 $files = glob("nvgt_*.exe");
 foreach ($files as $file) {
 	$ver = substr($file, 5, -4);
