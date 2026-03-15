@@ -152,6 +152,7 @@ public:
 	}
 	void prepare() {
 		set_status("initializing...");
+		stub = g_stub; // We must do this now because script should be compiled at this point and thus stub selected from pragma should be stored in g_stub.
 		Path stubpath = config.getString("application.dir");
 		stubpath.pushDirectory("stub");
 		xplatform_correct_path_to_stubs(stubpath);
