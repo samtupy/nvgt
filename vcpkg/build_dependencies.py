@@ -80,7 +80,7 @@ def fix_debug(out_dir):
 		count = 1 if not f.stem.lower().endswith("-d") else 2
 		f.replace(f.with_stem(f.stem[:-count]))
 def windows_lib_rename(out_dir):
-	"""Sometimes windows libraries get built with annoying names that complicate build scripts. We have to handle them somewhere, may as well be here. Temporarily we'll also copy angelscript as angelscript-nc."""
+	"""Sometimes windows libraries get built with annoying names that complicate build scripts. We have to handle them somewhere, may as well be here."""
 	renames = [
 		("libcrypto", "crypto"),
 		("libcurl", "curl"),
@@ -110,7 +110,6 @@ def windows_lib_rename(out_dir):
 	for lib in ["debug/lib", "lib"]:
 		for r in renames:
 			if (out_dir / lib / (r[0] + ".lib")).exists(): (out_dir / lib / (r[0] + ".lib")).replace(out_dir / lib / (r[1] + ".lib"))
-		shutil.copyfile(out_dir / lib / "angelscript_nc.lib", out_dir / lib / "angelscript-nc.lib")
 def remove_duplicates(out_dir):
 	"""A couple libraries on Linux and MacOS might have created duplicate versions of themselves because of symlinks, lets get rid of them."""
 	for lib in ["libarchive", "libgit2"]:

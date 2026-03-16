@@ -184,7 +184,7 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 		stublibs = list(stub_env["LIBS"])
 		if "angelscript" in stublibs:
 			stublibs.remove("angelscript")
-			stublibs.append("angelscript-nc")
+			stublibs.append("angelscript_nc")
 			if ARGUMENTS.get("debug", "0") == "1": stub_env["PDB"] = "#build/debug/nvgt_windows_nc.pdb"
 			stub_nc = stub_env.Program(f"release/stub/nvgt_{stub_platform}_nc", stub_objects, LIBS = stublibs)
 			stub_env.AddPostAction(stub_nc, fix_stub)
