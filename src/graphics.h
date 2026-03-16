@@ -58,6 +58,28 @@ graphic* load_png(const std::string& file);
 graphic* load_surface(const std::string& file);
 graphic* create_surface(int width, int height, unsigned int pixel_format);
 
+class graphics_texture {
+	SDL_Texture* _texture;
+	int _width;
+	int _height;
+	int _refcount;
+public:
+	graphics_texture(SDL_Texture* texture);
+	~graphics_texture();
+	void duplicate() { asAtomicInc(_refcount); }
+	void release() { if (asAtomicDec(_refcount) < 1) delete this; }
+	int get_width() const { return _width; }
+	int get_height() const { return _height; }
+	bool is_valid() const { return _texture != nullptr; }
+	bool set_color_mod(unsigned int r, unsigned int g, unsigned int b);
+	bool get_color_mod(unsigned int& r, unsigned int& g, unsigned int& b) const;
+	bool set_alpha_mod(unsigned int alpha);
+	unsigned int get_alpha_mod() const;
+	bool set_blend_mode(unsigned int mode);
+	unsigned int get_blend_mode() const;
+	SDL_Texture* get_texture() const { return _texture; }
+};
+
 class text_font {
 	TTF_Font* _font;
 	std::vector<text_font*> _fallback_fonts;
@@ -159,6 +181,9 @@ public:
 	bool fill_rect(float x, float y, float w, float h);
 	bool render_graphic(graphic* gfx, float dst_x, float dst_y);
 	bool render_graphic_ex(graphic* gfx, float src_x, float src_y, float src_w, float src_h, float dst_x, float dst_y, float dst_w, float dst_h);
+	graphics_texture* create_texture(graphic* gfx);
+	bool render_texture(graphics_texture* tex, float dst_x, float dst_y);
+	bool render_texture_ex(graphics_texture* tex, float src_x, float src_y, float src_w, float src_h, float dst_x, float dst_y, float dst_w, float dst_h);
 	bool set_logical_presentation(int w, int h, unsigned int mode);
 	bool get_logical_presentation(int& w, int& h, unsigned int& mode) const;
 	bool set_viewport(int x, int y, int w, int h);

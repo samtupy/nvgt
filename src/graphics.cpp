@@ -63,6 +63,53 @@ graphic* create_surface(int width, int height, unsigned int pixel_format) {
 	return s ? new graphic(s) : nullptr;
 }
 
+graphics_texture::graphics_texture(SDL_Texture* texture) : _texture(texture), _refcount(1), _width(0), _height(0) {
+	if (_texture) {
+		float w, h;
+		SDL_GetTextureSize(_texture, &w, &h);
+		_width = (int)w;
+		_height = (int)h;
+	}
+}
+
+graphics_texture::~graphics_texture() {
+	if (_texture) {
+		SDL_DestroyTexture(_texture);
+		_texture = nullptr;
+	}
+}
+
+bool graphics_texture::set_color_mod(unsigned int r, unsigned int g, unsigned int b) {
+	return SDL_SetTextureColorMod(_texture, (Uint8)r, (Uint8)g, (Uint8)b);
+}
+
+bool graphics_texture::get_color_mod(unsigned int& r, unsigned int& g, unsigned int& b) const {
+	Uint8 rv, gv, bv;
+	bool ok = SDL_GetTextureColorMod(_texture, &rv, &gv, &bv);
+	r = rv; g = gv; b = bv;
+	return ok;
+}
+
+bool graphics_texture::set_alpha_mod(unsigned int alpha) {
+	return SDL_SetTextureAlphaMod(_texture, (Uint8)alpha);
+}
+
+unsigned int graphics_texture::get_alpha_mod() const {
+	Uint8 alpha = 255;
+	SDL_GetTextureAlphaMod(_texture, &alpha);
+	return (unsigned int)alpha;
+}
+
+bool graphics_texture::set_blend_mode(unsigned int mode) {
+	return SDL_SetTextureBlendMode(_texture, (SDL_BlendMode)mode);
+}
+
+unsigned int graphics_texture::get_blend_mode() const {
+	SDL_BlendMode mode = SDL_BLENDMODE_NONE;
+	SDL_GetTextureBlendMode(_texture, &mode);
+	return (unsigned int)mode;
+}
+
 // text_font
 
 text_font::text_font(const std::string& name, float size, unsigned int initial_style) : _font(nullptr), _refcount(1) {
@@ -252,6 +299,25 @@ bool graphics_renderer::render_graphic_ex(graphic* gfx, float src_x, float src_y
 	return ok;
 }
 
+graphics_texture* graphics_renderer::create_texture(graphic* gfx) {
+	if (!gfx || !gfx->get_surface()) return nullptr;
+	SDL_Texture* tex = SDL_CreateTextureFromSurface(_renderer, gfx->get_surface());
+	return tex ? new graphics_texture(tex) : nullptr;
+}
+
+bool graphics_renderer::render_texture(graphics_texture* tex, float dst_x, float dst_y) {
+	if (!tex || !tex->get_texture()) return false;
+	SDL_FRect dst = {dst_x, dst_y, (float)tex->get_width(), (float)tex->get_height()};
+	return SDL_RenderTexture(_renderer, tex->get_texture(), nullptr, &dst);
+}
+
+bool graphics_renderer::render_texture_ex(graphics_texture* tex, float src_x, float src_y, float src_w, float src_h, float dst_x, float dst_y, float dst_w, float dst_h) {
+	if (!tex || !tex->get_texture()) return false;
+	SDL_FRect src = {src_x, src_y, src_w, src_h};
+	SDL_FRect dst = {dst_x, dst_y, dst_w, dst_h};
+	return SDL_RenderTexture(_renderer, tex->get_texture(), &src, &dst);
+}
+
 bool graphics_renderer::set_logical_presentation(int w, int h, unsigned int mode) {
 	return SDL_SetRenderLogicalPresentation(_renderer, w, h, (SDL_RendererLogicalPresentation)mode);
 }
@@ -381,6 +447,21 @@ void RegisterGraphics(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("graphic@ load_png(const string&in file)", asFUNCTION(load_png), asCALL_CDECL);
 	engine->RegisterGlobalFunction("graphic@ load_surface(const string&in file)", asFUNCTION(load_surface), asCALL_CDECL);
 	engine->RegisterGlobalFunction("graphic@ create_surface(int width, int height, pixel_format pixel_format)", asFUNCTION(create_surface), asCALL_CDECL);
+	
+	// graphics_texture
+	engine->RegisterObjectType("graphics_texture", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("graphics_texture", asBEHAVE_ADDREF, "void f()", asMETHOD(graphics_texture, duplicate), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("graphics_texture", asBEHAVE_RELEASE, "void f()", asMETHOD(graphics_texture, release), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_texture", "int get_width() const property", asMETHOD(graphics_texture, get_width), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_texture", "int get_height() const property", asMETHOD(graphics_texture, get_height), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_texture", "bool get_is_valid() const property", asMETHOD(graphics_texture, is_valid), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_texture", "bool set_color_mod(uint r, uint g, uint b)", asMETHOD(graphics_texture, set_color_mod), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_texture", "bool get_color_mod(uint&out r, uint&out g, uint&out b) const", asMETHOD(graphics_texture, get_color_mod), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_texture", "bool set_alpha_mod(uint alpha)", asMETHOD(graphics_texture, set_alpha_mod), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_texture", "uint get_alpha_mod() const", asMETHOD(graphics_texture, get_alpha_mod), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_texture", "bool set_blend_mode(blend_mode mode)", asMETHOD(graphics_texture, set_blend_mode), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_texture", "blend_mode get_blend_mode() const", asMETHOD(graphics_texture, get_blend_mode), asCALL_THISCALL);
+
 	// text_font
 	engine->RegisterObjectType("text_font", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("text_font", asBEHAVE_ADDREF, "void f()", asMETHOD(text_font, duplicate), asCALL_THISCALL);
@@ -474,6 +555,9 @@ void RegisterGraphics(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("graphics_renderer", "bool get_current_output_size(int&out w, int&out h) const", asMETHOD(graphics_renderer, get_current_output_size), asCALL_THISCALL);
 	engine->RegisterObjectMethod("graphics_renderer", "bool render_graphic(graphic@+ gfx, float dst_x, float dst_y)", asMETHOD(graphics_renderer, render_graphic), asCALL_THISCALL);
 	engine->RegisterObjectMethod("graphics_renderer", "bool render_graphic(graphic@+ gfx, float src_x, float src_y, float src_w, float src_h, float dst_x, float dst_y, float dst_w, float dst_h)", asMETHOD(graphics_renderer, render_graphic_ex), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_renderer", "graphics_texture@ create_texture(graphic@+ gfx)", asMETHOD(graphics_renderer, create_texture), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_renderer", "bool render_texture(graphics_texture@+ tex, float dst_x, float dst_y)", asMETHOD(graphics_renderer, render_texture), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_renderer", "bool render_texture(graphics_texture@+ tex, float src_x, float src_y, float src_w, float src_h, float dst_x, float dst_y, float dst_w, float dst_h)", asMETHOD(graphics_renderer, render_texture_ex), asCALL_THISCALL);
 	engine->RegisterObjectMethod("graphics_renderer", "bool set_logical_presentation(int w, int h, renderer_logical_presentation mode)", asMETHOD(graphics_renderer, set_logical_presentation), asCALL_THISCALL);
 	engine->RegisterObjectMethod("graphics_renderer", "bool get_logical_presentation(int&out w, int&out h, renderer_logical_presentation&out mode) const", asMETHOD(graphics_renderer, get_logical_presentation), asCALL_THISCALL);
 	engine->RegisterObjectMethod("graphics_renderer", "bool set_viewport(int x, int y, int w, int h)", asMETHOD(graphics_renderer, set_viewport), asCALL_THISCALL);
