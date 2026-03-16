@@ -16,7 +16,7 @@ def generate_version(env = None, target = None, source = None):
 	version = ""
 	with open(os.path.join(basedir, "version"), "r") as f: version = f.read().strip();
 	version_major, version_minor, version_patch, version_type = version.replace("-", ".").split(".")
-	with open(os.path.join(basedir, "src", "version.cpp"), "w") as f:
+	with open(os.path.join(basedir, "src", "version.cpp"), "w", encoding="utf8") as f:
 		f.write("// Auto-generated code containing version information and other constants retrieved from the system at build time.\n\n")
 		f.write('#include "version.h"\n');
 		f.write(f'const std::string NVGT_VERSION = "{version}";\n')
