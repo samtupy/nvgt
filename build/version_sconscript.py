@@ -11,12 +11,12 @@ def generate_version(env = None, target = None, source = None):
 	git_hash = "release"
 	try: git_hash = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip() if os.path.isdir(os.path.join(basedir, ".git")) else "release"
 	except: pass # git must not be on path
-	datetime_now = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S")
+	datetime_now = datetime.now().astimezone().strftime("%A, %B %d, %Y at %I:%M:%S %p %Z")
 	timestamp = int(datetime.now().timestamp())
 	version = ""
 	with open(os.path.join(basedir, "version"), "r") as f: version = f.read().strip();
 	version_major, version_minor, version_patch, version_type = version.replace("-", ".").split(".")
-	with open(os.path.join(basedir, "src", "version.cpp"), "w") as f:
+	with open(os.path.join(basedir, "src", "version.cpp"), "w", encoding="utf8") as f:
 		f.write("// Auto-generated code containing version information and other constants retrieved from the system at build time.\n\n")
 		f.write('#include "version.h"\n');
 		f.write(f'const std::string NVGT_VERSION = "{version}";\n')
