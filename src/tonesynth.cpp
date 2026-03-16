@@ -18,8 +18,10 @@
 #include "tonesynth.h"
 #include <angelscript.h>
 #include <scriptarray.h>
+#include <Poco/Format.h>
 #include "sound.h"
 #include "nvgt.h" // g_ScriptEngine
+#include "nvgt_angelscript.h" // get_system_namespace
 
 tone_synth::tone_synth() {
 	gen = new elz_tonar{};
@@ -239,7 +241,7 @@ void RegisterScriptTonesynth(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("tone_synth", "bool rest_ms(int ms)", asMETHOD(tone_synth, rest_ms), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "int get_sample_rate() property", asMETHOD(tone_synth, get_sample_rate), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "int get_channels() property", asMETHOD(tone_synth, get_channels), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tone_synth", "sound@ write_wave_sound()", asMETHOD(tone_synth, generate_sound), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", Poco::format("%s::sound@ write_wave_sound()", get_system_namespace("sound")).c_str(), asMETHOD(tone_synth, generate_sound), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "int16[]@ write_samples()", asMETHOD(tone_synth, write_samples), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool write_wave_file(const string &in filename)", asMETHOD(tone_synth, generate_file), asCALL_THISCALL);
 }
