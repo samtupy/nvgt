@@ -19,9 +19,7 @@ with open("repls.txt", "rb") as f:
 
 files=recursive(os.path.dirname(__file__), "*.cpp");
 for f in files:
-	with open(f, "rb") as F:
-		data=F.read()
-	for search in replacements:
-		data=data.replace(search, replacements[search])
-	with open(f, "wb") as F:
-		F.write(data)
+	with open(f, "rb") as F: old_data=data=F.read()
+	for search in replacements: data=data.replace(search, replacements[search])
+	if data == old_data: continue
+	with open(f, "wb") as F: F.write(data)

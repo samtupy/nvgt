@@ -106,6 +106,7 @@ bool Print::PrintAddonTypes(std::ostream & dst, void const *objPtr, int typeId, 
         auto value = reinterpret_cast<CScriptDictValue const*>(objPtr);
 
         Print::PrintTemplate(dst, value->GetAddressOfValue(), value->GetTypeId(), depth+1);
+        return true;
     }
 
     return false;
