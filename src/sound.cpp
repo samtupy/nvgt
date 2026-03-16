@@ -301,7 +301,7 @@ public:
 		if ((flags & NO_DEVICE) == 0) {
 			device = std::make_unique<ma_device>();
 			ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
-			cfg.playback.channels = channels;
+			cfg.playback.channels = channels > 0? channels : 2;
 			cfg.playback.format = ma_format_f32;
 			cfg.sampleRate = sample_rate;
 			cfg.noClip = (flags & engine_flags::NO_CLIP)? MA_TRUE : MA_FALSE;
@@ -354,8 +354,8 @@ public:
 		if ((flags & NO_DEVICE) == 0) cfg.pDevice = &*device;
 		else {
 			cfg.noDevice = MA_TRUE;
-			cfg.channels = channels;
-			cfg.sampleRate = sample_rate;
+			cfg.channels = channels > 0? channels : 2;
+			cfg.sampleRate = sample_rate > 0? sample_rate : 48000;
 		}
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS) {
 			engine.reset();
