@@ -11,7 +11,7 @@ def generate_version(env = None, target = None, source = None):
 	git_hash = "release"
 	try: git_hash = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip() if os.path.isdir(os.path.join(basedir, ".git")) else "release"
 	except: pass # git must not be on path
-	datetime_now = datetime.now().astimezone().strftime("%A, %B %d, %Y at %I:%M:%S %p %Z")
+	datetime_now = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S")
 	timestamp = int(datetime.now().timestamp())
 	version = ""
 	with open(os.path.join(basedir, "version"), "r") as f: version = f.read().strip();
