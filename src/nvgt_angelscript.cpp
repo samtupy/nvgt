@@ -41,6 +41,7 @@
 #include "crypto.h"
 #include "datastreams.h"
 #include "events.h"
+#include "graphics.h"
 #include "hash.h"
 #include "input.h"
 #include "internet.h"
@@ -549,6 +550,7 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	RegisterTTSVoice(engine);
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("ui");
+	RegisterGraphics(engine);
 	RegisterUI(engine);
 	engine->EndConfigGroup();
 	g_ctxMgr = new CContextMgr();

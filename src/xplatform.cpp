@@ -124,6 +124,44 @@ std::string android_get_main_shared_object() {
 }
 #endif
 
+#ifndef _WIN32
+// Dummy versions of functions that are currently only implemented on windows. If some of these get defined on other platforms, this define can be made more complex to avoid the dummy versions clashing.
+void lost_window_focus_platform() {}
+void regained_window_focus_platform() {}
+#endif
+
+std::string get_font_path(const std::string& name) {
+	// If the name already ends in .ttf, treat it as a path directly.
+	if (name.size() >= 4 && name.substr(name.size() - 4) == ".ttf") return name;
+	// See if name+".ttf" already exists as a relative or absolute path.
+	std::string with_ext = name + ".ttf";
+	if (File(with_ext).exists()) return with_ext;
+	// Search platform system font directories.
+	static const char* font_dirs[] = {
+		#ifdef _WIN32
+		"C:/Windows/Fonts/",
+		#elif defined(__APPLE__)
+		"/Library/Fonts/",
+		"/System/Library/Fonts/",
+		"/System/Library/Fonts/Supplemental/",
+		#elif defined(__ANDROID__)
+		"/system/fonts/",
+		"/system/font/",
+		#else // Linux and other Unix-likes
+		"/usr/share/fonts/truetype/",
+		"/usr/share/fonts/",
+		"/usr/local/share/fonts/",
+		#endif
+		nullptr
+	};
+	for (int i = 0; font_dirs[i]; i++) {
+		std::string candidate = std::string(font_dirs[i]) + name + ".ttf";
+		if (File(candidate).exists()) return candidate;
+	}
+	// Couldn't resolve — return name+".ttf" and let the caller handle the error.
+	return with_ext;
+}
+
 // Anything below this point is function registrations.
 // Usually this involves defining no-op versions of functions that are only available on certain platforms, though can sometimes include wrappers as well to get around char* and other things that we can't directly register.
 #ifndef SDL_PLATFORM_LINUX

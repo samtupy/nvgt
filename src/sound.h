@@ -12,6 +12,7 @@
 
 #pragma once
 
+#define NOMINMAX
 #include <miniaudio.h>
 #include <reactphysics3d/mathematics/Vector3.h>
 #include "sound_service.h"

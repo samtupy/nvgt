@@ -16,11 +16,32 @@
 #include <Poco/Path.h>
 #ifdef __APPLE__
 #include <TargetConditionals.h>
+#include "apple.h"
+#elif defined(_WIN32)
+#include "win.h"
 #endif
 
 class asIScriptEngine;
 
+// Native window handle type and SDL property name for the current platform.
+#ifndef NVGT_NATIVE_WINDOW_DEFINED
+#define NVGT_NATIVE_WINDOW_DEFINED
+#ifdef _WIN32
+typedef HWND native_window_t;
+#define NATIVE_WINDOW_SDL_PROP SDL_PROP_WINDOW_WIN32_HWND_POINTER
+#elif defined(__APPLE__)
+typedef void* native_window_t; // NSWindow*, cast in .mm code
+#define NATIVE_WINDOW_SDL_PROP SDL_PROP_WINDOW_COCOA_WINDOW_POINTER
+#elif defined(__ANDROID__)
+typedef void* native_window_t; // ANativeWindow*
+#define NATIVE_WINDOW_SDL_PROP SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER
+#else
+typedef void* native_window_t;
+#endif
+#endif
+
 bool running_on_mobile();
+std::string get_font_path(const std::string& name);
 void register_native_tts(); // Actual function exists in either android.cpp, apple.mm, linux.cpp or win.cpp, of which only one will be built.
 #ifndef NVGT_STUB
 void determine_compile_platform();
@@ -38,5 +59,8 @@ std::string event_requested_file();
 #ifdef __ANDROID__
 std::string android_get_main_shared_object();
 #endif
+
+void lost_window_focus_platform();
+void regained_window_focus_platform();
 
 void RegisterXplatform(asIScriptEngine* engine);

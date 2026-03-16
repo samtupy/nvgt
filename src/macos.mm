@@ -15,13 +15,14 @@
 #include <Poco/Event.h>
 #include <Poco/Mutex.h>
 #include <Poco/Thread.h>
+#include "UI.h"
 
-extern NSWindow* g_OSWindowHandle; // Voice over speech unfortunately only works from a window created by our application it seems.
 bool voice_over_announce(const std::string& message) {
-	if (!g_OSWindowHandle) return false;
+	NSWindow* win = g_window ? (NSWindow*)g_window->get_native_window() : nullptr;
+	if (!win) return false;
 	NSString* nsmsg = [NSString stringWithUTF8String:message.c_str()];
-	NSAccessibilityPostNotificationWithUserInfo(g_OSWindowHandle, NSAccessibilityAnnouncementRequestedNotification, @ {NSAccessibilityAnnouncementKey: nsmsg, NSAccessibilityPriorityKey: @(NSAccessibilityPriorityHigh)});
-	return [NSApp keyWindow] == g_OSWindowHandle;
+	NSAccessibilityPostNotificationWithUserInfo(win, NSAccessibilityAnnouncementRequestedNotification, @ {NSAccessibilityAnnouncementKey: nsmsg, NSAccessibilityPriorityKey: @(NSAccessibilityPriorityHigh)});
+	return [NSApp keyWindow] == win;
 }
 
 std::string speech_text = "";
@@ -56,15 +57,18 @@ bool voice_over_speak(const std::string& message, bool interrupt) {
 		speech_text += message;
 	}
 	speech_new_event.set();
-	return [NSApp keyWindow] == g_OSWindowHandle; // The window being active is the closest aproximation to a success value we're going to get.
+	NSWindow* win = g_window ? (NSWindow*)g_window->get_native_window() : nullptr;
+	return [NSApp keyWindow] == win; // The window being active is the closest aproximation to a success value we're going to get.
 }
 
 // Voiceover takes a second to detect the app window after it is shown even though the system has keyboard input instantly. Can we fix that with an accessibility notification? I have no idea what I'm doing here.
 void voice_over_window_created() {
-	NSAccessibilityPostNotification(g_OSWindowHandle, NSAccessibilityApplicationActivatedNotification);
-	NSAccessibilityPostNotification(g_OSWindowHandle, NSAccessibilityApplicationShownNotification);
-	NSAccessibilityPostNotification(g_OSWindowHandle, NSAccessibilityWindowCreatedNotification);
-	NSAccessibilityPostNotification(g_OSWindowHandle, NSAccessibilityFocusedWindowChangedNotification);
+	NSWindow* win = g_window ? (NSWindow*)g_window->get_native_window() : nullptr;
+	if (!win) return;
+	NSAccessibilityPostNotification(win, NSAccessibilityApplicationActivatedNotification);
+	NSAccessibilityPostNotification(win, NSAccessibilityApplicationShownNotification);
+	NSAccessibilityPostNotification(win, NSAccessibilityWindowCreatedNotification);
+	NSAccessibilityPostNotification(win, NSAccessibilityFocusedWindowChangedNotification);
 }
 
 void voice_over_speech_shutdown() {

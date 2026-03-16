@@ -87,7 +87,7 @@ shared double string_to_number(const string& in num) {
 	return parse_double(num.trim_whitespace_left());
 }
 bool show_game_window(const string& in title) {
-	return show_window(title);
+	return show_window(title) !is null;
 }
 
 bool hide_game_window() {

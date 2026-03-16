@@ -11,8 +11,12 @@
 */
 
 #pragma once
-#include "tts.h"
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#define VC_EXTRALEAN
+#include <windows.h>
 #include <sapibridge.h>
+#include "tts.h"
 
 class sapi5_engine : public tts_engine_impl {
 	sb_sapi *inst;
@@ -38,3 +42,6 @@ public:
 	virtual int get_current_voice() override;
 };
 
+bool install_keyhook();
+void uninstall_keyhook();
+void process_keyhook_commands();

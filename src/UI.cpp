@@ -10,13 +10,10 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-#define NOMINMAX
 #include <angelscript.h>
 #include "tts.h"
 #ifdef _WIN32
-	#define WIN32_LEAN_AND_MEAN
-	#define VC_EXTRALEAN
-	#include <windows.h>
+	#include "win.h"
 	#include "InputBox.h"
 #elif defined(__APPLE__)
 	#include <IOKit/IOKitLib.h>
@@ -80,7 +77,7 @@ int message_box(const std::string& title, const std::string& text, const std::ve
 		sdlbtn.buttonID = i + 1;
 		sdlbtn.text = buttons[i].c_str() + skip;
 	}
-	SDL_MessageBoxData box = {mb_flags, g_WindowHandle, title.c_str(), text.c_str(), int(sdlbuttons.size()), sdlbuttons.data(), NULL};
+	SDL_MessageBoxData box = {mb_flags, g_window ? g_window->get_sdl_window() : nullptr, title.c_str(), text.c_str(), int(sdlbuttons.size()), sdlbuttons.data(), NULL};
 	int ret;
 	if (!SDL_ShowMessageBox(&box, &ret)) return -1;
 	return ret;
@@ -172,7 +169,7 @@ std::string simple_file_dialog(const std::string& filters, const std::string& de
 	end.name = nullptr;
 	end.pattern = nullptr;
 	nvgt_file_dialog_info fdi;
-	SDL_Window* parent_window = g_WindowHandle;
+	SDL_Window* parent_window = g_window ? g_window->get_sdl_window() : nullptr;
 #ifdef _WIN32
 	parent_window = nullptr; // Passing nullptr for the parent window on Windows prevents the OS from attaching the background thread's input queue to the main thread's, And it seems to fix the extreme lag in the open and save as dialogs As the wait(5); doesn't effect the dialogs. 
 #endif
@@ -212,11 +209,11 @@ std::string input_box(const std::string& title, const std::string& text, const s
 	}
 	std::string resultA;
 	Poco::UnicodeConverter::convert(r, resultA);
-	if (g_WindowHandle) SDL_RaiseWindow(g_WindowHandle);
+	if (g_window) g_window->raise();
 	return resultA;
 	#elif defined(__APPLE__)
 	std::string r = apple_input_box(title, text, default_value, false, false);
-	if (g_WindowHandle) SDL_RaiseWindow(g_WindowHandle);
+	if (g_window) g_window->raise();
 	if (r == "\xff") {
 		g_LastError = -12;
 		return "";
@@ -245,121 +242,210 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 	#endif
 }
 
-SDL_Window* g_WindowHandle = 0;
-#ifdef _WIN32
-	HWND g_OSWindowHandle = NULL;
-#elif defined(__APPLE__)
-	#include "apple.h"
-	NSWindow* g_OSWindowHandle = NULL;
-#elif defined(__ANDROID__)
-	ANativeWindow* g_OSWindowHandle = nullptr;
-#else
-	void* g_OSWindowHandle = NULL;
-#endif
+game_window::game_window(const std::string& title, unsigned int w, unsigned int h, unsigned int flags) : _window(nullptr), _owns_window(true), _native_window(nullptr), _refcount(1) {
+	_window = SDL_CreateWindow(title.c_str(), (int)w, (int)h, flags);
+	if (!_window) return;
+	_renderer = new graphics_renderer(this);
+	if (!SDL_HasScreenKeyboardSupport()) SDL_StartTextInput(_window);
+	SDL_PropertiesID props = SDL_GetWindowProperties(_window);
+	#ifdef NATIVE_WINDOW_SDL_PROP
+	_native_window = (native_window_t)SDL_GetPointerProperty(props, NATIVE_WINDOW_SDL_PROP, nullptr);
+	#endif
+	#ifdef __APPLE__
+	SDL_ShowWindow(_window);
+	SDL_RaiseWindow(_window);
+	voice_over_window_created();
+	#endif
+}
+game_window::game_window(SDL_Window* window) : _window(window), _owns_window(false), _native_window(nullptr), _refcount(1) {
+	if (!_window) return;
+	_renderer = new graphics_renderer(this);
+	SDL_PropertiesID props = SDL_GetWindowProperties(_window);
+	#ifdef NATIVE_WINDOW_SDL_PROP
+	_native_window = (native_window_t)SDL_GetPointerProperty(props, NATIVE_WINDOW_SDL_PROP, nullptr);
+	#endif
+}
+game_window::~game_window() {
+	_font = nullptr;
+	_renderer = nullptr;
+	if (_owns_window && _window) SDL_DestroyWindow(_window);
+}
+bool game_window::clear(unsigned int r, unsigned int g, unsigned int b) {
+	if (!_renderer) return false;
+	_renderer->set_draw_color(r, g, b, 255);
+	return _renderer->clear();
+}
+void game_window::draw_text(const std::string& text, float x, float y, unsigned int r, unsigned int g, unsigned int b) {
+	if (!_renderer || !_font || text.empty()) return;
+	Poco::AutoPtr<graphic> surf(_font->render_text_blended(text, r, g, b));
+	if (surf && surf->is_valid()) _renderer->render_graphic(surf.get(), x, y);
+}
+uint64_t game_window::measure_text(const std::string& text) const {
+	if (!_font) return 0;
+	int w = 0, h = 0;
+	_font->get_string_size(text, w, h);
+	return ((uint64_t)w << 32) | (uint32_t)h;
+}
+void game_window::draw_text_wrapped(const std::string& text, float x, float y, int wrap_width, unsigned int r, unsigned int g, unsigned int b) {
+	if (!_renderer || !_font || text.empty()) return;
+	Poco::AutoPtr<graphic> surf(_font->render_text_blended_wrapped(text, wrap_width, r, g, b));
+	if (surf && surf->is_valid()) _renderer->render_graphic(surf.get(), x, y);
+}
+uint64_t game_window::measure_text_wrapped(const std::string& text, int wrap_width) const {
+	if (!_font) return 0;
+	int w = 0, h = 0;
+	_font->get_string_size_wrapped(text, wrap_width, w, h);
+	return ((uint64_t)w << 32) | (uint32_t)h;
+}
+void game_window::draw_rect(float x, float y, float w, float h, unsigned int r, unsigned int g, unsigned int b, bool filled) {
+	if (!_renderer) return;
+	_renderer->set_draw_color(r, g, b, 255);
+	if (filled) _renderer->fill_rect(x, y, w, h);
+	else _renderer->draw_rect(x, y, w, h);
+}
+void game_window::draw_line(float x1, float y1, float x2, float y2, unsigned int r, unsigned int g, unsigned int b) {
+	if (!_renderer) return;
+	_renderer->set_draw_color(r, g, b, 255);
+	_renderer->draw_line(x1, y1, x2, y2);
+}
+void game_window::draw_circle(float cx, float cy, int radius, unsigned int r, unsigned int g, unsigned int b, bool filled) {
+	if (!_renderer) return;
+	_renderer->set_draw_color(r, g, b, 255);
+	SDL_Renderer* rend = _renderer->get_renderer();
+	int offsetx = 0, offsety = radius, d = radius - 1, status = 0;
+	while (offsety >= offsetx) {
+		if (filled) {
+			SDL_RenderLine(rend, cx - offsety, cy + offsetx, cx + offsety, cy + offsetx);
+			SDL_RenderLine(rend, cx - offsetx, cy + offsety, cx + offsetx, cy + offsety);
+			SDL_RenderLine(rend, cx - offsetx, cy - offsety, cx + offsetx, cy - offsety);
+			SDL_RenderLine(rend, cx - offsety, cy - offsetx, cx + offsety, cy - offsetx);
+		} else {
+			SDL_RenderPoint(rend, cx + offsetx, cy + offsety);
+			SDL_RenderPoint(rend, cx + offsety, cy + offsetx);
+			SDL_RenderPoint(rend, cx - offsetx, cy + offsety);
+			SDL_RenderPoint(rend, cx - offsety, cy + offsetx);
+			SDL_RenderPoint(rend, cx + offsetx, cy - offsety);
+			SDL_RenderPoint(rend, cx + offsety, cy - offsetx);
+			SDL_RenderPoint(rend, cx - offsetx, cy - offsety);
+			SDL_RenderPoint(rend, cx - offsety, cy - offsetx);
+		}
+		if (status >= 2 * offsetx) { status -= 2 * offsetx + 1; offsetx++; }
+		else if (d < 2 * radius) { status += 2 * offsety - 1; offsety--; }
+		else { status -= 2 * (offsetx - offsety + 1); offsety--; offsetx++; }
+	}
+}
+void game_window::draw_menu(CScriptArray* items, float x, float y) {
+	if (!_renderer || !_font || !items) return;
+	int w = 0, h = 0;
+	_font->get_string_size("A", w, h);
+	float line_height = (float)(h + 10);
+	float current_y = y;
+	for (unsigned int i = 0; i < items->GetSize(); i++) {
+		std::string item = *(std::string*)items->At(i);
+		bool selected = !item.empty() && item[0] == '*';
+		if (selected) item = item.substr(1);
+		_font->get_string_size(item, w, h);
+		float text_x = x - (float)(w / 2);
+		if (selected) {
+			draw_rect(text_x - 10, current_y, (float)(w + 20), line_height, 50, 50, 50, true);
+			draw_text(item, text_x, current_y + 5, 255, 255, 0);
+		} else {
+			draw_text(item, text_x, current_y + 5, 200, 200, 200);
+		}
+		current_y += line_height;
+	}
+}
+
+Poco::AutoPtr<game_window> g_window;
 thread_id_t g_WindowThreadId = 0;
-bool g_WindowHidden = false;
 
 static std::vector<SDL_Event> post_events; // holds events that should be processed after the next wait() call.
 bool set_application_name(const std::string& name) {
 	return SDL_SetHintWithPriority(SDL_HINT_APP_NAME, name.c_str(), SDL_HINT_OVERRIDE);
 }
-bool ShowNVGTWindow(const std::string& window_title, unsigned int flags) {
-	if (g_WindowHandle) {
-		SDL_SetWindowTitle(g_WindowHandle, window_title.c_str());
-		if (g_WindowHidden) {
-			g_WindowHidden = false;
-			SDL_ShowWindow(g_WindowHandle);
-			SDL_RaiseWindow(g_WindowHandle);
+game_window* ShowNVGTWindow(const std::string& window_title, unsigned int flags) {
+	if (g_window) {
+		g_window->set_title(window_title);
+		if (g_window->get_flags() & SDL_WINDOW_HIDDEN) {
+			g_window->show();
+			g_window->raise();
 		}
-		return true;
+		g_window->duplicate();
+		return g_window.get();
 	}
 	InputInit();
-	g_WindowHandle = SDL_CreateWindow(window_title.c_str(), 640, 640, flags);
-	if (!g_WindowHandle) return false;
-	if (!SDL_HasScreenKeyboardSupport()) SDL_StartTextInput(g_WindowHandle);
-	SDL_PropertiesID window_props = SDL_GetWindowProperties(g_WindowHandle);
-	#ifdef _WIN32
-	g_OSWindowHandle = (HWND)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
-	#elif defined(__APPLE__) // Will probably need to fix for IOS
-	g_OSWindowHandle = (NSWindow*)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
-	SDL_ShowWindow(g_WindowHandle);
-	SDL_RaiseWindow(g_WindowHandle);
-	voice_over_window_created();
-	#elif defined(__ANDROID__)
-	g_OSWindowHandle = (ANativeWindow*)SDL_GetPointerProperty(window_props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, NULL);
-	#endif
+	TTF_Init();
+	g_window = new game_window(window_title, 640, 640, flags);
+	if (!g_window->get_sdl_window()) {
+		g_window = nullptr;
+		return nullptr;
+	}
 	g_WindowThreadId = thread_current_thread_id();
-	return true;
+	g_window->duplicate();
+	return g_window.get();
 }
 bool DestroyNVGTWindow() {
-	if (!g_WindowHandle) return false;
-	SDL_DestroyWindow(g_WindowHandle);
+	if (!g_window) return false;
 	InputDestroy();
-	g_WindowHandle = NULL;
-	g_OSWindowHandle = NULL;
+	TTF_Quit();	
+	g_window = nullptr;
 	return true;
 }
 BOOL HideNVGTWindow() {
-	if (!g_WindowHandle) return false;
-	SDL_HideWindow(g_WindowHandle);
-	g_WindowHidden = true;
+	if (!g_window) return false;
+	g_window->hide();
 	return true;
 }
 BOOL FocusNVGTWindow() {
-	if (!g_WindowHandle) return false;
-	SDL_RaiseWindow(g_WindowHandle);
+	if (!g_window) return false;
+	g_window->raise();
 	return true;
 }
 bool WindowIsFocused() {
 #ifdef __ANDROID__
 	return android_is_window_active();
 #else
-	if (!g_WindowHandle) return false;
-	return g_WindowHandle == SDL_GetKeyboardFocus();
+	return g_window && g_window->get_sdl_window() == SDL_GetKeyboardFocus();
 #endif
 }
 bool WindowIsHidden() {
-	if (!g_WindowHandle) return false;
-	return (SDL_GetWindowFlags(g_WindowHandle) & SDL_WINDOW_HIDDEN) != 0;
+	return g_window && (g_window->get_flags() & SDL_WINDOW_HIDDEN) != 0;
 }
 bool set_window_fullscreen(bool fullscreen) {
-	if (!g_WindowHandle) return false;
-	return SDL_SetWindowFullscreen(g_WindowHandle, fullscreen);
+	return g_window && g_window->set_fullscreen(fullscreen);
 }
 int get_window_width() {
-	if (!g_WindowHandle) return 0;
+	if (!g_window) return 0;
 	int w, h;
-	SDL_GetWindowSize(g_WindowHandle, &w, &h);
+	g_window->get_size(w, h);
 	return w;
 }
 int get_window_height() {
-	if (!g_WindowHandle) return 0;
+	if (!g_window) return 0;
 	int w, h;
-	SDL_GetWindowSize(g_WindowHandle, &w, &h);
+	g_window->get_size(w, h);
 	return h;
 }
 std::string get_window_text() {
-	if (!g_WindowHandle) return "";
-	return std::string(SDL_GetWindowTitle(g_WindowHandle));
+	return g_window ? g_window->get_title() : "";
 }
 void* get_window_os_handle() {
-	return reinterpret_cast<void*>(g_OSWindowHandle);
+	return g_window ? reinterpret_cast<void*>(g_window->get_native_window()) : nullptr;
 }
+game_window* get_window() { return g_window.get(); }
 void handle_sdl_event(SDL_Event* evt) {
 	if (InputEvent(evt)) return;
-	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_LOST)
-		lost_window_focus();
-	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_GAINED)
-		regained_window_focus();
+	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_LOST) lost_window_focus();
+	else if (evt->type == SDL_EVENT_WINDOW_FOCUS_GAINED) regained_window_focus();
 }
 void refresh_window() {
 	anticheat_check();
 	#ifdef _WIN32
-	extern void process_keyhook_commands();
 	process_keyhook_commands();
 	#endif
 	SDL_PumpEvents();
 	update_joysticks(); // Update all active joystick instances
+	if (g_window && g_window->get_renderer()) g_window->get_renderer()->present();
 	SDL_Event evt;
 	std::unordered_set<int> keys_pressed_this_frame;
 	while (SDL_PollEvent(&evt)) {
@@ -380,7 +466,7 @@ void refresh_window() {
 }
 void wait(int ms) {
 	anticheat_check();
-	if (!g_WindowHandle || g_WindowThreadId != thread_current_thread_id()) {
+	if (!g_window || g_WindowThreadId != thread_current_thread_id()) {
 		Poco::Thread::sleep(ms);
 		return;
 	}
@@ -452,6 +538,8 @@ std::string sdl_get_hint(const std::string& hint) {
 	return SDL_GetHint(hint.c_str());
 }
 
+static game_window* game_window_factory(const std::string& title, unsigned int w, unsigned int h, unsigned int flags) { return new game_window(title, w, h, flags); }
+
 void RegisterUI(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UI);
 	engine->RegisterEnum(_O("message_box_flags"));
@@ -490,7 +578,89 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool info_box(const string& in title, const string& in caption, const string& in text, uint64 flags = 0)"), asFUNCTION(info_box), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void next_keyboard_layout()"), asFUNCTION(next_keyboard_layout), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool set_application_name(const string& in name)", asFUNCTION(set_application_name), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool show_window(const string& in title, uint flags = 0)", asFUNCTION(ShowNVGTWindow), asCALL_CDECL);
+	engine->RegisterEnum("window_flash_operation");
+	engine->RegisterEnumValue("window_flash_operation", "FLASH_CANCEL", SDL_FLASH_CANCEL);
+	engine->RegisterEnumValue("window_flash_operation", "FLASH_BRIEFLY", SDL_FLASH_BRIEFLY);
+	engine->RegisterEnumValue("window_flash_operation", "FLASH_UNTIL_FOCUSED", SDL_FLASH_UNTIL_FOCUSED);
+	engine->RegisterEnum("window_progress_state");
+	engine->RegisterEnumValue("window_progress_state", "PROGRESS_STATE_INVALID", SDL_PROGRESS_STATE_INVALID);
+	engine->RegisterEnumValue("window_progress_state", "PROGRESS_STATE_NONE", SDL_PROGRESS_STATE_NONE);
+	engine->RegisterEnumValue("window_progress_state", "PROGRESS_STATE_INDETERMINATE", SDL_PROGRESS_STATE_INDETERMINATE);
+	engine->RegisterEnumValue("window_progress_state", "PROGRESS_STATE_NORMAL", SDL_PROGRESS_STATE_NORMAL);
+	engine->RegisterEnumValue("window_progress_state", "PROGRESS_STATE_PAUSED", SDL_PROGRESS_STATE_PAUSED);
+	engine->RegisterEnumValue("window_progress_state", "PROGRESS_STATE_ERROR", SDL_PROGRESS_STATE_ERROR);
+	// game_window
+	engine->RegisterObjectType("game_window", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("game_window", asBEHAVE_ADDREF, "void f()", asMETHOD(game_window, duplicate), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("game_window", asBEHAVE_RELEASE, "void f()", asMETHOD(game_window, release), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("game_window", asBEHAVE_FACTORY, "game_window@ f(const string&in title, uint w, uint h, uint flags = 0)", asFUNCTION(game_window_factory), asCALL_CDECL);
+	engine->RegisterObjectMethod("game_window", "bool show()", asMETHOD(game_window, show), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool hide()", asMETHOD(game_window, hide), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool raise()", asMETHOD(game_window, raise), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool maximize()", asMETHOD(game_window, maximize), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool minimize()", asMETHOD(game_window, minimize), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool restore()", asMETHOD(game_window, restore), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool sync()", asMETHOD(game_window, sync), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_fullscreen(bool fullscreen)", asMETHOD(game_window, set_fullscreen), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_title(const string&in title)", asMETHOD(game_window, set_title), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "string get_title() const property", asMETHOD(game_window, get_title), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "uint get_id() const property", asMETHOD(game_window, get_id), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "uint64 get_flags() const property", asMETHOD(game_window, get_flags), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "float get_pixel_density() const property", asMETHOD(game_window, get_pixel_density), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "float get_display_scale() const property", asMETHOD(game_window, get_display_scale), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "uint get_pixel_format() const property", asMETHOD(game_window, get_pixel_format), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_bordered(bool bordered)", asMETHOD(game_window, set_bordered), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_resizable(bool resizable)", asMETHOD(game_window, set_resizable), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_always_on_top(bool on_top)", asMETHOD(game_window, set_always_on_top), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_fill_document(bool fill)", asMETHOD(game_window, set_fill_document), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_modal(bool modal)", asMETHOD(game_window, set_modal), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_focusable(bool focusable)", asMETHOD(game_window, set_focusable), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_keyboard_grab(bool grabbed)", asMETHOD(game_window, set_keyboard_grab), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool get_keyboard_grab() const property", asMETHOD(game_window, get_keyboard_grab), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_mouse_grab(bool grabbed)", asMETHOD(game_window, set_mouse_grab), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool get_mouse_grab() const property", asMETHOD(game_window, get_mouse_grab), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_opacity(float opacity)", asMETHOD(game_window, set_opacity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "float get_opacity() const property", asMETHOD(game_window, get_opacity), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool flash(uint operation)", asMETHOD(game_window, flash), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool show_system_menu(int x, int y)", asMETHOD(game_window, show_system_menu), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_icon(graphic@+ icon)", asMETHOD(game_window, set_icon), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool get_position(int&out x, int&out y) const", asMETHOD(game_window, get_position), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_position(int x, int y)", asMETHOD(game_window, set_position), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool get_size(int&out w, int&out h) const", asMETHOD(game_window, get_size), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_size(int w, int h)", asMETHOD(game_window, set_size), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool get_size_in_pixels(int&out w, int&out h) const", asMETHOD(game_window, get_size_in_pixels), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool get_minimum_size(int&out w, int&out h) const", asMETHOD(game_window, get_minimum_size), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_minimum_size(int w, int h)", asMETHOD(game_window, set_minimum_size), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool get_maximum_size(int&out w, int&out h) const", asMETHOD(game_window, get_maximum_size), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_maximum_size(int w, int h)", asMETHOD(game_window, set_maximum_size), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool get_aspect_ratio(float&out min_aspect, float&out max_aspect) const", asMETHOD(game_window, get_aspect_ratio), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_aspect_ratio(float min_aspect, float max_aspect)", asMETHOD(game_window, set_aspect_ratio), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool get_borders_size(int&out top, int&out left, int&out bottom, int&out right) const", asMETHOD(game_window, get_borders_size), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool get_has_surface() const property", asMETHOD(game_window, has_surface), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool update_surface()", asMETHOD(game_window, update_surface), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool destroy_surface()", asMETHOD(game_window, destroy_surface), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_surface_vsync(int vsync)", asMETHOD(game_window, set_surface_vsync), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool get_surface_vsync(int&out vsync) const", asMETHOD(game_window, get_surface_vsync), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_progress_state(uint state)", asMETHOD(game_window, set_progress_state), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "uint get_progress_state() const property", asMETHOD(game_window, get_progress_state), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_progress_value(float value)", asMETHOD(game_window, set_progress_value), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "float get_progress_value() const property", asMETHOD(game_window, get_progress_value), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "void set_font(text_font@+ font) property", asMETHOD(game_window, set_font), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "graphics_renderer@+ get_renderer() property", asMETHOD(game_window, get_renderer), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "text_font@+ get_font() property", asMETHOD(game_window, get_font), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool clear(uint r, uint g, uint b)", asMETHOD(game_window, clear), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool present()", asMETHOD(game_window, present), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "void draw_text(const string&in text, float x, float y, uint r, uint g, uint b)", asMETHOD(game_window, draw_text), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "uint64 measure_text(const string&in text) const", asMETHOD(game_window, measure_text), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "void draw_text_wrapped(const string&in text, float x, float y, int wrap_width, uint r, uint g, uint b)", asMETHOD(game_window, draw_text_wrapped), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "uint64 measure_text_wrapped(const string&in text, int wrap_width) const", asMETHOD(game_window, measure_text_wrapped), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "void draw_rect(float x, float y, float w, float h, uint r, uint g, uint b, bool filled = false)", asMETHOD(game_window, draw_rect), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "void draw_circle(float cx, float cy, int radius, uint r, uint g, uint b, bool filled = false)", asMETHOD(game_window, draw_circle), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "void draw_line(float x1, float y1, float x2, float y2, uint r, uint g, uint b)", asMETHOD(game_window, draw_line), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool render_graphic(graphic@+ gfx, float x, float y)", asMETHOD(game_window, render_graphic), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "void draw_menu(string[]@ items, float x, float y)", asMETHOD(game_window, draw_menu), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "uint64 get_native_window() const property", asMETHOD(game_window, get_native_window), asCALL_THISCALL);
+	engine->RegisterGlobalFunction("game_window@ show_window(const string& in title, uint flags = 0)", asFUNCTION(ShowNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool destroy_window()", asFUNCTION(DestroyNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool hide_window()", asFUNCTION(HideNVGTWindow), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool focus_window()", asFUNCTION(FocusNVGTWindow), asCALL_CDECL);
@@ -500,6 +670,7 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("int get_window_width()", asFUNCTION(get_window_width), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_window_height()", asFUNCTION(get_window_height), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_window_text()", asFUNCTION(get_window_text), asCALL_CDECL);
+	engine->RegisterGlobalFunction("game_window@+ get_window() property", asFUNCTION(get_window), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uint64 get_window_os_handle()", asFUNCTION(get_window_os_handle), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void refresh_window()", asFUNCTION(refresh_window), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void wait(int ms)", asFUNCTIONPR(wait, (int), void), asCALL_CDECL);
