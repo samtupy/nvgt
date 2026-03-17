@@ -42,6 +42,8 @@
 #include <Poco/StringTokenizer.h>
 #include <Poco/SynchronizedObject.h>
 #include <Poco/Thread.h>
+#include <Poco/Environment.h>
+#include <Poco/Platform.h>
 #include <Poco/UnicodeConverter.h>
 #include <Poco/Util/Application.h>
 #include <Poco/Format.h>
@@ -243,6 +245,7 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 }
 
 game_window::game_window(const std::string& title, unsigned int w, unsigned int h, unsigned int flags) : _window(nullptr), _owns_window(true), _native_window(nullptr), _refcount(1) {
+	if (Poco::Environment::os() == POCO_OS_LINUX) flags |= SDL_WINDOW_FULLSCREEN;
 	_window = SDL_CreateWindow(title.c_str(), (int)w, (int)h, flags);
 	if (!_window) return;
 	_renderer = new graphics_renderer(this);
