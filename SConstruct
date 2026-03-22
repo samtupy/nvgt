@@ -130,6 +130,8 @@ stub_env = env.Clone(PROGSUFFIX = ".bin")
 if env["PLATFORM"] == "win32": env.Append(LINKFLAGS = ["/delayload:plist-2.0.dll"])
 env.Append(LIBS = ["plist-2.0"])
 extra_objects = [version_object]
+if env["PLATFORM"] == "win32":
+	extra_objects.append(env.RES("#src/nvgt.rc"))
 if static_plugins_object: extra_objects.append(static_plugins_object)
 if ARGUMENTS.get("debug", "0") == "1": env["PDB"] = "#build/debug/nvgt.pdb"
 nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + extra_objects)
