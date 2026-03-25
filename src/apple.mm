@@ -13,13 +13,23 @@
 
 #import <AVFoundation/AVFoundation.h>
 #import <Foundation/Foundation.h>
+#if TARGET_OS_IOS
+#import <UIKit/UIKit.h>
+#else
+#import <AppKit/AppKit.h>
+#endif
 #include <memory>
 #include <vector>
 #include <string>
 #include <angelscript.h>
 #include <scriptarray.h>
+#include <TargetConditionals.h>
+#include <Poco/Event.h>
+#include <Poco/Mutex.h>
+#include <Poco/Thread.h>
 #include "apple.h"
 #include "UI.h"
+#include "xplatform.h"
 
 void register_native_tts() { tts_engine_register("avspeech", []() -> std::shared_ptr<tts_engine> { return std::make_shared<AVTTSVoice>(); }); }
 
@@ -221,7 +231,7 @@ std::string AVTTSVoice::getVoiceName(uint64_t index) {
 }
 
 bool AVTTSVoice::is_available() { return impl != nullptr; }
-tts_pcm_generation_state AVTTSVoice::get_pcm_generation_state() { return PCM_PREFERRED; }
+tts_pcm_generation_state AVTTSVoice::get_pcm_generation_state() { return !running_on_mobile()? PCM_PREFERRED : PCM_SUPPORTED; }
 bool AVTTSVoice::stop() { return impl ? impl->stopSpeech() : false; }
 
 bool AVTTSVoice::get_rate_range(float& minimum, float& midpoint, float& maximum) { minimum = AVSpeechUtteranceMinimumSpeechRate; midpoint = AVSpeechUtteranceDefaultSpeechRate; maximum = AVSpeechUtteranceMaximumSpeechRate; return true; }
@@ -316,3 +326,155 @@ void AVTTSVoice::free_pcm(tts_audio_data* data) {
 AVTTSVoice* init() {
 	return new AVTTSVoice;
 }
+
+bool voice_over_announce(const std::string& message) {
+	NSString* nsmsg = [NSString stringWithUTF8String:message.c_str()];
+#if TARGET_OS_IOS
+	UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, nsmsg);
+	return UIAccessibilityIsVoiceOverRunning();
+#else
+	NSWindow* win = g_window ? (NSWindow*)g_window->get_native_window() : nullptr;
+	if (!win) return false;
+	NSAccessibilityPostNotificationWithUserInfo(win, NSAccessibilityAnnouncementRequestedNotification, @{NSAccessibilityAnnouncementKey: nsmsg, NSAccessibilityPriorityKey: @(NSAccessibilityPriorityHigh)});
+	return [NSApp keyWindow] == win;
+#endif
+}
+
+std::string speech_text = "";
+Poco::FastMutex speech_text_mutex;
+Poco::Event speech_new_event;
+Poco::Thread speech_thread;
+bool speech_shutdown = false;
+// So this really sucks, and if someone can come along and make this nonsense unneeded, it would be very very appreciated. So the apple documentation taunts us telling us that we can pass speech notification priorities to NSAccessibilityPostNotificationWithUserInfo to control speech interrupt, and quite simply it doesn't work. While this doesn't at all make non-interrupting speech events actually work, it does make it possible to queue multiple speak calls together with only the first being interrupting.
+void vo_speech_thread(void* extra) {
+	speech_new_event.wait();
+	if (speech_shutdown) {
+		speech_shutdown = false;
+		return;
+	}
+	while (speech_new_event.tryWait(10)) continue;
+	Poco::FastMutex::ScopedLock exclusive(speech_text_mutex);
+	voice_over_announce(speech_text);
+	speech_text = "";
+}
+
+void voice_over_window_created(game_window* window) {
+	#if TARGET_OS_IOS
+		UIWindow* win = (UIWindow*)window->get_native_window();
+		win.rootViewController.view.isAccessibilityElement = YES;
+		win.rootViewController.view.accessibilityTraits |= UIAccessibilityTraitAllowsDirectInteraction;
+	#endif
+}
+
+bool voice_over_is_running() {
+	#if TARGET_OS_IOS
+		return UIAccessibilityIsVoiceOverRunning();
+	#else
+		return [[NSWorkspace sharedWorkspace] isVoiceOverEnabled];
+	#endif
+}
+
+bool voice_over_speak(const std::string& message, bool interrupt) {
+	if (!voice_over_is_running()) return false;
+	if (!speech_thread.isRunning()) speech_thread.start(vo_speech_thread);
+	Poco::FastMutex::ScopedLock exclusive(speech_text_mutex);
+	if (interrupt || speech_text == "") speech_text = message;
+	else {
+		speech_text += " . ";
+		speech_text += message;
+	}
+	speech_new_event.set();
+	#if TARGET_OS_IOS
+		return UIAccessibilityIsVoiceOverRunning();
+	#else
+		NSWindow* win = g_window ? (NSWindow*)g_window->get_native_window() : nullptr;
+		return [NSApp keyWindow] == win;
+	#endif
+}
+
+void voice_over_speech_shutdown() {
+	speech_shutdown = true;
+	speech_new_event.set();
+}
+
+bool screen_reader_load() { return true; }
+void screen_reader_unload() { voice_over_speech_shutdown(); }
+std::string screen_reader_detect() { return voice_over_is_running() ? "VoiceOver" : ""; }
+bool screen_reader_has_speech() { return voice_over_is_running(); }
+bool screen_reader_has_braille() { return false; }
+bool screen_reader_is_speaking() { return false; }
+bool screen_reader_output(const std::string& text, bool interrupt) { return voice_over_speak(text, interrupt); }
+bool screen_reader_speak(const std::string& text, bool interrupt) { return voice_over_speak(text, interrupt); }
+bool screen_reader_braille(const std::string& text) { return false; }
+bool screen_reader_silence() { return voice_over_speak("", true); }
+// The following code was originally taken from https://github.com/hammerspoon/hammerspoon under an MIT license, but has been heavily trimmed/modified for our simpler needs and basically consists of system API calls. It was then run through Claude to create the IOS version.
+#if !TARGET_OS_IOS
+std::string apple_input_box(const std::string& title, const std::string& message, const std::string& default_value, bool secure, bool readonly) {
+	NSAlert* alert = [[NSAlert alloc] init];
+	[alert setMessageText:[NSString stringWithUTF8String:title.c_str()]];
+	[alert setInformativeText:[NSString stringWithUTF8String:message.c_str()]];
+	[alert addButtonWithTitle:@"OK"];
+	[alert addButtonWithTitle:@"Cancel"];
+	[[alert.buttons objectAtIndex:0] setKeyEquivalent:@"\r"]; // Return
+	[[alert.buttons objectAtIndex:1] setKeyEquivalent:@"\033"]; // Escape
+	NSTextField* input;
+	if (secure) input = [[NSSecureTextField alloc] initWithFrame:NSMakeRect(0, 0, 200, 24)];
+	else input = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 200, 24)];
+	[input setStringValue:[NSString stringWithUTF8String:default_value.c_str()]];
+	input.editable = !readonly;
+	[alert setAccessoryView:input];
+	[[alert window] setInitialFirstResponder:input]; // Focus on text input.
+	NSInteger result = [alert runModal];
+	if (result == NSAlertFirstButtonReturn) return [[input stringValue] UTF8String];
+	else if (result == NSAlertSecondButtonReturn) return "\xff"; // nvgt value for cancel for the moment.
+	return "\xff"; // Either an error or we can't determine what was pressed.
+}
+#else
+std::string apple_input_box(const std::string& title, const std::string& message, const std::string& default_value, bool secure, bool readonly) {
+	__block std::string result = "\xff";
+	__block bool done = false;
+	__block UIWindow* alertWindow = nil;
+	dispatch_async(dispatch_get_main_queue(), ^{
+		UIWindow* sdlWindow = g_window ? (UIWindow*)g_window->get_native_window() : nil;
+		UIAlertController* alert = [UIAlertController alertControllerWithTitle:[NSString stringWithUTF8String:title.c_str()] message:[NSString stringWithUTF8String:message.c_str()] preferredStyle:UIAlertControllerStyleAlert];
+		[alert addTextFieldWithConfigurationHandler:^(UITextField* field) {
+			field.text = [NSString stringWithUTF8String:default_value.c_str()];
+			field.secureTextEntry = secure;
+			field.enabled = !readonly;
+			field.accessibilityLabel = [NSString stringWithUTF8String:message.c_str()]; // Attach caption so VoiceOver announces label+field as one element.
+		}];
+		void (^dismiss)(void) = ^{
+			if (alertWindow) alertWindow.hidden = YES;
+			alertWindow = nil;
+			if (sdlWindow) sdlWindow.hidden = NO;
+			done = true;
+		};
+		[alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) {
+			NSString* text = alert.textFields.firstObject.text;
+			result = text ? [text UTF8String] : "";
+			dismiss();
+		}]];
+		[alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:^(UIAlertAction* action) {
+			dismiss();
+		}]];
+		// Create a dedicated window isolated from SDL's view hierarchy. Hidden (not key) so SDL retains key status,
+		// preventing orientation changes and touch disruption. SDL's window is hidden to stop VoiceOver forwarding touches to it.
+		if (@available(iOS 13.0, *)) {
+			for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+				if (scene.activationState == UISceneActivationStateForegroundActive && [scene isKindOfClass:[UIWindowScene class]]) {
+					alertWindow = [[UIWindow alloc] initWithWindowScene:(UIWindowScene*)scene];
+					break;
+				}
+			}
+		}
+		if (!alertWindow) alertWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+		alertWindow.rootViewController = [[UIViewController alloc] init];
+		alertWindow.windowLevel = UIWindowLevelAlert;
+		if (sdlWindow) sdlWindow.hidden = YES;
+		alertWindow.hidden = NO;
+		[alertWindow.rootViewController presentViewController:alert animated:YES completion:nil];
+	});
+	while (!done) [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+	return result;
+}
+#endif
