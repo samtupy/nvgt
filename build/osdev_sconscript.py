@@ -6,11 +6,25 @@ from pathlib import Path
 
 Import("env")
 
+def get_platform():
+	target = ARGUMENTS.get("target", "")
+	valid_targets = {"windows", "macos", "linux", "android", "ios"}
+	if target in valid_targets:
+		return target
+	platform_map = {"win32": "windows", "darwin": "macos", "posix": "linux"}
+	detected = platform_map.get(env["PLATFORM"], "")
+	if not detected:
+		print(f"Unknown host platform '{env['PLATFORM']}' and no valid target= argument specified.")
+		Exit(1)
+	return detected
+
+env["NVGT_TARGET"] = get_platform()
+
 prefix = ""
-if env["PLATFORM"] == "win32": prefix = "win"
-elif env["PLATFORM"] == "darwin": prefix = "macos"
-elif env["PLATFORM"] == "posix": prefix = "lin"
-else: Exit(1)
+if env["NVGT_TARGET"] == "windows": prefix = "win"
+elif env["NVGT_TARGET"] == "linux": prefix = "lin"
+elif env["NVGT_TARGET"] == "android": prefix = "droi"
+else: prefix = env["NVGT_TARGET"]
 env["NVGT_OSDEV_NAME"] = prefix + "dev"
 
 def set_osdev_paths(env, osdev_path = ARGUMENTS.get("deps_path", prefix + "dev")):
@@ -20,7 +34,7 @@ def set_osdev_paths(env, osdev_path = ARGUMENTS.get("deps_path", prefix + "dev")
 	if ARGUMENTS.get("debug", "0") == "1": env.Append(LIBPATH = [str(osdev_path / "debug" / "lib")])
 	env.Append(LIBPATH = [str(osdev_path / "lib")])
 	env["NVGT_OSDEV_PATH"] = str(Dir(osdev_path))
-	if env["PLATFORM"] == "win32":
+	if env["NVGT_TARGET"] == "windows":
 		if ARGUMENTS.get("debug", "0") == "1": env.Append(LIBPATH = [str(osdev_path / "debug" / "bin")])
 		env.Append(LIBPATH = [str(osdev_path / "bin")])
 
@@ -29,7 +43,7 @@ set_osdev_paths(env)
 # Copy dynamic libraries to the release/lib directory. Usually these are contained in osdev/bin or osdev/lib, but the entire libpath is searched. Later we may consider doing this only on a successful NVGT build, but this could cause it to happen too infrequently.
 def copy_osdev_libraries(env):
 	libs = ["archive", "bass", "bass_fx", "bassmix", "git2", "plist-2.0", "phonon"]
-	if env["PLATFORM"] == "win32": libs += ["GPUUtilities", "nvdaControllerClient64", "SAAPI64", "TrueAudioNext"]
+	if env["NVGT_TARGET"] == "windows": libs += ["GPUUtilities", "nvdaControllerClient64", "SAAPI64", "TrueAudioNext"]
 	for l in libs:
 		env.Install("#release/lib", FindFile(env.subst("${SHLIBPREFIX}" + l + ("$SHLIBSUFFIX" if not env["SHLIBSUFFIX"] in l else "")), env["LIBPATH"]))
 
