@@ -8,8 +8,8 @@ void main() {
 		alert("error", "can't load library");
 		return;
 	}
-	dictionary@ d = l.call("int MessageBoxW(int, ptr, ptr, int)", 0, string_recode("this is a test", "UTF8", "UTF16"), string_recode("no way this will work", "UTF8", "UTF16"), 1);
-	int r = -1;
-	d.get(0, r);
-	alert("test", r);
+	library_function@ MessageBoxW = l.get("int MessageBoxW(int, wchar*, wchar*, int)");
+	var@ d = MessageBoxW(0, "this is a test", "no way this will work", 1);
+	alert("test", int(d));
+	MessageBoxW(0, "It does?", "Whoa!", 0);
 }
