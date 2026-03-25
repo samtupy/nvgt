@@ -20,9 +20,6 @@
     "angelscript",
     "angelscript-nc",
     "reactphysics3d",
-    "bass",
-    "bass-fx",
-    "bassmix",
     "steam-audio-official",
     {
       "name": "openssl",
@@ -71,6 +68,26 @@
       "platform": "windows"
     },
     {
+      "name": "bass",
+      "platform": "!ios"
+    },
+    {
+      "name": "bass-fx",
+      "platform": "!ios"
+    },
+    {
+      "name": "bassmix",
+      "platform": "!ios"
+    },
+    {
+      "name": "libmysofa",
+      "platform": "ios"
+    },
+    {
+      "name": "pffft",
+      "platform": "ios"
+    },
+    {
       "name": "poco",
       "default-features": false,
       "features": [
@@ -79,7 +96,6 @@
         "json",
         "util",
         "xml",
-        "zip",
         "encodings",
         "mongodb",
         "redis",
