@@ -397,12 +397,12 @@ bool DestroyNVGTWindow() {
 	g_window = nullptr;
 	return true;
 }
-BOOL HideNVGTWindow() {
+bool HideNVGTWindow() {
 	if (!g_window) return false;
 	g_window->hide();
 	return true;
 }
-BOOL FocusNVGTWindow() {
+bool FocusNVGTWindow() {
 	if (!g_window) return false;
 	g_window->raise();
 	return true;
