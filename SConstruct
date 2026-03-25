@@ -179,22 +179,24 @@ if ARGUMENTS.get("no_stubs", "0") == "0":
 	if ARGUMENTS.get("debug", "0") == "1": stub_env["PDB"] = f"#build/debug/nvgt_{stub_platform}.pdb"
 	stub = stub_env.Program(f"release/stub/nvgt_{stub_platform}", stub_objects)
 	stub_env.AddPostAction(stub, fix_stub)
-	if env["NVGT_TARGET"] == "windows": env.Install("c:/nvgt/stub", stub)
-	if "upx" in env:
-		stub_u = stub_env.UPX(f"release/stub/nvgt_{stub_platform}_upx.bin", stub)
-		stub_env.AddPostAction(stub_u, fix_stub)
-		if env["NVGT_TARGET"] == "windows": env.Install("c:/nvgt/stub", stub_u)
+	if env["NVGT_TARGET"] == "windows":
+		env.Install("c:/nvgt/stub", stub)
+		if "upx" in env:
+			stub_u = stub_env.UPX(f"release/stub/nvgt_{stub_platform}_upx.bin", stub)
+			stub_env.AddPostAction(stub_u, fix_stub)
+			env.Install("c:/nvgt/stub", stub_u)
 	stublibs = list(stub_env["LIBS"])
 	if "angelscript" in stublibs:
 		stublibs[stublibs.index("angelscript")] = "angelscript_nc"
 		if ARGUMENTS.get("debug", "0") == "1": stub_env["PDB"] = f"#build/debug/nvgt_{stub_platform}_nc.pdb"
 		stub_nc = stub_env.Program(f"release/stub/nvgt_{stub_platform}_nc", stub_objects, LIBS = stublibs)
 		stub_env.AddPostAction(stub_nc, fix_stub)
-		if env["NVGT_TARGET"] == "windows": env.Install("c:/nvgt/stub", stub_nc)
-		if "upx" in env:
-			stub_nc_u = stub_env.UPX(f"release/stub/nvgt_{stub_platform}_nc_upx.bin", stub_nc)
-			stub_env.AddPostAction(stub_nc_u, fix_stub)
-			if env["NVGT_TARGET"] == "windows": env.Install("c:/nvgt/stub", stub_nc_u)
+		if env["NVGT_TARGET"] == "windows":
+			env.Install("c:/nvgt/stub", stub_nc)
+			if "upx" in env:
+				stub_nc_u = stub_env.UPX(f"release/stub/nvgt_{stub_platform}_nc_upx.bin", stub_nc)
+				stub_env.AddPostAction(stub_nc_u, fix_stub)
+				env.Install("c:/nvgt/stub", stub_nc_u)
 
 if ARGUMENTS.get("copylibs", "1") == "1":
 	env["NVGT_OSDEV_COPY_LIBS"](env)
