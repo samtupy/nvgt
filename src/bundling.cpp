@@ -513,7 +513,7 @@ protected:
 					archive_entry_set_pathname(de, appname.c_str());
 					archive_entry_set_filetype(de, AE_IFDIR);
 					archive_entry_set_perm(de, 0755);
-					archive_entry_set_mtime(de, Timestamp().epochTime(), 0)
+					archive_entry_set_mtime(de, Timestamp().epochTime(), 0);
 					archive_entry_set_size(de, 0);
 					archive_write_header(a, de);
 					archive_entry_free(de);
