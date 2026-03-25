@@ -28,6 +28,7 @@
 #include <Poco/Mutex.h>
 #include <Poco/Path.h>
 #include <Poco/Runnable.h>
+#include <Poco/String.h>
 #include <Poco/Thread.h>
 #include <Poco/Timestamp.h>
 #include <Poco/UnbufferedStreamBuf.h>
@@ -272,10 +273,8 @@ void ShowAngelscriptMessages() {
 			info_box("Compilation warnings", "", g_scriptMessagesWarn);
 	} else {
 	#endif
-		if (g_scriptMessagesErrNum)
-			message((g_ScriptEngine->GetEngineProperty(asEP_COMPILER_WARNINGS) == 2 ? g_scriptMessagesWarn : "") + (g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0), "Compilation error");
-		else
-			message(g_scriptMessagesWarn, "Compilation warnings");
+		if (g_scriptMessagesErrNum) message((g_ScriptEngine->GetEngineProperty(asEP_COMPILER_WARNINGS) == 2 ? g_scriptMessagesWarn : "") + (g_scriptMessagesErr != "" ? g_scriptMessagesErr : g_scriptMessagesLine0), "Compilation error");
+		else message(g_scriptMessagesWarn, "Compilation warnings");
 		#ifdef _WIN32
 	} // endif gui
 		#endif
@@ -843,8 +842,7 @@ int LoadCompiledExecutable(asIScriptEngine *engine) {
 	br >> data_location;
 	#endif
 	fs.seekg(data_location);
-	if (!load_embedded_packs(br))
-		return -1;
+	if (!load_embedded_packs(br)) return -1;
 	br.read7BitEncoded(code_size);
 	code_size ^= NVGT_BYTECODE_NUMBER_XOR;
 	unsigned char* code = (unsigned char*)malloc(code_size);
@@ -970,14 +968,11 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*us
 	if (cleanText.starts_with("include ")) {
 		cleanText.erase(0, 8);
 		g_IncludeDirs.insert(g_IncludeDirs.begin(), cleanText);
-	} else if (cleanText.starts_with("stub "))
-		g_stub = cleanText.substr(5);
-	else if (cleanText.starts_with("embed "))
-		embed_pack(cleanText.substr(6), Path(cleanText.substr(6)).getFileName());
-	else if (cleanText.starts_with("asset"))
-		add_game_asset_to_bundle(cleanText.substr(6));
-	else if (cleanText.starts_with("document"))
-		add_game_asset_to_bundle(cleanText.substr(9), GAME_ASSET_DOCUMENT);
+	} else if (cleanText.starts_with("stub ")) g_stub = cleanText.substr(5);
+	else if (cleanText.starts_with("embed ")) embed_pack(cleanText.substr(6), Path(cleanText.substr(6)).getFileName());
+	else if (cleanText.starts_with("asset $")) add_game_asset_to_bundle(cleanText.substr(7), GAME_ASSET_UNCOMPRESSED);
+	else if (cleanText.starts_with("asset")) add_game_asset_to_bundle(cleanText.substr(6));
+	else if (cleanText.starts_with("document")) add_game_asset_to_bundle(cleanText.substr(9), GAME_ASSET_DOCUMENT);
 	else if (cleanText.starts_with("plugin ")) {
 		string plugin_name = cleanText.substr(7);
 		if (find(g_pending_plugins.begin(), g_pending_plugins.end(), plugin_name) == g_pending_plugins.end())
@@ -992,6 +987,15 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*us
 		g_bcCompressionLevel = strtol(cleanText.substr(21).c_str(), NULL, 10);
 		if (g_bcCompressionLevel < 0 || g_bcCompressionLevel > 9)
 			return -1;
+	} else if (cleanText.starts_with("config ")) {
+		int sep = cleanText.find("=");
+		string key, value;
+		if (sep == string::npos) key = trim(cleanText.substr(7));
+		else {
+			key = trim(cleanText.substr(7, sep - 7));
+			value = trim(cleanText.substr(sep + 1));
+		}
+		config.setString(key, value);
 	} else if (cleanText.starts_with("namespace")) {
 		string ns = cleanText.substr(10);
 		int space = ns.rfind(" ");
@@ -999,8 +1003,7 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*us
 		g_system_namespaces[ns.substr(0, space)] = ns.substr(space + 1);
 	} else if (cleanText == "console") config.setString("build.windowsConsole", "");
 	else if (cleanText == "no_auto_chdir") config.setString("app.no_auto_chdir", "");
-	else
-		return -1;
+	else return -1;
 	return 0;
 }
 // angelscript debugger stuff taken from asrun sample.
