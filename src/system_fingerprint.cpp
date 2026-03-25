@@ -176,7 +176,9 @@ void getMacHash(unsigned short& mac1, unsigned short& mac2) {
 }
 
 #ifdef __APPLE__
+#include <TargetConditionals.h>
 unsigned long long getSystemSerialNumberHash() {
+	#if !TARGET_OS_IPHONE
 	unsigned long long hash = 0;
 	unsigned char* phash = (unsigned char*)&hash;
 	io_service_t platformExpert = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"));
@@ -192,6 +194,9 @@ unsigned long long getSystemSerialNumberHash() {
 	CFRelease(serialNumber);
 	IOObjectRelease(platformExpert);
 	return hash;
+	#else
+	return 0;
+	#endif
 }
 #endif
 
