@@ -13,7 +13,7 @@
 #pragma once
 
 // Game asset management.
-enum game_asset_flags { GAME_ASSET_DOCUMENT = 1 << 0 };
+enum game_asset_flags { GAME_ASSET_DOCUMENT = 1 << 0, GAME_ASSET_BINARY = 1 << 1, GAME_ASSET_UNCOMPRESSED = 1 << 2 };
 void add_game_asset_to_bundle(const std::string& filesystem_path, const std::string& bundled_path, int flags = 0);
 void add_game_asset_to_bundle(const std::string& path, int flags = 0);
 
