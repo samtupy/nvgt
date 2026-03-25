@@ -81,8 +81,13 @@ std::string get_data_location() {
 	#if defined(__ANDROID__)
 	return android_get_main_shared_object();
 	#elif defined(__APPLE__)
+		#ifndef NVGT_MOBILE
 		Path payload_file = Path(Util::Application::instance().commandPath()).makeParent().makeParent().append("Resources/exec");
-		return Poco::Environment::has("MACOS_BUNDLED_APP") && File(payload_file).exists()? payload_file.toString() : executable;
+		#else
+		Path payload_file = Path(Util::Application::instance().commandPath()).makeParent().append("exec");
+		#endif
+		payload_file.makeFile();
+		return (Poco::Environment::has("MACOS_BUNDLED_APP") || running_on_mobile()) && File(payload_file).exists()? payload_file.toString() : executable;
 	#else
 		return executable;
 	#endif

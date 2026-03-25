@@ -12,12 +12,15 @@
 
 #include <angelscript.h>
 #include "tts.h"
+#include "xplatform.h"
 #ifdef _WIN32
 	#include "win.h"
 	#include "InputBox.h"
 #elif defined(__APPLE__)
 	#include <IOKit/IOKitLib.h>
+	#ifndef NVGT_MOBILE
 	#include <IOKit/IOCFBundle.h>
+	#endif
 	#include <CoreFoundation/CoreFoundation.h>
 	#include "apple.h"
 #elif defined(__ANDROID__)
@@ -257,7 +260,7 @@ game_window::game_window(const std::string& title, unsigned int w, unsigned int 
 	#ifdef __APPLE__
 	SDL_ShowWindow(_window);
 	SDL_RaiseWindow(_window);
-	voice_over_window_created();
+	voice_over_window_created(this);
 	#endif
 }
 game_window::game_window(SDL_Window* window) : _window(window), _owns_window(false), _native_window(nullptr), _refcount(1) {

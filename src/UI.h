@@ -22,8 +22,13 @@
 typedef HWND native_window_t;
 #define NATIVE_WINDOW_SDL_PROP SDL_PROP_WINDOW_WIN32_HWND_POINTER
 #elif defined(__APPLE__)
+#ifndef NVGT_MOBILE
 typedef void* native_window_t; // NSWindow*, cast in .mm code
 #define NATIVE_WINDOW_SDL_PROP SDL_PROP_WINDOW_COCOA_WINDOW_POINTER
+#else
+typedef void* native_window_t; // UIWindow*, cast in .mm code
+#define NATIVE_WINDOW_SDL_PROP SDL_PROP_WINDOW_UIKIT_WINDOW_POINTER
+#endif
 #elif defined(__ANDROID__)
 typedef void* native_window_t; // ANativeWindow*
 #define NATIVE_WINDOW_SDL_PROP SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER

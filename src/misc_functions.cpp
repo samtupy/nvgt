@@ -47,7 +47,7 @@
 #include <fast_float/fast_float.h>
 #include <system_error>
 
-BOOL ChDir(const std::string& d) {
+bool ChDir(const std::string& d) {
 	#ifdef _WIN32
 	return _chdir(d.c_str()) == 0;
 	#else
