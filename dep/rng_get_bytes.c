@@ -13,6 +13,7 @@
 */
 
 #include <assert.h>
+#include "rng_get_bytes.h"
 
 #if !defined(_WIN32)
 #include <stdio.h>
