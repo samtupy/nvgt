@@ -623,8 +623,9 @@ int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
 	builder.SetPragmaCallback(PragmaCallback, 0);
 	if (builder.StartNewModule(engine, "nvgt_game") < 0)
 		return -1;
-	if (g_platform != "auto")
-		builder.DefineWord(g_platform.c_str());
+	if (g_platform != "auto") builder.DefineWord(g_platform.c_str());
+	if (g_platform == "ios" || g_platform == "android") builder.DefineWord("mobile");
+	else builder.DefineWord("desktop");
 	asIScriptModule *mod = builder.GetModule();
 	if (mod)
 		mod->SetAccessMask(NVGT_SUBSYSTEM_EVERYTHING);
