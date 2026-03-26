@@ -74,7 +74,7 @@ void add_game_asset_to_bundle(const string& path, int flags) {
 	while (semi && semi != string::npos && path[semi -1] == '\\' ) semi = path.find_first_of(';', semi + 1);
 	return add_game_asset_to_bundle(path.substr(0, semi), path.substr(semi +1 ), flags);
 }
-set<string> g_bundle_libraries = {"nvdaControllerClient64", "phonon", "SAAPI64"};
+set<string> g_bundle_libraries = {"nvdaControllerClient64", "phonon", "SAAPI64", "zdsrapi"};
 void nvgt_bundle_shared_library(const string& libname) {
 	g_bundle_libraries.insert(libname);
 }
