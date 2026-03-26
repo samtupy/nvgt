@@ -315,6 +315,7 @@ void nvgt_line_callback(asIScriptContext *ctx, void* obj) {
 }
 #ifndef NVGT_STUB
 int IncludeCallback(const char* filename, const char* sectionname, CScriptBuilder *builder, void* param) {
+	builder->DefineWord("include"); // In scriptbuilder, #if has already been checked for the main section before it's #include directives are parsed, so if this word is set, we're certainly handling an include.
 	#ifdef NVGT_MOBILE
 	// Including scripts on mobile platforms that use content URIs and sandboxing is far from ideal, we're currently restricted to assets bundled with the NVGT runner which must be accessed via file_get_contents at this time.
 	string include_text = file_get_contents(filename);
