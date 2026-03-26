@@ -138,6 +138,74 @@ public:
 
 extern Poco::AutoPtr<game_window> g_window;
 
+enum system_tray_menu_item_type { SYSTEM_TRAY_ITEM, SYSTEM_TRAY_CHECKBOX, SYSTEM_TRAY_SEPARATOR, SYSTEM_TRAY_SUBMENU };
+
+class system_tray_menu_item;
+class system_tray_menu;
+class system_tray;
+
+class system_tray_menu_item {
+	SDL_TrayEntry* _entry;
+	Poco::AutoPtr<system_tray_menu> _submenu; // lazily created when get_submenu() is first called on a SYSTEM_TRAY_SUBMENU item
+	asIScriptFunction* _callback;
+	system_tray_menu_item_type _type;
+	mutable int _refcount;
+public:
+	system_tray_menu_item(SDL_TrayEntry* entry, system_tray_menu_item_type type);
+	~system_tray_menu_item(); // defined in .cpp so that system_tray_menu is complete there
+	void duplicate() { asAtomicInc(_refcount); }
+	void release() { if (asAtomicDec(_refcount) < 1) delete this; }
+	SDL_TrayEntry* get_sdl_entry() const { return _entry; }
+	bool is_valid() const { return _entry != nullptr; }
+	void invalidate() { _entry = nullptr; } // called by system_tray_menu::remove_entry
+	system_tray_menu_item_type get_type() const { return _type; }
+	void set_label(const std::string& label) { if (_entry) SDL_SetTrayEntryLabel(_entry, label.c_str()); }
+	std::string get_label() const { return _entry ? from_cstr(SDL_GetTrayEntryLabel(_entry)) : ""; }
+	void set_checked(bool checked) { if (_entry) SDL_SetTrayEntryChecked(_entry, checked); }
+	bool get_checked() const { return _entry && SDL_GetTrayEntryChecked(_entry); }
+	void set_enabled(bool enabled) { if (_entry) SDL_SetTrayEntryEnabled(_entry, enabled); }
+	bool get_enabled() const { return _entry && SDL_GetTrayEntryEnabled(_entry); }
+	void click() { if (_entry) SDL_ClickTrayEntry(_entry); }
+	void set_callback(asIScriptFunction* func);
+	void invoke_callback();
+	system_tray_menu* get_submenu(); // returns nullptr unless type is SYSTEM_TRAY_SUBMENU
+};
+
+class system_tray_menu {
+	SDL_TrayMenu* _menu;
+	std::vector<Poco::AutoPtr<system_tray_menu_item>> _items;
+	mutable int _refcount;
+	system_tray_menu_item* make_entry(int pos, const char* label, SDL_TrayEntryFlags flags, system_tray_menu_item_type type);
+public:
+	system_tray_menu(SDL_TrayMenu* menu);
+	void duplicate() { asAtomicInc(_refcount); }
+	void release() { if (asAtomicDec(_refcount) < 1) delete this; }
+	SDL_TrayMenu* get_sdl_menu() const { return _menu; }
+	system_tray_menu_item* insert_item(const std::string& label, asIScriptFunction* callback = nullptr, bool disabled = false, int pos = -1);
+	system_tray_menu_item* insert_checkbox(const std::string& label, bool checked = false, asIScriptFunction* callback = nullptr, bool disabled = false, int pos = -1);
+	system_tray_menu_item* insert_submenu(const std::string& label, bool disabled = false, int pos = -1);
+	system_tray_menu_item* insert_separator(int pos = -1);
+	system_tray_menu_item* find_item(SDL_TrayEntry* entry);
+	void remove_entry(system_tray_menu_item* item);
+	int get_entry_count() const;
+	CScriptArray* get_entries();
+};
+
+class system_tray {
+	SDL_Tray* _tray;
+	Poco::AutoPtr<system_tray_menu> _menu; // lazily created when get_menu() is first called
+	mutable int _refcount;
+public:
+	system_tray(const std::string& tooltip, graphic* icon);
+	~system_tray();
+	void duplicate() { asAtomicInc(_refcount); }
+	void release() { if (asAtomicDec(_refcount) < 1) delete this; }
+	bool is_valid() const { return _tray != nullptr; }
+	void set_icon(graphic* icon) { if (_tray) SDL_SetTrayIcon(_tray, icon ? icon->get_surface() : nullptr); }
+	void set_tooltip(const std::string& tooltip) { if (_tray) SDL_SetTrayTooltip(_tray, tooltip.empty() ? nullptr : tooltip.c_str()); }
+	system_tray_menu* get_menu();
+};
+
 game_window* ShowNVGTWindow(const std::string& window_title, unsigned int flags = 0);
 bool DestroyNVGTWindow();
 bool WindowIsFocused();
