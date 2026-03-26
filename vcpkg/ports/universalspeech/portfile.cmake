@@ -4,8 +4,8 @@ vcpkg_find_acquire_program(SCONS)
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO samtupy/UniversalSpeechMSVCStatic
-    REF ad2fb95eca691eb580121d716d8b89d68cb912e2
-    SHA512 37dbf79fa6264fc82829d433b572373358831e3ea407582693274c3b96bb52f750ace501ff9bf32b4d8fea56fcca5274b235a3af50223df8edbe4c8a928c5efd
+    REF 9bf2ed99e706e5eaa51744fcb9e348862b1583fe
+    SHA512 3f1528ad9593e354f5079a61dcdaba1d3c1c51827ff12a2dde960de7c0e409a1d55d0b2bf688b84ea04245642fd57bf9c52cb418cc0ff96773910dd8a80362cb
     HEAD_REF master
 )
 
