@@ -46,11 +46,12 @@
 using namespace Poco;
 
 // SDL file stream implementation
-sdl_file_stream_buf::sdl_file_stream_buf() : BufferedBidirectionalStreamBuf(8192, std::ios::in | std::ios::out), _handle(nullptr) {}
+sdl_file_stream_buf::sdl_file_stream_buf() : BufferedBidirectionalStreamBuf(8192, std::ios::in | std::ios::out), _handle(nullptr), _owns_handle(true) {}
 sdl_file_stream_buf::~sdl_file_stream_buf() { close(); }
 void sdl_file_stream_buf::open(const std::string& path, const std::string& mode) {
 	close();
 	resetBuffers();
+	_owns_handle = true;
 	_path = path;
 	_handle = SDL_IOFromFile(path.c_str(), mode.c_str());
 	if (!_handle) throw FileException("Cannot open file: " + path);
@@ -64,11 +65,24 @@ void sdl_file_stream_buf::open(const std::string& path, const std::string& mode)
 	}
 	setMode(new_mode);
 }
+void sdl_file_stream_buf::attach(SDL_IOStream* io, std::ios::openmode mode) {
+	close();
+	resetBuffers();
+	_handle = io;
+	_owns_handle = false;
+	setMode(mode);
+}
+void sdl_file_stream_buf::detach() {
+	if (_handle) {
+		if (getMode() & std::ios::out) sync();
+		_handle = nullptr;
+	}
+}
 bool sdl_file_stream_buf::close() {
 	bool success = true;
 	if (_handle) {
 		sync();
-		success = SDL_CloseIO(_handle);
+		if (_owns_handle) success = SDL_CloseIO(_handle);
 		_handle = nullptr;
 	}
 	_path.clear();
@@ -120,6 +134,8 @@ SDL_IOWhence sdl_file_stream_buf::seekdir_to_whence(std::ios::seekdir dir) const
 
 sdl_file_ios::sdl_file_ios() { poco_ios_init(&_buf); }
 void sdl_file_ios::open(const std::string& path, const std::string& mode) { clear(); _buf.open(path, mode); }
+void sdl_file_ios::attach(SDL_IOStream* io, std::ios::openmode mode) { clear(); _buf.attach(io, mode); }
+void sdl_file_ios::detach() { _buf.detach(); }
 void sdl_file_ios::close() { if (!_buf.close()) setstate(std::ios::badbit); }
 sdl_file_stream_buf* sdl_file_ios::rdbuf() { return &_buf; }
 sdl_file_ios::NativeHandle sdl_file_ios::nativeHandle() const { return _buf.nativeHandle(); }
@@ -128,12 +144,15 @@ void sdl_file_ios::flushToDisk() { _buf.flushToDisk(); }
 
 sdl_file_input_stream::sdl_file_input_stream() : std::istream(&_buf) {}
 sdl_file_input_stream::sdl_file_input_stream(const std::string& path, const std::string& mode) : std::istream(&_buf) { open(path, mode); }
+sdl_file_input_stream::sdl_file_input_stream(SDL_IOStream* io) : std::istream(&_buf) { attach(io, std::ios::in); }
 
 sdl_file_output_stream::sdl_file_output_stream() : std::ostream(&_buf) {}
 sdl_file_output_stream::sdl_file_output_stream(const std::string& path, const std::string& mode) : std::ostream(&_buf) { open(path, mode); }
+sdl_file_output_stream::sdl_file_output_stream(SDL_IOStream* io) : std::ostream(&_buf) { attach(io, std::ios::out); }
 
 sdl_file_stream::sdl_file_stream() : std::iostream(&_buf) {}
 sdl_file_stream::sdl_file_stream(const std::string& path, const std::string& mode) : std::iostream(&_buf) { open(path, mode); }
+sdl_file_stream::sdl_file_stream(SDL_IOStream* io, std::ios::openmode mode) : std::iostream(&_buf) { attach(io, mode); }
 
 // Prebuffered input stream implementation
 prebuffer_istreambuf::prebuffer_istreambuf(std::istream& source, std::size_t prebuffer_size) : BasicBufferedStreamBuf(4096, std::ios_base::in), source(&source), prebuffer_size(prebuffer_size), prebuffer_pos(0), prebuffer_discarded(false), owns_source(false) {
@@ -346,8 +365,8 @@ long long datastream::get_wpos() {
 	return _ostr ? (long long)_ostr->tellp() : -1;
 }
 std::string datastream::read(unsigned int size) {
-	if (!r)
-		return "";
+	if (!r) return "";
+	if (skip_eof && eof()) stream()->clear();
 	std::string output;
 	if (!size) {
 		std::streampos pos = _istr->tellg();
@@ -370,15 +389,13 @@ std::string datastream::read(unsigned int size) {
 	return output;
 }
 std::string datastream::read_line() {
-	if (!_istr)
-		return "";
+	if (!_istr) return "";
 	std::string result;
 	std::getline(*_istr, result);
 	return result;
 }
 UInt64 datastream::read_7bit_encoded() {
-	if (!_istr)
-		return 0;
+	if (!_istr) return 0;
 	UInt64 integer;
 	r->read7BitEncoded(integer);
 	return integer;
@@ -400,6 +417,12 @@ bool datastream::can_write() {
 		_istr->clear(); // Should we seek here or something?
 	return true;
 }
+void datastream::flush() {
+	if (!_ostr) return;
+	_ostr->flush();
+	sdl_file_ios* sdlio = dynamic_cast<sdl_file_ios*>(_ostr);
+	if (sdlio) sdlio->flushToDisk();
+}
 unsigned int datastream::write(const std::string& data) {
 	if (!can_write())
 		return 0;
@@ -411,24 +434,23 @@ unsigned int datastream::write(const std::string& data) {
 	} catch (std::exception) {
 		return long(_ostr->tellp()) - pos;
 	}
+	if (autoflush) flush();
 	return long(_ostr->tellp()) - pos; // This is the only function with the extra tellp operations, for bgt backwards compatibility.
 }
 template <typename T>
 datastream& datastream::read(T& value) {
-	if (!r)
-		return *this;
+	if (!r) return *this;
+	if (skip_eof && eof()) stream()->clear();
 	binary ? (*r) >> value : (*_istr) >> value;
 	return *this;
 }
 template <typename T>
 T datastream::read() {
 	T value;
-	if constexpr(std::is_same<T, std::string>::value)
-		value = "";
-	else
-		value = 0;
-	if (!r)
-		return value;
+	if constexpr(std::is_same<T, std::string>::value) value = "";
+	else value = 0;
+	if (!r) return value;
+	if (skip_eof && eof()) stream()->clear();
 	binary ? (*r) >> value : (*_istr) >> value;
 	return value;
 }
@@ -437,6 +459,7 @@ datastream& datastream::write(T value) {
 	if (!can_write())
 		return *this;
 	binary ? (*w) << value : (*_ostr) << value;
+	if (autoflush) flush();
 	return *this;
 }
 std::string datastream::read_until(const std::string& text, bool require_full) {
@@ -558,7 +581,10 @@ void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classnam
 	RegisterDatastreamReadwrite<double>(engine, classname, "double");
 	RegisterDatastreamReadwrite<std::string>(engine, classname, "string");
 	engine->RegisterObjectProperty(classname.c_str(), "bool binary", asOFFSET(datastream, binary));
+	engine->RegisterObjectProperty(classname.c_str(), "bool autoflush", asOFFSET(datastream, autoflush));
+	engine->RegisterObjectProperty(classname.c_str(), "bool skip_eof", asOFFSET(datastream, skip_eof));
 	engine->RegisterObjectProperty(classname.c_str(), "bool sync_rw_cursors", asOFFSET(datastream, sync_rw_cursors));
+	engine->RegisterObjectMethod(classname.c_str(), "void flush()", asMETHOD(datastream, flush), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_good() const property", asMETHOD(datastream, good), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_bad() const property", asMETHOD(datastream, bad), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_fail() const property", asMETHOD(datastream, fail), asCALL_THISCALL);

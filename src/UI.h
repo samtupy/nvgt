@@ -52,6 +52,7 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 bool ClipboardSetText(const std::string& text);
 std::string simple_file_open_dialog(const std::string& filters = "All files:*", const std::string& default_location = "");
 bool urlopen(const std::string& url);
+bool is_console_available();
 
 class game_window {
 	SDL_Window* _window;

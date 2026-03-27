@@ -1,0 +1,15 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2026 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	process@ cmd = run({"cmd", "/Q"}, PROCESS_CAPTURE | PROCESS_PIPE_STDIN);
+	string output;
+	while ((output = cmd.stdout.read()).empty()) wait(10);
+	alert("test", output);
+	cmd.stdin << "echo this is a test\n";
+	while ((output = cmd.stdout.read()).empty()) wait(10);
+	alert("test", output);
+	cmd.stdin << "exit\n";
+	alert(cmd.pid, cmd.wait());
+}

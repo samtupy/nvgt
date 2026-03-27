@@ -1,0 +1,8 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2026 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	process@ p = run({"nvgt", "--help"}, PROCESS_CAPTURE);
+	alert("test", p.read());
+}

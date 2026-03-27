@@ -22,9 +22,8 @@
 	#include <direct.h>
 #else
 	#include <unistd.h>
-	#include <sys/types.h>
-	#include <sys/wait.h>
 #endif
+#include <Poco/AutoPtr.h>
 #include <Poco/Exception.h>
 #include <Poco/TextConverter.h>
 #include <Poco/TextIterator.h>
@@ -37,6 +36,7 @@
 #include <SDL3/SDL.h>
 #include <tinyexpr.h>
 #include <dbgtools.h>
+#include "datastreams.h"
 #include "nvgt_angelscript.h"
 #include "nvgt.h"
 #include "UI.h" // wait
@@ -100,46 +100,151 @@ double Round(double n, int p) {
 		return round(n / P) * P;
 	return round(n);
 }
+enum process_flags {
+	PROCESS_PIPE_STDIN = 1,        // connect stdin to a writable datastream
+	PROCESS_PIPE_STDOUT = 2,       // connect stdout to a readable datastream
+	PROCESS_PIPE_STDERR = 4,       // connect stderr to a readable datastream
+	PROCESS_STDERR_TO_STDOUT = 8,  // redirect stderr into stdout (ignored if PROCESS_PIPE_STDERR is set)
+	PROCESS_BACKGROUND = 16,       // run process detached from the console
+	PROCESS_WAIT = 32,             // block until the process exits (used by the bool run() overload)
+	PROCESS_FAIL_EXCEPTION = 64,   // throw a Poco::RuntimeException containing SDL_GetError() if the process fails to launch
+	PROCESS_CAPTURE = 128,         // convenience flag: forces PROCESS_PIPE_STDOUT | PROCESS_PIPE_STDERR
+};
+
+// close_cb called by datastream when closing. Detaches the underlying SDL_IOStream handle so that close doesn't try to SDL_CloseIO a stream owned by SDL_Process.
+static void process_stream_detach_cb(datastream* ds) {
+	if (ds->user) static_cast<sdl_file_ios*>(ds->user)->detach(); // user is then nulled by datastream::close() after calling the callback; the stream itself is deleted by the datastream as it owns _istr/_ostr.
+}
+
+class process {
+	SDL_Process* _proc;
+	Poco::AutoPtr<datastream> _stdin_ds;
+	Poco::AutoPtr<datastream> _stdout_ds;
+	Poco::AutoPtr<datastream> _stderr_ds;
+	mutable int _refcount;
+	datastream* make_stream(SDL_IOStream* io, std::ios::openmode mode) {
+		if (!io) return nullptr;
+		datastream* ds = mode & std::ios::in? new datastream(new sdl_file_input_stream(io), nullptr, "", Poco::BinaryReader::NATIVE_BYTE_ORDER, nullptr) : new datastream(nullptr, new sdl_file_output_stream(io), "", Poco::BinaryReader::NATIVE_BYTE_ORDER, nullptr);
+		ds->set_close_callback(process_stream_detach_cb);
+		ds->binary = false;
+		ds->skip_eof = true;
+		if (mode & std::ios::out) ds->autoflush = true;
+		return ds;
+	}
+	void detach_stream(Poco::AutoPtr<datastream>& ds) {
+		sdl_file_ios* fs = nullptr;
+		if (ds && ds->get_istr()) fs = dynamic_cast<sdl_file_ios*>(ds->get_istr());
+		else if (ds && ds->get_ostr()) fs = dynamic_cast<sdl_file_ios*>(ds->get_ostr());
+		if (fs) fs->detach();
+	}
+public:
+	process(SDL_Process* proc) : _proc(proc), _refcount(1) {}
+	~process() {
+		// Detach all stdio wrappers before destroying the SDL process; SDL_DestroyProcess frees the underlying SDL_IOStreams.
+		detach_stream(_stdin_ds);
+		detach_stream(_stdout_ds);
+		detach_stream(_stderr_ds);
+		if (_proc) SDL_DestroyProcess(_proc);
+	}
+	void duplicate() { asAtomicInc(_refcount); }
+	void release() { if (asAtomicDec(_refcount) < 1) delete this; }
+	bool is_valid() const { return _proc != nullptr; }
+	Sint64 get_pid() const {
+		if (!_proc) return -1;
+		return SDL_GetNumberProperty(SDL_GetProcessProperties(_proc), SDL_PROP_PROCESS_PID_NUMBER, -1);
+	}
+	bool kill(bool force = true) { return _proc && SDL_KillProcess(_proc, force); }
+	bool running() const { return _proc && !SDL_WaitProcess(_proc, false, nullptr); }
+	int wait() { int code = -1; if (_proc) SDL_WaitProcess(_proc, true, &code); return code; }
+	std::string read() {
+		if (!_proc) return "";
+		size_t datasize = 0;
+		void* data = SDL_ReadProcess(_proc, &datasize, nullptr);
+		if (!data) return "";
+		std::string result(static_cast<char*>(data), datasize);
+		SDL_free(data);
+		return result;
+	}
+	datastream* get_stdin() {
+		if (!_proc) return nullptr;
+		if (!_stdin_ds) {
+			SDL_IOStream* io = SDL_GetProcessInput(_proc);
+			datastream* ds = make_stream(io, std::ios::out);
+			if (ds) _stdin_ds = ds;
+			else return nullptr;
+		}
+		return _stdin_ds.get();
+	}
+	datastream* get_stdout() {
+		if (!_proc) return nullptr;
+		if (!_stdout_ds) {
+			SDL_IOStream* io = SDL_GetProcessOutput(_proc);
+			datastream* ds = make_stream(io, std::ios::in);
+			if (ds) _stdout_ds = ds;
+			else return nullptr;
+		}
+		return _stdout_ds.get();
+	}
+	datastream* get_stderr() {
+		if (!_proc) return nullptr;
+		if (!_stderr_ds) {
+			SDL_PropertiesID props = SDL_GetProcessProperties(_proc);
+			SDL_IOStream* io = props ? static_cast<SDL_IOStream*>(SDL_GetPointerProperty(props, SDL_PROP_PROCESS_STDERR_POINTER, nullptr)) : nullptr;
+			datastream* ds = make_stream(io, std::ios::in);
+			if (ds) _stderr_ds = ds;
+			else return nullptr;
+		}
+		return _stderr_ds.get();
+	}
+};
+
+process* run(const std::vector<std::string>& args, int flags, const std::string& workdir) {
+	if (args.empty()) return nullptr;
+	// Expand convenience flags and auto-pipe stdout/stderr when no console is available (e.g. GUI subsystem on Windows, where DuplicateHandle on invalid stdio handles would otherwise cause CreateProcessWithProperties to fail).
+	if ((flags & PROCESS_CAPTURE) || !is_console_available()) flags |= PROCESS_PIPE_STDOUT | PROCESS_PIPE_STDERR;
+	std::vector<const char*> argv;
+	argv.reserve(args.size() + 1);
+	for (const auto& a : args) argv.push_back(a.c_str());
+	argv.push_back(nullptr);
+	SDL_PropertiesID props = SDL_CreateProperties();
+	if (!props) return nullptr;
+	SDL_SetPointerProperty(props, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, argv.data());
+	if (!workdir.empty()) SDL_SetStringProperty(props, SDL_PROP_PROCESS_CREATE_WORKING_DIRECTORY_STRING, workdir.c_str());
+	if (flags & PROCESS_PIPE_STDIN) SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_APP);
+	if (flags & PROCESS_PIPE_STDOUT) SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP);
+	if (flags & PROCESS_PIPE_STDERR) SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_APP);
+	if ((flags & PROCESS_STDERR_TO_STDOUT) && !(flags & PROCESS_PIPE_STDERR)) SDL_SetBooleanProperty(props, SDL_PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN, true);
+	if (flags & PROCESS_BACKGROUND) SDL_SetBooleanProperty(props, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true);
+	SDL_Process* proc = SDL_CreateProcessWithProperties(props);
+	SDL_DestroyProperties(props);
+	if (!proc) {
+		if (flags & PROCESS_FAIL_EXCEPTION) throw Poco::RuntimeException("process launch failed", SDL_GetError());
+		return nullptr;
+	}
+	process* result = new process(proc);
+	if (flags & PROCESS_WAIT) result->wait();
+	return result;
+}
+
+static process* run_script(CScriptArray* args, int flags = 0, const std::string& workdir = "") {
+	if (!args) return nullptr;
+	std::vector<std::string> vargs;
+	vargs.reserve(args->GetSize());
+	for (asUINT i = 0; i < args->GetSize(); i++) vargs.push_back(*static_cast<std::string*>(args->At(i)));
+	return run(vargs, flags, workdir);
+}
+
 bool run(const std::string& filename, const std::string& cmdline, bool wait_for_completion, bool background) {
-	#ifdef _WIN32
-	std::wstring exe;
-	std::wstring args;
-	Poco::UnicodeConverter::convert(filename, exe);
-	Poco::UnicodeConverter::convert(cmdline, args);
-	std::wstring full = L"\"" + exe + L"\"";
-	if (!args.empty()) {
-		full += L" ";
-		full += args;
+	std::vector<std::string> args;
+	args.push_back(filename);
+	if (!cmdline.empty()) {
+		std::istringstream iss(cmdline);
+		std::string token;
+		while (iss >> token) args.push_back(token);
 	}
-	std::vector<wchar_t> buffer(full.begin(), full.end());
-	buffer.push_back(L'\0');
-	STARTUPINFOW si{};
-	si.cb = sizeof(si);
-	si.dwFlags = STARTF_USESHOWWINDOW;
-	si.wShowWindow = background ? SW_HIDE : SW_SHOW;
-	PROCESS_INFORMATION pi{};
-	DWORD flags = background ? CREATE_NO_WINDOW : 0;
-	BOOL ok = CreateProcessW(nullptr, buffer.data(), nullptr, nullptr, FALSE, flags, nullptr, nullptr, &si, &pi);
-	if (!ok) return false;
-	if (wait_for_completion) WaitForSingleObject(pi.hProcess, INFINITE);
-	CloseHandle(pi.hProcess);
-	CloseHandle(pi.hThread);
-	return true;
-	#else
-	int status;
-	pid_t pid = fork();
-	if (pid < 0) return false;
-	else if (pid == 0) {
-		std::string cmd = filename;
-		cmd += " ";
-		cmd += cmdline;
-		execl("/bin/sh", "/bin/sh", "-c", cmd.c_str(), NULL);
-		_exit(EXIT_FAILURE);
-	} else {
-		if (!wait_for_completion) return true;
-		else return waitpid(pid, &status, 0) == pid;
-	}
-	#endif
+	int flags = (wait_for_completion ? PROCESS_WAIT : 0) | (background ? PROCESS_BACKGROUND : 0);
+	Poco::AutoPtr<process> proc(run(args, flags, ""));
+	return proc != nullptr;
 }
 double tinyexpr(const std::string& expr) {
 	return te_interp(expr.c_str(), NULL);
@@ -401,7 +506,29 @@ void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction(_O("string[]@ get_preferred_locales()"), asFUNCTION(get_preferred_locales), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_COMMAND_LINE() property"), asFUNCTION(get_command_line), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool run(const string& in filename, const string& in arguments, bool wait_for_completion, bool background)"), asFUNCTION(run), asCALL_CDECL);
+	engine->RegisterEnum(_O("process_flags"));
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_PIPE_STDIN"), PROCESS_PIPE_STDIN);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_PIPE_STDOUT"), PROCESS_PIPE_STDOUT);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_PIPE_STDERR"), PROCESS_PIPE_STDERR);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_STDERR_TO_STDOUT"), PROCESS_STDERR_TO_STDOUT);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_BACKGROUND"), PROCESS_BACKGROUND);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_WAIT"), PROCESS_WAIT);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_FAIL_EXCEPTION"), PROCESS_FAIL_EXCEPTION);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_CAPTURE"), PROCESS_CAPTURE);
+	engine->RegisterObjectType(_O("process"), 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour(_O("process"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(process, duplicate), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour(_O("process"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(process, release), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("bool get_valid() const property"), asMETHOD(process, is_valid), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("int64 get_pid() const property"), asMETHOD(process, get_pid), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("bool get_running() const property"), asMETHOD(process, running), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("bool kill(bool force = true)"), asMETHOD(process, kill), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("int wait()"), asMETHOD(process, wait), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("string read()"), asMETHOD(process, read), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("datastream@+ get_stdin() property"), asMETHOD(process, get_stdin), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("datastream@+ get_stdout() property"), asMETHOD(process, get_stdout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("datastream@+ get_stderr() property"), asMETHOD(process, get_stderr), asCALL_THISCALL);
+	engine->RegisterGlobalFunction(_O("process@ run(const string[]& in args, int flags = 0, const string& in workdir = \"\")"), asFUNCTION(run_script), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool run(const string& in filename, const string& in arguments, bool wait_for_completion, bool background)"), asFUNCTIONPR(run, (const std::string&, const std::string&, bool, bool), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool is_debugger_present()"), asFUNCTION(debugger_present), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int get_last_error()"), asFUNCTION(get_last_error), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64 get_process_id()"), asFUNCTION(get_process_id), asCALL_CDECL);

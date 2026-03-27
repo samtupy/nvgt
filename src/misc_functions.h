@@ -12,9 +12,12 @@
 
 #pragma once
 #include <string>
+#include <vector>
 #include <angelscript.h>
 #include "nvgt.h"
 class CScriptArray;
+class datastream;
+class process;
 
 asINT64 GetFileSize(const std::string& path);
 bool ChDir(const std::string& d);
@@ -55,4 +58,6 @@ struct script_memory_buffer {
 	static script_memory_buffer* create(asITypeInfo* subtype, void* ptr, uint64_t size);
 	static void angelscript_register(asIScriptEngine* engine);
 };
+process* run(const std::vector<std::string>& args, int flags = 0, const std::string& workdir = "");
+bool run(const std::string& filename, const std::string& cmdline, bool wait_for_completion, bool background);
 void RegisterMiscFunctions(asIScriptEngine* engine);
