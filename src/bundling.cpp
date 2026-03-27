@@ -479,7 +479,7 @@ protected:
 		char* plist_xml;
 		uint32_t plist_len;
 		if (plist_to_xml(plist, &plist_xml, &plist_len) != PLIST_ERR_SUCCESS) throw Exception("Unable to create info.plist");
-		FileOutputStream plist_out(Path(workplace.path()).append("Contents/info.plist").toString());
+		FileOutputStream plist_out(Path(workplace.path()).append("Contents/Info.plist").toString());
 		plist_out.write(plist_xml, plist_len);
 		plist_out.close();
 		plist_mem_free(plist_xml);
