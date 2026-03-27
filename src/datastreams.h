@@ -27,11 +27,14 @@
 class sdl_file_stream_buf : public Poco::BufferedBidirectionalStreamBuf {
 	std::string _path;
 	SDL_IOStream* _handle;
+	bool _owns_handle; // false when wrapping an externally-owned SDL_IOStream (e.g. process stdio)
 	SDL_IOWhence seekdir_to_whence(std::ios::seekdir dir) const;
 public:
 	sdl_file_stream_buf();
 	~sdl_file_stream_buf();
 	void open(const std::string& path, const std::string& mode);
+	void attach(SDL_IOStream* io, std::ios::openmode mode); // wrap an externally-owned stream (does not close on destruction)
+	void detach(); // null the handle without closing it, used before the owning object frees the SDL_IOStream
 	bool close();
 	std::streampos seekoff(std::streamoff off, std::ios::seekdir dir, std::ios::openmode mode = std::ios::in | std::ios::out) override;
 	std::streampos seekpos(std::streampos pos, std::ios::openmode mode = std::ios::in | std::ios::out) override;
@@ -47,6 +50,8 @@ public:
 	using NativeHandle = SDL_IOStream*;
 	sdl_file_ios();
 	virtual void open(const std::string& path, const std::string& mode);
+	void attach(SDL_IOStream* io, std::ios::openmode mode);
+	void detach();
 	void close();
 	sdl_file_stream_buf* rdbuf();
 	NativeHandle nativeHandle() const;
@@ -59,16 +64,19 @@ class sdl_file_input_stream : public sdl_file_ios, public std::istream {
 public:
 	sdl_file_input_stream();
 	sdl_file_input_stream(const std::string& path, const std::string& mode = "rb");
+	sdl_file_input_stream(SDL_IOStream* io); // wrap an externally-owned read stream
 };
 class sdl_file_output_stream : public sdl_file_ios, public std::ostream {
 public:
 	sdl_file_output_stream();
 	sdl_file_output_stream(const std::string& path, const std::string& mode = "wb");
+	sdl_file_output_stream(SDL_IOStream* io); // wrap an externally-owned write stream
 };
 class sdl_file_stream : public sdl_file_ios, public std::iostream {
 public:
 	sdl_file_stream();
 	sdl_file_stream(const std::string& path, const std::string& mode = "rb+");
+	sdl_file_stream(SDL_IOStream* io, std::ios::openmode mode); // wrap an externally-owned process stdio stream
 };
 
 // Prebuffered input stream for unseekable sources like internet radio
@@ -110,15 +118,17 @@ public:
 	void* user; // Free for advanced streams to use.
 	bool no_close; // If set to true, the close function becomes a no-op for singleton streams like stdin/stdout.
 	bool binary; // If set to false, the template read/write functions will write formatted text output instead of binary data, used by default for console streams.
+	bool autoflush; // If set to true, flush() is called after every write. Useful for pipes and process stdio where buffering would otherwise prevent the data from being delivered.
+	bool skip_eof; // If true, the read function will clear all error bits if the eof bit is set on read, useful for streams rather than finite data areas where new data could come in at any time.
 	bool sync_rw_cursors; // If true (the default) and if this is an iostream, sink the write and read cursor so that they appear as one cursor.
 	// Empty constructor (internal stream is nonexistent/closed).
-	datastream() : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true), sync_rw_cursors(true) {}
+	datastream() : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true), autoflush(false), skip_eof(false), sync_rw_cursors(true) {}
 	// Low level constructor (Allows passing separate shared pointers to input and output stream).
-	datastream(std::istream* istr, std::ostream* ostr, const std::string& encoding, int byteorder, datastream* obj) : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true), sync_rw_cursors(true) {
+	datastream(std::istream* istr, std::ostream* ostr, const std::string& encoding, int byteorder, datastream* obj) : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true), autoflush(false), skip_eof(false), sync_rw_cursors(true) {
 		open(istr, ostr, encoding, byteorder, obj);
 	}
 	// Higher level constructor (Creates shared pointers for given std::ios pointer and has default arguments).
-	datastream(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = nullptr) : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true), sync_rw_cursors(true) {
+	datastream(std::ios* stream, const std::string& encoding = "", int byteorder = Poco::BinaryReader::StreamByteOrder::NATIVE_BYTE_ORDER, datastream* obj = nullptr) : r(nullptr), w(nullptr), _istr(nullptr), _ostr(nullptr), ds(nullptr), user(nullptr), close_cb(nullptr), no_close(false), binary(true), autoflush(false), skip_eof(false), sync_rw_cursors(true) {
 		open(stream, encoding, byteorder, obj);
 	}
 	~datastream() {
@@ -145,6 +155,7 @@ public:
 	std::string read(unsigned int size);
 	std::string read_line();
 	bool can_write();
+	void flush();
 	unsigned int write(const std::string& data);
 	template<typename T> datastream& read(T& value);
 	template <typename T> T read();

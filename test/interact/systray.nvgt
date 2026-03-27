@@ -1,0 +1,12 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2026 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+bool quit = false;
+void main() {
+	show_window("tray test");
+	system_tray tray("test the system tray");
+	tray.menu.insert_item("message", function(t) { alert("test", "this is a test message"); });
+	tray.menu.insert_item("exit", function(t) { quit = true; });
+	while (!quit and !key_pressed(KEY_ESCAPE)) wait(5);
+}

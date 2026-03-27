@@ -15,6 +15,7 @@ with open("../version", "r") as vf:
 	if os.path.isfile(os.path.join("..", "release", "stub", "nvgt_android.bin")): f.write("#define have_android_stubs\n#define have_full_android_stubs\n")
 	if os.path.isfile(os.path.join("..", "release", "stub", "nvgt_linux.bin")): f.write("#define have_linux_stubs\n")
 	if os.path.isfile(os.path.join("..", "release", "stub", "nvgt_mac.bin")): f.write("#define have_macos_stubs\n")
+	if os.path.isfile(os.path.join("..", "release", "stub", "nvgt_ios.bin")): f.write("#define have_ios_stubs\n")
 	if os.path.isfile(os.path.join("..", "release", "stub", "nvgt_windows.bin")): f.write("#define have_windows_stubs\n")
 	if os.path.isfile(os.path.join("..", "doc", "nvgt.chm")): f.write("#define have_docs\n")
 	f.close()

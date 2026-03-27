@@ -26,11 +26,9 @@ extern std::string g_scriptpath;
 extern std::string g_platform;
 extern bool g_make_console;
 
-#ifndef _WIN32
-	#ifndef BOOL
-		typedef int BOOL;
-		#define FALSE 0
-		#define TRUE 1
-	#endif
+#if !defined(_WIN32) && !defined(__APPLE__) && !defined(TRUE)
+	typedef int BOOL;
+	#define FALSE 0
+	#define TRUE 1
 	typedef unsigned int DWORD;
 #endif

@@ -41,7 +41,7 @@ void debug_callback(asIScriptContext* ctx, void* obj) {
 int g_GCMode = 2;
 Poco::Thread* g_GCThread = nullptr;
 asQWORD g_GCAutoFullTime = ticks();
-DWORD g_GCAutoFrequency = 300000;
+unsigned int g_GCAutoFrequency = 300000;
 void garbage_collect(bool full = true) {
 	if (!full && g_GCMode < 3)
 		g_ScriptEngine->GarbageCollect(asGC_ONE_STEP | asGC_DETECT_GARBAGE);
@@ -80,10 +80,10 @@ bool set_garbage_collect_mode(int m) {
 	g_GCMode = m;
 	return true;
 }
-DWORD get_garbage_collect_auto_frequency() {
+unsigned int get_garbage_collect_auto_frequency() {
 	return g_GCAutoFrequency;
 }
-bool set_garbage_collect_auto_frequency(DWORD freq) {
+bool set_garbage_collect_auto_frequency(unsigned int freq) {
 	if (freq < 2000 || freq > 86400000) return false;
 	g_GCAutoFrequency = freq;
 	return true;
@@ -156,7 +156,7 @@ void stop_profiling() {
 		return;
 	is_profiling = false;
 }
-static BOOL profiler_results_sort(asIScriptFunction* f1, asIScriptFunction* f2) {
+static bool profiler_results_sort(asIScriptFunction* f1, asIScriptFunction* f2) {
 	return profiler_cache[f1] > profiler_cache[f2];
 }
 std::string generate_profile(bool reset = true) {
@@ -318,7 +318,7 @@ CScriptDictionary* script_function_call(asIScriptFunction* func, CScriptDictiona
 	arg_index = 1;
 	while (args && args->GetSize() > 0) {
 		int arg_type_id;
-		DWORD arg_tmods;
+		asDWORD arg_tmods;
 		CScriptDictionary::CIterator k = args->find(std::to_string(arg_index));
 		if (k == args->end()) break;
 		if (func->GetParam(arg_index - 1, &arg_type_id, &arg_tmods) < 0) {
@@ -497,10 +497,10 @@ public:
 class script_module {
 	asIScriptModule* mod;
 	int RefCount;
-	BOOL exists;
+	bool exists;
 public:
 	unsigned int max_statement_count;
-	script_module(asIScriptModule* module, BOOL e) {
+	script_module(asIScriptModule* module, bool e) {
 		mod = module;
 		exists = e;
 		RefCount = 1;
@@ -578,14 +578,14 @@ public:
 			return asNO_MODULE;
 		return mod->BindAllImportedFunctions();
 	}
-	int bind_imported_function(DWORD index, asIScriptFunction* func) {
+	int bind_imported_function(asUINT index, asIScriptFunction* func) {
 		if (!mod)
 			return asNO_MODULE;
 		if (!func)
 			return asNO_FUNCTION;
 		return mod->BindImportedFunction(index, func);
 	}
-	asIScriptFunction* compile_function(const std::string& section_name, const std::string& code, CScriptArray* errors, BOOL add_to_module = FALSE, DWORD line_offset = 0) {
+	asIScriptFunction* compile_function(const std::string& section_name, const std::string& code, CScriptArray* errors, bool add_to_module = false, asDWORD line_offset = 0) {
 		if (mod == NULL) {
 			if (errors) errors->Release();
 			return NULL;
@@ -601,7 +601,7 @@ public:
 		if (errors) errors->Release();
 		return out_ptr;
 	}
-	int compile_global(const std::string& section_name, const std::string& code, CScriptArray* errors, DWORD line_offset = 0) {
+	int compile_global(const std::string& section_name, const std::string& code, CScriptArray* errors, asDWORD line_offset = 0) {
 		if (mod == NULL) {
 			if (errors) errors->Release();
 			return asNO_MODULE;
@@ -616,19 +616,19 @@ public:
 		if (!mod) return;
 		mod->Discard();
 	}
-	DWORD get_function_count() {
+	asDWORD get_function_count() {
 		if (!mod) return 0;
 		return mod->GetFunctionCount();
 	}
-	DWORD get_global_count() {
+	asDWORD get_global_count() {
 		if (!mod) return 0;
 		return mod->GetGlobalVarCount();
 	}
-	DWORD get_imported_function_count() {
+	asDWORD get_imported_function_count() {
 		if (!mod) return 0;
 		return mod->GetImportedFunctionCount();
 	}
-	DWORD set_access_mask(DWORD mask) {
+	asDWORD set_access_mask(asDWORD mask) {
 		if (!mod) return 0;
 		return mod->SetAccessMask(mask);
 	}
@@ -644,7 +644,7 @@ public:
 		if (!mod) return NULL;
 		return mod->GetFunctionByDecl(name.c_str());
 	}
-	const std::string get_imported_function_decl(DWORD index) {
+	const std::string get_imported_function_decl(asDWORD index) {
 		if (!mod)
 			return "";
 		const char* result = mod->GetImportedFunctionDeclaration(index);
@@ -656,14 +656,14 @@ public:
 			return asNO_MODULE;
 		return mod->GetImportedFunctionIndexByDecl(decl.c_str());
 	}
-	const std::string get_imported_function_module(DWORD index) {
+	const std::string get_imported_function_module(asDWORD index) {
 		if (!mod)
 			return "";
 		const char* result = mod->GetImportedFunctionSourceModule(index);
 		if (!result) return "";
 		return std::string(result);
 	}
-	CScriptAny* get_global(DWORD index) {
+	CScriptAny* get_global(asDWORD index) {
 		if (!mod)
 			return NULL;
 		const char* name;
@@ -674,7 +674,7 @@ public:
 		if (!ref) return NULL;
 		return new CScriptAny(ref, type_id, g_ScriptEngine);
 	}
-	const std::string get_global_decl(DWORD index) {
+	const std::string get_global_decl(asDWORD index) {
 		if (!mod)
 			return "";
 		const char* result = mod->GetGlobalVarDeclaration(index);
@@ -691,7 +691,7 @@ public:
 			return asNO_MODULE;
 		return mod->GetGlobalVarIndexByName(decl.c_str());
 	}
-	const std::string get_global_name(DWORD index) {
+	const std::string get_global_name(asDWORD index) {
 		if (!mod)
 			return "";
 		const char* result;
@@ -712,9 +712,8 @@ public:
 	}
 };
 script_module* script_get_module(const std::string& name, int mode) {
-	BOOL exists = FALSE;
-	if (mode != asGM_ALWAYS_CREATE)
-		exists = g_ScriptEngine->GetModule(name.c_str(), asGM_ONLY_IF_EXISTS) != NULL;
+	bool exists = false;
+	if (mode != asGM_ALWAYS_CREATE) exists = g_ScriptEngine->GetModule(name.c_str(), asGM_ONLY_IF_EXISTS) != NULL;
 	asIScriptModule* mod = g_ScriptEngine->GetModule(name.c_str(), (asEGMFlags)mode);
 	if (!mod) return NULL;
 	return new script_module(mod, exists);

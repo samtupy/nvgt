@@ -15,10 +15,11 @@
 #include "tts.h"
 class asIScriptEngine;
 class CScriptArray;
+class game_window;
 
 bool voice_over_is_running();
 bool voice_over_speak(const std::string& message, bool interrupt = true);
-void voice_over_window_created();
+void voice_over_window_created(game_window* window);
 void voice_over_speech_shutdown();
 std::string apple_input_box(const std::string& title, const std::string& message, const std::string& default_value = "", bool secure = false, bool readonly = false);
 

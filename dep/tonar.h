@@ -7,6 +7,10 @@
 #include <math.h>
 #include <ctype.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -141,5 +145,9 @@ double elz_tonar_music_note_to_freq(int note);
 int elz_tonar_music_name_to_note(char* name, int transpose);
 int elz_tonar_music_beat_to_ms(double tempo, double beat);
 double elz_tonar_music_ms_to_beat(double tempo, int ms);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

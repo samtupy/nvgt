@@ -102,7 +102,7 @@ protected:
 		SetDllDirectoryW(dir_u.c_str());
 		CreateMutexW(nullptr, false, L"NVGTApplication"); // This mutex will automatically be freed by the OS on process termination so we don't need a handle to it, this exists only so the NVGT windows installer or anything else on windows can tell that NVGT is running without process enumeration.
 		#elif defined(__APPLE__)
-		if (Environment::has("MACOS_BUNDLED_APP")) {
+		if (Environment::has("MACOS_BUNDLED_APP") || running_on_mobile()) {
 			// Use GUI instead of stdout.
 			config().setString("application.gui", "");
 		}
@@ -138,7 +138,7 @@ protected:
 		Application::defineOptions(options);
 		options.addOption(Option("compile", "c", "compile script in release mode").group("compiletype"));
 		options.addOption(Option("compile-debug", "C", "compile script in debug mode").group("compiletype"));
-		options.addOption(Option("platform", "p", "select target platform to compile for (auto|windows|linux|mac|android)", false, "platform", true).validator(new RegExpValidator("^(auto|windows|linux|mac|android)$")));
+		options.addOption(Option("platform", "p", "select target platform to compile for (auto|windows|linux|mac|android|ios)", false, "platform", true).validator(new RegExpValidator("^(auto|windows|linux|mac|android|ios)$")));
 		options.addOption(Option("quiet", "q", "do not output anything upon successful compilation").binding("application.quiet").group("quiet"));
 		options.addOption(Option("QUIET", "Q", "do not output anything (work in progress), error status must be determined by process exit code (intended for automation)").binding("application.QUIET").group("quiet"));
 		options.addOption(Option("debug", "d", "run with the Angelscript debugger").binding("application.as_debug"));
@@ -220,8 +220,8 @@ protected:
 		} else if (option >= 1 && option <= 3) {
 			if (option >= 2) {
 				// compiling, select platform
-				vector<string> platforms = {"auto", "windows", "mac", "linux", "android"};
-				int platform_selection = message_box("NVGT Compiler", "Please select a platform to compile for.", {format("`Host platform (%s)", Environment::osName()), "Windows", "MacOS", "Linux", "Android", "~cancel"}, SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT);
+				vector<string> platforms = {"auto", "windows", "mac", "linux", "android", "ios"};
+				int platform_selection = message_box("NVGT Compiler", "Please select a platform to compile for.", {format("`Host platform (%s)", Environment::osName()), "Windows", "MacOS", "Linux", "Android", "iOS", "~cancel"}, SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT);
 				if (platform_selection <= 0 || platform_selection > platforms.size()) {
 					mode = NVGT_EXIT;
 					return "";
@@ -339,7 +339,11 @@ protected:
 			ShowAngelscriptMessages();
 			return Application::EXIT_DATAERR;
 		}
+		#if defined(__APPLE__) && defined(NVGT_MOBILE)
+		_exit(retcode); // It's not recommended to call exit() on IOS but it does function, we'll let it work here but will recommend against it in docs.
+		#else
 		return retcode;
+		#endif
 	}
 	#endif
 	void uninitialize() override {

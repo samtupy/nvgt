@@ -277,7 +277,7 @@ int el_tonar_output_file(el_tonar* gen, char* fn)
 {
 int outsize=el_tonar_output_buffer_size(gen);
 if(outsize<=0) return 0;
-char* output=malloc(outsize+44);
+char* output=(char*)malloc(outsize+44);
 if(!output) return 0;
 if(!elz_tonar_output_wave_header(gen, output, 44, outsize))
 {
@@ -382,7 +382,7 @@ if(!elz_tonar_is_init(gen)) return 0;
 samples+=gen->cursor;
 if(samples<gen->size) return 1;
 samples*=2;
-double* data=realloc(gen->data, samples*sizeof(double));
+double* data=(double*)realloc(gen->data, samples*sizeof(double));
 if(!data) return 0;
 memset(data+gen->size, 0, (samples-gen->size)*sizeof(double));
 gen->data=data;

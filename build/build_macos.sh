@@ -20,5 +20,7 @@ else
 	echo Running on CI.
 fi
 scons -s
+echo Building NVGT IOS stubs...
+scons -s no_plugins=1 target=ios
 echo NVGT built.
 deactivate

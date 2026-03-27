@@ -69,6 +69,9 @@
 		name: "stubs\android"; description: "Android binary stub"; types: custom
 		name: "androidtools"; description: "Android tools (external download required)"; types: custom
 	#endif
+	#ifdef have_ios_stubs
+		name: "stubs\ios"; description: "iOS binary stub"; types: custom
+	#endif
 	#ifdef have_docs
 		name: "docs"; description: "Documentation"; types: custom
 	#else
@@ -108,6 +111,9 @@
 	#ifdef have_android_stubs
 		source: "release\stub\nvgt_android.bin"; DestDir: "{app}\stub"; components: stubs\android
 	#endif
+	#ifdef have_ios_stubs
+		source: "release\stub\nvgt_ios*.bin"; DestDir: "{app}\stub"; components: stubs\ios
+	#endif
 	; Includes
 	source: "release\include\*.nvgt"; DestDir: "{app}\include"; components: includes
 	#ifdef have_docs
@@ -144,6 +150,12 @@
 		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_debug\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pandroid -C ""%L"""; components: associate
 		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_release"; ValueType: string; ValueName: ""; ValueData: "Android (Release)"; components: associate
 		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_release\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pandroid -c ""%L"""; components: associate
+	#endif
+	#ifdef have_ios_stubs
+		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\ios_debug"; ValueType: string; ValueName: ""; ValueData: "iOS (Debug)"; components: associate
+		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\ios_debug\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pios -C ""%L"""; components: associate
+		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\ios_release"; ValueType: string; ValueName: ""; ValueData: "iOS (Release)"; components: associate
+		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\ios_release\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pios -c ""%L"""; components: associate
 	#endif
 	Root: HKA; subkey: "software\classes\NVGTScript\shell\edit"; ValueType: string; ValueName: ""; ValueData: "Edit Script"; components: associate
 	Root: HKA; subkey: "software\classes\NVGTScript\shell\edit\command"; ValueType: string; ValueName: ""; ValueData: """notepad"" ""%L"""; components: associate

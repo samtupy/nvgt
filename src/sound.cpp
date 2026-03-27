@@ -301,7 +301,7 @@ public:
 		if ((flags & NO_DEVICE) == 0) {
 			device = std::make_unique<ma_device>();
 			ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
-			cfg.playback.channels = channels;
+			cfg.playback.channels = channels > 0? channels : 2;
 			cfg.playback.format = ma_format_f32;
 			cfg.sampleRate = sample_rate;
 			cfg.noClip = (flags & engine_flags::NO_CLIP)? MA_TRUE : MA_FALSE;
@@ -354,8 +354,8 @@ public:
 		if ((flags & NO_DEVICE) == 0) cfg.pDevice = &*device;
 		else {
 			cfg.noDevice = MA_TRUE;
-			cfg.channels = channels;
-			cfg.sampleRate = sample_rate;
+			cfg.channels = channels > 0? channels : 2;
+			cfg.sampleRate = sample_rate > 0? sample_rate : 48000;
 		}
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS) {
 			engine.reset();
@@ -1886,7 +1886,6 @@ public:
 		if (capture_device) {
 			ma_device_stop(&*capture_device);
 			ma_device_uninit(&*capture_device);
-			capture_device.reset();
 		}
 		ma_device_config device_config = ma_device_config_init(ma_device_type_capture);
 		device_config.capture.format = ma_format_f32;
@@ -1895,10 +1894,17 @@ public:
 		device_config.dataCallback = capture_data_callback;
 		device_config.pUserData = this;
 		device_config.capture.pDeviceID = (device >= 0 && device < int(g_sound_input_devices.size())) ? &g_sound_input_devices[device].id : nullptr;
-		if ((g_soundsystem_last_error = ma_device_init(nullptr, &device_config, &*capture_device)) != MA_SUCCESS) return false;
+		capture_device = make_unique<ma_device>();
+		if ((g_soundsystem_last_error = ma_device_init(nullptr, &device_config, &*capture_device)) != MA_SUCCESS) {
+			capture_device.reset();
+			return false;
+		}
 		device_index = device;
 		if ((g_soundsystem_last_error = ma_device_start(&*capture_device)) != MA_SUCCESS) {
 			audio_node_impl::set_state(ma_node_state_stopped);
+			device_index = -1;
+			ma_device_uninit(&*capture_device);
+			capture_device.reset();
 			return false;
 		}
 		return true;

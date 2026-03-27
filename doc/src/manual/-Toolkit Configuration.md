@@ -20,7 +20,7 @@ Finally, a special argument, two hyphens without any following text, indicates t
 The following is a list of all available command line arguments, though note that it is best to directly run `nvgt --help` yourself encase this list is in any way out of date as nvgt's --help argument will always be more accurate because the text it prints is dynamically generated.
 * -c, --compile: compile script in release mode
 * -C, --compile-debug: compile script in debug mode
-* -pplatform, --platform=platform: select target platform to compile for (auto|android|windows|linux|mac)
+* -pplatform, --platform=platform: select target platform to compile for (auto|android|windows|linux|mac|ios)
 * -q, --quiet: do not output anything upon successful compilation
 * -Q, --QUIET: do not output anything (work in progress), error status must be determined by process exit code (intended for automation)
 * -d, --debug: run with the Angelscript debugger
