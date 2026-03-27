@@ -63,6 +63,7 @@ std::string get_nvgt_lib_directory(const std::string& platform) {
 	if (platform == "windows") dir = Poco::Environment::isWindows()? "lib" : "lib_windows";
 	else if (platform == "mac") dir = Environment::os() == POCO_OS_MAC_OS_X? (apple_bundle? "Frameworks" : "lib") : "lib_mac";
 	else if (platform == "linux") dir = Poco::Environment::os() == POCO_OS_LINUX? "lib" : "lib_linux";
+	else if (platform == "android") dir = "lib_android";
 	else return ""; // libs not applicable for this platform.
 	Path result(Path::self());
 	result.makeParent();

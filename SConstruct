@@ -26,7 +26,10 @@ Help("""
 """)
 
 # setup
-env = Environment()
+if ARGUMENTS.get("target", "") == "android":
+	env = Environment(tools=['mingw'])
+else:
+	env = Environment()
 # Prevent scons from wiping out the environment for certain tools, e.g. scan-build
 env["CC"] = os.getenv("CC") or env["CC"]
 env["CXX"] = os.getenv("CXX") or env["CXX"]
@@ -64,8 +67,44 @@ elif env["NVGT_TARGET"] == "linux":
 	# enable the gold linker, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
 	env.Append(CPPPATH = ["lindev/include", "/usr/local/include"], LIBPATH = ["lindev/lib", "/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
 	env.Append(LIBS = ["asound"])
+elif env["NVGT_TARGET"] == "android":
+	import platform
+	if "ANDROID_NDK_HOME" not in os.environ:
+		print("ANDROID_NDK_HOME not set, cannot build for android")
+		Exit(1)
+	env["NDK_HOME"] = os.environ["ANDROID_NDK_HOME"]
+	host_os = platform.system().lower()
+	if host_os == "windows":
+		env["NDK_HOST_TAG"] = "windows-x86_64"
+		cmd_ext = ".cmd"
+		exe_ext = ".exe"
+		env["GRADLE_CMD"] = ["cmd.exe", "/c", "gradlew.bat"]
+	elif host_os == "darwin":
+		env["NDK_HOST_TAG"] = "darwin-x86_64"
+		cmd_ext = ""
+		exe_ext = ""
+		env["GRADLE_CMD"] = ["./gradlew"]
+	else:
+		env["NDK_HOST_TAG"] = "linux-x86_64"
+		cmd_ext = ""
+		exe_ext = ""
+		env["GRADLE_CMD"] = ["./gradlew"]
+	toolchain_bin = os.path.join(env["NDK_HOME"], "toolchains", "llvm", "prebuilt", env["NDK_HOST_TAG"], "bin")
+	env["CC"] = os.path.join(toolchain_bin, f"aarch64-linux-android28-clang{cmd_ext}")
+	env["CXX"] = os.path.join(toolchain_bin, f"aarch64-linux-android28-clang++{cmd_ext}")
+	env["LINK"] = os.path.join(toolchain_bin, f"aarch64-linux-android28-clang++{cmd_ext}")
+	env["AR"] = os.path.join(toolchain_bin, f"llvm-ar{exe_ext}")
+	env["RANLIB"] = os.path.join(toolchain_bin, f"llvm-ranlib{exe_ext}")
+	env["SHLINKCOM"] = "$LINK -o $TARGET $LINKFLAGS -shared $__RPATH $SOURCES $_LIBDIRFLAGS $_LIBFLAGS"
+	env.Append(CCFLAGS = ["-fPIC"])
+	env.Append(CXXFLAGS = ["-DAS_USE_STLNAMES=1", "-ffunction-sections", "-O2", "-Wno-deprecated-array-compare", "-Wno-implicit-const-int-float-conversion", "-Wno-deprecated-enum-enum-conversion", "-Wno-absolute-value"])
+	env.Append(LINKFLAGS = ["-Wl,--no-fatal-warnings", "-Wl,--no-undefined", "-Wl,--gc-sections"])
+	env["PROGSUFFIX"] = ".so"
+	env["SHLIBSUFFIX"] = ".so"
+	env.Append(LIBS = ["PocoFoundation", "PocoCrypto", "PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "ffi", "z", "angelscript", "crypto", "pcre2-8", "utf8proc", "expat", "enet", "reactphysics3d", "ssl", "SDL3_ttf", "freetype", "bz2", "ogg", "vorbis", "vorbisfile", "opusfile", "opusenc", "opus", "tinyexpr", "tiny-aes-c", "GLESv1_CM", "GLESv2", "OpenSLES", "log", "android"])
 env.Append(CPPDEFINES = ["POCO_STATIC", "POCO_NO_AUTOMATIC_LIBS", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
+env["PLUGIN_DEST_DIR"] = "#release/lib_android" if env["NVGT_TARGET"] == "android" else "#release/lib"
 
 # plugins
 static_plugins = []
@@ -80,12 +119,16 @@ if  ARGUMENTS.get("no_plugins", "0") == "0":
 				static_plugins.append(l.strip())
 	except FileNotFoundError: pass
 	plugin_env = env.Clone()
+	if env["NVGT_TARGET"] == "android":
+		plugin_env.Append(CXXFLAGS = ["-fPIC"])
+		plugin_env["SHLIBPREFIX"] = ""
 	# Then loop through all known plugins and build them.
 	for s in Glob("plugin/*/_SConscript") + Glob("plugin/*/SConscript") + Glob("extra/plugin/integrated/*/_SConscript") + Glob("extra/plugin/integrated/*/SConscript"):
 		plugname = str(s).split(os.path.sep)[-2]
 		if ARGUMENTS.get(f"no_{plugname}_plugin", "0") == "1": continue
 		if ARGUMENTS.get(f"static_{plugname}_plugin", "0") == "1" and not plugname in static_plugins: static_plugins.append(plugname)
-		# Build the plugin. A list of static libraries NVGT should link with is returned if the plugin generates any.
+		# Build the plugin.
+		# A list of static libraries NVGT should link with is returned if the plugin generates any.
 		plug = SConscript(s, variant_dir = f"build/obj_plugin/{plugname}", duplicate = 0, exports = {"env": plugin_env, "nvgt_env": env})
 		if plug and plugname in static_plugins: env.Append(LIBS = plug)
 	# Finally generate nvgt_plugins.cpp
@@ -102,7 +145,8 @@ if env["NVGT_TARGET"] == "windows": env.Append(LIBS = ["UniversalSpeechStatic"])
 
 # nvgt itself
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
-if "android.cpp" in sources: sources.remove("android.cpp")
+if env["NVGT_TARGET"] != "android" and "android.cpp" in sources:
+	sources.remove("android.cpp")
 if env["NVGT_TARGET"] != "windows" and "win.cpp" in sources: sources.remove("win.cpp")
 if env["NVGT_TARGET"] != "linux" and "linux.cpp" in sources: sources.remove("linux.cpp")
 if "version.cpp" in sources: sources.remove("version.cpp")
@@ -137,18 +181,25 @@ SConscript("ASAddon/_SConscript", variant_dir = "build/obj_ASAddon", duplicate =
 SConscript("dep/_SConscript", variant_dir = "build/obj_dep", duplicate = 0, exports = "env")
 # We'll clone the environment for stubs now so that we can then add any extra libraries that are not needed for stubs to the main nvgt environment.
 stub_env = env.Clone(PROGSUFFIX = ".bin")
-if env["NVGT_TARGET"] == "windows": env.Append(LINKFLAGS = ["/delayload:plist-2.0.dll", "/delayload:archive.dll"])
-env.Append(LIBS = ["plist-2.0", "archive"])
+if env["NVGT_TARGET"] == "windows":
+	env.Append(LINKFLAGS = ["/delayload:plist-2.0.dll", "/delayload:archive.dll"])
+	env.Append(LIBS = ["plist-2.0", "archive"])
+	env["no_import_lib"] = 0
+elif env["NVGT_TARGET"] == "android":
+	env["no_import_lib"] = 1
+else: # linux and macos
+	env.Append(LIBS = ["plist-2.0", "archive"])
 extra_objects = [version_object]
 if static_plugins_object: extra_objects.append(static_plugins_object)
-if env["NVGT_TARGET"] != "ios":
+if env["NVGT_TARGET"] not in ("ios", "android"):
 	if ARGUMENTS.get("debug", "0") == "1": env["PDB"] = "#build/debug/nvgt.pdb"
 	nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + extra_objects)
 	if env["NVGT_TARGET"] == "macos":
 		# On Mac OS, we need to run install_name_tool to modify the paths of any dynamic libraries we link.
 		env.AddPostAction(nvgt, lambda target, source, env: env.Execute("install_name_tool -change lib/libplist-2.0.dylib @rpath/libplist-2.0.dylib " + str(target[0])))
 	if env["NVGT_TARGET"] == "windows":
-		# Only on windows we must go through the frustrating hastle of compiling a version of nvgt with no console E. the windows subsystem. It is at least set up so that we only need to recompile one object
+		# Only on windows we must go through the frustrating hastle of compiling a version of nvgt with no console E. the windows subsystem.
+		# It is at least set up so that we only need to recompile one object
 		if "nvgt.cpp" in sources: sources.remove("nvgt.cpp")
 		if ARGUMENTS.get("debug", "0") == "1": env["PDB"] = "#build/debug/nvgtw.pdb"
 		nvgtw = env.Program("release/nvgtw", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [env.Object("build/obj_src/nvgtw", "build/obj_src/nvgt.cpp", CPPDEFINES = ["$CPPDEFINES", "NVGT_WIN_APP"]), extra_objects], LINKFLAGS = ["$LINKFLAGS", "/subsystem:windows"])
@@ -158,10 +209,42 @@ if env["NVGT_TARGET"] != "ios":
 		env.Install("c:/nvgt", nvgtw)
 		env.Install("c:/nvgt", "#release/include")
 		env.Install("c:/nvgt", "#release/lib")
+elif env["NVGT_TARGET"] == "android":
+	# We need to build both the runner and the stub.
+	# First, the runner.
+	runner_dest = "jni/libs/runner/arm64-v8a"
+	runner_lib = env.SharedLibrary(os.path.join(runner_dest, "libmain"), env.Object([os.path.join("build/obj_src", s) for s in sources]) + extra_objects)
+	# Next, the stub.
+	stub_dest = "jni/libs/stub/arm64-v8a"
+	android_stub_env = env.Clone()
+	android_stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
+	VariantDir("build/obj_stub", "src", duplicate = 0)
+	libgame = env.SharedLibrary(os.path.join(stub_dest, "libgame"), android_stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + extra_objects)
+	# Copy dependencies to both directories.
+	libcxx_path = os.path.join(env["NDK_HOME"], "toolchains", "llvm", "prebuilt", env["NDK_HOST_TAG"], "sysroot", "usr", "lib", "aarch64-linux-android", "libc++_shared.so")
+	android_deps = [runner_lib, libgame]
+	for d in [runner_dest, stub_dest]:
+		android_deps.extend(env.Install(d, libcxx_path))
+		android_deps.extend(env.Install(d, os.path.join(env["NVGT_OSDEV_PATH"], "lib/libSDL3.so")))
+		android_deps.extend(env.Install(d, os.path.join(env["NVGT_OSDEV_PATH"], "lib/libphonon.so")))
+	# Finally, trigger Gradle to package the .bin and the APK
+	def run_gradle(target, source, env):
+		import subprocess
+		original_dir = os.getcwd()
+		os.chdir("jni")
+		try:
+			subprocess.check_call(env["GRADLE_CMD"] + ["assembleStubRelease", "assembleRunnerRelease"])
+		finally:
+			os.chdir(original_dir)
+	apk_alias = env.Alias("android_apk", android_deps)
+	env.AddPostAction(apk_alias, Action(run_gradle, "Packaging Android Stub and Runner..."))
+	env.Default(apk_alias)
 
 # stubs
 def fix_stub(target, source, env):
-	"""On windows, we replace the first 2 bytes of a stub with 'NV' to stop some sort of antivirus scan upon script compile that makes it take a bit longer. We do the same on MacOS because otherwise apple's notarization service detects the stub as an unsigned binary and fails. Stubs must be unsigned until the nvgt scripter signs their compiled games."""
+	"""On windows, we replace the first 2 bytes of a stub with 'NV' to stop some sort of antivirus scan upon script compile that makes it take a bit longer. We do the same on MacOS because otherwise 
+	apple's notarization service detects the stub as an unsigned binary and fails.
+	Stubs must be unsigned until the nvgt scripter signs their compiled games."""
 	for t in target:
 		if not str(t).endswith(".bin"): continue
 		with open(str(t), "rb+") as f:
@@ -169,7 +252,7 @@ def fix_stub(target, source, env):
 			f.write(b"NV")
 			f.close()
 
-if ARGUMENTS.get("no_stubs", "0") == "0":
+if ARGUMENTS.get("no_stubs", "0") == "0" and env["NVGT_TARGET"] not in ("ios", "android"):
 	stub_platform = env["NVGT_TARGET"] if env["NVGT_TARGET"] != "macos" else "mac"
 	VariantDir("build/obj_stub", "src", duplicate = 0)
 	stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
