@@ -271,12 +271,15 @@ asINT64 system_running_milliseconds() {
 	#else
 	FILE *f = fopen("/proc/uptime", "r");
 	char tmp[40];
-	if (!fgets(tmp, 40, f))
+	if (!fgets(tmp, 40, f)) {
+		fclose(f);
 		return 0;
+	}
 	char* space = strchr(tmp, ' ');
-	if (space)
-		*space = '\0';
-	return strtof(tmp, NULL) * 1000;
+	if (space) 		*space = '\0';
+	asINT64 ret = strtof(tmp, NULL) * 1000;
+	fclose(f);
+	return ret;
 	#endif
 }
 
