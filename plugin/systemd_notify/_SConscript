@@ -6,7 +6,7 @@ if conf.CheckLib("systemd"): systemd_avail = True
 env = conf.Finish()
 
 if ARGUMENTS.get("no_shared_plugins", "0") == "0":
-	env.SharedLibrary("#release/lib/systemd_notify", ["sd_notify.cpp"], LIBS = ["systemd"] if systemd_avail else [])
+	env.SharedLibrary(env["PLUGIN_DEST_DIR"] + "/systemd_notify", ["sd_notify.cpp"], LIBS = ["systemd"] if systemd_avail else [])
 static = env.Object("sd_notify_static", "sd_notify.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "systemd_notify")])
 static = env.StaticLibrary("#build/lib/systemd_notify", [static])
 if systemd_avail: static = [static, "systemd"]
