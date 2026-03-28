@@ -14,7 +14,7 @@
 
 #define NOMINMAX
 #include <miniaudio.h>
-#include <reactphysics3d/mathematics/Vector3.h>
+#include "nvgt_math.h"
 #include "sound_service.h"
 
 #define SOUNDSYSTEM_FRAMESIZE 256 // We can make this be configureable if enough people want it.
@@ -113,24 +113,24 @@ public:
 	virtual float get_gain() const = 0;
 	virtual unsigned int get_listener_count() const = 0;
 	virtual int find_closest_listener(float x, float y, float z) const = 0;
-	virtual int find_closest_listener_vector(const reactphysics3d::Vector3 &position) const = 0;
+	virtual int find_closest_listener_vector(const nvgt_vec3 &position) const = 0;
 	virtual void set_listener_position(unsigned int index, float x, float y, float z) = 0;
-	virtual void set_listener_position_vector(unsigned int index, const reactphysics3d::Vector3 &position) = 0;
-	virtual reactphysics3d::Vector3 get_listener_position(unsigned int index) const = 0;
+	virtual void set_listener_position_vector(unsigned int index, const nvgt_vec3 &position) = 0;
+	virtual nvgt_vec3 get_listener_position(unsigned int index) const = 0;
 	virtual void set_listener_direction(unsigned int index, float x, float y, float z) = 0;
-	virtual void set_listener_direction_vector(unsigned int index, const reactphysics3d::Vector3 &direction) = 0;
-	virtual reactphysics3d::Vector3 get_listener_direction(unsigned int index) const = 0;
+	virtual void set_listener_direction_vector(unsigned int index, const nvgt_vec3 &direction) = 0;
+	virtual nvgt_vec3 get_listener_direction(unsigned int index) const = 0;
 	virtual void set_listener_velocity(unsigned int index, float x, float y, float z) = 0;
-	virtual void set_listener_velocity_vector(unsigned int index, const reactphysics3d::Vector3 &velocity) = 0;
-	virtual reactphysics3d::Vector3 get_listener_velocity(unsigned int index) const = 0;
+	virtual void set_listener_velocity_vector(unsigned int index, const nvgt_vec3 &velocity) = 0;
+	virtual nvgt_vec3 get_listener_velocity(unsigned int index) const = 0;
 	virtual void set_listener_cone(unsigned int index, float inner_radians, float outer_radians, float outer_gain) = 0;
 	virtual void get_listener_cone(unsigned int index, float *inner_radians, float *outer_radians, float *outer_gain) const = 0;
 	virtual void set_listener_world_up(unsigned int index, float x, float y, float z) = 0;
-	virtual void set_listener_world_up_vector(unsigned int index, const reactphysics3d::Vector3 &world_up) = 0;
-	virtual reactphysics3d::Vector3 get_listener_world_up(unsigned int index) const = 0;
+	virtual void set_listener_world_up_vector(unsigned int index, const nvgt_vec3 &world_up) = 0;
+	virtual nvgt_vec3 get_listener_world_up(unsigned int index) const = 0;
 	virtual void set_listener_enabled(unsigned int index, bool enabled) = 0;
 	virtual bool get_listener_enabled(unsigned int index) const = 0;
-	virtual sound* play(const std::string& path, const reactphysics3d::Vector3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) = 0;
+	virtual sound* play(const std::string& path, const nvgt_vec3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) = 0;
 	virtual mixer *new_mixer() = 0;
 	virtual sound *new_sound() = 0;
 };
@@ -235,7 +235,7 @@ class sound_shape {
 	// We keep track of the original sound position before it was mutated so that sound::get_position_3d works as expected, as well as the original ref handle the scripter passed to sound::set_shape so that sound::get_shape returns something valid.
 	mutable int refcount;
 	CScriptHandle* shape;
-	reactphysics3d::Vector3 position;
+	nvgt_vec3 position;
 public:
 	mixer* connected_sound; // If set, this object is not threadsafe.
 	sound_shape(CScriptHandle* script_shape = nullptr) : refcount(1), shape(script_shape), connected_sound(nullptr) {}
@@ -243,10 +243,10 @@ public:
 	void release() const { if (asAtomicDec(refcount) < 1) delete this; }
 	void set_shape(CScriptHandle* script_shape) { shape = script_shape; }
 	CScriptHandle* get_shape() const { return shape; }
-	void set_position(const reactphysics3d::Vector3& new_position) { position = new_position; }
-	reactphysics3d::Vector3 get_position() const { return position; }
-	bool is_in_shape(const reactphysics3d::Vector3& listener_position, reactphysics3d::Vector3& sound_position) { position = sound_position; return contains(listener_position, sound_position); }
-	virtual bool contains(const reactphysics3d::Vector3&  listener_position, reactphysics3d::Vector3& sound_position) { return sound_position == listener_position; }
+	void set_position(const nvgt_vec3& new_position) { position = new_position; }
+	nvgt_vec3 get_position() const { return position; }
+	bool is_in_shape(const nvgt_vec3& listener_position, nvgt_vec3& sound_position) { position = sound_position; return contains(listener_position, sound_position); }
+	virtual bool contains(const nvgt_vec3&  listener_position, nvgt_vec3& sound_position) { return sound_position == listener_position; }
 };
 class mixer : public virtual audio_node {
 public:
@@ -291,17 +291,17 @@ public:
 	virtual void set_pinned_listener(unsigned int index) = 0;
 	virtual unsigned int get_pinned_listener() const = 0;
 	virtual unsigned int get_listener() const = 0;
-	virtual reactphysics3d::Vector3 get_direction_to_listener() const = 0;
+	virtual nvgt_vec3 get_direction_to_listener() const = 0;
 	virtual float get_distance_to_listener() const = 0;
 	virtual void set_position_3d(float x, float y, float z) = 0;
-	virtual void set_position_3d_vector(const reactphysics3d::Vector3& position) = 0;
-	virtual reactphysics3d::Vector3 get_position_3d() const = 0;
+	virtual void set_position_3d_vector(const nvgt_vec3& position) = 0;
+	virtual nvgt_vec3 get_position_3d() const = 0;
 	virtual void set_direction(float x, float y, float z) = 0;
-	virtual void set_direction_vector(const reactphysics3d::Vector3& direction) = 0;
-	virtual reactphysics3d::Vector3 get_direction() const = 0;
+	virtual void set_direction_vector(const nvgt_vec3& direction) = 0;
+	virtual nvgt_vec3 get_direction() const = 0;
 	virtual void set_velocity(float x, float y, float z) = 0;
-	virtual void set_velocity_vector(const reactphysics3d::Vector3& velocity) = 0;
-	virtual reactphysics3d::Vector3 get_velocity() const = 0;
+	virtual void set_velocity_vector(const nvgt_vec3& velocity) = 0;
+	virtual nvgt_vec3 get_velocity() const = 0;
 	virtual void set_positioning(ma_positioning positioning) = 0;
 	virtual ma_positioning get_positioning() const = 0;
 	virtual void set_rolloff(float rolloff) = 0;

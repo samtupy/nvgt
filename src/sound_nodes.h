@@ -102,7 +102,7 @@ class phonon_binaural_node : public virtual audio_node {
 	public:
 	static phonon_binaural_node* create(audio_engine* engine, int channels, int sample_rate, int frame_size = 0);
 	virtual void set_direction(float x, float y, float z, float distance) = 0;
-	virtual void set_direction_vector(const reactphysics3d::Vector3& direction, float distance) = 0;
+	virtual void set_direction_vector(const nvgt_vec3& direction, float distance) = 0;
 	virtual void set_spatial_blend_max_distance(float max_distance) = 0;
 };
 class splitter_node : public virtual audio_node {

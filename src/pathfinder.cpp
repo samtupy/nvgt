@@ -12,7 +12,7 @@
 
 #include <cstring>
 #include <algorithm>
-#include <reactphysics3d/reactphysics3d.h>
+#include "nvgt_math.h"
 #include "pathfinder.h"
 #include <cmath>
 using namespace std;
@@ -258,7 +258,7 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 		return array;
 	}
 	array->Reserve(path.size() - 1);
-	reactphysics3d::Vector3 v;
+	nvgt_vec3 v;
 	int x, y, z;
 	// BGT did not include the starting location here. Changing to match for now; discussion welcome.
 	for (int i = 1; i < path.size(); i++) {

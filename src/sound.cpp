@@ -11,6 +11,7 @@
 */
 
 #define NOMINMAX
+#include <cassert>
 #include <memory>
 #include <string>
 #include <thread>
@@ -18,7 +19,7 @@
 #include <Poco/FileStream.h>
 #include <Poco/Format.h>
 #include <Poco/MemoryStream.h>
-#include <reactphysics3d/collision/shapes/AABB.h>
+#include "nvgt_math.h"
 #include <angelscript.h>
 #include <scriptarray.h>
 #include <scripthandle.h>
@@ -142,7 +143,7 @@ CScriptArray *get_sound_output_devices() {
 	return g_sound_script_output_devices;
 }
 
-reactphysics3d::Vector3 ma_vec3_to_rp_vec3(const ma_vec3f &v) { return reactphysics3d::Vector3(v.x, v.y, v.z); }
+nvgt_vec3 ma_vec3_to_nvgt_vec3(const ma_vec3f &v) { return nvgt_vec3(v.x, v.y, v.z); }
 ma_format ma_format_from_angelscript_type(int type_id) {
 	if (type_id == asTYPEID_FLOAT)
 		return ma_format_f32;
@@ -250,12 +251,13 @@ class sound_aabb_shape : public sound_shape {
 public:
 	int left_range, right_range, backward_range, forward_range, lower_range, upper_range;
 	sound_aabb_shape(int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range) : sound_shape(), left_range(left_range), right_range(right_range), backward_range(backward_range), forward_range(forward_range), lower_range(lower_range), upper_range(upper_range) {}
-	bool contains(const reactphysics3d::Vector3& listener_position, reactphysics3d::Vector3& sound_position) override {
-		reactphysics3d::AABB bounds(reactphysics3d::Vector3(sound_position - reactphysics3d::Vector3(left_range, backward_range, lower_range)), reactphysics3d::Vector3(sound_position + reactphysics3d::Vector3(right_range, forward_range, upper_range)));
-		if (bounds.contains(listener_position)) return true;
-		sound_position.x = clamp(listener_position.x, bounds.getMin().x, bounds.getMax().x);
-		sound_position.y = clamp(listener_position.y, bounds.getMin().y, bounds.getMax().y);
-		sound_position.z = clamp(listener_position.z, bounds.getMin().z, bounds.getMax().z);
+	bool contains(const nvgt_vec3& listener_position, nvgt_vec3& sound_position) override {
+		nvgt_vec3 bmin(sound_position.x - left_range, sound_position.y - backward_range, sound_position.z - lower_range);
+		nvgt_vec3 bmax(sound_position.x + right_range, sound_position.y + forward_range, sound_position.z + upper_range);
+		if (listener_position.x >= bmin.x && listener_position.x <= bmax.x && listener_position.y >= bmin.y && listener_position.y <= bmax.y && listener_position.z >= bmin.z && listener_position.z <= bmax.z) return true;
+		sound_position.x = clamp(listener_position.x, bmin.x, bmax.x);
+		sound_position.y = clamp(listener_position.y, bmin.y, bmax.y);
+		sound_position.z = clamp(listener_position.z, bmin.z, bmax.z);
 		return false;
 	}
 };
@@ -461,36 +463,36 @@ public:
 	float get_gain() const override { return engine ? ma_engine_get_gain_db(&*engine) : 0; }
 	unsigned int get_listener_count() const override { return engine ? ma_engine_get_listener_count(&*engine) : 0; }
 	int find_closest_listener(float x, float y, float z) const override { return engine ? ma_engine_find_closest_listener(&*engine, x, y, z) : -1; }
-	int find_closest_listener_vector(const reactphysics3d::Vector3 &position) const override { return engine ? ma_engine_find_closest_listener(&*engine, position.x, position.y, position.z) : -1; }
+	int find_closest_listener_vector(const nvgt_vec3 &position) const override { return engine ? ma_engine_find_closest_listener(&*engine, position.x, position.y, position.z) : -1; }
 	void set_listener_position(unsigned int index, float x, float y, float z) override {
 		if (engine)
 			ma_engine_listener_set_position(&*engine, index, x, y, z);
 		update_blocking_sound_shapes();
 	}
-	void set_listener_position_vector(unsigned int index, const reactphysics3d::Vector3 &position) override {
+	void set_listener_position_vector(unsigned int index, const nvgt_vec3 &position) override {
 		if (engine)
 			ma_engine_listener_set_position(&*engine, index, position.x, position.y, position.z);
 		update_blocking_sound_shapes();
 	}
-	reactphysics3d::Vector3 get_listener_position(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_position(&*engine, index)) : reactphysics3d::Vector3(); }
+	nvgt_vec3 get_listener_position(unsigned int index) const override { return engine ? ma_vec3_to_nvgt_vec3(ma_engine_listener_get_position(&*engine, index)) : nvgt_vec3(); }
 	void set_listener_direction(unsigned int index, float x, float y, float z) override {
 		if (engine)
 			ma_engine_listener_set_direction(&*engine, index, x, y, z);
 	}
-	void set_listener_direction_vector(unsigned int index, const reactphysics3d::Vector3 &direction) override {
+	void set_listener_direction_vector(unsigned int index, const nvgt_vec3 &direction) override {
 		if (engine)
 			ma_engine_listener_set_direction(&*engine, index, direction.x, direction.y, direction.z);
 	}
-	reactphysics3d::Vector3 get_listener_direction(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_direction(&*engine, index)) : reactphysics3d::Vector3(); }
+	nvgt_vec3 get_listener_direction(unsigned int index) const override { return engine ? ma_vec3_to_nvgt_vec3(ma_engine_listener_get_direction(&*engine, index)) : nvgt_vec3(); }
 	void set_listener_velocity(unsigned int index, float x, float y, float z) override {
 		if (engine)
 			ma_engine_listener_set_velocity(&*engine, index, x, y, z);
 	}
-	void set_listener_velocity_vector(unsigned int index, const reactphysics3d::Vector3 &velocity) override {
+	void set_listener_velocity_vector(unsigned int index, const nvgt_vec3 &velocity) override {
 		if (engine)
 			ma_engine_listener_set_velocity(&*engine, index, velocity.x, velocity.y, velocity.z);
 	}
-	reactphysics3d::Vector3 get_listener_velocity(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_velocity(&*engine, index)) : reactphysics3d::Vector3(); }
+	nvgt_vec3 get_listener_velocity(unsigned int index) const override { return engine ? ma_vec3_to_nvgt_vec3(ma_engine_listener_get_velocity(&*engine, index)) : nvgt_vec3(); }
 	void set_listener_cone(unsigned int index, float inner_radians, float outer_radians, float outer_gain) override {
 		if (engine)
 			ma_engine_listener_set_cone(&*engine, index, inner_radians, outer_radians, outer_gain);
@@ -503,17 +505,17 @@ public:
 		if (engine)
 			ma_engine_listener_set_world_up(&*engine, index, x, y, z);
 	}
-	void set_listener_world_up_vector(unsigned int index, const reactphysics3d::Vector3 &world_up) override {
+	void set_listener_world_up_vector(unsigned int index, const nvgt_vec3 &world_up) override {
 		if (engine)
 			ma_engine_listener_set_world_up(&*engine, index, world_up.x, world_up.y, world_up.z);
 	}
-	reactphysics3d::Vector3 get_listener_world_up(unsigned int index) const override { return engine ? ma_vec3_to_rp_vec3(ma_engine_listener_get_world_up(&*engine, index)) : reactphysics3d::Vector3(); }
+	nvgt_vec3 get_listener_world_up(unsigned int index) const override { return engine ? ma_vec3_to_nvgt_vec3(ma_engine_listener_get_world_up(&*engine, index)) : nvgt_vec3(); }
 	void set_listener_enabled(unsigned int index, bool enabled) override {
 		if (engine)
 			ma_engine_listener_set_enabled(&*engine, index, enabled);
 	}
 	bool get_listener_enabled(unsigned int index) const override { return ma_engine_listener_is_enabled(&*engine, index); }
-	sound* play(const string& path, const reactphysics3d::Vector3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) override {
+	sound* play(const string& path, const nvgt_vec3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) override {
 		garbage_collect_inline_sounds();
 		sound* snd = new_sound();
 		if (!snd) return nullptr;
@@ -1190,7 +1192,7 @@ public:
 	audio_node_chain* get_internal_node_chain() override { return node_chain; }
 	bool get_spatialization_parameters(audio_spatialization_parameters& params) override {
 		if (!snd || !get_spatialization_enabled() || !spatialization_params_mutex.try_lock()) return false;
-		reactphysics3d::Vector3 listener_pos = get_engine()->get_listener_position(get_listener()), listener_dir = get_direction_to_listener(), pos = get_position_3d();
+		nvgt_vec3 listener_pos = get_engine()->get_listener_position(get_listener()), listener_dir = get_direction_to_listener(), pos = get_position_3d();
 		params.listener_x = listener_pos.x;
 		params.listener_y = listener_pos.y;
 		params.listener_z = listener_pos.z;
@@ -1271,11 +1273,11 @@ public:
 	unsigned int get_listener() const override {
 		return snd ? ma_sound_get_listener_index(&*snd) : 0;
 	}
-	reactphysics3d::Vector3 get_direction_to_listener() const override {
+	nvgt_vec3 get_direction_to_listener() const override {
 		if (!snd)
-			return reactphysics3d::Vector3();
+			return nvgt_vec3();
 		const auto dir = ma_sound_get_direction_to_listener(&*snd);
-		reactphysics3d::Vector3 res;
+		nvgt_vec3 res;
 		res.setAllValues(dir.x, dir.y, dir.z);
 		return res;
 	}
@@ -1287,20 +1289,20 @@ public:
 		if (sound_get_default_3d_panner() >= 0 && get_preferred_3d_panner() < 0) set_3d_panner(sound_get_default_3d_panner());
 		if (sound_get_default_3d_attenuator() >= 0 && get_preferred_3d_attenuator() < 0) set_3d_attenuator(sound_get_default_3d_attenuator());
 		if (shape) {
-			reactphysics3d::Vector3 pos(x, y, z);
-			reactphysics3d::Vector3 listener = get_engine()->get_listener_position(get_listener());
+			nvgt_vec3 pos(x, y, z);
+			nvgt_vec3 listener = get_engine()->get_listener_position(get_listener());
 			bool is_contained = shape->is_in_shape(listener, pos);
 			if (!is_contained) ma_sound_set_position(&*snd, pos.x, pos.y, pos.z);
 			else ma_sound_set_position(&*snd, listener.x, listener.y, listener.z);
 		} else ma_sound_set_position(&*snd, x, y, z);
 	}
-	void set_position_3d_vector(const reactphysics3d::Vector3& position) override { set_position_3d(position.x, position.y, position.z); }
-	reactphysics3d::Vector3 get_position_3d() const override {
+	void set_position_3d_vector(const nvgt_vec3& position) override { set_position_3d(position.x, position.y, position.z); }
+	nvgt_vec3 get_position_3d() const override {
 		if (!snd)
-			return reactphysics3d::Vector3();
+			return nvgt_vec3();
 		if (shape) return shape->get_position(); // True sound position is stored in the shape because the position stored in miniaudio may have been altered by the shape.
 		const auto pos = ma_sound_get_position(&*snd);
-		reactphysics3d::Vector3 res;
+		nvgt_vec3 res;
 		res.setAllValues(pos.x, pos.y, pos.z);
 		return res;
 	}
@@ -1309,12 +1311,12 @@ public:
 			return;
 		return ma_sound_set_direction(&*snd, x, y, z);
 	}
-	void set_direction_vector(const reactphysics3d::Vector3& direction) override { set_direction(direction.x, direction.y, direction.z); }
-	reactphysics3d::Vector3 get_direction() const override {
+	void set_direction_vector(const nvgt_vec3& direction) override { set_direction(direction.x, direction.y, direction.z); }
+	nvgt_vec3 get_direction() const override {
 		if (!snd)
-			return reactphysics3d::Vector3();
+			return nvgt_vec3();
 		const auto dir = ma_sound_get_direction(&*snd);
-		reactphysics3d::Vector3 res;
+		nvgt_vec3 res;
 		res.setAllValues(dir.x, dir.y, dir.z);
 		return res;
 	}
@@ -1323,12 +1325,12 @@ public:
 			return;
 		return ma_sound_set_velocity(&*snd, x, y, z);
 	}
-	void set_velocity_vector(const reactphysics3d::Vector3& velocity) override { set_velocity(velocity.x, velocity.y, velocity.z); }
-	reactphysics3d::Vector3 get_velocity() const override {
+	void set_velocity_vector(const nvgt_vec3& velocity) override { set_velocity(velocity.x, velocity.y, velocity.z); }
+	nvgt_vec3 get_velocity() const override {
 		if (!snd)
-			return reactphysics3d::Vector3();
+			return nvgt_vec3();
 		const auto vel = ma_sound_get_velocity(&*snd);
-		reactphysics3d::Vector3 res;
+		nvgt_vec3 res;
 		res.setAllValues(vel.x, vel.y, vel.z);
 		return res;
 	}
@@ -1948,12 +1950,12 @@ void set_sound_output_device(int device) {
 	init_sound();
 	g_audio_engine->set_device(device);
 }
-sound* sound_play(const string& path, const reactphysics3d::Vector3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) {
+sound* sound_play(const string& path, const nvgt_vec3& position, float volume, float pan, float pitch, mixer* mix, const pack_interface* pack_file, bool autoplay) {
 	if (!init_sound()) return nullptr;
 	return g_audio_engine->play(path, position, volume, pan, pitch, mix, pack_file, autoplay);
 }
-reactphysics3d::Vector3 sound_get_listener_position(unsigned int listener_index = 0) {
-	if (!init_sound()) return reactphysics3d::Vector3(0, 0, 0);
+nvgt_vec3 sound_get_listener_position(unsigned int listener_index = 0) {
+	if (!init_sound()) return nvgt_vec3(0, 0, 0);
 	return g_audio_engine->get_listener_position(listener_index);
 }
 bool sound_set_listener_position(float x, float y, float z, unsigned int listener_index = 0) {
@@ -1961,7 +1963,7 @@ bool sound_set_listener_position(float x, float y, float z, unsigned int listene
 	g_audio_engine->set_listener_position(listener_index, x, y, z);
 	return true;
 }
-bool sound_set_listener_position_vector(const reactphysics3d::Vector3& position, unsigned int listener_index = 0) {
+bool sound_set_listener_position_vector(const nvgt_vec3& position, unsigned int listener_index = 0) {
 	if (!init_sound()) return false;
 	g_audio_engine->set_listener_position_vector(listener_index, position);
 	return true;
@@ -2153,21 +2155,21 @@ void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "float get_gain() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_gain, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "uint get_listener_count() const property", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_count, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "int find_closest_listener(float x, float y, float z) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::find_closest_listener, int, float, float, float >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "int find_closest_listener(const vector&in position) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::find_closest_listener_vector, int, const reactphysics3d::Vector3 & >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "int find_closest_listener(const vector&in position) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::find_closest_listener_vector, int, const nvgt_vec3 & >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_position(int index, float x, float y, float z)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_position, void, int, float, float, float >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "void set_listener_position(int index, const vector&in position)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_position_vector, void, int, const reactphysics3d::Vector3 & >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "vector get_listener_position(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_position, reactphysics3d::Vector3, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_position(int index, const vector&in position)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_position_vector, void, int, const nvgt_vec3 & >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "vector get_listener_position(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_position, nvgt_vec3, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_direction(int index, float x, float y, float z)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_direction, void, int, float, float, float >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "void set_listener_direction(int index, const vector&in direction)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_direction_vector, void, int, const reactphysics3d::Vector3 & >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "vector get_listener_direction(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_direction, reactphysics3d::Vector3, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_direction(int index, const vector&in direction)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_direction_vector, void, int, const nvgt_vec3 & >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "vector get_listener_direction(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_direction, nvgt_vec3, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_velocity(int index, float x, float y, float z)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_velocity, void, int, float, float, float >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "void set_listener_velocity(int index, const vector&in velocity)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_velocity_vector, void, int, const reactphysics3d::Vector3 & >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "vector get_listener_velocity(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_velocity, reactphysics3d::Vector3, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_velocity(int index, const vector&in velocity)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_velocity_vector, void, int, const nvgt_vec3 & >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "vector get_listener_velocity(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_velocity, nvgt_vec3, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_cone(int index, float inner_radians, float outer_radians, float outer_gain)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_cone, void, int, float, float, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void get_listener_cone(int index, float&out inner_radians, float&out outer_radians, float&out outer_gain) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_cone, void, int, float *, float *, float * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_world_up(int index, float x, float y, float z)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_world_up, void, int, float, float, float >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "void set_listener_world_up(int index, const vector&in world_up)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_world_up_vector, void, int, const reactphysics3d::Vector3 & >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "vector get_listener_world_up(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_world_up, reactphysics3d::Vector3, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "void set_listener_world_up(int index, const vector&in world_up)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_world_up_vector, void, int, const nvgt_vec3 & >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "vector get_listener_world_up(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_world_up, nvgt_vec3, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_enabled(int index, bool enabled)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_enabled, void, int, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "bool get_listener_enabled(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_enabled, bool, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterGlobalFunction("void set_sound_default_engine(audio_engine@ engine) property", asFUNCTION(set_sound_default_engine), asCALL_CDECL);
@@ -2288,17 +2290,17 @@ template<class T> void RegisterSoundsystemMixer(asIScriptEngine *engine, const s
 	engine->RegisterObjectMethod(type.c_str(), "void set_pinned_listener(uint index) property", asFUNCTION((virtual_call < T, &T::set_pinned_listener, void, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_pinned_listener() const property", asFUNCTION((virtual_call < T, &T::get_pinned_listener, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_listener() const property", asFUNCTION((virtual_call < T, &T::get_listener, unsigned int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "vector get_direction_to_listener() const", asFUNCTION((virtual_call < T, &T::get_direction_to_listener, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_direction_to_listener() const", asFUNCTION((virtual_call < T, &T::get_direction_to_listener, nvgt_vec3 >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "float get_distance_to_listener() const", asFUNCTION((virtual_call < T, &T::get_distance_to_listener, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_position_3d(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_position_3d, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void set_position_3d(const vector&in position)", asFUNCTION((virtual_call < T, &T::set_position_3d_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "vector get_position_3d() const", asFUNCTION((virtual_call < T, &T::get_position_3d, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_position_3d(const vector&in position)", asFUNCTION((virtual_call < T, &T::set_position_3d_vector, void, const nvgt_vec3&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_position_3d() const", asFUNCTION((virtual_call < T, &T::get_position_3d, nvgt_vec3 >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_direction(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_direction, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void set_direction(const vector&in direction)", asFUNCTION((virtual_call < T, &T::set_direction_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "vector get_direction() const", asFUNCTION((virtual_call < T, &T::get_direction, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_direction(const vector&in direction)", asFUNCTION((virtual_call < T, &T::set_direction_vector, void, const nvgt_vec3&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_direction() const", asFUNCTION((virtual_call < T, &T::get_direction, nvgt_vec3 >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_velocity, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(const vector&in velocity)", asFUNCTION((virtual_call < T, &T::set_velocity_vector, void, const reactphysics3d::Vector3&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "vector get_velocity() const", asFUNCTION((virtual_call < T, &T::get_velocity, reactphysics3d::Vector3 >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(const vector&in velocity)", asFUNCTION((virtual_call < T, &T::set_velocity_vector, void, const nvgt_vec3&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "vector get_velocity() const", asFUNCTION((virtual_call < T, &T::get_velocity, nvgt_vec3 >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_positioning(audio_positioning_mode mode) property", asFUNCTION((virtual_call < T, &T::set_positioning, void, ma_positioning >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_positioning_mode get_positioning() const property", asFUNCTION((virtual_call < T, &T::get_positioning, ma_positioning >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_rolloff(float rolloff) property", asFUNCTION((virtual_call < T, &T::set_rolloff, void, float >)), asCALL_CDECL_OBJFIRST);
@@ -2342,7 +2344,7 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	RegisterSoundsystemAudioNode < phonon_binaural_node > (engine, "phonon_binaural_node");
 	engine->RegisterObjectBehaviour("phonon_binaural_node", asBEHAVE_FACTORY, "phonon_binaural_node@ n(audio_engine@ engine, int channels, int sample_rate, int frame_size = 0)", asFUNCTION(phonon_binaural_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("phonon_binaural_node", "void set_direction(float x, float y, float z, float distance)", asFUNCTION((virtual_call < phonon_binaural_node, &phonon_binaural_node::set_direction, void, float, float, float, float >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("phonon_binaural_node", "void set_direction(const vector&in direction, float distance)", asFUNCTION((virtual_call < phonon_binaural_node, &phonon_binaural_node::set_direction_vector, void, const reactphysics3d::Vector3 &, float >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("phonon_binaural_node", "void set_direction(const vector&in direction, float distance)", asFUNCTION((virtual_call < phonon_binaural_node, &phonon_binaural_node::set_direction_vector, void, const nvgt_vec3 &, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("phonon_binaural_node", "void set_spatial_blend_max_distance(float max_distance)", asFUNCTION((virtual_call < phonon_binaural_node, &phonon_binaural_node::set_spatial_blend_max_distance, void, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterGlobalFunction("bool set_sound_global_hrtf(bool enabled)", asFUNCTION(set_global_hrtf), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool get_sound_global_hrtf() property", asFUNCTION(get_global_hrtf), asCALL_CDECL);
@@ -2563,7 +2565,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	RegisterSoundsystemMixer < mixer > (engine, "mixer");
 	engine->RegisterObjectBehaviour("mixer", asBEHAVE_FACTORY, "mixer@ m()", asFUNCTION(new_global_mixer), asCALL_CDECL);
 	RegisterSoundsystemMixer < sound > (engine, "sound");
-	engine->RegisterObjectMethod("audio_engine", "sound@ play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@ mix = null, const pack_interface@ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION((virtual_call < audio_engine, &audio_engine::play, sound*, const string &, const reactphysics3d::Vector3&, float, float, float, mixer*, const pack_interface*, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "sound@ play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@ mix = null, const pack_interface@ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION((virtual_call < audio_engine, &audio_engine::play, sound*, const string &, const nvgt_vec3&, float, float, float, mixer*, const pack_interface*, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "mixer@ mixer()", asFUNCTION((virtual_call < audio_engine, &audio_engine::new_mixer, mixer * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "sound@ sound()", asFUNCTION((virtual_call < audio_engine, &audio_engine::new_sound, sound * >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemDataSources(engine);

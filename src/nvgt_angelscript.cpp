@@ -63,7 +63,7 @@
 #include "uuid.h"
 #include "mail.h"
 #include "random.h"
-#include "reactphysics.h"
+#include "jolt.h"
 #include "scriptstuff.h"
 #include "serialize.h"
 #include "sound.h"
@@ -451,7 +451,7 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->BeginConfigGroup("physics");
-	RegisterReactphysics(engine);
+	RegisterJolt(engine);
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
 	engine->BeginConfigGroup("compression");
@@ -1062,7 +1062,7 @@ std::string DateTimeToString(void* obj, int expandMembers, CDebugger *dbg) {
 	return s.str();
 }
 std::string Vector3ToString(void* obj, int expandMembers, CDebugger *dbg) {
-	reactphysics3d::Vector3 *v = reinterpret_cast<reactphysics3d::Vector3*>(obj);
+	nvgt_vec3 *v = reinterpret_cast<nvgt_vec3*>(obj);
 	return v->to_string();
 }
 #ifdef _WIN32

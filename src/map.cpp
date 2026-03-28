@@ -20,7 +20,7 @@
 #include <limits>
 #include "scriptstuff.h"
 
-using reactphysics3d::Vector3;
+using Vector3 = nvgt_vec3;
 
 static asIScriptContext* fcallback_ctx = NULL;
 
