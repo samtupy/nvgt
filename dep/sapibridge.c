@@ -31,10 +31,10 @@ int sb_sapi_speak(sb_sapi* sapi, char* text, int interrupt)
 {
 if(!sbz_sapi_is_init(sapi)) return 0;
 if((!text)||(!*text)) return 0;
-WCHAR* speak=sbz_form_message(text, sapi->pitch);
+WCHAR* speak=sbz_char_to_wchar(text);
 if(!speak) return 0;
 if(interrupt) sb_sapi_stop(sapi);
-HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, speak, SPF_IS_XML|SPF_ASYNC, NULL);
+HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, speak, SPF_ASYNC, NULL);
 free(speak);
 if(FAILED(hr)) return 0;
 return 1;
@@ -115,7 +115,7 @@ if(!sbz_sapi_is_init(sapi)) return 0;
 if((pitch<-10)||(pitch>10)) return 0;
 WCHAR buffer[100];
 swprintf(buffer, 100, L"<pitch absmiddle=\"%d\"/>", pitch);
-HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, buffer, SPF_IS_XML|SPF_ASYNC, NULL);
+HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, buffer, SPF_IS_XML|SPF_PERSIST_XML|SPF_PARSE_SAPI|SPF_ASYNC, NULL);
 if(FAILED(hr)) return 0;
 sapi->pitch=pitch;
 return 1;
@@ -317,7 +317,7 @@ int sbz_sapi_speak_to_memory(sb_sapi* sapi, char* text, void** buffer, int* size
 *buffer=NULL;
 *size=0;
 if(!sapi) return 0;
-WCHAR* speak=sbz_form_message(text, sapi->pitch);
+WCHAR* speak=sbz_char_to_wchar(text);
 if(!speak) return 0;
 ISpStream* stream=NULL;
 if(!sbz_sapi_create_memory_stream(sapi, &stream))
@@ -325,7 +325,7 @@ if(!sbz_sapi_create_memory_stream(sapi, &stream))
 free(speak);
 return 0;
 }
-HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, speak, SPF_IS_XML, NULL);
+HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, speak, SPF_IS_NOT_XML, NULL);
 free(speak);
 if(FAILED(hr))
 {
@@ -588,69 +588,4 @@ if((wf->nChannels!=1)&&(wf->nChannels!=2)) return 0;
 if((wf->wBitsPerSample!=8)&&(wf->wBitsPerSample!=16)) return 0;
 if((wf->nSamplesPerSec<8000)||(wf->nSamplesPerSec>192000)) return 0;
 return 1;
-}
-WCHAR* sbz_form_message(char* text, int pitch)
-{
-if((!text)||(!*text)) return NULL;
-WCHAR* text_compat=sbz_char_to_wchar(text);
-if(!text_compat) return NULL;
-WCHAR* escaped=sbz_xml_escape(text_compat);
-free(text_compat);
-if(!escaped) return NULL;
-int needed=_scwprintf(L"<pitch absmiddle=\"%d\">%ls</pitch>", pitch, escaped);
-if(needed<0)
-{
-free(escaped);
-return NULL;
-}
-WCHAR* buffer=malloc(sizeof(WCHAR)*(needed+1));
-if(!buffer)
-{
-free(escaped);
-return NULL;
-}
-swprintf(buffer, needed+1, L"<pitch absmiddle=\"%d\">%ls</pitch>", pitch, escaped);
-free(escaped);
-return buffer;
-}
-WCHAR* sbz_xml_escape(WCHAR* text)
-{
-if((!text)||(!*text)) return NULL;
-int needed=0;
-for(WCHAR* p=text; *p; p++)
-{
-needed+=sbz_xml_escape_size(*p);
-}
-WCHAR* out=malloc(sizeof(WCHAR)*(needed+1));
-if(!out) return NULL;
-WCHAR* esc=out;
-for(WCHAR* p=text; *p; p++)
-{
-WCHAR* entity=sbz_xml_escape_text(*p);
-if(!entity)
-{
-*esc=*p;
-esc++;
-continue;
-}
-wcscpy(esc, entity);
-esc+=sbz_xml_escape_size(*p);
-}
-*esc=L'\0';
-return out;
-}
-int sbz_xml_escape_size(WCHAR c)
-{
-WCHAR* entity=sbz_xml_escape_text(c);
-if(!entity) return 1;
-return wcslen(entity);
-}
-WCHAR* sbz_xml_escape_text(WCHAR c)
-{
-if(c==L'&') return L"&amp;";
-if(c==L'<') return L"&lt;";
-if(c==L'>') return L"&gt;";
-if(c==L'"') return L"&quot;";
-if(c==L'\'') return L"&apos;";
-return NULL;
 }
