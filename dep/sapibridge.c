@@ -436,6 +436,7 @@ for(int x=0; x<sapi->voice_count; x++)
 sapi->voices[x].token->lpVtbl->Release(sapi->voices[x].token);
 if(sapi->voices[x].default_token) sapi->voices[x].default_token->lpVtbl->Release(sapi->voices[x].default_token);
 free(sapi->voices[x].name);
+free(sapi->voices[x].language);
 }
 if(sapi->voices) free(sapi->voices);
 sbz_sapi_reset_voice_cache(sapi);
