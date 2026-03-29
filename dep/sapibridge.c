@@ -563,10 +563,16 @@ WCHAR* sbz_char_to_wchar(char* text)
 {
 if((!text)||(!*text)) return NULL;
 int source_length=strlen(text);
-int destination_length=MultiByteToWideChar(CP_UTF8, 0, text, source_length, NULL, 0);
+int destination_length=MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, source_length, NULL, 0);
+if(destination_length<=0) return NULL;
 WCHAR* wtext=malloc((destination_length+1)*sizeof(WCHAR));
 if(!wtext) return NULL;
-MultiByteToWideChar(CP_UTF8, 0, text, source_length, wtext, destination_length);
+int written=MultiByteToWideChar(CP_UTF8, 0, text, source_length, wtext, destination_length);
+if(written!=destination_length)
+{
+free(wtext);
+return NULL;
+}
 wtext[destination_length]=0;
 return wtext;
 }
