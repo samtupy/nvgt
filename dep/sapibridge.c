@@ -597,7 +597,7 @@ int destination_length=MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, 
 if(destination_length<=0) return NULL;
 WCHAR* wtext=malloc((destination_length+1)*sizeof(WCHAR));
 if(!wtext) return NULL;
-int written=MultiByteToWideChar(CP_UTF8, 0, text, source_length, wtext, destination_length);
+int written=MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, source_length, wtext, destination_length);
 if(written!=destination_length)
 {
 free(wtext);
