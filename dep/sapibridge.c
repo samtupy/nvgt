@@ -308,6 +308,11 @@ voice[written].langid=langid;
 voice[written].language=lang;
 written++;
 }
+if(written<=0)
+{
+free(voice);
+return 0;
+}
 sapi->voices=voice;
 sapi->voice_count=written;
 return 1;
