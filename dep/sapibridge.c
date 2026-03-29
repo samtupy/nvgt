@@ -162,7 +162,7 @@ return 1;
 }
 int sb_sapi_get_voice(sb_sapi* sapi)
 {
-if(!sb_sapi_refresh_voices(sapi)) return 0;
+if(!sb_sapi_refresh_voices(sapi)) return -1;
 ISpObjectToken* current=NULL;
 if(FAILED(sapi->voice->lpVtbl->GetVoice(sapi->voice, &current))) return -1;
 for(int x=0; x<sapi->voice_count; x++)
