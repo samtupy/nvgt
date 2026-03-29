@@ -31,9 +31,10 @@ int sb_sapi_speak(sb_sapi* sapi, char* text, int interrupt)
 {
 if(!sbz_sapi_is_init(sapi)) return 0;
 if((!text)||(!*text)) return 0;
+if(interrupt) sb_sapi_stop(sapi);
+if(!sbz_sapi_output_to_device(sapi)) return 0;
 WCHAR* speak=sbz_char_to_wchar(text);
 if(!speak) return 0;
-if(interrupt) sb_sapi_stop(sapi);
 HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, speak, SPF_ASYNC, NULL);
 free(speak);
 if(FAILED(hr)) return 0;
@@ -174,8 +175,11 @@ return x;
 // Sam: Otherwise we're probably dealing with the default voice, in which case the current token will not have been allocated within the refresh voices enumeration and thus can't be direct compared with voices[x].token.
 // We fall back to name comparison only once, then cache the default token for much quicker comparison in future calls.
 WCHAR* name = NULL;
-if(!FAILED(current->lpVtbl->GetStringValue(current, NULL, &name)))
+if(FAILED(current->lpVtbl->GetStringValue(current, NULL, &name)))
 {
+current->lpVtbl->Release(current);
+return -1;
+}
 char* utf8=sbz_wchar_to_char(name);
 sbz_com_free_memory(&sapi->com, name);
 for(int x=0; x<sapi->voice_count; x++)
@@ -186,7 +190,6 @@ free(utf8);
 return x; // We don't release the token in this case as it will be done at voice cache clean.
 }
 free(utf8);
-}
 current->lpVtbl->Release(current);
 return -1;
 }
@@ -322,57 +325,37 @@ int sbz_sapi_speak_to_memory(sb_sapi* sapi, char* text, void** buffer, int* size
 *buffer=NULL;
 *size=0;
 if(!sapi) return 0;
+if(!sbz_sapi_prepare_memory_stream(sapi)) return 0;
 WCHAR* speak=sbz_char_to_wchar(text);
 if(!speak) return 0;
-ISpStream* stream=NULL;
-if(!sbz_sapi_create_memory_stream(sapi, &stream))
-{
-free(speak);
-return 0;
-}
 HRESULT hr=sapi->voice->lpVtbl->Speak(sapi->voice, speak, SPF_IS_NOT_XML, NULL);
 free(speak);
-if(FAILED(hr))
-{
-sapi->voice->lpVtbl->SetOutput(sapi->voice, NULL, TRUE);
-stream->lpVtbl->Release(stream);
-return 0;
-    }
+if(FAILED(hr)) return 0;
 sbz_sapi_cache_audio_attributes(sapi);
-int ok=sbz_sapi_capture_stream_output(sapi, stream, buffer, size);
-sapi->voice->lpVtbl->SetOutput(sapi->voice, NULL, TRUE);
-stream->lpVtbl->Close(stream);
-stream->lpVtbl->Release(stream);
+int ok=sbz_sapi_capture_stream_output(sapi, buffer, size);
 return ok;
 }
-int sbz_sapi_create_memory_stream(sb_sapi* sapi, ISpStream** stream)
+int sbz_sapi_create_memory_stream(sb_sapi* sapi)
 {
 if(!sbz_sapi_is_init(sapi)) return 0;
-if(!stream) return 0;
 
 /* Manual GUID declarations */
 CLSID CLSID_SpMemoryStream={0x5FB7EF7D, 0xDFF4, 0x468a, {0xB6, 0xB7, 0x2F, 0xCB, 0xD1, 0x88, 0xF9, 0x94}};
 IID IID_ISpStream={0x12E3CCA9, 0x7518, 0x44C5, {0xA5, 0xE7, 0xBA, 0x5A, 0x79, 0xCB, 0x92, 0x9E}};
 
-*stream=NULL;
-if(!sbz_com_create_instance(&sapi->com, &CLSID_SpMemoryStream, &IID_ISpStream, (void**) stream)) return 0;
-HRESULT hr=sapi->voice->lpVtbl->SetOutput(sapi->voice, (IUnknown*) (*stream), TRUE);
-if(FAILED(hr))
-{
-(*stream)->lpVtbl->Release(*stream);
-*stream=NULL;
-return 0;
-}
+if(!sbz_com_create_instance(&sapi->com, &CLSID_SpMemoryStream, &IID_ISpStream, (void**) &sapi->mem)) return 0;
 return 1;
 }
-int sbz_sapi_capture_stream_output(sb_sapi* sapi, ISpStream* stream, void** buffer, int* size)
+int sbz_sapi_capture_stream_output(sb_sapi* sapi, void** buffer, int* size)
 {
 if(!sbz_sapi_is_init(sapi)) return 0;
-if((!stream)||(!buffer)||(!size)) return 0;
+if((!buffer)||(!size)) return 0;
 *buffer=NULL;
 *size = 0;
 LARGE_INTEGER zero={0};
 ULARGE_INTEGER end_pos;
+ISpStream* stream=sapi->mem;
+if(!stream) return 0;
 if(FAILED(stream->lpVtbl->Seek(stream, zero, STREAM_SEEK_END, &end_pos))) return 0;
 ULONG total_size=(ULONG) end_pos.QuadPart;
 if(total_size<=0) return 0;
@@ -427,6 +410,40 @@ if(pwfx) sbz_com_free_memory(&sapi->com, pwfx);
 if(format) format->lpVtbl->Release(format);
 return 0;
 }
+int sbz_sapi_output_to_device(sb_sapi* sapi)
+{
+if(!sbz_sapi_is_init(sapi)) return 0;
+if(!sapi->output) return 1;
+sapi->voice->lpVtbl->SetOutput(sapi->voice, NULL, TRUE);
+sapi->output=NULL;
+return 1;
+}
+int sbz_sapi_output_to_stream(sb_sapi* sapi)
+{
+if(!sbz_sapi_is_init(sapi)) return 0;
+if(!sapi->mem)
+{
+if(!sbz_sapi_create_memory_stream(sapi)) return 0;
+}
+if(sapi->output==sapi->mem) return 1;
+HRESULT hr=sapi->voice->lpVtbl->SetOutput(sapi->voice, (IUnknown*) (sapi->mem), TRUE);
+if(FAILED(hr)) return 0;
+sapi->output=sapi->mem;
+return 1;
+}
+int sbz_sapi_prepare_memory_stream(sb_sapi* sapi)
+{
+if(!sbz_sapi_is_init(sapi)) return 0;
+if(!sbz_sapi_output_to_stream(sapi)) return 0;
+LARGE_INTEGER zero;
+zero.QuadPart=0;
+ULARGE_INTEGER size;
+size.QuadPart=0;
+if(FAILED(sapi->mem->lpVtbl->Seek(sapi->mem, zero, STREAM_SEEK_SET, NULL))) return 0;
+if(FAILED(sapi->mem->lpVtbl->SetSize(sapi->mem, size))) return 0;
+if(FAILED(sapi->mem->lpVtbl->Seek(sapi->mem, zero, STREAM_SEEK_SET, NULL))) return 0;
+return 1;
+}
 void sbz_sapi_reset_voice_cache(sb_sapi* sapi)
 {
 if(!sapi) return;
@@ -450,6 +467,11 @@ void sbz_sapi_cleanup(sb_sapi* sapi)
 {
 if(!sapi) return;
 if(sapi->voice) sapi->voice->lpVtbl->Release(sapi->voice);
+if(sapi->mem)
+{
+sapi->mem->lpVtbl->Close(sapi->mem);
+sapi->mem->lpVtbl->Release(sapi->mem);
+}
 sbz_sapi_clean_voice_cache(sapi);
 sbz_com_cleanup(&sapi->com);
 sbz_sapi_reset(sapi);
@@ -460,6 +482,8 @@ if(!sapi) return;
 sbz_com_reset(&sapi->com);
 sbz_sapi_reset_voice_cache(sapi);
 sapi->voice = NULL;
+sapi->mem=NULL;
+sapi->output=NULL;
 sapi->pitch=0;
 sapi->audio_channels=0;
 sapi->audio_bit_depth=0;
