@@ -705,6 +705,12 @@ protected:
 			output_path = tgz_out.path();
 		} else output_path = workplace.path();
 	}
+	void open_output_stream(const Path& output_path) override {
+		nvgt_compilation_output_impl::open_output_stream(output_path);
+		BinaryWriter bw(fs);
+		fs.seekp(0);
+		bw.writeRaw("\x7f\x45"); // \x7fE — start of \x7fELF
+	}
 };
 class nvgt_compilation_output_android : public nvgt_compilation_output_impl {
 	TemporaryFile workplace;
