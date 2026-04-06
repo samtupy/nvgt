@@ -232,9 +232,9 @@ public:
 		stubpath = format("%snvgt_%s%s.bin", stubpath.toString(), platform, (stub != "" ? string("_") + stub : ""));
 		string basename = config.getString("build.output_basename", "");
 		if (basename.empty())
-			outpath = Path(input_file).setExtension("").toString();
+			outpath = Path(input_file).setExtension("").makeAbsolute().toString();
 		else
-			outpath = Path(Path(input_file).parent(), basename).toString();
+			outpath = Path(Path(input_file).makeAbsolute().parent(), basename).toString();
 		File(outpath.parent()).createDirectories();
 		alter_output_path(outpath);
 		string precommand = config.getString("build.precommand_" + g_platform + "_"s + (g_debug? "debug" : "release"), config.getString("build.precommand_" + g_platform, config.getString("build.precommand", "")));
