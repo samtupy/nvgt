@@ -230,9 +230,7 @@ public:
 		xplatform_correct_path_to_stubs(stubpath);
 		alter_stub_path(stubpath);
 		stubpath = format("%snvgt_%s%s.bin", stubpath.toString(), platform, (stub != "" ? string("_") + stub : ""));
-		string outpath_str = config.getString("build.output_basename", format("%s_$platform", Path(input_file).setExtension("").toString()));
-		replaceInPlace(outpath_str, "$platform"s, platform);
-		outpath = outpath_str;
+		outpath = config.getString("build.output_basename", format("%s", Path(input_file).setExtension("").toString()));
 		File(outpath.parent()).createDirectories();
 		alter_output_path(outpath);
 		string precommand = config.getString("build.precommand_" + g_platform + "_"s + (g_debug? "debug" : "release"), config.getString("build.precommand_" + g_platform, config.getString("build.precommand", "")));
