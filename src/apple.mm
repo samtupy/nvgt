@@ -363,6 +363,12 @@ void voice_over_window_created(game_window* window) {
 		UIWindow* win = (UIWindow*)window->get_native_window();
 		win.rootViewController.view.isAccessibilityElement = YES;
 		win.rootViewController.view.accessibilityTraits |= UIAccessibilityTraitAllowsDirectInteraction;
+	#else
+		NSWindow* win = g_window ? (NSWindow*)g_window->get_native_window() : nullptr;
+		NSAccessibilityPostNotification(win, NSAccessibilityApplicationActivatedNotification);
+		NSAccessibilityPostNotification(win, NSAccessibilityApplicationShownNotification);
+		NSAccessibilityPostNotification(win, NSAccessibilityWindowCreatedNotification);
+		NSAccessibilityPostNotification(win, NSAccessibilityFocusedWindowChangedNotification);
 	#endif
 }
 
