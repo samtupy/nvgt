@@ -100,7 +100,7 @@ LRESULT CALLBACK InputBoxWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 			// setting font
 			SetFontToControl(m_hWndPrompt);
 			// The TextEdit Control - For the text to be input
-			m_hWndEdit = CreateWindowEx(WS_EX_STATICEDGE, L"edit", _T(""), WS_VISIBLE | WS_CHILD | WS_TABSTOP | (infobox ? WS_VSCROLL | ES_WANTRETURN | ES_MULTILINE : 0), 5, TOP_EDGE + BUTTON_HEIGHT * 2 + 30, INPUTBOX_WIDTH - 30, TEXTEDIT_HEIGHT, hWnd, NULL, m_hInst, NULL);
+			m_hWndEdit = CreateWindowEx(WS_EX_STATICEDGE, L"edit", _T(""), WS_VISIBLE | WS_CHILD | WS_TABSTOP | (infobox ? WS_VSCROLL | ES_WANTRETURN | ES_MULTILINE : ES_AUTOHSCROLL), 5, TOP_EDGE + BUTTON_HEIGHT * 2 + 30, INPUTBOX_WIDTH - 30, TEXTEDIT_HEIGHT, hWnd, NULL, m_hInst, NULL);
 			if (m_hWndEdit == NULL) {
 				REPORTERROR;
 				return NULL;
