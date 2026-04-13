@@ -42,6 +42,7 @@
 #include <vs_version.h>
 #endif
 #include "bundling.h"
+#include "filesystem.h"
 #include "misc_functions.h" // parse_float
 #include "nvgt.h"
 #ifndef NVGT_USER_CONFIG
@@ -174,14 +175,31 @@ static void archive_write_dir(struct archive* a, const string& disk_dir, const s
 		}
 	}
 }
+// Thread-safe message box for use from the compilation worker thread. Dispatches message_box() onto the main thread via SDL_RunOnMainThread and blocks until the result is available. Returns -1 without showing anything for multi-button dialogs when quiet mode is active or a console is available, since the user cannot answer interactive questions in those conditions. Single-button alerts in console mode are printed to stdout.
+struct bundler_msgbox_args { const string& title; const string& text; const vector<string>& buttons; int result; };
+static void bundler_msgbox_callback(void* userdata) {
+	bundler_msgbox_args* a = static_cast<bundler_msgbox_args*>(userdata);
+	a->result = message_box(a->title, a->text, a->buttons);
+}
+int nvgt_compile_message_box(const string& title, const string& text, const vector<string>& buttons) {
+	auto& config = Util::Application::instance().config();
+	bool quiet = config.hasOption("application.quiet") || config.hasOption("application.QUIET");
+	bool console = is_console_available();
+	if (buttons.size() > 1 && (quiet || console)) return -1;
+	if (quiet) return -1;
+	if (console) { printf("%s: %s\n", title.c_str(), text.c_str()); return 1; }
+	bundler_msgbox_args args{title, text, buttons, -1};
+	SDL_RunOnMainThread(bundler_msgbox_callback, &args, true);
+	return args.result;
+}
+
 // Build the set of archive paths that should receive executable permissions.
 // main_exec: archive path of the primary executable. asset_prefix: prefix prepended to each binary asset's bundled_path.
 static set<string> build_exec_paths(const string& main_exec, const string& asset_prefix) {
 	set<string> paths;
 	if (!main_exec.empty()) paths.insert(main_exec);
 	for (const game_asset& g : g_game_assets)
-		if (g.flags & GAME_ASSET_BINARY)
-			paths.insert(asset_prefix.empty() ? g.bundled_path : asset_prefix + "/" + g.bundled_path);
+		if (g.flags & GAME_ASSET_BINARY) paths.insert(asset_prefix.empty() ? g.bundled_path : asset_prefix + "/" + g.bundled_path);
 	return paths;
 }
 
@@ -191,13 +209,12 @@ class nvgt_compilation_output_impl : public virtual nvgt_compilation_output {
 	UInt64 stub_size;
 	Path outpath;
 	Mutex status_text_mtx;
-	bool postbuild_complete;
 	void error(const exception& exc, const std::string& error) {
 		error_text = error;
 		throw;
 	}
 public:
-	nvgt_compilation_output_impl(const string& input_file) : input_file(input_file), platform(g_platform), stub(g_stub), stub_size(0), postbuild_complete(false), config(Util::Application::instance().config()) {}
+	nvgt_compilation_output_impl(const string& input_file) : input_file(input_file), platform(g_platform), stub(g_stub), stub_size(0), config(Util::Application::instance().config()) {}
 	const string& get_error_text() {
 		return error_text;
 	}
@@ -230,11 +247,9 @@ public:
 		xplatform_correct_path_to_stubs(stubpath);
 		alter_stub_path(stubpath);
 		stubpath = format("%snvgt_%s%s.bin", stubpath.toString(), platform, (stub != "" ? string("_") + stub : ""));
-		string basename = config.getString("build.output_basename", "");
-		if (basename.empty()) outpath = Path(input_file).setExtension("").makeAbsolute().toString();
-		else outpath = Path(Path(input_file).makeAbsolute().parent(), basename).toString();
 		string outpath_str = config.getString("build.output_basename", format("%s", Path(input_file).setExtension("").makeAbsolute().toString()));
 		replaceInPlace(outpath_str, "$platform"s, platform);
+		if (DirectoryExists(outpath_str)) File(outpath_str).remove(true); // Though some platforms must do indipendantly after extra modification, we still attempt to clean previous builds for generic outputs here so that a linux build won't output overtop a windows one leaving both an elf and an executable binary in the same place, for example.
 		outpath = outpath_str;
 		File(outpath.parent()).createDirectories();
 		alter_output_path(outpath);
@@ -276,17 +291,8 @@ public:
 			set_status("executing postbuild command...");
 			if (!user_command(postcommand)) throw Exception("postbuild command failed");
 		}
-	}
-	void postbuild_interface() {
-		if (!postbuild_complete) {
-			bool quiet = config.hasOption("application.quiet") || config.hasOption("application.QUIET") || config.hasOption("build.no_success_message"); // Maybe we should switch to a verbocity level?
-			if (!quiet) message(format("%s build succeeded in %?ums, saved to %s", string(g_debug ? "Debug" : "Release"), Util::Application::instance().uptime().totalMilliseconds(), output_file), "Success!");
-			postbuild_interface(false);
-			postbuild_complete = true;
-		} else postbuild_interface(true);
-	}
-	void postbuild() {
-		postbuild(outpath);
+		if (!config.hasOption("application.quiet") && !config.hasOption("application.QUIET") && !config.hasOption("build.no_success_message"))
+			nvgt_compile_message_box("Success!", format("%s build succeeded in %?ums, saved to %s", string(g_debug ? "Debug" : "Release"), Util::Application::instance().uptime().totalMilliseconds(), output_file), {"`OK"});
 	}
 protected:
 	FileStream fs;
@@ -360,12 +366,6 @@ protected:
 	virtual void finalize_product(Path& outpath) {
 		// Subclasses can override this method as a final hook into the bundling process after bytecode has been written to the stub but before build success is reported to the user. If any final packaging steps performed here modify the final output path, update the outpath parameter accordingly so that the correct path of the final product package will be shown to the user.
 	}
-	virtual void postbuild_interface(bool after_postbuild) {
-		// This serves as the point where any platforms can ask post build questions, such as whether the user would like to install the build etc. It exists because it is specifically executed on the main thread of NVGT's application as opposed to everything else in this class which is not. The method is called twice, once before the postbuild task and once after.
-	}
-	virtual void postbuild(const Path& output_path) {
-		// This is the very last method called on the bundling object before it is destroyed only assuming the build was successful. It was originally added to support output installation tasks on certain platforms.
-	}
 };
 class nvgt_compilation_output_windows : public nvgt_compilation_output_impl {
 	SharedPtr<File> workplace_tmp;
@@ -438,7 +438,10 @@ protected:
 		if (bundle_mode == 2) {
 			workplace_tmp = new TemporaryFile();
 			workplace = Path(workplace_tmp->path()).append(Path(output_path).makeFile().getFileName()).setExtension("app");
-		} else if(bundle_mode > 0) workplace = Path(output_path).makeFile().setExtension("app");
+		} else if(bundle_mode > 0) {
+			workplace = Path(output_path).makeFile().setExtension("app");
+			if (workplace.exists() && workplace.isDirectory()) workplace.remove(true); // both MacOS and IOS create .app bundles, if we don't construct them from scratch and someone compiles for IOS after MacOS, the bundles might clash without valid output basename set.
+		}
 		if (bundle_mode) {
 			Path tmp = Path(workplace.path()).append("Contents/Resources");
 			File(tmp).createDirectories();
@@ -561,7 +564,10 @@ protected:
 		if (bundle_mode == 2) {
 			workplace_tmp = new TemporaryFile();
 			workplace = Path(workplace_tmp->path()).append("Payload").append(Path(output_path).makeFile().getFileName()).setExtension("app");
-		} else if (bundle_mode > 0) workplace = Path(output_path).makeFile().setExtension("app");
+		} else if(bundle_mode > 0) {
+			workplace = Path(output_path).makeFile().setExtension("app");
+			if (workplace.exists() && workplace.isDirectory()) workplace.remove(true); // both MacOS and IOS create .app bundles, if we don't construct them from scratch and someone compiles for IOS after MacOS, the bundles might clash without valid output basename set.
+		}
 		if (bundle_mode) {
 			File(workplace.path()).createDirectories();
 			Path tmp = Path(workplace.path()).append(output_path.getBaseName()).makeFile();
@@ -721,7 +727,6 @@ class nvgt_compilation_output_android : public nvgt_compilation_output_impl {
 	int do_install; // 0 no, 1 ask, 2 always.
 	unsigned int install_transport_id; // ADB transport ID of device to install to.
 	string install_device_name; // Used for UI display to report device installed to.
-	Clock install_timer;
 	string sign_cert, sign_password;
 	using nvgt_compilation_output_impl::nvgt_compilation_output_impl;
 	string exe(const std::string& path) {
@@ -815,7 +820,7 @@ class nvgt_compilation_output_android : public nvgt_compilation_output_impl {
 		else device_description = !product.empty()? product : model;
 		return transport_id;
 	}
-	unsigned int get_install_device(bool quiet) {
+	unsigned int get_install_device() {
 		// Determine a device to install the generated APK to. If multiple devices are connected in debug mode, choose one if we can or else let the user select one.
 		install_transport_id = 0;
 		install_device_name.clear();
@@ -832,11 +837,12 @@ class nvgt_compilation_output_android : public nvgt_compilation_output_impl {
 			devices.push_back(make_pair(device_description, transport_id));
 		}
 		if (devices.empty()) return 0; // no available devices
+		bool quiet = config.hasOption("application.quiet") || config.hasOption("application.QUIET");
 		vector<string> buttons;
 		for (auto d : devices) buttons.push_back(buttons.empty()? "`"s + d.first : d.first);
 		buttons.push_back("~skip installation");
-		int result = devices.size() == 1 && (do_install == 2 || quiet)? 0 : !quiet? (message_box("install app", "1 or more Android devices are connected to this computer in debug mode. Would you like to install the generated APK on to one of these devices?", buttons) -1) : -1;
-		if (result < 0 || result >= devices.size()) return 0; // installation skipped
+		int result = devices.size() == 1 && (do_install == 2 || quiet) ? 0 : nvgt_compile_message_box("install app", "1 or more Android devices are connected to this computer in debug mode. Would you like to install the generated APK on to one of these devices?", buttons) - 1;
+		if (result < 0 || result >= (int)devices.size()) return 0; // installation skipped
 		install_device_name = devices[result].first;
 		return install_transport_id = devices[result].second;
 	}
@@ -911,20 +917,14 @@ protected:
 			if (!system_command(exe("java"), {"-jar", apksigner_jar.toString(), "sign", "-ks", sign_cert, "--ks-pass", sign_password, "--key-pass", sign_password, output_path.toString()}, sout, serr)) throw Exception(format("Failed to run apksigner, %s%s", sout, serr));
 		}
 	}
-	void postbuild_interface(bool after_postbuild) override {
-		bool quiet = config.hasOption("application.quiet") || config.hasOption("application.QUIET");
-		if (!after_postbuild) {	
-			do_install = do_install > 0 && (install_transport_id = get_install_device(quiet))? 2 : 0;
-		} else {
-			if (do_install == 2 && !quiet) message(format("The application %s (%s) was installed on %s in %ums.", config.getString("build.product_name"), config.getString("build.product_identifier"), install_device_name, uint32_t(install_timer.elapsed() / 1000)), "Success!");
-		}
-	}
-	void postbuild(const Path& output_path) override {
-		if (do_install < 2) return;
-		string sout, serr;
+	void finalize() override {
+		nvgt_compilation_output_impl::finalize(); // packages APK and shows success message
+		if (!do_install || !get_install_device()) return;
 		set_status("installing APK...");
-		install_timer.update();
-		if (!system_command(exe("adb"), {"-t", format("%u", install_transport_id), "install", "-r", "-f", output_path.toString()}, sout, serr)) throw Exception(format("Unable to install APK onto %s, %s", install_device_name, serr));
+		Clock install_clock;
+		string sout, serr;
+		if (!system_command(exe("adb"), {"-t", format("%u", install_transport_id), "install", "-r", "-f", get_output_file()}, sout, serr)) throw Exception(format("Unable to install APK onto %s, %s", install_device_name, serr));
+		nvgt_compile_message_box("Success!", format("The application %s (%s) was installed on %s in %ums.", config.getString("build.product_name"), config.getString("build.product_identifier"), install_device_name, uint32_t(install_clock.elapsed() / 1000)), {"`OK"});
 	}
 };
 nvgt_compilation_output* nvgt_init_compilation(const string& input_file, bool auto_prepare) {

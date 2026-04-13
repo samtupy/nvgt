@@ -14,6 +14,7 @@
 #include <angelscript.h>
 #include <string>
 
+bool DirectoryExists(const std::string& path);
 bool FileCopy(const std::string& source, const std::string& target, bool overwrite);
 bool FileMove(const std::string& source, const std::string& target);
 bool FileExists(const std::string& path);
