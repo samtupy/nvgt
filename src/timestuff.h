@@ -72,6 +72,9 @@ public:
 		return timer_objects.size();
 	}
 	bool loop(int max_timers = 0, int max_catchup = 100);
+	uint64_t ticks_to_next_event(uint64_t max = 100) {
+		return timers.ticks_to_next_event(max);
+	}
 };
 
 class timer : public Poco::RefCountedObject {
