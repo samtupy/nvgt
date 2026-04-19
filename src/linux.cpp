@@ -16,7 +16,12 @@
 #include <memory>
 #include <Poco/SharedLibrary.h>
 #include <stdexcept>
+#include <dbus/dbus.h>
+#include <memory>
 using namespace std;
+
+static DBusConnection* g_dbus_connection = nullptr;
+static bool g_dbus_initialized = false;
 
 #define spd_get_default_address (*spd_get_default_address)
 #define spd_open2 (*spd_open2)
@@ -31,6 +36,128 @@ using namespace std;
 #undef spd_say
 #undef spd_stop
 #undef spd_cancel
+
+static bool initialize_dbus_connection() {
+	if (g_dbus_initialized) return g_dbus_connection != nullptr;
+	g_dbus_initialized = true;
+	DBusError err;
+	dbus_error_init(&err);
+	g_dbus_connection = dbus_bus_get(DBUS_BUS_SESSION, &err);
+	if (dbus_error_is_set(&err)) {
+		dbus_error_free(&err);
+		return false;
+	}
+	return g_dbus_connection != nullptr;
+}
+
+bool orca_is_available() {
+	if (!g_dbus_initialized) {
+		if (!initialize_dbus_connection()) return false;
+	}
+	if (!g_dbus_connection) return false;
+	DBusError err;
+	dbus_error_init(&err);
+	DBusMessage *msg = dbus_message_new_method_call(
+			"org.freedesktop.DBus",
+			"/org/freedesktop/DBus",
+			"org.freedesktop.DBus",
+			"NameHasOwner"
+	);
+	if (!msg) return false;
+	const char *name = "org.gnome.Orca.Service";
+	dbus_message_append_args(msg, DBUS_TYPE_STRING, &name, DBUS_TYPE_INVALID);
+	DBusMessage *reply = dbus_connection_send_with_reply_and_block(
+		g_dbus_connection, msg, 1000, &err
+	);
+	dbus_message_unref(msg);
+	if (!reply || dbus_error_is_set(&err)) {
+		dbus_error_free(&err);
+		return false;
+	}
+	dbus_bool_t has_owner = FALSE;
+	if (!dbus_message_get_args(reply, &err, DBUS_TYPE_BOOLEAN, &has_owner, DBUS_TYPE_INVALID)) {
+		dbus_error_free(&err);
+		dbus_message_unref(reply);
+		return false;
+	}
+	dbus_message_unref(reply);
+	return has_owner;
+}
+
+bool orca_is_running(){
+	return orca_is_available();
+}
+
+bool orca_present_message(const std::string& message, bool interrupt) {
+	if (!orca_is_available() || message.empty()) return false;
+	DBusError err;
+	dbus_error_init(&err);
+	if (interrupt) {
+		orca_silence();
+	}
+	DBusMessage *msg = dbus_message_new_method_call(
+		"org.gnome.Orca.Service",
+		"/org/gnome/Orca/Service",
+		"org.gnome.Orca.Service",
+		"PresentMessage"
+	);
+	if (!msg) return false;
+	const char *msg_text = message.c_str();
+	dbus_message_append_args(msg, DBUS_TYPE_STRING, &msg_text, DBUS_TYPE_INVALID);
+	DBusMessage *reply = dbus_connection_send_with_reply_and_block(
+		g_dbus_connection, msg, 1000, &err
+	);
+	dbus_message_unref(msg);
+	if (!reply || dbus_error_is_set(&err)) {
+		dbus_error_free(&err);
+		return false;
+	}
+	dbus_bool_t success = FALSE;
+	if (!dbus_message_get_args(reply, &err, DBUS_TYPE_BOOLEAN, &success, DBUS_TYPE_INVALID)) {
+		dbus_error_free(&err);
+		dbus_message_unref(reply);
+		return false;
+	}
+	dbus_message_unref(reply);
+	return success;
+}
+
+bool orca_silence() {
+	if (!orca_is_available()) return false;
+	DBusError err;
+	dbus_error_init(&err);
+	DBusMessage *msg = dbus_message_new_method_call(
+		"org.gnome.Orca.Service",
+		"/org/gnome/Orca/Service/SpeechAndVerbosityManager",
+		"org.gnome.Orca.Module",
+		"ExecuteCommand"
+	);
+	if (!msg) return false;
+	const char *command = "InterruptSpeech";
+	dbus_bool_t notify_user = FALSE;
+	dbus_message_append_args(msg,
+		DBUS_TYPE_STRING, &command,
+		DBUS_TYPE_BOOLEAN, &notify_user,
+		DBUS_TYPE_INVALID
+	);
+	DBusMessage *reply = dbus_connection_send_with_reply_and_block(
+		g_dbus_connection, msg, 1000, &err
+	);
+	dbus_message_unref(msg);
+	if (!reply || dbus_error_is_set(&err)) {
+		dbus_error_free(&err);
+		return false;
+	}
+	dbus_bool_t success = FALSE;
+	if (!dbus_message_get_args(reply, &err, DBUS_TYPE_BOOLEAN, &success, DBUS_TYPE_INVALID)) {
+		dbus_error_free(&err);
+		dbus_message_unref(reply);
+		return false;
+	}
+	dbus_message_unref(reply);
+	return success;
+}
+
 
 static Poco::SharedLibrary g_speechd_lib;
 static bool g_speechd_lib_loaded = false;
@@ -72,7 +199,9 @@ speechd_engine::~speechd_engine() {
 	}
 }
 
-bool speechd_engine::is_available() { return loaded && connection != nullptr; }
+bool speechd_engine::is_available() {
+	return loaded && connection != nullptr;
+}
 
 bool speechd_engine::speak(const std::string &text, bool interrupt, bool blocking) {
 	if (!is_available() || text.empty()) return false;
@@ -96,48 +225,39 @@ bool screen_reader_is_speaking() { return false; }
 
 void register_native_tts() { tts_engine_register("speechd", []() -> shared_ptr<tts_engine> { return make_shared<speechd_engine>(); }); }
 
-static tts_voice* g_screen_reader_voice = nullptr;
+void screen_reader_unload() {}
 
 bool screen_reader_load() {
-	if (g_screen_reader_voice) return true;
-	g_screen_reader_voice = new tts_voice("speechd");
-	return g_screen_reader_voice != nullptr && g_screen_reader_voice->get_voice_count() > 0;
-}
-
-void screen_reader_unload() {
-	if (g_screen_reader_voice) {
-		g_screen_reader_voice->Release();
-		g_screen_reader_voice = nullptr;
-	}
+	return true;
 }
 
 std::string screen_reader_detect() {
-	if (!screen_reader_load()) return "";
-	return g_screen_reader_voice->get_voice_count() > 0 ? "Speech Dispatcher" : "";
+	if(orca_is_available()) return "Orca";
+	return "";
 }
 
 bool screen_reader_has_speech() {
-	if (!screen_reader_load()) return false;
-	return g_screen_reader_voice->get_voice_count() > 0;
+	return orca_is_available();
 }
 
-bool screen_reader_has_braille() { return false; }
+bool screen_reader_has_braille() {
+	return orca_is_available();
+}
 
 bool screen_reader_output(const std::string& text, bool interrupt) {
-	if (!screen_reader_load()) return false;
-	return g_screen_reader_voice->speak(text, interrupt);
+	return orca_present_message(text, interrupt);
 }
 
 bool screen_reader_speak(const std::string& text, bool interrupt) {
-	if (!screen_reader_load()) return false;
-	return g_screen_reader_voice->speak(text, interrupt);
+	return orca_present_message(text, interrupt);
 }
 
-bool screen_reader_braille(const std::string& text) { return false; }
+bool screen_reader_braille(const std::string& text) {
+	return orca_is_available();
+}
 
 bool screen_reader_silence() {
-	if (!screen_reader_load()) return false;
-	return g_screen_reader_voice->stop();
+	return orca_silence();
 }
 
 #endif
