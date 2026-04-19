@@ -225,10 +225,17 @@ bool screen_reader_is_speaking() { return false; }
 
 void register_native_tts() { tts_engine_register("speechd", []() -> shared_ptr<tts_engine> { return make_shared<speechd_engine>(); }); }
 
-void screen_reader_unload() {}
+void screen_reader_unload(){
+	if (g_dbus_connection) {
+		dbus_connection_unref(g_dbus_connection);
+		g_dbus_connection = nullptr;
+	}
+	g_dbus_initialized = false;
+}
 
 bool screen_reader_load() {
-	return true;
+	if (g_dbus_initialized) return g_dbus_connection != nullptr;
+	return initialize_dbus_connection();
 }
 
 std::string screen_reader_detect() {
