@@ -15,8 +15,8 @@
 #include <ankerl/unordered_dense.h>
 #include <vector>
 #include <angelscript.h>
-#include "nvgt_math.h"
 #include <scriptany.h>
+#include "jolt.h"
 #include "pathfinder.h"
 #define total_frame_sizes 3
 
@@ -35,7 +35,7 @@ public:
 	float minz;
 	float maxz;
 	float rotation;
-	nvgt_vec3 center;
+	vector3 center;
 	int framesize;
 	CScriptAny* primary_data;
 	std::string data1;
@@ -72,7 +72,7 @@ public:
 	coordinate_map() : ref_count(1) {}
 	void add_ref();
 	void release();
-	nvgt_vec3 get_frame_coordinates(int x, int y, int z, int size);
+	vector3 get_frame_coordinates(int x, int y, int z, int size);
 	map_frame* get_frame(int x, int y, int z, int size, bool create = true);
 	map_area* add_area(float minx, float maxx, float miny, float maxy, float minz, float maxz, float rotation, CScriptAny* primary_data, const std::string& data1, const std::string& data2, const std::string& data3, int priority, asINT64 flags = 0);
 	void get_areas(float minx, float maxx, float miny, float maxy, float minz, float maxz, float d, std::vector<map_area*>& local_areas, bool priority_check = true, asIScriptFunction* filter_callback = NULL, asINT64 flags = 0, asINT64 excluded_flags = 0);

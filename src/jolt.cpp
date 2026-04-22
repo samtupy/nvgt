@@ -8,7 +8,7 @@
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
- */
+*/
 
 #include <mutex>
 #include <string>
@@ -19,8 +19,9 @@
 #include <scriptany.h>
 #include <scriptarray.h>
 
-#define JPH_OBJECT_STREAM
+//#define JPH_OBJECT_STREAM
 #define JPH_FLOATING_POINT_EXCEPTIONS_ENABLED
+#include <Jolt/ConfigurationString.h>
 #include <Jolt/Jolt.h>
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Core/Factory.h>
@@ -54,15 +55,15 @@
 
 #include "nvgt.h"
 #include "nvgt_angelscript.h"
-#include "nvgt_math.h"
 #include "jolt.h"
+#include "UI.h" // temp alert
 
 using namespace JPH;
 using namespace std;
 
-// Helpers to convert between our shared nvgt_vec3 and Jolt's SIMD Vec3
-static inline Vec3 to_jolt(const nvgt_vec3& v) { return Vec3(v.x, v.y, v.z); }
-static inline nvgt_vec3 from_jolt(Vec3Arg v) { return nvgt_vec3(v.GetX(), v.GetY(), v.GetZ()); }
+// Helpers to convert between our shared vector3 and Jolt's SIMD Vec3
+static inline Vec3 to_jolt(const vector3& v) { return Vec3(v.x, v.y, v.z); }
+static inline vector3 from_jolt(Vec3Arg v) { return vector3(v.GetX(), v.GetY(), v.GetZ()); }
 
 // -- physics_material: ref-counted (via Jolt's RefTarget) override of PhysicsMaterial --
 // Note: this Jolt version's PhysicsMaterial only provides debug info; friction/restitution are per-body via BodyInterface.
@@ -142,27 +143,27 @@ template <class T>
 void jolt_copy_construct(void* mem, const T& o) { new (mem) T(o); }
 
 // -- physics_transform: simple 7-float POD struct avoiding SIMD alignment issues --
-struct jolt_transform {
+struct physics_transform {
 	float px = 0, py = 0, pz = 0;
 	float qx = 0, qy = 0, qz = 0, qw = 1;
 
-	jolt_transform() = default;
-	jolt_transform(Vec3Arg pos, QuatArg rot) : px(pos.GetX()), py(pos.GetY()), pz(pos.GetZ()), qx(rot.GetX()), qy(rot.GetY()), qz(rot.GetZ()), qw(rot.GetW()) {}
+	physics_transform() = default;
+	physics_transform(Vec3Arg pos, QuatArg rot) : px(pos.GetX()), py(pos.GetY()), pz(pos.GetZ()), qx(rot.GetX()), qy(rot.GetY()), qz(rot.GetZ()), qw(rot.GetW()) {}
 	Vec3 GetPosition() const { return Vec3(px, py, pz); }
 	Quat GetRotation() const { return Quat(qx, qy, qz, qw); }
 	void SetPosition(Vec3Arg p) { px = p.GetX(); py = p.GetY(); pz = p.GetZ(); }
 	void SetRotation(QuatArg r) { qx = r.GetX(); qy = r.GetY(); qz = r.GetZ(); qw = r.GetW(); }
-	bool operator==(const jolt_transform& o) const { return px==o.px && py==o.py && pz==o.pz && qx==o.qx && qy==o.qy && qz==o.qz && qw==o.qw; }
+	bool operator==(const physics_transform& o) const { return px==o.px && py==o.py && pz==o.pz && qx==o.qx && qy==o.qy && qz==o.qz && qw==o.qw; }
 };
 
-static void jolt_transform_construct(void* mem) { new (mem) jolt_transform(); }
-static void jolt_transform_construct_pq(void* mem, const nvgt_vec3& pos, const Quat& rot) { new (mem) jolt_transform(to_jolt(pos), rot); }
-static void jolt_transform_destruct(jolt_transform* t) { t->~jolt_transform(); }
+static void physics_transform_construct(void* mem) { new (mem) physics_transform(); }
+static void physics_transform_construct_pq(void* mem, const vector3& pos, const Quat& rot) { new (mem) physics_transform(to_jolt(pos), rot); }
+static void physics_transform_destruct(physics_transform* t) { t->~physics_transform(); }
 
-static nvgt_vec3 jolt_transform_get_position(const jolt_transform& t) { return from_jolt(t.GetPosition()); }
-static void jolt_transform_set_position(jolt_transform& t, const nvgt_vec3& p) { t.SetPosition(to_jolt(p)); }
-static Quat jolt_transform_get_rotation(const jolt_transform& t) { return t.GetRotation(); }
-static void jolt_transform_set_rotation(jolt_transform& t, const Quat& r) { t.SetRotation(r); }
+static vector3 physics_transform_get_position(const physics_transform& t) { return from_jolt(t.GetPosition()); }
+static void physics_transform_set_position(physics_transform& t, const vector3& p) { t.SetPosition(to_jolt(p)); }
+static Quat physics_transform_get_rotation(const physics_transform& t) { return t.GetRotation(); }
+static void physics_transform_set_rotation(physics_transform& t, const Quat& r) { t.SetRotation(r); }
 
 // -- jolt_shape_ref: ref-counted wrapper around a Jolt Shape --
 struct jolt_shape_ref {
@@ -180,7 +181,7 @@ static jolt_shape_ref* jolt_sphere_shape_create(float radius, nvgt_physics_mater
 	if (result.HasError()) return nullptr;
 	return new jolt_shape_ref(result.Get());
 }
-static jolt_shape_ref* jolt_box_shape_create(const nvgt_vec3& half_extents, float convex_radius, nvgt_physics_material* mat) {
+static jolt_shape_ref* jolt_box_shape_create(const vector3& half_extents, float convex_radius, nvgt_physics_material* mat) {
 	BoxShapeSettings settings(to_jolt(half_extents), convex_radius);
 	if (mat) settings.mMaterial = mat;
 	auto result = settings.Create();
@@ -234,21 +235,21 @@ static nvgt_physics_material* jolt_convex_shape_get_material(const jolt_shape_re
 static float jolt_sphere_shape_get_radius(const jolt_shape_ref* s) { return static_cast<const SphereShape*>(s->shape.GetPtr())->GetRadius(); }
 
 // -- BoxShape specific --
-static nvgt_vec3 jolt_box_shape_get_half_extent(const jolt_shape_ref* s) { return from_jolt(static_cast<const BoxShape*>(s->shape.GetPtr())->GetHalfExtent()); }
+static vector3 jolt_box_shape_get_half_extent(const jolt_shape_ref* s) { return from_jolt(static_cast<const BoxShape*>(s->shape.GetPtr())->GetHalfExtent()); }
 static float jolt_box_shape_get_convex_radius(const jolt_shape_ref* s) { return static_cast<const BoxShape*>(s->shape.GetPtr())->GetConvexRadius(); }
 
 // -- CapsuleShape specific --
 static float jolt_capsule_shape_get_half_height(const jolt_shape_ref* s) { return static_cast<const CapsuleShape*>(s->shape.GetPtr())->GetHalfHeightOfCylinder(); }
 static float jolt_capsule_shape_get_radius(const jolt_shape_ref* s) { return static_cast<const CapsuleShape*>(s->shape.GetPtr())->GetRadius(); }
 
-// -- nvgt_vec3 construct wrappers (nvgt_vec3 is the "vector" AngelScript type) --
-static void vec3_default_construct(void* mem) { new (mem) nvgt_vec3(); }
-static void vec3_xyz_construct(void* mem, float x, float y, float z) { new (mem) nvgt_vec3(x, y, z); }
-static void vec3_copy_construct(void* mem, const nvgt_vec3& o) { new (mem) nvgt_vec3(o); }
-static bool nvgt_vec3_is_normalized(const nvgt_vec3& v) { return v.is_normalized(); }
-static bool nvgt_vec3_is_near_zero(const nvgt_vec3& v) { return v.is_near_zero(); }
-static float& nvgt_vec3_opindex(nvgt_vec3& v, int i) { return i == 0 ? v.x : (i == 1 ? v.y : v.z); }
-static const float& nvgt_vec3_opindex_const(const nvgt_vec3& v, int i) { return i == 0 ? v.x : (i == 1 ? v.y : v.z); }
+// -- vector3 construct wrappers (vector3 is the "vector" AngelScript type) --
+static void vec3_default_construct(void* mem) { new (mem) vector3(); }
+static void vec3_xyz_construct(void* mem, float x, float y, float z) { new (mem) vector3(x, y, z); }
+static void vec3_copy_construct(void* mem, const vector3& o) { new (mem) vector3(o); }
+static bool vector3_is_normalized(const vector3& v) { return v.is_normalized(); }
+static bool vector3_is_near_zero(const vector3& v) { return v.is_near_zero(); }
+static float& vector3_opindex(vector3& v, int i) { return i == 0 ? v.x : (i == 1 ? v.y : v.z); }
+static const float& vector3_opindex_const(const vector3& v, int i) { return i == 0 ? v.x : (i == 1 ? v.y : v.z); }
 
 // -- global math helpers (backward compat) --
 static int nvgt_clamp_int(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -270,37 +271,37 @@ static void quat_set_y(Quat& q, float y) { q.SetY(y); }
 static void quat_set_z(Quat& q, float z) { q.SetZ(z); }
 static void quat_set_w(Quat& q, float w) { q.SetW(w); }
 static Quat quat_mul(const Quat& a, const Quat& b) { return a * b; }
-static nvgt_vec3 quat_mul_vec3(const Quat& q, const nvgt_vec3& v) { return from_jolt(q * to_jolt(v)); }
-static float quat_get_rotation_angle(const Quat& q, const nvgt_vec3& axis) { return q.GetRotationAngle(to_jolt(axis)); }
-static nvgt_vec3 quat_rotate_axis_x(const Quat& q) { return from_jolt(q.RotateAxisX()); }
-static nvgt_vec3 quat_rotate_axis_y(const Quat& q) { return from_jolt(q.RotateAxisY()); }
-static nvgt_vec3 quat_rotate_axis_z(const Quat& q) { return from_jolt(q.RotateAxisZ()); }
-static Quat quaternion_from_axis_angle(const nvgt_vec3& axis, float angle) { return Quat::sRotation(to_jolt(axis).Normalized(), angle); }
-static Quat quaternion_from_euler_angles(const nvgt_vec3& angles) { return Quat::sEulerAngles(to_jolt(angles)); }
+static vector3 quat_mul_vec3(const Quat& q, const vector3& v) { return from_jolt(q * to_jolt(v)); }
+static float quat_get_rotation_angle(const Quat& q, const vector3& axis) { return q.GetRotationAngle(to_jolt(axis)); }
+static vector3 quat_rotate_axis_x(const Quat& q) { return from_jolt(q.RotateAxisX()); }
+static vector3 quat_rotate_axis_y(const Quat& q) { return from_jolt(q.RotateAxisY()); }
+static vector3 quat_rotate_axis_z(const Quat& q) { return from_jolt(q.RotateAxisZ()); }
+static Quat quaternion_from_axis_angle(const vector3& axis, float angle) { return Quat::sRotation(to_jolt(axis).Normalized(), angle); }
+static Quat quaternion_from_euler_angles(const vector3& angles) { return Quat::sEulerAngles(to_jolt(angles)); }
 static Quat quaternion_slerp(const Quat& a, const Quat& b, float t) { return a.SLERP(b, t); }
-static jolt_transform jolt_identity_transform() { return jolt_transform(); }
+static physics_transform jolt_identity_transform() { return physics_transform(); }
 static string quat_to_string(const Quat& q) {
 	return "quaternion(" + to_string(q.GetX()) + ", " + to_string(q.GetY()) + ", " + to_string(q.GetZ()) + ", " + to_string(q.GetW()) + ")";
 }
 
 // -- AABox wrappers --
 static void aabb_default_construct(void* mem) { new (mem) AABox(); }
-static void aabb_minmax_construct(void* mem, const nvgt_vec3& mn, const nvgt_vec3& mx) { new (mem) AABox(to_jolt(mn), to_jolt(mx)); }
-static void aabb_center_radius_construct(void* mem, const nvgt_vec3& center, float radius) { new (mem) AABox(to_jolt(center), radius); }
+static void aabb_minmax_construct(void* mem, const vector3& mn, const vector3& mx) { new (mem) AABox(to_jolt(mn), to_jolt(mx)); }
+static void aabb_center_radius_construct(void* mem, const vector3& center, float radius) { new (mem) AABox(to_jolt(center), radius); }
 static void aabb_copy_construct(void* mem, const AABox& o) { new (mem) AABox(o); }
-static nvgt_vec3 aabb_get_min(const AABox& b) { return from_jolt(b.mMin); }
-static nvgt_vec3 aabb_get_max(const AABox& b) { return from_jolt(b.mMax); }
-static void aabb_set_min(AABox& b, const nvgt_vec3& v) { b.mMin = to_jolt(v); }
-static void aabb_set_max(AABox& b, const nvgt_vec3& v) { b.mMax = to_jolt(v); }
-static nvgt_vec3 aabb_get_center(const AABox& b) { return from_jolt(b.GetCenter()); }
-static nvgt_vec3 aabb_get_extent(const AABox& b) { return from_jolt(b.GetExtent()); }
-static nvgt_vec3 aabb_get_size(const AABox& b) { return from_jolt(b.GetSize()); }
+static vector3 aabb_get_min(const AABox& b) { return from_jolt(b.mMin); }
+static vector3 aabb_get_max(const AABox& b) { return from_jolt(b.mMax); }
+static void aabb_set_min(AABox& b, const vector3& v) { b.mMin = to_jolt(v); }
+static void aabb_set_max(AABox& b, const vector3& v) { b.mMax = to_jolt(v); }
+static vector3 aabb_get_center(const AABox& b) { return from_jolt(b.GetCenter()); }
+static vector3 aabb_get_extent(const AABox& b) { return from_jolt(b.GetExtent()); }
+static vector3 aabb_get_size(const AABox& b) { return from_jolt(b.GetSize()); }
 static float aabb_get_volume(const AABox& b) { return b.GetVolume(); }
 static bool aabb_is_valid(const AABox& b) { return b.IsValid(); }
-static bool aabb_contains_point(const AABox& b, const nvgt_vec3& p) { return b.Contains(to_jolt(p)); }
+static bool aabb_contains_point(const AABox& b, const vector3& p) { return b.Contains(to_jolt(p)); }
 static bool aabb_contains_box(const AABox& b, const AABox& o) { return b.Contains(o); }
 static bool aabb_overlaps(const AABox& a, const AABox& b) { return a.Overlaps(b); }
-static void aabb_encapsulate_point(AABox& b, const nvgt_vec3& p) { b.Encapsulate(to_jolt(p)); }
+static void aabb_encapsulate_point(AABox& b, const vector3& p) { b.Encapsulate(to_jolt(p)); }
 static void aabb_encapsulate_box(AABox& b, const AABox& o) { b.Encapsulate(o); }
 static AABox aabb_transformed(const AABox& b, const Mat44& m) { return b.Transformed(m); }
 
@@ -323,7 +324,7 @@ struct jolt_contact_event {
 	enum Type : int { Added = 0, Persisted = 1, Removed = 2 };
 	Type type;
 	BodyID body1, body2;
-	nvgt_vec3 world_normal;
+	vector3 world_normal;
 	float penetration_depth;
 };
 
@@ -346,7 +347,7 @@ public:
 	}
 	void OnContactRemoved(const SubShapeIDPair& pair) override {
 		lock_guard<mutex> lk(events_mutex);
-		pending.push_back({ jolt_contact_event::Removed, pair.GetBody1ID(), pair.GetBody2ID(), nvgt_vec3(), 0.0f });
+		pending.push_back({ jolt_contact_event::Removed, pair.GetBody1ID(), pair.GetBody2ID(), vector3(), 0.0f });
 	}
 };
 
@@ -430,7 +431,7 @@ static void jolt_world_set_contact_listener(jolt_physics_world* w, asIScriptFunc
 	w->cb_contact_removed = on_removed;
 }
 
-static BodyID jolt_world_create_and_add_body(jolt_physics_world* w, jolt_shape_ref* shape, const nvgt_vec3& pos, const Quat& rot, int motion_type, uint16 layer, int activation) {
+static BodyID jolt_world_create_and_add_body(jolt_physics_world* w, jolt_shape_ref* shape, const vector3& pos, const Quat& rot, int motion_type, uint16 layer, int activation) {
 	if (!shape || !shape->shape) return BodyID();
 	BodyCreationSettings settings(shape->shape.GetPtr(), to_jolt(pos), rot, (EMotionType)motion_type, (ObjectLayer)layer);
 	return w->system.GetBodyInterface().CreateAndAddBody(settings, (EActivation)activation);
@@ -451,39 +452,39 @@ static void jolt_world_remove_and_destroy_body(jolt_physics_world* w, const Body
 }
 
 static void jolt_world_optimize_broadphase(jolt_physics_world* w) { w->system.OptimizeBroadPhase(); }
-static nvgt_vec3 jolt_world_get_gravity(jolt_physics_world* w) { return from_jolt(w->system.GetGravity()); }
-static void jolt_world_set_gravity(jolt_physics_world* w, const nvgt_vec3& g) { w->system.SetGravity(to_jolt(g)); }
+static vector3 jolt_world_get_gravity(jolt_physics_world* w) { return from_jolt(w->system.GetGravity()); }
+static void jolt_world_set_gravity(jolt_physics_world* w, const vector3& g) { w->system.SetGravity(to_jolt(g)); }
 static uint jolt_world_get_num_bodies(jolt_physics_world* w) { return w->system.GetNumBodies(); }
 static uint jolt_world_get_num_active_bodies(jolt_physics_world* w) { return w->system.GetNumActiveBodies(EBodyType::RigidBody); }
 static bool jolt_world_were_bodies_in_contact(jolt_physics_world* w, const BodyID& a, const BodyID& b) { return w->system.WereBodiesInContact(a, b); }
 
 // Position/rotation
-static nvgt_vec3 jolt_world_get_position(jolt_physics_world* w, const BodyID& id) { return from_jolt(w->system.GetBodyInterface().GetPosition(id)); }
-static void jolt_world_set_position(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& pos, int activation) { w->system.GetBodyInterface().SetPosition(id, to_jolt(pos), (EActivation)activation); }
+static vector3 jolt_world_get_position(jolt_physics_world* w, const BodyID& id) { return from_jolt(w->system.GetBodyInterface().GetPosition(id)); }
+static void jolt_world_set_position(jolt_physics_world* w, const BodyID& id, const vector3& pos, int activation) { w->system.GetBodyInterface().SetPosition(id, to_jolt(pos), (EActivation)activation); }
 static Quat jolt_world_get_rotation(jolt_physics_world* w, const BodyID& id) { return w->system.GetBodyInterface().GetRotation(id); }
 static void jolt_world_set_rotation(jolt_physics_world* w, const BodyID& id, const Quat& rot, int activation) { w->system.GetBodyInterface().SetRotation(id, rot, (EActivation)activation); }
-static void jolt_world_set_position_and_rotation(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& pos, const Quat& rot, int activation) { w->system.GetBodyInterface().SetPositionAndRotation(id, to_jolt(pos), rot, (EActivation)activation); }
-static nvgt_vec3 jolt_world_get_center_of_mass_position(jolt_physics_world* w, const BodyID& id) { return from_jolt(w->system.GetBodyInterface().GetCenterOfMassPosition(id)); }
-static jolt_transform jolt_world_get_transform(jolt_physics_world* w, const BodyID& id) {
+static void jolt_world_set_position_and_rotation(jolt_physics_world* w, const BodyID& id, const vector3& pos, const Quat& rot, int activation) { w->system.GetBodyInterface().SetPositionAndRotation(id, to_jolt(pos), rot, (EActivation)activation); }
+static vector3 jolt_world_get_center_of_mass_position(jolt_physics_world* w, const BodyID& id) { return from_jolt(w->system.GetBodyInterface().GetCenterOfMassPosition(id)); }
+static physics_transform jolt_world_get_transform(jolt_physics_world* w, const BodyID& id) {
 	RVec3 pos; Quat rot;
 	w->system.GetBodyInterface().GetPositionAndRotation(id, pos, rot);
-	return jolt_transform(pos, rot);
+	return physics_transform(pos, rot);
 }
 
 // Velocity
-static nvgt_vec3 jolt_world_get_linear_velocity(jolt_physics_world* w, const BodyID& id) { return from_jolt(w->system.GetBodyInterface().GetLinearVelocity(id)); }
-static void jolt_world_set_linear_velocity(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& v) { w->system.GetBodyInterface().SetLinearVelocity(id, to_jolt(v)); }
-static nvgt_vec3 jolt_world_get_angular_velocity(jolt_physics_world* w, const BodyID& id) { return from_jolt(w->system.GetBodyInterface().GetAngularVelocity(id)); }
-static void jolt_world_set_angular_velocity(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& v) { w->system.GetBodyInterface().SetAngularVelocity(id, to_jolt(v)); }
-static void jolt_world_add_linear_velocity(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& v) { w->system.GetBodyInterface().AddLinearVelocity(id, to_jolt(v)); }
+static vector3 jolt_world_get_linear_velocity(jolt_physics_world* w, const BodyID& id) { return from_jolt(w->system.GetBodyInterface().GetLinearVelocity(id)); }
+static void jolt_world_set_linear_velocity(jolt_physics_world* w, const BodyID& id, const vector3& v) { w->system.GetBodyInterface().SetLinearVelocity(id, to_jolt(v)); }
+static vector3 jolt_world_get_angular_velocity(jolt_physics_world* w, const BodyID& id) { return from_jolt(w->system.GetBodyInterface().GetAngularVelocity(id)); }
+static void jolt_world_set_angular_velocity(jolt_physics_world* w, const BodyID& id, const vector3& v) { w->system.GetBodyInterface().SetAngularVelocity(id, to_jolt(v)); }
+static void jolt_world_add_linear_velocity(jolt_physics_world* w, const BodyID& id, const vector3& v) { w->system.GetBodyInterface().AddLinearVelocity(id, to_jolt(v)); }
 
 // Forces / impulses
-static void jolt_world_add_force(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& force) { w->system.GetBodyInterface().AddForce(id, to_jolt(force)); }
-static void jolt_world_add_force_at(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& force, const nvgt_vec3& point) { w->system.GetBodyInterface().AddForce(id, to_jolt(force), to_jolt(point)); }
-static void jolt_world_add_torque(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& torque) { w->system.GetBodyInterface().AddTorque(id, to_jolt(torque)); }
-static void jolt_world_add_impulse(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& impulse) { w->system.GetBodyInterface().AddImpulse(id, to_jolt(impulse)); }
-static void jolt_world_add_impulse_at(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& impulse, const nvgt_vec3& point) { w->system.GetBodyInterface().AddImpulse(id, to_jolt(impulse), to_jolt(point)); }
-static void jolt_world_add_angular_impulse(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& impulse) { w->system.GetBodyInterface().AddAngularImpulse(id, to_jolt(impulse)); }
+static void jolt_world_add_force(jolt_physics_world* w, const BodyID& id, const vector3& force) { w->system.GetBodyInterface().AddForce(id, to_jolt(force)); }
+static void jolt_world_add_force_at(jolt_physics_world* w, const BodyID& id, const vector3& force, const vector3& point) { w->system.GetBodyInterface().AddForce(id, to_jolt(force), to_jolt(point)); }
+static void jolt_world_add_torque(jolt_physics_world* w, const BodyID& id, const vector3& torque) { w->system.GetBodyInterface().AddTorque(id, to_jolt(torque)); }
+static void jolt_world_add_impulse(jolt_physics_world* w, const BodyID& id, const vector3& impulse) { w->system.GetBodyInterface().AddImpulse(id, to_jolt(impulse)); }
+static void jolt_world_add_impulse_at(jolt_physics_world* w, const BodyID& id, const vector3& impulse, const vector3& point) { w->system.GetBodyInterface().AddImpulse(id, to_jolt(impulse), to_jolt(point)); }
+static void jolt_world_add_angular_impulse(jolt_physics_world* w, const BodyID& id, const vector3& impulse) { w->system.GetBodyInterface().AddAngularImpulse(id, to_jolt(impulse)); }
 
 // Activation
 static void jolt_world_activate_body(jolt_physics_world* w, const BodyID& id) { w->system.GetBodyInterface().ActivateBody(id); }
@@ -518,12 +519,12 @@ static CScriptAny* jolt_world_get_user_data(jolt_physics_world* w, const BodyID&
 }
 
 // Kinematic move
-static void jolt_world_move_kinematic(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& target_pos, const Quat& target_rot, float delta_time) {
+static void jolt_world_move_kinematic(jolt_physics_world* w, const BodyID& id, const vector3& target_pos, const Quat& target_rot, float delta_time) {
 	w->system.GetBodyInterface().MoveKinematic(id, to_jolt(target_pos), target_rot, delta_time);
 }
 
 // Raycast: returns true if hit, fills out_body_id and out_fraction
-static bool jolt_world_cast_ray(jolt_physics_world* w, const nvgt_vec3& origin, const nvgt_vec3& direction, BodyID& out_body, float& out_fraction) {
+static bool jolt_world_cast_ray(jolt_physics_world* w, const vector3& origin, const vector3& direction, BodyID& out_body, float& out_fraction) {
 	RRayCast ray(to_jolt(origin), to_jolt(direction));
 	RayCastResult result;
 	if (w->system.GetNarrowPhaseQuery().CastRay(ray, result)) {
@@ -563,7 +564,7 @@ static float jolt_world_get_max_angular_velocity(jolt_physics_world* w, const Bo
 static void jolt_world_set_max_angular_velocity(jolt_physics_world* w, const BodyID& id, float v) { w->system.GetBodyInterface().SetMaxAngularVelocity(id, v); }
 
 // -- Body interface: buoyancy --
-static bool jolt_world_apply_buoyancy_impulse(jolt_physics_world* w, const BodyID& id, const nvgt_vec3& surface_pos, const nvgt_vec3& surface_normal, float buoyancy, float linear_drag, float angular_drag, const nvgt_vec3& fluid_velocity, const nvgt_vec3& gravity, float delta_time) {
+static bool jolt_world_apply_buoyancy_impulse(jolt_physics_world* w, const BodyID& id, const vector3& surface_pos, const vector3& surface_normal, float buoyancy, float linear_drag, float angular_drag, const vector3& fluid_velocity, const vector3& gravity, float delta_time) {
 	return w->system.GetBodyInterface().ApplyBuoyancyImpulse(id, to_jolt(surface_pos), to_jolt(surface_normal), buoyancy, linear_drag, angular_drag, to_jolt(fluid_velocity), to_jolt(gravity), delta_time);
 }
 
@@ -572,6 +573,7 @@ static bool g_jolt_initialized = false;
 static void jolt_ensure_init() {
 	if (g_jolt_initialized) return;
 	g_jolt_initialized = true;
+	alert("jolt settings", GetConfigurationString());
 	RegisterDefaultAllocator();
 	Factory::sInstance = new Factory();
 	RegisterTypes();
@@ -591,46 +593,46 @@ static void RegisterJoltMaterial(asIScriptEngine* engine) {
 }
 
 static void RegisterJoltMathTypes(asIScriptEngine* engine) {
-	// vector (nvgt_vec3 - shared 12-byte plain struct, layout-compatible with all subsystems)
-	engine->RegisterObjectType("vector", sizeof(nvgt_vec3), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<nvgt_vec3>() | asOBJ_APP_CLASS_ALLFLOATS);
+	// vector (vector3 - shared 12-byte plain struct, layout-compatible with all subsystems)
+	engine->RegisterObjectType("vector", sizeof(vector3), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<vector3>() | asOBJ_APP_CLASS_ALLFLOATS);
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(vec3_default_construct), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f(float x, float y, float z = 0.0f)", asFUNCTION(vec3_xyz_construct), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("vector", asBEHAVE_CONSTRUCT, "void f(const vector&in)", asFUNCTION(vec3_copy_construct), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectProperty("vector", "float x", asOFFSET(nvgt_vec3, x));
-	engine->RegisterObjectProperty("vector", "float y", asOFFSET(nvgt_vec3, y));
-	engine->RegisterObjectProperty("vector", "float z", asOFFSET(nvgt_vec3, z));
-	engine->RegisterObjectMethod("vector", "void set(float x, float y, float z)", asMETHOD(nvgt_vec3, set), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector opAdd(const vector&in) const", asMETHODPR(nvgt_vec3, operator+, (const nvgt_vec3&) const, nvgt_vec3), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector opSub(const vector&in) const", asMETHODPR(nvgt_vec3, operator-, (const nvgt_vec3&) const, nvgt_vec3), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector opMul(const vector&in) const", asMETHODPR(nvgt_vec3, operator*, (const nvgt_vec3&) const, nvgt_vec3), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector opMul(float) const", asMETHODPR(nvgt_vec3, operator*, (float) const, nvgt_vec3), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector opDiv(float) const", asMETHODPR(nvgt_vec3, operator/, (float) const, nvgt_vec3), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector opNeg() const", asMETHODPR(nvgt_vec3, operator-, () const, nvgt_vec3), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector& opAddAssign(const vector&in)", asMETHODPR(nvgt_vec3, operator+=, (const nvgt_vec3&), nvgt_vec3&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector& opSubAssign(const vector&in)", asMETHODPR(nvgt_vec3, operator-=, (const nvgt_vec3&), nvgt_vec3&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector& opMulAssign(float)", asMETHODPR(nvgt_vec3, operator*=, (float), nvgt_vec3&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector& opDivAssign(float)", asMETHODPR(nvgt_vec3, operator/=, (float), nvgt_vec3&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "bool opEquals(const vector&in) const", asMETHODPR(nvgt_vec3, operator==, (const nvgt_vec3&) const, bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "float dot(const vector&in) const", asMETHOD(nvgt_vec3, dot), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector cross(const vector&in) const", asMETHOD(nvgt_vec3, cross), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "float length() const", asMETHOD(nvgt_vec3, length), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "float length_sq() const", asMETHOD(nvgt_vec3, length_sq), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector normalized() const", asMETHOD(nvgt_vec3, normalized), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "bool is_normalized() const", asFUNCTION(nvgt_vec3_is_normalized), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("vector", "bool is_near_zero() const", asFUNCTION(nvgt_vec3_is_near_zero), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("vector", "float get_min_value() const property", asMETHOD(nvgt_vec3, reduce_min), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "float get_max_value() const property", asMETHOD(nvgt_vec3, reduce_max), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "vector abs() const", asMETHOD(nvgt_vec3, abs), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "string opImplConv() const", asMETHOD(nvgt_vec3, to_string), asCALL_THISCALL);
+	engine->RegisterObjectProperty("vector", "float x", asOFFSET(vector3, x));
+	engine->RegisterObjectProperty("vector", "float y", asOFFSET(vector3, y));
+	engine->RegisterObjectProperty("vector", "float z", asOFFSET(vector3, z));
+	engine->RegisterObjectMethod("vector", "void set(float x, float y, float z)", asMETHOD(vector3, set), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector opAdd(const vector&in) const", asMETHODPR(vector3, operator+, (const vector3&) const, vector3), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector opSub(const vector&in) const", asMETHODPR(vector3, operator-, (const vector3&) const, vector3), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector opMul(const vector&in) const", asMETHODPR(vector3, operator*, (const vector3&) const, vector3), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector opMul(float) const", asMETHODPR(vector3, operator*, (float) const, vector3), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector opDiv(float) const", asMETHODPR(vector3, operator/, (float) const, vector3), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector opNeg() const", asMETHODPR(vector3, operator-, () const, vector3), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector& opAddAssign(const vector&in)", asMETHODPR(vector3, operator+=, (const vector3&), vector3&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector& opSubAssign(const vector&in)", asMETHODPR(vector3, operator-=, (const vector3&), vector3&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector& opMulAssign(float)", asMETHODPR(vector3, operator*=, (float), vector3&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector& opDivAssign(float)", asMETHODPR(vector3, operator/=, (float), vector3&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "bool opEquals(const vector&in) const", asMETHODPR(vector3, operator==, (const vector3&) const, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "float dot(const vector&in) const", asMETHOD(vector3, dot), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector cross(const vector&in) const", asMETHOD(vector3, cross), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "float length() const", asMETHOD(vector3, length), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "float length_sq() const", asMETHOD(vector3, length_sq), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector normalized() const", asMETHOD(vector3, normalized), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "bool is_normalized() const", asFUNCTION(vector3_is_normalized), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("vector", "bool is_near_zero() const", asFUNCTION(vector3_is_near_zero), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("vector", "float get_min_value() const property", asMETHOD(vector3, reduce_min), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "float get_max_value() const property", asMETHOD(vector3, reduce_max), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "vector abs() const", asMETHOD(vector3, abs), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "string opImplConv() const", asMETHOD(vector3, to_string), asCALL_THISCALL);
 	// backward compat aliases
-	engine->RegisterObjectMethod("vector", "float length_square() const", asMETHOD(nvgt_vec3, length_sq), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "float& opIndex(int index)", asFUNCTION(nvgt_vec3_opindex), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("vector", "const float& opIndex(int index) const", asFUNCTION(nvgt_vec3_opindex_const), asCALL_CDECL_OBJFIRST);
-	engine->RegisterGlobalFunction("vector get_VEC3_ZERO() property", asFUNCTION(nvgt_vec3::zero), asCALL_CDECL);
-	engine->RegisterGlobalFunction("vector get_VEC3_ONE() property", asFUNCTION(nvgt_vec3::one), asCALL_CDECL);
-	engine->RegisterGlobalFunction("vector get_VEC3_AXIS_X() property", asFUNCTION(nvgt_vec3::axis_x), asCALL_CDECL);
-	engine->RegisterGlobalFunction("vector get_VEC3_AXIS_Y() property", asFUNCTION(nvgt_vec3::axis_y), asCALL_CDECL);
-	engine->RegisterGlobalFunction("vector get_VEC3_AXIS_Z() property", asFUNCTION(nvgt_vec3::axis_z), asCALL_CDECL);
+	engine->RegisterObjectMethod("vector", "float length_square() const", asMETHOD(vector3, length_sq), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "float& opIndex(int index)", asFUNCTION(vector3_opindex), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("vector", "const float& opIndex(int index) const", asFUNCTION(vector3_opindex_const), asCALL_CDECL_OBJFIRST);
+	engine->RegisterGlobalFunction("vector get_VEC3_ZERO() property", asFUNCTION(vector3::zero), asCALL_CDECL);
+	engine->RegisterGlobalFunction("vector get_VEC3_ONE() property", asFUNCTION(vector3::one), asCALL_CDECL);
+	engine->RegisterGlobalFunction("vector get_VEC3_AXIS_X() property", asFUNCTION(vector3::axis_x), asCALL_CDECL);
+	engine->RegisterGlobalFunction("vector get_VEC3_AXIS_Y() property", asFUNCTION(vector3::axis_y), asCALL_CDECL);
+	engine->RegisterGlobalFunction("vector get_VEC3_AXIS_Z() property", asFUNCTION(vector3::axis_z), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int clamp(int value, int min, int max)", asFUNCTION(nvgt_clamp_int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float clamp(float value, float min, float max)", asFUNCTION(nvgt_clamp_float), asCALL_CDECL);
 
@@ -694,23 +696,23 @@ static void RegisterJoltMathTypes(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("aabb", "bool test_collision(const aabb&in other) const", asFUNCTION(aabb_overlaps), asCALL_CDECL_OBJFIRST);
 
 	// physics_transform
-	engine->RegisterObjectType("physics_transform", sizeof(jolt_transform), asOBJ_VALUE | asGetTypeTraits<jolt_transform>());
-	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(jolt_transform_construct), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_CONSTRUCT, "void f(const vector&in position, const quaternion&in rotation)", asFUNCTION(jolt_transform_construct_pq), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_CONSTRUCT, "void f(const physics_transform&in)", asFUNCTION(jolt_copy_construct<jolt_transform>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(jolt_transform_destruct), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_transform", "vector get_position() const property", asFUNCTION(jolt_transform_get_position), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_transform", "void set_position(const vector&in) property", asFUNCTION(jolt_transform_set_position), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_transform", "quaternion get_rotation() const property", asFUNCTION(jolt_transform_get_rotation), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_transform", "void set_rotation(const quaternion&in) property", asFUNCTION(jolt_transform_set_rotation), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_transform", "bool opEquals(const physics_transform&in) const", asMETHODPR(jolt_transform, operator==, (const jolt_transform&) const, bool), asCALL_THISCALL);
-	engine->RegisterObjectProperty("physics_transform", "float px", asOFFSET(jolt_transform, px));
-	engine->RegisterObjectProperty("physics_transform", "float py", asOFFSET(jolt_transform, py));
-	engine->RegisterObjectProperty("physics_transform", "float pz", asOFFSET(jolt_transform, pz));
-	engine->RegisterObjectProperty("physics_transform", "float qx", asOFFSET(jolt_transform, qx));
-	engine->RegisterObjectProperty("physics_transform", "float qy", asOFFSET(jolt_transform, qy));
-	engine->RegisterObjectProperty("physics_transform", "float qz", asOFFSET(jolt_transform, qz));
-	engine->RegisterObjectProperty("physics_transform", "float qw", asOFFSET(jolt_transform, qw));
+	engine->RegisterObjectType("physics_transform", sizeof(physics_transform), asOBJ_VALUE | asGetTypeTraits<physics_transform>());
+	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(physics_transform_construct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_CONSTRUCT, "void f(const vector&in position, const quaternion&in rotation)", asFUNCTION(physics_transform_construct_pq), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_CONSTRUCT, "void f(const physics_transform&in)", asFUNCTION(jolt_copy_construct<physics_transform>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(physics_transform_destruct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_transform", "vector get_position() const property", asFUNCTION(physics_transform_get_position), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_transform", "void set_position(const vector&in) property", asFUNCTION(physics_transform_set_position), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_transform", "quaternion get_rotation() const property", asFUNCTION(physics_transform_get_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_transform", "void set_rotation(const quaternion&in) property", asFUNCTION(physics_transform_set_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_transform", "bool opEquals(const physics_transform&in) const", asMETHODPR(physics_transform, operator==, (const physics_transform&) const, bool), asCALL_THISCALL);
+	engine->RegisterObjectProperty("physics_transform", "float px", asOFFSET(physics_transform, px));
+	engine->RegisterObjectProperty("physics_transform", "float py", asOFFSET(physics_transform, py));
+	engine->RegisterObjectProperty("physics_transform", "float pz", asOFFSET(physics_transform, pz));
+	engine->RegisterObjectProperty("physics_transform", "float qx", asOFFSET(physics_transform, qx));
+	engine->RegisterObjectProperty("physics_transform", "float qy", asOFFSET(physics_transform, qy));
+	engine->RegisterObjectProperty("physics_transform", "float qz", asOFFSET(physics_transform, qz));
+	engine->RegisterObjectProperty("physics_transform", "float qw", asOFFSET(physics_transform, qw));
 	engine->RegisterGlobalFunction("physics_transform get_IDENTITY_TRANSFORM() property", asFUNCTION(jolt_identity_transform), asCALL_CDECL);
 }
 
@@ -720,233 +722,233 @@ static void RegisterJoltEnums(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("physics_body_type", "PHYSICS_BODY_KINEMATIC", (int)EMotionType::Kinematic);
 	engine->RegisterEnumValue("physics_body_type", "PHYSICS_BODY_DYNAMIC", (int)EMotionType::Dynamic);
 
-	engine->RegisterEnum("jolt_object_layer");
-	engine->RegisterEnumValue("jolt_object_layer", "JOLT_LAYER_NON_MOVING", (int)JoltLayers::NON_MOVING);
-	engine->RegisterEnumValue("jolt_object_layer", "JOLT_LAYER_MOVING", (int)JoltLayers::MOVING);
+	engine->RegisterEnum("physics_object_layer");
+	engine->RegisterEnumValue("physics_object_layer", "PHYSICS_LAYER_NON_MOVING", (int)JoltLayers::NON_MOVING);
+	engine->RegisterEnumValue("physics_object_layer", "PHYSICS_LAYER_MOVING", (int)JoltLayers::MOVING);
 
-	engine->RegisterEnum("jolt_activation");
-	engine->RegisterEnumValue("jolt_activation", "JOLT_ACTIVATE", (int)EActivation::Activate);
-	engine->RegisterEnumValue("jolt_activation", "JOLT_DONT_ACTIVATE", (int)EActivation::DontActivate);
+	engine->RegisterEnum("physics_activation");
+	engine->RegisterEnumValue("physics_activation", "PHYSICS_ACTIVATE", (int)EActivation::Activate);
+	engine->RegisterEnumValue("physics_activation", "PHYSICS_DONT_ACTIVATE", (int)EActivation::DontActivate);
 
-	engine->RegisterEnum("jolt_motion_quality");
-	engine->RegisterEnumValue("jolt_motion_quality", "JOLT_MOTION_QUALITY_DISCRETE", (int)EMotionQuality::Discrete);
-	engine->RegisterEnumValue("jolt_motion_quality", "JOLT_MOTION_QUALITY_LINEAR_CAST", (int)EMotionQuality::LinearCast);
+	engine->RegisterEnum("physics_motion_quality");
+	engine->RegisterEnumValue("physics_motion_quality", "PHYSICS_MOTION_QUALITY_DISCRETE", (int)EMotionQuality::Discrete);
+	engine->RegisterEnumValue("physics_motion_quality", "PHYSICS_MOTION_QUALITY_LINEAR_CAST", (int)EMotionQuality::LinearCast);
 
-	engine->RegisterEnum("jolt_shape_type");
-	engine->RegisterEnumValue("jolt_shape_type", "JOLT_SHAPE_CONVEX", (int)EShapeType::Convex);
-	engine->RegisterEnumValue("jolt_shape_type", "JOLT_SHAPE_COMPOUND", (int)EShapeType::Compound);
-	engine->RegisterEnumValue("jolt_shape_type", "JOLT_SHAPE_MESH", (int)EShapeType::Mesh);
-	engine->RegisterEnumValue("jolt_shape_type", "JOLT_SHAPE_HEIGHT_FIELD", (int)EShapeType::HeightField);
+	engine->RegisterEnum("physics_shape_type");
+	engine->RegisterEnumValue("physics_shape_type", "PHYSICS_SHAPE_CONVEX", (int)EShapeType::Convex);
+	engine->RegisterEnumValue("physics_shape_type", "PHYSICS_SHAPE_COMPOUND", (int)EShapeType::Compound);
+	engine->RegisterEnumValue("physics_shape_type", "PHYSICS_SHAPE_MESH", (int)EShapeType::Mesh);
+	engine->RegisterEnumValue("physics_shape_type", "PHYSICS_SHAPE_HEIGHT_FIELD", (int)EShapeType::HeightField);
 
-	engine->RegisterEnum("jolt_shape_sub_type");
-	engine->RegisterEnumValue("jolt_shape_sub_type", "JOLT_SHAPE_SPHERE", (int)EShapeSubType::Sphere);
-	engine->RegisterEnumValue("jolt_shape_sub_type", "JOLT_SHAPE_BOX", (int)EShapeSubType::Box);
-	engine->RegisterEnumValue("jolt_shape_sub_type", "JOLT_SHAPE_TRIANGLE", (int)EShapeSubType::Triangle);
-	engine->RegisterEnumValue("jolt_shape_sub_type", "JOLT_SHAPE_CAPSULE", (int)EShapeSubType::Capsule);
-	engine->RegisterEnumValue("jolt_shape_sub_type", "JOLT_SHAPE_CYLINDER", (int)EShapeSubType::Cylinder);
-	engine->RegisterEnumValue("jolt_shape_sub_type", "JOLT_SHAPE_CONVEX_HULL", (int)EShapeSubType::ConvexHull);
-	engine->RegisterEnumValue("jolt_shape_sub_type", "JOLT_SHAPE_STATIC_COMPOUND", (int)EShapeSubType::StaticCompound);
-	engine->RegisterEnumValue("jolt_shape_sub_type", "JOLT_SHAPE_MUTABLE_COMPOUND", (int)EShapeSubType::MutableCompound);
-	engine->RegisterEnumValue("jolt_shape_sub_type", "JOLT_SHAPE_MESH_SUBTYPE", (int)EShapeSubType::Mesh);
-	engine->RegisterEnumValue("jolt_shape_sub_type", "JOLT_SHAPE_HEIGHT_FIELD_SUBTYPE", (int)EShapeSubType::HeightField);
+	engine->RegisterEnum("physics_shape_sub_type");
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_SPHERE", (int)EShapeSubType::Sphere);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_BOX", (int)EShapeSubType::Box);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_TRIANGLE", (int)EShapeSubType::Triangle);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_CAPSULE", (int)EShapeSubType::Capsule);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_CYLINDER", (int)EShapeSubType::Cylinder);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_CONVEX_HULL", (int)EShapeSubType::ConvexHull);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_STATIC_COMPOUND", (int)EShapeSubType::StaticCompound);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_MUTABLE_COMPOUND", (int)EShapeSubType::MutableCompound);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_MESH_SUBTYPE", (int)EShapeSubType::Mesh);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_HEIGHT_FIELD_SUBTYPE", (int)EShapeSubType::HeightField);
 }
 
 static void RegisterJoltBodyID(asIScriptEngine* engine) {
-	engine->RegisterObjectType("jolt_body_id", sizeof(BodyID), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<BodyID>());
-	engine->RegisterObjectBehaviour("jolt_body_id", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(body_id_default_construct), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("jolt_body_id", asBEHAVE_CONSTRUCT, "void f(uint raw_id)", asFUNCTION(body_id_uint_construct), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("jolt_body_id", asBEHAVE_CONSTRUCT, "void f(const jolt_body_id&in)", asFUNCTION(body_id_copy_construct), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("jolt_body_id", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(jolt_destruct<BodyID>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_body_id", "bool get_is_invalid() const property", asFUNCTION(body_id_is_invalid), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_body_id", "uint get_index() const property", asFUNCTION(body_id_get_index), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_body_id", "uint8 get_sequence_number() const property", asFUNCTION(body_id_get_sequence), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_body_id", "uint get_raw() const property", asFUNCTION(body_id_get_raw), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_body_id", "bool opEquals(const jolt_body_id&in) const", asFUNCTION(body_id_equals), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_body_id", "string opImplConv() const", asFUNCTION(body_id_to_string), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectType("physics_body_id", sizeof(BodyID), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<BodyID>());
+	engine->RegisterObjectBehaviour("physics_body_id", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(body_id_default_construct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_body_id", asBEHAVE_CONSTRUCT, "void f(uint raw_id)", asFUNCTION(body_id_uint_construct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_body_id", asBEHAVE_CONSTRUCT, "void f(const physics_body_id&in)", asFUNCTION(body_id_copy_construct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_body_id", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(jolt_destruct<BodyID>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_body_id", "bool get_is_invalid() const property", asFUNCTION(body_id_is_invalid), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_body_id", "uint get_index() const property", asFUNCTION(body_id_get_index), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_body_id", "uint8 get_sequence_number() const property", asFUNCTION(body_id_get_sequence), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_body_id", "uint get_raw() const property", asFUNCTION(body_id_get_raw), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_body_id", "bool opEquals(const physics_body_id&in) const", asFUNCTION(body_id_equals), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_body_id", "string opImplConv() const", asFUNCTION(body_id_to_string), asCALL_CDECL_OBJFIRST);
 }
 
 static void RegisterJoltShape(asIScriptEngine* engine) {
 	// All shape types are backed by jolt_shape_ref* — AddRef/Release are shared
 	// Forward declare shape types
-	engine->RegisterObjectType("jolt_convex_shape", 0, asOBJ_REF);
-	engine->RegisterObjectType("jolt_sphere_shape", 0, asOBJ_REF);
-	engine->RegisterObjectType("jolt_box_shape", 0, asOBJ_REF);
-	engine->RegisterObjectType("jolt_capsule_shape", 0, asOBJ_REF);
-	// jolt_shape (base)
-	engine->RegisterObjectType("jolt_shape", 0, asOBJ_REF);
-	engine->RegisterObjectBehaviour("jolt_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("jolt_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("jolt_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_shape", "aabb get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_shape", "jolt_convex_shape@ opCast()", asFUNCTION(jolt_shape_to_convex), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectType("physics_convex_shape", 0, asOBJ_REF);
+	engine->RegisterObjectType("physics_sphere_shape", 0, asOBJ_REF);
+	engine->RegisterObjectType("physics_box_shape", 0, asOBJ_REF);
+	engine->RegisterObjectType("physics_capsule_shape", 0, asOBJ_REF);
+	// physics_shape (base)
+	engine->RegisterObjectType("physics_shape", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("physics_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("physics_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_shape", "aabb get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_shape", "physics_convex_shape@ opCast()", asFUNCTION(jolt_shape_to_convex), asCALL_CDECL_OBJFIRST);
 
 	// jolt_convex_shape
-	engine->RegisterObjectBehaviour("jolt_convex_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("jolt_convex_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("jolt_convex_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_convex_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_convex_shape", "aabb get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_convex_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_convex_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_convex_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_convex_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_convex_shape", "jolt_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_convex_shape", "jolt_sphere_shape@ opCast()", asFUNCTION(jolt_convex_to_sphere), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_convex_shape", "jolt_box_shape@ opCast()", asFUNCTION(jolt_convex_to_box), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_convex_shape", "jolt_capsule_shape@ opCast()", asFUNCTION(jolt_convex_to_capsule), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_convex_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("physics_convex_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_convex_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_convex_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_convex_shape", "aabb get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_convex_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_convex_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_convex_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_convex_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_convex_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_convex_shape", "physics_sphere_shape@ opCast()", asFUNCTION(jolt_convex_to_sphere), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_convex_shape", "physics_box_shape@ opCast()", asFUNCTION(jolt_convex_to_box), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_convex_shape", "physics_capsule_shape@ opCast()", asFUNCTION(jolt_convex_to_capsule), asCALL_CDECL_OBJFIRST);
 
 	// jolt_sphere_shape
-	engine->RegisterObjectBehaviour("jolt_sphere_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("jolt_sphere_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("jolt_sphere_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_sphere_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_sphere_shape", "aabb get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_sphere_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_sphere_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_sphere_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_sphere_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_sphere_shape", "float get_radius() const property", asFUNCTION(jolt_sphere_shape_get_radius), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_sphere_shape", "jolt_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_sphere_shape", "jolt_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_sphere_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("physics_sphere_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_sphere_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_sphere_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_sphere_shape", "aabb get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_sphere_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_sphere_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_sphere_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_sphere_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_sphere_shape", "float get_radius() const property", asFUNCTION(jolt_sphere_shape_get_radius), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_sphere_shape", "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_sphere_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
 
 	// jolt_box_shape
-	engine->RegisterObjectBehaviour("jolt_box_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("jolt_box_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("jolt_box_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_box_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_box_shape", "aabb get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_box_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_box_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_box_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_box_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_box_shape", "vector get_half_extent() const property", asFUNCTION(jolt_box_shape_get_half_extent), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_box_shape", "float get_convex_radius() const property", asFUNCTION(jolt_box_shape_get_convex_radius), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_box_shape", "jolt_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_box_shape", "jolt_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_box_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("physics_box_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_box_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_box_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_box_shape", "aabb get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_box_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_box_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_box_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_box_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_box_shape", "vector get_half_extent() const property", asFUNCTION(jolt_box_shape_get_half_extent), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_box_shape", "float get_convex_radius() const property", asFUNCTION(jolt_box_shape_get_convex_radius), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_box_shape", "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_box_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
 
 	// jolt_capsule_shape
-	engine->RegisterObjectBehaviour("jolt_capsule_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("jolt_capsule_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("jolt_capsule_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_capsule_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_capsule_shape", "aabb get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_capsule_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_capsule_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_capsule_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_capsule_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_capsule_shape", "float get_half_height() const property", asFUNCTION(jolt_capsule_shape_get_half_height), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_capsule_shape", "float get_radius() const property", asFUNCTION(jolt_capsule_shape_get_radius), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_capsule_shape", "jolt_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_capsule_shape", "jolt_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("physics_capsule_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("physics_capsule_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_capsule_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_capsule_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_capsule_shape", "aabb get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_capsule_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_capsule_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_capsule_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_capsule_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_capsule_shape", "float get_half_height() const property", asFUNCTION(jolt_capsule_shape_get_half_height), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_capsule_shape", "float get_radius() const property", asFUNCTION(jolt_capsule_shape_get_radius), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_capsule_shape", "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_capsule_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
 
 	// Factory functions return specific typed shapes
-	engine->RegisterGlobalFunction("jolt_sphere_shape@ jolt_sphere_shape_create(float radius, physics_material@ mat = null)", asFUNCTION(jolt_sphere_shape_create), asCALL_CDECL);
-	engine->RegisterGlobalFunction("jolt_box_shape@ jolt_box_shape_create(const vector&in half_extents, float convex_radius = 0.05f, physics_material@ mat = null)", asFUNCTION(jolt_box_shape_create), asCALL_CDECL);
-	engine->RegisterGlobalFunction("jolt_capsule_shape@ jolt_capsule_shape_create(float half_height, float radius, physics_material@ mat = null)", asFUNCTION(jolt_capsule_shape_create), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_sphere_shape@ physics_sphere_shape_create(float radius, physics_material@ mat = null)", asFUNCTION(jolt_sphere_shape_create), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_box_shape@ physics_box_shape_create(const vector&in half_extents, float convex_radius = 0.05f, physics_material@ mat = null)", asFUNCTION(jolt_box_shape_create), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_capsule_shape@ physics_capsule_shape_create(float half_height, float radius, physics_material@ mat = null)", asFUNCTION(jolt_capsule_shape_create), asCALL_CDECL);
 }
 
 static void RegisterJoltWorld(asIScriptEngine* engine) {
-	engine->RegisterFuncdef("void jolt_contact_added_callback(const jolt_body_id&in body1, const jolt_body_id&in body2, const vector&in world_normal, float penetration_depth)");
-	engine->RegisterFuncdef("void jolt_contact_persisted_callback(const jolt_body_id&in body1, const jolt_body_id&in body2, const vector&in world_normal, float penetration_depth)");
-	engine->RegisterFuncdef("void jolt_contact_removed_callback(const jolt_body_id&in body1, const jolt_body_id&in body2)");
+	engine->RegisterFuncdef("void physics_contact_added_callback(const physics_body_id&in body1, const physics_body_id&in body2, const vector&in world_normal, float penetration_depth)");
+	engine->RegisterFuncdef("void physics_contact_persisted_callback(const physics_body_id&in body1, const physics_body_id&in body2, const vector&in world_normal, float penetration_depth)");
+	engine->RegisterFuncdef("void physics_contact_removed_callback(const physics_body_id&in body1, const physics_body_id&in body2)");
 
-	engine->RegisterObjectType("jolt_physics_world", 0, asOBJ_REF);
-	engine->RegisterObjectBehaviour("jolt_physics_world", asBEHAVE_FACTORY, "jolt_physics_world@ f(uint max_bodies = 1024, uint max_body_pairs = 1024, uint max_contact_constraints = 1024)", asFUNCTION(jolt_world_factory), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("jolt_physics_world", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_physics_world, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("jolt_physics_world", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_physics_world, Release), asCALL_THISCALL);
+	engine->RegisterObjectType("physics_world", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("physics_world", asBEHAVE_FACTORY, "physics_world@ f(uint max_bodies = 1024, uint max_body_pairs = 1024, uint max_contact_constraints = 1024)", asFUNCTION(jolt_world_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("physics_world", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_physics_world, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("physics_world", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_physics_world, Release), asCALL_THISCALL);
 
 	// Simulation
-	engine->RegisterObjectMethod("jolt_physics_world", "void update(float delta_time, int collision_steps = 1)", asFUNCTION(jolt_world_update), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void optimize_broadphase()", asFUNCTION(jolt_world_optimize_broadphase), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void update(float delta_time, int collision_steps = 1)", asFUNCTION(jolt_world_update), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void optimize_broadphase()", asFUNCTION(jolt_world_optimize_broadphase), asCALL_CDECL_OBJFIRST);
 
 	// Gravity
-	engine->RegisterObjectMethod("jolt_physics_world", "vector get_gravity() const property", asFUNCTION(jolt_world_get_gravity), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_gravity(const vector&in) property", asFUNCTION(jolt_world_set_gravity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "vector get_gravity() const property", asFUNCTION(jolt_world_get_gravity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_gravity(const vector&in) property", asFUNCTION(jolt_world_set_gravity), asCALL_CDECL_OBJFIRST);
 
 	// Body counts
-	engine->RegisterObjectMethod("jolt_physics_world", "uint get_num_bodies() const property", asFUNCTION(jolt_world_get_num_bodies), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "uint get_num_active_bodies() const property", asFUNCTION(jolt_world_get_num_active_bodies), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "uint get_num_bodies() const property", asFUNCTION(jolt_world_get_num_bodies), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "uint get_num_active_bodies() const property", asFUNCTION(jolt_world_get_num_active_bodies), asCALL_CDECL_OBJFIRST);
 
 	// Body lifecycle
-	engine->RegisterObjectMethod("jolt_physics_world", "jolt_body_id create_and_add_body(jolt_shape@ shape, const vector&in position, const quaternion&in rotation, physics_body_type motion_type, uint16 layer = JOLT_LAYER_MOVING, jolt_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_create_and_add_body), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void remove_body(const jolt_body_id&in id)", asFUNCTION(jolt_world_remove_body), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void destroy_body(const jolt_body_id&in id)", asFUNCTION(jolt_world_destroy_body), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void remove_and_destroy_body(const jolt_body_id&in id)", asFUNCTION(jolt_world_remove_and_destroy_body), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "physics_body_id create_and_add_body(physics_shape@ shape, const vector&in position, const quaternion&in rotation, physics_body_type motion_type, uint16 layer = JOLT_LAYER_MOVING, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_create_and_add_body), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void remove_body(const physics_body_id&in id)", asFUNCTION(jolt_world_remove_body), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void destroy_body(const physics_body_id&in id)", asFUNCTION(jolt_world_destroy_body), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void remove_and_destroy_body(const physics_body_id&in id)", asFUNCTION(jolt_world_remove_and_destroy_body), asCALL_CDECL_OBJFIRST);
 
 	// Transform
-	engine->RegisterObjectMethod("jolt_physics_world", "vector get_position(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_position), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_position(const jolt_body_id&in id, const vector&in pos, jolt_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_position), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "quaternion get_rotation(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_rotation), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_rotation(const jolt_body_id&in id, const quaternion&in rot, jolt_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_rotation), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_position_and_rotation(const jolt_body_id&in id, const vector&in pos, const quaternion&in rot, jolt_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_position_and_rotation), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "vector get_center_of_mass_position(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_center_of_mass_position), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "physics_transform get_transform(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_transform), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "vector get_position(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_position), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_position(const physics_body_id&in id, const vector&in pos, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_position), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "quaternion get_rotation(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_rotation(const physics_body_id&in id, const quaternion&in rot, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_position_and_rotation(const physics_body_id&in id, const vector&in pos, const quaternion&in rot, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_position_and_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "vector get_center_of_mass_position(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_center_of_mass_position), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "physics_transform get_transform(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_transform), asCALL_CDECL_OBJFIRST);
 
 	// Velocity
-	engine->RegisterObjectMethod("jolt_physics_world", "vector get_linear_velocity(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_linear_velocity), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_linear_velocity(const jolt_body_id&in id, const vector&in v)", asFUNCTION(jolt_world_set_linear_velocity), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "vector get_angular_velocity(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_angular_velocity), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_angular_velocity(const jolt_body_id&in id, const vector&in v)", asFUNCTION(jolt_world_set_angular_velocity), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void add_linear_velocity(const jolt_body_id&in id, const vector&in v)", asFUNCTION(jolt_world_add_linear_velocity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "vector get_linear_velocity(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_linear_velocity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_linear_velocity(const physics_body_id&in id, const vector&in v)", asFUNCTION(jolt_world_set_linear_velocity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "vector get_angular_velocity(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_angular_velocity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_angular_velocity(const physics_body_id&in id, const vector&in v)", asFUNCTION(jolt_world_set_angular_velocity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void add_linear_velocity(const physics_body_id&in id, const vector&in v)", asFUNCTION(jolt_world_add_linear_velocity), asCALL_CDECL_OBJFIRST);
 
 	// Forces / impulses
-	engine->RegisterObjectMethod("jolt_physics_world", "void add_force(const jolt_body_id&in id, const vector&in force)", asFUNCTION(jolt_world_add_force), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void add_force(const jolt_body_id&in id, const vector&in force, const vector&in point)", asFUNCTION(jolt_world_add_force_at), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void add_torque(const jolt_body_id&in id, const vector&in torque)", asFUNCTION(jolt_world_add_torque), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void add_impulse(const jolt_body_id&in id, const vector&in impulse)", asFUNCTION(jolt_world_add_impulse), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void add_impulse(const jolt_body_id&in id, const vector&in impulse, const vector&in point)", asFUNCTION(jolt_world_add_impulse_at), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void add_angular_impulse(const jolt_body_id&in id, const vector&in impulse)", asFUNCTION(jolt_world_add_angular_impulse), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void add_force(const physics_body_id&in id, const vector&in force)", asFUNCTION(jolt_world_add_force), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void add_force(const physics_body_id&in id, const vector&in force, const vector&in point)", asFUNCTION(jolt_world_add_force_at), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void add_torque(const physics_body_id&in id, const vector&in torque)", asFUNCTION(jolt_world_add_torque), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void add_impulse(const physics_body_id&in id, const vector&in impulse)", asFUNCTION(jolt_world_add_impulse), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void add_impulse(const physics_body_id&in id, const vector&in impulse, const vector&in point)", asFUNCTION(jolt_world_add_impulse_at), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void add_angular_impulse(const physics_body_id&in id, const vector&in impulse)", asFUNCTION(jolt_world_add_angular_impulse), asCALL_CDECL_OBJFIRST);
 
 	// Activation
-	engine->RegisterObjectMethod("jolt_physics_world", "void activate_body(const jolt_body_id&in id)", asFUNCTION(jolt_world_activate_body), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void deactivate_body(const jolt_body_id&in id)", asFUNCTION(jolt_world_deactivate_body), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "bool is_active(const jolt_body_id&in id) const", asFUNCTION(jolt_world_is_active), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "bool is_added(const jolt_body_id&in id) const", asFUNCTION(jolt_world_is_added), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void activate_body(const physics_body_id&in id)", asFUNCTION(jolt_world_activate_body), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void deactivate_body(const physics_body_id&in id)", asFUNCTION(jolt_world_deactivate_body), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "bool is_active(const physics_body_id&in id) const", asFUNCTION(jolt_world_is_active), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "bool is_added(const physics_body_id&in id) const", asFUNCTION(jolt_world_is_added), asCALL_CDECL_OBJFIRST);
 
 	// Motion type
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_motion_type(const jolt_body_id&in id, physics_body_type type, jolt_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_motion_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "physics_body_type get_motion_type(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_motion_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_motion_type(const physics_body_id&in id, physics_body_type type, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_motion_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "physics_body_type get_motion_type(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_motion_type), asCALL_CDECL_OBJFIRST);
 
 	// Shape
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_shape(const jolt_body_id&in id, jolt_shape@ shape, bool update_mass = true, jolt_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_shape), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_shape(const physics_body_id&in id, physics_shape@ shape, bool update_mass = true, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_shape), asCALL_CDECL_OBJFIRST);
 
 	// Material properties
-	engine->RegisterObjectMethod("jolt_physics_world", "float get_friction(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_friction), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_friction(const jolt_body_id&in id, float v)", asFUNCTION(jolt_world_set_friction), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "float get_restitution(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_restitution), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_restitution(const jolt_body_id&in id, float v)", asFUNCTION(jolt_world_set_restitution), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "float get_gravity_factor(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_gravity_factor), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_gravity_factor(const jolt_body_id&in id, float v)", asFUNCTION(jolt_world_set_gravity_factor), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "float get_friction(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_friction), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_friction(const physics_body_id&in id, float v)", asFUNCTION(jolt_world_set_friction), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "float get_restitution(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_restitution), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_restitution(const physics_body_id&in id, float v)", asFUNCTION(jolt_world_set_restitution), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "float get_gravity_factor(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_gravity_factor), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_gravity_factor(const physics_body_id&in id, float v)", asFUNCTION(jolt_world_set_gravity_factor), asCALL_CDECL_OBJFIRST);
 
 	// Spatial queries
-	engine->RegisterObjectMethod("jolt_physics_world", "aabb get_world_space_bounds(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_world_space_bounds), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "aabb get_world_space_bounds(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_world_space_bounds), asCALL_CDECL_OBJFIRST);
 
 	// Velocity limits
-	engine->RegisterObjectMethod("jolt_physics_world", "float get_max_linear_velocity(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_max_linear_velocity), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_max_linear_velocity(const jolt_body_id&in id, float v)", asFUNCTION(jolt_world_set_max_linear_velocity), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "float get_max_angular_velocity(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_max_angular_velocity), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_max_angular_velocity(const jolt_body_id&in id, float v)", asFUNCTION(jolt_world_set_max_angular_velocity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "float get_max_linear_velocity(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_max_linear_velocity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_max_linear_velocity(const physics_body_id&in id, float v)", asFUNCTION(jolt_world_set_max_linear_velocity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "float get_max_angular_velocity(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_max_angular_velocity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_max_angular_velocity(const physics_body_id&in id, float v)", asFUNCTION(jolt_world_set_max_angular_velocity), asCALL_CDECL_OBJFIRST);
 
 	// Buoyancy
-	engine->RegisterObjectMethod("jolt_physics_world", "bool apply_buoyancy_impulse(const jolt_body_id&in id, const vector&in surface_pos, const vector&in surface_normal, float buoyancy, float linear_drag, float angular_drag, const vector&in fluid_velocity, const vector&in gravity, float delta_time)", asFUNCTION(jolt_world_apply_buoyancy_impulse), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "bool apply_buoyancy_impulse(const physics_body_id&in id, const vector&in surface_pos, const vector&in surface_normal, float buoyancy, float linear_drag, float angular_drag, const vector&in fluid_velocity, const vector&in gravity, float delta_time)", asFUNCTION(jolt_world_apply_buoyancy_impulse), asCALL_CDECL_OBJFIRST);
 
 	// Kinematic
-	engine->RegisterObjectMethod("jolt_physics_world", "void move_kinematic(const jolt_body_id&in id, const vector&in target_pos, const quaternion&in target_rot, float delta_time)", asFUNCTION(jolt_world_move_kinematic), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void move_kinematic(const physics_body_id&in id, const vector&in target_pos, const quaternion&in target_rot, float delta_time)", asFUNCTION(jolt_world_move_kinematic), asCALL_CDECL_OBJFIRST);
 
 	// Contact query
-	engine->RegisterObjectMethod("jolt_physics_world", "bool were_bodies_in_contact(const jolt_body_id&in a, const jolt_body_id&in b) const", asFUNCTION(jolt_world_were_bodies_in_contact), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "bool were_bodies_in_contact(const physics_body_id&in a, const physics_body_id&in b) const", asFUNCTION(jolt_world_were_bodies_in_contact), asCALL_CDECL_OBJFIRST);
 
 	// Raycast
-	engine->RegisterObjectMethod("jolt_physics_world", "bool cast_ray(const vector&in origin, const vector&in direction, jolt_body_id&out hit_body, float&out hit_fraction) const", asFUNCTION(jolt_world_cast_ray), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "bool cast_ray(const vector&in origin, const vector&in direction, physics_body_id&out hit_body, float&out hit_fraction) const", asFUNCTION(jolt_world_cast_ray), asCALL_CDECL_OBJFIRST);
 
 	// User data
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_user_data(const jolt_body_id&in id, any@ data)", asFUNCTION(jolt_world_set_user_data), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("jolt_physics_world", "any@ get_user_data(const jolt_body_id&in id) const", asFUNCTION(jolt_world_get_user_data), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_user_data(const physics_body_id&in id, any@ data)", asFUNCTION(jolt_world_set_user_data), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "any@ get_user_data(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_user_data), asCALL_CDECL_OBJFIRST);
 
 	// Contact listener
-	engine->RegisterObjectMethod("jolt_physics_world", "void set_contact_listener(jolt_contact_added_callback@ on_added, jolt_contact_persisted_callback@ on_persisted, jolt_contact_removed_callback@ on_removed)", asFUNCTION(jolt_world_set_contact_listener), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_contact_listener(physics_contact_added_callback@ on_added, physics_contact_persisted_callback@ on_persisted, physics_contact_removed_callback@ on_removed)", asFUNCTION(jolt_world_set_contact_listener), asCALL_CDECL_OBJFIRST);
 }
 
 void RegisterJolt(asIScriptEngine* engine) {

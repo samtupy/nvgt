@@ -1031,7 +1031,7 @@ std::string DateTimeToString(void* obj, int expandMembers, CDebugger *dbg) {
 	return s.str();
 }
 std::string Vector3ToString(void* obj, int expandMembers, CDebugger *dbg) {
-	nvgt_vec3 *v = reinterpret_cast<nvgt_vec3*>(obj);
+	vector3 *v = reinterpret_cast<vector3*>(obj);
 	return v->to_string();
 }
 #ifdef _WIN32

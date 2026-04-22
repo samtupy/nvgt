@@ -12,10 +12,12 @@
 
 #include <cstring>
 #include <algorithm>
-#include "nvgt_math.h"
-#include "pathfinder.h"
 #include <cmath>
+#include "jolt.h"
+#include "pathfinder.h"
+
 using namespace std;
+
 static asITypeInfo* VectorArrayType = NULL;
 static asITypeInfo* StringType = nullptr;
 #define NODE_BIT_SIZE 19
@@ -258,7 +260,7 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 		return array;
 	}
 	array->Reserve(path.size() - 1);
-	nvgt_vec3 v;
+	vector3 v;
 	int x, y, z;
 	// BGT did not include the starting location here. Changing to match for now; discussion welcome.
 	for (int i = 1; i < path.size(); i++) {

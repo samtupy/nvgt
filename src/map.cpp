@@ -20,7 +20,7 @@
 #include <limits>
 #include "scriptstuff.h"
 
-using Vector3 = nvgt_vec3;
+using Vector3 = vector3;
 
 static asIScriptContext* fcallback_ctx = NULL;
 
