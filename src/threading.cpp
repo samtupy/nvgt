@@ -387,7 +387,7 @@ template <class T> void RegisterMutexType(asIScriptEngine* engine, const std::st
 	engine->RegisterObjectMethod(type.c_str(), _O("void lock()"), asMETHODPR(T, lock, (), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), _O("bool try_lock()"), asMETHODPR(T, tryLock, (), bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), _O("void unlock()"), asMETHOD(T, unlock), asCALL_THISCALL);
-	engine->RegisterObjectType(format("%s_lock", type).c_str(), sizeof(ScopedLock<T>), asOBJ_VALUE | asGetTypeTraits<ScopedLock<T>>());
+	engine->RegisterObjectType(format("%s_lock", type).c_str(), sizeof(ScopedLockWithUnlock<T>), asOBJ_VALUE | asGetTypeTraits<ScopedLock<T>>());
 	engine->RegisterObjectBehaviour(format("%s_lock", type).c_str(), asBEHAVE_CONSTRUCT, format("void f(%s@)", type).c_str(), asFUNCTION(scoped_lock_construct<T>), asCALL_CDECL_OBJFIRST);
 	if constexpr(!std::is_same<T, NamedMutex>::value) engine->RegisterObjectBehaviour(format("%s_lock", type).c_str(), asBEHAVE_CONSTRUCT, format("void f(%s@, uint)", type).c_str(), asFUNCTION(scoped_lock_construct_ms<T>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour(format("%s_lock", type).c_str(), asBEHAVE_DESTRUCT, "void f()", asFUNCTION(scoped_lock_destruct<T>), asCALL_CDECL_OBJFIRST);
@@ -423,7 +423,7 @@ void RegisterThreading(asIScriptEngine* engine) {
 	RegisterMutexType<Mutex>(engine, "mutex");
 	RegisterMutexType<FastMutex>(engine, "fast_mutex");
 	RegisterMutexType<NamedMutex>(engine, "named_mutex");
-	RegisterMutexType<NamedMutex>(engine, "spinlock_mutex");
+	RegisterMutexType<SpinlockMutex>(engine, "spinlock_mutex");
 	angelscript_refcounted_register<RWLock>(engine, "rw_lock");
 	engine->RegisterObjectBehaviour(_O("rw_lock"), asBEHAVE_FACTORY, _O("rw_lock@ l()"), asFUNCTION(angelscript_refcounted_factory<RWLock>), asCALL_CDECL);
 	engine->RegisterObjectMethod(_O("rw_lock"), _O("void read_lock()"), asMETHOD(RWLock, readLock), asCALL_THISCALL);

@@ -80,7 +80,7 @@ bool speechd_engine::speak(const std::string &text, bool interrupt, bool blockin
 		spd_stop((SPDConnection*)connection);
 		spd_cancel((SPDConnection*)connection);
 	}
-	return spd_say((SPDConnection*)connection, interrupt ? SPD_IMPORTANT : SPD_TEXT, text.c_str()) >= 0;
+	return spd_say((SPDConnection*)connection, interrupt ? SPD_IMPORTANT : SPD_MESSAGE, text.c_str()) >= 0;
 }
 
 bool speechd_engine::is_speaking() { return false; }

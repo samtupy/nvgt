@@ -3,7 +3,7 @@
 # NVGT - NonVisual Gaming Toolkit (https://nvgt.dev)
 # Copyright (c) 2022-2025 Sam Tupy
 # license: zlib
-
+import os
 import hashlib
 from pathlib import Path
 import shutil
@@ -26,7 +26,11 @@ def build(triplet = "", do_archive = False, out_dir = ""):
 		# Try to determine, logic probably could be improved
 		if sys.platform == "win32": triplet = "x64-windows"
 		elif sys.platform == "darwin": triplet = "arm64-osx"
-		elif sys.platform == "linux": triplet = "x64-linux"
+		elif sys.platform == "linux":
+                    if(os.uname().machine.__contains__("x86")):
+                        triplet = "x64-linux"
+                    elif(os.uname().machine.__contains__("aarch64")):
+                        triplet = "arm64-linux"
 		else: sys.exit("unable to determine platform, please pass a triplet explicitly.")
 	bootstrap_vcpkg()
 	try: subprocess.check_output([vcpkg_path, "install", "--triplet", triplet, "--x-manifest-root", vcpkg_path.parents[1]])

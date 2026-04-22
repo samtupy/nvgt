@@ -333,9 +333,8 @@ bool voice_over_announce(const std::string& message) {
 	UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, nsmsg);
 	return UIAccessibilityIsVoiceOverRunning();
 #else
-	NSWindow* win = g_window ? (NSWindow*)g_window->get_native_window() : nullptr;
-	if (!win) return false;
-	NSAccessibilityPostNotificationWithUserInfo(win, NSAccessibilityAnnouncementRequestedNotification, @{NSAccessibilityAnnouncementKey: nsmsg, NSAccessibilityPriorityKey: @(NSAccessibilityPriorityHigh)});
+	NSWindow* win = g_window? (NSWindow*)g_window->get_native_window() : nullptr;
+	NSAccessibilityPostNotificationWithUserInfo([NSApp keyWindow], NSAccessibilityAnnouncementRequestedNotification, @{NSAccessibilityAnnouncementKey: nsmsg, NSAccessibilityPriorityKey: @(NSAccessibilityPriorityHigh)});
 	return [NSApp keyWindow] == win;
 #endif
 }
@@ -363,6 +362,12 @@ void voice_over_window_created(game_window* window) {
 		UIWindow* win = (UIWindow*)window->get_native_window();
 		win.rootViewController.view.isAccessibilityElement = YES;
 		win.rootViewController.view.accessibilityTraits |= UIAccessibilityTraitAllowsDirectInteraction;
+	#else
+		NSWindow* win = (NSWindow*)window->get_native_window();
+		NSAccessibilityPostNotification(win, NSAccessibilityApplicationActivatedNotification);
+		NSAccessibilityPostNotification(win, NSAccessibilityApplicationShownNotification);
+		NSAccessibilityPostNotification(win, NSAccessibilityWindowCreatedNotification);
+		NSAccessibilityPostNotification(win, NSAccessibilityFocusedWindowChangedNotification);
 	#endif
 }
 
