@@ -146,7 +146,7 @@ if env["NVGT_TARGET"] != "ios":
 	nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + extra_objects)
 	if env["NVGT_TARGET"] == "macos":
 		# On Mac OS, we need to run install_name_tool to modify the paths of any dynamic libraries we link.
-		env.AddPostAction(nvgt, lambda target, source, env: env.Execute("install_name_tool -change lib/libplist-2.0.dylib @rpath/libplist-2.0.dylib " + str(target[0])))
+		for lib in ["plist-2.0", "archive"]: env.AddPostAction(nvgt, lambda target, source, env: env.Execute(f"install_name_tool -change lib/lib{lib}.dylib @rpath/lib{lib}.dylib " + str(target[0])))
 	if env["NVGT_TARGET"] == "windows":
 		# Only on windows we must go through the frustrating hastle of compiling a version of nvgt with no console E. the windows subsystem. It is at least set up so that we only need to recompile one object
 		if "nvgt.cpp" in sources: sources.remove("nvgt.cpp")
