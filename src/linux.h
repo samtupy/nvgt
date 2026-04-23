@@ -16,7 +16,6 @@
 
 bool screen_reader_is_speaking();
 bool orca_is_available();
-bool orca_is_running();
 bool orca_present_message(const std::string& message, bool interrupt = false);
 bool orca_silence();
 

@@ -8,20 +8,31 @@
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
- */
+*/
 
 #if !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
 #include "linux.h"
 #include "tts.h"
 #include <memory>
+#include <mutex>
+#include <vector>
 #include <Poco/SharedLibrary.h>
 #include <stdexcept>
-#include <dbus/dbus.h>
-#include <memory>
 using namespace std;
 
-static DBusConnection* g_dbus_connection = nullptr;
-static bool g_dbus_initialized = false;
+#if __has_include(<sdbus-c++/sdbus-c++.h>)
+	#include <sdbus-c++/sdbus-c++.h>
+	#define ORCA_DBUS_AVAILABLE
+#endif
+
+#ifdef ORCA_DBUS_AVAILABLE
+// Experimental SUPPORT for Orca DBus service. See documentation at: https://gitlab.gnome.org/GNOME/orca/-/blob/main/docs/remote-controller.md
+	static std::mutex g_orca_mutex;
+	static std::unique_ptr<sdbus::IConnection> g_orca_connection = nullptr;
+	static std::unique_ptr<sdbus::IProxy> g_orca_service_proxy = nullptr;
+	static std::unique_ptr<sdbus::IProxy> g_orca_speech_proxy = nullptr;
+	static bool g_orca_initialized = false;
+#endif
 
 #define spd_get_default_address (*spd_get_default_address)
 #define spd_open2 (*spd_open2)
@@ -37,127 +48,157 @@ static bool g_dbus_initialized = false;
 #undef spd_stop
 #undef spd_cancel
 
-static bool initialize_dbus_connection() {
-	if (g_dbus_initialized) return g_dbus_connection != nullptr;
-	g_dbus_initialized = true;
-	DBusError err;
-	dbus_error_init(&err);
-	g_dbus_connection = dbus_bus_get(DBUS_BUS_SESSION, &err);
-	if (dbus_error_is_set(&err)) {
-		dbus_error_free(&err);
+#ifdef ORCA_DBUS_AVAILABLE
+static bool initialize_orca_dbus() {
+	std::lock_guard<std::mutex> lock(g_orca_mutex);
+	if (g_orca_initialized){
+		return g_orca_connection && g_orca_service_proxy && g_orca_speech_proxy;
+	}
+	g_orca_connection.reset();
+	g_orca_service_proxy.reset();
+	g_orca_speech_proxy.reset();
+
+	try {
+		g_orca_connection = sdbus::createSessionBusConnection();
+		if (!g_orca_connection) {
+			return false;
+		}
+		g_orca_service_proxy = sdbus::createProxy(
+			*g_orca_connection,
+			sdbus::ServiceName{"org.gnome.Orca.Service"},
+			sdbus::ObjectPath{"/org/gnome/Orca/Service"}
+		);
+		if (!g_orca_service_proxy) {
+			return false;
+		}
+		// Orca 49: /org/gnome/Orca/Service/SpeechAndVerbosityManager
+		// Orca 50: /org/gnome/Orca/Service/SpeechManager
+		static const std::vector<sdbus::ObjectPath> speech_paths = {
+			sdbus::ObjectPath{"/org/gnome/Orca/Service/SpeechManager"},
+			sdbus::ObjectPath{"/org/gnome/Orca/Service/SpeechAndVerbosityManager"}
+		};
+
+		for (const auto& path : speech_paths) {
+			try {
+				auto proxy = sdbus::createProxy(
+					*g_orca_connection,
+					sdbus::ServiceName{"org.gnome.Orca.Service"},
+					path
+				);
+				if (!proxy) continue;
+				auto method = proxy->createMethodCall(
+					sdbus::InterfaceName{"org.gnome.Orca.Module"},
+					sdbus::MethodName{"ExecuteCommand"}
+				);
+				method << std::string("InterruptSpeech");
+				method << false;
+				proxy->callMethod(method);
+				g_orca_speech_proxy = std::move(proxy);
+				g_orca_initialized = true;
+				return true;
+			} catch (...) {
+				continue;
+			}
+		}
+		g_orca_speech_proxy.reset();
+		g_orca_service_proxy.reset();
+		g_orca_connection.reset();
+		return false;
+	} catch (...) {
+		g_orca_speech_proxy.reset();
+		g_orca_service_proxy.reset();
+		g_orca_connection.reset();
 		return false;
 	}
-	return g_dbus_connection != nullptr;
 }
 
-bool orca_is_available() {
-	if (!g_dbus_initialized) {
-		if (!initialize_dbus_connection()) return false;
+bool orca_is_available(){
+	if (!g_orca_initialized) {
+		return initialize_orca_dbus();
 	}
-	if (!g_dbus_connection) return false;
-	DBusError err;
-	dbus_error_init(&err);
-	DBusMessage *msg = dbus_message_new_method_call(
-			"org.freedesktop.DBus",
-			"/org/freedesktop/DBus",
-			"org.freedesktop.DBus",
-			"NameHasOwner"
-	);
-	if (!msg) return false;
-	const char *name = "org.gnome.Orca.Service";
-	dbus_message_append_args(msg, DBUS_TYPE_STRING, &name, DBUS_TYPE_INVALID);
-	DBusMessage *reply = dbus_connection_send_with_reply_and_block(
-		g_dbus_connection, msg, 1000, &err
-	);
-	dbus_message_unref(msg);
-	if (!reply || dbus_error_is_set(&err)) {
-		dbus_error_free(&err);
+	std::lock_guard<std::mutex> lock(g_orca_mutex);
+	if (!g_orca_connection || !g_orca_service_proxy || !g_orca_speech_proxy) return false;
+
+	try {
+		auto method = g_orca_service_proxy->createMethodCall(
+			sdbus::InterfaceName{"org.gnome.Orca.Service"},
+			sdbus::MethodName{"GetVersion"}
+		);
+		auto reply = g_orca_service_proxy->callMethod(method);
+		return true;
+	} catch (...) {
+		g_orca_speech_proxy.reset();
+		g_orca_service_proxy.reset();
+		g_orca_connection.reset();
+		g_orca_initialized = false;
 		return false;
 	}
-	dbus_bool_t has_owner = FALSE;
-	if (!dbus_message_get_args(reply, &err, DBUS_TYPE_BOOLEAN, &has_owner, DBUS_TYPE_INVALID)) {
-		dbus_error_free(&err);
-		dbus_message_unref(reply);
-		return false;
-	}
-	dbus_message_unref(reply);
-	return has_owner;
 }
 
-bool orca_is_running(){
-	return orca_is_available();
-}
-
-bool orca_present_message(const std::string& message, bool interrupt) {
-	if (!orca_is_available() || message.empty()) return false;
-	DBusError err;
-	dbus_error_init(&err);
-	if (interrupt) {
-		orca_silence();
-	}
-	DBusMessage *msg = dbus_message_new_method_call(
-		"org.gnome.Orca.Service",
-		"/org/gnome/Orca/Service",
-		"org.gnome.Orca.Service",
-		"PresentMessage"
-	);
-	if (!msg) return false;
-	const char *msg_text = message.c_str();
-	dbus_message_append_args(msg, DBUS_TYPE_STRING, &msg_text, DBUS_TYPE_INVALID);
-	DBusMessage *reply = dbus_connection_send_with_reply_and_block(
-		g_dbus_connection, msg, 1000, &err
-	);
-	dbus_message_unref(msg);
-	if (!reply || dbus_error_is_set(&err)) {
-		dbus_error_free(&err);
+static bool orca_silence_nolock() {
+	if (!g_orca_speech_proxy) return false;
+	try {
+		auto method = g_orca_speech_proxy->createMethodCall(
+			sdbus::InterfaceName{"org.gnome.Orca.Module"},
+			sdbus::MethodName{"ExecuteCommand"}
+		);
+		method << std::string("InterruptSpeech");
+		method << false;
+		auto reply = g_orca_speech_proxy->callMethod(method);
+		bool success;
+		reply >> success;
+		return success;
+	} catch (...) {
+		g_orca_speech_proxy.reset();
+		g_orca_service_proxy.reset();
+		g_orca_connection.reset();
+		g_orca_initialized = false;
 		return false;
 	}
-	dbus_bool_t success = FALSE;
-	if (!dbus_message_get_args(reply, &err, DBUS_TYPE_BOOLEAN, &success, DBUS_TYPE_INVALID)) {
-		dbus_error_free(&err);
-		dbus_message_unref(reply);
-		return false;
-	}
-	dbus_message_unref(reply);
-	return success;
 }
 
 bool orca_silence() {
 	if (!orca_is_available()) return false;
-	DBusError err;
-	dbus_error_init(&err);
-	DBusMessage *msg = dbus_message_new_method_call(
-		"org.gnome.Orca.Service",
-		"/org/gnome/Orca/Service/SpeechAndVerbosityManager",
-		"org.gnome.Orca.Module",
-		"ExecuteCommand"
-	);
-	if (!msg) return false;
-	const char *command = "InterruptSpeech";
-	dbus_bool_t notify_user = FALSE;
-	dbus_message_append_args(msg,
-		DBUS_TYPE_STRING, &command,
-		DBUS_TYPE_BOOLEAN, &notify_user,
-		DBUS_TYPE_INVALID
-	);
-	DBusMessage *reply = dbus_connection_send_with_reply_and_block(
-		g_dbus_connection, msg, 1000, &err
-	);
-	dbus_message_unref(msg);
-	if (!reply || dbus_error_is_set(&err)) {
-		dbus_error_free(&err);
-		return false;
-	}
-	dbus_bool_t success = FALSE;
-	if (!dbus_message_get_args(reply, &err, DBUS_TYPE_BOOLEAN, &success, DBUS_TYPE_INVALID)) {
-		dbus_error_free(&err);
-		dbus_message_unref(reply);
-		return false;
-	}
-	dbus_message_unref(reply);
-	return success;
+	std::lock_guard<std::mutex> lock(g_orca_mutex);
+	if (orca_silence_nolock()) return true;
+	g_orca_initialized = false;
+	if (!initialize_orca_dbus()) return false;
+	return orca_silence_nolock();
 }
 
+bool orca_present_message(const std::string& message, bool interrupt) {
+	if (!orca_is_available() || message.empty()) return false;
+	std::lock_guard<std::mutex> lock(g_orca_mutex);
+	if (interrupt) {
+		orca_silence_nolock();
+	}
+
+	if (!g_orca_service_proxy) return false;
+
+	try {
+		auto method = g_orca_service_proxy->createMethodCall(
+			sdbus::InterfaceName{"org.gnome.Orca.Service"},
+			sdbus::MethodName{"PresentMessage"}
+		);
+		method << message;
+		auto reply = g_orca_service_proxy->callMethod(method);
+		bool success;
+		reply >> success;
+		return success;
+	} catch (...) {
+		g_orca_speech_proxy.reset();
+		g_orca_service_proxy.reset();
+		g_orca_connection.reset();
+		g_orca_initialized = false;
+		return false;
+	}
+}
+
+#else
+	bool orca_is_available() { return false; }
+	bool orca_present_message(const std::string& message, bool interrupt) { return false; }
+	bool orca_silence() { return false; }
+#endif
 
 static Poco::SharedLibrary g_speechd_lib;
 static bool g_speechd_lib_loaded = false;
@@ -225,17 +266,22 @@ bool screen_reader_is_speaking() { return false; }
 
 void register_native_tts() { tts_engine_register("speechd", []() -> shared_ptr<tts_engine> { return make_shared<speechd_engine>(); }); }
 
-void screen_reader_unload(){
-	if (g_dbus_connection) {
-		dbus_connection_unref(g_dbus_connection);
-		g_dbus_connection = nullptr;
-	}
-	g_dbus_initialized = false;
+void screen_reader_unload() {
+	#ifdef ORCA_DBUS_AVAILABLE
+	std::lock_guard<std::mutex> lock(g_orca_mutex);
+	g_orca_speech_proxy.reset();
+	g_orca_service_proxy.reset();
+	g_orca_connection.reset();
+	g_orca_initialized = false;
+	#endif
 }
 
 bool screen_reader_load() {
-	if (g_dbus_initialized) return g_dbus_connection != nullptr;
-	return initialize_dbus_connection();
+	#ifdef ORCA_DBUS_AVAILABLE
+	return initialize_orca_dbus() && orca_is_available();
+	#else
+	return false;
+	#endif
 }
 
 std::string screen_reader_detect() {
@@ -247,9 +293,7 @@ bool screen_reader_has_speech() {
 	return orca_is_available();
 }
 
-bool screen_reader_has_braille() {
-	return orca_is_available();
-}
+bool screen_reader_has_braille() { return false; }
 
 bool screen_reader_output(const std::string& text, bool interrupt) {
 	return orca_present_message(text, interrupt);
@@ -259,12 +303,9 @@ bool screen_reader_speak(const std::string& text, bool interrupt) {
 	return orca_present_message(text, interrupt);
 }
 
-bool screen_reader_braille(const std::string& text) {
-	return orca_is_available();
-}
+bool screen_reader_braille(const std::string& text){ return false; }
 
 bool screen_reader_silence() {
 	return orca_silence();
 }
-
 #endif
