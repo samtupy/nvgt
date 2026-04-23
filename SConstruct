@@ -140,6 +140,8 @@ stub_env = env.Clone(PROGSUFFIX = ".bin")
 if env["NVGT_TARGET"] == "windows": env.Append(LINKFLAGS = ["/delayload:plist-2.0.dll", "/delayload:archive.dll"])
 env.Append(LIBS = ["plist-2.0", "archive"])
 extra_objects = [version_object]
+if env["PLATFORM"] == "win32":
+	extra_objects.append(env.RES("#src/nvgt.rc"))
 if static_plugins_object: extra_objects.append(static_plugins_object)
 if env["NVGT_TARGET"] != "ios":
 	if ARGUMENTS.get("debug", "0") == "1": env["PDB"] = "#build/debug/nvgt.pdb"
