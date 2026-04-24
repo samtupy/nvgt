@@ -68,6 +68,10 @@
       "platform": "windows"
     },
     {
+      "name": "sdbus-cpp",
+      "platform": "linux"
+    },
+    {
       "name": "bass",
       "platform": "!ios"
     },

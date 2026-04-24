@@ -63,12 +63,9 @@ elif env["NVGT_TARGET"] == "ios":
 elif env["NVGT_TARGET"] == "linux":
 	# enable the gold linker, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
 	env.Append(CPPPATH = ["lindev/include", "/usr/local/include"], LIBPATH = ["lindev/lib", "/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
-	conf = Configure(env, log_file = "#build/config.log")
-	if conf.CheckLib("sdbus-c++") and conf.CheckHeader("sdbus-c++/sdbus-c++.h"):
-		env.Append(CPPDEFINES = ["ORCA_DBUS_AVAILABLE"])
-		env.Append(LIBS = ["sdbus-c++"])
-	env = conf.Finish()
 	env.Append(LIBS = ["asound"])
+	env.Append(CPPDEFINES = ["ORCA_DBUS_AVAILABLE"])
+	env.Append(LIBS = ["sdbus-cpp"])
 env.Append(CPPDEFINES = ["POCO_STATIC", "POCO_NO_AUTOMATIC_LIBS", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
@@ -145,13 +142,15 @@ stub_env = env.Clone(PROGSUFFIX = ".bin")
 if env["NVGT_TARGET"] == "windows": env.Append(LINKFLAGS = ["/delayload:plist-2.0.dll", "/delayload:archive.dll"])
 env.Append(LIBS = ["plist-2.0", "archive"])
 extra_objects = [version_object]
+if env["PLATFORM"] == "win32":
+	extra_objects.append(env.RES("#src/nvgt.rc"))
 if static_plugins_object: extra_objects.append(static_plugins_object)
 if env["NVGT_TARGET"] != "ios":
 	if ARGUMENTS.get("debug", "0") == "1": env["PDB"] = "#build/debug/nvgt.pdb"
 	nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + extra_objects)
 	if env["NVGT_TARGET"] == "macos":
 		# On Mac OS, we need to run install_name_tool to modify the paths of any dynamic libraries we link.
-		env.AddPostAction(nvgt, lambda target, source, env: env.Execute("install_name_tool -change lib/libplist-2.0.dylib @rpath/libplist-2.0.dylib " + str(target[0])))
+		for lib in ["plist-2.0", "archive"]: env.AddPostAction(nvgt, lambda target, source, env: env.Execute(f"install_name_tool -change lib/lib{lib}.dylib @rpath/lib{lib}.dylib " + str(target[0])))
 	if env["NVGT_TARGET"] == "windows":
 		# Only on windows we must go through the frustrating hastle of compiling a version of nvgt with no console E. the windows subsystem. It is at least set up so that we only need to recompile one object
 		if "nvgt.cpp" in sources: sources.remove("nvgt.cpp")
