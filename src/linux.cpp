@@ -20,12 +20,9 @@
 #include <stdexcept>
 using namespace std;
 
-#if __has_include(<sdbus-c++/sdbus-c++.h>)
-	#include <sdbus-c++/sdbus-c++.h>
-	#define ORCA_DBUS_AVAILABLE
-#endif
 
 #ifdef ORCA_DBUS_AVAILABLE
+#include <sdbus-c++/sdbus-c++.h>
 // Experimental SUPPORT for Orca DBus service. See documentation at: https://gitlab.gnome.org/GNOME/orca/-/blob/main/docs/remote-controller.md
 	static std::mutex g_orca_mutex;
 	static std::unique_ptr<sdbus::IConnection> g_orca_connection = nullptr;
