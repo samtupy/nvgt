@@ -97,7 +97,7 @@ if  ARGUMENTS.get("no_plugins", "0") == "0":
 			static_plugins_object = env.Object(static_plugins_path, static_plugins_path + ".cpp", CPPPATH = env["CPPPATH"] + ["#src"])
 
 # Project libraries
-env.Append(LIBS = ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoCrypto", "PocoFoundation", "expat", "z", "angelscript", "SDL3", "SDL3_ttf", "freetype", "bz2", "phonon", "enet", "reactphysics3d", "ssl", "crypto", "utf8proc", "pcre2-8", "ASAddon", "deps", "vorbisfile", "vorbisenc", "vorbis", "ogg", "opusfile", "opusenc", "opus", "tinyexpr", "tiny-aes-c", "ffi"])
+env.Append(LIBS = ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoCrypto", "PocoFoundation", "expat", "zs" if env["NVGT_TARGET"] == "windows" else "z", "angelscript", "SDL3", "SDL3_ttf", "freetype", "bz2", "phonon", "enet", "reactphysics3d", "ssl", "crypto", "utf8proc", "pcre2-8", "ASAddon", "deps", "vorbisfile", "vorbisenc", "vorbis", "ogg", "opusfile", "opusenc", "opus", "tinyexpr", "tiny-aes-c", "ffi"])
 if env["NVGT_TARGET"] == "windows": env.Append(LIBS = ["UniversalSpeechStatic"])
 
 # nvgt itself
