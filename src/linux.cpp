@@ -18,18 +18,8 @@
 #include <vector>
 #include <Poco/SharedLibrary.h>
 #include <stdexcept>
-using namespace std;
-
-
-#ifdef ORCA_DBUS_AVAILABLE
 #include <sdbus-c++/sdbus-c++.h>
-// Experimental SUPPORT for Orca DBus service. See documentation at: https://gitlab.gnome.org/GNOME/orca/-/blob/main/docs/remote-controller.md
-	static std::mutex g_orca_mutex;
-	static std::unique_ptr<sdbus::IConnection> g_orca_connection = nullptr;
-	static std::unique_ptr<sdbus::IProxy> g_orca_service_proxy = nullptr;
-	static std::unique_ptr<sdbus::IProxy> g_orca_speech_proxy = nullptr;
-	static bool g_orca_initialized = false;
-#endif
+using namespace std;
 
 #define spd_get_default_address (*spd_get_default_address)
 #define spd_open2 (*spd_open2)
@@ -45,7 +35,13 @@ using namespace std;
 #undef spd_stop
 #undef spd_cancel
 
-#ifdef ORCA_DBUS_AVAILABLE
+// Experimental SUPPORT for Orca DBus service. See documentation at: https://gitlab.gnome.org/GNOME/orca/-/blob/main/docs/remote-controller.md
+static std::mutex g_orca_mutex;
+static std::unique_ptr<sdbus::IConnection> g_orca_connection = nullptr;
+static std::unique_ptr<sdbus::IProxy> g_orca_service_proxy = nullptr;
+static std::unique_ptr<sdbus::IProxy> g_orca_speech_proxy = nullptr;
+static bool g_orca_initialized = false;
+
 static bool initialize_orca_dbus() {
 	std::lock_guard<std::mutex> lock(g_orca_mutex);
 	if (g_orca_initialized){
@@ -191,12 +187,6 @@ bool orca_present_message(const std::string& message, bool interrupt) {
 	}
 }
 
-#else
-	bool orca_is_available() { return false; }
-	bool orca_present_message(const std::string& message, bool interrupt) { return false; }
-	bool orca_silence() { return false; }
-#endif
-
 static Poco::SharedLibrary g_speechd_lib;
 static bool g_speechd_lib_loaded = false;
 
@@ -264,21 +254,15 @@ bool screen_reader_is_speaking() { return false; }
 void register_native_tts() { tts_engine_register("speechd", []() -> shared_ptr<tts_engine> { return make_shared<speechd_engine>(); }); }
 
 void screen_reader_unload() {
-	#ifdef ORCA_DBUS_AVAILABLE
 	std::lock_guard<std::mutex> lock(g_orca_mutex);
 	g_orca_speech_proxy.reset();
 	g_orca_service_proxy.reset();
 	g_orca_connection.reset();
 	g_orca_initialized = false;
-	#endif
 }
 
 bool screen_reader_load() {
-	#ifdef ORCA_DBUS_AVAILABLE
 	return initialize_orca_dbus() && orca_is_available();
-	#else
-	return false;
-	#endif
 }
 
 std::string screen_reader_detect() {
