@@ -2701,7 +2701,7 @@ class control {
 			speak("Alt+" + hotkey_letter, false);
 		if ((type == ct_input) && (password_mask != "")) {
 			if (text.length() > 0)
-				speak(text.length() + " characters", false);
+				speak(utf8length(text) + " characters", false);
 			else
 				speak("Blank", false);
 		}
@@ -3277,7 +3277,7 @@ class control {
 	}
 	private void speak_selected(const string& in selection) {
 		if (selection.length() >= 1024 || password_mask != "")
-			speak(selection.length() + " characters " + highlight_selection_speech_text);
+			speak(utf8length(text) + " characters " + highlight_selection_speech_text);
 		else
 			speak(selection + " " + highlight_selection_speech_text, true, null);
 	}
@@ -3727,7 +3727,7 @@ class control {
 		if (temp == "")
 			return "Blank";
 		if (password_mask != "")
-			return temp.length() + " characters";
+			return utf8length(text) + " characters";
 		return temp;
 	}
 	void line_start() {
@@ -3985,6 +3985,13 @@ class control {
 		if (list_is_tab_panel) speak(list[list_position].item + " tab", (interrupt ? true : false));
 		else if (!list_is_tab_panel and list[list_position].checked) speak(list[list_position].item + " Checked", (interrupt ? true : false));
 		else speak(list[list_position].item, (interrupt ? true : false));
+	}
+	private int utf8length(const string &in txt) {
+		if (txt.empty()) return 0;
+		int length = txt.length(), count = 0;
+		for (int cursor = 0; length > cursor; count ++)
+		cursor = utf8next(txt, cursor);
+		return count;
 	}
 	/*
 	bool speak(string text, bool interrupt)
