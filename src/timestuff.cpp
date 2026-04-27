@@ -668,6 +668,7 @@ void RegisterScriptTimestuffCore(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("string[]@ list_timers()"), asMETHOD(timer_queue, list_timers), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint size() const"), asMETHOD(timer_queue, size), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("timer_queue"), _O("bool loop(int max_timers = 0, int max_catchup_milliseconds = 100)"), asMETHOD(timer_queue, loop), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("timer_queue"), _O("uint64 ticks_to_next_event(uint64 max = 100) const"), asMETHOD(timer_queue, ticks_to_next_event), asCALL_THISCALL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATETIME);
 	engine->RegisterObjectType(_O("timer"), 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(_O("timer"), asBEHAVE_FACTORY, _O("timer@ t()"), asFUNCTION(timestuff_factory<timer>), asCALL_CDECL);

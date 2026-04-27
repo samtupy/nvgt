@@ -31,12 +31,12 @@ def set_osdev_paths(env, osdev_path = ARGUMENTS.get("deps_path", prefix + "dev")
 	if not "deps_path" in ARGUMENTS and Path(osdev_path + "_path").exists(): osdev_path = Path(osdev_path).read_text()
 	else: osdev_path = Path("#" + osdev_path)
 	env.Append(CPPPATH = [str(osdev_path / "include")])
-	if ARGUMENTS.get("debug", "0") == "1": env.Append(LIBPATH = [str(osdev_path / "debug" / "lib")])
-	env.Append(LIBPATH = [str(osdev_path / "lib")])
+	if ARGUMENTS.get("debug", "0") == "1": env.Prepend(LIBPATH = [str(osdev_path / "debug" / "lib")])
+	env.Prepend(LIBPATH = [str(osdev_path / "lib")])
 	env["NVGT_OSDEV_PATH"] = str(Dir(osdev_path))
 	if env["NVGT_TARGET"] == "windows":
-		if ARGUMENTS.get("debug", "0") == "1": env.Append(LIBPATH = [str(osdev_path / "debug" / "bin")])
-		env.Append(LIBPATH = [str(osdev_path / "bin")])
+		if ARGUMENTS.get("debug", "0") == "1": env.Prepend(LIBPATH = [str(osdev_path / "debug" / "bin")])
+		env.Prepend(LIBPATH = [str(osdev_path / "bin")])
 
 set_osdev_paths(env)
 
