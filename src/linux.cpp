@@ -110,22 +110,7 @@ bool orca_is_available(){
 		return initialize_orca_dbus();
 	}
 	std::lock_guard<std::mutex> lock(g_orca_mutex);
-	if (!g_orca_connection || !g_orca_service_proxy || !g_orca_speech_proxy) return false;
-
-	try {
-		auto method = g_orca_service_proxy->createMethodCall(
-			sdbus::InterfaceName{"org.gnome.Orca.Service"},
-			sdbus::MethodName{"GetVersion"}
-		);
-		auto reply = g_orca_service_proxy->callMethod(method);
-		return true;
-	} catch (...) {
-		g_orca_speech_proxy.reset();
-		g_orca_service_proxy.reset();
-		g_orca_connection.reset();
-		g_orca_initialized = false;
-		return false;
-	}
+	return g_orca_connection && g_orca_service_proxy && g_orca_speech_proxy;                                        
 }
 
 static bool orca_silence_nolock() {
@@ -227,9 +212,7 @@ speechd_engine::~speechd_engine() {
 	}
 }
 
-bool speechd_engine::is_available() {
-	return loaded && connection != nullptr;
-}
+bool speechd_engine::is_available() { return loaded && connection != nullptr; }
 
 bool speechd_engine::speak(const std::string &text, bool interrupt, bool blocking) {
 	if (!is_available() || text.empty()) return false;
