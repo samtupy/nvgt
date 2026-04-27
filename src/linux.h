@@ -15,6 +15,9 @@
 #include "tts.h"
 
 bool screen_reader_is_speaking();
+bool orca_is_available();
+bool orca_present_message(const std::string& message, bool interrupt = false);
+bool orca_silence();
 
 class speechd_engine : public tts_engine_impl {
 	void* connection;

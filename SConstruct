@@ -64,6 +64,7 @@ elif env["NVGT_TARGET"] == "linux":
 	# enable the gold linker, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
 	env.Append(CPPPATH = ["lindev/include", "/usr/local/include"], LIBPATH = ["lindev/lib", "/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
 	env.Append(LIBS = ["asound"])
+	env.Append(LIBS = ["sdbus-c++", "systemd", "cap"])
 env.Append(CPPDEFINES = ["POCO_STATIC", "POCO_NO_AUTOMATIC_LIBS", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 
@@ -140,6 +141,8 @@ stub_env = env.Clone(PROGSUFFIX = ".bin")
 if env["NVGT_TARGET"] == "windows": env.Append(LINKFLAGS = ["/delayload:plist-2.0.dll", "/delayload:archive.dll"])
 env.Append(LIBS = ["plist-2.0", "archive"])
 extra_objects = [version_object]
+if env["PLATFORM"] == "win32":
+	extra_objects.append(env.RES("#src/nvgt.rc"))
 if static_plugins_object: extra_objects.append(static_plugins_object)
 if env["NVGT_TARGET"] != "ios":
 	if ARGUMENTS.get("debug", "0") == "1": env["PDB"] = "#build/debug/nvgt.pdb"
