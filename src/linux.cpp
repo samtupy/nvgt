@@ -15,6 +15,7 @@
 #include "tts.h"
 #include <memory>
 #include <mutex>
+#include <shared_mutex>                                                                                     
 #include <vector>
 #include <Poco/SharedLibrary.h>
 #include <stdexcept>
@@ -36,14 +37,14 @@ using namespace std;
 #undef spd_cancel
 
 // Experimental SUPPORT for Orca DBus service. See documentation at: https://gitlab.gnome.org/GNOME/orca/-/blob/main/docs/remote-controller.md
-static std::mutex g_orca_mutex;
+static std::shared_mutex g_orca_mutex;
 static std::unique_ptr<sdbus::IConnection> g_orca_connection = nullptr;
 static std::unique_ptr<sdbus::IProxy> g_orca_service_proxy = nullptr;
 static std::unique_ptr<sdbus::IProxy> g_orca_speech_proxy = nullptr;
 static bool g_orca_initialized = false;
 
 static bool initialize_orca_dbus() {
-	std::lock_guard<std::mutex> lock(g_orca_mutex);
+	std::unique_lock<std::shared_mutex> lock(g_orca_mutex);
 	if (g_orca_initialized){
 		return g_orca_connection && g_orca_service_proxy && g_orca_speech_proxy;
 	}
@@ -109,11 +110,12 @@ bool orca_is_available(){
 	if (!g_orca_initialized) {
 		return initialize_orca_dbus();
 	}
-	std::lock_guard<std::mutex> lock(g_orca_mutex);
+	std::shared_lock<std::shared_mutex> lock(g_orca_mutex);
 	return g_orca_connection && g_orca_service_proxy && g_orca_speech_proxy;                                        
 }
 
-static bool orca_silence_nolock() {
+static bool orca_silence_lock() {
+	std::unique_lock<std::shared_mutex> lock(g_orca_mutex);
 	if (!g_orca_speech_proxy) return false;
 	try {
 		auto method = g_orca_speech_proxy->createMethodCall(
@@ -137,18 +139,19 @@ static bool orca_silence_nolock() {
 
 bool orca_silence() {
 	if (!orca_is_available()) return false;
-	std::lock_guard<std::mutex> lock(g_orca_mutex);
-	if (orca_silence_nolock()) return true;
+	if (orca_silence_lock()) return true;
 	g_orca_initialized = false;
 	if (!initialize_orca_dbus()) return false;
-	return orca_silence_nolock();
+	return orca_silence_lock();
 }
 
 bool orca_present_message(const std::string& message, bool interrupt) {
 	if (!orca_is_available() || message.empty()) return false;
-	std::lock_guard<std::mutex> lock(g_orca_mutex);
+	std::unique_lock<std::shared_mutex> lock(g_orca_mutex);
 	if (interrupt) {
-		orca_silence_nolock();
+		lock.unlock();
+		orca_silence_lock();
+		lock.lock();
 	}
 
 	if (!g_orca_service_proxy) return false;
@@ -237,7 +240,7 @@ bool screen_reader_is_speaking() { return false; }
 void register_native_tts() { tts_engine_register("speechd", []() -> shared_ptr<tts_engine> { return make_shared<speechd_engine>(); }); }
 
 void screen_reader_unload() {
-	std::lock_guard<std::mutex> lock(g_orca_mutex);
+	std::unique_lock<std::shared_mutex> lock(g_orca_mutex);
 	g_orca_speech_proxy.reset();
 	g_orca_service_proxy.reset();
 	g_orca_connection.reset();
