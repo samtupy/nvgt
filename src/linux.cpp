@@ -15,7 +15,7 @@
 #include "tts.h"
 #include <memory>
 #include <mutex>
-#include <shared_mutex>                                                                                     
+#include <shared_mutex>
 #include <vector>
 #include <Poco/SharedLibrary.h>
 #include <stdexcept>
@@ -54,17 +54,13 @@ static bool initialize_orca_dbus() {
 
 	try {
 		g_orca_connection = sdbus::createSessionBusConnection();
-		if (!g_orca_connection) {
-			return false;
-		}
+		if (!g_orca_connection) { return false; }
 		g_orca_service_proxy = sdbus::createProxy(
 			*g_orca_connection,
 			sdbus::ServiceName{"org.gnome.Orca.Service"},
 			sdbus::ObjectPath{"/org/gnome/Orca/Service"}
 		);
-		if (!g_orca_service_proxy) {
-			return false;
-		}
+		if (!g_orca_service_proxy) { return false; }
 		// Orca 49: /org/gnome/Orca/Service/SpeechAndVerbosityManager
 		// Orca 50: /org/gnome/Orca/Service/SpeechManager
 		static const std::vector<sdbus::ObjectPath> speech_paths = {
@@ -82,10 +78,8 @@ static bool initialize_orca_dbus() {
 				if (!proxy) continue;
 				auto method = proxy->createMethodCall(
 					sdbus::InterfaceName{"org.gnome.Orca.Module"},
-					sdbus::MethodName{"ExecuteCommand"}
+					sdbus::MethodName{"ListCommands"}
 				);
-				method << std::string("InterruptSpeech");
-				method << false;
 				proxy->callMethod(method);
 				g_orca_speech_proxy = std::move(proxy);
 				g_orca_initialized = true;
@@ -111,7 +105,7 @@ bool orca_is_available(){
 		return initialize_orca_dbus();
 	}
 	std::shared_lock<std::shared_mutex> lock(g_orca_mutex);
-	return g_orca_connection && g_orca_service_proxy && g_orca_speech_proxy;                                        
+	return g_orca_connection && g_orca_service_proxy && g_orca_speech_proxy;
 }
 
 static bool orca_silence_lock() {
