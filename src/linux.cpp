@@ -8,7 +8,7 @@
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
  * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
  * 3. This notice may not be removed or altered from any source distribution.
-*/
+ */
 
 #if !defined(__ANDROID__) && (defined(__linux__) || defined(__unix__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
 #include "linux.h"
@@ -42,6 +42,7 @@ static std::unique_ptr<sdbus::IConnection> g_orca_connection = nullptr;
 static std::unique_ptr<sdbus::IProxy> g_orca_service_proxy = nullptr;
 static std::unique_ptr<sdbus::IProxy> g_orca_speech_proxy = nullptr;
 static bool g_orca_initialized = false;
+static tts_voice* g_screen_reader_voice = nullptr;
 
 static bool initialize_orca_dbus() {
 	std::unique_lock<std::shared_mutex> lock(g_orca_mutex);
@@ -169,6 +170,30 @@ bool orca_present_message(const std::string& message, bool interrupt) {
 	}
 }
 
+orca_engine::orca_engine() : tts_engine_impl("Orca") {
+	initialize_orca_dbus();
+}
+
+bool orca_engine::is_available() {
+	return orca_is_available();
+}
+
+bool orca_engine::speak(const std::string& text, bool interrupt, bool) {
+	return orca_present_message(text, interrupt);
+}
+
+bool orca_engine::stop() {
+	return orca_silence();
+}
+
+orca_engine::~orca_engine(){
+	std::unique_lock<std::shared_mutex> lock(g_orca_mutex);
+	g_orca_speech_proxy.reset();
+	g_orca_service_proxy.reset();
+	g_orca_connection.reset();
+	g_orca_initialized = false;
+}
+
 static Poco::SharedLibrary g_speechd_lib;
 static bool g_speechd_lib_loaded = false;
 
@@ -231,42 +256,55 @@ bool speechd_engine::stop() {
 
 bool screen_reader_is_speaking() { return false; }
 
-void register_native_tts() { tts_engine_register("speechd", []() -> shared_ptr<tts_engine> { return make_shared<speechd_engine>(); }); }
+void register_native_tts() { 
+	tts_engine_register("speechd", []() -> shared_ptr<tts_engine> {
+		return make_shared<speechd_engine>();
+	});
+	tts_engine_register("orca", []() -> shared_ptr<tts_engine> {
+		return make_shared<orca_engine>();
+	});
+}
 
 void screen_reader_unload() {
-	std::unique_lock<std::shared_mutex> lock(g_orca_mutex);
-	g_orca_speech_proxy.reset();
-	g_orca_service_proxy.reset();
-	g_orca_connection.reset();
-	g_orca_initialized = false;
+	if (g_screen_reader_voice) {
+		g_screen_reader_voice->Release();
+		g_screen_reader_voice = nullptr;
+	}
 }
 
 bool screen_reader_load() {
-	return initialize_orca_dbus() && orca_is_available();
+	if (g_screen_reader_voice) return true;
+	g_screen_reader_voice = new tts_voice("orca");
+	return g_screen_reader_voice && g_screen_reader_voice->get_voice_count() > 0;
 }
 
 std::string screen_reader_detect() {
-	if(orca_is_available()) return "Orca";
-	return "";
+	if (!screen_reader_load()) return "";
+	return g_screen_reader_voice->get_voice_count() > 0 ? "Orca" : "Speech Dispatcher";
 }
 
 bool screen_reader_has_speech() {
-	return orca_is_available();
+	if (!screen_reader_load()) return false;
+	g_screen_reader_voice->refresh();
+	return g_screen_reader_voice->get_voice_count() > 0;
 }
 
 bool screen_reader_has_braille() { return false; }
 
 bool screen_reader_output(const std::string& text, bool interrupt) {
-	return orca_present_message(text, interrupt);
+	if (!screen_reader_load()) return false;
+	return g_screen_reader_voice->speak(text, interrupt);
 }
 
 bool screen_reader_speak(const std::string& text, bool interrupt) {
-	return orca_present_message(text, interrupt);
+	if(!screen_reader_load()) return false;
+	return g_screen_reader_voice->speak(text, interrupt);
 }
 
 bool screen_reader_braille(const std::string& text){ return false; }
 
 bool screen_reader_silence() {
-	return orca_silence();
+	if(!screen_reader_load()) return false;
+	return g_screen_reader_voice->stop();
 }
 #endif

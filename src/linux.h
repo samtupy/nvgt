@@ -30,3 +30,12 @@ public:
 	virtual bool is_speaking() override;
 	virtual bool stop() override;
 };
+
+class orca_engine : public tts_engine_impl {
+public:
+	orca_engine();
+	virtual ~orca_engine();
+	bool is_available() override;
+	bool speak(const std::string& text, bool interrupt = false, bool blocking = false) override;
+	bool stop() override;
+};
