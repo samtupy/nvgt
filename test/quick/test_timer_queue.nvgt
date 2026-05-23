@@ -38,5 +38,7 @@ void main() {
 			screen_reader_speak_interrupt(NVDA, timers.size());
 		if (key_pressed(KEY_3))
 			timers.restart("3");
+		if(key_pressed(KEY_RETURN))
+			screen_reader_speak_interrupt(NVDA, timers.ticks_to_next_event(1000));
 	}
 }

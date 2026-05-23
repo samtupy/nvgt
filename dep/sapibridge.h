@@ -79,6 +79,8 @@ struct sbz_sapi
 int begin;
 sbz_com com;
 ISpVoice* voice;
+ISpStream* mem;
+ISpStream* output;
 sbz_sapi_voice* voices;
 int voice_count;
 int pitch;
@@ -94,10 +96,13 @@ int sbz_sapi_refresh_voices(sb_sapi* sapi);
 int sbz_sapi_get_voice_enum(sb_sapi* sapi, IEnumSpObjectTokens** enum_tokens);
 int sbz_sapi_populate_voices_from_tokens(sb_sapi* sapi, IEnumSpObjectTokens** enum_tokens, int count);
 int sbz_sapi_speak_to_memory(sb_sapi* sapi, char* text, void** buffer, int* size);
-int sbz_sapi_create_memory_stream(sb_sapi* sapi, ISpStream** stream);
-int sbz_sapi_capture_stream_output(sb_sapi* sapi, ISpStream* stream, void** buffer, int* size);
+int sbz_sapi_create_memory_stream(sb_sapi* sapi);
+int sbz_sapi_capture_stream_output(sb_sapi* sapi, void** buffer, int* size);
 int sbz_sapi_cache_audio_attributes(sb_sapi* sapi);
 int sbz_sapi_get_waveformatex(sb_sapi* sapi, WAVEFORMATEX** wf);
+int sbz_sapi_output_to_device(sb_sapi* sapi);
+int sbz_sapi_output_to_stream(sb_sapi* sapi);
+int sbz_sapi_prepare_memory_stream(sb_sapi* sapi);
 void sbz_sapi_reset_voice_cache(sb_sapi* sapi);
 void sbz_sapi_clean_voice_cache(sb_sapi* sapi);
 void sbz_sapi_cleanup(sb_sapi* sapi);
@@ -115,10 +120,6 @@ void sbz_com_cleanup(sbz_com* com);
 WCHAR* sbz_char_to_wchar(char* text);
 char* sbz_wchar_to_char(WCHAR* text);
 int sbz_validate_waveformatex(WAVEFORMATEX* wf);
-WCHAR* sbz_form_message(char* text, int pitch);
-WCHAR* sbz_xml_escape(WCHAR* text);
-int sbz_xml_escape_size(WCHAR c);
-WCHAR* sbz_xml_escape_text(WCHAR c);
 
 #ifdef __cplusplus
 }

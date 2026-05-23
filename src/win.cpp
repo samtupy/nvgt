@@ -77,10 +77,7 @@ string sapi5_engine::get_voice_name(int index) {
 string sapi5_engine::get_voice_language(int index) {
 	if (!inst || index < 0 || index >= get_voice_count()) return "";
 	char *lang = sb_sapi_get_voice_language(inst, index);
-	if (!lang) return "";
-	string result(lang);
-	free(lang);
-	return result;
+	return lang ? string(lang) : "";
 }
 bool sapi5_engine::set_voice(int voice) {
 	if (voice < 0 || voice >= inst->voice_count) return false;

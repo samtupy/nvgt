@@ -267,6 +267,10 @@ class audio_form {
 	}
 	int create_input_box(string caption, string default_text = "", string password_mask = "", int maximum_length = 0, bool read_only = false, bool multiline = false, bool multiline_enter = true) {
 		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
 			return -1;
@@ -303,6 +307,10 @@ class audio_form {
 	}
 	int create_list(string caption, int maximum_items = 0, bool multiselect = false, bool repeat_boundary_items = false) {
 		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
 			return -1;
@@ -326,6 +334,10 @@ class audio_form {
 	}
 	int create_tab_panel(string caption, int maximum_items = 0, bool repeat_boundary_items = false) {
 		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
 			return -1;
@@ -350,6 +362,10 @@ class audio_form {
 	}
 	int create_button(string caption, bool primary = false, bool cancel = false, bool overwrite = true) {
 		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
 			return -1;
@@ -371,6 +387,10 @@ class audio_form {
 	}
 	int create_progress_bar(string caption, int speak_interval = 5, bool speak_global = true) {
 		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
 			return -1;
@@ -393,6 +413,10 @@ class audio_form {
 	}
 	int create_slider(string caption, double default_value = 50, double minimum_value = 0, double maximum_value = 100, string text = "", double step_size = 1) {
 		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
 			return -1;
@@ -418,6 +442,10 @@ class audio_form {
 	}
 	int create_status_bar(string caption, string text) {
 		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
 			return -1;
@@ -439,6 +467,10 @@ class audio_form {
 	}
 	int create_keyboard_area(string caption) {
 		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
 			return -1;
@@ -460,6 +492,10 @@ class audio_form {
 	int create_subform(string caption, audio_form@ f) {
 		if (@f != null) f.subform = true;
 		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
 			return -1;
@@ -482,6 +518,10 @@ class audio_form {
 	}
 	int create_checkbox(string caption, bool initial_value = false, bool read_only = false) {
 		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
 			return -1;
@@ -504,6 +544,10 @@ class audio_form {
 	}
 	int create_link(string caption, string url) {
 		form_error = 0;
+		if (!active) {
+			form_error = form_error_no_window;
+			return -1;
+		}
 		if (active_controls >= 50) {
 			form_error = form_error_window_full;
 			return -1;
