@@ -15,6 +15,9 @@
 #include "tts.h"
 
 bool screen_reader_is_speaking();
+bool orca_is_available();
+bool orca_present_message(const std::string& message, bool interrupt = false);
+bool orca_silence();
 
 class speechd_engine : public tts_engine_impl {
 	void* connection;
@@ -26,4 +29,13 @@ public:
 	virtual bool speak(const std::string &text, bool interrupt = false, bool blocking = false) override;
 	virtual bool is_speaking() override;
 	virtual bool stop() override;
+};
+
+class orca_engine : public tts_engine_impl {
+public:
+	orca_engine();
+	virtual ~orca_engine();
+	bool is_available() override;
+	bool speak(const std::string& text, bool interrupt = false, bool blocking = false) override;
+	bool stop() override;
 };
