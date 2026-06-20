@@ -69,9 +69,10 @@ bool add_decoder(ma_decoding_backend_vtable *vtable) {
 	}
 }
 bool init_sound() {
-	if (g_soundsystem_initialized.test())
-		return true;
-	if ((g_soundsystem_last_error = ma_context_init(nullptr, 0, nullptr, &g_sound_context)) != MA_SUCCESS)
+	if (g_soundsystem_initialized.test()) return true;
+	ma_context_config cfg = ma_context_config_init();
+	cfg.coreaudio.sessionCategoryOptions = ma_ios_session_category_option_mix_with_others | ma_ios_session_category_option_allow_bluetooth_a2dp | ma_ios_session_category_option_allow_air_play;
+	if ((g_soundsystem_last_error = ma_context_init(nullptr, 0, &cfg, &g_sound_context)) != MA_SUCCESS)
 		return false;
 	g_sound_service = sound_service::make();
 	if (g_sound_service == nullptr) {
