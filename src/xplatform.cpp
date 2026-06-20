@@ -21,6 +21,7 @@
 #include <Poco/Environment.h>
 #include <Poco/File.h>
 #include <Poco/Path.h>
+#include <Poco/String.h>
 #include <Poco/Thread.h>
 #include <Poco/Util/Application.h>
 #include <obfuscate.h>
@@ -53,7 +54,7 @@ void determine_compile_platform() {
 }
 void xplatform_correct_path_to_stubs(Poco::Path& stubpath) {
 	#ifdef __APPLE__ // Stub may be in Resources directory of an app bundle.
-	if (!File(stubpath).exists() && stubpath[stubpath.depth() -2] == "MacOS" && stubpath[stubpath.depth() -3] == "Contents") stubpath.makeParent().makeParent().pushDirectory("Resources").pushDirectory("stub");
+	if (!File(stubpath).exists() && !icompare(stubpath[stubpath.depth() -2], "MacOS") && !icompare(stubpath[stubpath.depth() -3], "Contents")) stubpath.makeParent().makeParent().pushDirectory("Resources").pushDirectory("stub");
 	#endif
 }
 std::string get_nvgt_lib_directory(const std::string& platform) {
