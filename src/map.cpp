@@ -54,14 +54,14 @@ bool polygons_intersect(const std::vector<Vector3>& a, const std::vector<Vector3
 			const double normalx = polygon[i2].y - polygon[i1].y;
 			const double normaly = polygon[i2].x - polygon[i1].x;
 			double minA = (std::numeric_limits<double>::max());
-			double maxA = (std::numeric_limits<double>::min());
+			double maxA = (std::numeric_limits<double>::lowest());
 			for (int ai = 0; ai < a.size(); ++ai) {
 				const double projected = normalx * a[ai].x + normaly * a[ai].y;
 				if (projected < minA) minA = projected;
 				if (projected > maxA) maxA = projected;
 			}
 			double minB = std::numeric_limits<double>::max();
-			double maxB = std::numeric_limits<double>::min();
+			double maxB = std::numeric_limits<double>::lowest();
 			for (int bi = 0; bi < b.size(); ++bi) {
 				const double projected = normalx * b[bi].x + normaly * b[bi].y;
 				if (projected < minB) minB = projected;
