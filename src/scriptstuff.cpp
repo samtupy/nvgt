@@ -489,9 +489,11 @@ public:
 	}
 	int Read(void* ptr, asUINT size) {
 		if (cursor >= data.size()) return -1;
-		memcpy(ptr, &data[cursor], size);
-		cursor += size;
-		return size;
+		asUINT available = static_cast<asUINT>(data.size() - cursor);
+		asUINT to_copy = size < available ? size : available;
+		memcpy(ptr, data.data() + cursor, to_copy);
+		cursor += to_copy;
+		return to_copy;
 	}
 };
 class script_module {
