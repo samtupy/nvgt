@@ -42,6 +42,11 @@
 #include <miniaudio_libvorbis.h>
 #include <miniaudio_libopus.h>
 #include <iostream>
+#if __has_include(<alsa/asoundlib.h>)
+#include <alsa/asoundlib.h>
+#define NVGT_HAS_ALSA
+void quiet_alsa_handler(const char *file, int line, const char *function, int err, const char *fmt, ...) {}
+#endif
 using namespace std;
 
 class sound_impl;
@@ -70,6 +75,9 @@ bool add_decoder(ma_decoding_backend_vtable *vtable) {
 }
 bool init_sound() {
 	if (g_soundsystem_initialized.test()) return true;
+	#ifdef NVGT_HAS_ALSA
+	snd_lib_error_set_handler(quiet_alsa_handler); // Try to avoid NVGT server applications that accidentally touch the sound system from causing headless Linux servers to print audio device enumeration errors to stdout.
+	#endif
 	ma_context_config cfg = ma_context_config_init();
 	cfg.coreaudio.sessionCategoryOptions = ma_ios_session_category_option_mix_with_others | ma_ios_session_category_option_allow_bluetooth_a2dp | ma_ios_session_category_option_allow_air_play;
 	if ((g_soundsystem_last_error = ma_context_init(nullptr, 0, &cfg, &g_sound_context)) != MA_SUCCESS)
