@@ -186,21 +186,19 @@ public:
 			else value = malloc(ctx->GetEngine()->GetSizeOfPrimitiveType(subtypeid));
 			if ((subtypeid & ~asTYPEID_MASK_SEQNBR) && !(subtypeid & asTYPEID_OBJHANDLE)) *(void**)value = ctx->GetEngine()->CreateScriptObjectCopy(ctx->GetReturnObject(), subtype->GetSubType());
 			else if (subtypeid & asTYPEID_OBJHANDLE) {
-				void* tmp = value;
 				*(void**)value = ctx->GetReturnObject();
 				ctx->GetEngine()->AddRefScriptObject(*(void**)value, subtype->GetSubType());
-				if (tmp) ctx->GetEngine()->ReleaseScriptObject(*(void**)tmp, subtype->GetSubType());
 			} else if (subtypeid == asTYPEID_BOOL || subtypeid == asTYPEID_INT8 || subtypeid == asTYPEID_UINT8) *(char*)value = ctx->GetReturnByte();
 			else if (subtypeid == asTYPEID_INT16 || subtypeid == asTYPEID_UINT16) *(short*)value = ctx->GetReturnWord();
 			else if (subtypeid == asTYPEID_INT32 || subtypeid == asTYPEID_UINT32 || subtypeid > asTYPEID_DOUBLE) *(int*)value = ctx->GetReturnDWord();
 			else if (subtypeid == asTYPEID_FLOAT) *(float*)value = ctx->GetReturnFloat();
-			else if (subtypeid == asTYPEID_INT64 || subtypeid == asTYPEID_UINT64) *(double*)value = ctx->GetReturnQWord();
+			else if (subtypeid == asTYPEID_INT64 || subtypeid == asTYPEID_UINT64) *(asQWORD*)value = ctx->GetReturnQWord();
 			else if (subtypeid == asTYPEID_DOUBLE) *(double*)value = ctx->GetReturnDouble();
 		}
 		ctx->GetEngine()->ReturnContext(ctx);
 		release_value_args();
-		release();
 		progress.set();
+		release();
 	}
 	void release_value_args() {
 		for (const auto& obj : value_args) g_ScriptEngine->ReleaseScriptObject(obj.first, obj.second);
