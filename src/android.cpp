@@ -14,6 +14,7 @@
 #include "android.h"
 #include "UI.h"
 #include <jni.h>
+#include <time.h>
 #include <Poco/Exception.h>
 #include <Poco/Format.h>
 #include <SDL3/SDL.h>
@@ -426,5 +427,11 @@ bool screen_reader_output(const std::string& text, bool interrupt) { return andr
 bool screen_reader_speak(const std::string& text, bool interrupt) { return android_screen_reader_speak(text, interrupt); }
 bool screen_reader_braille(const std::string& text) { return false; }
 bool screen_reader_silence() { return android_screen_reader_silence(); }
+
+unsigned long long system_running_milliseconds() {
+	struct timespec ts;
+	if (clock_gettime(CLOCK_BOOTTIME, &ts) != 0) return 0;
+	return (unsigned long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
 
 #endif // __ANDROID__
