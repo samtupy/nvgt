@@ -1,0 +1,25 @@
+/**
+	Determine if a particular mouse button is pressed.
+bool mouse_pressed(uint8 button);
+## Arguments:
+*uint8 button: The mouse button to check.
+## returns:
+bool: If the specified  mouse button was pressed.
+*/
+// Example:
+void main()
+{
+show_window("Example");
+while(true)
+{
+wait(5);
+if(mouse_pressed(1))
+{
+screen_reader_output("You just pressed left click!");
+}
+if(key_pressed(KEY_ESCAPE))
+{
+exit();
+}
+}
+}
