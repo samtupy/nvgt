@@ -65,12 +65,12 @@
 	#ifdef have_linux_stubs
 		name: "stubs\linux"; description: "Linux binary stub"; types: custom
 	#endif
+	#ifdef have_ios_stubs
+		name: "stubs\ios"; description: "iOS binary stub"; types: custom
+	#endif
 	#ifdef have_android_stubs
 		name: "stubs\android"; description: "Android binary stub"; types: custom
 		name: "androidtools"; description: "Android tools (external download required)"; types: custom
-	#endif
-	#ifdef have_ios_stubs
-		name: "stubs\ios"; description: "iOS binary stub"; types: custom
 	#endif
 	#ifdef have_docs
 		name: "docs"; description: "Documentation"; types: custom
