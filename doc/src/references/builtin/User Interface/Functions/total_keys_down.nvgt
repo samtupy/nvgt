@@ -1,8 +1,10 @@
 /**
-	Returns the total number of keys that are currently held down.
+	Returns the total number of keys that are currently or have just been held down.
 	int total_keys_down();
 	## Returns:
-		int: the number of keys currently held down.
+		int: the number of keys currently or recently held down.
+	## Remarks:
+		This function includes not only keys that are currently being held down, but also keys that have just been released within the last frame. It's purpose is to reduce the worklow of keyboard configuration systems that want to detect how many keys to monitor, including key releases.
 */
 
 // Example:
