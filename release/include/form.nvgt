@@ -3142,18 +3142,15 @@ class control {
 		if (type != ct_input) return false;
 		if (col < 1) col = 1;
 		int max_col = col;
-		int pos = 0;
-		if (line > 1)
-			pos = bgt_string_contains(text, "\n", line - 1);
-		if (pos > -1) {
-			int pos2 = bgt_string_contains(text, "\n", line);
-			if (pos2 > -1) max_col = pos2 - pos - 1;
-		} else {
+		int pos = line > 1? bgt_string_contains(text, "\n", line -1) : 0;
+		if (pos < 0) {
 			if (!silent) speak("line number out of range");
 			return false;
 		}
-		if (col > max_col) col = max_col;
+		int pos2 = bgt_string_contains(text, "\n", line);
+		if (pos2 > -1) max_col = pos2 - pos;
 		if (pos==0) col--;
+		if (col > max_col) col = max_col;
 		pos += col;
 		cursor = pos;
 		sel_start = -1;
@@ -3222,13 +3219,14 @@ class control {
 		if (sel_start < 0) {
 			sel_start = utf8prev(text, cursor);
 			sel_end = sel_start;
+			cursor = sel_start;
 			speak(input_box_speak(find_appropriate_character(text.substr(sel_start, 4)), true) + " " + highlight_selection_speech_text, true);
 			return;
 		}
 		int old_cursor = cursor;
 		if (cursor > 0)
 			cursor = utf8prev(text, cursor);
-		if ((cursor == sel_start || old_cursor == sel_start) && sel_start > 0) {
+		if ((cursor == sel_start || old_cursor == sel_start) && cursor != sel_end && sel_start > 0) {
 			sel_start = utf8prev(text, sel_start);
 			speak(input_box_speak(find_appropriate_character(text.substr(sel_start, 4)), true) + " " + highlight_selection_speech_text, true);
 		} else if (cursor == sel_end || (old_cursor == sel_end) && sel_end > 0 && sel_end < text.length()) {
