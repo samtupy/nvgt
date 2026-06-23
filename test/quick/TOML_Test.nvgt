@@ -1,0 +1,11 @@
+#include "toml.nvgt"
+toml t;
+void main() {
+	alert("Loaded", t.load("../data/test.toml"));
+	alert("Author", t.get("author", "name", "") + " <" + t.get("author", "homepage", "") + ">");
+	for (uint a = 0; a < t.sections.length(); a++)
+		alert(t.sections[a].name, t.sections[a].dump(true, 1, 0));
+	alert("Info removal", t.remove("author"));
+	alert("Info removal", t.remove("test.hahaha"));
+	alert("All dump copied", clipboard_set_raw_text(t.dump()));
+}
