@@ -1953,7 +1953,10 @@ sound *new_global_sound() {
 	init_sound();
 	sound* s = new sound_impl(g_audio_engine);
 	if (!s) return nullptr;
-	if (g_audio_mixer) s->set_mixer(g_audio_mixer);
+	if (g_audio_mixer) {
+		g_audio_mixer->duplicate(); // set_mixer takes ownership of one reference (script callers get this via AngelScript's handle transfer; internal C++ callers must add it explicitly).
+		s->set_mixer(g_audio_mixer);
+	}
 	return s;
 }
 int get_sound_output_device() {
