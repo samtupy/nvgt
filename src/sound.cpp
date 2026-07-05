@@ -42,6 +42,10 @@
 #include <miniaudio_libvorbis.h>
 #include <miniaudio_libopus.h>
 #include <iostream>
+#ifdef __linux__
+#include <SDL3/SDL_loadso.h>
+static void quiet_alsa_handler(const char *file, int line, const char *function, int err, const char *fmt, ...) {}
+#endif
 using namespace std;
 
 class sound_impl;
@@ -69,9 +73,17 @@ bool add_decoder(ma_decoding_backend_vtable *vtable) {
 	}
 }
 bool init_sound() {
-	if (g_soundsystem_initialized.test())
-		return true;
-	if ((g_soundsystem_last_error = ma_context_init(nullptr, 0, nullptr, &g_sound_context)) != MA_SUCCESS)
+	if (g_soundsystem_initialized.test()) return true;
+	#ifdef __linux__
+	// Attempt to silence ALSA's verbose error output on headless servers; libasound may not be present so load it dynamically and ignore failure.
+	typedef int (*snd_lib_error_set_handler_t)(void (*)(const char*, int, const char*, int, const char*, ...));
+	if (SDL_SharedObject* alsa = SDL_LoadObject("libasound.so.2")) {
+		if (auto set_handler = (snd_lib_error_set_handler_t)SDL_LoadFunction(alsa, "snd_lib_error_set_handler")) set_handler(quiet_alsa_handler);
+	}
+	#endif
+	ma_context_config cfg = ma_context_config_init();
+	cfg.coreaudio.sessionCategoryOptions = ma_ios_session_category_option_mix_with_others | ma_ios_session_category_option_allow_bluetooth_a2dp | ma_ios_session_category_option_allow_air_play;
+	if ((g_soundsystem_last_error = ma_context_init(nullptr, 0, &cfg, &g_sound_context)) != MA_SUCCESS)
 		return false;
 	g_sound_service = sound_service::make();
 	if (g_sound_service == nullptr) {
@@ -277,11 +289,13 @@ class audio_engine_impl final : public audio_node_impl, public virtual audio_eng
 		if (engine->script_data_callback) {
 			asIScriptContext* ctx = g_ScriptEngine->RequestContext();
 			if (!ctx || ctx->Prepare(engine->script_data_callback) < 0) {
+				if (ctx) g_ScriptEngine->ReturnContext(ctx);
 				engine->release();
 				return; // Todo: Maybe find a way to log error state here?
 			}
 			script_memory_buffer buf(g_ScriptEngine->GetTypeInfoByDecl("memory_buffer<float>"), pOutput, pDevice->playback.channels * frames_read); // Todo: Support all data formats.
 			if (ctx->SetArgObject(0, engine) < 0 || ctx->SetArgObject(1, &buf) < 0 || ctx->SetArgQWord(2, frames_read) < 0) {
+				g_ScriptEngine->ReturnContext(ctx);
 				engine->release();
 				return;
 			}
@@ -359,6 +373,8 @@ public:
 		}
 		if ((g_soundsystem_last_error = ma_engine_init(&cfg, &*engine)) != MA_SUCCESS) {
 			engine.reset();
+			if (resource_manager) { ma_resource_manager_uninit(&*resource_manager); resource_manager.reset(); }
+			if (device) { ma_device_uninit(&*device); device.reset(); }
 			throw runtime_error(Poco::format("failed to initialize sound engine %d", int(g_soundsystem_last_error)));
 		}
 		node = (ma_node_base*)&*engine;
@@ -402,16 +418,14 @@ public:
 		return -1; // couldn't determine device?
 	}
 	bool set_device(int device) override {
-		if (!engine || flags & NO_DEVICE || device < -1 || device >= int(g_sound_output_devices.size()))
-			return false;
+		if (!engine || flags & NO_DEVICE || device < -1 || device >= int(g_sound_output_devices.size())) return false;
 		ma_device *old_dev = ma_engine_get_device(&*engine);
-		if (!old_dev || device > -1 && ma_device_id_equal(&old_dev->playback.id, &g_sound_output_devices[device].id))
-			return false;
+		if (!old_dev || device > -1 && ma_device_id_equal(&old_dev->playback.id, &g_sound_output_devices[device].id)) return false;
 		ma_engine_stop(&*engine);
 		ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
-		if (device > -1)
-			cfg.playback.pDeviceID = &g_sound_output_devices[device].id;
+		if (device > -1) cfg.playback.pDeviceID = &g_sound_output_devices[device].id;
 		cfg.playback.channels = old_dev->playback.channels;
+		cfg.playback.format = ma_format_f32;
 		cfg.sampleRate = old_dev->sampleRate;
 		cfg.noClip = MA_TRUE;
 		cfg.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE;
@@ -423,8 +437,10 @@ public:
 		cfg.pUserData = old_dev->pUserData;
 		ma_device_stop(old_dev);
 		ma_device_uninit(old_dev);
-		if ((g_soundsystem_last_error = ma_device_init(&g_sound_context, &cfg, old_dev)) != MA_SUCCESS)
-			return false;
+		if ((g_soundsystem_last_error = ma_device_init(&g_sound_context, &cfg, old_dev)) != MA_SUCCESS) {
+			cfg.playback.pDeviceID = nullptr;
+			g_soundsystem_last_error = ma_device_init(&g_sound_context, &cfg, old_dev); // Try to at least initialize the default device so as not to leave useless engine.
+		}
 		return (g_soundsystem_last_error = ma_engine_start(&*engine)) == MA_SUCCESS;
 	}
 	bool read(void *buffer, unsigned long long frame_count, unsigned long long *frames_read) override { return engine ? (g_soundsystem_last_error = ma_engine_read_pcm_frames(&*engine, buffer, frame_count, frames_read)) == MA_SUCCESS : false; }
@@ -2619,7 +2635,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("sound", "bool seek_in_milliseconds(const uint64 position)", asFUNCTION((virtual_call < sound, &sound::seek_in_milliseconds, bool, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "uint64 get_position() property", asFUNCTION((virtual_call < sound, &sound::get_position, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "uint64 get_position_in_frames() const property", asFUNCTION((virtual_call < sound, &sound::get_position_in_frames, unsigned long long >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "uint64 get_position_in_milliseconnds() const property", asFUNCTION((virtual_call < sound, &sound::get_position_in_milliseconds, unsigned long long >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "uint64 get_position_in_milliseconds() const property", asFUNCTION((virtual_call < sound, &sound::get_position_in_milliseconds, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "uint64 get_length() property", asFUNCTION((virtual_call < sound, &sound::get_length, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "uint64 get_length_in_frames( ) const property", asFUNCTION((virtual_call < sound, &sound::get_length_in_frames, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "uint64 get_length_in_ms() const property", asFUNCTION((virtual_call < sound, &sound::get_length_in_milliseconds, unsigned long long >)), asCALL_CDECL_OBJFIRST);

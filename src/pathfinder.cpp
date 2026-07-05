@@ -100,10 +100,8 @@ bool pathfinder::get_gc_flag() {
 	return gc_flag;
 }
 void pathfinder::set_callback_function(asIScriptFunction* func) {
-	if (callback)
-		callback->Release();
-	if (func)
-		callback = func;
+	if (callback) callback->Release();
+	callback = func;
 	callback_mode = CALLBACK_SIMPLE;
 }
 void pathfinder::set_callback_function_ex(asIScriptFunction* func) {
@@ -218,26 +216,23 @@ void pathfinder::reset() {
 	pf->Reset();
 }
 CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny* data) {
-	if (!VectorArrayType)
-		VectorArrayType = g_ScriptEngine->GetTypeInfoByDecl("array<vector>");
+	if (!VectorArrayType) VectorArrayType = g_ScriptEngine->GetTypeInfoByDecl("array<vector>");
 	CScriptArray* array = CScriptArray::Create(VectorArrayType);
-	if (solving)
-		return array;
+	if (solving) return array;
 	abort = false;
 	must_reset = false;
 	total_cost = 0;
-	if (!callback)
-		return array;
-	if (search_range > 0 && allow_diagonals && hypot(end_x - start_x, end_y - start_y, end_z - start_z) > search_range || search_range > 0 && !allow_diagonals && (abs(end_x - start_x) + abs(end_y - start_y) + abs(end_z - start_z)) > search_range)
-		return array;
-	if (automatic_reset || !cache)
-		reset();
+	if (!callback) return array;
+	if (search_range > 0 && allow_diagonals && hypot(end_x - start_x, end_y - start_y, end_z - start_z) > search_range || search_range > 0 && !allow_diagonals && (abs(end_x - start_x) + abs(end_y - start_y) + abs(end_z - start_z)) > search_range) return array;
+	if (automatic_reset || !cache) reset();
 	callback_data = data;
-	if (data)
-		data->AddRef();
+	if (data) data->AddRef();
 	// Only perform this fast-fail optimization if callback is "simple", otherwise it will just produce false positives.
-	if (callback_mode == CALLBACK_SIMPLE && (get_difficulty(start_x, start_y, start_z, start_x, start_y, start_z) > 9 || get_difficulty(end_x, end_y, end_z, end_x, end_y, end_z) > 9))
+	if (callback_mode == CALLBACK_SIMPLE && (get_difficulty(start_x, start_y, start_z, start_x, start_y, start_z) > 9 || get_difficulty(end_x, end_y, end_z, end_x, end_y, end_z) > 9)) {
+		if (data) data->Release();
+		callback_data = NULL;
 		return array;
+	}
 	void* start = encode_state(start_x, start_y, start_z, desperation_factor);
 	this->start_x = start_x;
 	this->start_y = start_y;
@@ -247,14 +242,12 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 	solving = true;
 	int result = pf->Solve(start, end, &path, &total_cost);
 	solving = false;
-	if (data)
-		data->Release();
+	if (data) data->Release();
 	callback_data = NULL;
 	if (abort || must_reset || result != micropather::MicroPather::SOLVED) {
 		abort = false;
 		total_cost = 0;
-		if (must_reset)
-			reset();
+		if (must_reset) reset();
 		return array;
 	}
 	array->Reserve(path.size() - 1);
@@ -348,7 +341,6 @@ void RegisterScriptPathfinder(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_RELEASEREFS, "void f(int&in)", asMETHOD(pathfinder, release_all_handles), asCALL_THISCALL);
 	engine->RegisterObjectProperty("pathfinder", "const bool solving", asOFFSET(pathfinder, solving));
 	engine->RegisterObjectProperty("pathfinder", "const float total_cost", asOFFSET(pathfinder, total_cost));
-	engine->RegisterObjectProperty("pathfinder", "int desperation_factor", asOFFSET(pathfinder, desperation_factor));
 	engine->RegisterObjectProperty("pathfinder", "bool allow_diagonals", asOFFSET(pathfinder, allow_diagonals));
 	engine->RegisterObjectProperty("pathfinder", "bool automatic_reset", asOFFSET(pathfinder, automatic_reset));
 	engine->RegisterObjectProperty("pathfinder", "int search_range", asOFFSET(pathfinder, search_range));
@@ -357,6 +349,8 @@ void RegisterScriptPathfinder(asIScriptEngine* engine) {
 	engine->RegisterFuncdef("int pathfinder_callback_legacy(int, int, int, int, string)");
 	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback@)", asMETHOD(pathfinder, set_callback_function), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_ex@)", asMETHOD(pathfinder, set_callback_function_ex), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "int get_desperation_factor() const property", asMETHOD(pathfinder, get_desperation_factor), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "void set_desperation_factor(int factor) property", asMETHOD(pathfinder, set_desperation_factor), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void cancel()", asMETHOD(pathfinder, cancel), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_legacy@)", asMETHOD(pathfinder, set_callback_function_legacy), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void reset()", asMETHOD(pathfinder, reset), asCALL_THISCALL);

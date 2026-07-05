@@ -89,21 +89,17 @@ std::string u64beToByteString(uint64_t num) {
 }
 
 uint32_t hotp(const std::string& key, uint64_t counter, uint32_t digitCount) {
+	if (digitCount == 0 || digitCount > 9) digitCount = 6;
 	std::string msg = u64beToByteString(counter);
 	Poco::HMACEngine<Poco::SHA1Engine> engine(key);
 	engine.update(msg);
 	auto hmac = engine.digest();
 	uint32_t digits10 = 1;
-	for (size_t i = 0; i < digitCount; ++i)
-		digits10 *= 10;
-	// fetch the offset (from the last nibble)
-	uint8_t offset = hmac[hmac.size() - 1] & 0x0F;
-	// fetch the four bytes from the offset
-	Poco::DigestEngine::Digest fourWord(hmac.begin() + offset, hmac.begin() + offset + 4);
-	// turn them into a 32-bit integer
-	uint32_t ret = (fourWord[0] << 24) | (fourWord[1] << 16) | (fourWord[2] << 8) | (fourWord[3] << 0);
-	// snip off the MSB (to alleviate signed/unsigned troubles) and calculate modulo digit count
-	return (ret & 0x7fffffff) % digits10;
+	for (size_t i = 0; i < digitCount; ++i) digits10 *= 10;
+	uint8_t offset = hmac[hmac.size() - 1] & 0x0F; // fetch the offset (from the last nibble)
+	Poco::DigestEngine::Digest fourWord(hmac.begin() + offset, hmac.begin() + offset + 4); // fetch the four bytes from the offset
+	uint32_t ret = (fourWord[0] << 24) | (fourWord[1] << 16) | (fourWord[2] << 8) | (fourWord[3] << 0); // turn them into a 32-bit integer
+	return (ret & 0x7fffffff) % digits10; // snip off the MSB (to alleviate signed/unsigned troubles) and calculate modulo digit count
 }
 
 unsigned int crc32(const std::string& data) {

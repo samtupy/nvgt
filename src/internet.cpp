@@ -159,7 +159,7 @@ CScriptArray* host_entry_get_addresses(const HostEntry& e) { return vector_to_sc
 // In NVGT we tend to overuse std::string, make sure sockets can handle this datatype. We should try to register versions of SendBytes and ReceiveBytes that works with a lower level datatype when possible especially because of the unnecessary memory usage incurred with std::string in this case.
 template <class T> int socket_send_bytes(T& sock, const string& data, int flags) { return sock.sendBytes(data.data(), data.size(), flags); }
 template <class T> string socket_receive_bytes(T& sock, int length, int flags) {
-	if (!length) return 0;
+	if (!length) return "";
 	string result(length, 0); // ooouuuch this initialization to null chars hurts and is a waste, find a way to fix it!
 	int recv_len = sock.receiveBytes(result.data(), length, flags);
 	result.resize(recv_len);
@@ -167,7 +167,7 @@ template <class T> string socket_receive_bytes(T& sock, int length, int flags) {
 }
 template <class T> string socket_receive_bytes_buf(T& sock, int flags, const Timespan& timeout) {
 	Buffer<char> buf(0);
-	sock.receiveBytes(buf, flags);
+	sock.receiveBytes(buf, flags, timeout);
 	return string(buf.begin(), buf.end());
 }
 int websocket_send_frame(WebSocket& sock, const string& data, int flags) { return sock.sendFrame(data.data(), data.size(), flags); }
@@ -646,42 +646,40 @@ public:
 			try {
 				string path = _url.getPathAndQuery();
 				if (path.empty()) path = "/";
-				lock();
 				HTTPRequest req(_request);
-				req.setHost(_url.getHost());
-				req.setURI(path);
-				unlock();
-				if (req.getContentType() == HTTPMessage::UNKNOWN_CONTENT_TYPE) req.setContentType("application/x-www-form-urlencoded");
-				lock();
 				HTTPResponse tmp_response = _response;
-				if (!_session) _session = _url.getScheme() == "http"? new HTTPClientSession(_url.getHost(), _url.getPort()) : new HTTPSClientSession(_url.getHost(), _url.getPort());
-				if (authorize) _creds.authenticate(req, tmp_response);
-				_session->setKeepAlive(_keepalive);
-				_session->setTimeout(_connect_timeout * 1000, _send_timeout * 1000, _receive_timeout * 1000);
-				_session->setKeepAliveTimeout(_keepalive_timeout * 1000);
+				{
+					ScopedLock lock(*this);
+					req.setHost(_url.getHost());
+					req.setURI(path);
+					if (req.getContentType() == HTTPMessage::UNKNOWN_CONTENT_TYPE) req.setContentType("application/x-www-form-urlencoded");
+					if (!_session) _session = _url.getScheme() == "http"? new HTTPClientSession(_url.getHost(), _url.getPort()) : new HTTPSClientSession(_url.getHost(), _url.getPort());
+					if (authorize) _creds.authenticate(req, tmp_response);
+					_session->setKeepAlive(_keepalive);
+					_session->setTimeout(_connect_timeout * 1000, _send_timeout * 1000, _receive_timeout * 1000);
+					_session->setKeepAliveTimeout(_keepalive_timeout * 1000);
+				}
 				std::ostream& ostr = _session->sendRequest(req);
-				unlock();;
 				if (tryWait(0)) break;
 				ostr << _request_body;
 				std::istream& istr = _session->receiveResponse(tmp_response);
-				lock();
-				_response = tmp_response;
-				bool moved = (_response.getStatus() == HTTPResponse::HTTP_MOVED_PERMANENTLY || _response.getStatus() == HTTPResponse::HTTP_FOUND || _response.getStatus() == HTTPResponse::HTTP_SEE_OTHER || _response.getStatus() == HTTPResponse::HTTP_TEMPORARY_REDIRECT);
-				if (moved) {
-					_url.resolve(_response.get("Location"));
-					authorize = false;
-					delete _session;
-					_session = nullptr;
-					unlock();
-					continue;
-				} else if (_response.getStatus() == HTTPResponse::HTTP_UNAUTHORIZED && !authorize && !_creds.empty()) {
-					unlock();
-					authorize = true;
-					NullOutputStream null;
-					StreamCopier::copyStream(istr, null);
-					continue;
-				}
-				unlock();
+				{
+					ScopedLock lock(*this);
+					_response = tmp_response;
+					bool moved = (_response.getStatus() == HTTPResponse::HTTP_MOVED_PERMANENTLY || _response.getStatus() == HTTPResponse::HTTP_FOUND || _response.getStatus() == HTTPResponse::HTTP_SEE_OTHER || _response.getStatus() == HTTPResponse::HTTP_TEMPORARY_REDIRECT);
+					if (moved) {
+						_url.resolve(_response.get("Location"));
+						authorize = false;
+						delete _session;
+						_session = nullptr;
+						continue;
+					} else if (_response.getStatus() == HTTPResponse::HTTP_UNAUTHORIZED && !authorize && !_creds.empty()) {
+						authorize = true;
+						NullOutputStream null;
+						StreamCopier::copyStream(istr, null);
+						continue;
+					}
+				};
 				while (istr.good() && !tryWait(0)) {
 					istr.read(download_buffer.data(), download_buffer.size());
 					streamsize count = istr.gcount();
@@ -693,7 +691,6 @@ public:
 			} catch(Exception& e) {
 				if (_session) delete _session;
 				_session = nullptr;
-				unlock();
 				return;
 			}
 		}

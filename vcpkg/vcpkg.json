@@ -7,6 +7,7 @@
     "miniaudio",
     "miniupnpc",
     "libobfuscate",
+    "zlib",
     "libogg",
     "libopusenc",
     "opus",
@@ -123,5 +124,5 @@
       ]
     }
   ],
-  "builtin-baseline": "4b77da7fed37817f124936239197833469f1b9a8"
+  "builtin-baseline": "a0b1c8d3a477c1cb4813d8e127a56961707ca42b"
 }

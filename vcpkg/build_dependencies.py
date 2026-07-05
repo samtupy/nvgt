@@ -3,7 +3,7 @@
 # NVGT - NonVisual Gaming Toolkit (https://nvgt.dev)
 # Copyright (c) 2022-2025 Sam Tupy
 # license: zlib
-
+import os
 import hashlib
 from pathlib import Path
 import shutil
@@ -26,7 +26,11 @@ def build(triplet = "", do_archive = False, out_dir = ""):
 		# Try to determine, logic probably could be improved
 		if sys.platform == "win32": triplet = "x64-windows"
 		elif sys.platform == "darwin": triplet = "arm64-osx"
-		elif sys.platform == "linux": triplet = "x64-linux"
+		elif sys.platform == "linux":
+                    if(os.uname().machine.__contains__("x86")):
+                        triplet = "x64-linux"
+                    elif(os.uname().machine.__contains__("aarch64")):
+                        triplet = "arm64-linux"
 		else: sys.exit("unable to determine platform, please pass a triplet explicitly.")
 	bootstrap_vcpkg()
 	try: subprocess.check_output([vcpkg_path, "install", "--triplet", triplet, "--x-manifest-root", vcpkg_path.parents[1]])
@@ -111,13 +115,14 @@ def windows_lib_rename(out_dir):
 		for r in renames:
 			if (out_dir / lib / (r[0] + ".lib")).exists(): (out_dir / lib / (r[0] + ".lib")).replace(out_dir / lib / (r[1] + ".lib"))
 def remove_duplicates(out_dir):
-	"""A couple libraries on Linux and MacOS might have created duplicate versions of themselves because of symlinks, lets get rid of them."""
+	"""A couple libraries on Linux and MacOS might have created duplicate versions of themselves because of symlinks, lets get rid of them. We'll also perform install_name_tool fixes on MacOS."""
 	for lib in ["libarchive", "libgit2"]:
 		for libdir in ["debug/lib", "lib"]:
 			versions = list((out_dir / libdir).glob(lib + "*"))
 			if len(versions) < 2: continue
 			versions.sort(key = lambda v: len(v.name))
 			for v in versions[1:]: v.unlink()
+			if sys.platform == "darwin": subprocess.check_output(["install_name_tool", "-id", f"@rpath/{versions[0].name}", str(versions[0])])
 
 if __name__ == "__main__":
 	triplets = []

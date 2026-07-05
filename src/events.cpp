@@ -20,7 +20,7 @@
 
 using namespace std::string_literals;
 
-engine_event_listener::engine_event_listener(asIScriptObject* obj, const engine_event* parent) : obj(new CScriptWeakRef(obj, obj->GetObjectType()->GetModule()->GetTypeInfoByDecl(Poco::format("weakref<%s>", std::string(obj->GetObjectType()->GetName())).c_str()))), func(nullptr), is_object(true) {
+engine_event_listener::engine_event_listener(asIScriptObject* obj, const engine_event* parent) : obj(std::make_shared<CScriptWeakRef>(obj, obj->GetObjectType()->GetModule()->GetTypeInfoByDecl(Poco::format("weakref<%s::%s>", obj->GetObjectType()->GetNamespace()? std::string(obj->GetObjectType()->GetNamespace()) : "", std::string(obj->GetObjectType()->GetName())).c_str()))), func(nullptr), is_object(true) {
 	asITypeInfo* ot = obj->GetObjectType();
 	if (ot) func = ot->GetMethodByDecl(("void "s + parent->callback_declaration()).c_str());
 	if (!func && ot) func = ot->GetMethodByDecl(("bool "s + parent->callback_declaration()).c_str());
@@ -28,7 +28,7 @@ engine_event_listener::engine_event_listener(asIScriptObject* obj, const engine_
 }
 engine_event_listener::engine_event_listener(asIScriptFunction* func) : obj(nullptr), func(func), is_object(false) {
 	if (func->GetFuncType() == asFUNC_DELEGATE) {
-		this->obj = new CScriptWeakRef(func->GetDelegateObject(), func->GetDelegateObjectType()->GetModule()->GetTypeInfoByDecl(Poco::format("weakref<%s>", std::string(func->GetDelegateObjectType()->GetName())).c_str()));
+		this->obj = std::make_shared<CScriptWeakRef>(func->GetDelegateObject(), func->GetDelegateObjectType()->GetModule()->GetTypeInfoByDecl(Poco::format("weakref<%s::%s>", func->GetDelegateObjectType()->GetNamespace()? std::string(func->GetDelegateObjectType()->GetNamespace()) : "", std::string(func->GetDelegateObjectType()->GetName())).c_str()));
 		this->func = func->GetDelegateFunction();
 		func->Release();
 	}
@@ -43,7 +43,10 @@ bool engine_event_listener::good() const {
 	return true;
 }
 bool engine_event_listener::operator==(const engine_event_listener& other) const {
-	return obj == other.obj && func == other.func;
+	if (func != other.func) return false;
+	if (!obj && !other.obj) return true;
+	if (!obj || !other.obj) return false;
+	return *obj == *other.obj;
 }
 
 std::unordered_set<std::string> g_engine_event_registered_types;

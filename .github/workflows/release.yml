@@ -13,12 +13,44 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  generate_config:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-id: ${{ steps.upload_config.outputs.artifact-id }}
+    steps:
+    - uses: actions/checkout@v5
+    - name: generate config
+      run: python3 build/nvgt_config_gen.py
+    - name: encrypt config
+      shell: bash
+      run: |
+        PASS="${{ secrets.NVGT_CONFIG_TRANSFER_KEY }}"
+        [ -z "$PASS" ] && PASS="nvgt_fork_build_passphrase"
+        openssl enc -aes-256-cbc -pbkdf2 -pass pass:"$PASS" -in user/nvgt_config.h -out nvgt_config.h.enc
+    - id: upload_config
+      uses: actions/upload-artifact@v4
+      with:
+        name: nvgt_config_enc
+        path: nvgt_config.h.enc
+        retention-days: 1
+
   mac_build:
     runs-on: macos-14
+    needs: generate_config
     steps:
     - uses: actions/checkout@v5
       with:
         submodules: true
+    - uses: actions/download-artifact@v4
+      with:
+        name: nvgt_config_enc
+    - name: decrypt config
+      shell: bash
+      run: |
+        mkdir -p user
+        PASS="${{ secrets.NVGT_CONFIG_TRANSFER_KEY }}"
+        [ -z "$PASS" ] && PASS="nvgt_fork_build_passphrase"
+        openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:"$PASS" -in nvgt_config.h.enc -out user/nvgt_config.h
     - id: cache_macos
       uses: actions/cache@v4
       with:
@@ -57,10 +89,21 @@ jobs:
 
   linux_build:
     runs-on: ubuntu-22.04
+    needs: generate_config
     steps:
     - uses: actions/checkout@v5
       with:
         submodules: true
+    - uses: actions/download-artifact@v4
+      with:
+        name: nvgt_config_enc
+    - name: decrypt config
+      shell: bash
+      run: |
+        mkdir -p user
+        PASS="${{ secrets.NVGT_CONFIG_TRANSFER_KEY }}"
+        [ -z "$PASS" ] && PASS="nvgt_fork_build_passphrase"
+        openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:"$PASS" -in nvgt_config.h.enc -out user/nvgt_config.h
     - uses: actions/cache@v4
       with:
         path: lindev
@@ -90,10 +133,21 @@ jobs:
 
   android_build:
     runs-on: macos-14
+    needs: generate_config
     steps:
     - uses: actions/checkout@v5
       with:
         submodules: true
+    - uses: actions/download-artifact@v4
+      with:
+        name: nvgt_config_enc
+    - name: decrypt config
+      shell: bash
+      run: |
+        mkdir -p user
+        PASS="${{ secrets.NVGT_CONFIG_TRANSFER_KEY }}"
+        [ -z "$PASS" ] && PASS="nvgt_fork_build_passphrase"
+        openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:"$PASS" -in nvgt_config.h.enc -out user/nvgt_config.h
     - uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
@@ -150,10 +204,21 @@ jobs:
 
   windows_build:
     runs-on: windows-latest
+    needs: generate_config
     steps:
     - uses: actions/checkout@v5
       with:
         submodules: true
+    - uses: actions/download-artifact@v4
+      with:
+        name: nvgt_config_enc
+    - name: decrypt config
+      shell: bash
+      run: |
+        mkdir -p user
+        PASS="${{ secrets.NVGT_CONFIG_TRANSFER_KEY }}"
+        [ -z "$PASS" ] && PASS="nvgt_fork_build_passphrase"
+        openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:"$PASS" -in nvgt_config.h.enc -out user/nvgt_config.h
     - uses: jwlawson/actions-setup-cmake@v2
       with:
         cmake-version: '4.0.1'
@@ -179,6 +244,18 @@ jobs:
       with:
         name: windows_release
         path: 'release'
+
+  cleanup_config:
+    runs-on: ubuntu-latest
+    needs: [generate_config, mac_build, linux_build, android_build, windows_build]
+    if: always() && needs.generate_config.outputs.artifact-id != ''
+    permissions:
+      actions: write
+    steps:
+    - name: delete config artifact
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: gh api --method DELETE /repos/${{ github.repository }}/actions/artifacts/${{ needs.generate_config.outputs.artifact-id }}
 
   windows_package:
     runs-on: windows-2022

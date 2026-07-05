@@ -254,6 +254,7 @@ class menu {
 // learn_game_sounds: takes a dictionary of sound descriptions mapped to sound filenames or lists of sound filenames and displays a menu which allows users to press enter on sound descriptions to hear associated sounds.
 void learn_game_sounds_menu(const name_value_collection&in sfx, const string&in audio_prefix = "", menu@ m = null, string go_back = "Go back") {
 	sound audio;
+	regexp random_select("""(.*)\{(\d*)\.\.\.(\d*)\}(.*)""");
 	if (@m == null) @m = menu();
 	if (m.intro_text.empty()) m.intro_text = "Select a sound with the up and down arrow keys and press enter to preview it.";
 	string select_sound = m.select_sound;
@@ -280,6 +281,8 @@ void learn_game_sounds_menu(const name_value_collection&in sfx, const string&in 
 			string[]@ options = filename.split(",");
 			filename = options.random();
 		}
+		string[]@ randoms = random_select.split(filename);
+		while (randoms.length() == 5) @randoms = random_select.split((filename = randoms[1] + random(parse_float(randoms[2]), parse_float(randoms[3])) + randoms[4]));
 		bool loop = filename.starts_with("~");
 		if (loop) filename.erase(0, 1);
 		if (!filename.empty()) {

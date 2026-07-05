@@ -78,12 +78,12 @@ public:
 		return ctx->GetReturnFloat();
 	}
 
-		int64 next64() override {
+	int64 next64() override {
 		if (!next64Func || !ctx) return 0;
 		ctx->Prepare(next64Func);
 		ctx->SetObject(scriptObj);
 		ctx->Execute();
-		return ctx->GetReturnDWord();
+		return ctx->GetReturnQWord();
 	}
 
 	int32 range(int32 min, int32 max) override {
@@ -96,14 +96,14 @@ public:
 		return ctx->GetReturnDWord();
 	}
 
-		int64 range64(int64 min, int64 max) override {
+	int64 range64(int64 min, int64 max) override {
 		if (!range64Func || !ctx) return min;
 		ctx->Prepare(range64Func);
 		ctx->SetObject(scriptObj);
-		ctx->SetArgDWord(0, min);
-		ctx->SetArgDWord(1, max);
+		ctx->SetArgQWord(0, min);
+		ctx->SetArgQWord(1, max);
 		ctx->Execute();
-		return ctx->GetReturnDWord();
+		return ctx->GetReturnQWord();
 	}
 
 	void seed(uint32 s) override {
@@ -122,14 +122,8 @@ public:
 		return false;  // Script objects handle their own state
 	}
 
-	void add_ref() override {
-		++ref_count;
-	}
-
-	void release() override {
-		if (--ref_count == 0)
-			delete this;
-	}
+	void add_ref() override { asAtomicInc(ref_count); }
+	void release() override { if (asAtomicDec(ref_count) < 1) delete this; }
 };
 
 // Global default random generator
@@ -260,15 +254,8 @@ bool random_pcg::set_state(const std::string& state) {
 	memcpy(&gen.state[0], &r[0], sizeof(gen.state));
 	return true;
 }
-
-void random_pcg::add_ref() {
-	++ref_count;
-}
-
-void random_pcg::release() {
-	if (--ref_count == 0)
-		delete this;
-}
+void random_pcg::add_ref() { asAtomicInc(ref_count); }
+void random_pcg::release() { if (asAtomicDec(ref_count) < 1) delete this; }
 
 // WELL implementation
 random_well::random_well() : ref_count(1) {
@@ -320,14 +307,8 @@ bool random_well::set_state(const std::string& state) {
 	return true;
 }
 
-void random_well::add_ref() {
-	++ref_count;
-}
-
-void random_well::release() {
-	if (--ref_count == 0)
-		delete this;
-}
+void random_well::add_ref() { asAtomicInc(ref_count); }
+void random_well::release() { if (asAtomicDec(ref_count) < 1) delete this; }
 
 // Gamerand implementation
 random_gamerand::random_gamerand() : ref_count(1) {
@@ -379,14 +360,8 @@ bool random_gamerand::set_state(const std::string& state) {
 	return true;
 }
 
-void random_gamerand::add_ref() {
-	++ref_count;
-}
-
-void random_gamerand::release() {
-	if (--ref_count == 0)
-		delete this;
-}
+void random_gamerand::add_ref() { asAtomicInc(ref_count); }
+void random_gamerand::release() { if (asAtomicDec(ref_count) < 1) delete this; }
 
 // Xorshift implementation
 random_xorshift::random_xorshift() : ref_count(1) {
@@ -454,50 +429,18 @@ bool random_xorshift::set_state(const std::string& state) {
 	return true;
 }
 
-void random_xorshift::add_ref() {
-	++ref_count;
-}
+void random_xorshift::add_ref() { asAtomicInc(ref_count); }
+void random_xorshift::release() { if (asAtomicDec(ref_count) < 1) delete this; }
 
-void random_xorshift::release() {
-	if (--ref_count == 0)
-		delete this;
-}
-
-random_pcg* random_pcg_factory() {
-	return new random_pcg();
-}
-
-random_pcg* random_pcg_factory_seed(uint32 seed) {
-	return new random_pcg(seed);
-}
-
-random_well* random_well_factory() {
-	return new random_well();
-}
-
-random_well* random_well_factory_seed(uint32 seed) {
-	return new random_well(seed);
-}
-
-random_gamerand* random_gamerand_factory() {
-	return new random_gamerand();
-}
-
-random_gamerand* random_gamerand_factory_seed(uint32 seed) {
-	return new random_gamerand(seed);
-}
-
-random_xorshift* random_xorshift_factory() {
-	return new random_xorshift();
-}
-
-random_xorshift* random_xorshift_factory_seed_uint(uint32 seed) {
-	return new random_xorshift(static_cast<uint64>(seed));
-}
-
-random_xorshift* random_xorshift_factory_seed(uint64 seed) {
-	return new random_xorshift(seed);
-}
+random_pcg* random_pcg_factory() { return new random_pcg(); }
+random_pcg* random_pcg_factory_seed(uint32 seed) { return new random_pcg(seed); }
+random_well* random_well_factory() { return new random_well(); }
+random_well* random_well_factory_seed(uint32 seed) { return new random_well(seed); }
+random_gamerand* random_gamerand_factory() { return new random_gamerand(); }
+random_gamerand* random_gamerand_factory_seed(uint32 seed) { return new random_gamerand(seed); }
+random_xorshift* random_xorshift_factory() { return new random_xorshift(); }
+random_xorshift* random_xorshift_factory_seed_uint(uint32 seed) { return new random_xorshift(static_cast<uint64>(seed)); }
+random_xorshift* random_xorshift_factory_seed(uint64 seed) { return new random_xorshift(seed); }
 
 void* random_array_choice(CScriptArray* array, random_interface* rng) {
 	if (array->GetSize() == 0) {

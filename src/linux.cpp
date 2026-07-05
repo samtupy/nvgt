@@ -14,6 +14,7 @@
 #include "linux.h"
 #include "tts.h"
 #include <memory>
+#include <time.h>
 #include <Poco/SharedLibrary.h>
 #include <stdexcept>
 using namespace std;
@@ -80,7 +81,7 @@ bool speechd_engine::speak(const std::string &text, bool interrupt, bool blockin
 		spd_stop((SPDConnection*)connection);
 		spd_cancel((SPDConnection*)connection);
 	}
-	return spd_say((SPDConnection*)connection, interrupt ? SPD_IMPORTANT : SPD_TEXT, text.c_str()) >= 0;
+	return spd_say((SPDConnection*)connection, interrupt ? SPD_IMPORTANT : SPD_MESSAGE, text.c_str()) >= 0;
 }
 
 bool speechd_engine::is_speaking() { return false; }
@@ -138,6 +139,12 @@ bool screen_reader_braille(const std::string& text) { return false; }
 bool screen_reader_silence() {
 	if (!screen_reader_load()) return false;
 	return g_screen_reader_voice->stop();
+}
+
+unsigned long long system_running_milliseconds() {
+	struct timespec ts;
+	if (clock_gettime(CLOCK_BOOTTIME, &ts) != 0) return 0;
+	return (unsigned long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
 #endif

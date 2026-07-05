@@ -64,6 +64,7 @@ static PFN_LdrUnregisterDllNotification pfn_ldr_unregister = nullptr;
 #endif
 std::atomic_flag memory_scan_detected;
 std::atomic_flag speed_hack_detected;
+std::atomic_flag is_on_wine;
 
 #ifdef _WIN32
 #if defined(__x86_64__) || defined(_M_X64) || defined(__amd64__)
@@ -241,6 +242,7 @@ void anticheat_check() {
 		if (VirtualFree(mem_addr, 0, MEM_RELEASE) == 0) FatalAppExit(0, L"Failed to release an internal memory block"); // Should we do this, or set a flag?
 		mem_addr = VirtualAlloc(nullptr, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	}
+	if (is_on_wine.test(std::memory_order_relaxed)) return;
 	std::array<void*, 4> funcs {{&QueryPerformanceCounter, &timeGetTime, &GetTickCount, &GetTickCount64}};
 	for (void* func: funcs)
 		if (is_function_hooked(func))
@@ -299,6 +301,8 @@ void register_anticheat(asIScriptEngine* engine) {
 	assert(pfn_ldr_register != NULL);
 	assert(pfn_ldr_unregister != NULL);
 	if (pfn_ldr_register) pfn_ldr_register(0, &handle_dll_loader_notification, nullptr, &ldr_dll_cookie);
+	if (GetProcAddress(ntdll_handle, "wine_get_version") != nullptr)
+		is_on_wine.test_and_set();
 #endif
 	engine->RegisterGlobalProperty("const atomic_flag speed_hack_detected", (void*)&speed_hack_detected);
 	engine->RegisterGlobalProperty("const atomic_flag memory_scan_detected", (void*)&memory_scan_detected);

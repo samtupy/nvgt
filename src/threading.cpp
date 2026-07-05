@@ -186,21 +186,19 @@ public:
 			else value = malloc(ctx->GetEngine()->GetSizeOfPrimitiveType(subtypeid));
 			if ((subtypeid & ~asTYPEID_MASK_SEQNBR) && !(subtypeid & asTYPEID_OBJHANDLE)) *(void**)value = ctx->GetEngine()->CreateScriptObjectCopy(ctx->GetReturnObject(), subtype->GetSubType());
 			else if (subtypeid & asTYPEID_OBJHANDLE) {
-				void* tmp = value;
 				*(void**)value = ctx->GetReturnObject();
 				ctx->GetEngine()->AddRefScriptObject(*(void**)value, subtype->GetSubType());
-				if (tmp) ctx->GetEngine()->ReleaseScriptObject(*(void**)tmp, subtype->GetSubType());
 			} else if (subtypeid == asTYPEID_BOOL || subtypeid == asTYPEID_INT8 || subtypeid == asTYPEID_UINT8) *(char*)value = ctx->GetReturnByte();
 			else if (subtypeid == asTYPEID_INT16 || subtypeid == asTYPEID_UINT16) *(short*)value = ctx->GetReturnWord();
 			else if (subtypeid == asTYPEID_INT32 || subtypeid == asTYPEID_UINT32 || subtypeid > asTYPEID_DOUBLE) *(int*)value = ctx->GetReturnDWord();
 			else if (subtypeid == asTYPEID_FLOAT) *(float*)value = ctx->GetReturnFloat();
-			else if (subtypeid == asTYPEID_INT64 || subtypeid == asTYPEID_UINT64) *(double*)value = ctx->GetReturnQWord();
+			else if (subtypeid == asTYPEID_INT64 || subtypeid == asTYPEID_UINT64) *(asQWORD*)value = ctx->GetReturnQWord();
 			else if (subtypeid == asTYPEID_DOUBLE) *(double*)value = ctx->GetReturnDouble();
 		}
 		ctx->GetEngine()->ReturnContext(ctx);
 		release_value_args();
-		release();
 		progress.set();
+		release();
 	}
 	void release_value_args() {
 		for (const auto& obj : value_args) g_ScriptEngine->ReleaseScriptObject(obj.first, obj.second);
@@ -275,17 +273,17 @@ template<typename atomic_type, typename divisible_type> void register_atomic_typ
 	engine->RegisterObjectType(type_name.c_str(), sizeof(atomic_type), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<atomic_type>());
 	engine->RegisterObjectBehaviour(type_name.c_str(), asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(atomics_construct<atomic_type>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour(type_name.c_str(), asBEHAVE_DESTRUCT, "void f()", asFUNCTION(atomics_destruct<atomic_type>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type_name.c_str(), "bool is_lock_free()", asMETHODPR(atomic_type, is_lock_free, () const noexcept, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), "bool is_lock_free() const", asMETHODPR(atomic_type, is_lock_free, () const noexcept, bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("void store(%s val, memory_order order = MEMORY_ORDER_SEQ_CST)", regular_type_name).c_str(), asMETHODPR(atomic_type, store, (divisible_type, std::memory_order) noexcept, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opAssign(%s val)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, operator=, (divisible_type) noexcept, divisible_type), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s load(memory_order order = MEMORY_ORDER_SEQ_CST)", regular_type_name).c_str(), asMETHODPR(atomic_type, load, (std::memory_order) const noexcept, divisible_type), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opImplConv()", regular_type_name).c_str(), asMETHODPR(atomic_type, operator divisible_type, () const noexcept, divisible_type), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s load(memory_order order = MEMORY_ORDER_SEQ_CST) const", regular_type_name).c_str(), asMETHODPR(atomic_type, load, (std::memory_order) const noexcept, divisible_type), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s opImplConv() const", regular_type_name).c_str(), asMETHODPR(atomic_type, operator divisible_type, () const noexcept, divisible_type), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("%s exchange(%s desired, memory_order order = MEMORY_ORDER_SEQ_CST)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, exchange, (divisible_type, std::memory_order) noexcept, divisible_type), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool compare_exchange_weak(%s& expected, %s desired, memory_order success, memory_order failure)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, compare_exchange_weak, (divisible_type&, divisible_type, std::memory_order, std::memory_order) noexcept, bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool compare_exchange_weak(%s& expected, %s desired, memory_order order = MEMORY_ORDER_SEQ_CST)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, compare_exchange_weak, (divisible_type&, divisible_type, std::memory_order) noexcept, bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool compare_exchange_strong(%s& expected, %s desired, memory_order success, memory_order failure)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, compare_exchange_strong, (divisible_type&, divisible_type, std::memory_order, std::memory_order) noexcept, bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool compare_exchange_strong(%s& expected, %s desired, memory_order order = MEMORY_ORDER_SEQ_CST)", regular_type_name, regular_type_name).c_str(), asMETHODPR(atomic_type, compare_exchange_strong, (divisible_type&, divisible_type, std::memory_order) noexcept, bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("void wait(%s old, memory_order order = MEMORY_ORDER_SEQ_CST)", regular_type_name).c_str(), asMETHODPR(atomic_type, wait, (divisible_type, std::memory_order) const noexcept, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type_name.c_str(), Poco::format("void wait(%s old, memory_order order = MEMORY_ORDER_SEQ_CST) const", regular_type_name).c_str(), asMETHODPR(atomic_type, wait, (divisible_type, std::memory_order) const noexcept, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type_name.c_str(), "void notify_one()", asMETHODPR(atomic_type, notify_one, () noexcept, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type_name.c_str(), "void notify_all()", asMETHODPR(atomic_type, notify_all, () noexcept, void), asCALL_THISCALL);
 	// Begin type-specific atomics
@@ -328,8 +326,8 @@ void RegisterAtomics(asIScriptEngine* engine) {
 	engine->RegisterObjectType("atomic_flag", sizeof(std::atomic_flag), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<std::atomic_flag>());
 	engine->RegisterObjectBehaviour("atomic_flag", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(atomics_construct<std::atomic_flag>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("atomic_flag", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(atomics_destruct<std::atomic_flag>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("atomic_flag", "bool test(memory_order order = MEMORY_ORDER_SEQ_CST) const", asMETHODPR(std::atomic_flag, test, (std::memory_order) const noexcept, bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("atomic_flag", "void clear(memory_order order = MEMORY_ORDER_SEQ_CST)", asMETHODPR(std::atomic_flag, clear, (std::memory_order), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("atomic_flag", "bool test(memory_order order = MEMORY_ORDER_SEQ_CST) const", asMETHODPR(std::atomic_flag, test, (std::memory_order) const noexcept, bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("atomic_flag", "bool test_and_set(memory_order order = MEMORY_ORDER_SEQ_CST)", asMETHODPR(std::atomic_flag, test_and_set, (std::memory_order) noexcept, bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("atomic_flag", "void wait(bool old, memory_order order = MEMORY_ORDER_SEQ_CST) const", asMETHODPR(std::atomic_flag, wait, (bool, std::memory_order) const noexcept, void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("atomic_flag", "void notify_one()", asMETHOD(std::atomic_flag, notify_one), asCALL_THISCALL);
@@ -387,7 +385,7 @@ template <class T> void RegisterMutexType(asIScriptEngine* engine, const std::st
 	engine->RegisterObjectMethod(type.c_str(), _O("void lock()"), asMETHODPR(T, lock, (), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), _O("bool try_lock()"), asMETHODPR(T, tryLock, (), bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), _O("void unlock()"), asMETHOD(T, unlock), asCALL_THISCALL);
-	engine->RegisterObjectType(format("%s_lock", type).c_str(), sizeof(ScopedLock<T>), asOBJ_VALUE | asGetTypeTraits<ScopedLock<T>>());
+	engine->RegisterObjectType(format("%s_lock", type).c_str(), sizeof(ScopedLockWithUnlock<T>), asOBJ_VALUE | asGetTypeTraits<ScopedLock<T>>());
 	engine->RegisterObjectBehaviour(format("%s_lock", type).c_str(), asBEHAVE_CONSTRUCT, format("void f(%s@)", type).c_str(), asFUNCTION(scoped_lock_construct<T>), asCALL_CDECL_OBJFIRST);
 	if constexpr(!std::is_same<T, NamedMutex>::value) engine->RegisterObjectBehaviour(format("%s_lock", type).c_str(), asBEHAVE_CONSTRUCT, format("void f(%s@, uint)", type).c_str(), asFUNCTION(scoped_lock_construct_ms<T>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour(format("%s_lock", type).c_str(), asBEHAVE_DESTRUCT, "void f()", asFUNCTION(scoped_lock_destruct<T>), asCALL_CDECL_OBJFIRST);
@@ -423,7 +421,7 @@ void RegisterThreading(asIScriptEngine* engine) {
 	RegisterMutexType<Mutex>(engine, "mutex");
 	RegisterMutexType<FastMutex>(engine, "fast_mutex");
 	RegisterMutexType<NamedMutex>(engine, "named_mutex");
-	RegisterMutexType<NamedMutex>(engine, "spinlock_mutex");
+	RegisterMutexType<SpinlockMutex>(engine, "spinlock_mutex");
 	angelscript_refcounted_register<RWLock>(engine, "rw_lock");
 	engine->RegisterObjectBehaviour(_O("rw_lock"), asBEHAVE_FACTORY, _O("rw_lock@ l()"), asFUNCTION(angelscript_refcounted_factory<RWLock>), asCALL_CDECL);
 	engine->RegisterObjectMethod(_O("rw_lock"), _O("void read_lock()"), asMETHOD(RWLock, readLock), asCALL_THISCALL);

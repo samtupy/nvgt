@@ -11,22 +11,25 @@
 */
 
 #pragma once
+#include <string>
+#include <vector>
 
 // Game asset management.
 enum game_asset_flags { GAME_ASSET_DOCUMENT = 1 << 0, GAME_ASSET_BINARY = 1 << 1, GAME_ASSET_UNCOMPRESSED = 1 << 2 };
 void add_game_asset_to_bundle(const std::string& filesystem_path, const std::string& bundled_path, int flags = 0);
 void add_game_asset_to_bundle(const std::string& path, int flags = 0);
 
-// The following class has a specific use case in which prepare, write_payload, and finalize are expected to be called once and in order. Ignoring these conditions will result in negatively undefined behavior. It's functionality is split into 3 steps mostly in order to profile and/or error check at certain points or in other ways order execution from outside the class E. don't generate a payload in the first place unless prepare succeeds. This also handles the postbuild interface and any other postbuild steps, facilitated in the postbuild_interface() and postbuild methods. The class will throw exceptions on error and if this happens, the failed object instance should be discarded. This class is also expected to be used from a standalone thread, with the get_status() function being called in a loop on the main thread for updates. Usage is in CompileExecutableTask (angelscript.cpp).
+// Thread-safe message box for use in the bundling system. Dispatches to the main thread via SDL_RunOnMainThread and blocks until the result is available, allowing it to be called safely from worker threads such as during compilation. For multi-button (question) dialogs, returns -1 without showing anything when either application.quiet is set or is_console_available() returns true, since the user cannot interactively answer such dialogs in those modes. For single-button alerts in console mode, prints title/text to stdout instead of showing a dialog.
+int nvgt_compile_message_box(const std::string& title, const std::string& text, const std::vector<std::string>& buttons);
+
+// The following class has a specific use case in which prepare, write_payload, and finalize are expected to be called once and in order. Ignoring these conditions will result in negatively undefined behavior. finalize() handles all post-build steps including platform packaging, the success dialog, and any final install steps. The class will throw exceptions on error and if this happens, the failed object instance should be discarded. This class is also expected to be used from a standalone thread, with the get_status() function being called in a loop on the main thread for updates. Usage is in CompileExecutableTask (angelscript.cpp).
 class nvgt_compilation_output {
 public:
 	virtual ~nvgt_compilation_output() {}
 	virtual void prepare() = 0; // Copies the configured stub and opens the copy for writing the payload, allowing for any per-platform handling during the process such as extracting nvgt_android.bin (a zip file) then opening the contained libgame.so, just directly opening nvgt_windows.bin (an executable) for writing, or anything else in between so long as write_payload can then be safely called.
 	virtual void write_payload(const unsigned char* payload, unsigned int size) = 0; // This also takes care of writing embedded packs.
-	virtual void finalize() = 0; // Does anything necessary per platform to take the now prepared output executable or binary and bundle it into a package that is as ready to be run by an end player to the best extent NVGT can manage, usually driven by several configuration options. This might do anything from copying shared libraries to preparing an entire app bundle depending on platform and configuration.
-	virtual void postbuild_interface() = 0; // Displays the compilation success dialog, and optionally asks any extra per-platform questions. This is the only method in this class that UI display functions should be called from, as it executes on the main thread.
-	virtual void postbuild() = 0; // Only after the build is successful and that fact is reported to the user, this function is run so that the bundling system can perform any last steps before the bundle object is destroyed. This is a no-op on most platforms, however if nvgt can for example install an app after building it, such a thing should be done here. You can also perform any cleanup that you feel would be unsafe to do in the destructor.
-	virtual void set_status(const std::string& mesage) = 0; // Sets a status message that gets picked up by get_status below in a thread-safe manner, used for the compilation status display. Will not return until get_status() picks up the message.
+	virtual void finalize() = 0; // Does anything necessary per platform to take the now prepared output executable or binary and bundle it into a package that is as ready to be run by an end player to the best extent NVGT can manage, usually driven by several configuration options. This might do anything from copying shared libraries to preparing an entire app bundle depending on platform and configuration. Also displays the compilation success dialog and handles any final post-build steps such as installing the build on a connected device.
+	virtual void set_status(const std::string& mesage) = 0; // Sets a status message that gets picked up by get_status below in a thread-safe manner, used for the compilation status display.
 	virtual std::string get_status() = 0; // Returns the last status message set using set_status, and clears the status buffer. Must be called in a loop from a different thread than that on which set_status was executed.
 	virtual const std::string& get_error_text() = 0;
 	virtual const std::string& get_output_file() = 0;

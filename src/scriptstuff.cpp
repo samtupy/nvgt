@@ -335,20 +335,18 @@ CScriptDictionary* script_function_call(asIScriptFunction* func, CScriptDictiona
 		}
 		if ((arg_type_id & asTYPEID_MASK_OBJECT)) {
 			const void* o = k.GetAddressOfValue();
-			if (arg_type_id & asTYPEID_OBJHANDLE)
-				ctx->SetArgObject(arg_index - 1, *(void**)o);
-			else
-				ctx->SetArgObject(arg_index - 1, (void*)o);
+			if (arg_type_id & asTYPEID_OBJHANDLE) ctx->SetArgObject(arg_index - 1, *(void**)o);
+			else ctx->SetArgObject(arg_index - 1, (void*)o);
 		} else if (!k.GetValue(arg_value, arg_type_id)) {
-			if (arg_type_id & asTYPEID_INT32) {
+			if (arg_type_id == asTYPEID_INT32) {
 				asINT64 val;
 				k.GetValue(val);
 				ctx->SetArgDWord(arg_index - 1, val);
-			} else if (arg_type_id & asTYPEID_FLOAT) {
+			} else if (arg_type_id == asTYPEID_FLOAT) {
 				double val;
 				k.GetValue(val);
 				ctx->SetArgFloat(arg_index - 1, val);
-			} else if (arg_type_id & asTYPEID_BOOL) {
+			} else if (arg_type_id == asTYPEID_BOOL) {
 				asINT64 val;
 				k.GetValue(val);
 				ctx->SetArgByte(arg_index - 1, val);
@@ -489,9 +487,11 @@ public:
 	}
 	int Read(void* ptr, asUINT size) {
 		if (cursor >= data.size()) return -1;
-		memcpy(ptr, &data[cursor], size);
-		cursor += size;
-		return size;
+		asUINT available = static_cast<asUINT>(data.size() - cursor);
+		asUINT to_copy = size < available ? size : available;
+		memcpy(ptr, data.data() + cursor, to_copy);
+		cursor += to_copy;
+		return to_copy;
 	}
 };
 class script_module {
