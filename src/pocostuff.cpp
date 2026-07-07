@@ -357,7 +357,9 @@ poco_json_object& poco_json_object::operator=(poco_json_object* other) {
 	return *this;
 }
 poco_shared<Dynamic::Var>* poco_json_object::get(const std::string& key, poco_shared<Dynamic::Var>* default_value) const {
-	return ptr->has(key)? new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(key)))) : default_value; // Oof, more duplication than I like probably?
+	if (ptr->has(key)) return default_value;
+	if (default_value) default_value->release();
+	return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(key))));
 }
 poco_shared<Dynamic::Var>* poco_json_object::get_indexed(const std::string& key) const {
 	return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(ptr->get(key)))); // Oof, more duplication than I like probably?
@@ -365,7 +367,9 @@ poco_shared<Dynamic::Var>* poco_json_object::get_indexed(const std::string& key)
 poco_shared<Dynamic::Var>* poco_json_object::query(const std::string& path, poco_shared<Dynamic::Var>* default_value) const {
 	JSON::Query q(shared); // I tried to cache the query object in the class variable above, and spent an hour or 2 figuring out that this causes a memory access violation in Poco::Dynamic::Var::Var.
 	Dynamic::Var result = q.find(path);
-	return !result.isEmpty()? new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(result))) : default_value;
+	if (result.isEmpty()) return default_value;
+	if (default_value) default_value->release();
+	return new poco_shared<Dynamic::Var>(SharedPtr<Dynamic::Var>(new Dynamic::Var(result)));
 }
 poco_json_array* poco_json_object::get_array(const std::string& key) const {
 	JSON::Array::Ptr obj = ptr->getArray(key);
