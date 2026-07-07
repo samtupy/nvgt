@@ -205,8 +205,8 @@ elif env["NVGT_TARGET"] == "android":
 		finally:
 			os.chdir(original_dir)
 	apk_alias = env.Alias("android_apk", android_deps)
-	env.AddPostAction(apk_alias, Action(run_gradle, "Packaging Android Stub and Runner..."))
-	env.Default(apk_alias)
+	#env.AddPostAction(apk_alias, Action(run_gradle, "Packaging Android Stub and Runner..."))
+	#env.Default(apk_alias)
 
 # stubs
 def fix_stub(target, source, env):
