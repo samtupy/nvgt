@@ -277,6 +277,7 @@ jobs:
         cd ..
         python3 docgen.py
         cd ..
+        cp android_release/lib_android release
         cp android_release/stub/* release/stub
         cp -r linux_release/lib release/lib_linux
         cp linux_release/stub/* release/stub
