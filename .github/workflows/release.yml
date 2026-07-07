@@ -28,7 +28,7 @@ jobs:
         [ -z "$PASS" ] && PASS="nvgt_fork_build_passphrase"
         openssl enc -aes-256-cbc -pbkdf2 -pass pass:"$PASS" -in user/nvgt_config.h -out nvgt_config.h.enc
     - id: upload_config
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: nvgt_config_enc
         path: nvgt_config.h.enc
@@ -41,7 +41,7 @@ jobs:
     - uses: actions/checkout@v5
       with:
         submodules: true
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: nvgt_config_enc
     - name: decrypt config
@@ -82,7 +82,7 @@ jobs:
         cp build/build_macos.sh .
         sudo chmod +x build_macos.sh
         ./build_macos.sh ci
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: mac_release
         path: 'release'
@@ -94,7 +94,7 @@ jobs:
     - uses: actions/checkout@v5
       with:
         submodules: true
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: nvgt_config_enc
     - name: decrypt config
@@ -126,7 +126,7 @@ jobs:
         pip3 install scons
         sudo chmod +x build/build_linux.sh
         ./build/build_linux.sh ci
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: linux_release
         path: 'release'
@@ -138,7 +138,7 @@ jobs:
     - uses: actions/checkout@v5
       with:
         submodules: true
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: nvgt_config_enc
     - name: decrypt config
@@ -197,7 +197,7 @@ jobs:
         ./gradlew assembleRunnerRelease AssembleStubRelease --no-daemon -Pandroid.injected.signing.store.file=android.keystore -Pandroid.injected.signing.store.password=${{env.ANDROID_RUNNER_KEYSTORE_PW}} -Pandroid.injected.signing.key.alias=app -Pandroid.injected.signing.key.password="${{env.ANDROID_RUNNER_KEYSTORE_PW}}"
         mv build/outputs/apk/runner/release/nvgt-runner-release.apk ../release/nvgt.apk
         cd ..
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: android_release
         path: 'release'
@@ -209,7 +209,7 @@ jobs:
     - uses: actions/checkout@v5
       with:
         submodules: true
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: nvgt_config_enc
     - name: decrypt config
@@ -240,7 +240,7 @@ jobs:
         pip3 install scons
         choco install -y upx
         scons -s no_upx=0
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: windows_release
         path: 'release'
@@ -262,7 +262,7 @@ jobs:
     needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v5
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
     - name: set_version
       run: |
         python3 build/ci_set_version.py
@@ -301,7 +301,7 @@ jobs:
         files-folder-filter: exe
         description: NonVisual Gaming Toolkit
         description-url: https://nvgt.dev
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: windows_package
         path: 'install/nvgt_${{env.nvgt_version}}.exe'
@@ -311,7 +311,7 @@ jobs:
     needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v5
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
     - name: set_version
       run: |
         python3 build/ci_set_version.py
@@ -357,7 +357,7 @@ jobs:
         cd install
         hdiutil create -srcfolder nvgt.app nvgt_${{env.nvgt_version}}.dmg
         cd ..
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: mac_package
         path: 'install/nvgt_${{env.nvgt_version}}.dmg'
@@ -367,7 +367,7 @@ jobs:
     needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v5
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
     - name: set_version
       run: |
         python3 build/ci_set_version.py
@@ -394,7 +394,7 @@ jobs:
         cd release
         tar -czf "../nvgt_$nvgt_version.tar.gz" *
         cd ..
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: linux_package
         path: 'nvgt_${{env.nvgt_version}}.tar.gz'
@@ -407,10 +407,10 @@ jobs:
       contents: write
     steps:
     - uses: actions/checkout@v5
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         pattern: '*_package'
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: android_release
         path: android_release
@@ -437,10 +437,10 @@ jobs:
       contents: write
     steps:
     - uses: actions/checkout@v5
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         pattern: '*_package'
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: android_release
         path: android_release
