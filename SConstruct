@@ -47,6 +47,7 @@ if ARGUMENTS.get("debug", "0") == "1":
 	Alias('cdb', cdb)
 
 # Platform setup and system libraries
+common_libs = ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoCrypto", "PocoFoundation", "expat", "angelscript", "SDL3_ttf", "freetype", "bz2", "enet", "reactphysics3d", "ssl", "crypto", "utf8proc", "pcre2-8", "vorbisfile", "vorbisenc", "vorbis", "ogg", "opusfile", "opusenc", "opus", "tinyexpr", "tiny-aes-c", "ffi"]
 if env["NVGT_TARGET"] == "windows":
 	deb_rel_flags = ["/MTd", "/Od", "/Z7"] if ARGUMENTS.get("debug", "0") == "1" else ["/MT", "/O2"]
 	env.Append(CCFLAGS = ["/EHsc", "/J", "/utf-8", "/Gy", "/std:c++20", "/GF", "/Zc:inline", "/bigobj", "/permissive-", "/W3" if ARGUMENTS.get("warnings", "0") == "1" else "", "/WX" if ARGUMENTS.get("warnings_as_errors", "0") == "1" else ""] + deb_rel_flags)
@@ -67,40 +68,8 @@ elif env["NVGT_TARGET"] == "linux":
 	# enable the gold linker, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
 	env.Append(CPPPATH = ["lindev/include", "/usr/local/include"], LIBPATH = ["lindev/lib", "/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
 elif env["NVGT_TARGET"] == "android":
-	import platform
-	if "ANDROID_NDK_HOME" not in os.environ:
-		print("ANDROID_NDK_HOME not set, cannot build for android")
-		Exit(1)
-	env["NDK_HOME"] = os.environ["ANDROID_NDK_HOME"]
-	host_os = platform.system().lower()
-	if host_os == "windows":
-		env["NDK_HOST_TAG"] = "windows-x86_64"
-		cmd_ext = ".cmd"
-		exe_ext = ".exe"
-		env["GRADLE_CMD"] = ["cmd.exe", "/c", "gradlew.bat"]
-	elif host_os == "darwin":
-		env["NDK_HOST_TAG"] = "darwin-x86_64"
-		cmd_ext = ""
-		exe_ext = ""
-		env["GRADLE_CMD"] = ["./gradlew"]
-	else:
-		env["NDK_HOST_TAG"] = "linux-x86_64"
-		cmd_ext = ""
-		exe_ext = ""
-		env["GRADLE_CMD"] = ["./gradlew"]
-	toolchain_bin = os.path.join(env["NDK_HOME"], "toolchains", "llvm", "prebuilt", env["NDK_HOST_TAG"], "bin")
-	env["CC"] = os.path.join(toolchain_bin, f"aarch64-linux-android28-clang{cmd_ext}")
-	env["CXX"] = os.path.join(toolchain_bin, f"aarch64-linux-android28-clang++{cmd_ext}")
-	env["LINK"] = os.path.join(toolchain_bin, f"aarch64-linux-android28-clang++{cmd_ext}")
-	env["AR"] = os.path.join(toolchain_bin, f"llvm-ar{exe_ext}")
-	env["RANLIB"] = os.path.join(toolchain_bin, f"llvm-ranlib{exe_ext}")
-	env["SHLINKCOM"] = "$LINK -o $TARGET $LINKFLAGS -shared $__RPATH $SOURCES $_LIBDIRFLAGS $_LIBFLAGS"
-	env.Append(CCFLAGS = ["-fPIC"])
-	env.Append(CXXFLAGS = ["-DAS_USE_STLNAMES=1", "-ffunction-sections", "-O2", "-Wno-deprecated-array-compare", "-Wno-implicit-const-int-float-conversion", "-Wno-deprecated-enum-enum-conversion", "-Wno-absolute-value"])
-	env.Append(LINKFLAGS = ["-Wl,--no-fatal-warnings", "-Wl,--no-undefined", "-Wl,--gc-sections"])
-	env["PROGSUFFIX"] = ".so"
-	env["SHLIBSUFFIX"] = ".so"
-	env.Append(LIBS = ["PocoFoundation", "PocoCrypto", "PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "ffi", "z", "angelscript", "crypto", "pcre2-8", "utf8proc", "expat", "enet", "reactphysics3d", "ssl", "SDL3_ttf", "freetype", "bz2", "ogg", "vorbis", "vorbisfile", "opusfile", "opusenc", "opus", "tinyexpr", "tiny-aes-c", "GLESv1_CM", "GLESv2", "OpenSLES", "log", "android"])
+	SConscript("build/android_sconscript.py", exports = ["env"])
+	env.Append(LIBS = common_libs + ["z", "GLESv1_CM", "GLESv2", "OpenSLES", "log", "android"])
 env.Append(CPPDEFINES = ["POCO_STATIC", "POCO_NO_AUTOMATIC_LIBS", "UNIVERSAL_SPEECH_STATIC", "DEBUG" if ARGUMENTS.get("debug", "0") == "1" else "NDEBUG", "UNICODE"])
 env.Append(CPPPATH = ["#ASAddon/include", "#dep"], LIBPATH = ["#build/lib"])
 env["PLUGIN_DEST_DIR"] = "#release/lib_android" if env["NVGT_TARGET"] == "android" else "#release/lib"
@@ -139,7 +108,7 @@ if  ARGUMENTS.get("no_plugins", "0") == "0":
 			static_plugins_object = env.Object(static_plugins_path, static_plugins_path + ".cpp", CPPPATH = env["CPPPATH"] + ["#src"])
 
 # Project libraries
-env.Append(LIBS = ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoCrypto", "PocoFoundation", "expat", "zs" if env["NVGT_TARGET"] == "windows" else "z", "angelscript", "SDL3", "SDL3_ttf", "freetype", "bz2", "phonon", "enet", "reactphysics3d", "ssl", "crypto", "utf8proc", "pcre2-8", "ASAddon", "deps", "vorbisfile", "vorbisenc", "vorbis", "ogg", "opusfile", "opusenc", "opus", "tinyexpr", "tiny-aes-c", "ffi"])
+env.Append(LIBS = common_libs + ["zs" if env["NVGT_TARGET"] == "windows" else "z", "SDL3", "phonon", "ASAddon", "deps"])
 if env["NVGT_TARGET"] == "windows": env.Append(LIBS = ["UniversalSpeechStatic"])
 
 # nvgt itself
