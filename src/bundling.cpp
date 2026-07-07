@@ -242,7 +242,9 @@ public:
 	void prepare() {
 		set_status("initializing...");
 		stub = g_stub; // We must do this now because script should be compiled at this point and thus stub selected from pragma should be stored in g_stub.
-		Path stubpath = config.getString("application.dir");
+		string app_dir = config.getString("application.dir", "");
+		if (app_dir.empty()) app_dir = Path(Util::Application::instance().commandPath()).makeParent().toString();
+		Path stubpath = app_dir;
 		stubpath.pushDirectory("stub");
 		xplatform_correct_path_to_stubs(stubpath);
 		alter_stub_path(stubpath);
@@ -250,7 +252,7 @@ public:
 		string outpath_str = config.getString("build.output_basename", format("%s", Path(input_file).setExtension("").makeAbsolute().toString()));
 		replaceInPlace(outpath_str, "$platform"s, platform);
 		outpath_str = Path(outpath_str).makeAbsolute().toString();
-		if (DirectoryExists(outpath_str)) File(outpath_str).remove(true); // Though some platforms must do indipendantly after extra modification, we still attempt to clean previous builds for generic outputs here so that a linux build won't output overtop a windows one leaving both an elf and an executable binary in the same place, for example.
+		if (DirectoryExists(outpath_str)) File(outpath_str).remove(true);
 		outpath = outpath_str;
 		File(outpath.parent()).createDirectories();
 		alter_output_path(outpath);
@@ -888,6 +890,19 @@ protected:
 		string tmp_apk_path = Path(workplace.path()).append("tmp.apk").toString();
 		libarchive_extract(tmp_apk_path, workplace.path());
 		File(tmp_apk_path).remove();
+		// Copy any requested dynamic plugins into the APK structure.
+		set_status("injecting dynamic plugins...");
+		string plugin_src_str = get_nvgt_lib_directory("android");
+		if (plugin_src_str.empty()) throw Exception("Unable to locate Android library directory (lib_android)");
+		Path plugin_src(plugin_src_str);
+		Path plugin_dest = Path(workplace.path()).append("lib/arm64-v8a");
+		plugin_dest.makeDirectory();
+		for (const string& lib : g_bundle_libraries) {
+			Path src = Path(plugin_src).append(lib + ".so");
+			if (File(src).exists()) {
+				File(src).copyTo(plugin_dest.toString());
+			}
+		}
 		// OK! At this point, we have the final contents of our APK file, though extracted and lacking a signature. Lets zip it up, though we can't place the temporary zip file in the directory we want to zip up so we'll need a temporary file.
 		set_status("packaging APK...");
 		TemporaryFile zip_out_location;
@@ -936,6 +951,13 @@ nvgt_compilation_output* nvgt_init_compilation(const string& input_file, bool au
 	else if (g_platform == "android") output = new nvgt_compilation_output_android(input_file);
 	else if (g_platform == "ios") output = new nvgt_compilation_output_ios(input_file);
 	else output = new nvgt_compilation_output_impl(input_file);
+	
+	// Ensure stubs can be found in development environments.
+	if (!File(Path(Util::Application::instance().config().getString("application.dir", "")).append("stub")).exists()) {
+		Path dev_stub = Path(Util::Application::instance().commandPath()).makeParent().append("stub");
+		if (File(dev_stub).exists()) Util::Application::instance().config().setString("application.dir", dev_stub.makeParent().toString());
+	}
+
 	if (auto_prepare) output->prepare();
 	return output;
 }
