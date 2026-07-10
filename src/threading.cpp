@@ -271,6 +271,7 @@ template<typename T> bool is_always_lock_free(T* obj) {
 template<typename T>
 consteval const char* as_script_int_name() {
 	static_assert(std::is_integral_v<T> && !std::is_same_v<T, bool>);
+	if constexpr(!std::is_floating_point_v<T>) {
 	constexpr auto s = std::is_signed_v<T>;
 	if	  constexpr (sizeof(T) == 1)
 		return s ? "int8"  : "uint8";
@@ -282,6 +283,14 @@ consteval const char* as_script_int_name() {
 		return s ? "int64" : "uint64";
 	else
 		static_assert(false, "value_type has no matching AngelScript primitive");
+} else {
+if (sizeof(T) == 4)
+return "float";
+else if (sizeof(T) == 8)
+return "double";
+else
+static_assert(false, "value_type has no matching AngelScript primitive");
+}
 }
 template<typename atomic_type, typename divisible_type> void register_atomic_type(asIScriptEngine* engine, const std::string& type_name, const std::string& regular_type_name) {
 	// The following functions are available on all atomic types
