@@ -1,0 +1,17 @@
+/**
+	Get a value out of the JSON object with literal syntax, for example `json["key"]`.
+	var@ json::get_opIndex(const string&in key) property;
+	## Arguments:
+		- `const string&in key`: the key of the object to get.
+	## Returns:
+		var@: a handle to the object, or null if not found.
+*/
+
+// Example:
+#include "json.nvgt"
+void main() {
+	string data = """{"name": "Jon", "age": 30}""";
+	json o;
+	o.loads(data);
+	alert("Info", o["name"] + " is " + o["age"]);
+}
