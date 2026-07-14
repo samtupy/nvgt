@@ -29,12 +29,6 @@ android {
 		targetSdkVersion 35
 		versionCode 1
 		versionName "1.0"
-		externalNativeBuild {
-			ndkBuild {
-				arguments "APP_PLATFORM=android-28", "-j8"
-				abiFilters 'arm64-v8a' // 'armeabi-v7a', 
-			}
-		}
 	}
 	buildTypes {
 		release {
@@ -48,20 +42,10 @@ android {
 			dimension "version"
 			applicationId "com.samtupy.nvgt.runner"
 			versionName file("../version").getText().trim()
-			externalNativeBuild {
-				ndkBuild {
-					arguments "BUILD_RUNNER=1", "BUILD_STUB=0"
-				}
-			}
 		}
 		stub {
 			dimension "version"
 			applicationId "com.samtupy.nvgt.stub"
-			externalNativeBuild {
-				ndkBuild {
-					arguments "BUILD_RUNNER=0", "BUILD_STUB=1"
-				}
-			}
 		}
 	}
 
@@ -90,14 +74,6 @@ android {
 		} else {
 			variant.outputs.each { output ->
 				output.versionCodeOverride = (int) (new Date().getTime() / 60000.0)
-			}
-		}
-		tasks["merge${variant.name.capitalize()}Assets"].dependsOn("externalNativeBuild${variant.name.capitalize()}")
-	}
-	if (!project.hasProperty('EXCLUDE_NATIVE_LIBS')) {
-		externalNativeBuild {
-			ndkBuild {
-				path 'Android.mk'
 			}
 		}
 	}

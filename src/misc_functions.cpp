@@ -84,22 +84,13 @@ asQWORD timestamp() {
 std::string get_command_line() {
 	return g_CommandLine;
 }
-float fRound(float n, int p) {
-	int P = powf(10, fabs(p));
-	if (p > 0)
-		return roundf(n * P) / P;
-	else if (p < 0)
-		return roundf(n / P) * P;
-	return roundf(n);
+template <typename T> T GenericRound(T n, int p) {
+	T P = std::pow(static_cast<T>(10), std::abs(p));
+	T result = (p > 0)? (std::round(n * P) / P) : (p < 0)? (std::round(n / P) * P) : std::round(n);
+	return (result == static_cast<T>(0)) ? static_cast<T>(0) : result;
 }
-double Round(double n, int p) {
-	int P = pow(10, abs(p));
-	if (p > 0)
-		return round(n * P) / P;
-	else if (p < 0)
-		return round(n / P) * P;
-	return round(n);
-}
+float fRound(float n, int p)   { return GenericRound<float>(n, p); }
+double Round(double n, int p)  { return GenericRound<double>(n, p); }
 enum process_flags {
 	PROCESS_PIPE_STDIN = 1,        // connect stdin to a writable datastream
 	PROCESS_PIPE_STDOUT = 2,       // connect stdout to a readable datastream

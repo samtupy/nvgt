@@ -4,6 +4,7 @@
 #pragma plugin systemd_notify
 #pragma plugin unicode
 string[] global_vars;
+bool is_cli = false;
 class exported_enum {
 	dictionary properties;
 	string[] property_list;
@@ -59,7 +60,7 @@ void add_nvgt_class_method(const string&in classname, string method) {
 	if (method.starts_with(classname + "::")) method.erase(0, classname.length() + 2);
 	nvgt_class@ nvgtcl = get_nvgt_class(classname);
 	if (@nvgtcl != null) nvgtcl.methods.insert_last(method);
-	else alert("error", "Couldn't add NVGT class " + classname);
+	else if (!is_cli) alert("error", "Couldn't add NVGT class " + classname);
 }
 void add_nvgt_class_property(const string&in classname, string property) {
 	if (property.starts_with(classname + "::")) property.erase(0, classname.length() + 2);
@@ -72,8 +73,10 @@ void main() {
 	script_dump_engine_configuration(f);
 	string data = ds.str();
 	string[] lines = data.split("\n");
-	output_dir = input_box("where", "", output_dir);
-	if (output_dir.is_empty()) exit();
+	output_dir = COMMAND_LINE;
+	is_cli = !output_dir.empty();
+	if (output_dir.empty()) output_dir = input_box("where", "", "nvgtexport");
+	if (output_dir.empty()) exit();
 	uint len = lines.length();
 	if (directory_exists(output_dir)) directory_delete(output_dir);
 	directory_create(output_dir);
@@ -145,8 +148,9 @@ void write_global_vars() {
 }
 void write_classes() {
 	if (!directory_exists(output_dir + "/classes")) directory_create(output_dir + "/classes");
-	alert("classes", classes.get_size() + " in writing");
-	string[] lst = classes.get_keys();
+	if (!is_cli) alert("classes", classes.get_size() + " in writing");
+	else println("writing " + classes.get_size() + " classes");
+	string[]@ lst = classes.get_keys();
 	file classes_file;
 	classes_file.open(output_dir + "/classes.txt", "wb");
 	for (uint i = 0; i < lst.length(); i += 1) {

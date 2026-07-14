@@ -186,21 +186,19 @@ public:
 			else value = malloc(ctx->GetEngine()->GetSizeOfPrimitiveType(subtypeid));
 			if ((subtypeid & ~asTYPEID_MASK_SEQNBR) && !(subtypeid & asTYPEID_OBJHANDLE)) *(void**)value = ctx->GetEngine()->CreateScriptObjectCopy(ctx->GetReturnObject(), subtype->GetSubType());
 			else if (subtypeid & asTYPEID_OBJHANDLE) {
-				void* tmp = value;
 				*(void**)value = ctx->GetReturnObject();
 				ctx->GetEngine()->AddRefScriptObject(*(void**)value, subtype->GetSubType());
-				if (tmp) ctx->GetEngine()->ReleaseScriptObject(*(void**)tmp, subtype->GetSubType());
 			} else if (subtypeid == asTYPEID_BOOL || subtypeid == asTYPEID_INT8 || subtypeid == asTYPEID_UINT8) *(char*)value = ctx->GetReturnByte();
 			else if (subtypeid == asTYPEID_INT16 || subtypeid == asTYPEID_UINT16) *(short*)value = ctx->GetReturnWord();
 			else if (subtypeid == asTYPEID_INT32 || subtypeid == asTYPEID_UINT32 || subtypeid > asTYPEID_DOUBLE) *(int*)value = ctx->GetReturnDWord();
 			else if (subtypeid == asTYPEID_FLOAT) *(float*)value = ctx->GetReturnFloat();
-			else if (subtypeid == asTYPEID_INT64 || subtypeid == asTYPEID_UINT64) *(double*)value = ctx->GetReturnQWord();
+			else if (subtypeid == asTYPEID_INT64 || subtypeid == asTYPEID_UINT64) *(asQWORD*)value = ctx->GetReturnQWord();
 			else if (subtypeid == asTYPEID_DOUBLE) *(double*)value = ctx->GetReturnDouble();
 		}
 		ctx->GetEngine()->ReturnContext(ctx);
 		release_value_args();
-		release();
 		progress.set();
+		release();
 	}
 	void release_value_args() {
 		for (const auto& obj : value_args) g_ScriptEngine->ReleaseScriptObject(obj.first, obj.second);
@@ -269,6 +267,30 @@ template <class T> void atomics_destruct(T* obj) {
 }
 template<typename T> bool is_always_lock_free(T* obj) {
 	return obj->is_always_lock_free;
+}
+template<typename T>
+consteval const char* as_script_int_name() {
+	static_assert(std::is_integral_v<T> && !std::is_same_v<T, bool>);
+	if constexpr(!std::is_floating_point_v<T>) {
+	constexpr auto s = std::is_signed_v<T>;
+	if	  constexpr (sizeof(T) == 1)
+		return s ? "int8"  : "uint8";
+	else if constexpr (sizeof(T) == 2)
+		return s ? "int16" : "uint16";
+	else if constexpr (sizeof(T) == 4)
+		return s ? "int"   : "uint";
+	else if constexpr (sizeof(T) == 8)
+		return s ? "int64" : "uint64";
+	else
+		static_assert(false, "value_type has no matching AngelScript primitive");
+} else {
+if (sizeof(T) == 4)
+return "float";
+else if (sizeof(T) == 8)
+return "double";
+else
+static_assert(false, "value_type has no matching AngelScript primitive");
+}
 }
 template<typename atomic_type, typename divisible_type> void register_atomic_type(asIScriptEngine* engine, const std::string& type_name, const std::string& regular_type_name) {
 	// The following functions are available on all atomic types
@@ -345,6 +367,11 @@ void RegisterAtomics(asIScriptEngine* engine) {
 	register_atomic_type<std::atomic_int64_t, std::int64_t>(engine, "atomic_int64", "int64");
 	register_atomic_type<std::atomic_uint64_t, std::uint64_t>(engine, "atomic_uint64", "uint64");
 	register_atomic_type<std::atomic_bool, bool>(engine, "atomic_bool", "bool");
+	register_atomic_type<std::atomic_signed_lock_free, std::atomic_signed_lock_free::value_type>(engine, "atomic_signed_lock_free", as_script_int_name<std::atomic_signed_lock_free::value_type>());
+	register_atomic_type<std::atomic_unsigned_lock_free, std::atomic_unsigned_lock_free::value_type>(engine, "atomic_unsigned_lock_free", as_script_int_name<std::atomic_unsigned_lock_free::value_type>());
+	register_atomic_type<std::atomic<float>, float>(engine, "atomic_float", "float");
+	register_atomic_type<std::atomic<double>, double>(engine, "atomic_double", "double");
+	engine->RegisterGlobalFunction("void atomic_thread_fence(memory_order order)", asFUNCTION(std::atomic_thread_fence), asCALL_CDECL);
 }
 
 template <class T> void scoped_lock_construct(void* mem, T* mutex) {

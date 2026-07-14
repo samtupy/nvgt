@@ -924,15 +924,12 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*us
 			string token = pragmaText.substr(pos, length);
 			if (tokenClass == asTC_VALUE) {
 				// May be a string, trim quotes
-				if (token.starts_with("\""))
-					token.erase(0, 1);
-				if (token.ends_with("\""))
-					token.pop_back();
+				if (token.starts_with("\"")) token.erase(0, 1);
+				if (token.ends_with("\"")) token.pop_back();
 			}
 			cleanText += " " + token;
 		}
-		if (tokenClass == asTC_UNKNOWN)
-			return -1;
+		if (tokenClass == asTC_UNKNOWN) return -1;
 		pos += length;
 	}
 	cleanText.erase(cleanText.begin());
