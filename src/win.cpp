@@ -323,8 +323,4 @@ void regained_window_focus_platform() {
 	}
 }
 
-unsigned long long system_running_milliseconds() {
-	return GetTickCount64();
-}
-
 #endif

@@ -262,7 +262,7 @@ int CScriptBuilder::ProcessScriptSection(const char *script, unsigned int length
 		{
 			int start = pos++;
 
-			// Is this an #if, #if_not, or #define directive?
+			// Is this an #if directive?
 			t = engine->ParseToken(&modifiedScript[pos], modifiedScript.size() - pos, &len);
 
 			string token;
@@ -270,7 +270,7 @@ int CScriptBuilder::ProcessScriptSection(const char *script, unsigned int length
 
 			pos += len;
 
-			if( token == "if" || token == "if_not" || token == "define")
+			if( token == "if" || token == "if_not")
 			{
 				bool if_not = token == "if_not";
 				t = engine->ParseToken(&modifiedScript[pos], modifiedScript.size() - pos, &len);
@@ -288,20 +288,17 @@ int CScriptBuilder::ProcessScriptSection(const char *script, unsigned int length
 					// Overwrite the #if directive with space characters to avoid compiler error
 					pos += len;
 					OverwriteCode(start, pos-start);
-					if (token == "define") DefineWord(word.c_str());
+
+					// Has this identifier been defined by the application or not?
+					bool word_exists = definedWords.find(word) != definedWords.end();
+					if( if_not && word_exists || !if_not && !word_exists )
+					{
+						// Exclude all the code until and including the #endif
+						pos = ExcludeCode(pos);
+					}
 					else
 					{
-						// Has this identifier been defined by the application or not?
-						bool word_exists = definedWords.find(word) != definedWords.end();
-						if( if_not && word_exists || !if_not && !word_exists )
-						{
-							// Exclude all the code until and including the #endif
-							pos = ExcludeCode(pos);
-						}
-						else
-						{
-							nested++;
-						}
+						nested++;
 					}
 				}
 			}

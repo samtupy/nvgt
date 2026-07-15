@@ -13,7 +13,6 @@
 #include <angelscript.h>
 #include <weakref.h>
 #include <SDL3/SDL_touch.h>
-#include <memory>
 #include <string>
 #include <vector>
 #include <angelscript_call.hpp>
@@ -22,7 +21,7 @@
 // DO not instanciate manually, instances are created by engine_event.
 class engine_event;
 class engine_event_listener {
-	std::shared_ptr<CScriptWeakRef> obj;
+	CScriptWeakRef* obj;
 	asIScriptFunction* func;
 	bool is_object;
 public:
