@@ -175,6 +175,17 @@ static void archive_write_dir(struct archive* a, const string& disk_dir, const s
 		}
 	}
 }
+// Opens an archive for writing at the given path, throwing a clear exception on failure instead of
+// letting later archive_write_* calls crash on a half-initialized archive. This most commonly fails
+// because the destination file is locked by another program (for example open in an archive viewer).
+// The archive is freed before throwing, since the caller's archive_write_free is skipped.
+static void archive_write_open_or_throw(struct archive* a, const string& path) {
+	if (archive_write_open_filename(a, path.c_str()) == ARCHIVE_OK) return;
+	const char* err = archive_error_string(a);
+	string message = format("could not open %s for writing%s. It may be open or locked by another program.", path, err ? string(" (") + err + ")" : string(""));
+	archive_write_free(a);
+	throw Poco::FileException(message);
+}
 // Thread-safe message box for use from the compilation worker thread. Dispatches message_box() onto the main thread via SDL_RunOnMainThread and blocks until the result is available. Returns -1 without showing anything for multi-button dialogs when quiet mode is active or a console is available, since the user cannot answer interactive questions in those conditions. Single-button alerts in console mode are printed to stdout.
 struct bundler_msgbox_args { const string& title; const string& text; const vector<string>& buttons; int result; };
 static void bundler_msgbox_callback(void* userdata) {
@@ -423,7 +434,7 @@ protected:
 			struct archive* a = archive_write_new();
 			archive_write_set_format_zip(a);
 			archive_write_zip_set_compression_deflate(a);
-			archive_write_open_filename(a, zip_out.path().c_str());
+			archive_write_open_or_throw(a, zip_out.path());
 			archive_write_dir(a, workplace.path(), "", build_exec_paths("", ""), store_paths, true);
 			archive_write_close(a);
 			archive_write_free(a);
@@ -516,7 +527,7 @@ protected:
 				archive_write_set_format_iso9660(a);
 				archive_write_set_option(a, nullptr, "rockridge", "1");
 				archive_write_add_filter_none(a);
-				archive_write_open_filename(a, iso_out.path().c_str());
+				archive_write_open_or_throw(a, iso_out.path());
 				if (bundle_mode == 2) archive_write_dir(a, Path(workplace.path()).makeParent().toString(), "", mac_execs, {}, false);
 				else {
 					// Add .app explicitly, then add document assets at ISO root from their source paths.
@@ -674,7 +685,7 @@ protected:
 			struct archive* a = archive_write_new();
 			archive_write_set_format_zip(a);
 			archive_write_zip_set_compression_deflate(a);
-			archive_write_open_filename(a, ipa_out.path().c_str());
+			archive_write_open_or_throw(a, ipa_out.path());
 			archive_write_dir(a, ipa_root.toString(), "", build_exec_paths(ios_exec, format("Payload/%s", appbundle)), store_paths, true);
 			archive_write_close(a);
 			archive_write_free(a);
@@ -712,7 +723,7 @@ protected:
 			struct archive* a = archive_write_new();
 			archive_write_set_format_pax_restricted(a);
 			archive_write_add_filter_gzip(a);
-			archive_write_open_filename(a, tgz_out.path().c_str());
+			archive_write_open_or_throw(a, tgz_out.path());
 			archive_write_dir(a, workplace.path(), "", build_exec_paths(output_path.getFileName(), ""), {}, false);
 			archive_write_close(a);
 			archive_write_free(a);
@@ -914,7 +925,7 @@ protected:
 		struct archive* apk_arc = archive_write_new();
 		archive_write_set_format_zip(apk_arc);
 		archive_write_zip_set_compression_deflate(apk_arc);
-		archive_write_open_filename(apk_arc, zip_out_location.path().c_str());
+		archive_write_open_or_throw(apk_arc, zip_out_location.path());
 		archive_write_dir(apk_arc, workplace.path(), "", {}, apk_store_arcs, true);
 		archive_write_close(apk_arc);
 		archive_write_free(apk_arc);
