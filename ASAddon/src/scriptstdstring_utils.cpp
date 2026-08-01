@@ -182,6 +182,18 @@ static string StringReplaceRange(asUINT start, int count, const string &replace,
 	return ret;
 }
 
+// Like replace_range, but modifies the string in place instead of returning a new one.
+//
+// AngelScript signature:
+// string& string::replace_range_this(uint start, int count, const string &in replace)
+static string &StringReplaceRangeThis(asUINT start, int count, const string &replace, string &str)
+{
+	if (start >= str.size() || count < 1)
+		return str;
+	str.replace(start, (size_t)count, replace);
+	return str;
+}
+
 // This function replaces a given substring of text with another.
 // Set replaceAll to false to only replace the first occurrence of the text.
 //
@@ -240,6 +252,15 @@ static void StringReplaceRange_Generic(asIScriptGeneric *gen)
 	string *replace = reinterpret_cast<string *>(gen->GetArgAddress(3));
 	string *self = reinterpret_cast<string *>(gen->GetObject());
 	*reinterpret_cast<string *>(gen->GetAddressOfReturnLocation()) = StringReplaceRange(start, count, *replace, *self);
+}
+
+static void StringReplaceRangeThis_Generic(asIScriptGeneric *gen)
+{
+	asUINT start = gen->GetArgDWord(0);
+	int count = gen->GetArgDWord(1);
+	string *replace = reinterpret_cast<string *>(gen->GetArgAddress(2));
+	string *self = reinterpret_cast<string *>(gen->GetObject());
+	gen->SetReturnAddress(&StringReplaceRangeThis(start, count, *replace, *self));
 }
 
 static void StringReplace_Generic(asIScriptGeneric *gen)
@@ -434,6 +455,8 @@ void RegisterStdStringUtils(asIScriptEngine *engine)
 		assert(r >= 0);
 		r = engine->RegisterObjectMethod("string", "string replace_range(uint start, int count, const string& in) const", asFUNCTION(StringReplaceRange_Generic), asCALL_GENERIC);
 		assert(r >= 0);
+		r = engine->RegisterObjectMethod("string", "string& replace_range_this(uint start, int count, const string& in)", asFUNCTION(StringReplaceRangeThis_Generic), asCALL_GENERIC);
+		assert(r >= 0);
 		r = engine->RegisterObjectMethod("string", "string replace(const string& in, const string& in, bool = true, uint = 0) const", asFUNCTION(StringReplace_Generic), asCALL_GENERIC);
 		assert(r >= 0);
 	}
@@ -446,6 +469,8 @@ void RegisterStdStringUtils(asIScriptEngine *engine)
 		r = engine->RegisterObjectMethod("string", "string slice(int start = 0, int end = 0) const", asFUNCTION(StringSlice), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
 		r = engine->RegisterObjectMethod("string", "string replace_range(uint start, int count, const string& in) const", asFUNCTION(StringReplaceRange), asCALL_CDECL_OBJLAST);
+		assert(r >= 0);
+		r = engine->RegisterObjectMethod("string", "string& replace_range_this(uint start, int count, const string& in)", asFUNCTION(StringReplaceRangeThis), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
 		r = engine->RegisterObjectMethod("string", "string replace(const string& in, const string& in, bool = true, uint = 0) const", asFUNCTION(StringReplace), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
