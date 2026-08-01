@@ -97,6 +97,18 @@ public:
 
 bool set_global_hrtf(bool enabled);
 bool get_global_hrtf();
+bool phonon_reflection_set_settings(int rays, int bounces, float duration, int order, int diffuse_samples, int max_sources, int threads, float default_wet_gain, float silence_threshold, float tail_padding);
+int phonon_reflection_get_order();
+int phonon_reflection_get_channels();
+int phonon_reflection_get_rays();
+int phonon_reflection_get_bounces();
+int phonon_reflection_get_diffuse_samples();
+int phonon_reflection_get_max_sources();
+int phonon_reflection_get_threads();
+float phonon_reflection_get_duration();
+float phonon_reflection_get_default_wet_gain();
+float phonon_reflection_get_silence_threshold();
+float phonon_reflection_get_tail_padding();
 
 class phonon_binaural_node : public virtual audio_node {
 	public:
@@ -198,6 +210,36 @@ class freeverb_node : public virtual audio_node {
 	virtual void set_frozen(bool frozen) = 0;
 	virtual bool get_frozen() const = 0;
 	static freeverb_node* create(audio_engine* engine);
+};
+class phonon_reflection_node;
+class sound_environment {
+public:
+	virtual void duplicate() = 0;
+	virtual void release() = 0;
+	virtual bool get_active() const = 0;
+	virtual bool add_material(const std::string& name, float absorption_low, float absorption_mid, float absorption_high, float scattering, float transmission_low, float transmission_mid, float transmission_high, bool replace_if_existing = false) = 0;
+	virtual bool add_box(const std::string& material, float minx, float maxx, float miny, float maxy, float minz, float maxz) = 0;
+	virtual bool commit_scene() = 0;
+	virtual void set_listener(float x, float y, float z, float rotation) = 0;
+	virtual void set_listener_vector(const reactphysics3d::Vector3& position, float rotation) = 0;
+	virtual bool update(bool reflections = true) = 0;
+	virtual phonon_reflection_node* create_reflection_node(audio_engine* engine = g_audio_engine) = 0;
+	static sound_environment* create(audio_engine* engine = g_audio_engine);
+};
+class phonon_reflection_node : public virtual audio_node {
+public:
+	virtual bool set_environment(sound_environment* environment) = 0;
+	virtual sound_environment* get_environment() const = 0;
+	virtual void set_position(float x, float y, float z) = 0;
+	virtual void set_position_vector(const reactphysics3d::Vector3& position) = 0;
+	virtual reactphysics3d::Vector3 get_position() const = 0;
+	virtual void set_enabled(bool enabled) = 0;
+	virtual bool get_enabled() const = 0;
+	virtual bool get_has_tail() const = 0;
+	virtual bool finish_tail() = 0;
+	virtual void set_wet_gain(float gain) = 0;
+	virtual float get_wet_gain() const = 0;
+	static phonon_reflection_node* create(sound_environment* environment, audio_engine* engine = g_audio_engine);
 };
 class reverb3d : public virtual passthrough_node {
 public:

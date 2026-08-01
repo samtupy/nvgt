@@ -1,0 +1,62 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2025 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+void main() {
+	show_window("Steam Audio geometry reverb test");
+	set_sound_global_hrtf(true);
+
+	sound_environment@ env = sound_environment();
+	env.add_box("concrete", -20, 20, -20, 20, -1, 0);
+	env.add_box("concrete", -20, 20, -20, -19, 0, 8);
+	env.add_box("concrete", -20, 20, 19, 20, 0, 8);
+	env.add_box("concrete", -20, -19, -20, 20, 0, 8);
+	env.add_box("glass", 19, 20, -20, 20, 0, 8);
+	env.commit_scene();
+
+	sound@ snd = sound_play("C:/windows/media/Ring10.wav", autoplay = false);
+	phonon_reflection_node@ reflections = env.create_reflection_node();
+	reflections.set_position(8, 8, 1);
+	snd.effects_chain.add_node(reflections);
+	snd.set_position_3d(8, 8, 1);
+	snd.play_looped();
+
+	float x = 0;
+	float y = 0;
+	float z = 1;
+	double rotation = 0;
+	timer update_timer;
+	while (!key_pressed(KEY_ESCAPE)) {
+		bool moved = false;
+		if (key_down(KEY_LEFT)) {
+			x -= 0.15;
+			moved = true;
+		}
+		if (key_down(KEY_RIGHT)) {
+			x += 0.15;
+			moved = true;
+		}
+		if (key_down(KEY_DOWN)) {
+			y -= 0.15;
+			moved = true;
+		}
+		if (key_down(KEY_UP)) {
+			y += 0.15;
+			moved = true;
+		}
+		if (key_down(KEY_A)) {
+			rotation -= 0.04;
+			moved = true;
+		}
+		if (key_down(KEY_D)) {
+			rotation += 0.04;
+			moved = true;
+		}
+		if (moved or update_timer.elapsed >= 50) {
+			update_timer.restart();
+			env.set_listener(x, y, z, rotation);
+			env.update(true);
+		}
+		wait(5);
+	}
+}
