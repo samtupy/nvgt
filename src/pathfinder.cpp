@@ -253,12 +253,11 @@ CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x,
 		return array;
 	}
 	array->Reserve(path.size() - 1);
-	vector3 v;
 	int x, y, z;
 	// BGT did not include the starting location here. Changing to match for now; discussion welcome.
 	for (int i = 1; i < path.size(); i++) {
 		decode_state(path[i], &x, &y, &z);
-		v.setAllValues(x, y, z);
+		vector3* v = new_vec3((float)x, (float)y, (float)z);
 		array->InsertLast(&v);
 	}
 	return array;

@@ -12,46 +12,24 @@
 
 #pragma once
 
-#include <cmath>
-#include <string>
+#define JPH_OBJECT_STREAM
+#define JPH_FLOATING_POINT_EXCEPTIONS_ENABLED
+#include <Jolt/Jolt.h>
+#include <Jolt/Math/Vec3.h>
+#include <phonon.h>
+
+// JPH::Vec3 is used as the AngelScript "vector" type throughout NVGT.
+// Internal C++ code can use Vec3 by value; only values crossing the AngelScript boundary need new_vec3().
+using vector3 = JPH::Vec3;
+JPH::Vec3* new_vec3(float x = 0.0f, float y = 0.0f, float z = 0.0f);
+inline JPH::Vec3* new_vec3(JPH::Vec3Arg v) { return new_vec3(v.GetX(), v.GetY(), v.GetZ()); }
+
+// Steam Audio custom scene callbacks backed by the Jolt physics world.
+// Pass a jolt_physics_world* as the userData when creating an IPL_SCENETYPE_CUSTOM scene.
+void IPLCALL jolt_ipl_closest_hit(const IPLRay* ray, IPLfloat32 min_dist, IPLfloat32 max_dist, IPLHit* hit, void* user_data);
+void IPLCALL jolt_ipl_any_hit(const IPLRay* ray, IPLfloat32 min_dist, IPLfloat32 max_dist, IPLuint8* occluded, void* user_data);
+void IPLCALL jolt_ipl_batched_closest_hit(IPLint32 num_rays, const IPLRay* rays, const IPLfloat32* min_dists, const IPLfloat32* max_dists, IPLHit* hits, void* user_data);
+void IPLCALL jolt_ipl_batched_any_hit(IPLint32 num_rays, const IPLRay* rays, const IPLfloat32* min_dists, const IPLfloat32* max_dists, IPLuint8* occluded, void* user_data);
 
 class asIScriptEngine;
-
-// Plain 3-float vector type used as the AngelScript "vector" type throughout NVGT, kept as a simple POD struct to avoid physics-library dependencies in subsystems that only need 3D math.
-struct vector3 {
-	float x, y, z;
-	vector3() : x(0), y(0), z(0) {}
-	vector3(float x, float y, float z) : x(x), y(y), z(z) {}
-	void setAllValues(float nx, float ny, float nz) { x = nx; y = ny; z = nz; }
-	vector3 operator+(const vector3& o) const { return vector3(x + o.x, y + o.y, z + o.z); }
-	vector3 operator-(const vector3& o) const { return vector3(x - o.x, y - o.y, z - o.z); }
-	vector3 operator*(const vector3& o) const { return vector3(x * o.x, y * o.y, z * o.z); }
-	vector3 operator*(float s) const { return vector3(x * s, y * s, z * s); }
-	vector3 operator/(float s) const { return vector3(x / s, y / s, z / s); }
-	vector3 operator-() const { return vector3(-x, -y, -z); }
-	vector3& operator+=(const vector3& o) { x += o.x; y += o.y; z += o.z; return *this; }
-	vector3& operator-=(const vector3& o) { x -= o.x; y -= o.y; z -= o.z; return *this; }
-	vector3& operator*=(float s) { x *= s; y *= s; z *= s; return *this; }
-	vector3& operator/=(float s) { x /= s; y /= s; z /= s; return *this; }
-	bool operator==(const vector3& o) const { return x == o.x && y == o.y && z == o.z; }
-	bool operator!=(const vector3& o) const { return !(*this == o); }
-	float length() const { return std::sqrt(x * x + y * y + z * z); }
-	float length_sq() const { return x * x + y * y + z * z; }
-	float dot(const vector3& o) const { return x * o.x + y * o.y + z * o.z; }
-	vector3 cross(const vector3& o) const { return vector3(y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x); }
-	vector3 normalized() const { float l = length(); return l > 0 ? *this / l : vector3(); }
-	bool is_normalized(float tol = 1e-6f) const { return std::abs(length_sq() - 1.0f) <= tol; }
-	bool is_near_zero(float tol = 1e-6f) const { return length_sq() <= tol * tol; }
-	vector3 abs() const { return vector3(std::abs(x), std::abs(y), std::abs(z)); }
-	float reduce_min() const { return x < y ? (x < z ? x : z) : (y < z ? y : z); }
-	float reduce_max() const { return x > y ? (x > z ? x : z) : (y > z ? y : z); }
-	void set(float nx, float ny, float nz) { x = nx; y = ny; z = nz; }
-	std::string to_string() const { return "vector(" + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z) + ")"; }
-	static vector3 zero() { return vector3(0, 0, 0); }
-	static vector3 one() { return vector3(1, 1, 1); }
-	static vector3 axis_x() { return vector3(1, 0, 0); }
-	static vector3 axis_y() { return vector3(0, 1, 0); }
-	static vector3 axis_z() { return vector3(0, 0, 1); }
-};
-
 void RegisterJolt(asIScriptEngine* engine);

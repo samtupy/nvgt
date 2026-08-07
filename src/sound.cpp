@@ -264,12 +264,12 @@ public:
 	int left_range, right_range, backward_range, forward_range, lower_range, upper_range;
 	sound_aabb_shape(int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range) : sound_shape(), left_range(left_range), right_range(right_range), backward_range(backward_range), forward_range(forward_range), lower_range(lower_range), upper_range(upper_range) {}
 	bool contains(const vector3& listener_position, vector3& sound_position) override {
-		vector3 bmin(sound_position.x - left_range, sound_position.y - backward_range, sound_position.z - lower_range);
-		vector3 bmax(sound_position.x + right_range, sound_position.y + forward_range, sound_position.z + upper_range);
-		if (listener_position.x >= bmin.x && listener_position.x <= bmax.x && listener_position.y >= bmin.y && listener_position.y <= bmax.y && listener_position.z >= bmin.z && listener_position.z <= bmax.z) return true;
-		sound_position.x = clamp(listener_position.x, bmin.x, bmax.x);
-		sound_position.y = clamp(listener_position.y, bmin.y, bmax.y);
-		sound_position.z = clamp(listener_position.z, bmin.z, bmax.z);
+		vector3 bmin(sound_position.GetX() - left_range, sound_position.GetY() - backward_range, sound_position.GetZ() - lower_range);
+		vector3 bmax(sound_position.GetX() + right_range, sound_position.GetY() + forward_range, sound_position.GetZ() + upper_range);
+		if (listener_position.GetX() >= bmin.GetX() && listener_position.GetX() <= bmax.GetX() && listener_position.GetY() >= bmin.GetY() && listener_position.GetY() <= bmax.GetY() && listener_position.GetZ() >= bmin.GetZ() && listener_position.GetZ() <= bmax.GetZ()) return true;
+		sound_position.SetX(clamp(listener_position.GetX(), bmin.GetX(), bmax.GetX()));
+		sound_position.SetY(clamp(listener_position.GetY(), bmin.GetY(), bmax.GetY()));
+		sound_position.SetZ(clamp(listener_position.GetZ(), bmin.GetZ(), bmax.GetZ()));
 		return false;
 	}
 };
@@ -479,7 +479,7 @@ public:
 	float get_gain() const override { return engine ? ma_engine_get_gain_db(&*engine) : 0; }
 	unsigned int get_listener_count() const override { return engine ? ma_engine_get_listener_count(&*engine) : 0; }
 	int find_closest_listener(float x, float y, float z) const override { return engine ? ma_engine_find_closest_listener(&*engine, x, y, z) : -1; }
-	int find_closest_listener_vector(const vector3 &position) const override { return engine ? ma_engine_find_closest_listener(&*engine, position.x, position.y, position.z) : -1; }
+	int find_closest_listener_vector(const vector3 &position) const override { return engine ? ma_engine_find_closest_listener(&*engine, position.GetX(), position.GetY(), position.GetZ()) : -1; }
 	void set_listener_position(unsigned int index, float x, float y, float z) override {
 		if (engine)
 			ma_engine_listener_set_position(&*engine, index, x, y, z);
@@ -487,7 +487,7 @@ public:
 	}
 	void set_listener_position_vector(unsigned int index, const vector3 &position) override {
 		if (engine)
-			ma_engine_listener_set_position(&*engine, index, position.x, position.y, position.z);
+			ma_engine_listener_set_position(&*engine, index, position.GetX(), position.GetY(), position.GetZ());
 		update_blocking_sound_shapes();
 	}
 	vector3 get_listener_position(unsigned int index) const override { return engine ? ma_vec3_to_vector3(ma_engine_listener_get_position(&*engine, index)) : vector3(); }
@@ -497,7 +497,7 @@ public:
 	}
 	void set_listener_direction_vector(unsigned int index, const vector3 &direction) override {
 		if (engine)
-			ma_engine_listener_set_direction(&*engine, index, direction.x, direction.y, direction.z);
+			ma_engine_listener_set_direction(&*engine, index, direction.GetX(), direction.GetY(), direction.GetZ());
 	}
 	vector3 get_listener_direction(unsigned int index) const override { return engine ? ma_vec3_to_vector3(ma_engine_listener_get_direction(&*engine, index)) : vector3(); }
 	void set_listener_velocity(unsigned int index, float x, float y, float z) override {
@@ -506,7 +506,7 @@ public:
 	}
 	void set_listener_velocity_vector(unsigned int index, const vector3 &velocity) override {
 		if (engine)
-			ma_engine_listener_set_velocity(&*engine, index, velocity.x, velocity.y, velocity.z);
+			ma_engine_listener_set_velocity(&*engine, index, velocity.GetX(), velocity.GetY(), velocity.GetZ());
 	}
 	vector3 get_listener_velocity(unsigned int index) const override { return engine ? ma_vec3_to_vector3(ma_engine_listener_get_velocity(&*engine, index)) : vector3(); }
 	void set_listener_cone(unsigned int index, float inner_radians, float outer_radians, float outer_gain) override {
@@ -523,7 +523,7 @@ public:
 	}
 	void set_listener_world_up_vector(unsigned int index, const vector3 &world_up) override {
 		if (engine)
-			ma_engine_listener_set_world_up(&*engine, index, world_up.x, world_up.y, world_up.z);
+			ma_engine_listener_set_world_up(&*engine, index, world_up.GetX(), world_up.GetY(), world_up.GetZ());
 	}
 	vector3 get_listener_world_up(unsigned int index) const override { return engine ? ma_vec3_to_vector3(ma_engine_listener_get_world_up(&*engine, index)) : vector3(); }
 	void set_listener_enabled(unsigned int index, bool enabled) override {
@@ -540,7 +540,7 @@ public:
 			return nullptr;
 		}
 		if (mix) snd->set_mixer(mix);
-		if (position.x != FLT_MAX || position.y != FLT_MAX || position.z != FLT_MAX) snd->set_position_3d_vector(position);
+		if (position.GetX() != FLT_MAX || position.GetY() != FLT_MAX || position.GetZ() != FLT_MAX) snd->set_position_3d_vector(position);
 		snd->set_volume(volume);
 		snd->set_pan(pan);
 		snd->set_pitch(pitch);
@@ -1209,16 +1209,16 @@ public:
 	bool get_spatialization_parameters(audio_spatialization_parameters& params) override {
 		if (!snd || !get_spatialization_enabled() || !spatialization_params_mutex.try_lock()) return false;
 		vector3 listener_pos = get_engine()->get_listener_position(get_listener()), listener_dir = get_direction_to_listener(), pos = get_position_3d();
-		params.listener_x = listener_pos.x;
-		params.listener_y = listener_pos.y;
-		params.listener_z = listener_pos.z;
-		params.listener_direction_x = listener_dir.x * -1;
-		params.listener_direction_y = listener_dir.y * -1;
-		params.listener_direction_z = listener_dir.z * -1;
+		params.listener_x = listener_pos.GetX();
+		params.listener_y = listener_pos.GetY();
+		params.listener_z = listener_pos.GetZ();
+		params.listener_direction_x = listener_dir.GetX() * -1;
+		params.listener_direction_y = listener_dir.GetY() * -1;
+		params.listener_direction_z = listener_dir.GetZ() * -1;
 		params.listener_distance = get_distance_to_listener();
-		params.sound_x = pos.x;
-		params.sound_y = pos.y;
-		params.sound_z = pos.z;
+		params.sound_x = pos.GetX();
+		params.sound_y = pos.GetY();
+		params.sound_z = pos.GetZ();
 		params.min_distance = get_min_distance();
 		params.max_distance = get_max_distance();
 		params.min_volume = get_min_gain();
@@ -1293,9 +1293,7 @@ public:
 		if (!snd)
 			return vector3();
 		const auto dir = ma_sound_get_direction_to_listener(&*snd);
-		vector3 res;
-		res.setAllValues(dir.x, dir.y, dir.z);
-		return res;
+		return vector3(dir.x, dir.y, dir.z);
 	}
 	float get_distance_to_listener() const override { return snd && get_spatialization_enabled()? ma_sound_get_distance_to_listener(&*snd) : 0.0; }
 	void set_position_3d(float x, float y, float z) override {
@@ -1308,47 +1306,41 @@ public:
 			vector3 pos(x, y, z);
 			vector3 listener = get_engine()->get_listener_position(get_listener());
 			bool is_contained = shape->is_in_shape(listener, pos);
-			if (!is_contained) ma_sound_set_position(&*snd, pos.x, pos.y, pos.z);
-			else ma_sound_set_position(&*snd, listener.x, listener.y, listener.z);
+			if (!is_contained) ma_sound_set_position(&*snd, pos.GetX(), pos.GetY(), pos.GetZ());
+			else ma_sound_set_position(&*snd, listener.GetX(), listener.GetY(), listener.GetZ());
 		} else ma_sound_set_position(&*snd, x, y, z);
 	}
-	void set_position_3d_vector(const vector3& position) override { set_position_3d(position.x, position.y, position.z); }
+	void set_position_3d_vector(const vector3& position) override { set_position_3d(position.GetX(), position.GetY(), position.GetZ()); }
 	vector3 get_position_3d() const override {
 		if (!snd)
 			return vector3();
-		if (shape) return shape->get_position(); // True sound position is stored in the shape because the position stored in miniaudio may have been altered by the shape.
+		if (shape) return shape->get_position();
 		const auto pos = ma_sound_get_position(&*snd);
-		vector3 res;
-		res.setAllValues(pos.x, pos.y, pos.z);
-		return res;
+		return vector3(pos.x, pos.y, pos.z);
 	}
 	void set_direction(float x, float y, float z) override {
 		if (!snd)
 			return;
 		return ma_sound_set_direction(&*snd, x, y, z);
 	}
-	void set_direction_vector(const vector3& direction) override { set_direction(direction.x, direction.y, direction.z); }
+	void set_direction_vector(const vector3& direction) override { set_direction(direction.GetX(), direction.GetY(), direction.GetZ()); }
 	vector3 get_direction() const override {
 		if (!snd)
 			return vector3();
 		const auto dir = ma_sound_get_direction(&*snd);
-		vector3 res;
-		res.setAllValues(dir.x, dir.y, dir.z);
-		return res;
+		return vector3(dir.x, dir.y, dir.z);
 	}
 	void set_velocity(float x, float y, float z) override {
 		if (!snd)
 			return;
 		return ma_sound_set_velocity(&*snd, x, y, z);
 	}
-	void set_velocity_vector(const vector3& velocity) override { set_velocity(velocity.x, velocity.y, velocity.z); }
+	void set_velocity_vector(const vector3& velocity) override { set_velocity(velocity.GetX(), velocity.GetY(), velocity.GetZ()); }
 	vector3 get_velocity() const override {
 		if (!snd)
 			return vector3();
 		const auto vel = ma_sound_get_velocity(&*snd);
-		vector3 res;
-		res.setAllValues(vel.x, vel.y, vel.z);
-		return res;
+		return vector3(vel.x, vel.y, vel.z);
 	}
 	void set_positioning(ma_positioning positioning) override {
 		if (snd)
@@ -1970,9 +1962,9 @@ sound* sound_play(const string& path, const vector3& position, float volume, flo
 	if (!init_sound()) return nullptr;
 	return g_audio_engine->play(path, position, volume, pan, pitch, mix, pack_file, autoplay);
 }
-vector3 sound_get_listener_position(unsigned int listener_index = 0) {
-	if (!init_sound()) return vector3(0, 0, 0);
-	return g_audio_engine->get_listener_position(listener_index);
+vector3* sound_get_listener_position(unsigned int listener_index = 0) {
+	if (!init_sound()) return new_vec3();
+	return new_vec3(g_audio_engine->get_listener_position(listener_index));
 }
 bool sound_set_listener_position(float x, float y, float z, unsigned int listener_index = 0) {
 	if (!init_sound()) return false;
@@ -2078,6 +2070,9 @@ template < class T, auto Function, typename ReturnType, typename... Args >
 ReturnType virtual_call(T *object, Args... args) {
 	return (object->*Function)(std::forward < Args > (args)...);
 }
+// Wrapper for virtual methods returning vector3 by value — returns heap-allocated Vec3* for AS scoped type
+template<class T, auto MemberFn, typename... Args>
+static vector3* sound_vec3(T* obj, Args... args) { return new_vec3((obj->*MemberFn)(std::forward<Args>(args)...)); }
 template < class T > inline void RegisterSoundsystemAudioNode(asIScriptEngine *engine, const std::string &type) {
 	engine->RegisterObjectType(type.c_str(), 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_ADDREF, "void f()", asFUNCTION((virtual_call < T, &T::duplicate, void >)), asCALL_CDECL_OBJFIRST);
@@ -2174,18 +2169,18 @@ void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_engine", "int find_closest_listener(const vector&in position) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::find_closest_listener_vector, int, const vector3 & >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_position(int index, float x, float y, float z)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_position, void, int, float, float, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_position(int index, const vector&in position)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_position_vector, void, int, const vector3 & >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "vector get_listener_position(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_position, vector3, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "vector@ get_listener_position(int index) const", asFUNCTION((sound_vec3<audio_engine, &audio_engine::get_listener_position, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_direction(int index, float x, float y, float z)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_direction, void, int, float, float, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_direction(int index, const vector&in direction)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_direction_vector, void, int, const vector3 & >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "vector get_listener_direction(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_direction, vector3, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "vector@ get_listener_direction(int index) const", asFUNCTION((sound_vec3<audio_engine, &audio_engine::get_listener_direction, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_velocity(int index, float x, float y, float z)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_velocity, void, int, float, float, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_velocity(int index, const vector&in velocity)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_velocity_vector, void, int, const vector3 & >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "vector get_listener_velocity(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_velocity, vector3, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "vector@ get_listener_velocity(int index) const", asFUNCTION((sound_vec3<audio_engine, &audio_engine::get_listener_velocity, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_cone(int index, float inner_radians, float outer_radians, float outer_gain)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_cone, void, int, float, float, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void get_listener_cone(int index, float&out inner_radians, float&out outer_radians, float&out outer_gain) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_cone, void, int, float *, float *, float * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_world_up(int index, float x, float y, float z)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_world_up, void, int, float, float, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_world_up(int index, const vector&in world_up)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_world_up_vector, void, int, const vector3 & >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("audio_engine", "vector get_listener_world_up(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_world_up, vector3, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "vector@ get_listener_world_up(int index) const", asFUNCTION((sound_vec3<audio_engine, &audio_engine::get_listener_world_up, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "void set_listener_enabled(int index, bool enabled)", asFUNCTION((virtual_call < audio_engine, &audio_engine::set_listener_enabled, void, int, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "bool get_listener_enabled(int index) const", asFUNCTION((virtual_call < audio_engine, &audio_engine::get_listener_enabled, bool, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterGlobalFunction("void set_sound_default_engine(audio_engine@ engine) property", asFUNCTION(set_sound_default_engine), asCALL_CDECL);
@@ -2306,17 +2301,17 @@ template<class T> void RegisterSoundsystemMixer(asIScriptEngine *engine, const s
 	engine->RegisterObjectMethod(type.c_str(), "void set_pinned_listener(uint index) property", asFUNCTION((virtual_call < T, &T::set_pinned_listener, void, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_pinned_listener() const property", asFUNCTION((virtual_call < T, &T::get_pinned_listener, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_listener() const property", asFUNCTION((virtual_call < T, &T::get_listener, unsigned int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "vector get_direction_to_listener() const", asFUNCTION((virtual_call < T, &T::get_direction_to_listener, vector3 >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "vector@ get_direction_to_listener() const", asFUNCTION((sound_vec3<T, &T::get_direction_to_listener>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "float get_distance_to_listener() const", asFUNCTION((virtual_call < T, &T::get_distance_to_listener, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_position_3d(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_position_3d, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_position_3d(const vector&in position)", asFUNCTION((virtual_call < T, &T::set_position_3d_vector, void, const vector3&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "vector get_position_3d() const", asFUNCTION((virtual_call < T, &T::get_position_3d, vector3 >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "vector@ get_position_3d() const", asFUNCTION((sound_vec3<T, &T::get_position_3d>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_direction(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_direction, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_direction(const vector&in direction)", asFUNCTION((virtual_call < T, &T::set_direction_vector, void, const vector3&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "vector get_direction() const", asFUNCTION((virtual_call < T, &T::get_direction, vector3 >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "vector@ get_direction() const", asFUNCTION((sound_vec3<T, &T::get_direction>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(float x, float y, float z)", asFUNCTION((virtual_call < T, &T::set_velocity, void, float, float, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_velocity(const vector&in velocity)", asFUNCTION((virtual_call < T, &T::set_velocity_vector, void, const vector3&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "vector get_velocity() const", asFUNCTION((virtual_call < T, &T::get_velocity, vector3 >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "vector@ get_velocity() const", asFUNCTION((sound_vec3<T, &T::get_velocity>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_positioning(audio_positioning_mode mode) property", asFUNCTION((virtual_call < T, &T::set_positioning, void, ma_positioning >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_positioning_mode get_positioning() const property", asFUNCTION((virtual_call < T, &T::get_positioning, ma_positioning >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_rolloff(float rolloff) property", asFUNCTION((virtual_call < T, &T::set_rolloff, void, float >)), asCALL_CDECL_OBJFIRST);
@@ -2649,7 +2644,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterGlobalProperty("mixer@ sound_default_mixer", (void*)&g_audio_mixer);
 	engine->RegisterGlobalFunction("void set_sound_output_device(int device) property", asFUNCTION(set_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalFunction("sound@ sound_play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@ mix = null, const pack_interface@ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION(sound_play), asCALL_CDECL);
-	engine->RegisterGlobalFunction("vector sound_get_listener_position(uint listener_index = 0)", asFUNCTION(sound_get_listener_position), asCALL_CDECL);
+	engine->RegisterGlobalFunction("vector@ sound_get_listener_position(uint listener_index = 0)", asFUNCTION(sound_get_listener_position), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool sound_set_listener_position(float x, float y, float z, uint listener_index = 0)", asFUNCTION(sound_set_listener_position), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool sound_set_listener_position(const vector&in position, uint listener_index = 0)", asFUNCTION(sound_set_listener_position_vector), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_decryption_key(const string& in key) property", asFUNCTION(set_default_decryption_key), asCALL_CDECL);

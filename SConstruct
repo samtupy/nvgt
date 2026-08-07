@@ -157,8 +157,13 @@ elif env["NVGT_TARGET"] == "android": env["no_import_lib"] = 1
 elif env["NVGT_TARGET"] != "ios": env.Append(LIBS = ["plist-2.0", "archive"])
 extra_objects = [version_object]
 if static_plugins_object: extra_objects.append(static_plugins_object)
+<<<<<<< Updated upstream
 if env["NVGT_TARGET"] not in ["android", "ios"]:
 	if ARGUMENTS.get("debug", "0") == "1": env["PDB"] = "#build/debug/nvgt.pdb"
+=======
+if env["NVGT_TARGET"] != "ios":
+	if ARGUMENTS.get("debug", "0") != "0": env["PDB"] = "#build/debug/nvgt.pdb"
+>>>>>>> Stashed changes
 	nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + extra_objects)
 	if env["NVGT_TARGET"] == "macos":
 		# On Mac OS, we need to run install_name_tool to modify the paths of any dynamic libraries we link.
@@ -167,7 +172,7 @@ if env["NVGT_TARGET"] not in ["android", "ios"]:
 		# Only on windows we must go through the frustrating hastle of compiling a version of nvgt with no console E. the windows subsystem.
 		# It is at least set up so that we only need to recompile one object
 		if "nvgt.cpp" in sources: sources.remove("nvgt.cpp")
-		if ARGUMENTS.get("debug", "0") == "1": env["PDB"] = "#build/debug/nvgtw.pdb"
+		if ARGUMENTS.get("debug", "0") != "0": env["PDB"] = "#build/debug/nvgtw.pdb"
 		nvgtw = env.Program("release/nvgtw", env.Object([os.path.join("build/obj_src", s) for s in sources]) + [env.Object("build/obj_src/nvgtw", "build/obj_src/nvgt.cpp", CPPDEFINES = ["$CPPDEFINES", "NVGT_WIN_APP"]), extra_objects], LINKFLAGS = ["$LINKFLAGS", "/subsystem:windows"])
 		sources.append("nvgt.cpp")
 		# Todo: Properly implement the install target on other platforms

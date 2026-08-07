@@ -25,19 +25,17 @@ using Vector3 = vector3;
 static asIScriptContext* fcallback_ctx = NULL;
 
 Vector3 rotate(const Vector3& p, const Vector3& o, double theta, bool maintain_z = true) {
-	int angle = (180.0 / M_PI) * theta;
-	Vector3 r;
-	Vector3 cs = Vector3(angle != 90 && angle != 270 ? cos(theta) : 0, angle != 180 ? sin(theta) : 0, 0);
-	r.x = (cs.x * (p.x - o.x)) - (cs.y * (p.y - o.y)) + o.x;
-	r.y = (cs.y * (p.x - o.x)) + (cs.x * (p.y - o.y)) + o.y;
-	if (maintain_z)
-		r.z = p.z;
-	return r;
+	int angle = (int)((180.0 / M_PI) * theta);
+	float csx = angle != 90 && angle != 270 ? (float)cos(theta) : 0.0f;
+	float csy = angle != 180 ? (float)sin(theta) : 0.0f;
+	float rx = (csx * (p.GetX() - o.GetX())) - (csy * (p.GetY() - o.GetY())) + o.GetX();
+	float ry = (csy * (p.GetX() - o.GetX())) + (csx * (p.GetY() - o.GetY())) + o.GetY();
+	return Vector3(rx, ry, maintain_z ? p.GetZ() : 0.0f);
 }
+static vector3* rotate_as(const vector3& p, const vector3& o, double theta, bool maintain_z = true) { return new_vec3(rotate(p, o, theta, maintain_z)); }
 Vector3 get_center(Vector3 _min, Vector3 _max) {
-	if (_min == _max || _max.x - _min.x < 2 && _max.y - _min.y < 2 && _max.z - _min.z < 2)
-		return _min;
-	return Vector3(_min.x + (_max.x - _min.x) / 2.0, _min.y + (_max.y - _min.y) / 2.0, _min.z + (_max.z - _min.z) / 2.0);
+	if (_min == _max || _max.GetX() - _min.GetX() < 2 && _max.GetY() - _min.GetY() < 2 && _max.GetZ() - _min.GetZ() < 2) return _min;
+	return Vector3(_min.GetX() + (_max.GetX() - _min.GetX()) / 2.0f, _min.GetY() + (_max.GetY() - _min.GetY()) / 2.0f, _min.GetZ() + (_max.GetZ() - _min.GetZ()) / 2.0f);
 }
 Vector3 get_center(double minx, double maxx, double miny, double maxy, double minz, double maxz) {
 	if (minx == maxx && miny == maxy && minz == maxz || maxx - minx < 2 && maxy - miny < 2 && maxz - minz < 2)
@@ -51,19 +49,19 @@ bool polygons_intersect(const std::vector<Vector3>& a, const std::vector<Vector3
 		const std::vector<Vector3>& polygon = polyi == 0 ? a : b;
 		for (int i1 = 0; i1 < polygon.size(); ++i1) {
 			const int i2 = (i1 + 1) % polygon.size();
-			const double normalx = polygon[i2].y - polygon[i1].y;
-			const double normaly = polygon[i2].x - polygon[i1].x;
+			const double normalx = polygon[i2].GetY() - polygon[i1].GetY();
+			const double normaly = polygon[i2].GetX() - polygon[i1].GetX();
 			double minA = (std::numeric_limits<double>::max());
 			double maxA = (std::numeric_limits<double>::lowest());
 			for (int ai = 0; ai < a.size(); ++ai) {
-				const double projected = normalx * a[ai].x + normaly * a[ai].y;
+				const double projected = normalx * a[ai].GetX() + normaly * a[ai].GetY();
 				if (projected < minA) minA = projected;
 				if (projected > maxA) maxA = projected;
 			}
 			double minB = std::numeric_limits<double>::max();
 			double maxB = std::numeric_limits<double>::lowest();
 			for (int bi = 0; bi < b.size(); ++bi) {
-				const double projected = normalx * b[bi].x + normaly * b[bi].y;
+				const double projected = normalx * b[bi].GetX() + normaly * b[bi].GetY();
 				if (projected < minB) minB = projected;
 				if (projected > maxB) maxB = projected;
 			}
@@ -78,8 +76,8 @@ bool boxes_intersect(float minx1, float maxx1, float miny1, float maxy1, float r
 	Vector3 c2 = get_center(minx2, maxx2, miny2, maxy2, 0, 0);
 	Vector3 min1 = Vector3(minx1, miny1, 0);
 	Vector3 min2 = Vector3(minx2, miny2, 0);
-	std::vector<Vector3> p1 = {min1 + rotate(Vector3(-c1.x, -c1.y, 0), Vector3(0, 0, 0), r1), min1 + rotate(Vector3(-c1.x, c1.y, 0), Vector3(0, 0, 0), r1), min1 + rotate(Vector3(c1.x, c1.y, 0), Vector3(0, 0, 0), r1), min1 + rotate(Vector3(c1.x, -c1.y, 0), Vector3(0, 0, 0), r1)};
-	std::vector<Vector3> p2 = {min2 + rotate(Vector3(-c2.x, -c2.y, 0), Vector3(0, 0, 0), r2), min2 + rotate(Vector3(-c2.x, c2.y, 0), Vector3(0, 0, 0), r2), min2 + rotate(Vector3(c2.x, c2.y, 0), Vector3(0, 0, 0), r2), min2 + rotate(Vector3(c2.x, -c2.y, 0), Vector3(0, 0, 0), r2)};
+	std::vector<Vector3> p1 = {min1 + rotate(Vector3(-c1.GetX(), -c1.GetY(), 0), Vector3(0, 0, 0), r1), min1 + rotate(Vector3(-c1.GetX(), c1.GetY(), 0), Vector3(0, 0, 0), r1), min1 + rotate(Vector3(c1.GetX(), c1.GetY(), 0), Vector3(0, 0, 0), r1), min1 + rotate(Vector3(c1.GetX(), -c1.GetY(), 0), Vector3(0, 0, 0), r1)};
+	std::vector<Vector3> p2 = {min2 + rotate(Vector3(-c2.GetX(), -c2.GetY(), 0), Vector3(0, 0, 0), r2), min2 + rotate(Vector3(-c2.GetX(), c2.GetY(), 0), Vector3(0, 0, 0), r2), min2 + rotate(Vector3(c2.GetX(), c2.GetY(), 0), Vector3(0, 0, 0), r2), min2 + rotate(Vector3(c2.GetX(), -c2.GetY(), 0), Vector3(0, 0, 0), r2)};
 	return polygons_intersect(p1, p2);
 }
 
@@ -150,17 +148,20 @@ void map_area::reframe() {
 	Vector3 MAX = Vector3(maxx, maxy, maxz);
 	if (rotation > 0) {
 		Vector3 d = MAX - MIN;
-		std::vector<Vector3> points = {rotate(MIN, center, rotation), rotate(Vector3(MIN.x + d.x, MIN.y, 0), center, rotation), rotate(Vector3(MIN.x, MIN.y + d.y, 0), center, rotation), rotate(Vector3(MIN.x + d.x, MIN.y + d.y, 0), center, rotation)};
-		for (int i = 0; i < points.size(); i++) {
-			if (points[i].x < MIN.x) MIN.x = points[i].x - 1;
-			else if (points[i].x > MAX.x) MAX.x = points[i].x + 1;
-			if (points[i].y < MIN.y) MIN.y = points[i].y - 1;
-			else if (points[i].y > MAX.y) MAX.y = points[i].y + 1;
+		std::vector<Vector3> points = {rotate(MIN, center, rotation), rotate(Vector3(MIN.GetX() + d.GetX(), MIN.GetY(), 0), center, rotation), rotate(Vector3(MIN.GetX(), MIN.GetY() + d.GetY(), 0), center, rotation), rotate(Vector3(MIN.GetX() + d.GetX(), MIN.GetY() + d.GetY(), 0), center, rotation)};
+		float minx = MIN.GetX(), miny = MIN.GetY(), maxx = MAX.GetX(), maxy = MAX.GetY();
+		for (int i = 0; i < (int)points.size(); i++) {
+			if (points[i].GetX() < minx) minx = points[i].GetX() - 1;
+			else if (points[i].GetX() > maxx) maxx = points[i].GetX() + 1;
+			if (points[i].GetY() < miny) miny = points[i].GetY() - 1;
+			else if (points[i].GetY() > maxy) maxy = points[i].GetY() + 1;
 		}
+		MIN = Vector3(minx, miny, MIN.GetZ());
+		MAX = Vector3(maxx, maxy, MAX.GetZ());
 	}
-	for (int x = MIN.x; x <= MAX.x + frame_sizes[framesize]; x += frame_sizes[framesize]) {
-		for (int y = MIN.y; y <= MAX.y + frame_sizes[framesize]; y += frame_sizes[framesize]) {
-			for (int z = MIN.z; z <= MAX.z + frame_sizes[framesize]; z += frame_sizes[framesize]) {
+	for (int x = (int)MIN.GetX(); x <= (int)MAX.GetX() + frame_sizes[framesize]; x += frame_sizes[framesize]) {
+		for (int y = (int)MIN.GetY(); y <= (int)MAX.GetY() + frame_sizes[framesize]; y += frame_sizes[framesize]) {
+			for (int z = (int)MIN.GetZ(); z <= (int)MAX.GetZ() + frame_sizes[framesize]; z += frame_sizes[framesize]) {
 				map_frame* f = parent->get_frame(x, y, z, framesize);
 				if (!f) continue;
 				add_ref();
@@ -198,18 +199,18 @@ bool map_area::is_in_area(float x, float y, float z, float d, asIScriptFunction*
 		int longest = maxx - minx;
 		if (maxy - miny > longest) longest = maxy - miny;
 		if (longest < 1) longest = 1;
-		return x >= center.x - d - longest && x <= center.x + d + longest && y >= center.y - d - longest && y <= center.y + d + longest && is_unfiltered(filter_callback);
+		return x >= center.GetX() - d - longest && x <= center.GetX() + d + longest && y >= center.GetY() - d - longest && y <= center.GetY() + d + longest && is_unfiltered(filter_callback);
 	}
 	Vector3 border = Vector3(1, 1, 1);
 	if (rotation > 0) {
 		Vector3 r = rotate(Vector3(x, y, z), center, rotation);
-		x = r.x;
-		y = r.y;
+		x = r.GetX();
+		y = r.GetY();
 		//border=rotate(border, Vector3(0, 0, 0), rotation);
 	}
-	if (x < minx - d + (border.x < 0 ? border.x : 0) || x >= maxx + d + (border.x > 0 ? border.x : 0)) return false;
-	if (y < miny - d + (border.y < 0 ? border.y : 0) || y >= maxy + d + (border.y > 0 ? border.y : 0)) return false;
-	if (z < minz - d + (border.z < 0 ? border.z : 0) || z >= maxz + d + (border.z > 0 ? border.z : 0)) return false;
+	if (x < minx - d + (border.GetX() < 0 ? border.GetX() : 0) || x >= maxx + d + (border.GetX() > 0 ? border.GetX() : 0)) return false;
+	if (y < miny - d + (border.GetY() < 0 ? border.GetY() : 0) || y >= maxy + d + (border.GetY() > 0 ? border.GetY() : 0)) return false;
+	if (z < minz - d + (border.GetZ() < 0 ? border.GetZ() : 0) || z >= maxz + d + (border.GetZ() > 0 ? border.GetZ() : 0)) return false;
 	return is_unfiltered(filter_callback);
 }
 bool map_area::is_in_area_range(float minx, float maxx, float miny, float maxy, float minz, float maxz, float d, float r, asIScriptFunction* filter_callback, asINT64 required_flags, asINT64 excluded_flags) {
@@ -220,7 +221,7 @@ bool map_area::is_in_area_range(float minx, float maxx, float miny, float maxy, 
 		Vector3 R = Vector3(this->minx, this->maxy, this->minz);
 		if (r > 0)
 			R = rotate(R, get_center(minx, maxx, miny, maxy, minz, maxz), r);
-		return R.x >= minx - d && R.x < maxx + d + 1.0 && R.y >= miny - d && R.y < maxy + d + 1.0 && R.z >= minz - d && R.z < maxz + d + 1.0 && is_unfiltered(filter_callback);
+		return R.GetX() >= minx - d && R.GetX() < maxx + d + 1.0 && R.GetY() >= miny - d && R.GetY() < maxy + d + 1.0 && R.GetZ() >= minz - d && R.GetZ() < maxz + d + 1.0 && is_unfiltered(filter_callback);
 	}
 	return this->minz >= minz - d && this->maxz < maxz + d + 1.0 && this->miny >= miny - d && this->maxy < maxy + d + 1.0 && this->minx >= minx - d && this->maxx < maxx + d + 1.0 && is_unfiltered(filter_callback);
 }
@@ -260,15 +261,8 @@ void coordinate_map::release() {
 	}
 }
 Vector3 coordinate_map::get_frame_coordinates(int x, int y, int z, int size) {
-	Vector3 r;
-	r.x = 0;
-	r.y = 0;
-	r.z = 0;
-	if (size < 0 || size >= total_frame_sizes) return r;
-	r.x -= x & (frame_sizes[size] - 1);
-	r.y -= y & (frame_sizes[size] - 1);
-	r.z -= z & (frame_sizes[size] - 1);
-	return r;
+	if (size < 0 || size >= total_frame_sizes) return vector3::sZero();
+	return Vector3(-(float)(x & (frame_sizes[size] - 1)), -(float)(y & (frame_sizes[size] - 1)), -(float)(z & (frame_sizes[size] - 1)));
 }
 map_frame* coordinate_map::get_frame(int x, int y, int z, int size, bool create) {
 	if (size < 0 || size >= total_frame_sizes) return NULL;
@@ -376,7 +370,7 @@ coordinate_map* new_coordinate_map() {
 
 void RegisterScriptMap(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
-	engine->RegisterGlobalFunction(_O("vector rotate(const vector&in point, const vector&in origin, double theta, bool maintain_z = true)"), asFUNCTION(rotate), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("vector@ rotate(const vector&in point, const vector&in origin, double theta, bool maintain_z = true)"), asFUNCTION(rotate_as), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool boxes_intersect(float, float, float, float, float, float, float, float, float, float)"), asFUNCTION(boxes_intersect), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_MAP);
 	engine->RegisterObjectType(_O("coordinate_map"), 0, asOBJ_REF);

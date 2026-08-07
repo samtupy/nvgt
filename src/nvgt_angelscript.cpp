@@ -1029,7 +1029,7 @@ std::string DateTimeToString(void* obj, int expandMembers, CDebugger *dbg) {
 }
 std::string Vector3ToString(void* obj, int expandMembers, CDebugger *dbg) {
 	vector3 *v = reinterpret_cast<vector3*>(obj);
-	return v->to_string();
+	return "vector(" + std::to_string(v->GetX()) + ", " + std::to_string(v->GetY()) + ", " + std::to_string(v->GetZ()) + ")";
 }
 #ifdef _WIN32
 BOOL WINAPI debugger_ctrlc(DWORD event) {
