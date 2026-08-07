@@ -74,7 +74,7 @@ public:
 		return send_peer(peer, message, channel);
 	}
 	bool send_unreliable_peer(asQWORD peer, const std::string& message, unsigned char channel) {
-		return send(peer, message, channel, false);
+		return send_peer(peer, message, channel, false);
 	}
 	bool flush();
 	bool disconnect_peer_softly(asQWORD peer_id);

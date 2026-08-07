@@ -56,7 +56,7 @@ void sdl_file_stream_buf::open(const std::string& path, const std::string& mode)
 	_handle = SDL_IOFromFile(path.c_str(), mode.c_str());
 	if (!_handle) throw FileException("Cannot open file: " + path);
 	// Parse the mode string just to the extent that we can disable read or write features on the bidirectional buffer depending on stream type.
-	std::ios::openmode new_mode;
+	std::ios::openmode new_mode{};
 	for (char c : mode) {
 		if (c == 'r') new_mode |= std::ios::in;
 		else if (c == 'w') new_mode |= std::ios::out;

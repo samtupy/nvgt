@@ -924,15 +924,12 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*us
 			string token = pragmaText.substr(pos, length);
 			if (tokenClass == asTC_VALUE) {
 				// May be a string, trim quotes
-				if (token.starts_with("\""))
-					token.erase(0, 1);
-				if (token.ends_with("\""))
-					token.pop_back();
+				if (token.starts_with("\"")) token.erase(0, 1);
+				if (token.ends_with("\"")) token.pop_back();
 			}
 			cleanText += " " + token;
 		}
-		if (tokenClass == asTC_UNKNOWN)
-			return -1;
+		if (tokenClass == asTC_UNKNOWN) return -1;
 		pos += length;
 	}
 	cleanText.erase(cleanText.begin());
@@ -972,7 +969,7 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*us
 		int space = ns.rfind(" ");
 		if (space == string::npos) return -1;
 		g_system_namespaces[ns.substr(0, space)] = ns.substr(space + 1);
-	} else if (cleanText == "console") config.setString("build.windowsConsole", "");
+	} else if (cleanText == "console") config.setString("build.windows_console", "");
 	else if (cleanText == "no_auto_chdir") config.setString("app.no_auto_chdir", "");
 	else return -1;
 	return 0;

@@ -67,5 +67,6 @@ std::string android_get_main_shared_object();
 
 void lost_window_focus_platform();
 void regained_window_focus_platform();
+unsigned long long system_running_milliseconds();
 
 void RegisterXplatform(asIScriptEngine* engine);

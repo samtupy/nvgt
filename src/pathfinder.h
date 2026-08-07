@@ -100,7 +100,8 @@ public:
 	void set_callback_function(asIScriptFunction* func); // Basic callback with only x, y, z, user_data.
 	void set_callback_function_ex(asIScriptFunction* func); // Advanced callback with x, y, z, parent_x, parent_y, parent_z, user_data.
 	void set_callback_function_legacy(asIScriptFunction* func); // 2D BGT legacy mode with string as user_data.
-
+int get_desperation_factor() const { return desperation_factor; }
+void set_desperation_factor(int f) { if (f > -1 && f < 11) desperation_factor = f; }
 	float get_difficulty(void* state, void* parent_state);
 	float get_difficulty(int x, int y, int z, int parent_x, int parent_y, int parent_z);
 	void cancel();

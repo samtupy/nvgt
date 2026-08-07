@@ -21,6 +21,8 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <sys/sysctl.h>
+#include <sys/time.h>
 #include <angelscript.h>
 #include <scriptarray.h>
 #include <TargetConditionals.h>
@@ -483,3 +485,13 @@ std::string apple_input_box(const std::string& title, const std::string& message
 	return result;
 }
 #endif
+
+unsigned long long system_running_milliseconds() {
+	struct timeval boottime, now;
+	int mib[2] = {CTL_KERN, KERN_BOOTTIME};
+	size_t size = sizeof(boottime);
+	if (sysctl(mib, 2, &boottime, &size, NULL, 0) != 0) return 0;
+	gettimeofday(&now, NULL);
+	long long ms = ((long long)(now.tv_sec - boottime.tv_sec)) * 1000LL + (now.tv_usec - boottime.tv_usec) / 1000;
+	return ms > 0 ? (unsigned long long)ms : 0;
+}

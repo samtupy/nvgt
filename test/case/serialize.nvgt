@@ -24,8 +24,93 @@ void test_serialize() {
 	int int_val;
 	assert(D.get("num", int_val) == true);
 	assert(int_val == 7);
-	
+
 	bool bool_val;
 	assert(D.get("hi", bool_val) == true);
 	assert(bool_val == false);
+}
+
+void test_serialize_nested() {
+	dictionary inner;
+	inner["a"] = 1;
+	inner["b"] = "hello";
+	int[] nums = {1, 2, 3};
+	string[] words = {"x", "y", "z"};
+	dictionary outer;
+	outer["inner"] = inner;
+	outer["numbers"] = nums;
+	outer["words"] = words;
+	outer["v"] = vector(1, 2, 3);
+	dictionary@ null_dict;
+	outer["missing"] = @null_dict;
+
+	string s = outer.serialize();
+	assert(s.length() > 0);
+	dictionary@ D = deserialize(s);
+	assert(@D != null);
+	assert(D.get_size() == 5);
+
+	dictionary@ got_inner;
+	assert(D.get("inner", @got_inner) == true);
+	assert(@got_inner != null);
+	int a_val;
+	assert(got_inner.get("a", a_val) == true);
+	assert(a_val == 1);
+	string b_val;
+	assert(got_inner.get("b", b_val) == true);
+	assert(b_val == "hello");
+
+	// The original inner dictionary above was stored without an explicit @, so make sure retrieval works the same way on the deserialized copy (this dictionary was nonetheless stored as a handle internally by CScriptDictionary since it has no other way to store a reference type).
+	dictionary got_inner_val;
+	assert(D.get("inner", got_inner_val) == true);
+	assert(got_inner_val.get("a", a_val) == true && a_val == 1);
+
+	int[]@ got_numbers;
+	assert(D.get("numbers", @got_numbers) == true);
+	assert(@got_numbers != null);
+	assert(got_numbers.length() == 3);
+	assert(got_numbers[0] == 1 && got_numbers[1] == 2 && got_numbers[2] == 3);
+
+	string[]@ got_words;
+	assert(D.get("words", @got_words) == true);
+	assert(@got_words != null);
+	assert(got_words.length() == 3);
+	assert(got_words[0] == "x" && got_words[1] == "y" && got_words[2] == "z");
+
+	vector v_val;
+	assert(D.get("v", v_val) == true);
+	assert(v_val == vector(1, 2, 3));
+
+	dictionary@ got_missing;
+	assert(D.get("missing", @got_missing) == true);
+	assert(@got_missing == null);
+
+	// Test serialization of object with dictionary@ opCast and object(dictionary@ data)
+	dictionary contains_object;
+	serializable_object obj;
+	obj.v1 = "hahaha";
+	obj.v2 = 999;
+	contains_object["obj"] = @obj;
+	dictionary@ contains_object2 = deserialize(contains_object.serialize());
+	assert(contains_object2.get_size() > 0);
+	serializable_object@ obj2 = cast<serializable_object@>(contains_object2["obj"]);
+	assert(obj.v1 == obj2.v1 and obj.v2 == obj2.v2);
+}
+class serializable_object {
+	string v1;
+	int v2;
+	serializable_object() {
+		v1 = "hello";
+		v2 = 123;
+	}
+	serializable_object(dictionary@ d) {
+		d.get("v1", v1);
+		d.get("v2", v2);
+	}
+	dictionary@ opCast() {
+		dictionary d;
+		d.set("v1", v1);
+		d.set("v2", v2);
+		return d;
+	}
 }

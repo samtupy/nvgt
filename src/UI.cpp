@@ -533,7 +533,7 @@ bool is_console_available() {
 	#if defined (_WIN32)
 	return Poco::Util::Application::instance().config().hasOption("application.gui") ? GetConsoleWindow() != nullptr : true;
 	#else
-	return isatty(fileno(stdin)) || isatty(fileno(stdout)) || isatty(fileno(stderr));
+	return Poco::Util::Application::instance().config().hasOption("application.gui")? isatty(fileno(stdin)) || isatty(fileno(stdout)) || isatty(fileno(stderr)) : true;
 	#endif
 }
 

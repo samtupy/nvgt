@@ -4,7 +4,7 @@ scriptdictionary = env.SharedObject("scriptdictionary", "#ASAddon/plugin/scriptd
 
 if ARGUMENTS.get("no_shared_plugins", "0") == "0":
 	libs = ["PocoRedis", "PocoNet", "PocoFoundation", "pcre2-8"]
-	env.SharedLibrary("#release/lib/redis", ["redis.cpp", scriptarray, scriptdictionary], LIBS = env["LIBS"] + libs)
-static = env.Object("redis_static", "redis.cpp", CPPDEFINES = env["CPPDEFINES"] + [("NVGT_PLUGIN_STATIC", "redis")])
+	env.SharedLibrary(env["PLUGIN_DEST_DIR"] + "/redis", ["redis.cpp", scriptarray, scriptdictionary], LIBS = env["LIBS"] + libs)
+static = env.Object("redis_static", "redis.cpp", CPPDEFINES = list(env["CPPDEFINES"]) + [("NVGT_PLUGIN_STATIC", "redis")])
 static = env.StaticLibrary("#build/lib/redis", [static])
 Return("static")

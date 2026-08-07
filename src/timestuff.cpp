@@ -33,6 +33,7 @@
 #include "nvgt.h"
 #include "pocostuff.h"  // angelscript_refcounted
 #include "scriptstuff.h"
+#include "xplatform.h"
 
 using namespace Poco;
 
@@ -259,28 +260,6 @@ uint64_t ticks(bool secure) {
 }
 uint64_t microticks(bool secure) {
 	return !secure ? g_clock.elapsed() : g_secure_clock.elapsed();
-}
-
-// Replace the following function with something from an external library or something as soon as we find it.
-#ifdef _WIN32
-	#include <windows.h>
-#endif
-asINT64 system_running_milliseconds() {
-	#ifdef _WIN32
-	return GetTickCount64();
-	#else
-	FILE *f = fopen("/proc/uptime", "r");
-	char tmp[40];
-	if (!fgets(tmp, 40, f)) {
-		fclose(f);
-		return 0;
-	}
-	char* space = strchr(tmp, ' ');
-	if (space) 		*space = '\0';
-	asINT64 ret = strtof(tmp, NULL) * 1000;
-	fclose(f);
-	return ret;
-	#endif
 }
 
 // timer class

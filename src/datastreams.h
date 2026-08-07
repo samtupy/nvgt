@@ -98,7 +98,7 @@ public:
 };
 class prebuffer_istream : public std::istream {
 public:
-	prebuffer_istream(std::istream& source, std::size_t prebuffer_size = 8192);
+	prebuffer_istream(std::istream& source, std::size_t prebuffer_size = 16384);
 	~prebuffer_istream();
 	std::istream& own_source(bool owns = true);
 };

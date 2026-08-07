@@ -1,0 +1,24 @@
+/**
+Determine if a particular mouse button is being held down.
+bool mouse_down(uint8 button);
+	## Arguments:
+*uint8 button: The button to check.
+	## Returns:
+bool: True if the mouse button is being held, false otherwise.
+*/
+// Example:
+void main()
+{
+while(true)
+{
+wait(5);
+if(mouse_down(1))
+{
+screen_reader_output("Left click is being held!");
+}
+if(key_pressed(KEY_ESCAPE))
+{
+exit();
+}
+}
+}
