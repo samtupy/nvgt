@@ -1,0 +1,47 @@
+// Quick test for aabb as a scoped reference type
+void main() {
+	// Default factory
+	aabb b1;
+	assert(!b1.is_valid, "Default aabb should be invalid (min > max)");
+
+	// Min/max factory
+	aabb b2(vector(-1, -1, -1), vector(1, 1, 1));
+	assert(b2.is_valid, "Min/max aabb should be valid");
+	assert(b2.min == vector(-1, -1, -1), "b2.min wrong");
+	assert(b2.max == vector(1, 1, 1), "b2.max wrong");
+	assert(b2.center == vector(0, 0, 0), "b2.center should be origin");
+
+	// Center/radius factory
+	aabb b3(vector(0, 0, 0), 2.0f);
+	assert(b3.is_valid, "Center/radius aabb should be valid");
+	assert(b3.min == vector(-2, -2, -2), "b3.min wrong");
+	assert(b3.max == vector(2, 2, 2), "b3.max wrong");
+
+	// Copy factory
+	aabb b4(b2);
+	assert(b4 == b2, "Copy should equal original");
+
+	// contains / overlaps
+	assert(b3.contains(vector(0, 0, 0)), "b3 should contain origin");
+	assert(!b3.contains(vector(3, 0, 0)), "b3 should not contain (3,0,0)");
+	assert(b2.overlaps(b3), "b2 and b3 should overlap");
+
+	// encapsulate and inflate
+	aabb b5(vector(0, 0, 0), vector(1, 1, 1));
+	b5.encapsulate(vector(2, 2, 2));
+	assert(b5.max == vector(2, 2, 2), "encapsulate point should expand max");
+	b5.inflate(0.5f, 0.5f, 0.5f);
+	assert(b5.min == vector(-0.5, -0.5, -0.5), "inflate should shrink min");
+
+	// intersect (new method via aabb_ret template)
+	aabb i = b2.intersect(b3);
+	assert(i.is_valid, "Intersection of b2 and b3 should be valid");
+	assert(i.min == vector(-1, -1, -1), "Intersection min should be b2.min");
+	assert(i.max == vector(1, 1, 1), "Intersection max should be b2.max");
+
+	// volume
+	float vol = b2.volume;
+	assert(vol > 0.0f, "Volume of b2 should be positive");
+
+	alert("AABB test", "All aabb scoped reference type tests passed!");
+}

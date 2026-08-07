@@ -157,13 +157,8 @@ elif env["NVGT_TARGET"] == "android": env["no_import_lib"] = 1
 elif env["NVGT_TARGET"] != "ios": env.Append(LIBS = ["plist-2.0", "archive"])
 extra_objects = [version_object]
 if static_plugins_object: extra_objects.append(static_plugins_object)
-<<<<<<< Updated upstream
 if env["NVGT_TARGET"] not in ["android", "ios"]:
 	if ARGUMENTS.get("debug", "0") == "1": env["PDB"] = "#build/debug/nvgt.pdb"
-=======
-if env["NVGT_TARGET"] != "ios":
-	if ARGUMENTS.get("debug", "0") != "0": env["PDB"] = "#build/debug/nvgt.pdb"
->>>>>>> Stashed changes
 	nvgt = env.Program("release/nvgt", env.Object([os.path.join("build/obj_src", s) for s in sources]) + extra_objects)
 	if env["NVGT_TARGET"] == "macos":
 		# On Mac OS, we need to run install_name_tool to modify the paths of any dynamic libraries we link.
