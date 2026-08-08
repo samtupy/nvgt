@@ -720,23 +720,90 @@ audio_ring_buffer* audio_ring_buffer::create(unsigned int channels, unsigned int
 class audio_decoder_impl : public audio_data_source_impl, public virtual audio_decoder {
 	unique_ptr<ma_decoder> decoder;
 	datastream* datastream_ref; // If the user opens a datastream, we must maintain a reference to it encase the user drops their handle.
+	// Rewind window, so that a datastream which cannot seek can still be decoded.
+	//
+	// ma_decoder_init works out a format by trying each backend in turn: read a header, rewind to the
+	// start, let the next one have a go. That is fine for a file and impossible for a socket, and the
+	// seek callback below used to paper over the difference by reporting success for a seekg that had
+	// silently failed. Every backend after the first therefore read from a mangled position, none of
+	// them could initialise, and an Icecast or Shoutcast stream could never be opened at all --
+	// whatever format it was in, and on every platform.
+	//
+	// Everything handed to the decoder is kept here until the window fills, so a rewind inside it is
+	// answered from memory and never reaches the stream. Detection only ever looks at the first few
+	// kilobytes, so the window only has to outlast that; past it playback is linear and seeking is not
+	// wanted anyway. Seekable streams are unaffected: a target outside the window is still passed
+	// through to the stream itself, which is what keeps file decoding behaving exactly as before.
+	struct stream_cursor {
+		static const size_t CAP = 256 * 1024;
+		datastream* ds = nullptr;
+		std::string window;      // every byte served so far, until CAP
+		size_t pos = 0;          // logical read position, which is where the decoder believes it is
+		// The window may only answer a seek while it MIRRORS the stream: holding bytes [0, size) and
+		// nothing having moved the stream out from under it. Both of these have to stop that.
+		bool window_full = false;   // hit CAP, so it no longer holds everything read
+		bool window_moved = false;  // a real seek happened, so it no longer starts at byte 0
+		bool mirrors_stream() const { return !window_full && !window_moved; }
+	};
+	unique_ptr<stream_cursor> cursor;
 	static ma_result on_read_datastream(ma_decoder *pDecoder, void *pDst, size_t sizeInBytes, size_t *pBytesRead) {
 		if (pBytesRead) *pBytesRead = 0;
-		datastream* ds = static_cast<datastream*>(pDecoder->pUserData);
-		if (!ds) return MA_ERROR;
-		istream* stream = ds->get_istr();
+		stream_cursor* sc = static_cast<stream_cursor*>(pDecoder->pUserData);
+		if (!sc || !sc->ds) return MA_ERROR;
+		istream* stream = sc->ds->get_istr();
 		if (!stream) return MA_ERROR;
-		if (!stream->good()) return MA_AT_END;
-		stream->read((char *)pDst, sizeInBytes);
-		if (pBytesRead) *pBytesRead = stream->gcount();
-		return MA_SUCCESS;
+		char* out = static_cast<char*>(pDst);
+		size_t total = 0;
+		// Anything still inside the window is replayed from memory rather than pulled again.
+		if (sc->mirrors_stream() && sc->pos < sc->window.size()) {
+			size_t n = std::min(sc->window.size() - sc->pos, sizeInBytes);
+			memcpy(out, sc->window.data() + sc->pos, n);
+			sc->pos += n;
+			out += n;
+			total += n;
+			sizeInBytes -= n;
+		}
+		if (sizeInBytes > 0) {
+			if (!stream->good()) {
+				if (pBytesRead) *pBytesRead = total;
+				return total ? MA_SUCCESS : MA_AT_END;
+			}
+			stream->read(out, sizeInBytes);
+			size_t got = static_cast<size_t>(stream->gcount());
+			// While the window is open it holds every byte read so far, which is what keeps its end
+			// and the stream's real position the same place -- replaying up to it then continues
+			// seamlessly into fresh bytes instead of jumping.
+			if (sc->mirrors_stream() && got) {
+				size_t room = stream_cursor::CAP - sc->window.size();
+				sc->window.append(out, std::min(room, got));
+				if (sc->window.size() >= stream_cursor::CAP) sc->window_full = true;
+			}
+			sc->pos += got;
+			total += got;
+		}
+		if (pBytesRead) *pBytesRead = total;
+		return total ? MA_SUCCESS : MA_AT_END;
 	}
 	static ma_result on_seek_datastream(ma_decoder *pDecoder, ma_int64 offset, ma_seek_origin origin) {
-		datastream* ds = static_cast<datastream*>(pDecoder->pUserData);
-		if (!ds) return MA_ERROR;
-		istream* stream = ds->get_istr();
+		stream_cursor* sc = static_cast<stream_cursor*>(pDecoder->pUserData);
+		if (!sc || !sc->ds) return MA_ERROR;
+		istream* stream = sc->ds->get_istr();
 		if (!stream) return MA_ERROR;
-		stream->clear();
+		// Where this wants to land, when that can be worked out. A seek from the end means nothing on
+		// a stream of unknown length, so it is left for the stream itself to accept or refuse.
+		ma_int64 target = -1;
+		if (origin == ma_seek_origin_start) target = offset;
+		else if (origin == ma_seek_origin_current) target = static_cast<ma_int64>(sc->pos) + offset;
+		// Only while the window mirrors the stream. Testing target <= window.size() on its own is not
+		// enough and was wrong in a way that mattered: after a real seek the window is emptied, and
+		// then a rewind to 0 satisfies 0 <= 0 and reports success without moving the stream, which
+		// leaves the decoder reading from wherever that earlier seek had parked it. A seekable stream
+		// gets a seek to the end to measure its length before anything else, so that is not a corner
+		// case -- it is every in-memory datastream, and it broke all of them.
+		if (sc->mirrors_stream() && target >= 0 && static_cast<size_t>(target) <= sc->window.size()) {
+			sc->pos = static_cast<size_t>(target); // inside the window, so no real seek is needed
+			return MA_SUCCESS;
+		}
 		std::ios_base::seekdir dir;
 		switch (origin) {
 			case ma_seek_origin_start:
@@ -751,15 +818,27 @@ class audio_decoder_impl : public audio_data_source_impl, public virtual audio_d
 			default: // Should never get here.
 				return MA_ERROR;
 		}
+		stream->clear();
 		stream->seekg(offset, dir);
+		if (stream->fail()) {
+			// Genuinely unseekable, and outside what was kept. Say so rather than claiming a seek that
+			// did not happen -- that claim is exactly what made live streams undecodable.
+			stream->clear();
+			return MA_NOT_IMPLEMENTED;
+		}
+		// The stream really moved, so the window no longer describes where the decoder is. From here
+		// the stream answers for itself, which is what it could always do -- it seeks.
+		sc->pos = static_cast<size_t>(stream->tellg());
+		sc->window.clear();
+		sc->window_moved = true;
 		return MA_SUCCESS;
 	}
 	static ma_result on_tell_datastream(ma_decoder *pDecoder, ma_int64 *pCursor) {
-		datastream* ds = static_cast<datastream*>(pDecoder->pUserData);
-		if (!ds) return MA_ERROR;
-		istream* stream = ds->get_istr();
-		if (!stream) return MA_ERROR;
-		*pCursor = stream->tellg();
+		// The logical position, not the stream's: while the window is being replayed the two differ,
+		// and the decoder's own view is the one that has to be answered.
+		stream_cursor* sc = static_cast<stream_cursor*>(pDecoder->pUserData);
+		if (!sc || !sc->ds) return MA_ERROR;
+		*pCursor = static_cast<ma_int64>(sc->pos);
 		return MA_SUCCESS;
 	}
 	ma_decoder_config decoder_config_init(unsigned int sample_rate, unsigned int channels) {
@@ -792,9 +871,12 @@ public:
 			return false;
 		}
 		ma_decoder_config cfg = decoder_config_init(sample_rate, channels);
+		cursor = make_unique<stream_cursor>();
+		cursor->ds = ds;
 		// Note: We used to pass on_tell_datastream here until miniaudio update Jan 8 2026, if something breaks with raw decoders and end checking, look here.
-		if ((g_soundsystem_last_error = ma_decoder_init(on_read_datastream, on_seek_datastream, ds, &cfg, &*decoder)) != MA_SUCCESS) {
+		if ((g_soundsystem_last_error = ma_decoder_init(on_read_datastream, on_seek_datastream, &*cursor, &cfg, &*decoder)) != MA_SUCCESS) {
 			decoder.reset();
+			cursor.reset();
 			ds->release();
 		} else {
 			datastream_ref = ds;
@@ -811,6 +893,7 @@ public:
 		}
 		if ((g_soundsystem_last_error = ma_decoder_uninit(&*decoder)) != MA_SUCCESS ) return false;
 		decoder.reset();
+		cursor.reset(); // after uninit, since the callbacks read through this
 		return true;
 	}
 	virtual unsigned int get_sample_rate() const override { return decoder? decoder->outputSampleRate : 0; }
@@ -2466,6 +2549,14 @@ void RegisterSoundsystemShapes(asIScriptEngine* engine) {
 	engine->RegisterObjectProperty("sound_aabb_shape", "int lower_range", asOFFSET(sound_aabb_shape, lower_range));
 	engine->RegisterObjectProperty("sound_aabb_shape", "int upper_range", asOFFSET(sound_aabb_shape, upper_range));
 }
+// How far a netstream reads ahead of what is being played. Exposed because the depth that helps
+// depends on the server, not on us: a live stream is paced at real time, so no setting can buy more
+// headroom than that server is willing to send early. sound_netstream_buffered is the one to watch --
+// if it sits near zero, raising the size will not change anything.
+static void set_netstream_buffer_size(unsigned int bytes) { g_netstream_buffer_size = bytes; }
+static unsigned int get_netstream_buffer_size() { return static_cast<unsigned int>(g_netstream_buffer_size); }
+static unsigned int get_netstream_buffered() { return static_cast<unsigned int>(g_netstream_buffered.load()); }
+
 void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterEnum("audio_error_state");
 	engine->RegisterEnumValue("audio_error_state", "AUDIO_ERROR_STATE_SUCCESS", MA_SUCCESS);
@@ -2655,6 +2746,9 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("pack_interface@ get_sound_default_pack() property", asFUNCTION(get_sound_default_storage), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_master_volume(float db) property", asFUNCTION(set_sound_master_volume), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float get_sound_master_volume() property", asFUNCTION(get_sound_master_volume), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_netstream_buffer_size(uint bytes) property", asFUNCTION(set_netstream_buffer_size), asCALL_CDECL);
+	engine->RegisterGlobalFunction("uint get_sound_netstream_buffer_size() property", asFUNCTION(get_netstream_buffer_size), asCALL_CDECL);
+	engine->RegisterGlobalFunction("uint get_sound_netstream_buffered() property", asFUNCTION(get_netstream_buffered), asCALL_CDECL);
 	engine->RegisterGlobalFunction("audio_error_state get_SOUNDSYSTEM_LAST_ERROR() property", asFUNCTION(get_soundsystem_last_error), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_SOUNDSYSTEM_LAST_ERROR_TEXT() property", asFUNCTION(get_soundsystem_last_error_text), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_3d_panner(int panner_id)", asFUNCTION(sound_set_default_3d_panner), asCALL_CDECL);

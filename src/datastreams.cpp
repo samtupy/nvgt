@@ -155,55 +155,124 @@ sdl_file_stream::sdl_file_stream(const std::string& path, const std::string& mod
 sdl_file_stream::sdl_file_stream(SDL_IOStream* io, std::ios::openmode mode) : std::iostream(&_buf) { attach(io, mode); }
 
 // Prebuffered input stream implementation
-prebuffer_istreambuf::prebuffer_istreambuf(std::istream& source, std::size_t prebuffer_size) : BasicBufferedStreamBuf(4096, std::ios_base::in), source(&source), prebuffer_size(prebuffer_size), prebuffer_pos(0), prebuffer_discarded(false), owns_source(false) {
+std::size_t g_netstream_buffer_size = 512 * 1024;
+std::atomic<std::size_t> g_netstream_buffered{0};
+
+prebuffer_istreambuf::prebuffer_istreambuf(std::istream& source, std::size_t prebuffer_size) : BasicBufferedStreamBuf(4096, std::ios_base::in), source(&source), detect_window(prebuffer_size), window_pos(0), window_closed(false), ring_head(0), ring_tail(0), ring_count(0), stopping(false), source_done(false), owns_source(false) {
 	if (!source.good()) throw std::invalid_argument("Source stream is invalid.");
-	prebuffer.reserve(prebuffer_size);
+	window.reserve(detect_window); // once, so appending never reallocates while audio is being served
+	std::size_t cap = g_netstream_buffer_size;
+	if (cap < READ_CHUNK * 2) cap = READ_CHUNK * 2; // a ring smaller than two reads cannot hold anything useful
+	ring.resize(cap);
+	reader = std::thread(&prebuffer_istreambuf::reader_loop, this);
 }
-prebuffer_istreambuf::~prebuffer_istreambuf() { if (owns_source) delete source; }
+prebuffer_istreambuf::~prebuffer_istreambuf() {
+	{
+		std::lock_guard<std::mutex> lock(mtx);
+		stopping = true;
+	}
+	drained.notify_all();
+	filled.notify_all();
+	// The reader may be inside a blocking source read, which cannot be interrupted; it reads in
+	// READ_CHUNK pieces so that wait is bounded rather than open ended.
+	if (reader.joinable()) reader.join();
+	if (owns_source) delete source;
+}
 void prebuffer_istreambuf::own_source(bool owns) { owns_source = owns; }
-bool prebuffer_istreambuf::fill_prebuffer() {
-	if (!prebuffer.empty() || prebuffer_discarded) return true;
-	prebuffer.resize(prebuffer_size);
-	source->read(prebuffer.data(), prebuffer_size);
-	std::size_t bytes_read = source->gcount();
-	prebuffer.resize(bytes_read);
-	return bytes_read > 0;
+std::size_t prebuffer_istreambuf::buffered() const {
+	std::lock_guard<std::mutex> lock(mtx);
+	return ring_count;
+}
+void prebuffer_istreambuf::reader_loop() {
+	std::vector<char> chunk(READ_CHUNK);
+	while (true) {
+		{
+			std::unique_lock<std::mutex> lock(mtx);
+			drained.wait(lock, [this] { return stopping || ring_count + READ_CHUNK <= ring.size(); });
+			if (stopping) return;
+		}
+		// Outside the lock: this blocks on the network, and holding the lock here would stall the
+		// consumer for exactly as long, which would defeat the whole point of reading ahead.
+		source->read(chunk.data(), READ_CHUNK);
+		std::size_t got = static_cast<std::size_t>(source->gcount());
+		std::lock_guard<std::mutex> lock(mtx);
+		if (stopping) return;
+		for (std::size_t k = 0; k < got; k++) {
+			ring[ring_head] = chunk[k];
+			ring_head = (ring_head + 1) % ring.size();
+		}
+		ring_count += got;
+		g_netstream_buffered.store(ring_count);
+		if (got == 0) { // the source is finished, so stop waking up to ask it again
+			source_done = true;
+			filled.notify_all();
+			return;
+		}
+		filled.notify_all();
+	}
+}
+std::size_t prebuffer_istreambuf::take(char* out, std::size_t n) {
+	std::unique_lock<std::mutex> lock(mtx);
+	filled.wait(lock, [this] { return ring_count > 0 || source_done || stopping; });
+	std::size_t give = std::min(n, ring_count);
+	for (std::size_t k = 0; k < give; k++) {
+		out[k] = ring[ring_tail];
+		ring_tail = (ring_tail + 1) % ring.size();
+	}
+	ring_count -= give;
+	g_netstream_buffered.store(ring_count);
+	lock.unlock();
+	drained.notify_all();
+	return give;
 }
 int prebuffer_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
 	if (length <= 0) return 0;
 	std::streamsize bytes_read = 0;
-	if (prebuffer.empty() && !prebuffer_discarded) fill_prebuffer();
-	if (!prebuffer_discarded && prebuffer_pos < prebuffer.size()) {
-		std::size_t available_in_prebuffer = prebuffer.size() - prebuffer_pos;
-		std::size_t to_copy = std::min(static_cast<std::size_t>(length), available_in_prebuffer);
-		std::memcpy(buffer, prebuffer.data() + prebuffer_pos, to_copy);
-		prebuffer_pos += to_copy;
+	// Anything still inside the window is replayed from memory rather than pulled again.
+	if (window_pos < window.size()) {
+		std::size_t to_copy = std::min(static_cast<std::size_t>(length), window.size() - window_pos);
+		std::memcpy(buffer, window.data() + window_pos, to_copy);
+		window_pos += to_copy;
 		buffer += to_copy;
 		length -= to_copy;
 		bytes_read += to_copy;
-		if (prebuffer_pos >= prebuffer.size()) {
-			prebuffer.clear();
-			prebuffer.shrink_to_fit();
-			prebuffer_discarded = true;
-		}
 	}
 	if (length > 0) {
-		source->read(buffer, length);
-		std::streamsize source_bytes_read = source->gcount();
-		bytes_read += source_bytes_read;
+		std::size_t got = take(buffer, static_cast<std::size_t>(length));
+		if (!window_closed && got > 0) {
+			// While it is open the window holds every byte served, which is what keeps its end and the
+			// consumer's position the same place -- replaying up to it then continues seamlessly into
+			// fresh bytes instead of jumping. Once that can no longer hold, it says so.
+			if (got <= detect_window - window.size()) window.insert(window.end(), buffer, buffer + got);
+			else {
+				window.clear();
+				window.shrink_to_fit();
+				window_closed = true;
+			}
+		}
+		window_pos += got;
+		bytes_read += got;
 	}
 	return static_cast<int>(bytes_read);
 }
 std::streampos prebuffer_istreambuf::seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
-	if (dir == std::ios_base::beg && off == 0) return seekpos(0);
-	return -1;
+	// Where the consumer actually is. The base class reads ahead of it, and those bytes were counted
+	// into window_pos when readFromDevice handed them over, so they have to come back off.
+	std::streamoff consumed = static_cast<std::streamoff>(window_pos) - (egptr() - gptr());
+	// tellg() arrives here as a seek of zero from the current position. That is a question, not a
+	// move, and this used to answer -1 to it -- so ma_vfs's onTell reported MA_NOT_IMPLEMENTED and
+	// the resource manager abandoned the sound before it ever probed the format.
+	if (dir == std::ios_base::cur && off == 0) return consumed;
+	if (dir == std::ios_base::end) return -1; // the length is unknown, so this genuinely cannot be answered
+	return seekpos(dir == std::ios_base::beg ? off : consumed + off, which);
 }
 std::streampos prebuffer_istreambuf::seekpos(std::streampos pos, std::ios_base::openmode which) {
-	if (pos != 0 || prebuffer_discarded) return -1;
-	if (prebuffer.empty()) fill_prebuffer();
-	prebuffer_pos = 0;
-	setg(nullptr, nullptr, nullptr);
-	return 0;
+	std::streamoff target = pos;
+	if (target < 0 || window_closed) return -1;
+	if (static_cast<std::size_t>(target) > window.size()) return -1; // past what was kept, and the source cannot go back
+	window_pos = static_cast<std::size_t>(target);
+	setg(nullptr, nullptr, nullptr); // drop what the base class had buffered, so it reads through us again
+	return pos;
 }
 prebuffer_istream::prebuffer_istream(std::istream& source, std::size_t prebuffer_size) : basic_istream(new prebuffer_istreambuf(source, prebuffer_size)) {}
 prebuffer_istream::~prebuffer_istream() { delete rdbuf(); }

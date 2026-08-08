@@ -325,11 +325,15 @@ private:
 	static ma_result onRead(ma_vfs *pVFS, ma_vfs_file file, void *pDst, size_t sizeInBytes, size_t *pBytesRead) {
 		if (pBytesRead) *pBytesRead = 0;
 		file_cast(file);
-		if (!stream->good()) return MA_AT_END;
+		// Only a real end of stream stops a read. A failbit left behind by a refused seek must not be
+		// mistaken for one: a live stream refuses every seek it cannot satisfy, and ma_decoder_init
+		// asks for the length before it probes any format, so treating that as the end meant the very
+		// first probe poisoned every read after it and no backend ever saw a byte.
+		if (stream->eof()) return MA_AT_END;
+		if (!stream->good()) stream->clear();
 		stream->read((char *)pDst, sizeInBytes);
 		if (pBytesRead) *pBytesRead = stream->gcount();
-
-		return MA_SUCCESS;
+		return stream->gcount() > 0? MA_SUCCESS : MA_AT_END;
 	}
 	static ma_result onSeek(ma_vfs *pVFS, ma_vfs_file file, ma_int64 offset, ma_seek_origin origin) {
 		file_cast(file);
@@ -349,13 +353,22 @@ private:
 				return MA_ERROR;
 		}
 		stream->seekg(offset, dir);
-		return stream->good()? MA_SUCCESS : MA_NOT_IMPLEMENTED;
+		if (stream->fail()) {
+			stream->clear(); // the reads that follow still need this stream, so leave it usable
+			return MA_NOT_IMPLEMENTED;
+		}
+		return MA_SUCCESS;
 	}
 	static ma_result onTell(ma_vfs *pVFS, ma_vfs_file file, ma_int64 *pCursor) {
 		file_cast(file);
+		stream->clear(); // tellg refuses to answer on a failed stream, and the failure may not be its own
 		ma_int64 result = stream->tellg();
 		*pCursor = result != -1? result : 0;
-		return result != -1? MA_SUCCESS : MA_NOT_IMPLEMENTED;
+		if (result == -1) {
+			stream->clear();
+			return MA_NOT_IMPLEMENTED;
+		}
+		return MA_SUCCESS;
 	}
 	static ma_result onInfo(ma_vfs *pVFS, ma_vfs_file file, ma_file_info *pInfo) {
 		file_cast(file);
