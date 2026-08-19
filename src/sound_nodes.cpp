@@ -12,7 +12,16 @@
 */
 
 #include <exception>
+#include <algorithm>
+#include <atomic>
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
+#include <cmath>
+#include <chrono>
 #include <memory>
+#include <mutex>
+#include <thread>
 #include <unordered_set>
 #include <Poco/NotificationQueue.h>
 #include <Poco/Thread.h>
@@ -21,6 +30,101 @@
 #include "sound_nodes.h"
 
 using namespace std;
+
+static int phonon_reflection_order = 1;
+static int phonon_reflection_rays = 1024;
+static int phonon_reflection_bounces = 1;
+static int phonon_reflection_diffuse_samples = 16;
+static int phonon_reflection_max_sources = 8;
+static int phonon_reflection_threads = 4;
+static float phonon_reflection_duration = 0.25f;
+static float phonon_reflection_wet_gain = 0.65f;
+static float phonon_reflection_silence_threshold = 0.000001f;
+static float phonon_reflection_tail_padding = 0.0f;
+static const IPLReflectionEffectType phonon_reflection_effect_type = IPL_REFLECTIONEFFECTTYPE_CONVOLUTION;
+static const bool phonon_reflection_log_audio_chunks = false;
+
+static int phonon_reflection_ir_size();
+static std::atomic<int> g_phonon_reflection_debug_lines{0};
+static std::atomic<unsigned long long> g_phonon_reflection_next_debug_id{1};
+
+static void phonon_reflection_debug_log(const char* fmt, ...) {
+	int line = g_phonon_reflection_debug_lines.fetch_add(1);
+	if (line >= 500) return;
+	FILE* f = std::fopen("phonon_reflection_debug.log", "ab");
+	if (!f) return;
+	std::va_list args;
+	va_start(args, fmt);
+	std::vfprintf(f, fmt, args);
+	va_end(args);
+	std::fprintf(f, "\r\n");
+	std::fclose(f);
+}
+
+static bool phonon_reflection_buffer_has_signal(const float* frames, ma_uint32 frame_count, ma_uint32 channels) {
+	if (!frames || frame_count == 0 || channels == 0) return false;
+	ma_uint32 samples = frame_count * channels;
+	for (ma_uint32 i = 0; i < samples; i++) {
+		float sample = frames[i];
+		if (sample > phonon_reflection_silence_threshold || sample < -phonon_reflection_silence_threshold) return true;
+	}
+	return false;
+}
+static float phonon_reflection_buffer_peak(const IPLAudioBuffer& buffer) {
+	float peak = 0.0f;
+	for (IPLint32 channel = 0; channel < buffer.numChannels; channel++) {
+		if (!buffer.data[channel]) continue;
+		for (IPLint32 sample = 0; sample < buffer.numSamples; sample++) {
+			float v = std::fabs(buffer.data[channel][sample]);
+			if (v > peak) peak = v;
+		}
+	}
+	return peak;
+}
+static const char* phonon_reflection_effect_type_name() {
+	switch (phonon_reflection_effect_type) {
+		case IPL_REFLECTIONEFFECTTYPE_CONVOLUTION: return "convolution";
+		case IPL_REFLECTIONEFFECTTYPE_PARAMETRIC: return "parametric";
+		case IPL_REFLECTIONEFFECTTYPE_HYBRID: return "hybrid";
+		case IPL_REFLECTIONEFFECTTYPE_TAN: return "tan";
+		default: return "unknown";
+	}
+}
+static int phonon_reflection_effect_channels() {
+	return phonon_reflection_effect_type == IPL_REFLECTIONEFFECTTYPE_PARAMETRIC ? 1 : (phonon_reflection_order + 1) * (phonon_reflection_order + 1);
+}
+
+static int clamp_int(int value, int min_value, int max_value) {
+	return std::max(min_value, std::min(max_value, value));
+}
+static float clamp_float(float value, float min_value, float max_value) {
+	return std::max(min_value, std::min(max_value, value));
+}
+
+bool phonon_reflection_set_settings(int rays, int bounces, float duration, int order, int diffuse_samples, int max_sources, int threads, float default_wet_gain, float silence_threshold, float tail_padding) {
+	phonon_reflection_rays = clamp_int(rays, 64, 8192);
+	phonon_reflection_bounces = clamp_int(bounces, 1, 64);
+	phonon_reflection_duration = clamp_float(duration, 0.10f, 4.0f);
+	phonon_reflection_order = clamp_int(order, 1, 3);
+	phonon_reflection_diffuse_samples = clamp_int(diffuse_samples, 8, 256);
+	phonon_reflection_max_sources = clamp_int(max_sources, 1, 64);
+	phonon_reflection_threads = clamp_int(threads, 1, 16);
+	phonon_reflection_wet_gain = clamp_float(default_wet_gain, 0.0f, 8.0f);
+	phonon_reflection_silence_threshold = clamp_float(silence_threshold, 0.0f, 0.01f);
+	phonon_reflection_tail_padding = clamp_float(tail_padding, 0.0f, 2.0f);
+	return true;
+}
+int phonon_reflection_get_order() { return phonon_reflection_order; }
+int phonon_reflection_get_channels() { return phonon_reflection_effect_channels(); }
+int phonon_reflection_get_rays() { return phonon_reflection_rays; }
+int phonon_reflection_get_bounces() { return phonon_reflection_bounces; }
+int phonon_reflection_get_diffuse_samples() { return phonon_reflection_diffuse_samples; }
+int phonon_reflection_get_max_sources() { return phonon_reflection_max_sources; }
+int phonon_reflection_get_threads() { return phonon_reflection_threads; }
+float phonon_reflection_get_duration() { return phonon_reflection_duration; }
+float phonon_reflection_get_default_wet_gain() { return phonon_reflection_wet_gain; }
+float phonon_reflection_get_silence_threshold() { return phonon_reflection_silence_threshold; }
+float phonon_reflection_get_tail_padding() { return phonon_reflection_tail_padding; }
 
 // This node allows easy creation of miniaudio nodes in C++.
 static void ma_effect_node_process_pcm_frames(ma_node* pNode, const float** ppFramesIn, ma_uint32* pFrameCountIn, float** ppFramesOut, ma_uint32* pFrameCountOut) {
@@ -171,10 +275,23 @@ static IPLAudioSettings g_phonon_audio_settings {44100, SOUNDSYSTEM_FRAMESIZE}; 
 static IPLContext g_phonon_context = nullptr;
 static IPLHRTF g_phonon_hrtf = nullptr;
 
+static int phonon_reflection_ir_size() {
+	int size = int(g_phonon_audio_settings.samplingRate * phonon_reflection_duration);
+	return size > SOUNDSYSTEM_FRAMESIZE ? size : SOUNDSYSTEM_FRAMESIZE;
+}
+static ma_uint32 phonon_reflection_tail_limit_frames() {
+	int size = int(g_phonon_audio_settings.samplingRate * (phonon_reflection_duration + phonon_reflection_tail_padding));
+	if (size < SOUNDSYSTEM_FRAMESIZE) size = SOUNDSYSTEM_FRAMESIZE;
+	return (ma_uint32)size;
+}
+
 bool phonon_init() {
 	if (g_phonon_context) return true;
 	if (!init_sound()) return false;
 	g_phonon_audio_settings = {g_audio_engine->get_sample_rate(), SOUNDSYSTEM_FRAMESIZE};
+	g_phonon_reflection_debug_lines.store(0);
+	if (FILE* f = std::fopen("phonon_reflection_debug.log", "wb")) std::fclose(f);
+	phonon_reflection_debug_log("phonon_init engine_rate=%d engine_channels=%d phonon_rate=%d frame_size=%d", g_audio_engine ? g_audio_engine->get_sample_rate() : -1, g_audio_engine ? g_audio_engine->get_channels() : -1, g_phonon_audio_settings.samplingRate, g_phonon_audio_settings.frameSize);
 	IPLContextSettings phonon_context_settings{};
 	phonon_context_settings.version = STEAMAUDIO_VERSION;
 	if (iplContextCreate(&phonon_context_settings, &g_phonon_context) != IPL_STATUS_SUCCESS) return false;
@@ -471,6 +588,705 @@ class freeverb_node_impl : public audio_node_impl, public virtual freeverb_node 
 	bool get_frozen() const override { return rn? verblib_get_mode(&rn->reverb) >= 0.5 : false; }
 };
 freeverb_node* freeverb_node::create(audio_engine* e) { return new freeverb_node_impl(e); }
+
+class sound_environment_impl;
+class phonon_reflection_mixer_node_impl;
+
+class phonon_reflection_node_impl : public effect_node_impl, public virtual phonon_reflection_node {
+	sound_environment_impl* environment;
+	IPLSource source;
+	IPLReflectionEffect reflection_effect;
+	IPLAmbisonicsDecodeEffect decode_effect;
+	IPLAudioBuffer input_buffer;
+	IPLAudioBuffer mono_input_buffer;
+	IPLAudioBuffer reflections_buffer;
+	IPLAudioBuffer decoded_buffer;
+	reactphysics3d::Vector3 position;
+	std::atomic<bool> enabled;
+	bool ready;
+	std::atomic<bool> tail_remaining;
+	std::atomic<bool> tail_draining;
+	std::atomic<bool> tail_retired;
+	ma_uint32 tail_frames_processed;
+	std::atomic<bool> has_received_signal;
+	bool source_inputs_dirty;
+	float wet_gain;
+	unsigned long long debug_id;
+	int debug_process_count;
+	bool debug_no_ir_logged;
+	std::mutex effect_mutex;
+
+	void release_steam_audio();
+	bool create_steam_audio();
+	void update_source_inputs_locked();
+	void reset_effects_locked();
+	bool drain_tail_chunk(ma_uint32 frame_count);
+public:
+	phonon_reflection_node_impl(sound_environment* environment, audio_engine* engine);
+	~phonon_reflection_node_impl();
+	bool set_environment(sound_environment* environment) override;
+	sound_environment* get_environment() const override;
+	void set_position(float x, float y, float z) override;
+	void set_position_vector(const reactphysics3d::Vector3& position) override;
+	reactphysics3d::Vector3 get_position() const override { return position; }
+	void set_enabled(bool value) override {
+		bool previous = enabled.exchange(value);
+		if (previous == value) return;
+		if (!value) {
+			std::lock_guard<std::mutex> lock(effect_mutex);
+			reset_effects_locked();
+		}
+	}
+	bool get_enabled() const override { return enabled.load(); }
+	bool get_has_tail() const override { return tail_remaining.load() || tail_draining.load(); }
+	bool finish_tail() override;
+	void set_wet_gain(float gain) override {
+		wet_gain = std::max(0.0f, gain);
+		if (debug_process_count < 2) phonon_reflection_debug_log("node_wet_gain id=%llu wet=%.3f", debug_id, wet_gain);
+	}
+	float get_wet_gain() const override { return wet_gain; }
+	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override;
+	friend class sound_environment_impl;
+};
+
+class phonon_reflection_mixer_node_impl : public effect_node_impl {
+	sound_environment_impl* environment;
+	IPLAmbisonicsDecodeEffect decode_effect;
+	IPLAudioBuffer reflections_buffer;
+	IPLAudioBuffer decoded_buffer;
+	std::mutex effect_mutex;
+public:
+	phonon_reflection_mixer_node_impl(sound_environment_impl* environment, audio_engine* engine);
+	~phonon_reflection_mixer_node_impl();
+	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override;
+	void shutdown();
+};
+
+class sound_environment_impl : public virtual sound_environment {
+	int refcount;
+	audio_engine* engine;
+	IPLScene scene;
+	IPLSimulator simulator;
+	IPLReflectionMixer reflection_mixer;
+	phonon_reflection_mixer_node_impl* mixer_node;
+	IPLSimulationSharedInputs shared_inputs;
+	std::unordered_map<std::string, IPLMaterial> materials;
+	std::vector<IPLStaticMesh> meshes;
+	std::unordered_set<phonon_reflection_node_impl*> nodes;
+	std::unordered_set<phonon_reflection_node_impl*> tail_nodes;
+	bool active;
+	bool scene_needs_commit;
+	bool shared_inputs_dirty;
+	std::atomic<bool> simulation_stop;
+	std::thread simulation_thread;
+	std::mutex simulation_mutex;
+	std::mutex mixer_mutex;
+	float listener_x, listener_y, listener_z, listener_rotation;
+	friend class phonon_reflection_node_impl;
+	friend class phonon_reflection_mixer_node_impl;
+	void cleanup_steam_audio_objects() {
+		if (mixer_node) {
+			mixer_node->shutdown();
+			mixer_node->release();
+			mixer_node = nullptr;
+		}
+		if (reflection_mixer) iplReflectionMixerRelease(&reflection_mixer);
+		for (auto mesh : meshes) {
+			if (mesh) iplStaticMeshRelease(&mesh);
+		}
+		meshes.clear();
+		if (scene) iplSceneRelease(&scene);
+		if (simulator) iplSimulatorRelease(&simulator);
+		scene = nullptr;
+		simulator = nullptr;
+		reflection_mixer = nullptr;
+		active = false;
+	}
+	bool run_simulation_tick(bool reflections) {
+		std::unique_lock<std::mutex> sim_lock(simulation_mutex);
+		IPLSimulator sim = nullptr;
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			if (!simulator) return false;
+			if (scene_needs_commit) {
+				iplSceneCommit(scene);
+				iplSimulatorCommit(simulator);
+				scene_needs_commit = false;
+			}
+			if (shared_inputs_dirty) {
+				iplSimulatorSetSharedInputs(simulator, IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS), &shared_inputs);
+				shared_inputs_dirty = false;
+			}
+			for (auto* node : nodes) {
+				if (node && node->source && node->source_inputs_dirty) {
+					node->update_source_inputs_locked();
+					node->source_inputs_dirty = false;
+				}
+			}
+			sim = simulator;
+		}
+		iplSimulatorRunDirect(sim);
+		if (reflections) iplSimulatorRunReflections(sim);
+		return true;
+	}
+	void simulation_loop() {
+		while (!simulation_stop.load()) {
+			run_simulation_tick(true);
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		}
+	}
+	void reset_reflection_mixer() {
+		std::lock_guard<std::mutex> lock(mixer_mutex);
+		if (reflection_mixer) iplReflectionMixerReset(reflection_mixer);
+	}
+public:
+	std::mutex mutex;
+
+	sound_environment_impl(audio_engine* engine) : refcount(1), engine(engine ? engine : g_audio_engine), scene(nullptr), simulator(nullptr), reflection_mixer(nullptr), mixer_node(nullptr), shared_inputs{}, active(false), scene_needs_commit(false), shared_inputs_dirty(false), simulation_stop(false), listener_x(0), listener_y(0), listener_z(0), listener_rotation(0) {
+		if (!this->engine) throw std::invalid_argument("no audio engine provided");
+		this->engine->duplicate();
+		try {
+			if (!phonon_init()) throw std::runtime_error("Steam Audio initialization failed");
+			IPLSimulationSettings simulation_settings{};
+			simulation_settings.flags = IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS);
+			simulation_settings.sceneType = IPL_SCENETYPE_DEFAULT;
+			simulation_settings.reflectionType = phonon_reflection_effect_type;
+			simulation_settings.maxNumRays = phonon_reflection_rays;
+			simulation_settings.numDiffuseSamples = phonon_reflection_diffuse_samples;
+			simulation_settings.maxDuration = phonon_reflection_duration;
+			simulation_settings.maxOrder = phonon_reflection_order;
+			simulation_settings.maxNumSources = phonon_reflection_max_sources;
+			simulation_settings.numThreads = phonon_reflection_threads;
+			simulation_settings.samplingRate = g_phonon_audio_settings.samplingRate;
+			simulation_settings.frameSize = g_phonon_audio_settings.frameSize;
+			if (iplSimulatorCreate(g_phonon_context, &simulation_settings, &simulator) != IPL_STATUS_SUCCESS) throw std::runtime_error("failed to create Steam Audio simulator");
+			IPLReflectionEffectSettings mixer_settings{phonon_reflection_effect_type, phonon_reflection_ir_size(), phonon_reflection_effect_channels()};
+			if (iplReflectionMixerCreate(g_phonon_context, &g_phonon_audio_settings, &mixer_settings, &reflection_mixer) != IPL_STATUS_SUCCESS) throw std::runtime_error("failed to create Steam Audio reflection mixer");
+			IPLSceneSettings scene_settings{};
+			scene_settings.type = IPL_SCENETYPE_DEFAULT;
+			if (iplSceneCreate(g_phonon_context, &scene_settings, &scene) != IPL_STATUS_SUCCESS) throw std::runtime_error("failed to create Steam Audio scene");
+			shared_inputs.numRays = phonon_reflection_rays;
+			shared_inputs.numBounces = phonon_reflection_bounces;
+			shared_inputs.duration = phonon_reflection_duration;
+			shared_inputs.order = phonon_reflection_order;
+			shared_inputs.irradianceMinDistance = 1.0f;
+			add_material("air", 0, 0, 0, 0, 1, 1, 1, true);
+			add_material("generic", 0.10f, 0.20f, 0.30f, 0.05f, 0.100f, 0.050f, 0.030f, true);
+			add_material("brick", 0.03f, 0.04f, 0.07f, 0.05f, 0.015f, 0.015f, 0.015f, true);
+			add_material("concrete", 0.05f, 0.07f, 0.08f, 0.05f, 0.015f, 0.002f, 0.001f, true);
+			add_material("ceramic", 0.01f, 0.02f, 0.02f, 0.05f, 0.060f, 0.044f, 0.011f, true);
+			add_material("gravel", 0.60f, 0.70f, 0.80f, 0.05f, 0.031f, 0.012f, 0.008f, true);
+			add_material("carpet", 0.24f, 0.69f, 0.73f, 0.05f, 0.020f, 0.005f, 0.003f, true);
+			add_material("glass", 0.06f, 0.03f, 0.02f, 0.05f, 0.060f, 0.044f, 0.011f, true);
+			add_material("plaster", 0.12f, 0.06f, 0.04f, 0.05f, 0.056f, 0.056f, 0.004f, true);
+			add_material("wood", 0.11f, 0.07f, 0.06f, 0.05f, 0.070f, 0.014f, 0.005f, true);
+			add_material("metal", 0.20f, 0.07f, 0.06f, 0.05f, 0.200f, 0.025f, 0.010f, true);
+			add_material("rock", 0.13f, 0.20f, 0.24f, 0.05f, 0.015f, 0.002f, 0.001f, true);
+			iplSimulatorSetScene(simulator, scene);
+			iplSimulatorCommit(simulator);
+			mixer_node = new phonon_reflection_mixer_node_impl(this, this->engine);
+			if (!mixer_node->attach_output_bus(0, this->engine->get_endpoint(), 0)) throw std::runtime_error("failed to attach Steam Audio reflection bus");
+			active = true;
+			simulation_thread = std::thread(&sound_environment_impl::simulation_loop, this);
+		} catch (...) {
+			simulation_stop.store(true);
+			if (simulation_thread.joinable()) simulation_thread.join();
+			cleanup_steam_audio_objects();
+			this->engine->release();
+			this->engine = nullptr;
+			throw;
+		}
+	}
+	~sound_environment_impl() {
+		simulation_stop.store(true);
+		if (simulation_thread.joinable()) simulation_thread.join();
+		phonon_reflection_mixer_node_impl* node_to_release = nullptr;
+		if (mixer_node) {
+			node_to_release = mixer_node;
+			mixer_node = nullptr;
+		}
+		if (node_to_release) {
+			node_to_release->shutdown();
+			node_to_release->release();
+		}
+		std::lock_guard<std::mutex> lock(mutex);
+		for (auto* node : nodes) {
+			if (node) node->environment = nullptr;
+		}
+		nodes.clear();
+		std::vector<phonon_reflection_node_impl*> tail_nodes_to_release;
+		for (auto* node : tail_nodes) {
+			if (node) node->environment = nullptr;
+			if (node) tail_nodes_to_release.push_back(node);
+		}
+		tail_nodes.clear();
+		cleanup_steam_audio_objects();
+		for (auto* node : tail_nodes_to_release) {
+			if (node) node->release();
+		}
+		if (engine) engine->release();
+	}
+	void duplicate() override { asAtomicInc(refcount); }
+	void release() override { if (asAtomicDec(refcount) < 1) delete this; }
+	bool get_active() const override { return active; }
+	bool add_material(const std::string& name, float absorption_low, float absorption_mid, float absorption_high, float scattering, float transmission_low, float transmission_mid, float transmission_high, bool replace_if_existing = false) override {
+		std::lock_guard<std::mutex> lock(mutex);
+		if (!replace_if_existing && materials.find(name) != materials.end()) return false;
+		materials[name] = IPLMaterial{{absorption_low, absorption_mid, absorption_high}, scattering, {transmission_low, transmission_mid, transmission_high}};
+		return true;
+	}
+	bool add_box(const std::string& material, float minx, float maxx, float miny, float maxy, float minz, float maxz) override {
+		std::lock_guard<std::mutex> sim_lock(simulation_mutex);
+		std::lock_guard<std::mutex> lock(mutex);
+		auto it = materials.find(material);
+		if (it == materials.end() || !scene) return false;
+		IPLVector3 vertices[8] = {{minx, miny, minz}, {maxx, miny, minz}, {maxx, maxy, minz}, {minx, maxy, minz}, {minx, miny, maxz}, {maxx, miny, maxz}, {maxx, maxy, maxz}, {minx, maxy, maxz}};
+		IPLTriangle triangles[12] = {{0, 1, 2}, {0, 2, 3}, {0, 1, 5}, {0, 5, 4}, {1, 5, 6}, {1, 6, 2}, {2, 6, 7}, {2, 7, 3}, {3, 7, 0}, {3, 0, 4}, {4, 5, 6}, {4, 6, 7}};
+		IPLint32 material_indexes[12] = {0};
+		IPLStaticMeshSettings mesh_settings{8, 12, 1, vertices, triangles, material_indexes, &it->second};
+		IPLStaticMesh mesh = nullptr;
+		if (iplStaticMeshCreate(scene, &mesh_settings, &mesh) != IPL_STATUS_SUCCESS || !mesh) return false;
+		iplStaticMeshAdd(mesh, scene);
+		meshes.push_back(mesh);
+		scene_needs_commit = true;
+		return true;
+	}
+	bool commit_scene() override {
+		std::lock_guard<std::mutex> sim_lock(simulation_mutex);
+		std::lock_guard<std::mutex> lock(mutex);
+		if (!scene || !simulator) return false;
+		if (scene_needs_commit) {
+			iplSceneCommit(scene);
+			iplSimulatorCommit(simulator);
+			scene_needs_commit = false;
+		}
+		return true;
+	}
+	void set_listener(float x, float y, float z, float rotation) override {
+		std::lock_guard<std::mutex> lock(mutex);
+		listener_x = x;
+		listener_y = y;
+		listener_z = z;
+		listener_rotation = rotation;
+		shared_inputs.listener.right = IPLVector3{1, 0, 0};
+		shared_inputs.listener.up = IPLVector3{0, 0, 1};
+		shared_inputs.listener.ahead = IPLVector3{sin(rotation), cos(rotation), 0};
+		shared_inputs.listener.origin = IPLVector3{x, y, z};
+		shared_inputs_dirty = true;
+	}
+	void set_listener_vector(const reactphysics3d::Vector3& position, float rotation) override { set_listener(position.x, position.y, position.z, rotation); }
+	bool update(bool reflections = true) override {
+		std::lock_guard<std::mutex> lock(mutex);
+		return simulator != nullptr;
+	}
+	phonon_reflection_node* create_reflection_node(audio_engine* engine = g_audio_engine) override { return phonon_reflection_node::create(this, engine ? engine : this->engine); }
+	bool attach(phonon_reflection_node_impl* node) {
+		if (!node || !simulator) return false;
+		std::lock_guard<std::mutex> lock(mutex);
+		nodes.insert(node);
+		return true;
+	}
+	void detach(phonon_reflection_node_impl* node) {
+		std::lock_guard<std::mutex> lock(mutex);
+		nodes.erase(node);
+	}
+	bool add_tail_node(phonon_reflection_node_impl* node) {
+		if (!node) return false;
+		std::lock_guard<std::mutex> lock(mutex);
+		if (tail_nodes.insert(node).second) node->duplicate();
+		return true;
+	}
+	void retire_tail_node(phonon_reflection_node_impl* node) {
+		bool should_release = false;
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			should_release = tail_nodes.erase(node) > 0;
+		}
+		if (should_release) node->release();
+	}
+	void drain_tail_nodes(ma_uint32 frame_count) {
+		std::vector<phonon_reflection_node_impl*> current_tail_nodes;
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			current_tail_nodes.reserve(tail_nodes.size());
+			for (auto* node : tail_nodes) {
+				if (node) current_tail_nodes.push_back(node);
+			}
+		}
+		for (auto* node : current_tail_nodes) {
+			if (node) node->drain_tail_chunk(frame_count);
+		}
+		std::vector<phonon_reflection_node_impl*> retired_tail_nodes;
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			for (auto it = tail_nodes.begin(); it != tail_nodes.end();) {
+				phonon_reflection_node_impl* node = *it;
+				if (node && node->tail_retired.load()) {
+					retired_tail_nodes.push_back(node);
+					it = tail_nodes.erase(it);
+				} else {
+					++it;
+				}
+			}
+		}
+		for (auto* node : retired_tail_nodes) {
+			if (node) node->release();
+		}
+	}
+	IPLSimulator get_simulator() const { return simulator; }
+	IPLSimulationSharedInputs get_shared_inputs() const { return shared_inputs; }
+};
+
+phonon_reflection_mixer_node_impl::phonon_reflection_mixer_node_impl(sound_environment_impl* environment, audio_engine* engine) : effect_node_impl(engine ? engine : g_audio_engine, 0, 0, 1, 1, MA_NODE_FLAG_CONTINUOUS_PROCESSING | MA_NODE_FLAG_ALLOW_NULL_INPUT), environment(environment), decode_effect(nullptr), reflections_buffer{}, decoded_buffer{} {
+	IPLAmbisonicsDecodeEffectSettings decode_settings{};
+	decode_settings.maxOrder = phonon_reflection_order;
+	decode_settings.hrtf = g_phonon_hrtf;
+	decode_settings.speakerLayout = IPLSpeakerLayout{IPL_SPEAKERLAYOUTTYPE_STEREO};
+	if (iplAmbisonicsDecodeEffectCreate(g_phonon_context, &g_phonon_audio_settings, &decode_settings, &decode_effect) != IPL_STATUS_SUCCESS) throw std::runtime_error("failed to create Steam Audio reflection mixer decoder");
+	if (iplAudioBufferAllocate(g_phonon_context, phonon_reflection_effect_channels(), g_phonon_audio_settings.frameSize, &reflections_buffer) != IPL_STATUS_SUCCESS ||
+		iplAudioBufferAllocate(g_phonon_context, 2, g_phonon_audio_settings.frameSize, &decoded_buffer) != IPL_STATUS_SUCCESS) {
+		shutdown();
+		throw std::runtime_error("failed to allocate Steam Audio reflection mixer buffers");
+	}
+}
+phonon_reflection_mixer_node_impl::~phonon_reflection_mixer_node_impl() {
+	shutdown();
+}
+void phonon_reflection_mixer_node_impl::shutdown() {
+	detach_output_bus(0);
+	std::lock_guard<std::mutex> lock(effect_mutex);
+	if (decode_effect) iplAmbisonicsDecodeEffectRelease(&decode_effect);
+	if (reflections_buffer.data) iplAudioBufferFree(g_phonon_context, &reflections_buffer);
+	if (decoded_buffer.data) iplAudioBufferFree(g_phonon_context, &decoded_buffer);
+	decode_effect = nullptr;
+	reflections_buffer = {};
+	decoded_buffer = {};
+	environment = nullptr;
+}
+void phonon_reflection_mixer_node_impl::process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) {
+	if (!frame_count_out || !frames_out || !frames_out[0]) return;
+	audio_engine* e = get_engine();
+	ma_uint32 channels = e ? e->get_channels() : 0;
+	ma_uint32 output_frames = *frame_count_out;
+	if (channels == 0 || output_frames == 0) return;
+	std::memset(frames_out[0], 0, output_frames * channels * sizeof(float));
+	std::lock_guard<std::mutex> effect_lock(effect_mutex);
+	if (!environment || !environment->reflection_mixer || !decode_effect || channels != 2) return;
+	if (!reflections_buffer.data || !decoded_buffer.data || g_phonon_audio_settings.frameSize <= 0) return;
+	IPLCoordinateSpace3 decode_orientation{};
+	{
+		std::lock_guard<std::mutex> lock(environment->mutex);
+		decode_orientation = environment->get_shared_inputs().listener;
+	}
+	IPLAmbisonicsDecodeEffectParams decode_params{};
+	decode_params.order = phonon_reflection_order;
+	decode_params.hrtf = g_phonon_hrtf;
+	decode_params.orientation = decode_orientation;
+	decode_params.binaural = IPL_TRUE;
+	IPLReflectionEffectParams mixer_params{};
+	mixer_params.type = phonon_reflection_effect_type;
+	mixer_params.numChannels = phonon_reflection_effect_channels();
+	mixer_params.irSize = phonon_reflection_ir_size();
+	if (!environment || !environment->reflection_mixer || !decode_effect || !reflections_buffer.data || !decoded_buffer.data) return;
+	ma_uint32 processed = 0;
+	while (processed < output_frames) {
+		ma_uint32 frames_this_time = output_frames - processed;
+		if (frames_this_time > (ma_uint32)g_phonon_audio_settings.frameSize) frames_this_time = (ma_uint32)g_phonon_audio_settings.frameSize;
+		reflections_buffer.numSamples = frames_this_time;
+		decoded_buffer.numSamples = frames_this_time;
+		for (IPLint32 i = 0; i < reflections_buffer.numChannels; i++) {
+			std::memset(reflections_buffer.data[i], 0, frames_this_time * sizeof(float));
+		}
+		for (IPLint32 i = 0; i < decoded_buffer.numChannels; i++) {
+			std::memset(decoded_buffer.data[i], 0, frames_this_time * sizeof(float));
+		}
+		environment->drain_tail_nodes(frames_this_time);
+		{
+			std::lock_guard<std::mutex> mixer_lock(environment->mixer_mutex);
+			iplReflectionMixerApply(environment->reflection_mixer, &mixer_params, &reflections_buffer);
+		}
+		iplAmbisonicsDecodeEffectApply(decode_effect, &decode_params, &reflections_buffer, &decoded_buffer);
+		iplAudioBufferInterleave(g_phonon_context, &decoded_buffer, ma_offset_pcm_frames_ptr_f32(frames_out[0], processed, 2));
+		processed += frames_this_time;
+	}
+}
+
+phonon_reflection_node_impl::phonon_reflection_node_impl(sound_environment* environment, audio_engine* engine) : effect_node_impl(engine ? engine : g_audio_engine, 0, 0, 1, 1, MA_NODE_FLAG_CONTINUOUS_PROCESSING | MA_NODE_FLAG_ALLOW_NULL_INPUT), environment(nullptr), source(nullptr), reflection_effect(nullptr), decode_effect(nullptr), input_buffer{}, mono_input_buffer{}, reflections_buffer{}, decoded_buffer{}, position(0, 0, 0), enabled(true), ready(false), tail_remaining(false), tail_draining(false), tail_retired(false), tail_frames_processed(0), has_received_signal(false), source_inputs_dirty(true), wet_gain(phonon_reflection_wet_gain), debug_id(g_phonon_reflection_next_debug_id.fetch_add(1)), debug_process_count(0), debug_no_ir_logged(false) {
+	if (!phonon_init()) throw std::runtime_error("Steam Audio initialization failed");
+	set_environment(environment);
+}
+phonon_reflection_node_impl::~phonon_reflection_node_impl() {
+	set_environment(nullptr);
+	release_steam_audio();
+}
+bool phonon_reflection_node_impl::create_steam_audio() {
+	if (!environment || ready) return ready;
+	audio_engine* e = get_engine();
+	if (!e || e->get_channels() != 2) return false;
+	IPLReflectionEffectSettings reflection_settings{phonon_reflection_effect_type, phonon_reflection_ir_size(), phonon_reflection_effect_channels()};
+	if (iplReflectionEffectCreate(g_phonon_context, &g_phonon_audio_settings, &reflection_settings, &reflection_effect) != IPL_STATUS_SUCCESS) return false;
+	if (iplAudioBufferAllocate(g_phonon_context, 2, g_phonon_audio_settings.frameSize, &input_buffer) != IPL_STATUS_SUCCESS ||
+		iplAudioBufferAllocate(g_phonon_context, 1, g_phonon_audio_settings.frameSize, &mono_input_buffer) != IPL_STATUS_SUCCESS ||
+		iplAudioBufferAllocate(g_phonon_context, phonon_reflection_effect_channels(), g_phonon_audio_settings.frameSize, &reflections_buffer) != IPL_STATUS_SUCCESS) {
+		release_steam_audio();
+		return false;
+	}
+	IPLSourceSettings source_settings{IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS)};
+	if (iplSourceCreate(environment->get_simulator(), &source_settings, &source) != IPL_STATUS_SUCCESS || !source) {
+		release_steam_audio();
+		return false;
+	}
+	{
+		std::lock_guard<std::mutex> sim_lock(environment->simulation_mutex);
+		std::lock_guard<std::mutex> lock(environment->mutex);
+		update_source_inputs_locked();
+		source_inputs_dirty = false;
+		iplSourceAdd(source, environment->get_simulator());
+		iplSimulatorCommit(environment->get_simulator());
+	}
+	ready = true;
+	phonon_reflection_debug_log("node_create id=%llu type=%s engine_rate=%d engine_channels=%d phonon_rate=%d frame_size=%d ir_size=%d tail_size=%d order=%d channels=%d rays=%d bounces=%d diffuse=%d max_sources=%d threads=%d duration=%.3f wet=%.3f tail_padding=%.3f", debug_id, phonon_reflection_effect_type_name(), e ? e->get_sample_rate() : -1, e ? e->get_channels() : -1, g_phonon_audio_settings.samplingRate, g_phonon_audio_settings.frameSize, phonon_reflection_ir_size(), reflection_effect ? iplReflectionEffectGetTailSize(reflection_effect) : -1, phonon_reflection_order, phonon_reflection_effect_channels(), phonon_reflection_rays, phonon_reflection_bounces, phonon_reflection_diffuse_samples, phonon_reflection_max_sources, phonon_reflection_threads, phonon_reflection_duration, wet_gain, phonon_reflection_tail_padding);
+	return true;
+}
+void phonon_reflection_node_impl::release_steam_audio() {
+	if (ready) phonon_reflection_debug_log("node_release id=%llu tail_remaining=%d process_count=%d", debug_id, tail_remaining.load() ? 1 : 0, debug_process_count);
+	sound_environment_impl* release_environment = environment;
+	if (source && environment) {
+		std::lock_guard<std::mutex> sim_lock(environment->simulation_mutex);
+		std::lock_guard<std::mutex> lock(environment->mutex);
+		if (environment->get_simulator()) {
+			iplSourceRemove(source, environment->get_simulator());
+			iplSimulatorCommit(environment->get_simulator());
+		}
+	}
+	{
+		std::lock_guard<std::mutex> effect_lock(effect_mutex);
+		reset_effects_locked();
+		if (source) iplSourceRelease(&source);
+		if (decode_effect) iplAmbisonicsDecodeEffectRelease(&decode_effect);
+		if (reflection_effect) iplReflectionEffectRelease(&reflection_effect);
+		if (input_buffer.data) iplAudioBufferFree(g_phonon_context, &input_buffer);
+		if (mono_input_buffer.data) iplAudioBufferFree(g_phonon_context, &mono_input_buffer);
+		if (reflections_buffer.data) iplAudioBufferFree(g_phonon_context, &reflections_buffer);
+		if (decoded_buffer.data) iplAudioBufferFree(g_phonon_context, &decoded_buffer);
+	}
+	source = nullptr;
+	decode_effect = nullptr;
+	reflection_effect = nullptr;
+	input_buffer = {};
+	mono_input_buffer = {};
+	reflections_buffer = {};
+	decoded_buffer = {};
+	ready = false;
+	tail_remaining.store(false);
+	tail_draining.store(false);
+	tail_retired.store(false);
+	tail_frames_processed = 0;
+	has_received_signal.store(false);
+	source_inputs_dirty = false;
+}
+void phonon_reflection_node_impl::update_source_inputs_locked() {
+	if (!source || !environment) return;
+	IPLSimulationInputs inputs{};
+	inputs.flags = IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS);
+	inputs.directFlags = IPLDirectSimulationFlags(IPL_DIRECTSIMULATIONFLAGS_DISTANCEATTENUATION | IPL_DIRECTSIMULATIONFLAGS_AIRABSORPTION | IPL_DIRECTSIMULATIONFLAGS_OCCLUSION | IPL_DIRECTSIMULATIONFLAGS_TRANSMISSION);
+	inputs.distanceAttenuationModel = IPLDistanceAttenuationModel{IPL_DISTANCEATTENUATIONTYPE_DEFAULT};
+	inputs.airAbsorptionModel = IPLAirAbsorptionModel{IPL_AIRABSORPTIONTYPE_DEFAULT};
+	inputs.source = IPLCoordinateSpace3{IPLVector3{1, 0, 0}, IPLVector3{0, 0, 1}, IPLVector3{0, 1, 0}, IPLVector3{position.x, position.y, position.z}};
+	inputs.occlusionType = IPL_OCCLUSIONTYPE_RAYCAST;
+	iplSourceSetInputs(source, IPLSimulationFlags(IPL_SIMULATIONFLAGS_DIRECT | IPL_SIMULATIONFLAGS_REFLECTIONS), &inputs);
+}
+void phonon_reflection_node_impl::reset_effects_locked() {
+	if (reflection_effect) iplReflectionEffectReset(reflection_effect);
+	if (decode_effect) iplAmbisonicsDecodeEffectReset(decode_effect);
+	tail_remaining.store(false);
+	tail_draining.store(false);
+	tail_retired.store(false);
+	tail_frames_processed = 0;
+	has_received_signal.store(false);
+	debug_no_ir_logged = false;
+}
+bool phonon_reflection_node_impl::set_environment(sound_environment* env) {
+	sound_environment_impl* next = dynamic_cast<sound_environment_impl*>(env);
+	if (next == environment) return true;
+	if (environment) {
+		release_steam_audio();
+		environment->detach(this);
+		environment->release();
+	}
+	environment = next;
+	if (!environment) return true;
+	environment->duplicate();
+	if (!environment->attach(this)) {
+		environment->release();
+		environment = nullptr;
+		return false;
+	}
+	return create_steam_audio();
+}
+sound_environment* phonon_reflection_node_impl::get_environment() const {
+	if (environment) environment->duplicate();
+	return environment;
+}
+bool phonon_reflection_node_impl::finish_tail() {
+	if (!environment || !ready || !reflection_effect || !has_received_signal.load()) return false;
+	if (tail_draining.load()) return true;
+	{
+		std::lock_guard<std::mutex> effect_lock(effect_mutex);
+		tail_remaining.store(true);
+		tail_draining.store(true);
+		tail_retired.store(false);
+		tail_frames_processed = 0;
+		enabled.store(true);
+	}
+	if (!environment->add_tail_node(this)) {
+		tail_draining.store(false);
+		return false;
+	}
+	phonon_reflection_debug_log("node_tail_begin id=%llu limit_frames=%u", debug_id, phonon_reflection_tail_limit_frames());
+	return true;
+}
+bool phonon_reflection_node_impl::drain_tail_chunk(ma_uint32 frame_count) {
+	if (!tail_draining.load() || tail_retired.load()) return false;
+	std::lock_guard<std::mutex> effect_lock(effect_mutex);
+	if (!tail_draining.load() || tail_retired.load()) return false;
+	if (!environment || !ready || !reflection_effect || !reflections_buffer.data || !environment->reflection_mixer) {
+		tail_draining.store(false);
+		tail_remaining.store(false);
+		tail_retired.store(true);
+		return false;
+	}
+	ma_uint32 frames_remaining = phonon_reflection_tail_limit_frames() > tail_frames_processed ? phonon_reflection_tail_limit_frames() - tail_frames_processed : 0;
+	ma_uint32 frames_this_time = std::min<ma_uint32>(frame_count, frames_remaining);
+	if (frames_this_time == 0) {
+		reset_effects_locked();
+		tail_retired.store(true);
+		phonon_reflection_debug_log("node_tail_end id=%llu", debug_id);
+		return false;
+	}
+	reflections_buffer.numSamples = frames_this_time;
+	for (IPLint32 i = 0; i < reflections_buffer.numChannels; i++) {
+		std::memset(reflections_buffer.data[i], 0, frames_this_time * sizeof(float));
+	}
+	{
+		std::lock_guard<std::mutex> mixer_lock(environment->mixer_mutex);
+		iplReflectionEffectGetTail(reflection_effect, &reflections_buffer, environment->reflection_mixer);
+	}
+	tail_frames_processed += frames_this_time;
+	tail_remaining.store(true);
+	if (tail_frames_processed >= phonon_reflection_tail_limit_frames()) {
+		reset_effects_locked();
+		tail_retired.store(true);
+		phonon_reflection_debug_log("node_tail_end id=%llu", debug_id);
+		return false;
+	}
+	return true;
+}
+void phonon_reflection_node_impl::set_position(float x, float y, float z) {
+	if (!environment || !source) {
+		position = reactphysics3d::Vector3(x, y, z);
+		return;
+	}
+	std::lock_guard<std::mutex> lock(environment->mutex);
+	position = reactphysics3d::Vector3(x, y, z);
+	source_inputs_dirty = true;
+}
+void phonon_reflection_node_impl::set_position_vector(const reactphysics3d::Vector3& pos) { set_position(pos.x, pos.y, pos.z); }
+void phonon_reflection_node_impl::process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) {
+	if (!frame_count_out || !frames_out || !frames_out[0]) return;
+	audio_engine* e = get_engine();
+	ma_uint32 channels = e ? e->get_channels() : 0;
+	if (channels == 0) return;
+	ma_uint32 output_frames = *frame_count_out;
+	ma_uint32 input_frames = (frame_count_in ? *frame_count_in : 0);
+	int process_index = debug_process_count++;
+	if (phonon_reflection_log_audio_chunks && process_index < 16) {
+		phonon_reflection_debug_log("process_enter id=%llu engine_rate=%d phonon_rate=%d output=%u input=%u has_in=%d tail_before=%d ready=%d enabled=%d", debug_id, e ? e->get_sample_rate() : -1, g_phonon_audio_settings.samplingRate, output_frames, input_frames, (frames_in && frames_in[0] && input_frames > 0) ? 1 : 0, tail_remaining.load() ? 1 : 0, ready ? 1 : 0, enabled.load() ? 1 : 0);
+	}
+	bool has_input = frames_in && frames_in[0] && input_frames > 0;
+	ma_uint32 input_copy_frames = has_input ? min(input_frames, output_frames) : 0;
+	bool input_has_signal = has_input && phonon_reflection_buffer_has_signal(frames_in[0], input_copy_frames, channels);
+	if (input_has_signal) has_received_signal.store(true);
+	bool has_tail = tail_remaining.load() || tail_draining.load();
+	bool has_reflection_input = has_input && input_has_signal;
+	if (input_copy_frames > 0) ma_copy_pcm_frames(frames_out[0], frames_in[0], input_copy_frames, ma_format_f32, channels);
+	if (output_frames > input_copy_frames) {
+		std::memset(ma_offset_pcm_frames_ptr_f32(frames_out[0], input_copy_frames, channels), 0, (output_frames - input_copy_frames) * channels * sizeof(float));
+	}
+	ma_uint32 total_frames = has_reflection_input ? input_copy_frames : (has_tail ? output_frames : 0);
+	if (total_frames == 0) return;
+	if (!enabled.load() || !environment || !ready || !source || !reflection_effect || channels != 2) return;
+	if (!input_buffer.data || !mono_input_buffer.data || !reflections_buffer.data) return;
+	if (g_phonon_audio_settings.frameSize <= 0) return;
+	IPLSimulationOutputs outputs{};
+	IPLReflectionEffectParams reflect_params{};
+	if (has_reflection_input) {
+		std::lock_guard<std::mutex> lock(environment->mutex);
+		if (!source || !environment) return;
+		iplSourceGetOutputs(source, IPLSimulationFlags(IPL_SIMULATIONFLAGS_REFLECTIONS), &outputs);
+		reflect_params = outputs.reflections;
+		if (phonon_reflection_effect_type != IPL_REFLECTIONEFFECTTYPE_PARAMETRIC && !reflect_params.ir) {
+			if (!debug_no_ir_logged) {
+				phonon_reflection_debug_log("process_no_ir id=%llu engine_rate=%d phonon_rate=%d output=%u input=%u", debug_id, e ? e->get_sample_rate() : -1, g_phonon_audio_settings.samplingRate, output_frames, input_frames);
+				debug_no_ir_logged = true;
+			}
+			return;
+		}
+		reflect_params.type = phonon_reflection_effect_type;
+		reflect_params.numChannels = phonon_reflection_effect_channels();
+		reflect_params.irSize = phonon_reflection_ir_size();
+	}
+	std::unique_lock<std::mutex> effect_lock(effect_mutex);
+	if (!enabled.load() || !ready || !reflection_effect || channels != 2) return;
+	if (!input_buffer.data || !mono_input_buffer.data || !reflections_buffer.data || !environment || !environment->reflection_mixer) return;
+	ma_uint32 processed = 0;
+	while (processed < total_frames) {
+		ma_uint32 frames_this_time = total_frames - processed;
+		if (frames_this_time > (ma_uint32)g_phonon_audio_settings.frameSize) frames_this_time = (ma_uint32)g_phonon_audio_settings.frameSize;
+		input_buffer.numSamples = frames_this_time;
+		mono_input_buffer.numSamples = frames_this_time;
+		reflections_buffer.numSamples = frames_this_time;
+		for (IPLint32 i = 0; i < reflections_buffer.numChannels; i++) {
+			std::memset(reflections_buffer.data[i], 0, frames_this_time * sizeof(float));
+		}
+		IPLAudioEffectState state = IPL_AUDIOEFFECTSTATE_TAILCOMPLETE;
+		if (has_reflection_input) {
+			tail_frames_processed = 0;
+			iplAudioBufferDeinterleave(g_phonon_context, (float*)ma_offset_pcm_frames_const_ptr_f32(frames_in[0], processed, 2), &input_buffer);
+			iplAudioBufferDownmix(g_phonon_context, &input_buffer, &mono_input_buffer);
+			if (wet_gain != 1.0f && mono_input_buffer.data[0]) {
+				for (IPLint32 sample = 0; sample < mono_input_buffer.numSamples; sample++) {
+					mono_input_buffer.data[0][sample] *= wet_gain;
+				}
+			}
+			{
+				std::lock_guard<std::mutex> mixer_lock(environment->mixer_mutex);
+				state = iplReflectionEffectApply(reflection_effect, &reflect_params, &mono_input_buffer, &reflections_buffer, environment->reflection_mixer);
+			}
+		} else {
+			tail_frames_processed += frames_this_time;
+			if (tail_frames_processed >= phonon_reflection_tail_limit_frames()) {
+				reset_effects_locked();
+				break;
+			}
+			for (IPLint32 i = 0; i < input_buffer.numChannels; i++) {
+				std::memset(input_buffer.data[i], 0, frames_this_time * sizeof(float));
+			}
+			{
+				std::lock_guard<std::mutex> mixer_lock(environment->mixer_mutex);
+				state = iplReflectionEffectGetTail(reflection_effect, &reflections_buffer, environment->reflection_mixer);
+			}
+		}
+		tail_remaining.store(input_has_signal || tail_draining.load() || state == IPL_AUDIOEFFECTSTATE_TAILREMAINING);
+		if (phonon_reflection_log_audio_chunks && process_index < 16) {
+			phonon_reflection_debug_log("process_chunk id=%llu type=%s render=mixer chunk=%u has_in=%d signal=%d tail_mode=%d state=%d tail_after=%d ir=%p ir_size=%d tail_size=%d gain=%.3f mixer=%p", debug_id, phonon_reflection_effect_type_name(), frames_this_time, has_input ? 1 : 0, input_has_signal ? 1 : 0, has_reflection_input ? 0 : 1, int(state), tail_remaining.load() ? 1 : 0, has_reflection_input ? (void*)reflect_params.ir : nullptr, has_reflection_input ? reflect_params.irSize : -1, reflection_effect ? iplReflectionEffectGetTailSize(reflection_effect) : -1, wet_gain, environment ? (void*)environment->reflection_mixer : nullptr);
+		}
+		processed += frames_this_time;
+	}
+}
+
+sound_environment* sound_environment::create(audio_engine* engine) { return new sound_environment_impl(engine); }
+phonon_reflection_node* phonon_reflection_node::create(sound_environment* environment, audio_engine* engine) { return new phonon_reflection_node_impl(environment, engine); }
 
 class reverb3d_impl : public passthrough_node_impl, public virtual reverb3d {
 	audio_node* reverb;
