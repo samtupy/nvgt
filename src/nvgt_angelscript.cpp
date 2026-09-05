@@ -280,7 +280,29 @@ void ShowAngelscriptMessages() {
 		#endif
 	g_scriptMessagesErr = g_scriptMessagesWarn = g_scriptMessagesLine0 = ""; // Clear out the message buffers such that only new messages will be displayed upon a second call to this function.
 }
-
+std::string get_hint(const std::string_view& msg)
+{
+std::string hint = "hint: ";
+if(msg.find("No entry point found (either 'int main()' or 'void main()'.)")!=std::string::npos)
+hint+= "All programs that are not include scripts must contain a main function, void main or int main. Please create this and write your code inside this function";
+if(msg.find("unable to locate this include")!=std::string::npos)
+	hint+="Make sure all your included scripts are in their correct file paths, and make sure your code points to the correct files";
+if(msg.find("Unexpected end of file")!=std::string::npos)
+hint+="Check for missing closing braces at the end of your code blocks.";
+if(msg.find("Non-terminated string literal") !=std::string::npos)
+	hint += "Check for unclosed quotes.";
+if(msg.find("Expected ',' or ';'")!=std::string::npos)
+hint+=" Check for a missing semicolon at the end of a statement or a missing comma in a function call.";
+if(msg.find("Not all paths return a value")!=std::string::npos)
+hint+= "Your function must return a value. Make sure that your function returns a value  in any given case.";
+if(msg.find("No matching symbol")!=std::string::npos)
+hint+= "Make sure all functions and variables being used are properly created , included and spelled correctly in your code.";
+if(hint!="hint: ")
+{
+return hint+"\r\n";
+}
+return "";
+}
 void MessageCallback(const asSMessageInfo *msg, void* param) {
 	string type = "ERROR";
 	if (msg->type == asMSGTYPE_WARNING)
@@ -290,6 +312,7 @@ void MessageCallback(const asSMessageInfo *msg, void* param) {
 	else
 		g_scriptMessagesErrNum += 1;
 	std::string buffer = format(Util::Application::instance().config().getString("application.compilation_message_template", "file: %s\r\nline: %u (%u)\r\n%s: %s\r\n") + "\r\n"s, string(msg->section), uint32_t(msg->row > 0 ? msg->row : 0), uint32_t(msg->col > 0 ? msg->col : 0), string(type), string(msg->message));
+buffer+= get_hint(msg->message);
 	if (msg->type == asMSGTYPE_INFORMATION)
 		g_scriptMessagesInfo = buffer;
 	else if (msg->type == asMSGTYPE_ERROR) {
