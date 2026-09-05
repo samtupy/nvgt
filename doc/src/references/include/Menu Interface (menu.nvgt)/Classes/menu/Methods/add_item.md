@@ -9,4 +9,4 @@ Add an item to the menu.
 * int position = -1: the position to insert the new item at (-1 = end of menu).
 
 ## Returns:
-int: the  position of the new item in the menu.
+int: the position of the new item in the menu, or -1 if the item could not be added.
