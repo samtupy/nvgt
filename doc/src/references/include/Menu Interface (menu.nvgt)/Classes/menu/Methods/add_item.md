@@ -1,7 +1,7 @@
 # add_item
 Add an item to the menu.
 
-`bool menu::add_item(string text, string id = "", int position = -1);`
+`int menu::add_item(string text, string id = "", int position = -1);`
 
 ## Arguments:
 * string text: the text of the item to add to the menu.
