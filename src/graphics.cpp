@@ -13,6 +13,8 @@
 #include "graphics.h"
 #include "UI.h"
 #include "nvgt_plugin.h"
+#include <memory>
+#include <sstream>
 std::string get_font_path(const std::string& name); // defined in xplatform.cpp
 
 // graphic
@@ -48,14 +50,41 @@ graphic* load_bmp(const std::string& file) {
 	return s ? new graphic(s) : nullptr;
 }
 
+static graphic* load_from_pack(const std::string& file, const pack_interface* pack_file, SDL_Surface* (*loader)(SDL_IOStream*, bool)) {
+	if (!pack_file || !pack_file->get_is_active()) return nullptr;
+	std::unique_ptr<std::istream> stream(pack_file->get_file(file));
+	if (!stream) return nullptr;
+	std::ostringstream buffer;
+	buffer << stream->rdbuf();
+	if (stream->bad()) return nullptr;
+	const std::string data = buffer.str();
+	if (data.empty()) return nullptr;
+	SDL_IOStream* io = SDL_IOFromConstMem(data.data(), data.size());
+	if (!io) return nullptr;
+	SDL_Surface* surface = loader(io, true);
+	return surface ? new graphic(surface) : nullptr;
+}
+
+graphic* load_bmp(const std::string& file, const pack_interface* pack_file) {
+	return load_from_pack(file, pack_file, SDL_LoadBMP_IO);
+}
+
 graphic* load_png(const std::string& file) {
 	SDL_Surface* s = SDL_LoadPNG(file.c_str());
 	return s ? new graphic(s) : nullptr;
 }
 
+graphic* load_png(const std::string& file, const pack_interface* pack_file) {
+	return load_from_pack(file, pack_file, SDL_LoadPNG_IO);
+}
+
 graphic* load_surface(const std::string& file) {
 	SDL_Surface* s = SDL_LoadSurface(file.c_str());
 	return s ? new graphic(s) : nullptr;
+}
+
+graphic* load_surface(const std::string& file, const pack_interface* pack_file) {
+	return load_from_pack(file, pack_file, SDL_LoadSurface_IO);
 }
 
 graphic* create_surface(int width, int height, unsigned int pixel_format) {
@@ -216,13 +245,13 @@ std::string font_tag_to_string(unsigned int tag) {
 
 // graphics_renderer
 
-graphics_renderer::graphics_renderer() : _renderer(nullptr), _refcount(1) {
+graphics_renderer::graphics_renderer() : _renderer(nullptr), _refcount(1), _dirty(false), _presented_once(false) {
 	// Default renderer attaches to whichever window SDL currently considers the focused one, if any.
 	SDL_Window* win = SDL_GetKeyboardFocus();
 	if (win) _renderer = SDL_CreateRenderer(win, nullptr);
 }
 
-graphics_renderer::graphics_renderer(game_window* window) : _renderer(nullptr), _refcount(1) {
+graphics_renderer::graphics_renderer(game_window* window) : _renderer(nullptr), _refcount(1), _dirty(false), _presented_once(false) {
 	if (window) _renderer = SDL_CreateRenderer(window->get_sdl_window(), nullptr);
 }
 
@@ -270,12 +299,16 @@ bool graphics_renderer::get_current_output_size(int& w, int& h) const {
 
 bool graphics_renderer::draw_rect(float x, float y, float w, float h) {
 	SDL_FRect r = {x, y, w, h};
-	return SDL_RenderRect(_renderer, &r);
+	bool ok = SDL_RenderRect(_renderer, &r);
+	if (ok) mark_dirty();
+	return ok;
 }
 
 bool graphics_renderer::fill_rect(float x, float y, float w, float h) {
 	SDL_FRect r = {x, y, w, h};
-	return SDL_RenderFillRect(_renderer, &r);
+	bool ok = SDL_RenderFillRect(_renderer, &r);
+	if (ok) mark_dirty();
+	return ok;
 }
 
 bool graphics_renderer::render_graphic(graphic* gfx, float dst_x, float dst_y) {
@@ -285,6 +318,7 @@ bool graphics_renderer::render_graphic(graphic* gfx, float dst_x, float dst_y) {
 	SDL_FRect dst = {dst_x, dst_y, (float)gfx->get_width(), (float)gfx->get_height()};
 	bool ok = SDL_RenderTexture(_renderer, tex, nullptr, &dst);
 	SDL_DestroyTexture(tex);
+	if (ok) mark_dirty();
 	return ok;
 }
 
@@ -296,6 +330,7 @@ bool graphics_renderer::render_graphic_ex(graphic* gfx, float src_x, float src_y
 	SDL_FRect dst = {dst_x, dst_y, dst_w, dst_h};
 	bool ok = SDL_RenderTexture(_renderer, tex, &src, &dst);
 	SDL_DestroyTexture(tex);
+	if (ok) mark_dirty();
 	return ok;
 }
 
@@ -308,14 +343,18 @@ graphics_texture* graphics_renderer::create_texture(graphic* gfx) {
 bool graphics_renderer::render_texture(graphics_texture* tex, float dst_x, float dst_y) {
 	if (!tex || !tex->get_texture()) return false;
 	SDL_FRect dst = {dst_x, dst_y, (float)tex->get_width(), (float)tex->get_height()};
-	return SDL_RenderTexture(_renderer, tex->get_texture(), nullptr, &dst);
+	bool ok = SDL_RenderTexture(_renderer, tex->get_texture(), nullptr, &dst);
+	if (ok) mark_dirty();
+	return ok;
 }
 
 bool graphics_renderer::render_texture_ex(graphics_texture* tex, float src_x, float src_y, float src_w, float src_h, float dst_x, float dst_y, float dst_w, float dst_h) {
 	if (!tex || !tex->get_texture()) return false;
 	SDL_FRect src = {src_x, src_y, src_w, src_h};
 	SDL_FRect dst = {dst_x, dst_y, dst_w, dst_h};
-	return SDL_RenderTexture(_renderer, tex->get_texture(), &src, &dst);
+	bool ok = SDL_RenderTexture(_renderer, tex->get_texture(), &src, &dst);
+	if (ok) mark_dirty();
+	return ok;
 }
 
 bool graphics_renderer::set_logical_presentation(int w, int h, unsigned int mode) {
@@ -443,9 +482,12 @@ void RegisterGraphics(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("graphic", "graphic@ convert(pixel_format pixel_format) const", asMETHOD(graphic, convert), asCALL_THISCALL);
 	engine->RegisterObjectMethod("graphic", "graphic@ duplicate() const", asMETHOD(graphic, duplicate_surface), asCALL_THISCALL);
 	// graphic free functions
-	engine->RegisterGlobalFunction("graphic@ load_bmp(const string&in file)", asFUNCTION(load_bmp), asCALL_CDECL);
-	engine->RegisterGlobalFunction("graphic@ load_png(const string&in file)", asFUNCTION(load_png), asCALL_CDECL);
-	engine->RegisterGlobalFunction("graphic@ load_surface(const string&in file)", asFUNCTION(load_surface), asCALL_CDECL);
+	engine->RegisterGlobalFunction("graphic@ load_bmp(const string&in file)", asFUNCTIONPR(load_bmp, (const std::string&), graphic*), asCALL_CDECL);
+	engine->RegisterGlobalFunction("graphic@ load_bmp(const string&in file, const pack_interface@ pack_file)", asFUNCTIONPR(load_bmp, (const std::string&, const pack_interface*), graphic*), asCALL_CDECL);
+	engine->RegisterGlobalFunction("graphic@ load_png(const string&in file)", asFUNCTIONPR(load_png, (const std::string&), graphic*), asCALL_CDECL);
+	engine->RegisterGlobalFunction("graphic@ load_png(const string&in file, const pack_interface@ pack_file)", asFUNCTIONPR(load_png, (const std::string&, const pack_interface*), graphic*), asCALL_CDECL);
+	engine->RegisterGlobalFunction("graphic@ load_surface(const string&in file)", asFUNCTIONPR(load_surface, (const std::string&), graphic*), asCALL_CDECL);
+	engine->RegisterGlobalFunction("graphic@ load_surface(const string&in file, const pack_interface@ pack_file)", asFUNCTIONPR(load_surface, (const std::string&, const pack_interface*), graphic*), asCALL_CDECL);
 	engine->RegisterGlobalFunction("graphic@ create_surface(int width, int height, pixel_format pixel_format)", asFUNCTION(create_surface), asCALL_CDECL);
 	
 	// graphics_texture

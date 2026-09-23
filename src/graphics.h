@@ -21,6 +21,7 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 class game_window;
+class pack_interface;
 
 inline std::string from_cstr(const char* str) { return str ? str : ""; }
 inline SDL_Color to_sdl_color(unsigned int r, unsigned int g, unsigned int b) { return {(Uint8)r, (Uint8)g, (Uint8)b, 255}; }
@@ -54,8 +55,11 @@ public:
 	SDL_Surface* get_surface() const { return _surface; }
 };
 graphic* load_bmp(const std::string& file);
+graphic* load_bmp(const std::string& file, const pack_interface* pack_file);
 graphic* load_png(const std::string& file);
+graphic* load_png(const std::string& file, const pack_interface* pack_file);
 graphic* load_surface(const std::string& file);
+graphic* load_surface(const std::string& file, const pack_interface* pack_file);
 graphic* create_surface(int width, int height, unsigned int pixel_format);
 
 class graphics_texture {
@@ -150,6 +154,8 @@ std::string font_tag_to_string(unsigned int tag);
 class graphics_renderer {
 	SDL_Renderer* _renderer;
 	int _refcount;
+	bool _dirty;
+	bool _presented_once;
 public:
 	graphics_renderer();
 	graphics_renderer(game_window* window);
@@ -157,11 +163,16 @@ public:
 	void duplicate() { asAtomicInc(_refcount); }
 	void release() { if (asAtomicDec(_refcount) < 1) delete this; }
 	bool is_valid() const { return _renderer != nullptr; }
+	bool has_presented() const { return _presented_once; }
+	bool has_pending_frame() const { return _dirty; }
+	void require_initial_frame() { _presented_once = false; }
+	void mark_dirty() { _dirty = true; }
 	std::string get_name() const { return from_cstr(SDL_GetRendererName(_renderer)); }
-	bool clear() { return SDL_RenderClear(_renderer); }
-	bool present() { return SDL_RenderPresent(_renderer); }
-	bool draw_point(float x, float y) { return SDL_RenderPoint(_renderer, x, y); }
-	bool draw_line(float x1, float y1, float x2, float y2) { return SDL_RenderLine(_renderer, x1, y1, x2, y2); }
+	bool clear() { bool ok = SDL_RenderClear(_renderer); if (ok) mark_dirty(); return ok; }
+	bool present() { bool ok = SDL_RenderPresent(_renderer); if (ok) { _dirty = false; _presented_once = true; } return ok; }
+	bool present_if_dirty() { return !_dirty || present(); }
+	bool draw_point(float x, float y) { bool ok = SDL_RenderPoint(_renderer, x, y); if (ok) mark_dirty(); return ok; }
+	bool draw_line(float x1, float y1, float x2, float y2) { bool ok = SDL_RenderLine(_renderer, x1, y1, x2, y2); if (ok) mark_dirty(); return ok; }
 	bool set_draw_color(unsigned int r, unsigned int g, unsigned int b, unsigned int a) { return SDL_SetRenderDrawColor(_renderer, (Uint8)r, (Uint8)g, (Uint8)b, (Uint8)a); }
 	bool set_scale(float sx, float sy) { return SDL_SetRenderScale(_renderer, sx, sy); }
 	bool set_vsync(int vsync) { return SDL_SetRenderVSync(_renderer, vsync); }
