@@ -35,7 +35,7 @@ bool FileHardLink(const std::string& source, const std::string& target) {
 	} catch (Poco::Exception) {
 		return false;
 	}
-	return false;
+	return true;
 }
 
 bool FNMatch(const std::string& file, const std::string& pattern) {
@@ -66,11 +66,11 @@ CScriptArray* FindFiles(const string& path) {
 
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
+	std::wstring bufUTF16;
+	UnicodeConverter::toUTF16(path, bufUTF16);
 
 	WIN32_FIND_DATAW ffd;
-	HANDLE hFind = FindFirstFileExW(bufUTF16, FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
+	HANDLE hFind = FindFirstFileExW(bufUTF16.c_str(), FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
 	if (INVALID_HANDLE_VALUE == hFind)
 		return array;
 
@@ -145,11 +145,11 @@ CScriptArray* FindDirectories(const string& path) {
 
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
+	std::wstring bufUTF16;
+	UnicodeConverter::toUTF16(path, bufUTF16);
 
 	WIN32_FIND_DATAW ffd;
-	HANDLE hFind = FindFirstFileExW(bufUTF16, FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
+	HANDLE hFind = FindFirstFileExW(bufUTF16.c_str(), FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
 	if (INVALID_HANDLE_VALUE == hFind)
 		return array;
 
@@ -235,11 +235,11 @@ bool DirectoryExists(const string& path) {
 bool FileExists(const string& path) {
 	#ifdef _WIN32
 	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
+	std::wstring bufUTF16;
+	UnicodeConverter::toUTF16(path, bufUTF16);
 
 	// Check if the path exists and is a directory
-	DWORD attrib = GetFileAttributesW(bufUTF16);
+	DWORD attrib = GetFileAttributesW(bufUTF16.c_str());
 	if (attrib == INVALID_FILE_ATTRIBUTES || (attrib & FILE_ATTRIBUTE_DIRECTORY))
 		return false;
 	return true;
@@ -258,12 +258,12 @@ bool FileExists(const string& path) {
 asINT64 FileGetSize(const string& path) {
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
+	std::wstring bufUTF16;
+	UnicodeConverter::toUTF16(path, bufUTF16);
 
 	// Get the size of the file
 	WIN32_FILE_ATTRIBUTE_DATA attrs;
-	if (!GetFileAttributesExW(bufUTF16, GetFileExInfoStandard, &attrs))
+	if (!GetFileAttributesExW(bufUTF16.c_str(), GetFileExInfoStandard, &attrs))
 		return -1;
 	LARGE_INTEGER size;
 	size.HighPart = attrs.nFileSizeHigh;
