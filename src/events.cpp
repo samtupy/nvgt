@@ -60,21 +60,21 @@ void engine_event::clean_inactive_listeners() {
 	}
 }
 bool engine_event::insert(const engine_event_listener& listener, int index = -1) {
-	if (find(listener) > -1) return false;
+	if (index < -1 || index > (int)listeners.size() || find(listener) > -1) return false;
 	if (index == -1) index = listeners.size();
 	listeners.insert(listeners.begin() + index, listener);
 	return true;
 }
 std::string engine_event::callback_declaration() const { return "on_"s + name + "("s + args + ")"; }
-int engine_event::find(asIScriptObject* obj) const { return find(engine_event_listener(obj, this)); }
-int engine_event::find(asIScriptFunction* func) const { return find(engine_event_listener(func)); }
+int engine_event::find(asIScriptObject* obj) const { return obj? find(engine_event_listener(obj, this)) : -1; }
+int engine_event::find(asIScriptFunction* func) const { return func? find(engine_event_listener(func)) : -1; }
 int engine_event::find(const engine_event_listener& listener) const {
 	auto it = std::find(listeners.begin(), listeners.end(), listener);
 	if (it == listeners.end()) return -1;
 	return distance(listeners.begin(), it);
 }
-bool engine_event::insert(asIScriptObject* obj, int index) { return insert(engine_event_listener(obj, this), index); }
-bool engine_event::insert(asIScriptFunction* func, int index) { return insert(engine_event_listener(func), index); }
+bool engine_event::insert(asIScriptObject* obj, int index) { return obj && insert(engine_event_listener(obj, this), index); }
+bool engine_event::insert(asIScriptFunction* func, int index) { return func && insert(engine_event_listener(func), index); }
 bool engine_event::remove(asIScriptObject* obj) { return remove(find(obj)); }
 bool engine_event::remove(asIScriptFunction* func) { return remove(find(func)); }
 bool engine_event::remove(unsigned int index) {

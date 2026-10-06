@@ -42,7 +42,8 @@ class engine_event {
 protected:
 	template <typename... Args> void fire(Args&... args) {
 		clean_inactive_listeners();
-		for (engine_event_listener& l : listeners) {
+		for (size_t i = 0; i < listeners.size(); i++) {
+			engine_event_listener l = listeners[i];
 			if (l.fire(std::forward<Args>(args)...)) break;
 		}
 	}
