@@ -176,7 +176,7 @@ bool network::send(asQWORD peer_id, const std::string& message, unsigned char ch
 bool network::send_peer(asQWORD peer, const std::string& message, unsigned char channel, bool reliable) {
 	if (!host || channel > channel_count) return false;
 	ENetPeer* peer_obj = reinterpret_cast<ENetPeer*>(peer);
-	if (!peer_obj) return false;
+	if (peer < asQWORD(host->peers) || peer >= asQWORD(host->peers + host->peerCount) || (peer - asQWORD(host->peers)) % sizeof(ENetPeer) != 0) return false;
 	ENetPacket* packet = enet_packet_create(message.c_str(), message.size(), (reliable ? ENET_PACKET_FLAG_RELIABLE : 0));
 	if (!packet) return false;
 	bool r = enet_peer_send(peer_obj, channel, packet) == 0;

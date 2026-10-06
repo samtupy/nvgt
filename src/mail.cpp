@@ -119,6 +119,7 @@ public:
 		for (const auto& r : recipients) {
 			mail_recipient* mr = new mail_recipient(r.getType(), r.getAddress(), r.getRealName());
 			arr->InsertLast(&mr);
+			mr->release();
 		}
 		return arr;
 	}
@@ -722,7 +723,7 @@ void RegisterMail(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("smtp_client", "bool connect()", asMETHOD(smtp_client, connect), asCALL_THISCALL);
 	engine->RegisterObjectMethod("smtp_client", "bool login(const string &in, const string &in, smtp_auth_method = SMTP_AUTH_LOGIN)", asMETHOD(smtp_client, login), asCALL_THISCALL);
 	engine->RegisterObjectMethod("smtp_client", "bool login_oauth2(const string &in, const string &in)", asMETHOD(smtp_client, login_oauth2), asCALL_THISCALL);
-	engine->RegisterObjectMethod("smtp_client", "bool send_message(mail_message@)", asMETHOD(smtp_client, send_message), asCALL_THISCALL);
+	engine->RegisterObjectMethod("smtp_client", "bool send_message(mail_message@+)", asMETHOD(smtp_client, send_message), asCALL_THISCALL);
 	engine->RegisterObjectMethod("smtp_client", "void close()", asMETHOD(smtp_client, close), asCALL_THISCALL);
 	engine->RegisterObjectMethod("smtp_client", "bool get_is_connected() const property", asMETHOD(smtp_client, is_connected), asCALL_THISCALL);
 	engine->RegisterObjectMethod("smtp_client", "bool get_is_authenticated() const property", asMETHOD(smtp_client, is_authenticated), asCALL_THISCALL);
@@ -731,7 +732,7 @@ void RegisterMail(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("smtp_client", "int get_timeout() const property", asMETHOD(smtp_client, get_timeout), asCALL_THISCALL);
 	engine->RegisterObjectMethod("smtp_client", "string query_server_capabilities()", asMETHOD(smtp_client, query_server_capabilities), asCALL_THISCALL);
 	engine->RegisterObjectMethod("smtp_client", "string get_server_capabilities() const property", asMETHOD(smtp_client, get_server_capabilities), asCALL_THISCALL);
-	engine->RegisterObjectMethod("smtp_client", "bool send_messages(array<mail_message@>@)", asMETHOD(smtp_client, send_messages), asCALL_THISCALL);
+	engine->RegisterObjectMethod("smtp_client", "bool send_messages(array<mail_message@>@+)", asMETHOD(smtp_client, send_messages), asCALL_THISCALL);
 	engine->RegisterGlobalFunction("bool validate_email_address(const string &in)", asFUNCTION(validate_email_address), asCALL_CDECL);
 	engine->RegisterGlobalFunction("mail_message@ parse_email_message(const string &in)", asFUNCTION(parse_email_message), asCALL_CDECL);
 }

@@ -203,8 +203,8 @@ template <class T, class P> void RegisterMessageHeader(asIScriptEngine* engine, 
 	RegisterNameValueCollection<T>(engine, type);
 	engine->RegisterObjectMethod(parent.c_str(), format("%s@ opCast()", type).c_str(), asFUNCTION((angelscript_refcounted_refcast<P, T>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), format("%s@ opImplCast()", parent).c_str(), asFUNCTION((angelscript_refcounted_refcast<T, P>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool write(datastream@) const", asFUNCTION(message_header_write<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool read(datastream@)", asFUNCTION(message_header_read<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool write(datastream@+) const", asFUNCTION(message_header_write<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool read(datastream@+)", asFUNCTION(message_header_read<T>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_auto_decode() const property", asMETHOD(T, getAutoDecode), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set_auto_decode(bool) property", asMETHOD(T, setAutoDecode), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "string get_decoded(const string&in, const string&in = \"\")", asMETHODPR(T, getDecoded, (const std::string&, const std::string&) const, std::string), asCALL_THISCALL);
@@ -358,8 +358,8 @@ void RegisterHTTPCredentials(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool http_credentials_is_proxy_basic(const http_request&in request)", asFUNCTION(HTTPCredentials::hasProxyBasicCredentials), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool http_credentials_is_proxy_digest(const http_request&in request)", asFUNCTION(HTTPCredentials::hasProxyDigestCredentials), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool http_credentials_is_proxy_ntlm(const http_request&in request)", asFUNCTION(HTTPCredentials::hasProxyNTLMCredentials), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool http_credentials_extract(const string&in user_info, string&out username, string&out password)", asFUNCTIONPR(HTTPCredentials::extractCredentials, (const string&, string&, string&), void), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool http_credentials_extract(const spec::uri&in uri, string&out username, string&out password)", asFUNCTIONPR(HTTPCredentials::extractCredentials, (const URI&, string&, string&), void), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void http_credentials_extract(const string&in user_info, string&out username, string&out password)", asFUNCTIONPR(HTTPCredentials::extractCredentials, (const string&, string&, string&), void), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void http_credentials_extract(const spec::uri&in uri, string&out username, string&out password)", asFUNCTIONPR(HTTPCredentials::extractCredentials, (const URI&, string&, string&), void), asCALL_CDECL);
 }
 void RegisterIPAddress(asIScriptEngine* engine) {
 	// Also registers SocketAddress as an aside.
@@ -811,7 +811,11 @@ string url_request(const string& method, const string& url, const string& data, 
 	http h;
 	if (!h.request(method, URI(url), nullptr, data)) return "";
 	h.wait();
-	if (resp) *resp = *h.get_response_headers();
+	if (resp) {
+		HTTPResponse* headers = h.get_response_headers();
+		*resp = *headers;
+		angelscript_refcounted_release(headers);
+	}
 	return h.get_response_body();
 }
 string url_get(const string& url, HTTPResponse* resp) { return url_request(HTTPRequest::HTTP_GET, url, "", resp); }
