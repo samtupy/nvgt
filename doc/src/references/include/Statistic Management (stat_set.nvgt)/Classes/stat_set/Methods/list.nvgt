@@ -20,6 +20,6 @@ void main() {
 	stats.add("deaths", 3);
 	stats.add("assists", 7);
 	stats.add("name", "Alex");
-	string[]@ by_value = stats.list(STAT_SORT_MODE_ADD_ORDER, {"name"});
-	alert("Example", join(by_value, ", "));
+	string[]@ names = stats.list(STAT_SORT_MODE_ADD_ORDER, {"name"});
+	alert("Example", join(names, ", "));
 }

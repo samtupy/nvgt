@@ -1,6 +1,12 @@
 /**
 	A single named statistic in a `stat_set`.
 	stat(const string&in name, var@ val, string text = "", stat_callback@ callback = default_stat_callback, dictionary@ user = null);
+	## Arguments:
+		* const string&in name: the name of the stat.
+		* var@ val: the starting value of the stat.
+		* string text = "": the text template used to display the stat, where `%0` is replaced with the value. If empty, it becomes `"%0"`.
+		* stat_callback@ callback = default_stat_callback: the function that produces the stat's display text. If null, `default_stat_callback` is used.
+		* dictionary@ user = null: optional data to attach to the stat, copied into its `user` property.
 	## Properties:
 		* string name: the name the stat is stored under in its set.
 		* var val: the current value of the stat. It can hold any type a `var` supports, usually a number or a string.
