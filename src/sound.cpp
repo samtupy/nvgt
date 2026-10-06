@@ -2062,14 +2062,14 @@ string get_soundsystem_last_error_text() {
 	return msg? msg : "";
 }
 void set_sound_master_volume(float db) {
-	if (!g_soundsystem_initialized.test())
+	if (!init_sound())
 		return;
 	if (db > 0 || db < -100)
 		return;
 	ma_engine_set_volume(g_audio_engine->get_ma_engine(), ma_volume_db_to_linear(db));
 }
 float get_sound_master_volume() {
-	if (!g_soundsystem_initialized.test())
+	if (!init_sound())
 		return 0;
 	return ma_volume_linear_to_db(ma_engine_get_volume(g_audio_engine->get_ma_engine()));
 }
