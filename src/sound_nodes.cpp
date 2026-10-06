@@ -193,7 +193,12 @@ bool set_global_hrtf(bool enabled) {
 	if (enabled) {
 		if (!phonon_init()) return false;
 		if (!sound_set_spatialization(g_audio_phonon_hrtf_panner, g_audio_phonon_attenuator)) return false;
-	} else return sound_set_spatialization(g_audio_basic_panner, g_audio_basic_attenuator, true, false);
+	} else {
+		if (sound_get_default_3d_panner() == g_audio_phonon_hrtf_panner) sound_set_default_3d_panner(g_audio_basic_panner);
+		if (sound_get_default_3d_attenuator() == g_audio_phonon_attenuator) sound_set_default_3d_attenuator(g_audio_basic_attenuator);
+		set_audio_panner_enabled(g_audio_phonon_hrtf_panner, false);
+		set_audio_attenuator_enabled(g_audio_phonon_attenuator, false);
+	}
 	return true;
 }
 bool get_global_hrtf() { return get_audio_panner_enabled(g_audio_phonon_hrtf_panner) && get_audio_attenuator_enabled(g_audio_phonon_attenuator); }
