@@ -1529,7 +1529,7 @@ void CScriptArray::Sort(asUINT startAt, asUINT count, bool asc)
 	int end = startAt + count;
 
 	// Check if we could access invalid item while sorting
-	if( start >= (int)buffer->numElements || end > (int)buffer->numElements )
+	if( startAt >= buffer->numElements || count > buffer->numElements - startAt )
 	{
 		asIScriptContext *ctx = asGetActiveContext();
 
