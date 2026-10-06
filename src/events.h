@@ -104,7 +104,7 @@ public:
 };
 class engine_character_event : public engine_event {
 public:
-	engine_character_event(const std::string& name) : engine_event(name, "character", "string character", asMETHOD(engine_key_event, operator())) {}
+	engine_character_event(const std::string& name) : engine_event(name, "character", "string character", asMETHOD(engine_character_event, operator())) {}
 	void operator()(std::string character) { fire<std::string>(character); }
 };
 class engine_touch_event : public engine_event {
