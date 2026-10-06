@@ -120,10 +120,10 @@ bool InputEvent(SDL_Event* evt) {
 	else if (evt->type == SDL_EVENT_MOUSE_MOTION) {
 		g_MouseAbsX = evt->motion.x;
 		g_MouseAbsY = evt->motion.y;
-	} else if (evt->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+	} else if (evt->type == SDL_EVENT_MOUSE_BUTTON_DOWN && evt->button.button < 32) {
 		g_MouseButtonsPressed[evt->button.button] = 1;
 		g_MouseButtonsReleased[evt->button.button] = 0;
-	} else if (evt->type == SDL_EVENT_MOUSE_BUTTON_UP) {
+	} else if (evt->type == SDL_EVENT_MOUSE_BUTTON_UP && evt->button.button < 32) {
 		g_MouseButtonsPressed[evt->button.button] = 0;
 		g_MouseButtonsReleased[evt->button.button] = 1;
 	} else if (evt->type == SDL_EVENT_MOUSE_WHEEL) g_MouseAbsZ += evt->wheel.y;
@@ -332,7 +332,7 @@ bool MousePressed(unsigned char button) {
 	return r;
 }
 bool mouse_down(unsigned char button) {
-	if (button > 31)
+	if (button == 0 || button > 31)
 		return false;
 	if (!g_KeysDown)
 		return false;
