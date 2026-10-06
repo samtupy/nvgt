@@ -121,7 +121,7 @@ std::string ClipboardGetText() {
 }
 bool ClipboardSetText(const std::string& text) {
 	InputInit();
-	return SDL_SetClipboardText(text.c_str()) == 0;
+	return SDL_SetClipboardText(text.c_str());
 }
 bool ClipboardSetRawText(const std::string& text) {
 	#ifdef _WIN32
