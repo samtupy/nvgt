@@ -357,6 +357,7 @@ bool pack::file_exists(const std::string& filename) {
 	return false;
 }
 int64_t pack::get_file_size(const std::string& filename) {
+	if (open_mode == OPEN_NOT) return -1;
 	const toc_entry* e = open_mode == OPEN_READ ? read->get(filename) : write->get(filename);
 	if (!e) return -1;
 	return e->size;
