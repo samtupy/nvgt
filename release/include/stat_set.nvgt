@@ -185,7 +185,7 @@ class stat_set {
 		return result;
 	}
 
-	stat@[] get_stats() const {
+	stat@[]@ get_stats() const {
 		stat@[] r(stats.get_size());
 		string[]@ k = stats.get_keys();
 		for (uint i = 0; i < k.length(); i++) @r[i] = cast<stat@>(stats[k[i]]);
