@@ -147,14 +147,14 @@ bool altPressed = false;
 bool capsPressed = false;
 bool insertPressed = false;
 static HHOOK g_keyhook_hHook = nullptr;
-bool g_keyhook_active = false;
+std::atomic<bool> g_keyhook_active{false};
 static std::unique_ptr<ProcessWatcher> g_process_watcher = nullptr;
 static std::thread g_process_watcher_thread;
 static std::atomic<bool> g_process_watcher_running{false};
 static std::atomic<bool> g_window_focused{false};
 static std::atomic<bool> g_jhookldr_process_running{false};
-static bool g_keyhook_needs_uninstall = false;
-static bool g_keyhook_needs_install = false;
+static std::atomic<bool> g_keyhook_needs_uninstall{false};
+static std::atomic<bool> g_keyhook_needs_install{false};
 // Used to control/reset various keys, usually insert, when toggling keyhook.
 void send_keyboard_input(WORD vk_code, bool key_up) {
 	INPUT input = {};
