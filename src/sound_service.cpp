@@ -409,7 +409,7 @@ std::istream *encryption_filter::wrap(std::istream &source, const directive_t di
 	if (key == nullptr)
 		return &source;
 	try {
-		return new chacha_istream(source, *key);
+		return &(new chacha_istream(source, *key))->own_source(true);
 	} catch (std::exception &) {
 		// Not encrypted or not valid.
 		return nullptr;
