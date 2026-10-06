@@ -1,0 +1,20 @@
+/**
+	Saves the values of every stat in the set to a compact binary string.
+	string stat_set::serialize();
+	## Returns:
+		string: the serialized stat values, to be loaded with `deserialize()`.
+	## Remarks:
+		Only the names and values of the stats are saved. Text templates, callbacks and user data are not, because they belong to your code rather than to the player's progress.
+		String, whole number and decimal values are saved. Values of any other type are skipped.
+*/
+
+// Example:
+#include "stat_set.nvgt"
+
+void main() {
+	stat_set stats;
+	stats.add("level", 3);
+	stats.add("gold", 250);
+	string data = stats.serialize();
+	alert("Example", "Saved " + data.length() + " bytes");
+}

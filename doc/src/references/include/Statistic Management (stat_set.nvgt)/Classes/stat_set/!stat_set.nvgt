@@ -1,0 +1,21 @@
+/**
+	A collection of named statistics.
+	1. stat_set();
+	2. stat_set(const stat_set&in other);
+	## Arguments (2):
+		* const stat_set&in other: a set to copy.
+	## Remarks:
+		The second constructor, and assigning one stat_set to another with `=`, create independent copies of every stat, so changing one set afterwards doesn't affect the other. The copies keep their original add order.
+		Stats are looked up by name with the `[]` operator, which returns a `stat@` or null if there is no stat with that name.
+*/
+
+// Example:
+#include "stat_set.nvgt"
+
+void main() {
+	stat_set current;
+	current.add("coins", 10, "Coins: %0");
+	stat_set saved = current; // Take a snapshot.
+	current["coins"] += 5;
+	alert("Example", "Now " + string(current["coins"]) + ", snapshot " + string(saved["coins"]));
+}

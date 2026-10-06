@@ -1,0 +1,22 @@
+/**
+	Loads stat values from `name=value` text lines, as written by `serialize_linear()`.
+	bool stat_set::deserialize_linear(const string&in data);
+	## Arguments:
+		* const string&in data: the text to read.
+	## Returns:
+		bool: true if at least one `name=value` line was found, false otherwise.
+	## Remarks:
+		As with `deserialize()`, only stats that already exist in the set are updated.
+		Everything after the first `=` on a line is the value, so values may contain `=` themselves. Values that look like numbers, such as `42`, `-7` or `3.5`, are loaded as numbers, and anything else is loaded as a string. Lines without an `=` are ignored, and both Unix and Windows line endings are accepted.
+*/
+
+// Example:
+#include "stat_set.nvgt"
+
+void main() {
+	stat_set settings;
+	settings.add("difficulty", "normal");
+	settings.add("volume", 0);
+	settings.deserialize_linear("difficulty=hard\nvolume=-10\n");
+	alert("Example", "Difficulty " + string(settings["difficulty"].val) + ", volume " + string(settings["volume"].val));
+}
