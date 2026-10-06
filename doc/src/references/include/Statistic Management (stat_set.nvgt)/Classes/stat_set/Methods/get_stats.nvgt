@@ -1,8 +1,8 @@
 /**
 	Gets handles to every stat in the set.
-	stat@[] stat_set::get_stats() const;
+	stat@[]@ stat_set::get_stats() const;
 	## Returns:
-		stat@[]: a handle to each stat in the set, in no particular order.
+		stat@[]@: an array containing a handle to each stat in the set, in no particular order.
 	## Remarks:
 		The handles refer to the stats themselves, so changing them changes the set. Use `list()` if you need the stats in a particular order.
 */
@@ -14,7 +14,7 @@ void main() {
 	stat_set stats;
 	stats.add("wood", 4);
 	stats.add("stone", 9);
-	stat@[] all = stats.get_stats();
+	stat@[]@ all = stats.get_stats();
 	for (uint i = 0; i < all.length(); i++) all[i] += 1; // Give one of everything.
 	alert("Example", "wood " + string(stats["wood"].val) + ", stone " + string(stats["stone"].val));
 }
