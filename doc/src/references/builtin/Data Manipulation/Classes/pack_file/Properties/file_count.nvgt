@@ -1,0 +1,17 @@
+/**
+	The number of files in the pack.
+	const int64 pack_file::file_count;
+	## Remarks:
+		This is -1 if no pack is open. While a pack is being written, it counts the files added so far.
+*/
+
+// Example:
+void main() {
+	pack_file p;
+	p.create("example.dat");
+	p.add_memory("a.txt", "a");
+	p.add_memory("b.txt", "b");
+	alert("Files in the pack", p.file_count);
+	p.close();
+	file_delete("example.dat");
+}

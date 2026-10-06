@@ -1,0 +1,31 @@
+/**
+	A pack file stores many files inside one larger file, usually so that a game's sounds and other assets can be distributed together and optionally encrypted.
+	pack_file();
+	## Remarks:
+		A pack_file object is inactive when created. Call `create()` to start writing a new pack, or `open()` to read an existing one. A pack is either being written or being read, never both: you cannot add files to a pack that was opened for reading, and you cannot read files out of a pack until it has been written, closed, and opened again.
+		Packs can be encrypted by passing a key to `create()`. The same key must then be passed to `open()`, otherwise opening fails.
+		Packs can also be embedded into your compiled game with the `#pragma embed packname.dat` directive. To open an embedded pack, put an asterisk before its name, for example `open("*packname.dat")`. For BGT compatibility, opening a pack called `*` opens the first embedded pack. This also works when you run the script from source, in which case the pack is read from disk instead.
+		Functions that load assets, such as `sound::load()`, accept a `pack_interface` handle. A pack_file converts to a pack_interface implicitly, so you can pass one directly or assign it to `sound_default_pack`. To get the pack_file back from a pack_interface handle, use `cast<pack_file@>()`.
+		Files inside a pack are identified by name. Names are case sensitive, must be valid UTF-8, and must be unique within the pack.
+		This class replaces the older `pack` class, which is now only available through the legacy_sound plugin. The two classes use different file formats.
+*/
+
+// Example:
+void main() {
+	pack_file p;
+	if (!p.create("example.dat")) {
+		alert("Error", "Unable to create the pack.");
+		return;
+	}
+	p.add_memory("greeting.txt", "Hello from inside a pack!");
+	p.close();
+	if (!p.open("example.dat")) {
+		alert("Error", "Unable to open the pack.");
+		return;
+	}
+	datastream@ ds = p.get_file("greeting.txt");
+	alert("greeting.txt", ds.read());
+	ds.close(); // The pack file can't be deleted while a stream still has it open.
+	p.close();
+	file_delete("example.dat");
+}
