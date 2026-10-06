@@ -107,6 +107,7 @@ void pathfinder::set_callback_function(asIScriptFunction* func) {
 void pathfinder::set_callback_function_ex(asIScriptFunction* func) {
 	// This callback type is fundamentally incompatible with path caching.
 	if (cache) {
+		if (func) func->Release();
 		asGetActiveContext()->SetException("A callback with parent state support cannot be used with path caching enabled.");
 		return;
 	}
@@ -116,6 +117,7 @@ void pathfinder::set_callback_function_ex(asIScriptFunction* func) {
 void pathfinder::set_callback_function_legacy(asIScriptFunction* func) {
 	// This callback type is also fundamentally incompatible with path caching.
 	if (cache) {
+		if (func) func->Release();
 		asGetActiveContext()->SetException("A legacy callback cannot be used with path caching enabled.");
 		return;
 	}
@@ -327,6 +329,10 @@ void pathfinder::AdjacentCost(void* node, micropather::MPVector<micropather::Sta
 }
 
 pathfinder* new_pathfinder(int size, bool cache) {
+	if (size < 1 || size > (1 << 24)) {
+		if (asIScriptContext* ctx = asGetActiveContext()) ctx->SetException("pathfinder size must be between 1 and 16777216");
+		return nullptr;
+	}
 	return new pathfinder(size, cache);
 }
 void RegisterScriptPathfinder(asIScriptEngine* engine) {
