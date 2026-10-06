@@ -210,6 +210,6 @@ void RegisterScriptCombination(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("combination", "bool generate_unique_combinations(int items, int size)", asMETHODPR(combination_api, generate_unique_combinations, (int, int), bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("combination", "bool generate_unique_combinations(int items, int min_size, int max_size)", asMETHODPR(combination_api, generate_unique_combinations, (int, int, int), bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("combination", "bool generate_permutations(int items)", asMETHOD(combination_api, generate_permutations), asCALL_THISCALL);
-	engine->RegisterObjectMethod("combination", "bool next(int[]@ list)", asMETHOD(combination_api, next), asCALL_THISCALL);
+	engine->RegisterObjectMethod("combination", "bool next(int[]@+ list)", asMETHOD(combination_api, next), asCALL_THISCALL);
 	engine->RegisterObjectMethod("combination", "bool get_active() property", asMETHOD(combination_api, is_active), asCALL_THISCALL);
 }
