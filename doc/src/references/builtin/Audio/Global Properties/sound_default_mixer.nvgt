@@ -1,4 +1,16 @@
-# sound_default_mixer
-Represents the default mixer object for all your sounds to use.
+/**
+	The mixer that newly created sounds are attached to.
+	mixer@ sound_default_mixer;
+	## Remarks:
+		This is null by default, which means new sounds play directly through the audio engine. If you assign a mixer, every sound created afterwards is attached to it, so you can control the volume or effects of all your sounds in one place. Sounds that already exist are not moved.
+		A sound can still be moved to a different mixer at any time with `sound::set_mixer()`.
+*/
 
-`mixer@ sound_default_mixer;`
+// Example:
+void main() {
+	mixer game_sounds;
+	@sound_default_mixer = game_sounds;
+	sound s; // This sound is attached to game_sounds automatically.
+	alert("Attached to the default mixer", s.get_mixer() is game_sounds ? "yes" : "no");
+	@sound_default_mixer = null;
+}

@@ -1,0 +1,18 @@
+/**
+	A datastream connected to the program's standard output.
+	datastream@ cout;
+	## Remarks:
+		Standard output is usually the console window the program was started from, or a file or other program that the output has been redirected to.
+		The stream is opened in text mode. Calling `close()` on it has no effect, since the program's standard output is not owned by the script.
+		Unlike `println()`, writing to cout does not add a line break, so you have full control over the output. Because it is a datastream, cout can also be passed to any function that accepts one, such as `script_dump_engine_configuration()`.
+*/
+
+// Example:
+void main() {
+	cout.write("Loading");
+	for (int i = 0; i < 3; i++) {
+		wait(100);
+		cout.write(".");
+	}
+	cout.write(" done!\n");
+}

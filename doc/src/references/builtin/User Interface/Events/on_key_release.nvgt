@@ -1,0 +1,34 @@
+/**
+	An event that is fired whenever a key is released.
+	engine_key_event on_key_release;
+	## Listener signatures:
+		* bool callback(int key);
+		* void callback(int key);
+		* A class implementing engine_key_event_listener, with a `bool on_key_release(int key)` or `void on_key_release(int key)` method.
+	## Arguments passed to listeners:
+		* int key: the code of the key that was released, one of the values in the `key_code` enum.
+	## Remarks:
+		See the Events topic for how listeners are added, ordered and removed, and what their return values mean.
+*/
+
+// Example:
+class key_timer : engine_key_event_listener {
+	timer held;
+	void on_key_press(int key) {
+		if (key == KEY_SPACE) held.restart();
+	}
+	void on_key_release(int key) {
+		if (key == KEY_SPACE) screen_reader_output("Held for " + held.elapsed + " milliseconds", true);
+	}
+}
+void main() {
+	show_window("Example");
+	key_timer kt;
+	on_key_press += kt;
+	on_key_release += kt;
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Hold and release space to hear how long you held it. Press escape to exit.", true);
+	while (!key_pressed(KEY_ESCAPE)) wait(5);
+	on_key_press -= kt;
+	on_key_release -= kt;
+}

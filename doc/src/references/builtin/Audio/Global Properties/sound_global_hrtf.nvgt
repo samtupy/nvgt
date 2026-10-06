@@ -1,6 +1,24 @@
-# sound_global_hrtf
-Controls weather to use steam audio's functionality. If this property is set to false, the sound_environment class will be quite useless and sounds will use very basic panning.
+/**
+	Determine whether sounds are positioned using Steam Audio's HRTF processing.
+	const bool sound_global_hrtf;
+	bool set_sound_global_hrtf(bool enabled);
+	## Arguments (set_sound_global_hrtf):
+		* bool enabled: true to position sounds with HRTF, false to use basic panning.
+	## Returns (set_sound_global_hrtf):
+		bool: true if the setting was applied (or was already in effect), false if Steam Audio couldn't be initialized.
+	## Remarks:
+		This property is read only. To change it, call `set_sound_global_hrtf()`.
+		HRTF (head related transfer function) processing makes positioned sounds seem to come from a direction around the listener, including in front, behind, above and below, and works best with headphones. When it is disabled, sounds are positioned with simple left and right panning and distance attenuation.
+		Enabling HRTF sets `sound_default_3d_panner` to `audio_panner_phonon_hrtf` and `sound_default_3d_attenuator` to `audio_attenuator_phonon`.
+*/
 
-`bool sound_global_hrtf;`
-
-Changes take nearly instant effect from the time this property is modified.
+// Example:
+void main() {
+	if (!set_sound_global_hrtf(true)) {
+		alert("Error", "HRTF could not be enabled.");
+		return;
+	}
+	alert("HRTF", sound_global_hrtf ? "enabled" : "disabled");
+	set_sound_global_hrtf(false);
+	alert("HRTF", sound_global_hrtf ? "enabled" : "disabled");
+}

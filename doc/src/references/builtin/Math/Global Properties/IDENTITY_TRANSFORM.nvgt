@@ -1,0 +1,16 @@
+/**
+	The identity transform, which has no translation and no rotation.
+	const physics_transform IDENTITY_TRANSFORM;
+	## Remarks:
+		The identity transform has a position of (0, 0, 0) and an orientation equal to `IDENTITY_QUATERNION`. Applying it to a vector leaves the vector unchanged. It is commonly used as the starting transform for physics bodies and colliders.
+		A new transform with the same value is returned every time this property is read, so modifying the result does not affect the property.
+*/
+
+// Example:
+void main() {
+	physics_transform t = IDENTITY_TRANSFORM;
+	vector p = t.position;
+	alert("Identity transform position", p.x + ", " + p.y + ", " + p.z);
+	vector moved = t * vector(5, 6, 7);
+	alert("Vector after applying the identity transform", moved.x + ", " + moved.y + ", " + moved.z);
+}

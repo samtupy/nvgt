@@ -1,4 +1,29 @@
-# sound_default_pack
-The default value passed to the second argument of sound::load, in other words, a handle to an open pack object that all future sounds will load from unless otherwise specified individually.
+/**
+	The pack that sounds are loaded from when no pack is passed to `sound::load()` or `sound::stream()`.
+	pack_interface@ sound_default_pack;
+	## Remarks:
+		This is null by default, which means sounds are loaded from files on disk. Assign an open `pack_file` to load sounds from that pack instead, and assign null to go back to loading from disk.
+		The pack must be open for reading when it is assigned, otherwise an exception is thrown. Always check the return value of `pack_file::open()` before assigning the pack. Reading the property returns the same pack object that was assigned, so you can get the pack_file back with `cast<pack_file@>(sound_default_pack)`.
+		This value is also the default for the pack argument of `sound_play()` and other functions that load audio.
+*/
 
-`pack@ sound_default_pack = null;`
+// Example:
+void main() {
+	// Build a pack containing a short tone, then load the tone from it.
+	tone_synth synth;
+	synth.freq_ms(440, 250);
+	synth.write_wave_file("tone.wav");
+	pack_file p;
+	p.create("sounds.dat");
+	p.add_file("tone.wav", "tone.wav");
+	p.close();
+	file_delete("tone.wav");
+	p.open("sounds.dat");
+	@sound_default_pack = p;
+	sound s;
+	alert("Loading tone.wav from the pack", s.load("tone.wav") ? "succeeded" : "failed");
+	s.close();
+	@sound_default_pack = null;
+	p.close();
+	file_delete("sounds.dat");
+}

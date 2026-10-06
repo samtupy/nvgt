@@ -1,0 +1,14 @@
+/**
+	Determines whether the script profiler is currently running.
+	const bool profiler_is_running;
+	## Remarks:
+		The profiler is started with `start_profiling()` and stopped with `stop_profiling()`. While it is running, NVGT records how much time is spent in each function of your script.
+*/
+
+// Example:
+void main() {
+	alert("Example", "Before starting, the profiler is " + (profiler_is_running ? "running" : "not running"));
+	start_profiling();
+	alert("Example", "After starting, the profiler is " + (profiler_is_running ? "running" : "not running"));
+	stop_profiling();
+}

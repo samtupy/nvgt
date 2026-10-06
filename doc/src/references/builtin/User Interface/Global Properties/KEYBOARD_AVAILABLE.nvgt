@@ -1,0 +1,14 @@
+/**
+	Determines whether a keyboard is connected to the device.
+	const bool KEYBOARD_AVAILABLE;
+	## Remarks:
+		This is mainly useful on mobile devices, where your game might want to offer touch controls when no physical keyboard is attached.
+		This property only reports accurate information once your game window has been shown with `show_window()`. Before that, it reads false even if a keyboard is connected.
+		To list the connected keyboards, see `get_keyboards()`.
+*/
+
+// Example:
+void main() {
+	show_window("Example");
+	alert("Keyboard", KEYBOARD_AVAILABLE ? "A keyboard is connected." : "No keyboard is connected.");
+}

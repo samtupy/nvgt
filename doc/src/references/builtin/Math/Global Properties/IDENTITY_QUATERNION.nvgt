@@ -1,0 +1,13 @@
+/**
+	The identity quaternion, which represents no rotation at all.
+	const quaternion IDENTITY_QUATERNION;
+	## Remarks:
+		The identity quaternion has x, y and z components of 0 and a w component of 1. Combining it with any other rotation leaves that rotation unchanged, so it is the usual starting orientation for objects.
+		A new quaternion with the same value is returned every time this property is read, so modifying the result does not affect the property.
+*/
+
+// Example:
+void main() {
+	quaternion q = IDENTITY_QUATERNION;
+	alert("Identity quaternion", "x " + q.x + ", y " + q.y + ", z " + q.z + ", w " + q.w);
+}

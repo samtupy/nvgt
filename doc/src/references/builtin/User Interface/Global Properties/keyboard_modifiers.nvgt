@@ -1,0 +1,23 @@
+/**
+	Gets or sets the modifier keys, such as shift, control and the lock keys, that are currently active.
+	key_modifier keyboard_modifiers;
+	## Remarks:
+		The value is a combination of the flags in the `key_modifier` enum. To check for a particular modifier, combine this value with the flag using the & operator and compare the result against 0, for example `(keyboard_modifiers & KEYMOD_SHIFT) != 0`. Remember the parentheses, because comparison operators are evaluated before &.
+		The KEYMOD_CTRL, KEYMOD_SHIFT, KEYMOD_ALT and KEYMOD_GUI values match either the left or the right version of their key.
+		Setting this property changes the modifier state that NVGT reports, but does not press or release any keys on the user's keyboard. This can be useful to clear a modifier that your game no longer wants to treat as held, for example after showing a dialog.
+*/
+
+// Example:
+void main() {
+	show_window("Example");
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Press space, optionally while holding shift or control. Press escape to exit.", true);
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (!key_pressed(KEY_SPACE)) continue;
+		string held;
+		if ((keyboard_modifiers & KEYMOD_SHIFT) != 0) held += "shift ";
+		if ((keyboard_modifiers & KEYMOD_CTRL) != 0) held += "control ";
+		screen_reader_output(held.empty() ? "Space" : held + "space", true);
+	}
+}

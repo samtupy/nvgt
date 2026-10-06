@@ -1,0 +1,32 @@
+/**
+	Sets the key used to decrypt sound files that were encrypted with the `asset_encryptor` datastream.
+	string sound_default_decryption_key;
+	## Remarks:
+		This property can only be assigned, not read. Assign an empty string to stop decrypting sounds.
+		While a key is set, sounds loaded with `sound::load()` or `sound::stream()` are decrypted with it, whether they are loaded from disk or from a pack. Files that aren't encrypted still load normally while a key is set.
+		Set the key before you load an encrypted file for the first time. If `sound::load()` fails on an encrypted file because the right key wasn't set yet, later loads of the same filename keep failing even after the key is set. Streaming the file with `sound::stream()` is not affected.
+		When encrypting a file with `asset_encryptor`, close both the encryptor and the underlying file before loading the result, otherwise the end of the data may not have been written to disk yet.
+*/
+
+// Example:
+void main() {
+	// Create an encrypted sound to load. A real game would do this ahead of time.
+	tone_synth synth;
+	synth.freq_ms(440, 250);
+	synth.write_wave_file("tone.wav");
+	file input("tone.wav", "rb");
+	string data = input.read();
+	input.close();
+	file output("tone.dat", "wb");
+	asset_encryptor encryptor(output, "my secret key");
+	encryptor.write(data);
+	encryptor.close();
+	output.close();
+	// Now load it.
+	sound_default_decryption_key = "my secret key";
+	sound s;
+	alert("Loading the encrypted sound", s.load("tone.dat") ? "succeeded" : "failed");
+	s.close();
+	file_delete("tone.wav");
+	file_delete("tone.dat");
+}

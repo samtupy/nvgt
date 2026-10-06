@@ -1,0 +1,20 @@
+/**
+	The attenuator that newly positioned sounds use to make themselves quieter with distance.
+	const int sound_default_3d_attenuator;
+	void set_sound_default_3d_attenuator(int attenuator_id);
+	## Arguments (set_sound_default_3d_attenuator):
+		* int attenuator_id: the attenuator to use, usually one of the values in the `audio_attenuator` enum.
+	## Remarks:
+		This property is read only. To change it, call `set_sound_default_3d_attenuator()`.
+		The default is `audio_attenuator_basic`. `audio_attenuator_phonon` uses Steam Audio's distance attenuation instead. Calling `set_sound_global_hrtf(true)` sets this property to `audio_attenuator_phonon` and also enables that attenuator.
+		The default only affects sounds that start being positioned after it changes. It is used when a sound hasn't been given an attenuator of its own.
+*/
+
+// Example:
+void main() {
+	alert("Default attenuator", sound_default_3d_attenuator == audio_attenuator_basic ? "basic" : "Steam Audio");
+	if (set_sound_global_hrtf(true))
+		alert("Default attenuator after enabling HRTF", sound_default_3d_attenuator == audio_attenuator_basic ? "basic" : "Steam Audio");
+	set_sound_global_hrtf(false);
+	set_sound_default_3d_attenuator(audio_attenuator_basic);
+}
