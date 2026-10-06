@@ -1,0 +1,50 @@
+diff --git a/source/utils.cpp b/source/utils.cpp
+index 5cdd091..b4c8e6d 100644
+--- a/source/utils.cpp
++++ b/source/utils.cpp
+@@ -27,6 +27,8 @@ void fill_frame_db(std::span<const float> interleaved, std::size_t channels,
+                    std::size_t frame_len, std::size_t hop,
+                    std::size_t total_frames, std::span<float> db);
+ 
++namespace prism::detail {
++
+ // Begin NVGT code
+ double range_convert(double v, double a0, double a1, double b0, double b1) {
+   const double t = (v - a0) / (a1 - a0);
+@@ -432,4 +434,6 @@ TrimView trim_silence_rms_gate_inplace(std::span<float> interleaved,
+   apply_fade_in(r.view, channels, fade_frames);
+   apply_fade_out(r.view, channels, fade_frames);
+   return r;
+-}
+\ No newline at end of file
++}
++
++} // namespace prism::detail
+diff --git a/source/utils.h b/source/utils.h
+index 34055c2..a86d3e8 100644
+--- a/source/utils.h
++++ b/source/utils.h
+@@ -26,6 +26,8 @@
+ #include <utility>
+ #include <vector>
+ 
++namespace prism::detail {
++
+ struct TrimParams {
+   float frame_ms = 20.0F;
+   float hop_ms = 10.0F;
+@@ -71,3 +73,14 @@ TrimView trim_silence_rms_gate_inplace(std::span<float> interleaved,
+                                        std::size_t channels,
+                                        std::size_t sample_rate,
+                                        const TrimParams &P = {});
++
++} // namespace prism::detail
++
++using prism::detail::TrimParams;
++using prism::detail::TrimView;
++using prism::detail::range_convert;
++using prism::detail::range_convert_midpoint;
++using prism::detail::exp_range_convert;
++using prism::detail::exp_range_convert_inv;
++using prism::detail::trim_silence_rms_gate;
++using prism::detail::trim_silence_rms_gate_inplace;
