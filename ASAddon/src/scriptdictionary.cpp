@@ -292,7 +292,10 @@ CScriptDictValue *CScriptDictionary::operator[](const dictKey_t &key)
 	
 	// Ensure the dictionary value has the engine pointer set (it will be null if newly created in above operation)
 	if (val.m_engine == 0)
+	{
 		val.m_engine = engine;
+		iterGuard++;
+	}
 
 	return &val;
 }
