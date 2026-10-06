@@ -551,10 +551,22 @@ static void StringReserve(asUINT l, string &str)
 	str.reserve(l);
 }
 
+static bool checkFormatWidth(asUINT width, asUINT precision = 0)
+{
+	if( width <= 0x7FFFFFFF && precision <= 0x7FFFFFFF )
+		return true;
+	asIScriptContext *ctx = asGetActiveContext();
+	if( ctx )
+		ctx->SetException("Format width or precision is too large");
+	return false;
+}
+
 // AngelScript signature:
 // string formatInt(int64 val, const string &in options, uint width)
 static string formatInt(asINT64 value, const string &options, asUINT width)
 {
+	if( !checkFormatWidth(width) )
+		return "";
 	bool leftJustify = options.find("l") != string::npos;
 	bool padWithZero = options.find("0") != string::npos;
 	bool alwaysSign  = options.find("+") != string::npos;
@@ -599,6 +611,8 @@ static string formatInt(asINT64 value, const string &options, asUINT width)
 // string formatUInt(uint64 val, const string &in options, uint width)
 static string formatUInt(asQWORD value, const string &options, asUINT width)
 {
+	if( !checkFormatWidth(width) )
+		return "";
 	bool leftJustify = options.find("l") != string::npos;
 	bool padWithZero = options.find("0") != string::npos;
 	bool alwaysSign  = options.find("+") != string::npos;
@@ -643,6 +657,8 @@ static string formatUInt(asQWORD value, const string &options, asUINT width)
 // string formatFloat(double val, const string &in options, uint width, uint precision)
 static string formatFloat(double value, const string &options, asUINT width, asUINT precision)
 {
+	if( !checkFormatWidth(width, precision) )
+		return "";
 	bool leftJustify = options.find("l") != string::npos;
 	bool padWithZero = options.find("0") != string::npos;
 	bool alwaysSign  = options.find("+") != string::npos;
@@ -663,7 +679,7 @@ static string formatFloat(double value, const string &options, asUINT width, asU
 	else fmt += "f";
 
 	string buf;
-	buf.resize(width+precision+50);
+	buf.resize(size_t(width)+precision+50);
 #if _MSC_VER >= 1400 && !defined(__S3E__)
 	// MSVC 8.0 / 2005 or newer
 	sprintf_s(&buf[0], buf.size(), fmt.c_str(), width, precision, value);
