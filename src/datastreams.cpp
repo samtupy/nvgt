@@ -231,6 +231,9 @@ datastream* ds_cerr = nullptr;
 bool datastream::open(std::istream* istr, std::ostream* ostr, const std::string& encoding, int byteorder, datastream* obj) {
 	if (no_close)
 		return false; // This stream cannot be reopened.
+	for (datastream* parent = obj; parent; parent = parent->ds) {
+		if (parent == this) return false;
+	}
 	if (r || w)
 		close();
 	if (!istr && !ostr)
@@ -338,8 +341,8 @@ bool datastream::rseek_end(unsigned long long offset) {
 	return _istr ? _istr->good() : false;
 }
 bool datastream::rseek_relative(long long offset) {
-	if (_istr && offset < 0) {
-		if (r->eof())
+	if (_istr) {
+		if (r->eof() && offset < 0)
 			_istr->clear();
 		_istr->seekg(offset, std::ios::cur);
 	}
@@ -571,7 +574,7 @@ void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classnam
 	engine->RegisterObjectMethod(classname.c_str(), "bool wseek(uint64)", asMETHOD(datastream, wseek), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool wseek_end(uint64 = 0)", asMETHOD(datastream, wseek_end), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool wseek_relative(int64)", asMETHOD(datastream, wseek_relative), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "int64 get_wpos() const property", asMETHOD(datastream, get_pos), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "int64 get_wpos() const property", asMETHOD(datastream, get_wpos), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read(uint = 0)", asMETHODPR(datastream, read, (unsigned int), std::string), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read_line()", asMETHOD(datastream, read_line), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read_until(const string&in text, bool require_full)", asMETHOD(datastream, read_until), asCALL_THISCALL);
@@ -614,6 +617,10 @@ datastream* generic_stream_factory(Args... args, f_streamargs) {
 }
 
 // The below template functions can handle the basic registration of any generic stream that connects to another one, including those that take arguments. The angelscript registration functions include factories and open functions for such streams, meaning that only custom functions on streams need to be registered. Sadly given my current experience we need to register them twice, once with and once without argument support. Even more sadly each version must have different names otherwise even when using asFUNCTIONPR with angelscript only some compilers complain about ambiguous calls, cross platform+lack of knowledge is exhausting sometimes!
+inline bool connect_stream_fail(datastream* ds_connect) {
+	ds_connect->release();
+	return false;
+}
 template <class T, class S>
 bool connect_stream_open_argless(datastream* ds, datastream* ds_connect, f_streamargs) {
 	if (!ds_connect)
@@ -621,27 +628,35 @@ bool connect_stream_open_argless(datastream* ds, datastream* ds_connect, f_strea
 	S* stream;
 	if constexpr(std::is_same<S, std::istream>::value) {
 		if (!ds_connect->get_istr())
-			return false;
+			return connect_stream_fail(ds_connect);
 		stream = new T(*ds_connect->get_istr());
-		return ds->open(stream, nullptr, p_streamargs, ds_connect);
+		if (!ds->open(stream, nullptr, p_streamargs, ds_connect))
+			return connect_stream_fail(ds_connect);
+		return true;
 	} else if constexpr(std::is_same<S, std::ostream>::value) {
 		if (!ds_connect->get_ostr())
-			return false;
+			return connect_stream_fail(ds_connect);
 		stream = new T(*ds_connect->get_ostr());
-		return ds->open(nullptr, stream, p_streamargs, ds_connect);
+		if (!ds->open(nullptr, stream, p_streamargs, ds_connect))
+			return connect_stream_fail(ds_connect);
+		return true;
 	} else if constexpr(std::is_same<S, std::iostream>::value) {
 		if (!ds_connect->get_iostr())
-			return false;
+			return connect_stream_fail(ds_connect);
 		stream = new T(*ds_connect->get_iostr());
-		return ds->open(stream, stream, p_streamargs, ds_connect);
+		if (!ds->open(stream, stream, p_streamargs, ds_connect))
+			return connect_stream_fail(ds_connect);
+		return true;
 	}
 	return false;
 }
 template <class T, class S>
 datastream* connect_stream_factory_argless(datastream* ds_connect, f_streamargs) {
 	datastream* ds = new datastream();
-	if (!connect_stream_open_argless<T, S>(ds, ds_connect, p_streamargs))
+	if (!connect_stream_open_argless<T, S>(ds, ds_connect, p_streamargs)) {
+		ds->release();
 		throw InvalidArgumentException("Unable to attach given stream");
+	}
 	return ds;
 }
 template <class T, datastream_factory_type factory, class S>
@@ -657,27 +672,35 @@ bool connect_stream_open(datastream* ds, datastream* ds_connect, Args... args, f
 	S* stream;
 	if constexpr(std::is_same<S, std::istream>::value) {
 		if (!ds_connect->get_istr())
-			return false;
+			return connect_stream_fail(ds_connect);
 		stream = new T(*ds_connect->get_istr(), args...);
-		return ds->open(stream, nullptr, p_streamargs, ds_connect);
+		if (!ds->open(stream, nullptr, p_streamargs, ds_connect))
+			return connect_stream_fail(ds_connect);
+		return true;
 	} else if constexpr(std::is_same<S, std::ostream>::value) {
 		if (!ds_connect->get_ostr())
-			return false;
+			return connect_stream_fail(ds_connect);
 		stream = new T(*ds_connect->get_ostr(), args...);
-		return ds->open(nullptr, stream, p_streamargs, ds_connect);
+		if (!ds->open(nullptr, stream, p_streamargs, ds_connect))
+			return connect_stream_fail(ds_connect);
+		return true;
 	} else if constexpr(std::is_same<S, std::iostream>::value) {
 		if (!ds_connect->get_iostr())
-			return false;
+			return connect_stream_fail(ds_connect);
 		stream = new T(*ds_connect->get_iostr(), args...);
-		return ds->open(stream, stream, p_streamargs, ds_connect);
+		if (!ds->open(stream, stream, p_streamargs, ds_connect))
+			return connect_stream_fail(ds_connect);
+		return true;
 	}
 	return false;
 }
 template <class T, class S, typename... Args>
 datastream* connect_stream_factory(datastream* ds_connect, Args... args, f_streamargs) {
 	datastream* ds = new datastream();
-	if (!connect_stream_open<T, S, Args...>(ds, ds_connect, args..., p_streamargs))
+	if (!connect_stream_open<T, S, Args...>(ds, ds_connect, args..., p_streamargs)) {
+		ds->release();
 		throw InvalidArgumentException("Unable to attach given stream");
+	}
 	return ds;
 }
 template <class T, datastream_factory_type factory, class S, typename... Args>
@@ -760,17 +783,19 @@ void duplicating_stream_close(datastream* ds) {
 		return;
 	for (datastream* s : *streams)
 		s->release();
-	streams->clear();
+	delete streams;
 }
 datastream* duplicating_stream_add(datastream* ds, datastream* ds_connect) {
+	ds->duplicate();
 	if (!ds_connect)
 		return ds;
 	TeeIOS* ios = dynamic_cast<TeeIOS*>(ds->stream());
-	if (!ios)
-		throw InvalidArgumentException("not a duplicating reader or writer");
 	std::ostream* ostr = ds_connect->get_ostr();
-	if (!ostr)
-		throw InvalidArgumentException("non-writer was connected to duplicator");
+	if (!ios || !ostr) {
+		ds->release();
+		ds_connect->release();
+		throw InvalidArgumentException(!ios ? "not a duplicating reader or writer" : "non-writer was connected to duplicator");
+	}
 	std::vector<datastream*>* streams = ds->user ? (std::vector<datastream*>*)ds->user : new std::vector<datastream*>;
 	streams->push_back(ds_connect);
 	ios->addStream(*ostr);
@@ -778,7 +803,6 @@ datastream* duplicating_stream_add(datastream* ds, datastream* ds_connect) {
 		ds->user = streams;
 		ds->set_close_callback(duplicating_stream_close);
 	}
-	ds->duplicate();
 	return ds;
 }
 void RegisterDuplicatingStream(asIScriptEngine* engine) {
