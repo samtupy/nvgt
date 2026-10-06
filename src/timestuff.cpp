@@ -722,9 +722,9 @@ void RegisterScriptTimestuffCore(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("timespan", "timespan opAdd(const timespan&in) const", asMETHODPR(Timespan, operator+, (const Timespan&) const, Timespan), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "timespan opSub(int64 microseconds) const", asMETHODPR(Timespan, operator-, (Int64) const, Timespan), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "timespan opSub(const timespan&in) const", asMETHODPR(Timespan, operator-, (const Timespan&) const, Timespan), asCALL_THISCALL);
-	engine->RegisterObjectMethod("timespan", "timespan& opAddAssign(int64 milliseconds)", asMETHODPR(Timespan, operator+=, (Int64), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opAddAssign(int64 microseconds)", asMETHODPR(Timespan, operator+=, (Int64), Timespan&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "timespan& opAddAssign(const timespan&in)", asMETHODPR(Timespan, operator+=, (const Timespan&), Timespan&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("timespan", "timespan& opSubAssign(int64 milliseconds)", asMETHODPR(Timespan, operator-=, (Int64), Timespan&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("timespan", "timespan& opSubAssign(int64 microseconds)", asMETHODPR(Timespan, operator-=, (Int64), Timespan&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "timespan& opSubAssign(const timespan&in)", asMETHODPR(Timespan, operator-=, (const Timespan&), Timespan&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "int get_days() const property", asMETHOD(Timespan, days), asCALL_THISCALL);
 	engine->RegisterObjectMethod("timespan", "int get_hours() const property", asMETHOD(Timespan, hours), asCALL_THISCALL);
