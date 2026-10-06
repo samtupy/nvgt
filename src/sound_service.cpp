@@ -203,12 +203,12 @@ public:
 		return std::atomic_load(&default_protocol)->get();
 	}
 	bool is_default_protocol(size_t slot) {
-		if (slot < 0 || slot >= filters.size())
+		if (slot < 0 || slot >= protocols.size())
 			return false;
 		return protocols[slot] == std::atomic_load(&default_protocol);
 	}
 	bool set_default_filter(size_t slot) {
-		if (slot < 0 || slot > filters.size())
+		if (slot < 0 || slot >= filters.size())
 			return false;
 		std::atomic_store(&default_filter, filters[slot]);
 		return true;
