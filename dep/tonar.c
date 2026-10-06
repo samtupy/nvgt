@@ -1,3 +1,4 @@
+#include <limits.h>
 #include "tonar.h"
 
 int el_tonar_reset(el_tonar* gen)
@@ -173,7 +174,7 @@ int el_tonar_rest_ms(el_tonar* gen, int ms)
 if(!elz_tonar_is_init(gen)) return 0;
 if(ms<=0) return 0;
 int frames=elz_tonar_ms_to_frames(gen, ms);
-if(frames<=0) return 0;
+if(frames<=0 || frames>INT_MAX/gen->channels) return 0;
 int samples=frames*gen->channels;
 if(!elz_tonar_manage_buffer(gen, samples)) return 0;
 gen->cursor+=samples;
@@ -347,7 +348,7 @@ if(length<=0) return 0;
 int bend_end=bend_start+bend_length;
 if(bend_end>length) bend_end=length;
 int frames=elz_tonar_ms_to_frames(gen, length);
-if(frames<=0) return 0;
+if(frames<=0 || frames>INT_MAX/gen->channels) return 0;
 int samples=frames*gen->channels;
 if(!elz_tonar_manage_buffer(gen, samples)) return 0;
 double amplitude=elz_tonar_db_to_amp(gen->volume);
@@ -374,11 +375,13 @@ int elz_tonar_ms_to_frames(el_tonar* gen, int ms)
 if(!elz_tonar_is_init(gen)) return 0;
 double rate_ms=(double) gen->sample_rate/1000;
 rate_ms*=ms;
+if(rate_ms>INT_MAX) return 0;
 return rate_ms;
 }
 int elz_tonar_manage_buffer(el_tonar* gen, int samples)
 {
 if(!elz_tonar_is_init(gen)) return 0;
+if(samples<0 || samples>INT_MAX/2-gen->cursor) return 0;
 samples+=gen->cursor;
 if(samples<gen->size) return 1;
 samples*=2;

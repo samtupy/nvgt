@@ -232,11 +232,11 @@ void RegisterScriptTonesynth(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("tone_synth", "bool note(string note, double length)", asMETHOD(tone_synth, note), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool note_ms(string note, int ms)", asMETHOD(tone_synth, note_ms), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool note_bend(string note, int bend_amount, double length, double bend_start, double bend_length)", asMETHOD(tone_synth, note_bend), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tone_synth", "bool note_bend_ms(string note, int bend_amount, int length, int bend_start, int bend_length)", asMETHOD(tone_synth, note_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool note_bend_ms(string note, int bend_amount, int length, int bend_start, int bend_length)", asMETHOD(tone_synth, note_bend_ms), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool freq(double freq, double length)", asMETHOD(tone_synth, freq), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool freq_ms(double freq, int ms)", asMETHOD(tone_synth, freq_ms), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool freq_bend(double freq, int bend_amount, double length, double bend_start, double bend_length)", asMETHOD(tone_synth, freq_bend), asCALL_THISCALL);
-	engine->RegisterObjectMethod("tone_synth", "bool freq_bend_ms(double freq, int bend_amount, int length, int bend_start, int bend_length)", asMETHOD(tone_synth, freq_ms), asCALL_THISCALL);
+	engine->RegisterObjectMethod("tone_synth", "bool freq_bend_ms(double freq, int bend_amount, int length, int bend_start, int bend_length)", asMETHOD(tone_synth, freq_bend_ms), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool rest(double length)", asMETHOD(tone_synth, rest), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "bool rest_ms(int ms)", asMETHOD(tone_synth, rest_ms), asCALL_THISCALL);
 	engine->RegisterObjectMethod("tone_synth", "int get_sample_rate() property", asMETHOD(tone_synth, get_sample_rate), asCALL_THISCALL);
