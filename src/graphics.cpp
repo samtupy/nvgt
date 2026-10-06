@@ -113,6 +113,7 @@ unsigned int graphics_texture::get_blend_mode() const {
 // text_font
 
 text_font::text_font(const std::string& name, float size, unsigned int initial_style) : _font(nullptr), _refcount(1) {
+	TTF_Init();
 	_font = TTF_OpenFont(get_font_path(name).c_str(), size);
 	if (_font && initial_style != TTF_STYLE_NORMAL) TTF_SetFontStyle(_font, (TTF_FontStyleFlags)initial_style);
 }
@@ -123,6 +124,7 @@ text_font::~text_font() {
 		TTF_CloseFont(_font);
 		_font = nullptr;
 	}
+	TTF_Quit();
 }
 
 bool text_font::add_fallback_font(text_font* font) {
