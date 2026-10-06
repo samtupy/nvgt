@@ -73,7 +73,7 @@ bool Print::PrintAddonTypes(std::ostream & dst, void const *objPtr, int typeId, 
         return true;
     }
 
-    if(strcmp(typeInfo->GetName(), "dictionary") == 0)
+    if(depth < 32 && strcmp(typeInfo->GetName(), "dictionary") == 0)
     {
         CScriptDictionary const* dictionary{};
 
@@ -151,7 +151,12 @@ void Print::PrintTemplate(std::ostream & dst, void const* objPtr, int typeId, in
 
     if(typeInfo->GetFuncdefSignature())
     {
-        auto func = reinterpret_cast<asIScriptFunction const*>(objPtr);
+        auto func = *reinterpret_cast<asIScriptFunction const* const*>(objPtr);
+        if(!func)
+        {
+            dst << "null";
+            return;
+        }
         dst << func->GetDeclaration(true, true, true);
         return;
     }
@@ -159,7 +164,16 @@ void Print::PrintTemplate(std::ostream & dst, void const* objPtr, int typeId, in
     auto enumValueCount = typeInfo->GetEnumValueCount();
     if(enumValueCount)
     {
-        asINT64 value = *(asINT64 const*)objPtr;
+        int size = engine->GetSizeOfPrimitiveType(typeId);
+        asQWORD mask = size >= 8? ~asQWORD(0) : (asQWORD(1) << (size * 8)) - 1;
+        asQWORD value;
+        switch(size)
+        {
+        case 1:		value = *(asBYTE const*)objPtr; break;
+        case 2:		value = *(asWORD const*)objPtr; break;
+        case 8:		value = *(asQWORD const*)objPtr; break;
+        default:	value = *(asDWORD const*)objPtr; break;
+        }
 
         dst << typeInfo->GetName();
 
@@ -168,7 +182,7 @@ void Print::PrintTemplate(std::ostream & dst, void const* objPtr, int typeId, in
             asINT64 val;
             const char * text = typeInfo->GetEnumValueByIndex(i, &val);
 
-            if(val == value)
+            if((asQWORD(val) & mask) == value)
             {
                 dst << "::" << text;
             }
@@ -200,6 +214,11 @@ void Print::PrintTemplate(std::ostream & dst, void const* objPtr, int typeId, in
             {
                 typeId &= ~(asTYPEID_OBJHANDLE|asTYPEID_HANDLETOCONST);
                 objPtr = *(void**)objPtr;
+                if(!objPtr)
+                {
+                    dst << "null";
+                    return;
+                }
             }
 
             if(g_PrintRegisteredType(dst, objPtr, typeId, depth))
@@ -350,6 +369,12 @@ static void PrettyPrintingF(asIScriptGeneric * generic)
 
 static std::string PrettyPrintingArrayF(std::string* fmt, CScriptArray* elements)
 {
+    if(!elements)
+    {
+        asIScriptContext* ctx = asGetActiveContext();
+        if(ctx) ctx->SetException("Null pointer access");
+        return "";
+    }
     std::stringstream ss;
 	Print::PrintFormatArray(ss, *fmt, elements, 0);
 	return ss.str();
@@ -372,7 +397,7 @@ void Print::asRegister(asIScriptEngine * engine, bool registerStdStringFormatter
     if(registerStdStringFormatter)
     {
 		r = engine->RegisterObjectBehaviour("string", asBEHAVE_CONSTRUCT,  "void f(const ?&in, " INS_15 ")",  asFUNCTION(PrettyPrinting), asCALL_GENERIC); assert( r >= 0 );
-		r = engine->RegisterObjectMethod("string", "string format(string[]@ elements) const",  asFUNCTION(PrettyPrintingArrayF), asCALL_CDECL_OBJFIRST); assert( r >= 0 );
+		r = engine->RegisterObjectMethod("string", "string format(string[]@+ elements) const",  asFUNCTION(PrettyPrintingArrayF), asCALL_CDECL_OBJFIRST); assert( r >= 0 );
 		r = engine->RegisterObjectMethod("string", "string format(" INS_16 ") const",  asFUNCTION(PrettyPrintingF), asCALL_GENERIC); assert( r >= 0 );
     }
 
