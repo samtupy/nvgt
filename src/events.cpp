@@ -95,13 +95,14 @@ void engine_event::angelscript_register(asIScriptEngine* engine, engine_event* g
 		engine->RegisterFuncdef(Poco::format("bool %s_callback(%s)", type_name, args).c_str());
 		engine->RegisterFuncdef(Poco::format("void %s_passthrough_callback(%s)", type_name, args).c_str());
 		engine->RegisterObjectType(type_name.c_str(), 0, asOBJ_REF | asOBJ_NOHANDLE);
-		for (const std::string& t : listener_types) {
-			bool is_interface = t == listener_name;
-			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("int find(%s@ listener) const", t).c_str(), is_interface? asMETHODPR(engine_event, find, (asIScriptObject*) const, int) : asMETHODPR(engine_event, find, (asIScriptFunction*) const, int), asCALL_THISCALL);
-			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool insert(%s@ listener, int index = -1)", t).c_str(), is_interface? asMETHODPR(engine_event, insert, (asIScriptObject*, int), bool) : asMETHODPR(engine_event, insert, (asIScriptFunction*, int), bool), asCALL_THISCALL);
-			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool opAddAssign(%s@ listener)", t).c_str(), is_interface? asMETHODPR(engine_event, operator+=, (asIScriptObject*), bool) : asMETHODPR(engine_event, operator+=, (asIScriptFunction*), bool), asCALL_THISCALL);
-			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool remove(%s@ listener)", t).c_str(), is_interface? asMETHODPR(engine_event, remove, (asIScriptObject*), bool) : asMETHODPR(engine_event, remove, (asIScriptFunction*), bool), asCALL_THISCALL);
-			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool opSubAssign(%s@ listener)", t).c_str(), is_interface? asMETHODPR(engine_event, operator-=, (asIScriptObject*), bool) : asMETHODPR(engine_event, operator-=, (asIScriptFunction*), bool), asCALL_THISCALL);
+		for (const std::string& listener_type : listener_types) {
+			bool is_interface = listener_type == listener_name;
+			std::string t = is_interface? listener_type + "@+" : listener_type + "@";
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("int find(%s listener) const", t).c_str(), is_interface? asMETHODPR(engine_event, find, (asIScriptObject*) const, int) : asMETHODPR(engine_event, find, (asIScriptFunction*) const, int), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool insert(%s listener, int index = -1)", t).c_str(), is_interface? asMETHODPR(engine_event, insert, (asIScriptObject*, int), bool) : asMETHODPR(engine_event, insert, (asIScriptFunction*, int), bool), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool opAddAssign(%s listener)", t).c_str(), is_interface? asMETHODPR(engine_event, operator+=, (asIScriptObject*), bool) : asMETHODPR(engine_event, operator+=, (asIScriptFunction*), bool), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool remove(%s listener)", t).c_str(), is_interface? asMETHODPR(engine_event, remove, (asIScriptObject*), bool) : asMETHODPR(engine_event, remove, (asIScriptFunction*), bool), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool opSubAssign(%s listener)", t).c_str(), is_interface? asMETHODPR(engine_event, operator-=, (asIScriptObject*), bool) : asMETHODPR(engine_event, operator-=, (asIScriptFunction*), bool), asCALL_THISCALL);
 		}
 		engine->RegisterObjectMethod(type_name.c_str(), "bool remove(uint index)", asMETHODPR(engine_event, remove, (unsigned int), bool), asCALL_THISCALL);
 		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("void opCall(%s)", args).c_str(), fire_func, asCALL_THISCALL);
