@@ -731,7 +731,7 @@ void CScriptArray::RemoveRange(asUINT start, asUINT count)
 	}
 
 	// Cap count to the end of the array
-	if (start + count > buffer->numElements)
+	if (count > buffer->numElements - start)
 		count = buffer->numElements - start;
 
 	// Destroy the elements that are being removed
