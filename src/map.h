@@ -13,6 +13,7 @@
 #pragma once
 #include <string>
 #include <ankerl/unordered_dense.h>
+#include <unordered_set>
 #include <vector>
 #include <angelscript.h>
 #include <reactphysics3d/mathematics/Vector3.h>
@@ -61,6 +62,7 @@ class map_frame {
 public:
 	std::vector<map_area*> areas;
 	int size;
+	int find_after_callback(map_area* a, int i);
 	int add_areas_for_point(std::vector<map_area*>& local_areas, float x, float y, float z, float d = 0.0, int p = -1, asIScriptFunction* filter_callback = NULL, asINT64 flags = 0, asINT64 excluded_flags = 0);
 	int add_areas_for_range(std::vector<map_area*>& local_areas, float minx, float maxx, float miny, float maxy, float minz, float maxz, float d = 0.0, int p = -1, asIScriptFunction* filter_callback = NULL, asINT64 flags = 0, asINT64 excluded_flags = 0);
 	void reset();
@@ -69,6 +71,7 @@ class coordinate_map {
 	ankerl::unordered_dense::map<hashpoint, map_frame*, hashpoint_hash, hashpoint_equals> frames[total_frame_sizes];
 	int ref_count;
 public:
+	std::unordered_set<map_area*> areas;
 	coordinate_map() : ref_count(1) {}
 	void add_ref();
 	void release();
