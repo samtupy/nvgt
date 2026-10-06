@@ -825,6 +825,8 @@ bool CScriptArray::CheckMaxSize(asUINT numElements)
 	asUINT maxSize = 0xFFFFFFFFul - sizeof(SArrayBuffer) + 1;
 	if( elementSize > 0 )
 		maxSize /= elementSize;
+	if( maxSize > 0x7FFFFFFFul )
+		maxSize = 0x7FFFFFFFul;
 
 	if( numElements > maxSize )
 	{

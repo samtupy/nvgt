@@ -576,7 +576,7 @@ bool CScriptGrid::CheckMaxSize(asUINT width, asUINT height)
 	if( elementSize > 0 )
 		maxSize /= elementSize;
 
-	asINT64 numElements  = width * height;
+	asINT64 numElements  = asINT64(width) * height;
 
 	if( (numElements >> 32) || numElements > maxSize )
 	{
