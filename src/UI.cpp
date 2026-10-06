@@ -541,7 +541,7 @@ bool sdl_set_hint(const std::string& hint, const std::string& value, int priorit
 	return SDL_SetHintWithPriority(hint.c_str(), value.c_str(), SDL_HintPriority(priority));
 }
 std::string sdl_get_hint(const std::string& hint) {
-	return SDL_GetHint(hint.c_str());
+	return from_cstr(SDL_GetHint(hint.c_str()));
 }
 
 static game_window* game_window_factory(const std::string& title, unsigned int w, unsigned int h, unsigned int flags) { return new game_window(title, w, h, flags); }
