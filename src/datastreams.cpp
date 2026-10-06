@@ -540,10 +540,10 @@ datastream* datastream_simple_factory(f_streamargs) {
 // This function set registers all generic methods and/or properties of a datastream class, sans all non-default factory/open functions. The template parameter should be the c++ stream type being wrapped, such as stringstream of FileStream.
 template <typename T>
 void RegisterDatastreamReadwrite(asIScriptEngine* engine, const std::string& classname, const std::string& type_name) {
-	engine->RegisterObjectMethod(classname.c_str(), format("%s& opShr(%s&out)", classname, type_name).c_str(), asMETHODPR(datastream, read<T>, (T&), datastream&), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), format("%s& opShr(%s&out value)", classname, type_name).c_str(), asMETHODPR(datastream, read<T>, (T&), datastream&), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), format("%s read_%s()", type_name, type_name).c_str(), asMETHODPR(datastream, read<T>, (), T), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), format("%s& opShl(%s)", classname, type_name).c_str(), asMETHODPR(datastream, write<T>, (T), datastream&), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), format("%s& write_%s(%s)", classname, type_name, type_name).c_str(), asMETHODPR(datastream, write<T>, (T), datastream&), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), format("%s& opShl(%s value)", classname, type_name).c_str(), asMETHODPR(datastream, write<T>, (T), datastream&), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), format("%s& write_%s(%s value)", classname, type_name, type_name).c_str(), asMETHODPR(datastream, write<T>, (T), datastream&), asCALL_THISCALL);
 }
 template <class T, datastream_factory_type factory>
 void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classname) {
@@ -559,29 +559,29 @@ void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classnam
 	if (classname != "datastream")
 		engine->RegisterObjectMethod(classname.c_str(), "datastream@ opImplCast()", asFUNCTION(datastream_cast_to), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datastream", format("%s@ opCast()", classname).c_str(), asFUNCTION(datastream_cast_from<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(classname.c_str(), "bool close(bool = false)", asMETHOD(datastream, close), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool close(bool close_all = false)", asMETHOD(datastream, close), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool close_all()", asMETHOD(datastream, close_all), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_active() const property", asMETHOD(datastream, active), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "uint64 get_available() const property", asMETHOD(datastream, available), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool seek(uint64)", asMETHOD(datastream, seek), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool seek_end(uint64 = 0)", asMETHOD(datastream, seek_end), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool seek_relative(int64)", asMETHOD(datastream, seek_relative), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool seek(uint64 offset)", asMETHOD(datastream, seek), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool seek_end(uint64 offset = 0)", asMETHOD(datastream, seek_end), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool seek_relative(int64 offset)", asMETHOD(datastream, seek_relative), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "int64 get_pos() const property", asMETHOD(datastream, get_pos), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool rseek(uint64)", asMETHOD(datastream, rseek), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool rseek_end(uint64 = 0)", asMETHOD(datastream, rseek_end), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool rseek_relative(int64)", asMETHOD(datastream, rseek_relative), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool rseek(uint64 offset)", asMETHOD(datastream, rseek), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool rseek_end(uint64 offset = 0)", asMETHOD(datastream, rseek_end), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool rseek_relative(int64 offset)", asMETHOD(datastream, rseek_relative), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "int64 get_rpos() const property", asMETHOD(datastream, get_rpos), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool wseek(uint64)", asMETHOD(datastream, wseek), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool wseek_end(uint64 = 0)", asMETHOD(datastream, wseek_end), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool wseek_relative(int64)", asMETHOD(datastream, wseek_relative), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool wseek(uint64 offset)", asMETHOD(datastream, wseek), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool wseek_end(uint64 offset = 0)", asMETHOD(datastream, wseek_end), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool wseek_relative(int64 offset)", asMETHOD(datastream, wseek_relative), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "int64 get_wpos() const property", asMETHOD(datastream, get_wpos), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "string read(uint = 0)", asMETHODPR(datastream, read, (unsigned int), std::string), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "string read(uint count = 0)", asMETHODPR(datastream, read, (unsigned int), std::string), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read_line()", asMETHOD(datastream, read_line), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read_until(const string&in text, bool require_full)", asMETHOD(datastream, read_until), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "uint64 read_7bit_encoded()", asMETHODPR(datastream, read_7bit_encoded, (), UInt64), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "void read_7bit_encoded(uint64&out integer)", asMETHODPR(datastream, read_7bit_encoded, (UInt64&), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "void write_7bit_encoded(uint64 integer)", asMETHODPR(datastream, write_7bit_encoded, (UInt64), void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "uint write(const string&in)", asMETHODPR(datastream, write, (const std::string&), unsigned int), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "uint write(const string&in data)", asMETHODPR(datastream, write, (const std::string&), unsigned int), asCALL_THISCALL);
 	RegisterDatastreamReadwrite<char>(engine, classname, "int8");
 	RegisterDatastreamReadwrite<unsigned char>(engine, classname, "uint8");
 	RegisterDatastreamReadwrite<short>(engine, classname, "int16");
@@ -662,8 +662,8 @@ datastream* connect_stream_factory_argless(datastream* ds_connect, f_streamargs)
 template <class T, datastream_factory_type factory, class S>
 void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classname) {
 	RegisterDatastreamType<T, factory>(engine, classname);
-	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(datastream@, const string&in = \"\", int byteorder = 1)", classname).c_str(), asFUNCTION((connect_stream_factory_argless<T, S>)), asCALL_CDECL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool open(datastream@, const string&in = \"\", int byteorder = 1)", asFUNCTION((connect_stream_open_argless<T, S>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(datastream@ stream, const string&in encoding = \"\", int byteorder = 1)", classname).c_str(), asFUNCTION((connect_stream_factory_argless<T, S>)), asCALL_CDECL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool open(datastream@ stream, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((connect_stream_open_argless<T, S>)), asCALL_CDECL_OBJFIRST);
 }
 template <class T, class S, typename... Args>
 bool connect_stream_open(datastream* ds, datastream* ds_connect, Args... args, f_streamargs) {
@@ -706,8 +706,8 @@ datastream* connect_stream_factory(datastream* ds_connect, Args... args, f_strea
 template <class T, datastream_factory_type factory, class S, typename... Args>
 void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classname, const std::string& arg_types) {
 	RegisterDatastreamType<T, factory>(engine, classname);
-	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(datastream@, %s, const string&in = \"\", int byteorder = 1)", classname, arg_types).c_str(), asFUNCTION((connect_stream_factory<T, S, Args...>)), asCALL_CDECL);
-	engine->RegisterObjectMethod(classname.c_str(), format("bool open(datastream@, %s, const string&in = \"\", int byteorder = 1)", arg_types).c_str(), asFUNCTION((connect_stream_open<T, S, Args...>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(datastream@ stream, %s, const string&in encoding = \"\", int byteorder = 1)", classname, arg_types).c_str(), asFUNCTION((connect_stream_factory<T, S, Args...>)), asCALL_CDECL);
+	engine->RegisterObjectMethod(classname.c_str(), format("bool open(datastream@ stream, %s, const string&in encoding = \"\", int byteorder = 1)", arg_types).c_str(), asFUNCTION((connect_stream_open<T, S, Args...>)), asCALL_CDECL_OBJFIRST);
 }
 template <class T>
 void RegisterInputDatastreamType(asIScriptEngine* engine, const std::string& classname) { RegisterDatastreamType<T, datastream_factory_closed, std::istream>(engine, classname); }
@@ -807,13 +807,13 @@ datastream* duplicating_stream_add(datastream* ds, datastream* ds_connect) {
 }
 void RegisterDuplicatingStream(asIScriptEngine* engine) {
 	RegisterInputDatastreamType<TeeInputStream>(engine, "duplicating_reader");
-	engine->RegisterObjectMethod("duplicating_reader", "duplicating_reader@ opAdd(datastream@)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("duplicating_reader", "duplicating_reader@ opAddAssign(datastream@)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("duplicating_reader", "duplicating_reader@ add(datastream@)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("duplicating_reader", "duplicating_reader@ opAdd(datastream@ stream)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("duplicating_reader", "duplicating_reader@ opAddAssign(datastream@ stream)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("duplicating_reader", "duplicating_reader@ add(datastream@ stream)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
 	RegisterDatastreamType<TeeOutputStream, datastream_factory_opened, std::ostream>(engine, "duplicating_writer");
-	engine->RegisterObjectMethod("duplicating_writer", "duplicating_writer@ opAdd(datastream@)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("duplicating_writer", "duplicating_writer@ opAddAssign(datastream@)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("duplicating_writer", "duplicating_writer@ add(datastream@)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("duplicating_writer", "duplicating_writer@ opAdd(datastream@ stream)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("duplicating_writer", "duplicating_writer@ opAddAssign(datastream@ stream)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("duplicating_writer", "duplicating_writer@ add(datastream@ stream)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
 }
 
 // counting streams
@@ -865,10 +865,10 @@ void RegisterCountingStream(asIScriptEngine* engine, const std::string& type) {
 	engine->RegisterObjectMethod(type.c_str(), "int64 get_lines() property", asFUNCTION(counting_stream_lines), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "int64 get_current_line() property", asFUNCTION(counting_stream_get_current_line), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void reset()", asFUNCTION(counting_stream_reset), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void set_current_line(int64)", asFUNCTION(counting_stream_set_current_line), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void add_chars(int64)", asFUNCTION(counting_stream_add_chars), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void add_lines(int64)", asFUNCTION(counting_stream_add_lines), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void add_pos(int64)", asFUNCTION(counting_stream_add_pos), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_current_line(int64 line)", asFUNCTION(counting_stream_set_current_line), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void add_chars(int64 count)", asFUNCTION(counting_stream_add_chars), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void add_lines(int64 count)", asFUNCTION(counting_stream_add_lines), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void add_pos(int64 count)", asFUNCTION(counting_stream_add_pos), asCALL_CDECL_OBJFIRST);
 }
 
 // Wrappers around cin, cout and cerr from the stl. The first function just performs any common setup used for all 3 streams.
@@ -914,7 +914,7 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty("const string NEWLINE_LF", (void*)&LineEnding::NEWLINE_LF);
 	engine->SetDefaultNamespace("");
 	RegisterDatastreamType<std::stringstream, datastream_factory_none>(engine, "datastream");
-	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in = \"\")", asFUNCTION(stringstream_implicit_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in initial_data = \"\")", asFUNCTION(stringstream_implicit_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in initial_data, const string&in encoding, int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_factory), asCALL_CDECL);
 	engine->RegisterObjectMethod("datastream", "bool open(const string&in initial_data = \"\", const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_open), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datastream", "string str()", asFUNCTION(stringstream_str), asCALL_CDECL_OBJFIRST);
@@ -925,8 +925,8 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("datastream@ get_cerr() property", asFUNCTION(get_cerr), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_FS);
 	RegisterDatastreamType<FileStream, datastream_factory_closed>(engine, "file");
-	engine->RegisterObjectBehaviour("file", asBEHAVE_FACTORY, "file@ d(const string&in, const string&in, const string&in = \"\", int byteorder = 1)", asFUNCTION(file_stream_factory), asCALL_CDECL);
-	engine->RegisterObjectMethod("file", "bool open(const string&in, const string&in, const string&in = \"\", int byteorder = 1)", asFUNCTION(file_stream_open), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("file", asBEHAVE_FACTORY, "file@ d(const string&in path, const string&in mode, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION(file_stream_factory), asCALL_CDECL);
+	engine->RegisterObjectMethod("file", "bool open(const string&in path, const string&in mode, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION(file_stream_open), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("file", "uint64 get_size() const property", asFUNCTION(file_stream_size), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
 	RegisterInputDatastreamType<HexBinaryDecoder>(engine, "hex_decoder");
@@ -950,10 +950,10 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	RegisterInputDatastreamType<chacha_istream, const std::string&>(engine, "asset_decryptor", "const string& in key");
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_RAW_MEMORY);
 	RegisterDatastreamType<MemoryInputStream, datastream_factory_closed>(engine, "memory_reader");
-	engine->RegisterObjectBehaviour("memory_reader", asBEHAVE_FACTORY, "memory_reader@ d(uint64, uint64, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_factory<MemoryInputStream, const char*, size_t>)), asCALL_CDECL);
-	engine->RegisterObjectMethod("memory_reader", "bool open(uint64, uint64, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_open<MemoryInputStream, const char*, size_t>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("memory_reader", asBEHAVE_FACTORY, "memory_reader@ d(uint64 address, uint64 size, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_factory<MemoryInputStream, const char*, size_t>)), asCALL_CDECL);
+	engine->RegisterObjectMethod("memory_reader", "bool open(uint64 address, uint64 size, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_open<MemoryInputStream, const char*, size_t>)), asCALL_CDECL_OBJFIRST);
 	RegisterDatastreamType<MemoryOutputStream, datastream_factory_closed>(engine, "memory_writer");
-	engine->RegisterObjectBehaviour("memory_writer", asBEHAVE_FACTORY, "memory_writer@ d(uint64, uint64, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_factory<MemoryOutputStream, char*, size_t>)), asCALL_CDECL);
-	engine->RegisterObjectMethod("memory_writer", "bool open(uint64, uint64, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_open<MemoryOutputStream, char*, size_t>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("memory_writer", asBEHAVE_FACTORY, "memory_writer@ d(uint64 address, uint64 size, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_factory<MemoryOutputStream, char*, size_t>)), asCALL_CDECL);
+	engine->RegisterObjectMethod("memory_writer", "bool open(uint64 address, uint64 size, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_open<MemoryOutputStream, char*, size_t>)), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 }

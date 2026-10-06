@@ -367,7 +367,7 @@ void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool directory_delete(const string& in path, bool recursive = true)", asFUNCTION(DirectoryDelete), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_exists(const string& in path)", asFUNCTION(FileExists), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_delete(const string& in path)", asFUNCTION(FileDelete), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool file_copy(const string& in source, const string& in destination, bool)", asFUNCTION(FileCopy), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool file_copy(const string& in source, const string& in destination, bool overwrite)", asFUNCTION(FileCopy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_hard_link(const string& in source, const string&in destination)", asFUNCTION(FileHardLink), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_move(const string& in source, const string& in destination)", asFUNCTION(FileMove), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string[]@ find_directories(const string& in pattern)", asFUNCTION(FindDirectories), asCALL_CDECL);

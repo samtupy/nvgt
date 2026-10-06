@@ -627,21 +627,21 @@ template <class T> void poco_value_destruct(T* mem) { mem->~T(); }
 
 // Template wrapper function to make the registration of types with Dynamic::Var easier.
 template<typename T, bool is_string = false> void RegisterPocoVarType(asIScriptEngine* engine, const std::string& type) {
-	engine->RegisterObjectBehaviour("var", asBEHAVE_FACTORY, format("var@ v(const %s&in)", type).c_str(), asFUNCTION(poco_var_factory_value<T>), asCALL_CDECL);
-	engine->RegisterObjectMethod("var", format("var& opAssign(const %s&in)", type).c_str(), asFUNCTION(poco_var_assign<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("var", format("%s opAddAssign(const %s&in)", type, type).c_str(), asFUNCTION(poco_var_add_assign<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("var", format("%s opAdd(const %s&in) const", type, type).c_str(), asFUNCTION(poco_var_add<T>), asCALL_CDECL_OBJFIRST);
-	//engine->RegisterObjectMethod("var", format("%s opAddR(const %s&in) const", type, type).c_str(), asFUNCTION(poco_var_add_r<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("var", asBEHAVE_FACTORY, format("var@ v(const %s&in value)", type).c_str(), asFUNCTION(poco_var_factory_value<T>), asCALL_CDECL);
+	engine->RegisterObjectMethod("var", format("var& opAssign(const %s&in value)", type).c_str(), asFUNCTION(poco_var_assign<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("var", format("%s opAddAssign(const %s&in value)", type, type).c_str(), asFUNCTION(poco_var_add_assign<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("var", format("%s opAdd(const %s&in value) const", type, type).c_str(), asFUNCTION(poco_var_add<T>), asCALL_CDECL_OBJFIRST);
+	//engine->RegisterObjectMethod("var", format("%s opAddR(const %s&in value) const", type, type).c_str(), asFUNCTION(poco_var_add_r<T>), asCALL_CDECL_OBJFIRST);
 	if constexpr(!is_string) {
-		engine->RegisterObjectMethod("var", format("%s opSubAssign(const %s&in)", type, type).c_str(), asFUNCTION(poco_var_sub_assign<T>), asCALL_CDECL_OBJFIRST);
-		engine->RegisterObjectMethod("var", format("%s opSub(const %s&in) const", type, type).c_str(), asFUNCTION(poco_var_sub<T>), asCALL_CDECL_OBJFIRST);
-		engine->RegisterObjectMethod("var", format("%s opMulAssign(const %s&in)", type, type).c_str(), asFUNCTION(poco_var_mul_assign<T>), asCALL_CDECL_OBJFIRST);
-		engine->RegisterObjectMethod("var", format("%s opMul(const %s&in) const", type, type).c_str(), asFUNCTION(poco_var_mul<T>), asCALL_CDECL_OBJFIRST);
-		engine->RegisterObjectMethod("var", format("%s opDivAssign(const %s&in)", type, type).c_str(), asFUNCTION(poco_var_div_assign<T>), asCALL_CDECL_OBJFIRST);
-		engine->RegisterObjectMethod("var", format("%s opDiv(const %s&in) const", type, type).c_str(), asFUNCTION(poco_var_div<T>), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectMethod("var", format("%s opSubAssign(const %s&in value)", type, type).c_str(), asFUNCTION(poco_var_sub_assign<T>), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectMethod("var", format("%s opSub(const %s&in value) const", type, type).c_str(), asFUNCTION(poco_var_sub<T>), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectMethod("var", format("%s opMulAssign(const %s&in value)", type, type).c_str(), asFUNCTION(poco_var_mul_assign<T>), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectMethod("var", format("%s opMul(const %s&in value) const", type, type).c_str(), asFUNCTION(poco_var_mul<T>), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectMethod("var", format("%s opDivAssign(const %s&in value)", type, type).c_str(), asFUNCTION(poco_var_div_assign<T>), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectMethod("var", format("%s opDiv(const %s&in value) const", type, type).c_str(), asFUNCTION(poco_var_div<T>), asCALL_CDECL_OBJFIRST);
 		if constexpr(std::is_integral<T>::value) {
-			engine->RegisterObjectMethod("var", format("%s opModAssign(const %s&in)", type, type).c_str(), asFUNCTION(poco_var_mod_assign<T>), asCALL_CDECL_OBJFIRST);
-			engine->RegisterObjectMethod("var", format("%s opMod(const %s&in) const", type, type).c_str(), asFUNCTION(poco_var_mod<T>), asCALL_CDECL_OBJFIRST);
+			engine->RegisterObjectMethod("var", format("%s opModAssign(const %s&in value)", type, type).c_str(), asFUNCTION(poco_var_mod_assign<T>), asCALL_CDECL_OBJFIRST);
+			engine->RegisterObjectMethod("var", format("%s opMod(const %s&in value) const", type, type).c_str(), asFUNCTION(poco_var_mod<T>), asCALL_CDECL_OBJFIRST);
 		}
 	}
 	engine->RegisterObjectMethod("var", format("%s opImplConv() const", type).c_str(), asFUNCTION(poco_var_extract<T>), asCALL_CDECL_OBJFIRST);
@@ -657,10 +657,10 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("var", asBEHAVE_FACTORY, "var @v()", asFUNCTION(poco_var_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("var", asBEHAVE_ADDREF, "void f()", asMETHOD(poco_shared<Dynamic::Var>, duplicate), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("var", asBEHAVE_RELEASE, "void f()", asMETHOD(poco_shared<Dynamic::Var>, release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("var", "var& opAssign(const var&in)", asFUNCTION(poco_var_assign_var), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("var", "var& opAssign(const var&in other)", asFUNCTION(poco_var_assign_var), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("var", "var& opPostInc()", asFUNCTION(poco_var_inc), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("var", "var& opPostDec()", asFUNCTION(poco_var_dec), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("var", "int opCmp(const var&in) const", asFUNCTION(poco_var_cmp), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("var", "int opCmp(const var&in other) const", asFUNCTION(poco_var_cmp), asCALL_CDECL_OBJFIRST);
 	RegisterPocoVarType<int>(engine, "int");
 	RegisterPocoVarType<unsigned int>(engine, "uint");
 	RegisterPocoVarType<short>(engine, "int16");
@@ -671,9 +671,9 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	RegisterPocoVarType<double>(engine, "double");
 	RegisterPocoVarType<bool, true>(engine, "bool");
 	RegisterPocoVarType<std::string, true>(engine, "string");
-	engine->RegisterObjectMethod("string", "string opAdd(const var&in) const", asFUNCTION(poco_var_add_string), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("string", "string& opAssign(const var&in)", asFUNCTION(poco_var_assign_string), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("string", "string& opAddAssign(const var&in)", asFUNCTION(poco_var_add_assign_string), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("string", "string opAdd(const var&in value) const", asFUNCTION(poco_var_add_string), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("string", "string& opAssign(const var&in value)", asFUNCTION(poco_var_assign_string), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("string", "string& opAddAssign(const var&in value)", asFUNCTION(poco_var_add_assign_string), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("var", "void clear()", asMETHOD(Dynamic::Var, clear), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
 	engine->RegisterObjectMethod("var", "bool get_empty() const property", asMETHOD(Dynamic::Var, isEmpty), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
 	engine->RegisterObjectMethod("var", "bool get_is_integer() const property", asMETHOD(Dynamic::Var, isInteger), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
@@ -681,11 +681,11 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("var", "bool get_is_numeric() const property", asMETHOD(Dynamic::Var, isNumeric), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
 	engine->RegisterObjectMethod("var", "bool get_is_boolean() const property", asMETHOD(Dynamic::Var, isBoolean), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
 	engine->RegisterObjectMethod("var", "bool get_is_string() const property", asMETHOD(Dynamic::Var, isString), asCALL_THISCALL, 0, asOFFSET(poco_shared<Dynamic::Var>, ptr), true);
-	engine->RegisterObjectBehaviour("var", asBEHAVE_FACTORY, "var @v(const json_object&in)", asFUNCTION(poco_var_factory_value_shared<JSON::Object>), asCALL_CDECL);
-	engine->RegisterObjectMethod("var", "var& opAssign(const json_object&in) const", asFUNCTION(poco_var_assign_shared<JSON::Object>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("var", asBEHAVE_FACTORY, "var @v(const json_object&in value)", asFUNCTION(poco_var_factory_value_shared<JSON::Object>), asCALL_CDECL);
+	engine->RegisterObjectMethod("var", "var& opAssign(const json_object&in value) const", asFUNCTION(poco_var_assign_shared<JSON::Object>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("var", "json_object@ opImplCast() const", asFUNCTION(poco_var_extract_shared<JSON::Object>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("var", asBEHAVE_FACTORY, "var @v(const json_array&in)", asFUNCTION(poco_var_factory_value_shared<JSON::Array>), asCALL_CDECL);
-	engine->RegisterObjectMethod("var", "var& opAssign(const json_array&in) const", asFUNCTION(poco_var_assign_shared<JSON::Array>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("var", asBEHAVE_FACTORY, "var @v(const json_array&in value)", asFUNCTION(poco_var_factory_value_shared<JSON::Array>), asCALL_CDECL);
+	engine->RegisterObjectMethod("var", "var& opAssign(const json_array&in value) const", asFUNCTION(poco_var_assign_shared<JSON::Array>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("var", "json_array@ opImplCast() const", asFUNCTION(poco_var_extract_shared<JSON::Array>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("json_object", asBEHAVE_FACTORY, "json_object @o()", asFUNCTION(poco_json_object_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("json_object", asBEHAVE_FACTORY, "json_object @o(json_object@+ other)", asFUNCTION(poco_json_object_copy_factory), asCALL_CDECL);
@@ -938,7 +938,7 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("path", _O("path& clear()"), asMETHOD(Path, clear), asCALL_THISCALL);
 	engine->RegisterObjectMethod("path", _O("path get_parent() const property"), asMETHOD(Path, parent), asCALL_THISCALL);
 	engine->RegisterObjectMethod("path", _O("path absolute() const"), asMETHODPR(Path, absolute, () const, Path), asCALL_THISCALL);
-	engine->RegisterObjectMethod("path", _O("path absolute(const path&in) const"), asMETHODPR(Path, absolute, (const Path&) const, Path), asCALL_THISCALL);
+	engine->RegisterObjectMethod("path", _O("path absolute(const path&in base) const"), asMETHODPR(Path, absolute, (const Path&) const, Path), asCALL_THISCALL);
 	engine->RegisterObjectType("uri", sizeof(URI), asOBJ_VALUE | asGetTypeTraits<URI>());
 	engine->RegisterObjectBehaviour("uri", asBEHAVE_CONSTRUCT, _O("void f()"), asFUNCTION(poco_value_construct<URI>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("uri", asBEHAVE_CONSTRUCT, _O("void f(const string&in uri)"), asFUNCTION((poco_value_construct<URI, const std::string&>)), asCALL_CDECL_OBJFIRST);
@@ -948,11 +948,11 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("uri", asBEHAVE_CONSTRUCT, _O("void f(const string&in scheme, const string&in authority, const string&in path, const string&in query, const string&in fragment)"), asFUNCTION((poco_value_construct<URI, const std::string&, const std::string&, const std::string&, const std::string&, const std::string&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("uri", asBEHAVE_CONSTRUCT, _O("void f(const uri&in base_uri, const string&in relative_uri)"), asFUNCTION((poco_value_construct<URI, const URI&, const std::string&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("uri", asBEHAVE_CONSTRUCT, _O("void f(const path&in path)"), asFUNCTION((poco_value_construct<URI, const Path&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("uri", asBEHAVE_CONSTRUCT, _O("void f(const uri&in)"), asFUNCTION(poco_value_copy_construct<URI>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("uri", asBEHAVE_CONSTRUCT, _O("void f(const uri&in other)"), asFUNCTION(poco_value_copy_construct<URI>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("uri", asBEHAVE_DESTRUCT, _O("void f()"), asFUNCTION(poco_value_destruct<URI>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("uri", _O("uri& opAssign(const uri&in)"), asMETHODPR(URI, operator=, (const URI&), URI&), asCALL_THISCALL);
+	engine->RegisterObjectMethod("uri", _O("uri& opAssign(const uri&in other)"), asMETHODPR(URI, operator=, (const URI&), URI&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("uri", _O("uri& opAssign(const string&in uri)"), asMETHODPR(URI, operator=, (const std::string&), URI&), asCALL_THISCALL);
-	engine->RegisterObjectMethod("uri", _O("bool opEquals(const uri&in)"), asMETHODPR(URI, operator==, (const URI&) const, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("uri", _O("bool opEquals(const uri&in other)"), asMETHODPR(URI, operator==, (const URI&) const, bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("uri", _O("bool opEquals(const string&in uri)"), asMETHODPR(URI, operator==, (const std::string&) const, bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("uri", _O("void clear()"), asMETHOD(URI, clear), asCALL_THISCALL);
 	engine->RegisterObjectMethod("uri", _O("string opImplConv() const"), asMETHOD(URI, toString), asCALL_THISCALL);

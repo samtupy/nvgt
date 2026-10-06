@@ -468,5 +468,5 @@ CScriptDictionary* deserialize(const std::string& input) {
 
 void RegisterSerializationFunctions(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("dictionary", "string serialize()", asFUNCTION(serialize), asCALL_CDECL_OBJLAST);
-	engine->RegisterGlobalFunction("dictionary@ deserialize(const string& in)", asFUNCTION(deserialize), asCALL_CDECL);
+	engine->RegisterGlobalFunction("dictionary@ deserialize(const string& in data)", asFUNCTION(deserialize), asCALL_CDECL);
 }

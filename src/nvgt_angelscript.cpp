@@ -526,7 +526,7 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->BeginConfigGroup("core");
-	engine->RegisterGlobalFunction("void exit(int=0)", asFUNCTION(Exit), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void exit(int retcode=0)", asFUNCTION(Exit), asCALL_CDECL);
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("threading");
 	RegisterThreading(engine);
@@ -1126,8 +1126,8 @@ void RegisterUnsorted(asIScriptEngine *engine) {
 	engine->RegisterGlobalProperty("const int NVGT_VERSION_PATCH", (void*)&NVGT_VERSION_PATCH);
 	engine->RegisterGlobalProperty("const string NVGT_VERSION_TYPE", (void*)&NVGT_VERSION_TYPE);
 	engine->RegisterGlobalFunction("void debug_break()", asFUNCTION(asDebugBreak), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void debug_add_file_breakpoint(const string&in, int)", asFUNCTION(asDebuggerAddFileBreakpoint), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void debug_add_func_breakpoint(const string&in)", asFUNCTION(asDebuggerAddFuncBreakpoint), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void debug_add_file_breakpoint(const string&in filename, int line)", asFUNCTION(asDebuggerAddFileBreakpoint), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void debug_add_func_breakpoint(const string&in function_name)", asFUNCTION(asDebuggerAddFuncBreakpoint), asCALL_CDECL);
 	engine->RegisterGlobalProperty("const string[]@ ARGS", &g_command_line_args);
 	engine->RegisterGlobalProperty("const timestamp SCRIPT_BUILD_TIME", &g_script_build_time);
 	//engine->RegisterObjectMethod("dictionary", "bool get(const string&in key, string&out value) const", asFUNCTION(script_dictionary_get_string), asCALL_CDECL_OBJFIRST);

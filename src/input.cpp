@@ -1254,12 +1254,12 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_PADDLE3", SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2);
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_PADDLE4", SDL_GAMEPAD_BUTTON_LEFT_PADDLE2);
 	engine->RegisterEnumValue("joystick_control_type", "JOYSTICK_CONTROL_TOUCHPAD", SDL_GAMEPAD_BUTTON_TOUCHPAD);
-	engine->RegisterGlobalFunction(_O("int joystick_count(bool = true)"), asFUNCTION(joystick_count), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int joystick_count(bool gamepads_only = true)"), asFUNCTION(joystick_count), asCALL_CDECL);
 	// Register joystick_power_info struct
 	engine->RegisterObjectType("joystick_power_info", sizeof(joystick_power_info), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_ALLINTS | asGetTypeTraits<joystick_power_info>());
 	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(joystick_power_info_construct), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_CONSTRUCT, "void f(int, int)", asFUNCTION(joystick_power_info_construct_params), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_CONSTRUCT, "void f(const joystick_power_info&in)", asFUNCTION(joystick_power_info_copy_construct), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_CONSTRUCT, "void f(int state, int percentage)", asFUNCTION(joystick_power_info_construct_params), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_CONSTRUCT, "void f(const joystick_power_info&in other)", asFUNCTION(joystick_power_info_copy_construct), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("joystick_power_info", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(joystick_power_info_destruct), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectProperty("joystick_power_info", "int state", asOFFSET(joystick_power_info, state));
 	engine->RegisterObjectProperty("joystick_power_info", "int percentage", asOFFSET(joystick_power_info, percentage));

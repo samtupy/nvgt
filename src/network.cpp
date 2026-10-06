@@ -281,7 +281,7 @@ void RegisterScriptNetwork(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("network_event"), asBEHAVE_FACTORY, _O("network_event @e()"), asFUNCTION(ScriptNetwork_event_Factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour(_O("network_event"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(network_event, addRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("network_event"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(network_event, release), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network_event"), _O("network_event& opAssign(const network_event &in)"), asMETHOD(network_event, operator=), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network_event"), _O("network_event& opAssign(const network_event &in other)"), asMETHOD(network_event, operator=), asCALL_THISCALL);
 	engine->RegisterObjectProperty(_O("network_event"), _O("const network_event_type type"), asOFFSET(network_event, type));
 	engine->RegisterObjectProperty(_O("network_event"), _O("const uint64 peer_id"), asOFFSET(network_event, peer_id));
 	engine->RegisterObjectProperty(_O("network_event"), _O("const uint channel"), asOFFSET(network_event, channel));

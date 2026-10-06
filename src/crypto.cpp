@@ -326,6 +326,6 @@ std::ostream &chacha_ostream::own_sink(bool owns) {
 
 void RegisterScriptCrypto(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("string string_aes_encrypt(const string&in plaintext, string key)"), asFUNCTION(string_aes_encrypt), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_aes_decrypt(const string&in ciphertext, string)"), asFUNCTION(string_aes_decrypt), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_aes_decrypt(const string&in ciphertext, string key)"), asFUNCTION(string_aes_decrypt), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string random_bytes(uint count)"), asFUNCTION(random_bytes), asCALL_CDECL);
 }

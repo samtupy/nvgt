@@ -337,7 +337,7 @@ pathfinder* new_pathfinder(int size, bool cache) {
 }
 void RegisterScriptPathfinder(asIScriptEngine* engine) {
 	engine->RegisterObjectType("pathfinder", 0, asOBJ_REF | asOBJ_GC);
-	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_FACTORY, "pathfinder @p(int = 1024, bool = true)", asFUNCTION(new_pathfinder), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_FACTORY, "pathfinder @p(int size = 1024, bool cache = true)", asFUNCTION(new_pathfinder), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_ADDREF, "void f()", asMETHOD(pathfinder, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_RELEASE, "void f()", asMETHOD(pathfinder, Release), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_GETREFCOUNT, "int f()", asMETHOD(pathfinder, get_ref_count), asCALL_THISCALL);
@@ -350,16 +350,16 @@ void RegisterScriptPathfinder(asIScriptEngine* engine) {
 	engine->RegisterObjectProperty("pathfinder", "bool allow_diagonals", asOFFSET(pathfinder, allow_diagonals));
 	engine->RegisterObjectProperty("pathfinder", "bool automatic_reset", asOFFSET(pathfinder, automatic_reset));
 	engine->RegisterObjectProperty("pathfinder", "int search_range", asOFFSET(pathfinder, search_range));
-	engine->RegisterFuncdef("int pathfinder_callback(int, int, int, any@ = null)");
-	engine->RegisterFuncdef("int pathfinder_callback_ex(int, int, int, int, int, int, any@ = null)");
-	engine->RegisterFuncdef("int pathfinder_callback_legacy(int, int, int, int, string)");
-	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback@)", asMETHOD(pathfinder, set_callback_function), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_ex@)", asMETHOD(pathfinder, set_callback_function_ex), asCALL_THISCALL);
+	engine->RegisterFuncdef("int pathfinder_callback(int x, int y, int z, any@ callback_data = null)");
+	engine->RegisterFuncdef("int pathfinder_callback_ex(int x, int y, int z, int parent_x, int parent_y, int parent_z, any@ callback_data = null)");
+	engine->RegisterFuncdef("int pathfinder_callback_legacy(int x, int y, int parent_x, int parent_y, string user_data)");
+	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback@ callback)", asMETHOD(pathfinder, set_callback_function), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_ex@ callback)", asMETHOD(pathfinder, set_callback_function_ex), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "int get_desperation_factor() const property", asMETHOD(pathfinder, get_desperation_factor), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void set_desperation_factor(int factor) property", asMETHOD(pathfinder, set_desperation_factor), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void cancel()", asMETHOD(pathfinder, cancel), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_legacy@)", asMETHOD(pathfinder, set_callback_function_legacy), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_legacy@ callback)", asMETHOD(pathfinder, set_callback_function_legacy), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void reset()", asMETHOD(pathfinder, reset), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int, int, int, int, int, int, any@+ = null)", asMETHOD(pathfinder, find), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int, int, int, int, string = \"\")", asMETHOD(pathfinder, find_legacy), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, any@+ callback_data = null)", asMETHOD(pathfinder, find), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int start_x, int start_y, int end_x, int end_y, string user_data = \"\")", asMETHOD(pathfinder, find_legacy), asCALL_THISCALL);
 }
