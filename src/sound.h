@@ -232,17 +232,14 @@ public:
 class sound_shape {
 	// This facility allows sounds to be attached to any arbitrary shape for positioning.
 	// When a shape is attached to a sound or mixer, set_position_3d exhibits different functionality. if sound_shape::contains returns true based on whether listener_position is within the shape, spatialization is disabled on the sound. Otherwise, the sound's position is set to the sound_position vector passed to the contains callback, the callback can alter it to point at the nearest edge of the shape if needed and should be overridden by subclasses. Do not override is_in_shape as it's a base function which calls contains.
-	// We keep track of the original sound position before it was mutated so that sound::get_position_3d works as expected, as well as the original ref handle the scripter passed to sound::set_shape so that sound::get_shape returns something valid.
+	// We keep track of the original sound position before it was mutated so that sound::get_position_3d works as expected.
 	mutable int refcount;
-	CScriptHandle* shape;
 	reactphysics3d::Vector3 position;
 public:
 	mixer* connected_sound; // If set, this object is not threadsafe.
-	sound_shape(CScriptHandle* script_shape = nullptr) : refcount(1), shape(script_shape), connected_sound(nullptr) {}
+	sound_shape() : refcount(1), connected_sound(nullptr) {}
 	void duplicate() const { asAtomicInc(refcount); }
 	void release() const { if (asAtomicDec(refcount) < 1) delete this; }
-	void set_shape(CScriptHandle* script_shape) { shape = script_shape; }
-	CScriptHandle* get_shape() const { return shape; }
 	void set_position(const reactphysics3d::Vector3& new_position) { position = new_position; }
 	reactphysics3d::Vector3 get_position() const { return position; }
 	bool is_in_shape(const reactphysics3d::Vector3& listener_position, reactphysics3d::Vector3& sound_position) { position = sound_position; return contains(listener_position, sound_position); }
@@ -264,8 +261,8 @@ public:
 	virtual int get_preferred_3d_attenuator() const = 0;
 	virtual void set_hrtf(bool enabled) = 0;
 	virtual bool get_hrtf() const = 0;
-	virtual bool set_shape(CScriptHandle* shape) = 0;
-	virtual CScriptHandle* get_shape() const = 0;
+	virtual bool set_shape(CScriptHandle shape) = 0;
+	virtual CScriptHandle get_shape() const = 0;
 	virtual sound_shape* get_shape_object() const = 0;
 	virtual void set_reverb3d(reverb3d* verb) = 0;
 	virtual void set_reverb3d_at(reverb3d* verb, audio_spatializer_reverb3d_placement placement) = 0;

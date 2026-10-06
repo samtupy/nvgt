@@ -294,7 +294,7 @@ class audio_engine_impl final : public audio_node_impl, public virtual audio_eng
 				return; // Todo: Maybe find a way to log error state here?
 			}
 			script_memory_buffer buf(g_ScriptEngine->GetTypeInfoByDecl("memory_buffer<float>"), pOutput, pDevice->playback.channels * frames_read); // Todo: Support all data formats.
-			if (ctx->SetArgObject(0, engine) < 0 || ctx->SetArgObject(1, &buf) < 0 || ctx->SetArgQWord(2, frames_read) < 0) {
+			if (ctx->SetArgObject(0, static_cast<audio_engine*>(engine)) < 0 || ctx->SetArgObject(1, &buf) < 0 || ctx->SetArgQWord(2, frames_read) < 0) {
 				g_ScriptEngine->ReturnContext(ctx);
 				engine->release();
 				return;
@@ -384,13 +384,13 @@ public:
 		engine_endpoint = new audio_node_impl(reinterpret_cast<ma_node_base *>(ma_engine_get_endpoint(&*engine)), this);
 	}
 	~audio_engine_impl() {
-		if (script_data_callback) {
-			script_data_callback.load()->Release();
-			script_data_callback = nullptr;
-		}
 		if (device) {
 			ma_device_stop(&*device);
 			ma_device_uninit(&*device);
+		}
+		if (script_data_callback) {
+			script_data_callback.load()->Release();
+			script_data_callback = nullptr;
 		}
 		if (engine_endpoint)
 			engine_endpoint->release();
@@ -447,7 +447,14 @@ public:
 	CScriptArray *read_script(unsigned long long frame_count) override {
 		if (!engine)
 			return nullptr;
-		CScriptArray *result = CScriptArray::Create(get_array_type("array<float>"), frame_count * ma_engine_get_channels(&*engine));
+		unsigned int channels = ma_engine_get_channels(&*engine);
+		if (frame_count > 0xFFFFFFFF / channels) throw runtime_error("too many frames requested");
+		CScriptArray *result = CScriptArray::Create(get_array_type("array<float>"), frame_count * channels);
+		asIScriptContext* ctx = asGetActiveContext();
+		if (ctx && ctx->GetState() == asEXECUTION_EXCEPTION) {
+			result->Release();
+			return nullptr;
+		}
 		unsigned long long frames_read;
 		if (!read(result->GetBuffer(), frame_count, &frames_read)) {
 			result->Resize(0);
@@ -601,7 +608,14 @@ public:
 	}
 	CScriptArray* read_script(unsigned long long frame_count) override {
 		if (!frame_count) frame_count = get_advised_read_frame_count();
-		CScriptArray* array = CScriptArray::Create(get_array_type("array<float>"), frame_count * get_channels());
+		unsigned int channels = get_channels();
+		if (channels && frame_count > 0xFFFFFFFF / channels) throw runtime_error("too many frames requested");
+		CScriptArray* array = CScriptArray::Create(get_array_type("array<float>"), frame_count * channels);
+		asIScriptContext* ctx = asGetActiveContext();
+		if (ctx && ctx->GetState() == asEXECUTION_EXCEPTION) {
+			array->Release();
+			return nullptr;
+		}
 		if (!frame_count) return array;
 		unsigned long long frames_read = read(array->GetBuffer(), frame_count);
 		array->Resize(frames_read * get_channels());
@@ -623,18 +637,22 @@ public:
 	bool seek_milliseconds(float ms) override { return src? (g_soundsystem_last_error = ma_data_source_seek_to_second(src->pDataSource, ms / 1000)) == MA_SUCCESS : false; }
 	unsigned long long get_cursor_frames() const override {
 		ma_uint64 cursor;
+		if (!src) return 0;
 		return (g_soundsystem_last_error = ma_data_source_get_cursor_in_pcm_frames(src->pDataSource, &cursor)) == MA_SUCCESS? cursor : 0;
 	}
 	float get_cursor_milliseconds() const override {
 		float cursor;
+		if (!src) return 0;
 		return (g_soundsystem_last_error = ma_data_source_get_cursor_in_seconds(src->pDataSource, &cursor)) == MA_SUCCESS? cursor * 1000 : 0;
 	}
 	unsigned long long get_length_frames() const override {
 		ma_uint64 length;
+		if (!src) return 0;
 		return (g_soundsystem_last_error = ma_data_source_get_length_in_pcm_frames(src->pDataSource, &length)) == MA_SUCCESS? length : 0;
 	}
 	float get_length_milliseconds() const override {
 		float length;
+		if (!src) return 0;
 		return (g_soundsystem_last_error = ma_data_source_get_length_in_seconds(src->pDataSource, &length)) == MA_SUCCESS? length * 1000 : 0;
 	}
 	bool set_looping(bool looping) override { return src? (g_soundsystem_last_error = ma_data_source_set_looping(src->pDataSource, looping)) == MA_SUCCESS : false; }
@@ -651,7 +669,13 @@ public:
 		if (src_cur) src_cur->duplicate();
 		return true;
 	}
-	audio_data_source* get_current() const override {  return src_cur? src_cur : src? audio_data_source_get(ma_data_source_get_current(src->pDataSource), get_engine()) : nullptr; }
+	audio_data_source* get_current() const override {
+		if (src_cur) {
+			src_cur->duplicate();
+			return src_cur;
+		}
+		return src? audio_data_source_get(ma_data_source_get_current(src->pDataSource), get_engine()) : nullptr;
+	}
 	bool set_next(audio_data_source* new_next) override {
 		if (!src) return false;
 		if ((g_soundsystem_last_error = ma_data_source_set_next(src->pDataSource, new_next? new_next->get_ma_data_source() : nullptr)) != MA_SUCCESS) return false;
@@ -660,7 +684,13 @@ public:
 		if (src_next) src_next->duplicate();
 		return true;
 	}
-	audio_data_source* get_next() const override {  return src_next? src_next : src? audio_data_source_get(ma_data_source_get_next(src->pDataSource), get_engine()) : nullptr; }
+	audio_data_source* get_next() const override {
+		if (src_next) {
+			src_next->duplicate();
+			return src_next;
+		}
+		return src? audio_data_source_get(ma_data_source_get_next(src->pDataSource), get_engine()) : nullptr;
+	}
 	bool get_data_format(ma_format *format, unsigned int *channels, unsigned int *sample_rate) const override { return src? (g_soundsystem_last_error = ma_data_source_get_data_format(src->pDataSource, format, channels, sample_rate, nullptr, 0)) == MA_SUCCESS : false; }
 	unsigned int get_channels() const override {
 		unsigned int channels;
@@ -830,7 +860,7 @@ class audio_decoder_impl : public audio_data_source_impl, public virtual audio_d
 		return cfg;
 	}
 public:
-	audio_decoder_impl(audio_engine* e) : audio_data_source_impl(nullptr, e), decoder(nullptr), datastream_ref(nullptr) {}
+	audio_decoder_impl(audio_engine* e) : audio_data_source_impl(e, nullptr), decoder(nullptr), datastream_ref(nullptr) {}
 	~audio_decoder_impl() { close(); }
 	virtual bool open(const std::string& filename, const pack_interface* pack_file, unsigned int sample_rate, unsigned int channels) override {
 		if (decoder && !close()) return false;
@@ -933,8 +963,12 @@ public:
 		return true;
 	}
 	bool open_pull(unsigned int sample_rate, unsigned int channels, unsigned int flags) override {
+		if (get_active()) close();
 		if (pull_stream) pull_stream->release();
-		return open_stream(pull_stream = new datastream(new stringstream()), sample_rate, channels, flags);
+		pull_stream = new datastream(new stringstream());
+		if (open_stream(pull_stream, sample_rate, channels, flags)) return true;
+		pull_stream = nullptr;
+		return false;
 	}
 	bool close() override {
 		unique_lock<mutex> lock(write_mtx);
@@ -1033,6 +1067,7 @@ protected:
 	}
 public:
 	audio_wav_encoder_impl(audio_engine* e) : audio_encoder_impl(e, false), encoder(nullptr) {}
+	~audio_wav_encoder_impl() { close(); }
 	unsigned int get_default_open_flags() const override { return audio_encoder_impl::get_default_open_flags() | WAV_S16; }
 	string get_format() const override { return "wav"; }
 	ma_format get_wav_format() const override { return get_dc()? get_dc()->formatOut : ma_format_f32; }
@@ -1059,7 +1094,11 @@ protected:
 			OpusEncCallbacks callbacks = {write_callback, close_callback};
 			encoder = ope_encoder_create_callbacks(&callbacks, ds->get_ostr(), comments, sample_rate, channels, 0, &error);
 		} else if (!filename.empty()) encoder = ope_encoder_create_file(filename.c_str(), comments, sample_rate, channels, 0, &error);
-		if (!encoder) return false;
+		if (!encoder) {
+			ope_comments_destroy(comments);
+			comments = nullptr;
+			return false;
+		}
 		ope_encoder_ctl(encoder, OPUS_SET_BITRATE(bitrate));
 		ope_encoder_ctl(encoder, OPUS_SET_COMPLEXITY(complexity));
 		ope_encoder_ctl(encoder, OPUS_SET_SIGNAL(signal_type));
@@ -1088,6 +1127,7 @@ protected:
 	}
 public:
 	audio_opus_encoder_impl(audio_engine* e) : audio_encoder_impl(e), encoder(nullptr), comments(nullptr), bitrate(128000), complexity(10), signal_type(OPUS_AUTO), application(OPUS_APPLICATION_AUDIO), packet_loss_percent(0), vbr(true), cvbr(false), dtx(false) {}
+	~audio_opus_encoder_impl() { close(); }
 	string get_format() const override { return "opus"; }
 	int get_bitrate() const override { return bitrate; }
 	bool set_bitrate(int new_bitrate) override {
@@ -1144,6 +1184,7 @@ protected:
 	unique_ptr<ma_sound> snd;
 	mixer *parent_mixer;
 	sound_shape* shape;
+	CScriptHandle shape_handle;
 	mutable audio_spatializer *spatializer;
 	mutex spatialization_params_mutex;
 	audio_node_chain* node_chain;
@@ -1218,25 +1259,25 @@ public:
 		}
 	}
 	bool get_hrtf() const override { return get_spatializer()->get_preferred_panner_id() == g_audio_phonon_hrtf_panner && get_spatializer()->get_preferred_attenuator_id() == g_audio_phonon_attenuator; }
-	bool set_shape(CScriptHandle* new_shape) override {
+	bool set_shape(CScriptHandle new_shape) override {
 		// release old shape.
 		sound_shape* old_shape = shape;
 		shape = nullptr;
+		shape_handle = CScriptHandle();
 		if (old_shape) old_shape->release();
-		if (!new_shape) return true;
-		int ot = new_shape->GetTypeId();
+		int ot = new_shape.GetTypeId();
 		ot ^= asTYPEID_OBJHANDLE;
 		if (!g_sound_shape_setup_callbacks.contains(ot)) return false;
-		sound_shape* new_shape_obj = g_sound_shape_setup_callbacks[ot](this, new_shape);
+		sound_shape* new_shape_obj = g_sound_shape_setup_callbacks[ot](this, &new_shape);
 		if (!new_shape_obj) return false;
-		new_shape_obj->set_shape(new_shape);
 		new_shape_obj->set_position(get_position_3d());
 		shape = new_shape_obj;
+		shape_handle = new_shape;
 		return true;
 	}
-	CScriptHandle* get_shape() const override {
-		if (!shape) return nullptr;
-		return shape->get_shape();
+	CScriptHandle get_shape() const override {
+		if (!shape) return CScriptHandle();
+		return shape_handle;
 	}
 	sound_shape* get_shape_object() const override { return shape; }
 	void set_reverb3d(reverb3d* verb) override { get_spatializer()->set_reverb3d(verb); }
@@ -1715,23 +1756,36 @@ public:
 	bool stream_pcm_script_array(CScriptArray *buffer, unsigned int sample_rate, unsigned int channels, unsigned int buffer_size) override {
 		if (!buffer)
 			return false;
-		ma_format format = pcm_stream? ma_format_unknown : ma_format_from_angelscript_type(buffer->GetElementTypeId());
+		ma_format format = ma_format_from_angelscript_type(buffer->GetElementTypeId());
+		if (pcm_stream) {
+			if (format != ma_pcm_rb_get_format(&*pcm_stream)) return false;
+			format = ma_format_unknown;
+		}
 		int nchannels = pcm_stream? ma_pcm_rb_get_channels(&*pcm_stream) : channels? channels : get_engine()->get_channels();
 		return stream_pcm(buffer->GetBuffer(), buffer->GetSize() / nchannels, format, sample_rate, channels, buffer_size);
 	}
 	bool stream_pcm_script_memory_buffer(script_memory_buffer* buffer, unsigned int sample_rate, unsigned int channels, unsigned int buffer_size) override {
 		if (!buffer)
 			return false;
-		ma_format format = pcm_stream? ma_format_unknown : ma_format_from_angelscript_type(buffer->subtypeid);
+		ma_format format = ma_format_from_angelscript_type(buffer->subtypeid);
+		if (pcm_stream) {
+			if (format != ma_pcm_rb_get_format(&*pcm_stream)) return false;
+			format = ma_format_unknown;
+		}
 		int nchannels = pcm_stream? ma_pcm_rb_get_channels(&*pcm_stream) : channels? channels : get_engine()->get_channels();
 		return stream_pcm(buffer->ptr, buffer->size / nchannels, format, sample_rate, channels, buffer_size);
 	}
 	bool open(audio_data_source* ds) override {
-		if (!ds || !ds->get_active()) return false;
+		if (!ds) return false;
+		if (!ds->get_active()) {
+			ds->release();
+			return false;
+		}
 		if (snd) close();
 		snd = make_unique<ma_sound>();
 		if ((g_soundsystem_last_error = ma_sound_init_from_data_source(get_engine()->get_ma_engine(), ds->get_ma_data_source(), 0, nullptr, &*snd)) != MA_SUCCESS) {
 			snd.reset();
+			ds->release();
 			return false;
 		}
 		datasource = ds;
@@ -2141,11 +2195,11 @@ template < class T > inline void RegisterSoundsystemAudioNode(asIScriptEngine *e
 	engine->RegisterObjectMethod(type.c_str(), "bool set_state(audio_node_state state)", asFUNCTION((virtual_call < T, &T::set_state, bool, ma_node_state >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_node_state get_state()", asFUNCTION((virtual_call < T, &T::get_state, ma_node_state >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_state_time(audio_node_state state, uint64 time)", asFUNCTION((virtual_call < T, &T::set_state_time, bool, ma_node_state, unsigned long long >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "uint64 get_state_time(uint64 global_time)", asFUNCTION((virtual_call < T, &T::get_state_time, unsigned long long, ma_node_state >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint64 get_state_time(audio_node_state state)", asFUNCTION((virtual_call < T, &T::get_state_time, unsigned long long, ma_node_state >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_node_state get_state_by_time(uint64 global_time)", asFUNCTION((virtual_call < T, &T::get_state_by_time, ma_node_state, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "audio_node_state get_state_by_time_range(uint64 global_time_begin, uint64 global_time_end)", asFUNCTION((virtual_call < T, &T::get_state_by_time_range, ma_node_state, unsigned long long, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint64 get_time() const", asFUNCTION((virtual_call < T, &T::get_time, unsigned long long >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool set_time(uint64 local_time)", asFUNCTION((virtual_call < T, &T::set_time, bool, ma_node_state >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_time(uint64 local_time)", asFUNCTION((virtual_call < T, &T::set_time, bool, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	if constexpr (!std::is_same < T, audio_node >::value) {
 		engine->RegisterObjectMethod(type.c_str(), "audio_node@ opImplCast()", asFUNCTION((op_cast < T, audio_node >)), asCALL_CDECL_OBJFIRST);
 		engine->RegisterObjectMethod("audio_node", Poco::format("%s@ opCast()", type).c_str(), asFUNCTION((op_cast < audio_node, T >)), asCALL_CDECL_OBJFIRST);
@@ -2170,9 +2224,9 @@ template <class T> inline void RegisterSoundsystemDataSource(asIScriptEngine *en
 	engine->RegisterObjectMethod(type.c_str(), "bool set_loop_point(uint64 start_frame, uint64 end_frame)", asFUNCTION((virtual_call<T, &T::set_loop_point, bool, unsigned long long, unsigned long long>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void get_loop_point(uint64&out start_frame, uint64&out end_frame) const", asFUNCTION((virtual_call<T, &T::get_loop_point, void, unsigned long long*, unsigned long long*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_current(audio_data_source@+ new_current)", asFUNCTION((virtual_call<T, &T::set_current, bool, audio_data_source*>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "audio_data_source@+ get_current() const property", asFUNCTION((virtual_call<T, &T::get_current, audio_data_source*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_data_source@ get_current() const property", asFUNCTION((virtual_call<T, &T::get_current, audio_data_source*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool set_next(audio_data_source@+ new_next)", asFUNCTION((virtual_call<T, &T::set_next, bool, audio_data_source*>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "audio_data_source@+ get_next() const property", asFUNCTION((virtual_call<T, &T::get_next, audio_data_source*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "audio_data_source@ get_next() const property", asFUNCTION((virtual_call<T, &T::get_next, audio_data_source*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_channels() const property", asFUNCTION((virtual_call<T, &T::get_channels, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_sample_rate() const property", asFUNCTION((virtual_call<T, &T::get_sample_rate, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_active() const property", asFUNCTION((virtual_call<T, &T::get_active, bool>)), asCALL_CDECL_OBJFIRST);
@@ -2184,7 +2238,7 @@ template <class T> inline void RegisterSoundsystemDataSource(asIScriptEngine *en
 template<class T> inline void RegisterSoundsystemRingBuffer(asIScriptEngine* engine, const std::string& type) {
 	RegisterSoundsystemDataSource<T>(engine, type);
 	engine->RegisterObjectMethod(type.c_str(), "void reset()", asFUNCTION((virtual_call<T, &T::reset, void>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "uint write(const float[]@ frames)", asFUNCTION((virtual_call<T, &T::write_script_array, unsigned int, CScriptArray*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint write(const float[]@+ frames)", asFUNCTION((virtual_call<T, &T::write_script_array, unsigned int, CScriptArray*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint write(const memory_buffer<float>& frames)", asFUNCTION((virtual_call<T, &T::write_script_memory_buffer, unsigned int, script_memory_buffer*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_available_read() const property", asFUNCTION((virtual_call<T, &T::get_available_read, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint get_available_write() const property", asFUNCTION((virtual_call<T, &T::get_available_write, unsigned int>)), asCALL_CDECL_OBJFIRST);
@@ -2241,14 +2295,14 @@ void RegisterSoundsystemEngine(asIScriptEngine *engine) {
 void RegisterSoundsystemDataSources(asIScriptEngine* engine) {
 	RegisterSoundsystemDataSource<audio_data_source>(engine, "audio_data_source");
 	RegisterSoundsystemDataSource<audio_decoder>(engine, "audio_decoder");
-	engine->RegisterObjectBehaviour("audio_decoder", asBEHAVE_FACTORY, "audio_decoder@ d(audio_engine@ engine = sound_default_engine)", asFUNCTION(audio_decoder::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_decoder", asBEHAVE_FACTORY, "audio_decoder@ d(audio_engine@+ engine = sound_default_engine)", asFUNCTION(audio_decoder::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_decoder", "bool open(const string&in filename, const pack_interface@+ pack_file = sound_default_pack, uint sample_rate = 0, uint channels = 0)", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::open, bool, const string&, const pack_interface*, unsigned int, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_decoder", "bool open(datastream@ stream, uint sample_rate = 0, uint channels = 0)", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::open_stream, bool, datastream*, unsigned int, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_decoder", "bool close()", asFUNCTION((virtual_call < audio_decoder, &audio_decoder::close, bool >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemRingBuffer<audio_ring_buffer>(engine, "audio_ring_buffer");
-	engine->RegisterObjectBehaviour("audio_ring_buffer", asBEHAVE_FACTORY, "audio_ring_buffer@ r(uint channels, uint size, audio_engine@ engine = sound_default_engine)", asFUNCTION(audio_ring_buffer::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_ring_buffer", asBEHAVE_FACTORY, "audio_ring_buffer@ r(uint channels, uint size, audio_engine@+ engine = sound_default_engine)", asFUNCTION(audio_ring_buffer::create), asCALL_CDECL);
 	RegisterSoundsystemRingBuffer<microphone>(engine, "microphone");
-	engine->RegisterObjectBehaviour("microphone", asBEHAVE_FACTORY, "microphone@ m(int device = -1, audio_engine@ engine = sound_default_engine)", asFUNCTION(microphone::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("microphone", asBEHAVE_FACTORY, "microphone@ m(int device = -1, audio_engine@+ engine = sound_default_engine)", asFUNCTION(microphone::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("microphone", "bool set_device(int device)", asFUNCTION((virtual_call < microphone, &microphone::set_device, bool, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("microphone", "int get_device() const property", asFUNCTION((virtual_call < microphone, &microphone::get_device, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("microphone", "void set_volume(float volume)", asFUNCTION((virtual_call < microphone, &microphone::set_volume, void, float>)), asCALL_CDECL_OBJFIRST);
@@ -2263,7 +2317,7 @@ template <class T> void RegisterSoundsystemEncoder(asIScriptEngine* engine, cons
 	engine->RegisterObjectMethod(type.c_str(), "bool close()", asFUNCTION((virtual_call<T, &T::close, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_active() const property", asFUNCTION((virtual_call<T, &T::get_active, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint64 get_frames_written() const property", asFUNCTION((virtual_call<T, &T::get_frames_written, unsigned long long>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "uint write(const float[]@ frames)", asFUNCTION((virtual_call<T, &T::write_script_array, unsigned int, CScriptArray*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "uint write(const float[]@+ frames)", asFUNCTION((virtual_call<T, &T::write_script_array, unsigned int, CScriptArray*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "uint write(const memory_buffer<float>& frames)", asFUNCTION((virtual_call<T, &T::write_script_memory_buffer, unsigned int, script_memory_buffer*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "string read()", asFUNCTION((virtual_call<T, &T::read, string>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "string get_format() const property", asFUNCTION((virtual_call<T, &T::get_format, string>)), asCALL_CDECL_OBJFIRST);
@@ -2286,7 +2340,7 @@ void RegisterSoundsystemEncoders(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("audio_wav_encoder_flags", "AUDIO_ENCODER_WAV_S32", audio_wav_encoder::WAV_S32);
 	engine->RegisterEnumValue("audio_wav_encoder_flags", "AUDIO_ENCODER_WAV_F32", audio_wav_encoder::WAV_F32);
 	RegisterSoundsystemEncoder<audio_wav_encoder>(engine, "audio_wav_encoder");
-	engine->RegisterObjectBehaviour("audio_wav_encoder", asBEHAVE_FACTORY, "audio_wav_encoder@ e(audio_engine@ engine = sound_default_engine)", asFUNCTION(audio_wav_encoder::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_wav_encoder", asBEHAVE_FACTORY, "audio_wav_encoder@ e(audio_engine@+ engine = sound_default_engine)", asFUNCTION(audio_wav_encoder::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_wav_encoder", "audio_format get_wav_format() const property", asFUNCTION((virtual_call<audio_wav_encoder, &audio_wav_encoder::get_wav_format, ma_format>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterEnum("opus_signal_type");
 	engine->RegisterEnumValue("opus_signal_type", "OPUS_AUTO", OPUS_AUTO);
@@ -2297,7 +2351,7 @@ void RegisterSoundsystemEncoders(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("opus_application_type", "OPUS_APPLICATION_AUDIO", OPUS_APPLICATION_AUDIO);
 	engine->RegisterEnumValue("opus_application_type", "OPUS_APPLICATION_RESTRICTED_LOWDELAY", OPUS_APPLICATION_RESTRICTED_LOWDELAY);
 	RegisterSoundsystemEncoder<audio_opus_encoder>(engine, "audio_opus_encoder");
-	engine->RegisterObjectBehaviour("audio_opus_encoder", asBEHAVE_FACTORY, "audio_opus_encoder@ e(audio_engine@ engine = sound_default_engine)", asFUNCTION(audio_opus_encoder::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_opus_encoder", asBEHAVE_FACTORY, "audio_opus_encoder@ e(audio_engine@+ engine = sound_default_engine)", asFUNCTION(audio_opus_encoder::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_opus_encoder", "int get_bitrate() const property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::get_bitrate, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_opus_encoder", "void set_bitrate(int bitrate) property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::set_bitrate, bool, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_opus_encoder", "int get_complexity() const property", asFUNCTION((virtual_call<audio_opus_encoder, &audio_opus_encoder::get_complexity, int>)), asCALL_CDECL_OBJFIRST);
@@ -2328,8 +2382,8 @@ template<class T> void RegisterSoundsystemMixer(asIScriptEngine *engine, const s
 	engine->RegisterObjectMethod(type.c_str(), "int get_preferred_3d_attenuator() const property", asFUNCTION((virtual_call < T, &T::get_preferred_3d_attenuator, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_hrtf(bool enabled) property", asFUNCTION((virtual_call < T, &T::set_hrtf, void, bool >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_hrtf() const property", asFUNCTION((virtual_call < T, &T::get_hrtf, bool >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool set_shape(ref@ shape)", asFUNCTION((virtual_call < T, &T::set_shape, bool, CScriptHandle*>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "ref@ get_shape() const property", asFUNCTION((virtual_call < T, &T::get_shape, CScriptHandle*>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool set_shape(ref@ shape)", asFUNCTION((virtual_call < T, &T::set_shape, bool, CScriptHandle>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "ref@ get_shape() const property", asFUNCTION((virtual_call < T, &T::get_shape, CScriptHandle>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_reverb3d(reverb3d@+ reverb) property", asFUNCTION((virtual_call < T, &T::set_reverb3d, void, reverb3d*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void set_reverb3d_at(reverb3d@+ reverb, reverb3d_placement placement)", asFUNCTION((virtual_call < T, &T::set_reverb3d_at, void, reverb3d*, audio_spatializer_reverb3d_placement>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "reverb3d@+ get_reverb3d() const property", asFUNCTION((virtual_call < T, &T::get_reverb3d, reverb3d*>)), asCALL_CDECL_OBJFIRST);
@@ -2391,7 +2445,7 @@ template<class T> void RegisterSoundsystemMixer(asIScriptEngine *engine, const s
 	engine->RegisterObjectMethod(type.c_str(), "bool get_playing() const property", asFUNCTION((virtual_call < T, &T::get_playing, bool >)), asCALL_CDECL_OBJFIRST);
 }
 void RegisterSoundsystemNodes(asIScriptEngine *engine) {
-	engine->RegisterObjectBehaviour("audio_node_chain", asBEHAVE_FACTORY, "audio_node_chain@ c(audio_node@ source = null, audio_node@+ endpoint = null, audio_engine@+ engine = sound_default_engine)", asFUNCTION(audio_node_chain::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_node_chain", asBEHAVE_FACTORY, "audio_node_chain@ c(audio_node@+ source = null, audio_node@+ endpoint = null, audio_engine@+ engine = sound_default_engine)", asFUNCTION(audio_node_chain::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_node_chain", "bool add_node(audio_node@+ node, audio_node@+ after = null, uint input_bus_index = 0)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::add_node, bool, audio_node*, audio_node*, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_node_chain", "bool add_node(audio_node@+ node, int after, uint input_bus_index = 0)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::add_node_at, bool, audio_node*, int, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_node_chain", "bool remove_node(audio_node@+ node)", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::remove_node, bool, audio_node*>)), asCALL_CDECL_OBJFIRST);
@@ -2405,39 +2459,39 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_node_chain", "int find(audio_node@+ node) const", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::index_of, int, audio_node*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_node_chain", "uint get_node_count() const property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::get_node_count, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemAudioNode < phonon_binaural_node > (engine, "phonon_binaural_node");
-	engine->RegisterObjectBehaviour("phonon_binaural_node", asBEHAVE_FACTORY, "phonon_binaural_node@ n(audio_engine@ engine, int channels, int sample_rate, int frame_size = 0)", asFUNCTION(phonon_binaural_node::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("phonon_binaural_node", asBEHAVE_FACTORY, "phonon_binaural_node@ n(audio_engine@+ engine, int channels, int sample_rate, int frame_size = 0)", asFUNCTION(phonon_binaural_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("phonon_binaural_node", "void set_direction(float x, float y, float z, float distance)", asFUNCTION((virtual_call < phonon_binaural_node, &phonon_binaural_node::set_direction, void, float, float, float, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("phonon_binaural_node", "void set_direction(const vector&in direction, float distance)", asFUNCTION((virtual_call < phonon_binaural_node, &phonon_binaural_node::set_direction_vector, void, const reactphysics3d::Vector3 &, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("phonon_binaural_node", "void set_spatial_blend_max_distance(float max_distance)", asFUNCTION((virtual_call < phonon_binaural_node, &phonon_binaural_node::set_spatial_blend_max_distance, void, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterGlobalFunction("bool set_sound_global_hrtf(bool enabled)", asFUNCTION(set_global_hrtf), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool get_sound_global_hrtf() property", asFUNCTION(get_global_hrtf), asCALL_CDECL);
-	engine->RegisterObjectBehaviour("audio_splitter_node", asBEHAVE_FACTORY, "audio_splitter_node@ n(audio_engine@ engine, int channels)", asFUNCTION(splitter_node::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_splitter_node", asBEHAVE_FACTORY, "audio_splitter_node@ n(audio_engine@+ engine, int channels)", asFUNCTION(splitter_node::create), asCALL_CDECL);
 	RegisterSoundsystemAudioNode <low_pass_filter_node> (engine, "audio_low_pass_filter");
-	engine->RegisterObjectBehaviour("audio_low_pass_filter", asBEHAVE_FACTORY, "audio_low_pass_filter@ f(double cutoff_frequency, uint order, audio_engine@ engine = sound_default_engine)", asFUNCTION(low_pass_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_low_pass_filter", asBEHAVE_FACTORY, "audio_low_pass_filter@ f(double cutoff_frequency, uint order, audio_engine@+ engine = sound_default_engine)", asFUNCTION(low_pass_filter_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_low_pass_filter", "void set_cutoff_frequency(double frequency) property", asFUNCTION((virtual_call < low_pass_filter_node, &low_pass_filter_node::set_cutoff_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_low_pass_filter", "double get_cutoff_frequency() const property", asFUNCTION((virtual_call < low_pass_filter_node, &low_pass_filter_node::get_cutoff_frequency, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_low_pass_filter", "void set_order(uint order) property", asFUNCTION((virtual_call < low_pass_filter_node, &low_pass_filter_node::set_order, void, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_low_pass_filter", "uint get_order() const property", asFUNCTION((virtual_call < low_pass_filter_node, &low_pass_filter_node::get_order, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemAudioNode <high_pass_filter_node> (engine, "audio_high_pass_filter");
-	engine->RegisterObjectBehaviour("audio_high_pass_filter", asBEHAVE_FACTORY, "audio_high_pass_filter@ f(double cutoff_frequency, uint order, audio_engine@ engine = sound_default_engine)", asFUNCTION(high_pass_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_high_pass_filter", asBEHAVE_FACTORY, "audio_high_pass_filter@ f(double cutoff_frequency, uint order, audio_engine@+ engine = sound_default_engine)", asFUNCTION(high_pass_filter_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_high_pass_filter", "void set_cutoff_frequency(double frequency) property", asFUNCTION((virtual_call < high_pass_filter_node, &high_pass_filter_node::set_cutoff_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_high_pass_filter", "double get_cutoff_frequency() const property", asFUNCTION((virtual_call < high_pass_filter_node, &high_pass_filter_node::get_cutoff_frequency, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_high_pass_filter", "void set_order(uint order) property", asFUNCTION((virtual_call < high_pass_filter_node, &high_pass_filter_node::set_order, void, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_high_pass_filter", "uint get_order() const property", asFUNCTION((virtual_call < high_pass_filter_node, &high_pass_filter_node::get_order, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemAudioNode <band_pass_filter_node> (engine, "audio_band_pass_filter");
-	engine->RegisterObjectBehaviour("audio_band_pass_filter", asBEHAVE_FACTORY, "audio_band_pass_filter@ f(double cutoff_frequency, uint order, audio_engine@ engine = sound_default_engine)", asFUNCTION(band_pass_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_band_pass_filter", asBEHAVE_FACTORY, "audio_band_pass_filter@ f(double cutoff_frequency, uint order, audio_engine@+ engine = sound_default_engine)", asFUNCTION(band_pass_filter_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_band_pass_filter", "void set_cutoff_frequency(double frequency) property", asFUNCTION((virtual_call < band_pass_filter_node, &band_pass_filter_node::set_cutoff_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_band_pass_filter", "double get_cutoff_frequency() const property", asFUNCTION((virtual_call < band_pass_filter_node, &band_pass_filter_node::get_cutoff_frequency, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_band_pass_filter", "void set_order(uint order) property", asFUNCTION((virtual_call < band_pass_filter_node, &band_pass_filter_node::set_order, void, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_band_pass_filter", "uint get_order() const property", asFUNCTION((virtual_call < band_pass_filter_node, &band_pass_filter_node::get_order, unsigned int >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemAudioNode <notch_filter_node> (engine, "audio_notch_filter");
-	engine->RegisterObjectBehaviour("audio_notch_filter", asBEHAVE_FACTORY, "audio_notch_filter@ f(double q, double frequency, audio_engine@ engine = sound_default_engine)", asFUNCTION(notch_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_notch_filter", asBEHAVE_FACTORY, "audio_notch_filter@ f(double q, double frequency, audio_engine@+ engine = sound_default_engine)", asFUNCTION(notch_filter_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_notch_filter", "void set_q(double q) property", asFUNCTION((virtual_call < notch_filter_node, &notch_filter_node::set_q, void, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_notch_filter", "double get_q() const property", asFUNCTION((virtual_call < notch_filter_node, &notch_filter_node::get_q, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_notch_filter", "void set_frequency(double frequency) property", asFUNCTION((virtual_call < notch_filter_node, &notch_filter_node::set_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_notch_filter", "double get_frequency() const property", asFUNCTION((virtual_call < notch_filter_node, &notch_filter_node::get_frequency, double >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemAudioNode <peak_filter_node> (engine, "audio_peak_filter");
-	engine->RegisterObjectBehaviour("audio_peak_filter", asBEHAVE_FACTORY, "audio_peak_filter@ f(double gain_db, double q, double frequency, audio_engine@ engine = sound_default_engine)", asFUNCTION(peak_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_peak_filter", asBEHAVE_FACTORY, "audio_peak_filter@ f(double gain_db, double q, double frequency, audio_engine@+ engine = sound_default_engine)", asFUNCTION(peak_filter_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_peak_filter", "void set_gain(double gain) property", asFUNCTION((virtual_call < peak_filter_node, &peak_filter_node::set_gain, void, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_peak_filter", "double get_gain() const property", asFUNCTION((virtual_call < peak_filter_node, &peak_filter_node::get_gain, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_peak_filter", "void set_q(double q) property", asFUNCTION((virtual_call < peak_filter_node, &peak_filter_node::set_q, void, double >)), asCALL_CDECL_OBJFIRST);
@@ -2445,7 +2499,7 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_peak_filter", "void set_frequency(double frequency) property", asFUNCTION((virtual_call < peak_filter_node, &peak_filter_node::set_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_peak_filter", "double get_frequency() const property", asFUNCTION((virtual_call < peak_filter_node, &peak_filter_node::get_frequency, double >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemAudioNode <low_shelf_filter_node> (engine, "audio_low_shelf_filter");
-	engine->RegisterObjectBehaviour("audio_low_shelf_filter", asBEHAVE_FACTORY, "audio_low_shelf_filter@ f(double gain_db, double q, double frequency, audio_engine@ engine = sound_default_engine)", asFUNCTION(low_shelf_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_low_shelf_filter", asBEHAVE_FACTORY, "audio_low_shelf_filter@ f(double gain_db, double q, double frequency, audio_engine@+ engine = sound_default_engine)", asFUNCTION(low_shelf_filter_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_low_shelf_filter", "void set_gain(double gain) property", asFUNCTION((virtual_call < low_shelf_filter_node, &low_shelf_filter_node::set_gain, void, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_low_shelf_filter", "double get_gain() const property", asFUNCTION((virtual_call < low_shelf_filter_node, &low_shelf_filter_node::get_gain, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_low_shelf_filter", "void set_q(double q) property", asFUNCTION((virtual_call < low_shelf_filter_node, &low_shelf_filter_node::set_q, void, double >)), asCALL_CDECL_OBJFIRST);
@@ -2453,7 +2507,7 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_low_shelf_filter", "void set_frequency(double frequency) property", asFUNCTION((virtual_call < low_shelf_filter_node, &low_shelf_filter_node::set_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_low_shelf_filter", "double get_frequency() const property", asFUNCTION((virtual_call < low_shelf_filter_node, &low_shelf_filter_node::get_frequency, double >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemAudioNode <high_shelf_filter_node> (engine, "audio_high_shelf_filter");
-	engine->RegisterObjectBehaviour("audio_high_shelf_filter", asBEHAVE_FACTORY, "audio_high_shelf_filter@ f(double gain_db, double q, double frequency, audio_engine@ engine = sound_default_engine)", asFUNCTION(high_shelf_filter_node::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_high_shelf_filter", asBEHAVE_FACTORY, "audio_high_shelf_filter@ f(double gain_db, double q, double frequency, audio_engine@+ engine = sound_default_engine)", asFUNCTION(high_shelf_filter_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_high_shelf_filter", "void set_gain(double gain) property", asFUNCTION((virtual_call < high_shelf_filter_node, &high_shelf_filter_node::set_gain, void, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_high_shelf_filter", "double get_gain() const property", asFUNCTION((virtual_call < high_shelf_filter_node, &high_shelf_filter_node::get_gain, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_high_shelf_filter", "void set_q(double q) property", asFUNCTION((virtual_call < high_shelf_filter_node, &high_shelf_filter_node::set_q, void, double >)), asCALL_CDECL_OBJFIRST);
@@ -2461,7 +2515,7 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_high_shelf_filter", "void set_frequency(double frequency) property", asFUNCTION((virtual_call < high_shelf_filter_node, &high_shelf_filter_node::set_frequency, void, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_high_shelf_filter", "double get_frequency() const property", asFUNCTION((virtual_call < high_shelf_filter_node, &high_shelf_filter_node::get_frequency, double >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemAudioNode <delay_node> (engine, "audio_delay_node");
-	engine->RegisterObjectBehaviour("audio_delay_node", asBEHAVE_FACTORY, "audio_delay_node@ d(uint delay_in_frames, float decay, audio_engine@ engine = sound_default_engine)", asFUNCTION(delay_node::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_delay_node", asBEHAVE_FACTORY, "audio_delay_node@ d(uint delay_in_frames, float decay, audio_engine@+ engine = sound_default_engine)", asFUNCTION(delay_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_delay_node", "void set_wet(float wet) property", asFUNCTION((virtual_call < delay_node, &delay_node::set_wet, void, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_delay_node", "float get_wet() const property", asFUNCTION((virtual_call < delay_node, &delay_node::get_wet, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_delay_node", "void set_dry(float dry) property", asFUNCTION((virtual_call < delay_node, &delay_node::set_dry, void, float >)), asCALL_CDECL_OBJFIRST);
@@ -2469,7 +2523,7 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_delay_node", "void set_decay(float decay) property", asFUNCTION((virtual_call < delay_node, &delay_node::set_decay, void, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_delay_node", "float get_decay() const property", asFUNCTION((virtual_call < delay_node, &delay_node::get_decay, float >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemAudioNode <freeverb_node> (engine, "audio_freeverb_node");
-	engine->RegisterObjectBehaviour("audio_freeverb_node", asBEHAVE_FACTORY, "audio_freeverb_node@ n(audio_engine@ engine = sound_default_engine)", asFUNCTION(freeverb_node::create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("audio_freeverb_node", asBEHAVE_FACTORY, "audio_freeverb_node@ n(audio_engine@+ engine = sound_default_engine)", asFUNCTION(freeverb_node::create), asCALL_CDECL);
 	engine->RegisterObjectMethod("audio_freeverb_node", "void set_room_size(float size) property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::set_room_size, void, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_freeverb_node", "float get_room_size() const property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::get_room_size, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_freeverb_node", "void set_damping(float damping) property", asFUNCTION((virtual_call < freeverb_node, &freeverb_node::set_damping, void, float >)), asCALL_CDECL_OBJFIRST);
@@ -2628,7 +2682,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	RegisterSoundsystemMixer < mixer > (engine, "mixer");
 	engine->RegisterObjectBehaviour("mixer", asBEHAVE_FACTORY, "mixer@ m()", asFUNCTION(new_global_mixer), asCALL_CDECL);
 	RegisterSoundsystemMixer < sound > (engine, "sound");
-	engine->RegisterObjectMethod("audio_engine", "sound@ play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@+ mix = null, const pack_interface@ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION((virtual_call < audio_engine, &audio_engine::play, sound*, const string &, const reactphysics3d::Vector3&, float, float, float, mixer*, const pack_interface*, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("audio_engine", "sound@ play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@+ mix = null, const pack_interface@+ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION((virtual_call < audio_engine, &audio_engine::play, sound*, const string &, const reactphysics3d::Vector3&, float, float, float, mixer*, const pack_interface*, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "mixer@ mixer()", asFUNCTION((virtual_call < audio_engine, &audio_engine::new_mixer, mixer * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_engine", "sound@ sound()", asFUNCTION((virtual_call < audio_engine, &audio_engine::new_sound, sound * >)), asCALL_CDECL_OBJFIRST);
 	RegisterSoundsystemDataSources(engine);
@@ -2636,22 +2690,22 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	RegisterSoundsystemEncoders(engine);
 	RegisterSoundsystemShapes(engine);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
-	engine->RegisterObjectMethod("sound", "bool load(const string&in filename, const pack_interface@ pack = sound_default_pack)", asFUNCTION((virtual_call < sound, &sound::load, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool stream(const string&in filename, const pack_interface@ pack = sound_default_pack)", asFUNCTION((virtual_call < sound, &sound::stream, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load(const string&in filename, const pack_interface@+ pack = sound_default_pack)", asFUNCTION((virtual_call < sound, &sound::load, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream(const string&in filename, const pack_interface@+ pack = sound_default_pack)", asFUNCTION((virtual_call < sound, &sound::stream, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool stream_url(const string&in url)", asFUNCTION((virtual_call < sound, &sound::stream_url, bool, const string&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool load_memory(const string&in data)", asFUNCTION((virtual_call < sound, &sound::load_string, bool, const string & >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool load_pcm(const float[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool load_pcm(const int[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool load_pcm(const int16[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool load_pcm(const uint8[]@ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const float[]@+ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const int[]@+ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const int16[]@+ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool load_pcm(const uint8[]@+ data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_array, bool, CScriptArray *, int, int >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool load_pcm(const memory_buffer<float>&in data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_memory_buffer, bool, script_memory_buffer*, int, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool load_pcm(const memory_buffer<int>&in data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_memory_buffer, bool, script_memory_buffer*, int, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool load_pcm(const memory_buffer<int16>&in data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_memory_buffer, bool, script_memory_buffer*, int, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool load_pcm(const memory_buffer<uint8>&in data, int samplerate, int channels)", asFUNCTION((virtual_call < sound, &sound::load_pcm_script_memory_buffer, bool, script_memory_buffer*, int, int>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool stream_pcm(const float[]@ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_array, bool, CScriptArray*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool stream_pcm(const int[]@ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_array, bool, CScriptArray*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool stream_pcm(const int16[]@ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_array, bool, CScriptArray*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "bool stream_pcm(const uint8[]@ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_array, bool, CScriptArray*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_pcm(const float[]@+ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_array, bool, CScriptArray*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_pcm(const int[]@+ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_array, bool, CScriptArray*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_pcm(const int16[]@+ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_array, bool, CScriptArray*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "bool stream_pcm(const uint8[]@+ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_array, bool, CScriptArray*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool stream_pcm(const memory_buffer<float>&in data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_memory_buffer, bool, script_memory_buffer*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool stream_pcm(const memory_buffer<int>&in data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_memory_buffer, bool, script_memory_buffer*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool stream_pcm(const memory_buffer<int16>&in data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0)", asFUNCTION((virtual_call < sound, &sound::stream_pcm_script_memory_buffer, bool, script_memory_buffer*, unsigned int, unsigned int, unsigned int>)), asCALL_CDECL_OBJFIRST);
@@ -2690,18 +2744,18 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("sound", "uint64 get_length_in_ms() const property", asFUNCTION((virtual_call < sound, &sound::get_length_in_milliseconds, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "uint64 get_length_in_milliseconds() const property", asFUNCTION((virtual_call < sound, &sound::get_length_in_milliseconds, unsigned long long >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool get_data_format(audio_format&out format, uint32&out channels, uint32&out sample_rate)", asFUNCTION((virtual_call < sound, &sound::get_data_format, bool, ma_format *, unsigned int *, unsigned int * >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("sound", "double get_pitch_lower_limit() const property", asFUNCTION((virtual_call < sound, &sound::get_pitch_lower_limit, bool >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound", "double get_pitch_lower_limit() const property", asFUNCTION((virtual_call < sound, &sound::get_pitch_lower_limit, double >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterGlobalFunction("const string[]@+ get_sound_input_devices() property", asFUNCTION(get_sound_input_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("const string[]@+ get_sound_output_devices() property", asFUNCTION(get_sound_output_devices), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_sound_output_device() property", asFUNCTION(get_sound_output_device), asCALL_CDECL);
 	engine->RegisterGlobalProperty("mixer@ sound_default_mixer", (void*)&g_audio_mixer);
 	engine->RegisterGlobalFunction("void set_sound_output_device(int device) property", asFUNCTION(set_sound_output_device), asCALL_CDECL);
-	engine->RegisterGlobalFunction("sound@ sound_play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@+ mix = null, const pack_interface@ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION(sound_play), asCALL_CDECL);
+	engine->RegisterGlobalFunction("sound@ sound_play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = 0.0, float pan = 0.0, float pitch = 100.0, mixer@+ mix = null, const pack_interface@+ pack_file = sound_default_pack, bool autoplay = true)", asFUNCTION(sound_play), asCALL_CDECL);
 	engine->RegisterGlobalFunction("vector sound_get_listener_position(uint listener_index = 0)", asFUNCTION(sound_get_listener_position), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool sound_set_listener_position(float x, float y, float z, uint listener_index = 0)", asFUNCTION(sound_set_listener_position), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool sound_set_listener_position(const vector&in position, uint listener_index = 0)", asFUNCTION(sound_set_listener_position_vector), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_default_decryption_key(const string& in key) property", asFUNCTION(set_default_decryption_key), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void set_sound_default_pack(pack_interface@ storage) property", asFUNCTION(set_sound_default_storage), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_sound_default_pack(pack_interface@+ storage) property", asFUNCTION(set_sound_default_storage), asCALL_CDECL);
 	engine->RegisterGlobalFunction("pack_interface@ get_sound_default_pack() property", asFUNCTION(get_sound_default_storage), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void set_sound_master_volume(float db) property", asFUNCTION(set_sound_master_volume), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float get_sound_master_volume() property", asFUNCTION(get_sound_master_volume), asCALL_CDECL);
