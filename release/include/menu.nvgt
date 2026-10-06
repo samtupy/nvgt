@@ -311,3 +311,15 @@ bool yes_no(const string&in prompt, menu@ m = null, string yes = "yes", string n
 	}
 	return m.selected_item == 1;
 }
+
+int choose_number(const string&in intro, int low, int high, int current) {
+	menu@ m = setup_menu(intro);
+	m.automatic_intro = false;
+	m.focus_first_item = false;
+	for (int i = low; i <= high; i++) m.add_item("" + i);
+	m.set_focused_item(fmax(0, fmin(current - low, high - low)), false);
+	m.intro();
+	while (m.monitor()) wait(5);
+	if (m.selected_item < 0) return -1;
+	return low + m.selected_item;
+}
