@@ -17,6 +17,7 @@
 #include <vector>
 #include <angelscript.h>
 #include <micropather.h>
+#include <ankerl/unordered_dense.h>
 #include "scriptarray.h"
 #include "scriptany.h"
 #include "nvgt.h"
@@ -68,7 +69,7 @@ struct hashpoint_equals {
 	}
 };
 typedef std::unordered_map<hashpoint, void*, hashpoint_hash, hashpoint_equals> hashpoint_map;
-typedef std::unordered_map<hashpoint, float, hashpoint_hash, hashpoint_equals> hashpoint_float_map;
+typedef ankerl::unordered_dense::map<hashpoint, float, hashpoint_hash, hashpoint_equals> hashpoint_float_map;
 class pathfinder : public micropather::Graph {
 	hashpoint_float_map difficulty_cache[11];
 	micropather::MicroPather* pf;
