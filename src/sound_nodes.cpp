@@ -35,14 +35,14 @@ static ma_result ma_effect_node_get_required_input_frame_count(ma_node* pNode, m
 	return MA_SUCCESS;
 }
 effect_node_impl::effect_node_impl(audio_engine* e, ma_uint8 input_channel_count, ma_uint8 output_channel_count, ma_uint8 input_bus_count, ma_uint8 output_bus_count, unsigned int flags) : n(make_unique<ma_effect_node>()), audio_node_impl(nullptr, e), vtable({&ma_effect_node_process_pcm_frames, &ma_effect_node_get_required_input_frame_count, input_bus_count, output_bus_count, flags}) {
-	if (!input_channel_count) input_channel_count = e->get_channels();
-	if (!output_channel_count) output_channel_count = e->get_channels();
+	if (!input_channel_count) input_channel_count = get_engine()->get_channels();
+	if (!output_channel_count) output_channel_count = get_engine()->get_channels();
 	ma_node_config cfg = ma_node_config_init();
 	vector<ma_uint32> channels_in(input_bus_count, input_channel_count), channels_out(output_bus_count, output_channel_count);
 	cfg.vtable          = &vtable;
 	if (input_bus_count > 0) cfg.pInputChannels  = &channels_in[0];
 	if (output_bus_count > 0) cfg.pOutputChannels = &channels_out[0];
-	if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*n)) != MA_SUCCESS) throw std::runtime_error("failed to create effect node");
+	if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*n)) != MA_SUCCESS) throw std::runtime_error("failed to create effect node");
 	n->node = this;
 	node = (ma_node_base*)&*n;
 }
@@ -229,7 +229,7 @@ class splitter_node_impl : public audio_node_impl, public virtual splitter_node 
 	public:
 	splitter_node_impl(audio_engine* e, int channels) : sn(make_unique<ma_splitter_node>()), audio_node_impl(nullptr, e) {
 		ma_splitter_node_config cfg = ma_splitter_node_config_init(channels);
-		if ((g_soundsystem_last_error = ma_splitter_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*sn)) != MA_SUCCESS) throw std::runtime_error("ma_splitter_node was not initialized");
+		if ((g_soundsystem_last_error = ma_splitter_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, &*sn)) != MA_SUCCESS) throw std::runtime_error("ma_splitter_node was not initialized");
 		node = (ma_node_base*)&*sn;
 	}
 	~splitter_node_impl() {
@@ -243,8 +243,8 @@ class low_pass_filter_node_impl : public audio_node_impl, public virtual low_pas
 	ma_lpf_node_config cfg;
 	public:
 	low_pass_filter_node_impl(double cutoff_frequency, int order, audio_engine* e) : fn(make_unique<ma_lpf_node>()), audio_node_impl(nullptr, e) {
-		cfg = ma_lpf_node_config_init(e->get_channels(), e->get_sample_rate(), cutoff_frequency, order);
-		if ((g_soundsystem_last_error = ma_lpf_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_low_pass_filter_node was not initialized");
+		cfg = ma_lpf_node_config_init(get_engine()->get_channels(), get_engine()->get_sample_rate(), cutoff_frequency, order);
+		if ((g_soundsystem_last_error = ma_lpf_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_low_pass_filter_node was not initialized");
 		node = (ma_node_base*)&*fn;
 	}
 	~low_pass_filter_node_impl() {
@@ -268,8 +268,8 @@ class high_pass_filter_node_impl : public audio_node_impl, public virtual high_p
 	ma_hpf_node_config cfg;
 	public:
 	high_pass_filter_node_impl(double cutoff_frequency, int order, audio_engine* e) : fn(make_unique<ma_hpf_node>()), audio_node_impl(nullptr, e) {
-		cfg = ma_hpf_node_config_init(e->get_channels(), e->get_sample_rate(), cutoff_frequency, order);
-		if ((g_soundsystem_last_error = ma_hpf_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_high_pass_filter_node was not initialized");
+		cfg = ma_hpf_node_config_init(get_engine()->get_channels(), get_engine()->get_sample_rate(), cutoff_frequency, order);
+		if ((g_soundsystem_last_error = ma_hpf_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_high_pass_filter_node was not initialized");
 		node = (ma_node_base*)&*fn;
 	}
 	~high_pass_filter_node_impl() {
@@ -293,8 +293,8 @@ class band_pass_filter_node_impl : public audio_node_impl, public virtual band_p
 	ma_bpf_node_config cfg;
 	public:
 	band_pass_filter_node_impl(double cutoff_frequency, int order, audio_engine* e) : fn(make_unique<ma_bpf_node>()), audio_node_impl(nullptr, e) {
-		cfg = ma_bpf_node_config_init(e->get_channels(), e->get_sample_rate(), cutoff_frequency, order);
-		if ((g_soundsystem_last_error = ma_bpf_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_band_pass_filter_node was not initialized");
+		cfg = ma_bpf_node_config_init(get_engine()->get_channels(), get_engine()->get_sample_rate(), cutoff_frequency, order);
+		if ((g_soundsystem_last_error = ma_bpf_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_band_pass_filter_node was not initialized");
 		node = (ma_node_base*)&*fn;
 	}
 	~band_pass_filter_node_impl() {
@@ -318,8 +318,8 @@ class notch_filter_node_impl : public audio_node_impl, public virtual notch_filt
 	ma_notch_node_config cfg;
 	public:
 	notch_filter_node_impl(double q, double frequency, audio_engine* e) : fn(make_unique<ma_notch_node>()), audio_node_impl(nullptr, e) {
-		cfg = ma_notch_node_config_init(e->get_channels(), e->get_sample_rate(), q, frequency);
-		if ((g_soundsystem_last_error = ma_notch_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_notch_filter_node was not initialized");
+		cfg = ma_notch_node_config_init(get_engine()->get_channels(), get_engine()->get_sample_rate(), q, frequency);
+		if ((g_soundsystem_last_error = ma_notch_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_notch_filter_node was not initialized");
 		node = (ma_node_base*)&*fn;
 	}
 	~notch_filter_node_impl() {
@@ -343,8 +343,8 @@ class peak_filter_node_impl : public audio_node_impl, public virtual peak_filter
 	ma_peak_node_config cfg;
 	public:
 	peak_filter_node_impl(double gain_db, double q, double frequency, audio_engine* e) : fn(make_unique<ma_peak_node>()), audio_node_impl(nullptr, e) {
-		cfg = ma_peak_node_config_init(e->get_channels(), e->get_sample_rate(), gain_db, q, frequency);
-		if ((g_soundsystem_last_error = ma_peak_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_peak_filter_node was not initialized");
+		cfg = ma_peak_node_config_init(get_engine()->get_channels(), get_engine()->get_sample_rate(), gain_db, q, frequency);
+		if ((g_soundsystem_last_error = ma_peak_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_peak_filter_node was not initialized");
 		node = (ma_node_base*)&*fn;
 	}
 	~peak_filter_node_impl() {
@@ -373,8 +373,8 @@ class low_shelf_filter_node_impl : public audio_node_impl, public virtual low_sh
 	ma_loshelf_node_config cfg;
 	public:
 	low_shelf_filter_node_impl(double gain_db, double q, double frequency, audio_engine* e) : fn(make_unique<ma_loshelf_node>()), audio_node_impl(nullptr, e) {
-		cfg = ma_loshelf_node_config_init(e->get_channels(), e->get_sample_rate(), gain_db, q, frequency);
-		if ((g_soundsystem_last_error = ma_loshelf_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_low_shelf_filter_node was not initialized");
+		cfg = ma_loshelf_node_config_init(get_engine()->get_channels(), get_engine()->get_sample_rate(), gain_db, q, frequency);
+		if ((g_soundsystem_last_error = ma_loshelf_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_low_shelf_filter_node was not initialized");
 		node = (ma_node_base*)&*fn;
 	}
 	~low_shelf_filter_node_impl() {
@@ -403,8 +403,8 @@ class high_shelf_filter_node_impl : public audio_node_impl, public virtual high_
 	ma_hishelf_node_config cfg;
 	public:
 	high_shelf_filter_node_impl(double gain_db, double q, double frequency, audio_engine* e) : fn(make_unique<ma_hishelf_node>()), audio_node_impl(nullptr, e) {
-		cfg = ma_hishelf_node_config_init(e->get_channels(), e->get_sample_rate(), gain_db, q, frequency);
-		if ((g_soundsystem_last_error = ma_hishelf_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_high_shelf_filter_node was not initialized");
+		cfg = ma_hishelf_node_config_init(get_engine()->get_channels(), get_engine()->get_sample_rate(), gain_db, q, frequency);
+		if ((g_soundsystem_last_error = ma_hishelf_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, &*fn)) != MA_SUCCESS) throw std::runtime_error("ma_high_shelf_filter_node was not initialized");
 		node = (ma_node_base*)&*fn;
 	}
 	~high_shelf_filter_node_impl() {
@@ -432,8 +432,8 @@ class delay_node_impl : public audio_node_impl, public virtual delay_node {
 	unique_ptr<ma_delay_node> dn;
 	public:
 	delay_node_impl(unsigned int delay_in_frames, float decay, audio_engine* e) : dn(make_unique<ma_delay_node>()), audio_node_impl(nullptr, e) {
-		ma_delay_node_config cfg = ma_delay_node_config_init(e->get_channels(), e->get_sample_rate(), delay_in_frames, decay);
-		if ((g_soundsystem_last_error = ma_delay_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*dn)) != MA_SUCCESS) throw std::runtime_error("ma_delay_node was not initialized");
+		ma_delay_node_config cfg = ma_delay_node_config_init(get_engine()->get_channels(), get_engine()->get_sample_rate(), delay_in_frames, decay);
+		if ((g_soundsystem_last_error = ma_delay_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, &*dn)) != MA_SUCCESS) throw std::runtime_error("ma_delay_node was not initialized");
 		node = (ma_node_base*)&*dn;
 	}
 	~delay_node_impl() {
@@ -452,8 +452,8 @@ class freeverb_node_impl : public audio_node_impl, public virtual freeverb_node 
 	unique_ptr<ma_reverb_node> rn;
 	public:
 	freeverb_node_impl(audio_engine* e) : rn(make_unique<ma_reverb_node>()), audio_node_impl(nullptr, e) {
-		ma_reverb_node_config cfg = ma_reverb_node_config_init(e->get_channels(), e->get_sample_rate());
-		if ((g_soundsystem_last_error = ma_reverb_node_init(ma_engine_get_node_graph(e->get_ma_engine()), &cfg, nullptr, &*rn)) != MA_SUCCESS) throw std::runtime_error("ma_reverb_node was not initialized");
+		ma_reverb_node_config cfg = ma_reverb_node_config_init(get_engine()->get_channels(), get_engine()->get_sample_rate());
+		if ((g_soundsystem_last_error = ma_reverb_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, &*rn)) != MA_SUCCESS) throw std::runtime_error("ma_reverb_node was not initialized");
 		node = (ma_node_base*)&*rn;
 	}
 	~freeverb_node_impl() {
@@ -486,7 +486,7 @@ public:
 		if (reverb) {
 			attach_output_bus(0, reverb, 0); // reverb is owned automatically via audio_node_impl's output_connections tracking.
 			if (output_mixer) reverb->attach_output_bus(0, output_mixer, 0);
-			else reverb->attach_output_bus(0, e->get_endpoint(), 0);
+			else reverb->attach_output_bus(0, get_engine()->get_endpoint(), 0);
 		}
 	}
 	~reverb3d_impl() {
@@ -573,11 +573,11 @@ class plugin_node_impl : public audio_node_impl, public virtual plugin_node {
 	plugin_node_impl(audio_plugin_node_interface* impl, unsigned char input_bus_count, unsigned char output_bus_count, unsigned int flags, audio_engine* engine) : pn(make_unique<ma_plugin_node>()), audio_node_impl(nullptr, engine), impl(impl) {
 		vtable = { ma_plugin_node_process_pcm_frames, nullptr, input_bus_count, output_bus_count, flags };
 		ma_node_config cfg = ma_node_config_init();
-		ma_uint32 channels = engine->get_channels();
+		ma_uint32 channels = get_engine()->get_channels();
 		cfg.vtable          = &vtable;
 		cfg.pInputChannels  = &channels;
 		cfg.pOutputChannels = &channels;
-		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(engine->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*pn)) != MA_SUCCESS) throw std::runtime_error("failed to create plugin_node");
+		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*pn)) != MA_SUCCESS) throw std::runtime_error("failed to create plugin_node");
 		node = (ma_node_base*)&*pn;
 	}
 	~plugin_node_impl() {
