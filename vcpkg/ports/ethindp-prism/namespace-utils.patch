@@ -21,7 +21,7 @@ index 5cdd091..b4c8e6d 100644
 +
 +} // namespace prism::detail
 diff --git a/source/utils.h b/source/utils.h
-index 34055c2..a86d3e8 100644
+index 34055c2..8e62335 100644
 --- a/source/utils.h
 +++ b/source/utils.h
 @@ -26,6 +26,8 @@
@@ -40,11 +40,11 @@ index 34055c2..a86d3e8 100644
 +
 +} // namespace prism::detail
 +
-+using prism::detail::TrimParams;
-+using prism::detail::TrimView;
-+using prism::detail::range_convert;
-+using prism::detail::range_convert_midpoint;
 +using prism::detail::exp_range_convert;
 +using prism::detail::exp_range_convert_inv;
++using prism::detail::range_convert;
++using prism::detail::range_convert_midpoint;
 +using prism::detail::trim_silence_rms_gate;
 +using prism::detail::trim_silence_rms_gate_inplace;
++using prism::detail::TrimParams;
++using prism::detail::TrimView;
