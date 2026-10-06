@@ -1,10 +1,10 @@
 # opIndex
 Set or retrieve the value of a dictionary by its key.
 
-`int opIndex(* const string &in key);`
+`int opIndex(const string&in key);`
 
 ## Arguments:
-* const string &in key: the key to use.
+* const string&in key: the key to use.
 
 ## Remarks:
 If the key doesn't exist in the dictionary, it will be created, similar to using the set method.

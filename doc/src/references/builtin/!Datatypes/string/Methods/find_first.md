@@ -1,7 +1,7 @@
 # find_first
 Find the position of a substring from within a string.
 
-`int string::find_first(const string &in search, uint start = 0);`
+`int string::find_first(const string&in search, uint start = 0);`
 
 ## Arguments:
 * search: The string to search for.

@@ -1,6 +1,6 @@
 /**
 	Overloads the == operator, checking if two arrays are equal.
-	bool array::opEquals(const array &in other);
+	bool array::opEquals(const array&in other);
 	## Arguments:
 		* const array&in other: the array to compare.
 */
