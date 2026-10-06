@@ -1,0 +1,97 @@
+diff --git a/sdk/angelscript/source/as_string_util.cpp b/sdk/angelscript/source/as_string_util.cpp
+index 11374ac..dd54df4 100644
+--- a/sdk/angelscript/source/as_string_util.cpp
++++ b/sdk/angelscript/source/as_string_util.cpp
+@@ -91,14 +91,31 @@ double asStringScanDouble(const char *string, size_t *numScanned)
+ 	bool negativeExponent = false;
+ 	int c = 0;
+ 
+-	// The tokenizer separates the sign from the number in   
++	// Accumulating the fraction digit by digit compounds rounding errors (0.3 came out
++	// as 0.30000000000000004), so the digits are also collected as an integer mantissa.
++	// When it fits in 53 bits and the decimal exponent is within 22, a single multiply or
++	// divide by an exact power of ten gives the correctly rounded result. Trailing zeros
++	// in the fraction are deferred since they would otherwise overflow the mantissa.
++	const asQWORD maxExactMantissa = (asQWORD(1) << 53) - 1;
++	asQWORD mantissa = 0;
++	int mantissaExponent = 0;
++	int pendingZeros = 0;
++	bool exact = true;
++
++	// The tokenizer separates the sign from the number in
+ 	// two tokens so we'll never have a sign to parse here
+ 
+ 	// Parse the integer value
+ 	for( ;; )
+ 	{
+ 		if (string[c] >= '0' && string[c] <= '9')
++		{
+ 			value = value * 10 + double(string[c] - '0');
++			if( exact && mantissa <= (maxExactMantissa - (string[c] - '0')) / 10 )
++				mantissa = mantissa * 10 + (string[c] - '0');
++			else
++				exact = false;
++		}
+ 		else if (string[c] == '\'' && string[c + 1] && string[c + 1] >= '0' && string[c + 1] <= '9')
+ 			; // skip separators
+ 		else 
+@@ -115,7 +132,31 @@ double asStringScanDouble(const char *string, size_t *numScanned)
+ 		for( ;; )
+ 		{
+ 			if( string[c] >= '0' && string[c] <= '9' )
++			{
+ 				value += fraction * double(string[c] - '0');
++				if( string[c] == '0' )
++					pendingZeros++;
++				else
++				{
++					for( ; exact && pendingZeros > 0; pendingZeros-- )
++					{
++						if( mantissa <= maxExactMantissa / 10 )
++						{
++							mantissa *= 10;
++							mantissaExponent--;
++						}
++						else
++							exact = false;
++					}
++					if( exact && mantissa <= (maxExactMantissa - (string[c] - '0')) / 10 )
++					{
++						mantissa = mantissa * 10 + (string[c] - '0');
++						mantissaExponent--;
++					}
++					else
++						exact = false;
++				}
++			}
+ 			else if (string[c] == '\'' && string[c + 1] && string[c + 1] >= '0' && string[c + 1] <= '9')
+ 			{
+ 				// skip separators
+@@ -157,6 +198,17 @@ double asStringScanDouble(const char *string, size_t *numScanned)
+ 		}
+ 	}
+ 
++	if( numScanned )
++		*numScanned = c;
++
++	if( exact && exponent <= 22 )
++	{
++		static const double powersOfTen[] = {1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22};
++		int totalExponent = mantissaExponent + (negativeExponent ? -exponent : exponent);
++		if( totalExponent >= -22 && totalExponent <= 22 )
++			return totalExponent < 0 ? double(mantissa) / powersOfTen[-totalExponent] : double(mantissa) * powersOfTen[totalExponent];
++	}
++
+ 	if( exponent )
+ 	{
+ 		if( negativeExponent )
+@@ -164,9 +216,6 @@ double asStringScanDouble(const char *string, size_t *numScanned)
+ 		value *= pow(10.0, exponent);
+ 	}
+ 
+-	if( numScanned )
+-		*numScanned = c;
+-
+ 	return value;
+ }
+ 
