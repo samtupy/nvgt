@@ -88,6 +88,7 @@ int message_box(const std::string& title, const std::string& text, const std::ve
 	return ret;
 }
 int message_box_script(const std::string& title, const std::string& text, CScriptArray* buttons, unsigned int flags) {
+	if (!buttons) return -1;
 	std::vector<std::string> v_buttons(buttons->GetSize());
 	for (unsigned int i = 0; i < buttons->GetSize(); i++) v_buttons[i] = (*(std::string*)(buttons->At(i)));
 	return message_box(title, text, v_buttons, flags);
