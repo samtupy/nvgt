@@ -211,7 +211,8 @@ class nvgt_compilation_output_impl : public virtual nvgt_compilation_output {
 	Mutex status_text_mtx;
 	void error(const exception& exc, const std::string& error) {
 		error_text = error;
-		throw;
+		if (std::current_exception()) throw;
+		throw Exception(error, exc.what());
 	}
 public:
 	nvgt_compilation_output_impl(const string& input_file) : input_file(input_file), platform(g_platform), stub(g_stub), stub_size(0), config(Util::Application::instance().config()) {}
@@ -463,7 +464,7 @@ protected:
 		bw.writeRaw("\xCA\xFE");
 		if (bundle_mode) {
 			fs.close();
-			fs.open(Path(workplace.path()).append("Contents/resources/exec").toString(), std::ios::out | std::ios::trunc); // App bundles must store their embedded packs and bytecode as a resource so the app bundle can be signed.
+			fs.open(Path(workplace.path()).append("Contents/Resources/exec").toString(), std::ios::out | std::ios::trunc); // App bundles must store their embedded packs and bytecode as a resource so the app bundle can be signed.
 		}
 	}
 	void finalize_output_stream() override {
