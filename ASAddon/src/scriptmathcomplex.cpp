@@ -179,21 +179,21 @@ static void RegisterScriptMathComplex_Native(asIScriptEngine *engine)
 
 	// Register the constructors
 	r = engine->RegisterObjectBehaviour("complex", asBEHAVE_CONSTRUCT,      "void f()",                             asFUNCTION(ComplexDefaultConstructor), asCALL_CDECL_OBJLAST); assert( r >= 0 );
-	r = engine->RegisterObjectBehaviour("complex", asBEHAVE_CONSTRUCT,      "void f(const complex &in)",            asFUNCTION(ComplexCopyConstructor), asCALL_CDECL_OBJLAST); assert( r >= 0 );
-	r = engine->RegisterObjectBehaviour("complex", asBEHAVE_CONSTRUCT,      "void f(float)",                        asFUNCTION(ComplexConvConstructor), asCALL_CDECL_OBJLAST); assert( r >= 0 );
-	r = engine->RegisterObjectBehaviour("complex", asBEHAVE_CONSTRUCT,      "void f(float, float)",                 asFUNCTION(ComplexInitConstructor), asCALL_CDECL_OBJLAST); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("complex", asBEHAVE_CONSTRUCT,      "void f(const complex &in other)",            asFUNCTION(ComplexCopyConstructor), asCALL_CDECL_OBJLAST); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("complex", asBEHAVE_CONSTRUCT,      "void f(float real)",                        asFUNCTION(ComplexConvConstructor), asCALL_CDECL_OBJLAST); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("complex", asBEHAVE_CONSTRUCT,      "void f(float real, float imaginary)",                 asFUNCTION(ComplexInitConstructor), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 	r = engine->RegisterObjectBehaviour("complex", asBEHAVE_LIST_CONSTRUCT, "void f(const int &in) {float, float}", asFUNCTION(ComplexListConstructor), asCALL_CDECL_OBJLAST); assert( r >= 0 );
 
 	// Register the operator overloads
-	r = engine->RegisterObjectMethod("complex", "complex &opAddAssign(const complex &in)", asMETHODPR(Complex, operator+=, (const Complex &), Complex&), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("complex", "complex &opSubAssign(const complex &in)", asMETHODPR(Complex, operator-=, (const Complex &), Complex&), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("complex", "complex &opMulAssign(const complex &in)", asMETHODPR(Complex, operator*=, (const Complex &), Complex&), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("complex", "complex &opDivAssign(const complex &in)", asMETHODPR(Complex, operator/=, (const Complex &), Complex&), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("complex", "bool opEquals(const complex &in) const", asMETHODPR(Complex, operator==, (const Complex &) const, bool), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("complex", "complex opAdd(const complex &in) const", asMETHODPR(Complex, operator+, (const Complex &) const, Complex), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("complex", "complex opSub(const complex &in) const", asMETHODPR(Complex, operator-, (const Complex &) const, Complex), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("complex", "complex opMul(const complex &in) const", asMETHODPR(Complex, operator*, (const Complex &) const, Complex), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("complex", "complex opDiv(const complex &in) const", asMETHODPR(Complex, operator/, (const Complex &) const, Complex), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("complex", "complex &opAddAssign(const complex &in other)", asMETHODPR(Complex, operator+=, (const Complex &), Complex&), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("complex", "complex &opSubAssign(const complex &in other)", asMETHODPR(Complex, operator-=, (const Complex &), Complex&), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("complex", "complex &opMulAssign(const complex &in other)", asMETHODPR(Complex, operator*=, (const Complex &), Complex&), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("complex", "complex &opDivAssign(const complex &in other)", asMETHODPR(Complex, operator/=, (const Complex &), Complex&), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("complex", "bool opEquals(const complex &in other) const", asMETHODPR(Complex, operator==, (const Complex &) const, bool), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("complex", "complex opAdd(const complex &in other) const", asMETHODPR(Complex, operator+, (const Complex &) const, Complex), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("complex", "complex opSub(const complex &in other) const", asMETHODPR(Complex, operator-, (const Complex &) const, Complex), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("complex", "complex opMul(const complex &in other) const", asMETHODPR(Complex, operator*, (const Complex &) const, Complex), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("complex", "complex opDiv(const complex &in other) const", asMETHODPR(Complex, operator/, (const Complex &) const, Complex), asCALL_THISCALL); assert( r >= 0 );
 
 	// Register the object methods
 	r = engine->RegisterObjectMethod("complex", "float abs() const", asMETHOD(Complex,length), asCALL_THISCALL); assert( r >= 0 );
@@ -201,8 +201,8 @@ static void RegisterScriptMathComplex_Native(asIScriptEngine *engine)
 	// Register the swizzle operators
 	r = engine->RegisterObjectMethod("complex", "complex get_ri() const property", asMETHOD(Complex, get_ri), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("complex", "complex get_ir() const property", asMETHOD(Complex, get_ir), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("complex", "void set_ri(const complex &in) property", asMETHOD(Complex, set_ri), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("complex", "void set_ir(const complex &in) property", asMETHOD(Complex, set_ir), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("complex", "void set_ri(const complex &in value) property", asMETHOD(Complex, set_ri), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("complex", "void set_ir(const complex &in value) property", asMETHOD(Complex, set_ir), asCALL_THISCALL); assert( r >= 0 );
 }
 
 void RegisterScriptMathComplex(asIScriptEngine *engine)

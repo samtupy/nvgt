@@ -229,9 +229,9 @@ static void RegisterScriptGrid_Native(asIScriptEngine *engine)
 	r = engine->RegisterObjectBehaviour("grid<T>", asBEHAVE_TEMPLATE_CALLBACK, "bool f(int&in, bool&out)", asFUNCTION(ScriptGridTemplateCallback), asCALL_CDECL); assert( r >= 0 );
 
 	// Templates receive the object type as the first parameter. To the script writer this is hidden
-	r = engine->RegisterObjectBehaviour("grid<T>", asBEHAVE_FACTORY, "grid<T>@ f(int&in)", asFUNCTIONPR(CScriptGrid::Create, (asITypeInfo*), CScriptGrid*), asCALL_CDECL); assert( r >= 0 );
-	r = engine->RegisterObjectBehaviour("grid<T>", asBEHAVE_FACTORY, "grid<T>@ f(int&in, uint, uint)", asFUNCTIONPR(CScriptGrid::Create, (asITypeInfo*, asUINT, asUINT), CScriptGrid*), asCALL_CDECL); assert( r >= 0 );
-	r = engine->RegisterObjectBehaviour("grid<T>", asBEHAVE_FACTORY, "grid<T>@ f(int&in, uint, uint, const T &in)", asFUNCTIONPR(CScriptGrid::Create, (asITypeInfo*, asUINT, asUINT, void *), CScriptGrid*), asCALL_CDECL); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("grid<T>", asBEHAVE_FACTORY, "grid<T>@ f(int&in type)", asFUNCTIONPR(CScriptGrid::Create, (asITypeInfo*), CScriptGrid*), asCALL_CDECL); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("grid<T>", asBEHAVE_FACTORY, "grid<T>@ f(int&in type, uint width, uint height)", asFUNCTIONPR(CScriptGrid::Create, (asITypeInfo*, asUINT, asUINT), CScriptGrid*), asCALL_CDECL); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("grid<T>", asBEHAVE_FACTORY, "grid<T>@ f(int&in type, uint width, uint height, const T &in value)", asFUNCTIONPR(CScriptGrid::Create, (asITypeInfo*, asUINT, asUINT, void *), CScriptGrid*), asCALL_CDECL); assert( r >= 0 );
 
 	// Register the factory that will be used for initialization lists
 	r = engine->RegisterObjectBehaviour("grid<T>", asBEHAVE_LIST_FACTORY, "grid<T>@ f(int&in type, int&in list) {repeat {repeat_same T}}", asFUNCTIONPR(CScriptGrid::Create, (asITypeInfo*, void*), CScriptGrid*), asCALL_CDECL); assert( r >= 0 );
@@ -241,8 +241,8 @@ static void RegisterScriptGrid_Native(asIScriptEngine *engine)
 	r = engine->RegisterObjectBehaviour("grid<T>", asBEHAVE_RELEASE, "void f()", asMETHOD(CScriptGrid,Release), asCALL_THISCALL); assert( r >= 0 );
 
 	// The index operator returns the template subtype
-	r = engine->RegisterObjectMethod("grid<T>", "T &opIndex(uint, uint)", asMETHODPR(CScriptGrid, At, (asUINT, asUINT), void*), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("grid<T>", "const T &opIndex(uint, uint) const", asMETHODPR(CScriptGrid, At, (asUINT, asUINT) const, const void*), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("grid<T>", "T &opIndex(uint x, uint y)", asMETHODPR(CScriptGrid, At, (asUINT, asUINT), void*), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("grid<T>", "const T &opIndex(uint x, uint y) const", asMETHODPR(CScriptGrid, At, (asUINT, asUINT) const, const void*), asCALL_THISCALL); assert( r >= 0 );
 
 	// Other methods
 	r = engine->RegisterObjectMethod("grid<T>", "void resize(uint width, uint height)", asMETHODPR(CScriptGrid, Resize, (asUINT, asUINT), void), asCALL_THISCALL); assert( r >= 0 );
