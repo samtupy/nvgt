@@ -282,8 +282,8 @@ std::string generate_system_fingerprint_legacy1(const std::string& identifier) {
 	if (cachedHash != nullptr && cachedIdentifier == identifier)
 		return *cachedHash;
 	std::stringstream stream;
-	unsigned short mac1;
-	unsigned short mac2;
+	unsigned short mac1 = 0;
+	unsigned short mac2 = 0;
 	getMacHash(mac1, mac2);
 	stream << mac1;
 	stream << mac2;

@@ -437,6 +437,10 @@ bool closeTo(double a, double b, double epsilon) {
 	return diff / (std::abs(a) + std::abs(b)) < epsilon;
 }
 
+template <class T> T scalbn_int64(T x, int64_t exp) {
+	return std::scalbln(x, long(std::clamp<int64_t>(exp, LONG_MIN, LONG_MAX)));
+}
+
 void RegisterScriptMath(asIScriptEngine *engine) {
 	compute_fp_characteristics();
 	using int8 = std::int8_t;
@@ -505,7 +509,7 @@ void RegisterScriptMath(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("float ldexp(float x, int exp)", asFUNCTIONPR(std::ldexp, (float, int), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float modf(float num, float& out iptr)", asFUNCTIONPR(std::modf, (float, float*), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float scalbn(float x, int exp)", asFUNCTIONPR(std::scalbn, (float, int), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float scalbn(float x, int64 exp)", asFUNCTIONPR(std::scalbln, (float, long), float), asCALL_CDECL);
+	engine->RegisterGlobalFunction("float scalbn(float x, int64 exp)", asFUNCTION(scalbn_int64<float>), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int ilogb(float x)", asFUNCTIONPR(std::ilogb, (float), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float logb(float x)", asFUNCTIONPR(std::logb, (float), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float nextafter(float from, float to)", asFUNCTIONPR(std::nextafter, (float, float), float), asCALL_CDECL);
@@ -570,7 +574,7 @@ void RegisterScriptMath(asIScriptEngine *engine) {
 	engine->RegisterGlobalFunction("double ldexp(double x, int exp)", asFUNCTIONPR(std::ldexp, (double, int), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double modf(double num, double& out iptr)", asFUNCTIONPR(std::modf, (double, double*), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double scalbn(double x, int exp)", asFUNCTIONPR(std::scalbn, (double, int), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double scalbn(double x, int64 exp)", asFUNCTIONPR(std::scalbln, (double, long), double), asCALL_CDECL);
+	engine->RegisterGlobalFunction("double scalbn(double x, int64 exp)", asFUNCTION(scalbn_int64<double>), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int ilogb(double x)", asFUNCTIONPR(std::ilogb, (double), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double logb(double x)", asFUNCTIONPR(std::logb, (double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double nextafter(double from, double to)", asFUNCTIONPR(std::nextafter, (double, double), double), asCALL_CDECL);
