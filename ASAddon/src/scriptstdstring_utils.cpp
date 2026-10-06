@@ -159,7 +159,7 @@ static string StringSlice(int start, int end, const string &str)
 		start = size + start;
 	if (end <= 0)
 		end = size + end;
-	if (end >= size)
+	if (end >= 0 && asUINT(end) >= size)
 		end = size;
 	int count = end - start;
 	if (start < 0 || count <= 0 || start >= size)
@@ -175,6 +175,8 @@ static string StringReplaceRange(asUINT start, int count, const string &replace,
 {
 	if (start >= str.size() || count < 1)
 		return str;
+	if (asUINT(count) > str.size() - start)
+		count = int(str.size() - start);
 	// Recreate the string so that the original stays in tact.
 	string ret(&str[0], start);
 	ret += replace;
@@ -474,7 +476,7 @@ void RegisterStdStringUtils(asIScriptEngine *engine)
 		assert(r >= 0);
 		r = engine->RegisterObjectMethod("string", "string replace(const string& in, const string& in, bool = true, uint = 0) const", asFUNCTION(StringReplace), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
-		r = engine->RegisterObjectMethod("string", "string& replace_this(const string& in, const string& in, bool = true, uint = 0) const", asFUNCTION(StringReplaceThis), asCALL_CDECL_OBJLAST);
+		r = engine->RegisterObjectMethod("string", "string& replace_this(const string& in, const string& in, bool = true, uint = 0)", asFUNCTION(StringReplaceThis), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
 		r = engine->RegisterObjectMethod("string", "string reverse_bytes() const", asFUNCTION(StringReverse), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
