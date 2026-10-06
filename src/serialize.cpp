@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -53,6 +54,14 @@ static asIScriptModule* current_module() {
 enum class value_tag : unsigned char {
 	boolean = 1, int8, uint8, int16, uint16, int32, uint32, int64, uint64, float32, float64,
 	string, dictionary, array, pod, json_object, json_array, name_value_collection, script_object
+};
+
+static thread_local int g_serialize_depth = 0;
+class serialize_depth_guard {
+public:
+	bool exceeded;
+	serialize_depth_guard() : exceeded(++g_serialize_depth > 128) {}
+	~serialize_depth_guard() { g_serialize_depth--; }
 };
 
 // Runs a registered/script function (which must return an object handle) through a pooled context. Only needed for the script_object contract below, everything else we can talk to directly in c++.
@@ -169,6 +178,8 @@ static bool write_value(Poco::BinaryWriter& w, const void* ref, int type_id) {
 		return true;
 	}
 	if (!(type_id & asTYPEID_MASK_OBJECT)) return false;
+	serialize_depth_guard depth;
+	if (depth.exceeded) return false;
 	bool is_handle = type_id & asTYPEID_OBJHANDLE;
 	void* obj = is_handle ? *(void**)ref : const_cast<void*>(ref);
 	bool is_null = is_handle && !obj;
@@ -230,6 +241,8 @@ using value_setter = std::function<void(void*, int)>;
 static CScriptDictionary* read_dictionary_body(Poco::BinaryReader& r, asIScriptModule* mod);
 static void read_array_body(Poco::BinaryReader& r, asIScriptModule* mod, CScriptArray* arr);
 static void read_value(Poco::BinaryReader& r, asIScriptModule* mod, const value_setter& set) {
+	serialize_depth_guard depth;
+	if (depth.exceeded) throw std::runtime_error("serialized data is nested too deeply");
 	unsigned char tag;
 	r >> tag;
 	switch ((value_tag)tag) {
@@ -253,6 +266,7 @@ static void read_value(Poco::BinaryReader& r, asIScriptModule* mod, const value_
 			std::string bytes;
 			r.readRaw(size, bytes);
 			asITypeInfo* ti = mod ? mod->GetTypeInfoByDecl(decl.c_str()) : nullptr;
+			if (ti && !(ti->GetFlags() & asOBJ_ENUM) && (ti->GetFlags() & (asOBJ_VALUE | asOBJ_POD)) != (asOBJ_VALUE | asOBJ_POD)) ti = nullptr;
 			if (ti && (asUINT)ti->GetSize() == size) set((void*)bytes.data(), ti->GetTypeId());
 			return;
 		}
@@ -276,8 +290,9 @@ static void read_value(Poco::BinaryReader& r, asIScriptModule* mod, const value_
 				if (arr_ti) { void* n = nullptr; int tid = arr_ti->GetTypeId() | asTYPEID_OBJHANDLE; set(&n, tid); }
 				return;
 			}
-			CScriptArray* arr = arr_ti ? CScriptArray::Create(arr_ti) : nullptr;
-			read_array_body(r, mod, arr);
+			std::unique_ptr<CScriptArray, void(*)(CScriptArray*)> guard(arr_ti ? CScriptArray::Create(arr_ti) : nullptr, [](CScriptArray* a) { a->Release(); });
+			read_array_body(r, mod, guard.get());
+			CScriptArray* arr = guard.release();
 			if (arr) {
 				int tid = arr_ti->GetTypeId() | asTYPEID_OBJHANDLE;
 				set(&arr, tid);
@@ -318,13 +333,14 @@ static void read_value(Poco::BinaryReader& r, asIScriptModule* mod, const value_
 			if (is_null) { if (ti) { void* n = nullptr; int tid = ti->GetTypeId() | asTYPEID_OBJHANDLE; set(&n, tid); } return; }
 			Poco::UInt32 count = 0;
 			r >> count;
-			Poco::Net::NameValueCollection* nvc = new (angelscript_refcounted_create<Poco::Net::NameValueCollection>()) Poco::Net::NameValueCollection();
+			std::unique_ptr<Poco::Net::NameValueCollection, void(*)(Poco::Net::NameValueCollection*)> guard(new (angelscript_refcounted_create<Poco::Net::NameValueCollection>()) Poco::Net::NameValueCollection(), angelscript_refcounted_release<Poco::Net::NameValueCollection>);
 			for (Poco::UInt32 i = 0; i < count; i++) {
 				std::string name, value;
 				r >> name;
 				r >> value;
-				nvc->add(name, value);
+				guard->add(name, value);
 			}
+			Poco::Net::NameValueCollection* nvc = guard.release();
 			if (ti) { void* p = nvc; set(&p, ti->GetTypeId() | asTYPEID_OBJHANDLE); }
 			angelscript_refcounted_release<Poco::Net::NameValueCollection>(nvc);
 			return;
@@ -356,7 +372,7 @@ static void read_value(Poco::BinaryReader& r, asIScriptModule* mod, const value_
 	}
 }
 static CScriptDictionary* read_dictionary_body(Poco::BinaryReader& r, asIScriptModule* mod) {
-	CScriptDictionary* dict = CScriptDictionary::Create(g_ScriptEngine);
+	std::unique_ptr<CScriptDictionary, void(*)(CScriptDictionary*)> dict(CScriptDictionary::Create(g_ScriptEngine), [](CScriptDictionary* d) { d->Release(); });
 	Poco::UInt32 count = 0;
 	r >> count;
 	for (Poco::UInt32 i = 0; i < count; i++) {
@@ -364,14 +380,20 @@ static CScriptDictionary* read_dictionary_body(Poco::BinaryReader& r, asIScriptM
 		r >> key;
 		read_value(r, mod, [&](void* v, int t) { dict->Set(key, v, t); });
 	}
-	return dict;
+	return dict.release();
 }
 static void read_array_body(Poco::BinaryReader& r, asIScriptModule* mod, CScriptArray* arr) {
 	Poco::UInt32 count = 0;
 	r >> count;
 	if (arr) arr->Resize(count);
-	for (Poco::UInt32 i = 0; i < count; i++)
-		read_value(r, mod, [&](void* v, int) { if (arr) arr->SetValue(i, v); });
+	for (Poco::UInt32 i = 0; i < count; i++) {
+		read_value(r, mod, [&](void* v, int t) {
+			if (!arr) return;
+			int elem_type = arr->GetElementTypeId();
+			if (t == elem_type) arr->SetValue(i, v);
+			else if (t == (elem_type | asTYPEID_OBJHANDLE) && *(void**)v) arr->SetValue(i, *(void**)v);
+		});
+	}
 }
 
 // Cleaned up but format-compatible reimplementation of the pre-2025 dictionary format (bool/int64/double/string only, keyed on a 1 byte type tag). Bounds every read against the remaining buffer instead of trusting embedded lengths, since that trust is what made the original implementation crash-prone on truncated or malformed input.
