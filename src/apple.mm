@@ -404,6 +404,7 @@ void voice_over_speech_shutdown() {
 	speech_new_event.set();
 }
 
+#if TARGET_OS_IOS
 bool screen_reader_load() { return true; }
 void screen_reader_unload() { voice_over_speech_shutdown(); }
 std::string screen_reader_detect() { return voice_over_is_running() ? "VoiceOver" : ""; }
@@ -414,6 +415,7 @@ bool screen_reader_output(const std::string& text, bool interrupt) { return voic
 bool screen_reader_speak(const std::string& text, bool interrupt) { return voice_over_speak(text, interrupt); }
 bool screen_reader_braille(const std::string& text) { return false; }
 bool screen_reader_silence() { return voice_over_speak("", true); }
+#endif
 // The following code was originally taken from https://github.com/hammerspoon/hammerspoon under an MIT license, but has been heavily trimmed/modified for our simpler needs and basically consists of system API calls. It was then run through Claude to create the IOS version.
 #if !TARGET_OS_IOS
 std::string apple_input_box(const std::string& title, const std::string& message, const std::string& default_value, bool secure, bool readonly) {
