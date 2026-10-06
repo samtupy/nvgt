@@ -73,13 +73,16 @@ void timer_queue_item::execute() {
 	}
 	ctx->SetArgObject(0, &id);
 	ctx->SetArgObject(1, &callback_data);
+	parent->executing_timers.insert(this);
 	int xr = ctx->Execute();
+	parent->executing_timers.erase(this);
 	int ms = 0;
 	if (xr == asEXECUTION_FINISHED) ms = ctx->GetReturnDWord();
 	else if (!is_scheduled || xr == asEXECUTION_EXCEPTION) repeating = false;
 	if (repeating && ms < 1) ms = timeout;
 	if (new_context) g_ScriptEngine->ReturnContext(ctx);
 	else ctx->PopState();
+	if (!parent->owns(this)) return;
 	if (!is_scheduled) {
 		if (ms > 0) {
 			parent->schedule(this, ms);
@@ -100,12 +103,22 @@ void timer_queue::release() {
 }
 void timer_queue::reset() {
 	for (auto it = timer_objects.begin(); it != timer_objects.end(); it++) {
-		if (it->second->callback) it->second->callback->Release();
 		if (it->second->is_scheduled) it->second->cancel();
-		delete it->second;
+		deleting_timers.insert(it->second);
 	}
 	timer_objects.clear();
 	flush();
+}
+void timer_queue::purge_deleting_timers() {
+	for (auto it = deleting_timers.begin(); it != deleting_timers.end();) {
+		if (executing_timers.contains(*it)) {
+			it++;
+			continue;
+		}
+		if ((*it)->callback) (*it)->callback->Release();
+		delete *it;
+		it = deleting_timers.erase(it);
+	}
 }
 CScriptArray* timer_queue::list_timers() {
 	asIScriptContext *context = asGetActiveContext();
@@ -182,19 +195,11 @@ bool timer_queue::erase(const std::string &id) {
 	return true;
 }
 void timer_queue::flush() {
-	for (auto i : deleting_timers) {
-		if (i->callback) i->callback->Release();
-		delete i;
-	}
-	deleting_timers.clear();
+	purge_deleting_timers();
 	last_looped = ticks();
 }
 bool timer_queue::loop(int max_timers, int max_catchup) {
-	for (auto i : deleting_timers) {
-		if (i->callback) i->callback->Release();
-		delete i;
-	}
-	deleting_timers.clear();
+	purge_deleting_timers();
 	uint64_t t = !open_tick ? ticks() - last_looped : 0;
 	if (t > max_catchup) t = max_catchup;
 	if (!open_tick && t <= 0) return true;
@@ -270,7 +275,7 @@ timer::timer(bool secure) : value(microticks(secure)), accuracy(timer_default_ac
 timer::timer(int64_t initial_value, bool secure) : value(int64_t(microticks(secure)) - initial_value * timer_default_accuracy), accuracy(timer_default_accuracy), paused(false), secure(secure) {}
 timer::timer(int64_t initial_value, uint64_t initial_accuracy, bool secure) : value(int64_t(microticks(secure)) - initial_value * initial_accuracy), accuracy(initial_accuracy), paused(false), secure(secure) {}
 int64_t timer::get_elapsed() const {
-	return int64_t(paused ? value : microticks(secure) - value) / int64_t(accuracy);
+	return int64_t(paused ? value : microticks(secure) - value) / int64_t(accuracy ? accuracy : 1);
 }
 bool timer::has_elapsed(int64_t value) const {
 	return get_elapsed() >= value;
@@ -353,6 +358,9 @@ template <class T, typename O> int timestuff_opCmp(T *self, O other) {
 // Assigns one of the datetime types to a new version of itself E. the current date and time.
 template <class T> void timestuff_reset(T *obj) {
 	(*obj) = T();
+}
+DateTime* calendar_get_utc(const LocalDateTime* obj) {
+	return new (angelscript_refcounted_create<DateTime>()) DateTime(obj->utc());
 }
 /**
  * Additional calendar methods and properties for BGT compatibility.
@@ -550,7 +558,7 @@ DateTime* parse_datetime_wrapper1(const std::string &fmt, const std::string &str
 		return nullptr;
 	}
 	try {
-		return new DateTime(DateTimeParser::parse(fmt, str, tzd));
+		return angelscript_refcounted_factory<DateTime>(DateTimeParser::parse(fmt, str, tzd));
 	} catch (const Poco::Exception& e) {
 		asGetActiveContext()->SetException(e.displayText().c_str());
 		return nullptr;
@@ -563,7 +571,7 @@ DateTime* parse_datetime_wrapper2(const std::string &str, int& tzd) {
 		return nullptr;
 	}
 	try {
-		return new DateTime(DateTimeParser::parse(str, tzd));
+		return angelscript_refcounted_factory<DateTime>(DateTimeParser::parse(str, tzd));
 	} catch (const Poco::Exception& e) {
 		asGetActiveContext()->SetException(e.displayText().c_str());
 		return nullptr;
@@ -574,7 +582,7 @@ DateTime* parse_datetime_wrapper2(const std::string &str, int& tzd) {
  * Registers the above extensions with Angelscript.
 */
 #define register_add_units(x) engine->RegisterObjectMethod(classname.c_str(), "bool add_" #x "(int32 amount)", asFUNCTION(add_##x<t>), asCALL_CDECL_OBJFIRST);
-#define register_diff_units(r, x) engine->RegisterObjectMethod(classname.c_str(), format(#r " diff_" #x "(%s@ other)", classname).c_str(), asFUNCTION(diff_##x<t>), asCALL_CDECL_OBJFIRST);
+#define register_diff_units(r, x) engine->RegisterObjectMethod(classname.c_str(), format(#r " diff_" #x "(const %s&in other)", classname).c_str(), asFUNCTION(diff_##x<t>), asCALL_CDECL_OBJFIRST);
 
 template <class t> void register_date_time_extensions(asIScriptEngine *engine, std::string classname) {
 	engine->RegisterObjectMethod(classname.c_str(), "string get_month_name() const property", asFUNCTION(get_month_name), asCALL_CDECL_OBJFIRST);
@@ -766,8 +774,8 @@ void RegisterScriptTimestuffCore(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("datetime", "int64 get_UTC_time() const property", asMETHOD(DateTime, utcTime), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "bool opEquals(const datetime&in) const", asMETHOD(DateTime, operator==), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "int opCmp(const datetime&in) const", asFUNCTION((timestuff_opCmp<DateTime, const DateTime&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("datetime", "datetime@ opAdd(const timespan&in) const", asMETHODPR(DateTime, operator+, (const Timespan&) const, DateTime), asCALL_THISCALL);
-	engine->RegisterObjectMethod("datetime", "datetime@ opSub(const timespan&in) const", asMETHODPR(DateTime, operator-, (const Timespan&) const, DateTime), asCALL_THISCALL);
+	engine->RegisterObjectMethod("datetime", "datetime@ opAdd(const timespan&in) const", asFUNCTION((angelscript_refcounted_duplicating_method < DateTime, static_cast<DateTime (DateTime::*)(const Timespan&) const>(&DateTime::operator+), const Timespan& >)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("datetime", "datetime@ opSub(const timespan&in) const", asFUNCTION((angelscript_refcounted_duplicating_method < DateTime, static_cast<DateTime (DateTime::*)(const Timespan&) const>(&DateTime::operator-), const Timespan& >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datetime", "timespan opSub(const datetime&in) const", asMETHODPR(DateTime, operator-, (const DateTime&) const, Timespan), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "datetime& opAddAssign(const timespan&in)", asMETHODPR(DateTime, operator+=, (const Timespan&), DateTime&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("datetime", "datetime& opSubAssign(const timespan&in)", asMETHODPR(DateTime, operator-=, (const Timespan&), DateTime&), asCALL_THISCALL);
@@ -802,7 +810,7 @@ void RegisterScriptTimestuffCore(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("calendar", "int get_microsecond() const property", asMETHOD(LocalDateTime, microsecond), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "double get_julian_day() const property", asMETHOD(LocalDateTime, julianDay), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "int get_tzd() const property", asMETHOD(LocalDateTime, tzd), asCALL_THISCALL);
-	engine->RegisterObjectMethod("calendar", "datetime@ get_UTC() const property", asMETHOD(LocalDateTime, utc), asCALL_THISCALL);
+	engine->RegisterObjectMethod("calendar", "datetime@ get_UTC() const property", asFUNCTION(calendar_get_utc), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("calendar", "timestamp get_timestamp() const property", asMETHOD(LocalDateTime, timestamp), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "int64 get_UTC_time() const property", asMETHOD(LocalDateTime, utcTime), asCALL_THISCALL);
 	engine->RegisterObjectMethod("calendar", "bool opEquals(const calendar&in) const", asMETHOD(LocalDateTime, operator==), asCALL_THISCALL);

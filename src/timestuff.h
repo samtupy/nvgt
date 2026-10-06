@@ -44,8 +44,14 @@ class timer_queue {
 	uint64_t last_looped;
 	bool open_tick;
 	int RefCount;
+	void purge_deleting_timers();
 public:
 	std::string failures;
+	std::unordered_set<timer_queue_item*> executing_timers;
+	bool owns(timer_queue_item* t) {
+		auto it = timer_objects.find(t->id);
+		return it != timer_objects.end() && it->second == t;
+	}
 	timer_queue();
 	void add_ref();
 	void release();
