@@ -32,6 +32,8 @@ class chacha_ostreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_tr
 	uint8_t key[32];
 	uint8_t nonce[24];
 	uint8_t work[64]; // Will contain the most recent block of cyphertext.
+	uint8_t keystream[64]; // Keystream of a partially written block, so a flush in the middle of a block doesn't desync the decryptor.
+	int keystream_pos;
 	uint64_t counter;
 	bool owns_sink;
 
