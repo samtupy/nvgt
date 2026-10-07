@@ -1,0 +1,26 @@
+diff --git a/source/backends/pc_talker.cpp b/source/backends/pc_talker.cpp
+index a916653..b66a627 100644
+--- a/source/backends/pc_talker.cpp
++++ b/source/backends/pc_talker.cpp
+@@ -163,7 +163,7 @@ public:
+ 
+ class PCTalkerBackend final : public TextToSpeechBackend {
+ private:
+-  std::atomic_unsigned_lock_free braille_context;
++  std::atomic<ULONGLONG> braille_context;
+   std::atomic_flag initialized;
+   BrailleMarshaller braille_marshaller;
+   const PcTalker *api = nullptr;
+diff --git a/source/frozen_registry.h b/source/frozen_registry.h
+index 7bc9536..3a7fe49 100644
+--- a/source/frozen_registry.h
++++ b/source/frozen_registry.h
+@@ -53,7 +53,7 @@ private:
+   [[nodiscard]] Entry *find(BackendId id) noexcept;
+   [[nodiscard]] Entry *find(std::string_view name) noexcept;
+   [[nodiscard]] std::shared_ptr<TextToSpeechBackend> acquire_entry(Entry *e);
+-  std::atomic_unsigned_lock_free refcount;
++  std::atomic<unsigned> refcount;
+   std::vector<Entry> entries;
+   mutable std::shared_mutex cache_mutex;
+ };

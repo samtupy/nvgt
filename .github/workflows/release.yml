@@ -35,7 +35,7 @@ jobs:
         retention-days: 1
 
   mac_build:
-    runs-on: macos-14
+    runs-on: macos-15
     needs: generate_config
     steps:
     - uses: actions/checkout@v5

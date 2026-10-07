@@ -133,7 +133,7 @@ elif env["NVGT_TARGET"] in ("macos", "ios"):
 	env.Append(FRAMEWORKS = ["AudioToolbox", "AVFoundation", "CoreAudio", "CoreFoundation", "CoreHaptics", "CoreMedia", "CoreVideo", "GameController", "IOKit", "Metal", "QuartzCore", "Security"])
 	if env["NVGT_TARGET"] == "macos":
 		env.Append(FRAMEWORKS = ["AppKit", "Carbon", "Cocoa", "ForceFeedback", "UniformTypeIdentifiers"])
-		env.Append(LINKFLAGS = ["-Wl,-rpath,'@loader_path',-rpath,'@loader_path/lib',-rpath,'@loader_path/../Frameworks',-dead_strip_dylibs", "-mmacosx-version-min=14.0"])
+		env.Append(LINKFLAGS = ["-Wl,-rpath,'@loader_path',-rpath,'@loader_path/lib',-rpath,'@loader_path/../Frameworks',-dead_strip_dylibs", "-mmacosx-version-min=14.0", "-fexperimental-library"])
 	else:
 		env.Append(FRAMEWORKS = ["CoreBluetooth", "CoreGraphics", "CoreMotion", "Foundation", "OpenGLES", "UIKit"])
 		env.Append(CCFLAGS = ["-miphoneos-version-min=16.0"], LINKFLAGS = ["-miphoneos-version-min=16.0"])
