@@ -111,7 +111,7 @@ if  ARGUMENTS.get("no_plugins", "0") == "0":
 env.Append(LIBS = ["deps"] + common_libs + ["zs" if env["NVGT_TARGET"] == "windows" else "z", "SDL3", "phonon", "ASAddon"])
 if env["NVGT_TARGET"] in ("windows", "macos", "linux"): env.Append(LIBS = ["prism", "fmt", "simdutf", "hwy_contrib", "hwy"])
 if env["NVGT_TARGET"] == "windows": env.Append(LIBS = ["runtimeobject", "uiautomationcore", "rpcrt4", "powrprof"])
-elif env["NVGT_TARGET"] == "linux": env.Append(LIBS = ["giomm-2.68", "glibmm-2.68", "sigc-3.0", "gio-2.0", "gobject-2.0", "gmodule-2.0", "glib-2.0"])
+elif env["NVGT_TARGET"] == "linux": env.Append(LIBS = ["giomm-2.68", "glibmm-2.68", "sigc-3.0", "gio-2.0", "gobject-2.0", "gmodule-2.0", "glib-2.0", "pcre2-8"])
 
 # nvgt itself
 sources = [str(i)[4:] for i in Glob("src/*.cpp")]
