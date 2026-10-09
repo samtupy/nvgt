@@ -1,0 +1,10 @@
+/**
+	Checks if a vector is considered finite (I.E. it has finite components).
+	bool vector::is_finite const;
+*/
+
+// Example:
+void main() {
+	vector v(5, 4, 8);
+	alert("Is finite?", v.is_finite);
+}

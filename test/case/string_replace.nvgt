@@ -1,0 +1,6 @@
+void test_string_replace() {
+	assert("this is a test".replace("test", "thing") == "this is a thing");
+	assert("hello hello hello".replace("hello", "hi") == "hi hi hi");
+	assert("test".replace("not found", "replacement") == "test");  // No match
+	assert("".replace("test", "replacement") == "");  // Empty string
+}

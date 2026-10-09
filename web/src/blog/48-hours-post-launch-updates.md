@@ -14,7 +14,7 @@ It's now the second day NVGT has been public, and we have several updates to sha
 
 Here are the highlights:
 ## Pre-Built Binaries Now Available
-Although there is still some testing left to do for the latter, Windows and Mac OS installers are now available from the [downloads page](https://nvgt.gg/downloads/).
+Although there is still some testing left to do for the latter, Windows and Mac OS installers are now available from the [downloads page](https://nvgt.dev/downloads/).
 
 There is also a linux release, which is currently uploaded as a tarball and cannot yet be installed automatically.
 

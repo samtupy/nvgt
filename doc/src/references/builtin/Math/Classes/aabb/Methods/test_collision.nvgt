@@ -1,0 +1,19 @@
+/**
+	Checks if the position of one box would collide or overlap with another.
+	bool aabb::test_collision(const aabb&in aabb) const;
+	## Arguments:
+		aabb: The box to compare with.
+	## Remarks
+		Where the contains() method checks whether one box is fully contained within another, this method merely checks whether two boxes are touching.
+*/
+
+// Example:
+void main() {
+	aabb b1;
+	aabb b2;
+	b1.min = vector(5, 5, 0);
+	b1.max = vector(10, 10, 0);
+	b2.min = vector(1, 1, 0);
+	b2.max = vector(5, 5, 0);
+	if (b1.test_collision(b2)) alert("Bang!", "We collided.");
+}

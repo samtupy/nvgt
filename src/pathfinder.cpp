@@ -1,8 +1,8 @@
 /* pathfinder.cpp - pathfinder implementation code
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -18,32 +18,34 @@
 using namespace std;
 static asITypeInfo* VectorArrayType = NULL;
 static asITypeInfo* StringType = nullptr;
-#define NODE_BIT_SIZE 19
+#define NODE_BIT_SIZE 20 // Each axis gets 20 bits (range +/-524288, offset so it's never negative) and the desperation factor (0-10) gets the remaining 4 bits, filling the 64-bit state exactly.
+#define NODE_OFFSET (int64_t(1) << (NODE_BIT_SIZE - 1))
+static_assert(sizeof(void*) == 8, "pathfinder's state encoding packs 3 coordinates and a desperation factor into all 64 bits of a pointer, and so requires a 64-bit build");
 inline void* encode_state(int64_t x, int64_t y, int64_t z, int64_t d) {
-	int mc = (1 << NODE_BIT_SIZE) - 1;
-	x += 10000;
-	y += 10000;
-	z += 10000;
+	int64_t mc = (int64_t(1) << NODE_BIT_SIZE) - 1;
+	x += NODE_OFFSET;
+	y += NODE_OFFSET;
+	z += NODE_OFFSET;
 	if (x < 0 || x > mc || y < 0 || y > mc || z < 0 || z > mc)
 		return NULL;
-	uint64_t s = x + (y << NODE_BIT_SIZE) + (z << (NODE_BIT_SIZE * 2)) + (d << NODE_BIT_SIZE * 3);
+	uint64_t s = x + (y << NODE_BIT_SIZE) + (z << (NODE_BIT_SIZE * 2)) + (d << (NODE_BIT_SIZE * 3));
 	return (void*)s;
 }
 inline hashpoint decode_state(void* st) {
-	int mc = (1 << NODE_BIT_SIZE) - 1;
+	int64_t mc = (int64_t(1) << NODE_BIT_SIZE) - 1;
 	uint64_t s = reinterpret_cast<uint64_t>(st);
-	return hashpoint((s & mc) - 10000, (s >> NODE_BIT_SIZE & mc) - 10000, (s >> NODE_BIT_SIZE * 2 & mc) - 10000);
+	return hashpoint((s & mc) - NODE_OFFSET, (s >> NODE_BIT_SIZE & mc) - NODE_OFFSET, (s >> NODE_BIT_SIZE * 2 & mc) - NODE_OFFSET);
 }
 inline void decode_state(void* st, int* x, int* y, int* z) {
-	int mc = (1 << NODE_BIT_SIZE) - 1;
+	int64_t mc = (int64_t(1) << NODE_BIT_SIZE) - 1;
 	uint64_t s = reinterpret_cast<uint64_t>(st);
-	*x = (s & mc) - 10000;
-	*y = (s >> NODE_BIT_SIZE & mc) - 10000;
-	*z = (s >> NODE_BIT_SIZE * 2 & mc) - 10000;
+	*x = (s & mc) - NODE_OFFSET;
+	*y = (s >> NODE_BIT_SIZE & mc) - NODE_OFFSET;
+	*z = (s >> NODE_BIT_SIZE * 2 & mc) - NODE_OFFSET;
 }
 
 pathfinder::pathfinder(int size, bool cache) : gc_flag(false) {
-	pf = new micropather::MicroPather(this, size, 10, cache);
+	pf = new micropather::MicroPather(this, size, 18, cache);
 	callback = NULL;
 	callback_data = NULL;
 	RefCount = 1;
@@ -100,15 +102,14 @@ bool pathfinder::get_gc_flag() {
 	return gc_flag;
 }
 void pathfinder::set_callback_function(asIScriptFunction* func) {
-	if (callback)
-		callback->Release();
-	if (func)
-		callback = func;
+	if (callback) callback->Release();
+	callback = func;
 	callback_mode = CALLBACK_SIMPLE;
 }
 void pathfinder::set_callback_function_ex(asIScriptFunction* func) {
 	// This callback type is fundamentally incompatible with path caching.
 	if (cache) {
+		if (func) func->Release();
 		asGetActiveContext()->SetException("A callback with parent state support cannot be used with path caching enabled.");
 		return;
 	}
@@ -118,6 +119,7 @@ void pathfinder::set_callback_function_ex(asIScriptFunction* func) {
 void pathfinder::set_callback_function_legacy(asIScriptFunction* func) {
 	// This callback type is also fundamentally incompatible with path caching.
 	if (cache) {
+		if (func) func->Release();
 		asGetActiveContext()->SetException("A legacy callback cannot be used with path caching enabled.");
 		return;
 	}
@@ -218,43 +220,43 @@ void pathfinder::reset() {
 	pf->Reset();
 }
 CScriptArray* pathfinder::find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, CScriptAny* data) {
-	if (!VectorArrayType)
-		VectorArrayType = g_ScriptEngine->GetTypeInfoByDecl("array<vector>");
+	if (!VectorArrayType) VectorArrayType = g_ScriptEngine->GetTypeInfoByDecl("array<vector>");
 	CScriptArray* array = CScriptArray::Create(VectorArrayType);
-	if (solving)
-		return array;
+	if (solving) return array;
 	abort = false;
 	must_reset = false;
 	total_cost = 0;
-	if (!callback)
-		return array;
-	if (search_range > 0 && allow_diagonals && hypot(end_x - start_x, end_y - start_y, end_z - start_z) > search_range || search_range > 0 && !allow_diagonals && (abs(end_x - start_x) + abs(end_y - start_y) + abs(end_z - start_z)) > search_range)
-		return array;
-	if (automatic_reset || !cache)
-		reset();
+	if (!callback) return array;
+	if (search_range > 0 && allow_diagonals && hypot(end_x - start_x, end_y - start_y, end_z - start_z) > search_range || search_range > 0 && !allow_diagonals && (abs(end_x - start_x) + abs(end_y - start_y) + abs(end_z - start_z)) > search_range) return array;
+	if (automatic_reset || !cache) reset();
 	callback_data = data;
-	if (data)
-		data->AddRef();
+	if (data) data->AddRef();
 	// Only perform this fast-fail optimization if callback is "simple", otherwise it will just produce false positives.
-	if (callback_mode == CALLBACK_SIMPLE && (get_difficulty(start_x, start_y, start_z, start_x, start_y, start_z) > 9 || get_difficulty(end_x, end_y, end_z, end_x, end_y, end_z) > 9))
+	if (callback_mode == CALLBACK_SIMPLE && (get_difficulty(start_x, start_y, start_z, start_x, start_y, start_z) > 9 || get_difficulty(end_x, end_y, end_z, end_x, end_y, end_z) > 9)) {
+		if (data) data->Release();
+		callback_data = NULL;
 		return array;
+	}
 	void* start = encode_state(start_x, start_y, start_z, desperation_factor);
 	this->start_x = start_x;
 	this->start_y = start_y;
 	this->start_z = start_z;
 	void* end = encode_state(end_x, end_y, end_z, desperation_factor);
+	if (!start || !end) {
+		if (data) data->Release();
+		callback_data = NULL;
+		return array;
+	}
 	micropather::MPVector<void*> path;
 	solving = true;
 	int result = pf->Solve(start, end, &path, &total_cost);
 	solving = false;
-	if (data)
-		data->Release();
+	if (data) data->Release();
 	callback_data = NULL;
 	if (abort || must_reset || result != micropather::MicroPather::SOLVED) {
 		abort = false;
 		total_cost = 0;
-		if (must_reset)
-			reset();
+		if (must_reset) reset();
 		return array;
 	}
 	array->Reserve(path.size() - 1);
@@ -280,31 +282,33 @@ CScriptArray* pathfinder::find_legacy(int start_x, int start_y, int parent_x, in
 	return result;
 }
 float pathfinder::LeastCostEstimate(void* nodeStart, void* nodeEnd) {
+	// This must be a pure geometric lower bound on the true cost, and must never call back into the terrain callback: doing so previously queried the callback with the destination as its own parent, a degenerate query many callbacks (especially BGT compatible ones) weren't written to expect, which could make them answer "impossible" and in turn make MicroPather push a node with an infinite cost into its open list, hanging forever (see https://github.com/samtupy/nvgt/issues/293).
 	int start_x, start_y, start_z, end_x, end_y, end_z;
 	decode_state(nodeStart, &start_x, &start_y, &start_z);
 	decode_state(nodeEnd, &end_x, &end_y, &end_z);
 	float x = end_x - start_x;
 	float y = end_y - start_y;
 	float z = end_z - start_z;
-	float d = get_difficulty(end_x, end_y, end_z, end_x, end_y, end_z);
-	if (d > 9)
-		return FLT_MAX;
-	if (allow_diagonals)
-		return hypot(x, y, z);
-	else
-		return (abs(x) + abs(y) + abs(z));
+	if (allow_diagonals) return hypot(x, y, z);
+	else return (abs(x) + abs(y) + abs(z));
 }
 void pathfinder::AdjacentCost(void* node, micropather::MPVector<micropather::StateCost>* neighbors) {
 	int x, y, z;
 	decode_state(node, &x, &y, &z);
 	const int dx[18] = {1, 1, 0, -1, -1, -1, 0, 1, 0, 0, 1, -1, 0, 0, 1, -1, 0, 0};
 	const int dy[18] = {0, 1, 1, 1, 0, -1, -1, -1, 0, 0, 0, 0, 1, -1, 0, 0, 1, -1};
-	const float cost[18] = {1.0f, 1.41f, 1.0f, 1.41f, 1.0f, 1.41f, 1.0f, 1.41f, 1.0f, 1.0f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f};
+	// Every "diagonal" entry above displaces exactly sqrt(2) map units; using that precise
+	// value (rather than the previous 1.41f approximation) keeps LeastCostEstimate's
+	// Euclidean-distance heuristic from ever overestimating the true minimum path cost.
+	const float diag = 1.4142135f;
+	const float cost[18] = {1.0f, diag, 1.0f, diag, 1.0f, diag, 1.0f, diag, 1.0f, 1.0f, diag, diag, diag, diag, diag, diag, diag, diag};
 	for (int i = 0; i < 18; ++i) {
 		int nx = x + dx[i];
 		int ny = y + dy[i];
 		int nz = i >= 8 && i != 9 && i < 14 ? z + 1 : (i == 9 || i >= 14 ? z - 1 : z);
 		void* st = encode_state(nx, ny, nz, desperation_factor);
+		if (!st)
+			continue;
 		if (search_range > 0 && (nx < start_x - search_range || nx > start_x + search_range || ny < start_y - search_range || ny > start_y + search_range || nz < start_z - search_range || nz > start_z + search_range)) {
 			/*
 			micropather::StateCost cost={st, FLT_MAX};
@@ -334,11 +338,15 @@ void pathfinder::AdjacentCost(void* node, micropather::MPVector<micropather::Sta
 }
 
 pathfinder* new_pathfinder(int size, bool cache) {
+	if (size < 1 || size > (1 << 24)) {
+		if (asIScriptContext* ctx = asGetActiveContext()) ctx->SetException("pathfinder size must be between 1 and 16777216");
+		return nullptr;
+	}
 	return new pathfinder(size, cache);
 }
 void RegisterScriptPathfinder(asIScriptEngine* engine) {
 	engine->RegisterObjectType("pathfinder", 0, asOBJ_REF | asOBJ_GC);
-	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_FACTORY, "pathfinder @p(int = 1024, bool = true)", asFUNCTION(new_pathfinder), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_FACTORY, "pathfinder @p(int size = 1024, bool cache = true)", asFUNCTION(new_pathfinder), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_ADDREF, "void f()", asMETHOD(pathfinder, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_RELEASE, "void f()", asMETHOD(pathfinder, Release), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_GETREFCOUNT, "int f()", asMETHOD(pathfinder, get_ref_count), asCALL_THISCALL);
@@ -348,18 +356,19 @@ void RegisterScriptPathfinder(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("pathfinder", asBEHAVE_RELEASEREFS, "void f(int&in)", asMETHOD(pathfinder, release_all_handles), asCALL_THISCALL);
 	engine->RegisterObjectProperty("pathfinder", "const bool solving", asOFFSET(pathfinder, solving));
 	engine->RegisterObjectProperty("pathfinder", "const float total_cost", asOFFSET(pathfinder, total_cost));
-	engine->RegisterObjectProperty("pathfinder", "int desperation_factor", asOFFSET(pathfinder, desperation_factor));
 	engine->RegisterObjectProperty("pathfinder", "bool allow_diagonals", asOFFSET(pathfinder, allow_diagonals));
 	engine->RegisterObjectProperty("pathfinder", "bool automatic_reset", asOFFSET(pathfinder, automatic_reset));
 	engine->RegisterObjectProperty("pathfinder", "int search_range", asOFFSET(pathfinder, search_range));
-	engine->RegisterFuncdef("int pathfinder_callback(int, int, int, any@ = null)");
-	engine->RegisterFuncdef("int pathfinder_callback_ex(int, int, int, int, int, int, any@ = null)");
-	engine->RegisterFuncdef("int pathfinder_callback_legacy(int, int, int, int, string)");
-	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback@)", asMETHOD(pathfinder, set_callback_function), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_ex@)", asMETHOD(pathfinder, set_callback_function_ex), asCALL_THISCALL);
+	engine->RegisterFuncdef("int pathfinder_callback(int x, int y, int z, any@ callback_data = null)");
+	engine->RegisterFuncdef("int pathfinder_callback_ex(int x, int y, int z, int parent_x, int parent_y, int parent_z, any@ callback_data = null)");
+	engine->RegisterFuncdef("int pathfinder_callback_legacy(int x, int y, int parent_x, int parent_y, string user_data)");
+	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback@ callback)", asMETHOD(pathfinder, set_callback_function), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_ex@ callback)", asMETHOD(pathfinder, set_callback_function_ex), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "int get_desperation_factor() const property", asMETHOD(pathfinder, get_desperation_factor), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "void set_desperation_factor(int factor) property", asMETHOD(pathfinder, set_desperation_factor), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void cancel()", asMETHOD(pathfinder, cancel), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_legacy@)", asMETHOD(pathfinder, set_callback_function_legacy), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "void set_callback_function(pathfinder_callback_legacy@ callback)", asMETHOD(pathfinder, set_callback_function_legacy), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pathfinder", "void reset()", asMETHOD(pathfinder, reset), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int, int, int, int, int, int, any@+ = null)", asMETHOD(pathfinder, find), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int, int, int, int, string = \"\")", asMETHOD(pathfinder, find_legacy), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int start_x, int start_y, int start_z, int end_x, int end_y, int end_z, any@+ callback_data = null)", asMETHOD(pathfinder, find), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pathfinder", "vector[]@ find(int start_x, int start_y, int end_x, int end_y, string user_data = \"\")", asMETHOD(pathfinder, find_legacy), asCALL_THISCALL);
 }

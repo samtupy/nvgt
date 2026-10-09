@@ -1,8 +1,8 @@
 /* music.nvgt - high level music system
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -83,7 +83,7 @@ class music_track {
 		if (@parent != null)
 			return parent.load_sound(@s, filename);
 		else {
-			s.load(filename);
+			s.stream(filename);
 			if (!s.active) return null;
 			return @s;
 		}
@@ -219,7 +219,7 @@ class music_manager {
 		if (@s == null) @s = sound();
 		s.set_mixer(music_mixer);
 		if (@load_callback != null) return load_callback(s, filename);
-		s.load(filename);
+		s.stream(filename);
 		if (!s.active) return null;
 		return s;
 	}
@@ -276,6 +276,14 @@ class music_manager {
 		if (@main_track != null) return main_track.playing;
 		else if (@next_track != null) return next_track.playing;
 		return false;
+	}
+	string get_playing_filename() const property {
+		if (@main_track != null) return main_track.intro_end > 0? main_track.intro_filename : main_track.main_filename;
+		return "";
+	}
+	string get_upcoming_filename() const property {
+		if (@next_track != null) return next_track.intro_end > 0? next_track.intro_filename : next_track.main_filename;
+		return "";
 	}
 	void loop(uint64 t = ticks()) {
 		if (@main_track != null) main_track.loop(t);

@@ -1,8 +1,8 @@
 /* internet.cpp - code for wrapping http, ftp and more mostly wrapping PocoNet
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -22,6 +22,7 @@
 #include <Poco/Thread.h>
 #include <Poco/URI.h>
 #include <Poco/URIStreamOpener.h>
+#include <Poco/UUIDGenerator.h>
 #include <Poco/Net/AcceptCertificateHandler.h>
 #include <Poco/Net/Context.h>
 #include <Poco/Net/DNS.h>
@@ -32,6 +33,9 @@
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/Net/HTTPRequest.h>
 #include <Poco/Net/HTTPSClientSession.h>
+#include <Poco/Net/FTPStreamFactory.h>
+#include <Poco/Net/HTTPSStreamFactory.h>
+#include <Poco/Net/HTTPStreamFactory.h>
 #include <Poco/Net/MessageHeader.h>
 #include <Poco/Net/SSLManager.h>
 #include <Poco/Net/WebSocket.h>
@@ -155,7 +159,7 @@ CScriptArray* host_entry_get_addresses(const HostEntry& e) { return vector_to_sc
 // In NVGT we tend to overuse std::string, make sure sockets can handle this datatype. We should try to register versions of SendBytes and ReceiveBytes that works with a lower level datatype when possible especially because of the unnecessary memory usage incurred with std::string in this case.
 template <class T> int socket_send_bytes(T& sock, const string& data, int flags) { return sock.sendBytes(data.data(), data.size(), flags); }
 template <class T> string socket_receive_bytes(T& sock, int length, int flags) {
-	if (!length) return 0;
+	if (!length) return "";
 	string result(length, 0); // ooouuuch this initialization to null chars hurts and is a waste, find a way to fix it!
 	int recv_len = sock.receiveBytes(result.data(), length, flags);
 	result.resize(recv_len);
@@ -163,7 +167,7 @@ template <class T> string socket_receive_bytes(T& sock, int length, int flags) {
 }
 template <class T> string socket_receive_bytes_buf(T& sock, int flags, const Timespan& timeout) {
 	Buffer<char> buf(0);
-	sock.receiveBytes(buf, flags);
+	sock.receiveBytes(buf, flags, timeout);
 	return string(buf.begin(), buf.end());
 }
 int websocket_send_frame(WebSocket& sock, const string& data, int flags) { return sock.sendFrame(data.data(), data.size(), flags); }
@@ -178,95 +182,96 @@ string websocket_receive_frame(WebSocket& sock, int& flags) {
 template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, const string& type) {
 	angelscript_refcounted_register<T>(engine, type.c_str());
 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f()", type).c_str(), asFUNCTION(angelscript_refcounted_factory<T>), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const %s&in)", type, type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const T&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const %s&in other)", type, type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const T&>)), asCALL_CDECL);
 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_LIST_FACTORY, format("%s@ f(int&in) {repeat {string, string}}", type).c_str(), asFUNCTION(name_value_collection_list_factory<T>), asCALL_CDECL);
-	engine->RegisterObjectMethod(type.c_str(), format("%s& opAssign(const %s&in)", type, type).c_str(), asMETHODPR(T, operator=, (const T&), T&), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "const string& get_opIndex(const string&in) const property", asMETHOD(T, operator[]), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_opIndex(const string&in, const string&in) property", asMETHOD(T, set), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set(const string&in, const string&in)", asMETHOD(T, set), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void add(const string&in, const string&in)", asMETHOD(T, add), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "const string& get(const string&in, const string&in = \"\") const", asMETHODPR(T, get, (const string&, const string&) const, const string&), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "bool exists(const string&in) const", asMETHOD(T, has), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), format("%s& opAssign(const %s&in other)", type, type).c_str(), asMETHODPR(T, operator=, (const T&), T&), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const string& get_opIndex(const string&in name) const property", asMETHOD(T, operator[]), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_opIndex(const string&in name, const string&in value) property", asMETHOD(T, set), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set(const string&in name, const string&in value)", asMETHOD(T, set), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void add(const string&in name, const string&in value)", asMETHOD(T, add), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const string& get(const string&in name, const string&in default_value = \"\") const", asMETHODPR(T, get, (const string&, const string&) const, const string&), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool exists(const string&in name) const", asMETHOD(T, has), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool empty() const", asMETHOD(T, empty), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "uint64 size() const", asMETHOD(T, size), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void erase(const string&in)", asMETHOD(T, erase), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void erase(const string&in name)", asMETHODPR(T, erase, (const std::string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void secure_erase(const string&in name)", asMETHODPR(T, secureErase, (const std::string&), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void clear()", asMETHOD(T, clear), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "const string& name_at(uint) const", asFUNCTION(name_value_collection_name_at<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "const string& value_at(uint) const", asFUNCTION(name_value_collection_value_at<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "const string& name_at(uint index) const", asFUNCTION(name_value_collection_name_at<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "const string& value_at(uint index) const", asFUNCTION(name_value_collection_value_at<T>), asCALL_CDECL_OBJFIRST);
 }
 template <class T, class P> void RegisterMessageHeader(asIScriptEngine* engine, const string& type, const string& parent) {
 	RegisterNameValueCollection<T>(engine, type);
 	engine->RegisterObjectMethod(parent.c_str(), format("%s@ opCast()", type).c_str(), asFUNCTION((angelscript_refcounted_refcast<P, T>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), format("%s@ opImplCast()", parent).c_str(), asFUNCTION((angelscript_refcounted_refcast<T, P>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool write(datastream@) const", asFUNCTION(message_header_write<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool read(datastream@)", asFUNCTION(message_header_read<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool write(datastream@+ stream) const", asFUNCTION(message_header_write<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool read(datastream@+ stream)", asFUNCTION(message_header_read<T>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_auto_decode() const property", asMETHOD(T, getAutoDecode), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_auto_decode(bool) property", asMETHOD(T, setAutoDecode), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "string get_decoded(const string&in, const string&in = \"\")", asMETHODPR(T, getDecoded, (const std::string&, const std::string&) const, std::string), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_auto_decode(bool enabled) property", asMETHOD(T, setAutoDecode), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "string get_decoded(const string&in name, const string&in default_value = \"\")", asMETHODPR(T, getDecoded, (const std::string&, const std::string&) const, std::string), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "int get_field_limit() const property", asMETHOD(T, getFieldLimit), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_field_limit(int) property", asMETHOD(T, setFieldLimit), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_field_limit(int limit) property", asMETHOD(T, setFieldLimit), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "int get_name_length_limit() const property", asMETHOD(T, getNameLengthLimit), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_name_length_limit(int) property", asMETHOD(T, setNameLengthLimit), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_name_length_limit(int limit) property", asMETHOD(T, setNameLengthLimit), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "int get_value_length_limit() const property", asMETHOD(T, getValueLengthLimit), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_value_length_limit(int) property", asMETHOD(T, setValueLengthLimit), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "bool has_token(const string&in, const string&in)", asMETHOD(T, hasToken), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_value_length_limit(int limit) property", asMETHOD(T, setValueLengthLimit), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "bool has_token(const string&in name, const string&in token)", asMETHOD(T, hasToken), asCALL_THISCALL);
 }
 template <class T, class P> void RegisterHTTPMessage(asIScriptEngine* engine, const string& type, const string& parent) {
 	RegisterMessageHeader<T, P>(engine, type, parent);
-	engine->RegisterObjectMethod(type.c_str(), "void set_version(const string&in) property", asMETHOD(T, setVersion), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_version(const string&in version) property", asMETHOD(T, setVersion), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_version() const property", asMETHOD(T, getVersion), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_content_length(int64) property", asMETHOD(T, setContentLength64), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_content_length(int64 length) property", asMETHOD(T, setContentLength64), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "int64 get_content_length() const property", asMETHOD(T, getContentLength64), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_has_content_length() const property", asMETHOD(T, hasContentLength), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_transfer_encoding(const string&in) property", asMETHOD(T, setTransferEncoding), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_transfer_encoding(const string&in encoding) property", asMETHOD(T, setTransferEncoding), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "string get_transfer_encoding() const property", asMETHOD(T, getTransferEncoding), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_chunked_transfer_encoding(bool) property", asMETHOD(T, setChunkedTransferEncoding), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_chunked_transfer_encoding(bool enabled) property", asMETHOD(T, setChunkedTransferEncoding), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_chunked_transfer_encoding() const property", asMETHOD(T, getChunkedTransferEncoding), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_content_type(const string&in) property", asMETHODPR(T, setContentType, (const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_content_type(const string&in media_type) property", asMETHODPR(T, setContentType, (const string&), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "string get_content_type() const property", asMETHOD(T, getContentType), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_keep_alive(bool) property", asMETHOD(T, setKeepAlive), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_keep_alive(bool enabled) property", asMETHOD(T, setKeepAlive), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_keep_alive() const property", asMETHOD(T, getKeepAlive), asCALL_THISCALL);
 }
 template <class T, class P> void RegisterHTTPRequest(asIScriptEngine* engine, const string& type, const string& parent) {
 	RegisterHTTPMessage<T, P>(engine, type, parent);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, const string&in, const string&in = HTTP_1_1)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, const string&, const string&>)), asCALL_CDECL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_method(const string&in) property", asMETHOD(T, setMethod), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in method, const string&in uri, const string&in version = HTTP_1_1)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, const string&, const string&>)), asCALL_CDECL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_method(const string&in method) property", asMETHOD(T, setMethod), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_method() const property", asMETHOD(T, getMethod), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_uri(const string&in) property", asMETHOD(T, setURI), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_uri(const string&in uri) property", asMETHOD(T, setURI), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_uri() const property", asMETHOD(T, getURI), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_host(const string&in) property", asMETHODPR(T, setHost, (const string&), void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_host(const string&in, uint16) property", asMETHODPR(T, setHost, (const string&, UInt16), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_host(const string&in host) property", asMETHODPR(T, setHost, (const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_host(const string&in host, uint16 port) property", asMETHODPR(T, setHost, (const string&, UInt16), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_host() const property", asMETHOD(T, getHost), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_cookies(const name_value_collection&)", asMETHOD(T, setCookies), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void get_cookies(name_value_collection&) const", asMETHOD(T, getCookies), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_cookies(const name_value_collection& cookies)", asMETHOD(T, setCookies), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void get_cookies(name_value_collection& cookies) const", asMETHOD(T, getCookies), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_has_credentials() const property", asMETHOD(T, hasCredentials), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void get_credentials(string&, string&) const", asMETHODPR(T, getCredentials, (string&, string&) const, void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_credentials(const string&in, const string&in)", asMETHODPR(T, setCredentials, (const string&, const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void get_credentials(string& scheme, string& auth_info) const", asMETHODPR(T, getCredentials, (string&, string&) const, void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_credentials(const string&in scheme, const string&in auth_info)", asMETHODPR(T, setCredentials, (const string&, const string&), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void remove_credentials()", asMETHOD(T, removeCredentials), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_expect_continue() const property", asMETHOD(T, getExpectContinue), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_expect_continue(bool) property", asMETHOD(T, setExpectContinue), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_expect_continue(bool expect) property", asMETHOD(T, setExpectContinue), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_has_proxy_credentials() const property", asMETHOD(T, hasProxyCredentials), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void get_proxy_credentials(string&, string&) const", asMETHOD(T, getProxyCredentials), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_proxy_credentials(const string&in, const string&in)", asMETHOD(T, setProxyCredentials), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void get_proxy_credentials(string& scheme, string& auth_info) const", asMETHOD(T, getProxyCredentials), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_proxy_credentials(const string&in scheme, const string&in auth_info)", asMETHOD(T, setProxyCredentials), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void remove_proxy_credentials()", asMETHOD(T, removeProxyCredentials), asCALL_THISCALL);
 }
 template <class T, class P> void RegisterHTTPResponse(asIScriptEngine* engine, const string& type, const string& parent) {
 	RegisterHTTPMessage<T, P>(engine, type, parent);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(http_status)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, HTTPResponse::HTTPStatus>)), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(http_status, const string&in)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, HTTPResponse::HTTPStatus, const string&>)), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, http_status, const string&in)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, HTTPResponse::HTTPStatus, const string&>)), asCALL_CDECL);
-	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, http_status)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, HTTPResponse::HTTPStatus>)), asCALL_CDECL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_status(http_status) property", asMETHODPR(T, setStatus, (HTTPResponse::HTTPStatus), void), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(http_status status)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, HTTPResponse::HTTPStatus>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(http_status status, const string&in reason)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, HTTPResponse::HTTPStatus, const string&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in version, http_status status, const string&in reason)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, HTTPResponse::HTTPStatus, const string&>)), asCALL_CDECL);
+	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in version, http_status status)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, HTTPResponse::HTTPStatus>)), asCALL_CDECL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_status(http_status status) property", asMETHODPR(T, setStatus, (HTTPResponse::HTTPStatus), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "http_status get_status() const property", asMETHOD(T, getStatus), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_status(const string&in)", asMETHODPR(T, setStatus, (const string&), void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_reason(const string&in) property", asMETHOD(T, setReason), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_status(const string&in status)", asMETHODPR(T, setStatus, (const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_reason(const string&in reason) property", asMETHOD(T, setReason), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_reason() const property", asMETHOD(T, getReason), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_status_and_reason(http_status, const string&in)", asMETHODPR(T, setStatusAndReason, (HTTPResponse::HTTPStatus, const string&), void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_status_and_reason(http_status)", asMETHODPR(T, setStatusAndReason, (HTTPResponse::HTTPStatus), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_status_and_reason(http_status status, const string&in reason)", asMETHODPR(T, setStatusAndReason, (HTTPResponse::HTTPStatus, const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_status_and_reason(http_status status)", asMETHODPR(T, setStatusAndReason, (HTTPResponse::HTTPStatus), void), asCALL_THISCALL);
 }
 template <class T> void RegisterHTTPSession(asIScriptEngine* engine, const string& type) {
 	angelscript_refcounted_register<T>(engine, type.c_str());
-	engine->RegisterObjectMethod(type.c_str(), "void set_keep_alive(bool) property", asMETHOD(T, setKeepAlive), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_keep_alive(bool enabled) property", asMETHOD(T, setKeepAlive), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_keep_alive() const property", asMETHOD(T, getKeepAlive), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_connected() const property", asMETHOD(T, connected), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void abort()", asMETHOD(T, abort), asCALL_THISCALL);
@@ -279,15 +284,15 @@ template <class T> void RegisterHTTPSession(asIScriptEngine* engine, const strin
 }
 template <class T> void RegisterHTTPClientSession(asIScriptEngine* engine, const string& type) {
 	RegisterHTTPSession<T>(engine, type);
-	if constexpr(std::is_same<T, HTTPSClientSession>::value) engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, uint16 = 443)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, UInt16>)), asCALL_CDECL);
-	else engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in, uint16 = 80)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, UInt16>)), asCALL_CDECL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_host(const string&in) property", asMETHOD(T, setHost), asCALL_THISCALL);
+	if constexpr(std::is_same<T, HTTPSClientSession>::value) engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in host, uint16 port = 443)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, UInt16>)), asCALL_CDECL);
+	else engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const string&in host, uint16 port = 80)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const string&, UInt16>)), asCALL_CDECL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_host(const string&in host) property", asMETHOD(T, setHost), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "const string& get_host() const property", asMETHOD(T, getHost), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void set_port(uint16) property", asMETHOD(T, setPort), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "void set_port(uint16 port) property", asMETHOD(T, setPort), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "uint16 get_port() const property", asMETHOD(T, getPort), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "datastream@ send_request(http_request&, const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(http_client_send_request<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "datastream@ receive_response(http_response&, const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(http_client_receive_response<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "bool peek_response(http_response&)", asMETHOD(T, peekResponse), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "datastream@ send_request(http_request& request, const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(http_client_send_request<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "datastream@ receive_response(http_response& response, const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(http_client_receive_response<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "bool peek_response(http_response& response)", asMETHOD(T, peekResponse), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void flush_request()", asMETHOD(T, flushRequest), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void reset()", asMETHOD(T, reset), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_secure() const property", asMETHOD(T, secure), asCALL_THISCALL);
@@ -353,8 +358,8 @@ void RegisterHTTPCredentials(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool http_credentials_is_proxy_basic(const http_request&in request)", asFUNCTION(HTTPCredentials::hasProxyBasicCredentials), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool http_credentials_is_proxy_digest(const http_request&in request)", asFUNCTION(HTTPCredentials::hasProxyDigestCredentials), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool http_credentials_is_proxy_ntlm(const http_request&in request)", asFUNCTION(HTTPCredentials::hasProxyNTLMCredentials), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool http_credentials_extract(const string&in user_info, string&out username, string&out password)", asFUNCTIONPR(HTTPCredentials::extractCredentials, (const string&, string&, string&), void), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool http_credentials_extract(const spec::uri&in uri, string&out username, string&out password)", asFUNCTIONPR(HTTPCredentials::extractCredentials, (const URI&, string&, string&), void), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void http_credentials_extract(const string&in user_info, string&out username, string&out password)", asFUNCTIONPR(HTTPCredentials::extractCredentials, (const string&, string&, string&), void), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void http_credentials_extract(const spec::uri&in uri, string&out username, string&out password)", asFUNCTIONPR(HTTPCredentials::extractCredentials, (const URI&, string&, string&), void), asCALL_CDECL);
 }
 void RegisterIPAddress(asIScriptEngine* engine) {
 	// Also registers SocketAddress as an aside.
@@ -370,10 +375,10 @@ void RegisterIPAddress(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("ip_address_family", "IP_FAMILY_IPV6", AddressFamily::IPv6);
 	engine->RegisterObjectType("ip_address", sizeof(IPAddress), asOBJ_VALUE | asGetTypeTraits<IPAddress>());
 	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(generic_construct<IPAddress>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f(ip_address_family)", asFUNCTION((generic_construct<IPAddress, AddressFamily::Family>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f(ip_address_family family)", asFUNCTION((generic_construct<IPAddress, AddressFamily::Family>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f(const string&in addr)", asFUNCTION((generic_construct<IPAddress, const string&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f(const string&in addr, ip_address_family)", asFUNCTION((generic_construct<IPAddress, const string&, AddressFamily::Family>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f(const ip_address&in)", asFUNCTION(generic_copy_construct<IPAddress>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f(const string&in addr, ip_address_family family)", asFUNCTION((generic_construct<IPAddress, const string&, AddressFamily::Family>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_CONSTRUCT, "void f(const ip_address&in other)", asFUNCTION(generic_copy_construct<IPAddress>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("ip_address", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(generic_destruct<IPAddress>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("ip_address", "ip_address& opAssign(const ip_address&in addr)", asMETHODPR(IPAddress, operator=, (const IPAddress&), IPAddress&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("ip_address", "bool get_is_v4() const property", asMETHOD(IPAddress, isV4), asCALL_THISCALL);
@@ -397,7 +402,7 @@ void RegisterIPAddress(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("ip_address", "bool get_is_org_local_multicast() const property", asMETHOD(IPAddress, isOrgLocalMC), asCALL_THISCALL);
 	engine->RegisterObjectMethod("ip_address", "bool get_is_global_multicast() const property", asMETHOD(IPAddress, isGlobalMC), asCALL_THISCALL);
 	engine->RegisterObjectMethod("ip_address", "bool opEquals(const ip_address&in addr) const", asMETHOD(IPAddress, operator==), asCALL_THISCALL);
-	engine->RegisterObjectMethod("ip_address", "int opCmp(const ip_address&in)", asFUNCTION(opCmp<IPAddress>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("ip_address", "int opCmp(const ip_address&in other)", asFUNCTION(opCmp<IPAddress>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("ip_address", "ip_address opAnd(const ip_address&in addr) const", asMETHOD(IPAddress, operator&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("ip_address", "ip_address opOr(const ip_address&in addr) const", asMETHOD(IPAddress, operator|), asCALL_THISCALL);
 	engine->RegisterObjectMethod("ip_address", "ip_address opXor(const ip_address&in addr) const", asMETHOD(IPAddress, operator^), asCALL_THISCALL);
@@ -406,28 +411,28 @@ void RegisterIPAddress(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("ip_address", "void mask(const ip_address&in mask)", asMETHODPR(IPAddress, mask, (const IPAddress&), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("ip_address", "void mask(const ip_address&in mask, const ip_address&in set)", asMETHODPR(IPAddress, mask, (const IPAddress&, const IPAddress&), void), asCALL_THISCALL);
 	engine->RegisterGlobalFunction("bool parse_ip_address(const string&in addr_in, ip_address&out addr_out)", asFUNCTION(IPAddress::tryParse), asCALL_CDECL);
-	engine->RegisterGlobalFunction("ip_address wildcard_ip_address(spec::ip_address_family)", asFUNCTION(IPAddress::wildcard), asCALL_CDECL);
+	engine->RegisterGlobalFunction("ip_address wildcard_ip_address(spec::ip_address_family family)", asFUNCTION(IPAddress::wildcard), asCALL_CDECL);
 	engine->RegisterGlobalFunction("ip_address broadcast_ip_address()", asFUNCTION(IPAddress::broadcast), asCALL_CDECL);
 	engine->SetDefaultNamespace("");
 	engine->RegisterObjectType("socket_address", sizeof(SocketAddress), asOBJ_VALUE | asGetTypeTraits<SocketAddress>());
 	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(generic_construct<SocketAddress>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family) explicit", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family family) explicit", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(uint16 port) explicit", asFUNCTION((generic_construct<SocketAddress, UInt16>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(const spec::ip_address&in addr, uint16 port)", asFUNCTION((generic_construct<SocketAddress, const IPAddress&, UInt16>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(const string&in host_and_port)", asFUNCTION((generic_construct<SocketAddress, const string&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(const string&in host, uint16 port)", asFUNCTION((generic_construct<SocketAddress, const string&, UInt16>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family, uint16 port)", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family, UInt16>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family, const string&in addr)", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family, const string&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family, const string&in host, uint16 port)", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family, const string&, UInt16>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family, const string&in host, const string&in port)", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family, const string&, const string&>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(const socket_address&in)", asFUNCTION(generic_copy_construct<SocketAddress>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family family, uint16 port)", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family, UInt16>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family family, const string&in addr)", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family, const string&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family family, const string&in host, uint16 port)", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family, const string&, UInt16>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(spec::ip_address_family family, const string&in host, const string&in port)", asFUNCTION((generic_construct<SocketAddress, AddressFamily::Family, const string&, const string&>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_CONSTRUCT, "void f(const socket_address&in other)", asFUNCTION(generic_copy_construct<SocketAddress>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("socket_address", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(generic_destruct<SocketAddress>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("socket_address", "socket_address& opAssign(const socket_address&in addr)", asMETHODPR(SocketAddress, operator=, (const SocketAddress&), SocketAddress&), asCALL_THISCALL);
 	engine->RegisterObjectMethod("socket_address", "spec::ip_address get_host() const property", asMETHOD(SocketAddress, host), asCALL_THISCALL);
 	engine->RegisterObjectMethod("socket_address", "uint16 get_port() const property", asMETHOD(SocketAddress, port), asCALL_THISCALL);
 	engine->RegisterObjectMethod("socket_address", "string opImplConv() const", asMETHOD(SocketAddress, toString), asCALL_THISCALL);
 	engine->RegisterObjectMethod("socket_address", "spec::ip_address_family get_family() const property", asMETHOD(SocketAddress, family), asCALL_THISCALL);
-	engine->RegisterObjectMethod("socket_address", "int opCmp(const socket_address&in)", asFUNCTION(opCmpNoGT<SocketAddress>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("socket_address", "int opCmp(const socket_address&in other)", asFUNCTION(opCmpNoGT<SocketAddress>), asCALL_CDECL_OBJFIRST);
 }
 template <class T> void RegisterSocket(asIScriptEngine* engine, const std::string& type) {
 	angelscript_refcounted_register<T>(engine, type.c_str());
@@ -436,7 +441,7 @@ template <class T> void RegisterSocket(asIScriptEngine* engine, const std::strin
 	engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const %s&in sock)", type, type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const T&>)), asCALL_CDECL);
 	if (type != "socket") 	engine->RegisterObjectMethod(type.c_str(), format("%s& opAssign(const socket&in sock)", type).c_str(), asMETHODPR(T, operator=, (const Socket&), T&), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), format("%s& opAssign(const %s&in socket)", type, type).c_str(), asMETHODPR(T, operator=, (const T&), T&), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), format("int opCmp(const %s&in)", type).c_str(), asFUNCTION(opCmp<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), format("int opCmp(const %s&in other)", type).c_str(), asFUNCTION(opCmp<T>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), format("socket_type get_type() const property", type).c_str(), asMETHOD(T, type), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_is_null() const property", asMETHOD(T, isNull), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool get_is_stream() const property", asMETHOD(T, isStream), asCALL_THISCALL);
@@ -487,18 +492,18 @@ template <class T> void RegisterStreamSocket(asIScriptEngine* engine, const std:
 	RegisterSocket<T>(engine, type);
 	if constexpr(!std::is_same_v<T, WebSocket>) {
 		engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const socket_address&in address)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const SocketAddress&>)), asCALL_CDECL);
-		engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const spec::ip_address_family)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, SocketAddress::Family>)), asCALL_CDECL);
+		engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ f(const spec::ip_address_family family)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, SocketAddress::Family>)), asCALL_CDECL);
 		engine->RegisterObjectMethod(type.c_str(), "void connect(const socket_address&in address)", asMETHODPR(T, connect, (const SocketAddress&), void), asCALL_THISCALL);
 		engine->RegisterObjectMethod(type.c_str(), "void connect(const socket_address&in address, const timespan&in timeout)", asMETHODPR(T, connect, (const SocketAddress&, const Timespan&), void), asCALL_THISCALL);
 		engine->RegisterObjectMethod(type.c_str(), "void connect_nonblocking(const socket_address&in address)", asMETHOD(T, connectNB), asCALL_THISCALL);
 		engine->RegisterObjectMethod(type.c_str(), "bool bind(const socket_address&in address, bool reuse_address = false, bool IPv6_only = false)", asMETHOD(T, bind), asCALL_THISCALL);
 	}
 	engine->RegisterObjectMethod(type.c_str(), "void shutdown_receive()", asMETHOD(T, shutdownReceive), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void shutdown_send()", asMETHOD(T, shutdownSend), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "void shutdown()", asMETHOD(T, shutdown), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int shutdown_send()", asMETHOD(T, shutdownSend), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "int shutdown()", asMETHODPR(T, shutdown, (), int), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "int send_bytes(const string&in data, int flags = 0)", asFUNCTION(socket_send_bytes<T>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "string receive_bytes(int length, int flags = 0)", asFUNCTION(socket_receive_bytes<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "string receive_bytes(int flags = 0, const timespan& timeout = 100000)", asFUNCTION(socket_receive_bytes_buf<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "string receive_bytes(int flags = 0, const timespan&in timeout = 100000)", asFUNCTION(socket_receive_bytes_buf<T>), asCALL_CDECL_OBJFIRST);
 }
 void RegisterWebSocket(asIScriptEngine* engine) {
 	engine->RegisterEnum("web_socket_mode");
@@ -544,7 +549,7 @@ void RegisterWebSocket(asIScriptEngine* engine) {
 	RegisterStreamSocket<WebSocket>(engine, "web_socket");
 	engine->RegisterObjectBehaviour("web_socket", asBEHAVE_FACTORY, "web_socket@ s(http_client& cs, http_request& request, http_response& response)", asFUNCTION((angelscript_refcounted_factory<WebSocket, HTTPClientSession&, HTTPRequest&, HTTPResponse&>)), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("web_socket", asBEHAVE_FACTORY, "web_socket@ s(http_client& cs, http_request& request, http_response& response, http_credentials& credentials)", asFUNCTION((angelscript_refcounted_factory<WebSocket, HTTPClientSession&, HTTPRequest&, HTTPResponse&, HTTPCredentials&>)), asCALL_CDECL);
-	engine->RegisterObjectMethod("web_socket", "void shutdown(uint16 status_code, const string&in status_message = \"\")", asMETHODPR(WebSocket, shutdown, (UInt16, const string&), void), asCALL_THISCALL);
+	engine->RegisterObjectMethod("web_socket", "int shutdown(uint16 status_code, const string&in status_message = \"\")", asMETHODPR(WebSocket, shutdown, (UInt16, const string&), int), asCALL_THISCALL);
 	engine->RegisterObjectMethod("web_socket", "int send_frame(const string&in data, int flags = WS_FRAME_TEXT)", asFUNCTION(websocket_send_frame), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("web_socket", "string receive_frame(int&out flags)", asFUNCTION(websocket_receive_frame), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("web_socket", "web_socket_mode get_mode() const property", asMETHOD(WebSocket, mode), asCALL_THISCALL);
@@ -554,7 +559,7 @@ void RegisterWebSocket(asIScriptEngine* engine) {
 void RegisterDNS(asIScriptEngine* engine) {
 	engine->RegisterObjectType("dns_host_entry", sizeof(HostEntry), asOBJ_VALUE | asGetTypeTraits<HostEntry>());
 	engine->RegisterObjectBehaviour("dns_host_entry", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(generic_construct<HostEntry>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("dns_host_entry", asBEHAVE_CONSTRUCT, "void f(const dns_host_entry&in)", asFUNCTION(generic_copy_construct<HostEntry>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("dns_host_entry", asBEHAVE_CONSTRUCT, "void f(const dns_host_entry&in other)", asFUNCTION(generic_copy_construct<HostEntry>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("dns_host_entry", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(generic_destruct<HostEntry>), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("dns_host_entry", "dns_host_entry& opAssign(const dns_host_entry&in e)", asMETHOD(HostEntry, operator=), asCALL_THISCALL);
 	engine->RegisterObjectMethod("dns_host_entry", "const string& get_name() const property", asMETHOD(HostEntry, name), asCALL_THISCALL);
@@ -571,13 +576,15 @@ class http : public RefCountedObject, Runnable, public SynchronizedObject {
 	HTTPRequest _request;
 	HTTPResponse _response;
 	HTTPCredentials _creds;
+	UUID _uuid;
 	string _request_body, _response_body, _user_agent;
 	Thread worker;
 	URI _url;
 	streamsize _bytes_downloaded;
-	atomic<int> _max_retries, _retry_delay;
+	atomic<bool> _keepalive;
+	atomic<unsigned int> _max_retries, _retry_delay, _connect_timeout, _send_timeout, _receive_timeout, _keepalive_timeout;
 public:
-	http() : _session(nullptr), _bytes_downloaded(0), _max_retries(10), _retry_delay(0) { set_user_agent(); }
+	http() : _session(nullptr), _uuid(UUIDGenerator::defaultGenerator().createOne()), _bytes_downloaded(0), _max_retries(10), _retry_delay(0), _keepalive(false), _connect_timeout(30000), _send_timeout(60000), _receive_timeout(60000),  _keepalive_timeout(10000) { set_user_agent(); }
 	bool request(const string& method, const URI& url, const NameValueCollection* headers, const string& body, const HTTPCredentials* creds = nullptr) {
 		if (worker.isRunning()) return false;
 		if (url.getScheme() != "http" && url.getScheme() != "https") return false;
@@ -594,13 +601,13 @@ public:
 		if (!url.getUserInfo().empty()) _creds.fromURI(url);
 		_request_body = body;
 		if (headers) {
-			for (const auto& header : *headers) _request.add(header.first, header.second);
+			for (const auto& header : *headers) _request.set(header.first, header.second);
 		}
 		worker.start(*this);
 		return true;
 	}
 	~http() { reset(); }
-	void reset() {
+	void reset(bool configuration = false) {
 		if (worker.isRunning()) {
 			notify();
 			worker.join();
@@ -609,15 +616,27 @@ public:
 		_creds.clear();
 		_request = HTTPRequest(HTTPMessage::HTTP_1_1);
 		_request.setContentLength(0);
-		_request.set("User-Agent", "nvgt " + NVGT_VERSION);
+		_request.set("User-Agent", _user_agent);
 		_response.clear();
 		_max_retries = 10;
 		_bytes_downloaded = _retry_delay = 0;
+		if (configuration) {
+			_keepalive = false;
+			_connect_timeout = 30000;
+			_send_timeout = _receive_timeout = 60000;
+			_keepalive_timeout = 30000;
+		}
 		tryWait(0); // Try making sure the event is not signaled.
 	}
 	bool get(const URI& url, const NameValueCollection* headers, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_GET, url, headers, "", creds); }
 	bool head(const URI& url, const NameValueCollection* headers, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_HEAD, url, headers, "", creds); }
 	bool post(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_POST, url, headers, body, creds); }
+	bool put(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_PUT, url, headers, body, creds); }
+	bool options(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_OPTIONS, url, headers, body, creds); }
+	bool delete_(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_DELETE, url, headers, body, creds); }
+	bool trace(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_TRACE, url, headers, body, creds); }
+	bool connect(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_CONNECT, url, headers, body, creds); }
+	bool patch(const URI& url, const string& body, const NameValueCollection* headers = nullptr, const HTTPCredentials* creds = nullptr) { return request(HTTPRequest::HTTP_PATCH, url, headers, body, creds); }
 	void run() {
 		bool authorize = false;
 		int tries = _max_retries;
@@ -627,39 +646,40 @@ public:
 			try {
 				string path = _url.getPathAndQuery();
 				if (path.empty()) path = "/";
-				lock();
 				HTTPRequest req(_request);
-				req.setHost(_url.getHost());
-				req.setURI(path);
-				unlock();
-				if (req.getContentType() == HTTPMessage::UNKNOWN_CONTENT_TYPE) req.setContentType("application/x-www-form-urlencoded");
-				lock();
 				HTTPResponse tmp_response = _response;
-				if (!_session) _session = _url.getScheme() == "http"? new HTTPClientSession(_url.getHost(), _url.getPort()) : new HTTPSClientSession(_url.getHost(), _url.getPort());
-				if (authorize) _creds.authenticate(req, tmp_response);
+				{
+					ScopedLock lock(*this);
+					req.setHost(_url.getHost());
+					req.setURI(path);
+					if (req.getContentType() == HTTPMessage::UNKNOWN_CONTENT_TYPE) req.setContentType("application/x-www-form-urlencoded");
+					if (!_session) _session = _url.getScheme() == "http"? new HTTPClientSession(_url.getHost(), _url.getPort()) : new HTTPSClientSession(_url.getHost(), _url.getPort());
+					if (authorize) _creds.authenticate(req, tmp_response);
+					_session->setKeepAlive(_keepalive);
+					_session->setTimeout(_connect_timeout * 1000, _send_timeout * 1000, _receive_timeout * 1000);
+					_session->setKeepAliveTimeout(_keepalive_timeout * 1000);
+				}
 				std::ostream& ostr = _session->sendRequest(req);
-				unlock();;
 				if (tryWait(0)) break;
 				ostr << _request_body;
 				std::istream& istr = _session->receiveResponse(tmp_response);
-				lock();
-				_response = tmp_response;
-				bool moved = (_response.getStatus() == HTTPResponse::HTTP_MOVED_PERMANENTLY || _response.getStatus() == HTTPResponse::HTTP_FOUND || _response.getStatus() == HTTPResponse::HTTP_SEE_OTHER || _response.getStatus() == HTTPResponse::HTTP_TEMPORARY_REDIRECT);
-				if (moved) {
-					_url.resolve(_response.get("Location"));
-					authorize = false;
-					delete _session;
-					_session = nullptr;
-					unlock();
-					continue;
-				} else if (_response.getStatus() == HTTPResponse::HTTP_UNAUTHORIZED && !authorize && !_creds.empty()) {
-					unlock();
-					authorize = true;
-					NullOutputStream null;
-					StreamCopier::copyStream(istr, null);
-					continue;
-				}
-				unlock();
+				{
+					ScopedLock lock(*this);
+					_response = tmp_response;
+					bool moved = (_response.getStatus() == HTTPResponse::HTTP_MOVED_PERMANENTLY || _response.getStatus() == HTTPResponse::HTTP_FOUND || _response.getStatus() == HTTPResponse::HTTP_SEE_OTHER || _response.getStatus() == HTTPResponse::HTTP_TEMPORARY_REDIRECT);
+					if (moved) {
+						_url.resolve(_response.get("Location"));
+						authorize = false;
+						delete _session;
+						_session = nullptr;
+						continue;
+					} else if (_response.getStatus() == HTTPResponse::HTTP_UNAUTHORIZED && !authorize && !_creds.empty()) {
+						authorize = true;
+						NullOutputStream null;
+						StreamCopier::copyStream(istr, null);
+						continue;
+					}
+				};
 				while (istr.good() && !tryWait(0)) {
 					istr.read(download_buffer.data(), download_buffer.size());
 					streamsize count = istr.gcount();
@@ -671,7 +691,6 @@ public:
 			} catch(Exception& e) {
 				if (_session) delete _session;
 				_session = nullptr;
-				unlock();
 				return;
 			}
 		}
@@ -711,15 +730,26 @@ public:
 		ScopedLock lock(*this);
 		return _url;
 	}
+	const UUID& get_uuid() const { return _uuid; }
 	string get_user_agent() const { return _user_agent; }
 	void set_user_agent(const string& agent = "") {
 		if (agent.empty()) _user_agent = "nvgt " + NVGT_VERSION;
 		else _user_agent = agent;
 	}
-	int get_max_retries() const { return _max_retries; }
-	void set_max_retries(int retries) { _max_retries = retries; }
-	int get_retry_delay() const { return _retry_delay; }
-	void set_retry_delay(int delay = 0) { _retry_delay = delay; }
+	unsigned int get_max_retries() const { return _max_retries; }
+	void set_max_retries(unsigned int retries) { _max_retries = retries; }
+	unsigned int get_retry_delay() const { return _retry_delay; }
+	void set_retry_delay(unsigned int delay = 0) { _retry_delay = delay; }
+	bool get_keepalive() const { return _keepalive; }
+	void set_keepalive(bool enabled) { _keepalive = enabled; }
+	unsigned int get_connect_timeout() const { return _connect_timeout; }
+	void set_connect_timeout(unsigned int timeout) { _connect_timeout = timeout; }
+	unsigned int get_send_timeout() const { return _send_timeout; }
+	void set_send_timeout(unsigned int timeout) { _send_timeout = timeout; }
+	unsigned int get_receive_timeout() const { return _receive_timeout; }
+	void set_receive_timeout(unsigned int timeout) { _receive_timeout = timeout; }
+	unsigned int get_keepalive_timeout() const { return _keepalive_timeout; }
+	void set_keepalive_timeout(unsigned int timeout) { _keepalive_timeout = timeout; }
 	void wait() {
 		if (!worker.isRunning()) return;
 		return worker.join();
@@ -740,23 +770,40 @@ void RegisterHTTP(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("http", "bool get(const spec::uri&in url, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, get), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "bool head(const spec::uri&in url, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, head), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "bool post(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, post), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool put(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, put), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool options(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, options), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool delete(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, delete_), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool trace(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, trace), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool connect(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, connect), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool patch(const spec::uri&in url, const string&in body, const name_value_collection@+ headers = null, const http_credentials@+ creds = null)", asMETHOD(http, patch), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "http_response@ get_response_headers() property", asMETHOD(http, get_response_headers), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "string get_response_body() property", asMETHOD(http, get_response_body), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "string request()", asMETHOD(http, get_response_body), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "string opIndex(const string&in key)", asMETHOD(http, operator[]), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "spec::uri get_url() property", asMETHOD(http, get_url), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "const uuid& get_uuid() const property", asMETHOD(http, get_uuid), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "float get_progress() property", asMETHOD(http, get_progress), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "int get_status_code() property", asMETHOD(http, get_status_code), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "string get_user_agent() const property", asMETHOD(http, get_user_agent), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "void set_user_agent(const string&in agent = \"\") property", asMETHOD(http, set_user_agent), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http", "int get_max_retries() const property", asMETHOD(http, get_max_retries), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http", "void set_max_retries(int retries) property", asMETHOD(http, set_max_retries), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http", "int get_retry_delay() const property", asMETHOD(http, get_retry_delay), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http", "void set_retry_delay(int delay = 0) property", asMETHOD(http, set_retry_delay), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "uint get_max_retries() const property", asMETHOD(http, get_max_retries), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_max_retries(uint retries) property", asMETHOD(http, set_max_retries), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "uint get_retry_delay() const property", asMETHOD(http, get_retry_delay), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_retry_delay(uint delay = 0) property", asMETHOD(http, set_retry_delay), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "bool get_keepalive() const property", asMETHOD(http, get_keepalive), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_keepalive(bool enabled) property", asMETHOD(http, set_keepalive), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "uint get_connect_timeout() const property", asMETHOD(http, get_connect_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_connect_timeout(uint timeout) property", asMETHOD(http, set_connect_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "uint get_send_timeout() const property", asMETHOD(http, get_send_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_send_timeout(uint timeout) property", asMETHOD(http, set_send_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "uint get_receive_timeout() const property", asMETHOD(http, get_receive_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_receive_timeout(uint timeout) property", asMETHOD(http, set_receive_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "uint get_keepalive_timeout() const property", asMETHOD(http, get_keepalive_timeout), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void set_keepalive_timeout(uint timeout) property", asMETHOD(http, set_keepalive_timeout), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "bool get_complete() property", asMETHOD(http, is_complete), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "bool get_running() property", asMETHOD(http, is_running), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http", "void wait()", asMETHOD(http, wait), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http", "void reset()", asMETHOD(http, reset), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http", "void reset(bool configuration = false)", asMETHOD(http, reset), asCALL_THISCALL);
 }
 
 // NVGT's highest level HTTP.
@@ -764,7 +811,11 @@ string url_request(const string& method, const string& url, const string& data, 
 	http h;
 	if (!h.request(method, URI(url), nullptr, data)) return "";
 	h.wait();
-	if (resp) *resp = *h.get_response_headers();
+	if (resp) {
+		HTTPResponse* headers = h.get_response_headers();
+		*resp = *headers;
+		angelscript_refcounted_release(headers);
+	}
 	return h.get_response_body();
 }
 string url_get(const string& url, HTTPResponse* resp) { return url_request(HTTPRequest::HTTP_GET, url, "", resp); }
@@ -772,6 +823,9 @@ string url_post(const string& url, const string& data, HTTPResponse* resp) { ret
 
 void RegisterInternet(asIScriptEngine* engine) {
 	SSLManager::instance().initializeClient(NULL, new AcceptCertificateHandler(false), new Context(Context::TLS_CLIENT_USE, ""));
+	FTPStreamFactory::registerFactory();
+	HTTPStreamFactory::registerFactory();
+	HTTPSStreamFactory::registerFactory();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
 	map<string, int> http_statuses({
 		{"HTTP_CONTINUE", 100}, {"HTTP_SWITCHING_PROTOCOLS", 101}, {"HTTP_PROCESSING", 102}, {"HTTP_OK", 200}, {"HTTP_CREATED", 201}, {"HTTP_ACCEPTED", 202}, {"HTTP_NONAUTHORITATIVE", 203}, {"HTTP_NO_CONTENT", 204}, {"HTTP_RESET_CONTENT", 205}, {"HTTP_PARTIAL_CONTENT", 206}, {"HTTP_MULTI_STATUS", 207}, {"HTTP_ALREADY_REPORTED", 208}, {"HTTP_IM_USED", 226},
@@ -781,7 +835,7 @@ void RegisterInternet(asIScriptEngine* engine) {
 	});
 	engine->RegisterEnum("http_status");
 	for (const auto& k : http_statuses) engine->RegisterEnumValue("http_status", k.first.c_str(), k.second);
-	engine->RegisterGlobalFunction("string http_status_reason(http_status)", asFUNCTION(HTTPResponse::getReasonForStatus), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string http_status_reason(http_status status)", asFUNCTION(HTTPResponse::getReasonForStatus), asCALL_CDECL);
 	engine->RegisterGlobalProperty("const string HTTP_1_0", (void*)&HTTPMessage::HTTP_1_0);
 	engine->RegisterGlobalProperty("const string HTTP_1_1", (void*)&HTTPMessage::HTTP_1_1);
 	engine->RegisterGlobalProperty("const string HTTP_IDENTITY_TRANSFER_ENCODING", (void*)&HTTPMessage::IDENTITY_TRANSFER_ENCODING);

@@ -1,0 +1,9 @@
+void test_path_joining() {
+	spec::path base("home");
+	spec::path joined = base / "quin" / "nvgt";
+	assert(joined.to_string(spec::PATH_STYLE_UNIX) == "home/quin/nvgt");
+	spec::path joined_path = base / spec::path("quin");
+	assert(joined_path.to_string(spec::PATH_STYLE_UNIX) == "home/quin");
+	spec::path abs = base / spec::path("/abs", spec::PATH_STYLE_UNIX);
+	assert(abs.to_string(spec::PATH_STYLE_UNIX) == "/abs");
+}

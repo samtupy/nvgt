@@ -11,5 +11,5 @@
 
 // Example:
 void main() {
-	urlopen("https://nvgt.gg");
+	urlopen("https://nvgt.dev");
 }

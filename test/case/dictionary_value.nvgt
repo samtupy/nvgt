@@ -1,0 +1,9 @@
+void test_dictionary_value() {
+	dictionary d;
+	d["test"] = 123;
+	d["test"] = 456;  // Overwrite value
+	int r = int(d["test"]);
+	
+	assert(d.get_size() == 1);  // Still only one key
+	assert(r == 456);  // Value was overwritten
+}

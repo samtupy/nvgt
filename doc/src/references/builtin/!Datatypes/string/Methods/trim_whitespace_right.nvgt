@@ -1,5 +1,5 @@
 /**
-	Trims any and all whitespace from the right side of a string.
+	Trims any and all whitespace from the right side of a string, returning a new string.
 	string string::trim_whitespace_right();
 	## Returns:
 		string: the specified string, with the whitespace removed from the right side.

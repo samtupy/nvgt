@@ -1,0 +1,18 @@
+/**
+	A list of the names of all sound input devices, such as microphones, available on the system.
+	const string[]@ sound_input_devices;
+	## Remarks:
+		The index of a device in this array is the device number accepted by the `microphone` constructor. Passing -1 instead of an index selects the system's default input device.
+		The array may be empty if the system has no input devices. It is the same array every time you access this property, so don't modify it. Make a copy first if you want to change it, for example to build a menu.
+		Reading this property starts the sound system if it hasn't been started yet.
+*/
+
+// Example:
+void main() {
+	const string[]@ devices = sound_input_devices;
+	if (devices.length() == 0) {
+		alert("Input devices", "No input devices were found.");
+		return;
+	}
+	alert("Input devices", "The following input devices are available: " + join(devices, ", "));
+}

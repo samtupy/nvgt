@@ -1,0 +1,21 @@
+/**
+	Determine whether a file with a given name exists in the pack.
+	bool pack_file::file_exists(const string&in filename);
+	## Arguments:
+		* const string&in filename: the internal name of the file to look for.
+	## Returns:
+		bool: true if the pack contains the file, false if not or if no pack is open.
+	## Remarks:
+		This works for packs opened with either `create()` or `open()`. Names are case sensitive, so `music.ogg` and `Music.ogg` are different files.
+*/
+
+// Example:
+void main() {
+	pack_file p;
+	p.create("example.dat");
+	p.add_memory("music.ogg", "not really music");
+	alert("music.ogg exists", p.file_exists("music.ogg") ? "yes" : "no");
+	alert("Music.ogg exists", p.file_exists("Music.ogg") ? "yes" : "no");
+	p.close();
+	file_delete("example.dat");
+}

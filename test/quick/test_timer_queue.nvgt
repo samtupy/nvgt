@@ -1,5 +1,5 @@
 // NonVisual Gaming Toolkit (NVGT)
-// Copyright (C) 2022-2024 Sam Tupy
+// Copyright (C) 2022-2025 Sam Tupy
 // License: zlib (see license.md in the root of the NVGT distribution)
 
 #include "bgt_compat.nvgt"
@@ -38,5 +38,7 @@ void main() {
 			screen_reader_speak_interrupt(NVDA, timers.size());
 		if (key_pressed(KEY_3))
 			timers.restart("3");
+		if(key_pressed(KEY_RETURN))
+			screen_reader_speak_interrupt(NVDA, timers.ticks_to_next_event(1000));
 	}
 }

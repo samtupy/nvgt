@@ -20,7 +20,7 @@ Finally, a special argument, two hyphens without any following text, indicates t
 The following is a list of all available command line arguments, though note that it is best to directly run `nvgt --help` yourself encase this list is in any way out of date as nvgt's --help argument will always be more accurate because the text it prints is dynamically generated.
 * -c, --compile: compile script in release mode
 * -C, --compile-debug: compile script in debug mode
-* -pplatform, --platform=platform: select target platform to compile for (auto|android|windows|linux|mac)
+* -pplatform, --platform=platform: select target platform to compile for (auto|android|windows|linux|mac|ios)
 * -q, --quiet: do not output anything upon successful compilation
 * -Q, --QUIET: do not output anything (work in progress), error status must be determined by process exit code (intended for automation)
 * -d, --debug: run with the Angelscript debugger
@@ -31,18 +31,18 @@ The following is a list of all available command line arguments, though note tha
 * -h, --help: display available command line options
 
 ## Configuration files
-Both because command line arguments can become exhausting to type for every script execution for a while and because NVGT contains far too many configuration options to make command line arguments out of, NVGT also supports configuration files which can be used either on a global or a project level to further direct NVGT.
+Both because command line arguments can become exhausting to type for every script execution, and because NVGT contains far too many configuration options to make command line arguments out of, NVGT also supports configuration files which can be used either on a global or a project level to further direct NVGT.
 
-Configuration files can either be in ini, json or properties formats and are loaded from multiple locations. Values in these configuration files are usually separated into sections in some form, for example settings controlling the user interface typically go in the application subsection while directives that provide control over Angelscript's engine properties are in a subsection called scripting. The way these directives in various subsections are defined depends on the configuration format you choose, however you can use any combination of configuration formats at once to suit your needs. Though all supported configuration formats are more or less standard, you can find examples of and notes on each format below.
+Configuration files can either be in ini, json or properties formats and are loaded from multiple locations. Values in these configuration files are usually separated into sections in some form. Settings controlling the user interface typically go in the application subsection, while directives that provide control over Angelscript's engine properties are in a subsection called scripting. The way these directives in various subsections are defined depends on the configuration format you choose, however you can use any combination of configuration formats at once to suit your needs. Though all supported configuration formats are more or less standard, you can find examples of and notes on each format below.
 
-Configuration files at any given location have a priority attached to them to resolve directive conflicts. For example if a global configuration file and a project configuration file both contain the same option, the project file takes priority.
+Configuration files at any given location have a priority attached to them to resolve directive conflicts. For instance, if a global configuration file and a project configuration file both contain the same option, the project file takes priority.
 
 ### Loaded configuration files
-The following configuration files are loaded listed in order of priority from lowest to highest:
-* config.ini, config.json and config.properties in the same directory as the nvgt application
-* exe_basename.ini, exe_basename.json and exe_basename.properties in the same directory as the nvgt compiler or any parent, where exe_basename is the name of nvgt's running executable without the extension (nvgt.json, nvgtw.ini)
-* .nvgtrc (ini format) in the same directory containing the nvgt script that is getting executed or in any parent
-* script_basename.ini, script_basename.json or script_basename.properties in the same directory as the nvgt script about to be run, where script_basename is the name of the nvgt script without an extension (mygame.nvgt = mygame.properties)
+The following configuration files are loaded listed in order of priority from highest to lowest:
+* Script-dependent project configuration: script_basename.ini, script_basename.json or script_basename.properties in the same directory as the nvgt script about to be run, where script_basename is the name of the nvgt script without an extension (mygame.nvgt = mygame.properties)
+* Script independent project configuration: .nvgtrc (ini format) in the same directory containing the nvgt script that is getting executed or in any parent
+* Compiler dependent global configuration: exe_basename.ini, exe_basename.json and exe_basename.properties in NVGT's installed directory or any parent, where exe_basename is the name of nvgt's running executable without the extension (for example nvgt.json or nvgtw.ini)
+* Compiler independent global configuration: config.ini, config.json and config.properties in NVGT's installed directory.
 
 ### Supported configuration formats
 NVGT supports 3 widely standard configuration formats, all of which have their own advantages and disadvantages. It is perfectly acceptable to create multiple configuration files with the same name but with different extension, all keys from all files will load and be combined. If the files nvgt.json and nvgt.ini both exist and both set the same key to a different value, however, the result is a bit less defined as to what key is actually used and typically depends on what file was internally loaded first by the engine.

@@ -1,8 +1,8 @@
 /* xplatform.h - header for various cross platform macros and routines
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -16,15 +16,44 @@
 #include <Poco/Path.h>
 #ifdef __APPLE__
 #include <TargetConditionals.h>
+#include "apple.h"
+#elif defined(_WIN32)
+#include "win.h"
 #endif
 
 class asIScriptEngine;
 
+// Native window handle type and SDL property name for the current platform.
+#ifndef NVGT_NATIVE_WINDOW_DEFINED
+#define NVGT_NATIVE_WINDOW_DEFINED
+#ifdef _WIN32
+typedef HWND native_window_t;
+#define NATIVE_WINDOW_SDL_PROP SDL_PROP_WINDOW_WIN32_HWND_POINTER
+#elif defined(__APPLE__)
+#ifndef TARGET_OS_IPHONE
+typedef void* native_window_t; // NSWindow*, cast in .mm code
+#define NATIVE_WINDOW_SDL_PROP SDL_PROP_WINDOW_COCOA_WINDOW_POINTER
+#else
+typedef void* native_window_t; // UIWindow*, cast in .mm code
+#define NATIVE_WINDOW_SDL_PROP SDL_PROP_WINDOW_UIKIT_WINDOW_POINTER
+#endif
+#elif defined(__ANDROID__)
+typedef void* native_window_t; // ANativeWindow*
+#define NATIVE_WINDOW_SDL_PROP SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER
+#else
+typedef void* native_window_t;
+#endif
+#endif
+
 bool running_on_mobile();
+std::string get_font_path(const std::string& name);
+void register_native_tts(); // Actual function exists in either android.cpp, apple.mm, linux.cpp or win.cpp, of which only one will be built.
 #ifndef NVGT_STUB
 void determine_compile_platform();
 void xplatform_correct_path_to_stubs(Poco::Path& stubpath);
 std::string get_nvgt_lib_directory(const std::string& platform);
+#else
+std::string get_data_location();
 #endif
 #if defined(__ANDROID__) || defined(__APPLE__) && TARGET_OS_IPHONE
 #define NVGT_MOBILE
@@ -35,5 +64,9 @@ std::string event_requested_file();
 #ifdef __ANDROID__
 std::string android_get_main_shared_object();
 #endif
+
+void lost_window_focus_platform();
+void regained_window_focus_platform();
+unsigned long long system_running_milliseconds();
 
 void RegisterXplatform(asIScriptEngine* engine);

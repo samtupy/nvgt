@@ -1,0 +1,25 @@
+/**
+	The signature of a function that produces a stat's display text.
+	funcdef string stat_callback(stat@ stat);
+	## Arguments:
+		* stat@ stat: the stat being displayed.
+	## Returns:
+		string: the text to show for the stat.
+	## Remarks:
+		Pass a stat_callback to `stat_set::add()` when a text template isn't flexible enough, for example to format a number of seconds as minutes and seconds, or to choose singular or plural wording.
+		The callback is called every time the stat is converted to a string, including when the whole set is converted to a `string[]`.
+*/
+
+// Example:
+#include "stat_set.nvgt"
+
+string format_time(stat@ s) {
+	int seconds = int(s.val);
+	return "Time played: " + (seconds / 60) + " minutes, " + (seconds % 60) + " seconds";
+}
+
+void main() {
+	stat_set stats;
+	stats.add("time", 754, "", format_time);
+	alert("Example", string(stats["time"]));
+}

@@ -1,6 +1,6 @@
 /**
 	Determine if a key exists in the JSON object.
-	bool json_object::exists(const string?&in key);
+	bool json_object::exists(const string&in key) const;
 	## Arguments:
 		* const string&in key: the key to search for.
 	## Returns:

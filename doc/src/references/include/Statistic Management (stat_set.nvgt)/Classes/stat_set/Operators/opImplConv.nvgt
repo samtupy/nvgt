@@ -1,0 +1,19 @@
+/**
+	Converts the set to a list of display strings.
+	string[]@ stat_set::opImplConv() const;
+	## Returns:
+		string[]@: the display text of every stat, in the order the stats were added.
+	## Remarks:
+		Each entry is what you get by converting that stat to a string, so it uses the stat's text template or callback. This makes it simple to show all statistics in a menu, a list box or a single alert.
+*/
+
+// Example:
+#include "stat_set.nvgt"
+
+void main() {
+	stat_set stats;
+	stats.add("level", 5, "Level: %0");
+	stats.add("class", "ranger", "Class: %0");
+	string[] lines = stats;
+	alert("Character", join(lines, "\r\n"));
+}

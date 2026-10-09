@@ -1,0 +1,24 @@
+/**
+	Merges another stat set into this one with `+=`.
+	stat_set@ stat_set::opAddAssign(const stat_set&in other);
+	## Arguments:
+		* const stat_set&in other: the set to add.
+	## Returns:
+		stat_set@: this set.
+	## Remarks:
+		For each stat in the other set, a stat with the same name in this set has the other value added to it, and a stat that doesn't exist yet is copied over along with its text template, callback and user data.
+		This is handy for adding the statistics of one round to a player's totals.
+*/
+
+// Example:
+#include "stat_set.nvgt"
+
+void main() {
+	stat_set totals, round;
+	totals.add("kills", 10, "Total kills: %0");
+	round.add("kills", 3);
+	round.add("headshots", 1, "Headshots: %0");
+	totals += round;
+	string[] lines = totals;
+	alert("Example", join(lines, ", "));
+}

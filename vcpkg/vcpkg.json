@@ -1,0 +1,128 @@
+{
+  "dependencies": [
+    "enet6",
+    "fast-float",
+    "libflac",
+    "libffi",
+    "miniaudio",
+    "miniupnpc",
+    "libobfuscate",
+    "zlib",
+    "libogg",
+    "libopusenc",
+    "opus",
+    "opusfile",
+    "sdl3-image",
+    "sdl3-ttf",
+    "tiny-aes-c",
+    "tinyexpr",
+    "unordered-dense",
+    "libvorbis",
+    "angelscript",
+    "angelscript-nc",
+    "reactphysics3d",
+    "steam-audio-official",
+    {
+      "name": "openssl",
+      "default-features": false
+    },
+    {
+      "name": "curl",
+      "default-features": false,
+      "features": [
+        "openssl"
+      ]
+    },
+    {
+      "name": "libplist",
+      "platform": "windows|osx|linux"
+    },
+    {
+      "name": "sdl3",
+      "features": [
+        "vulkan"
+      ],
+      "platform": "windows|osx|ios|android"
+    },
+    {
+      "name": "sdl3",
+      "platform": "linux",
+      "features": [
+        "vulkan",
+        "ibus",
+        "wayland",
+        "x11"
+      ]
+    },
+    {
+      "name": "freetype",
+      "default-features": false,
+      "features": [
+        "bzip2",
+        "error-strings",
+        "subpixel-rendering",
+        "zlib"
+      ]
+    },
+    {
+      "name": "universalspeech",
+      "platform": "windows"
+    },
+    {
+      "name": "bass",
+      "platform": "!ios"
+    },
+    {
+      "name": "bass-fx",
+      "platform": "!ios"
+    },
+    {
+      "name": "bassmix",
+      "platform": "!ios"
+    },
+    {
+      "name": "libmysofa",
+      "platform": "ios"
+    },
+    {
+      "name": "pffft",
+      "platform": "ios"
+    },
+    {
+      "name": "poco",
+      "default-features": false,
+      "features": [
+        "net",
+        "netssl",
+        "json",
+        "util",
+        "xml",
+        "encodings",
+        "mongodb",
+        "redis",
+        "jwt",
+        "prometheus",
+        "sevenzip"
+      ]
+    },
+    {
+      "name": "libgit2",
+      "default-features": false,
+      "features": [
+        "pcre2"
+      ]
+    },
+    {
+      "name": "libarchive",
+      "default-features": false,
+      "platform": "windows|osx|linux",
+      "features": [
+        "bzip2",
+        "lz4",
+        "lzma",
+        "zstd"
+      ]
+    }
+  ],
+  "builtin-baseline": "a0b1c8d3a477c1cb4813d8e127a56961707ca42b"
+}

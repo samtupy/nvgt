@@ -2,8 +2,8 @@
  * These are usually loaded with a "#pragma plugin pluginname" in nvgt code, and consist of either a dll file with an nvgt_plugin entry point or a static library.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -34,13 +34,13 @@ typedef struct {
 	nvgt_plugin_entry* e;
 	nvgt_plugin_version_func* v;
 } static_plugin_vtable;
-std::unordered_map<std::string, void*> loaded_plugins; // Contains handles to sdl objects.
+std::unordered_map<std::string, SDL_SharedObject*> loaded_plugins; // Contains handles to sdl objects.
 std::unordered_map<std::string, static_plugin_vtable>* static_plugins = NULL; // Contains pointers to static plugin entry points. This doesn't contain entry points for plugins loaded from a dll, rather those that have been linked statically into the executable produced by a custom build of nvgt. This is a pointer because the map is initialized the first time register_static_plugin is called so that we are not trusting in global initialization order.
 
 bool load_nvgt_plugin(const std::string& name, std::string* errmsg, void* user) {
 	nvgt_plugin_entry* entry = NULL;
 	nvgt_plugin_version_func* version = NULL;
-	void* obj = NULL;
+	SDL_SharedObject* obj = NULL;
 	if (loaded_plugins.contains(name)) return true; // plugin already loaded
 	if (static_plugins && static_plugins->contains(name)) {
 		entry = (*static_plugins)[name].e;

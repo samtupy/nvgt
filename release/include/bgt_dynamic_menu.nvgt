@@ -2,8 +2,8 @@
  * This include provides a fully dynamic and extendable menu system. It is set up to use both audio and Microsoft Sapi 5, even in one and the same menu. The dynamic_menu_item class holds all the parameters that are needed for each item, currently just a string which will either be the filename of the sound which should be played or the text that should be spoken when the user cycles over that option, plus a boolean that tells whether the option is text or a filename. Note that you should not make instances of the dynamic_menu_item class yourself.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * original dynamic_menu.bgt Copyright (C) 2010-2014 Blastbay Studios
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:

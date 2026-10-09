@@ -1,0 +1,13 @@
+/**
+	A read-only property representing the volume of the box, calculated based on min and max.
+	Note that "volume" here refers to total number of points, and is defined as extent.x * extent.y * extent.z.
+	float aabb::volume const;
+*/
+
+// Example:
+void main() {
+	aabb b;
+	b.min = vector(1, 2, 3);
+	b.max = vector(2, 4, 6);
+	alert("The volume of the box is", b.volume); // 6.
+}

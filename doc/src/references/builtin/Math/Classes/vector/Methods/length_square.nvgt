@@ -1,0 +1,14 @@
+/**
+	Retrieves the square length of the vector.
+	float vector::length_square();
+	## Arguments:
+		None.
+	## Remarks
+		This is similar to length except it does not perform the square root calculation.
+*/
+
+// Example:
+void main() {
+	vector v1(3, 4, 0);
+	alert("Length", v1.length_square());
+}

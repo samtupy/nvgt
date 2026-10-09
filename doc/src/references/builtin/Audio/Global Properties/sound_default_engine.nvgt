@@ -1,0 +1,14 @@
+/**
+	The audio engine used by sounds and audio nodes that aren't given one explicitly.
+	audio_engine@ sound_default_engine;
+	## Remarks:
+		New `sound` objects, the `sound_play()` function and the constructors of most audio classes use this engine unless you pass a different one. Properties such as `sound_output_device` and `sound_master_volume` also act on this engine.
+		You can assign a different engine, for example one created with the `AUDIO_ENGINE_NO_DEVICE` flag so that audio is rendered into memory instead of being played. Only sounds created after the assignment use the new engine, while existing sounds keep the engine they were created with. Assigning null throws an exception, because a default engine must always exist.
+		Reading this property starts the sound system if it hasn't been started yet.
+*/
+
+// Example:
+void main() {
+	audio_engine@ engine = sound_default_engine;
+	alert("Default engine", "The default engine has " + engine.get_output_channels(0) + " output channels.");
+}

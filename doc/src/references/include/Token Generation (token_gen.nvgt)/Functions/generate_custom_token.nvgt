@@ -20,4 +20,5 @@
 void main() {
 	alert("Info", "Your A to C token is: " + generate_custom_token(10, {"a", "b", "c"}));
 	alert("Info", "A to C with capitals included token is: " + generate_custom_token(10, {"a", "b", "c", "A", "B", "C"}));
+	alert("Info", "A to C with capitals included but using string instead of array token is: " + generate_custom_token(10, "abcABC"));
 }

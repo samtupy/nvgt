@@ -9,8 +9,8 @@
   * Adds new dump function that will save all configuration data to disk. Returns true on success, false otherwise.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * settings.nvgt - Copyright (C) 2024 Ivan Soto
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
@@ -51,7 +51,7 @@ class settings_helper {
 		this.company_name = company;
 		this.product = product;
 		this.local_path = local_path;
-		bool ensure = ensure_data_path(this.get_data_path(), true);
+		bool ensure = ensure_data_path(this.get_data_path(), !local_path);
 		if (ensure) return this.open();
 		else return false;
 	}
@@ -111,7 +111,7 @@ class settings_helper {
 	bool dump() {
 		if (!this.active) return false;
 		string filepath = this.get_data_path();
-		if (!ensure_data_path(filepath, (this.local_path?false:true))) return false;
+		if (!ensure_data_path(filepath, !this.local_path)) return false;
 		string final_data = this.raw_dump();
 		file tempfile;
 		if (!tempfile.open(filepath, "wb")) return false;
@@ -458,7 +458,7 @@ class settings {
 		if (!this.active) return false;
 		string file_path = this.data_helper.get_data_path();
 		if (!file_delete(file_path)) return false;
-		string[]@ path = file_path.split("/");
+		string[]@ path = file_path.split("/\\", false);
 		path.remove_at(path.length() - 1);
 		if (this.has_other_products()) path.remove_at(path.length() - 1);
 		return directory_delete(join(path, "/"));
@@ -510,22 +510,8 @@ class settings {
 }
 bool ensure_data_path(const string&in filename, bool absolute = true) {
 	spec::path filePath;
-	if (!filePath.parse(filename)) {
-		return false;
-	}
+	if (!filePath.parse(filename)) return false;
 	filePath.make_file();
-	spec::path dirPath;
-	if(!absolute)  dirPath = filePath.get_parent();
-	else dirPath = filePath.absolute();
-	spec::path currentPath;
-	for (int i = 0; i < dirPath.depth; i++) {
-		currentPath.push_directory(dirPath[i]);
-		string fullPath = (system_is_windows and absolute? currentPath.device+"\\":"") + currentPath.to_string(spec::PATH_STYLE_NATIVE);
-		if (!directory_exists(fullPath)) {
-			if (!directory_create(fullPath)) {
-				return false;
-			}
-		}
-	}
-	return true;
+	if (!absolute) directory_create(filePath.parent); // otherwise handled by DIRECTORY_PREFERENCES
+	return directory_exists(filePath.parent);
 }

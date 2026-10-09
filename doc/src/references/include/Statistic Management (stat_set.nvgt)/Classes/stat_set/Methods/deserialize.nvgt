@@ -1,0 +1,38 @@
+/**
+	Loads stat values that were saved with `serialize()`.
+	1. bool stat_set::deserialize(const string&in data);
+	2. bool stat_set::deserialize(datastream@ ds);
+	## Arguments (1):
+		* const string&in data: the string returned by `serialize()`.
+	## Arguments (2):
+		* datastream@ ds: a stream to read the serialized data from, starting at its current position.
+	## Returns:
+		bool: true if the data was read completely, false if it was missing, damaged or cut short.
+	## Remarks:
+		Loading only updates stats that already exist in the set. Values for names that aren't in the set are skipped, so add every stat, with its text template or callback, before calling this. This also means that stats added in a newer version of your game simply keep their starting values when an older save is loaded.
+		Reading from a datastream lets you store the stats alongside other data in the same file.
+*/
+
+// Example:
+#include "stat_set.nvgt"
+
+stat_set@ create_stats() {
+	stat_set s;
+	s.add("level", 1, "Level %0");
+	s.add("gold", 0, "%0 gold");
+	return s;
+}
+
+void main() {
+	stat_set@ game = create_stats();
+	game["level"] = 4;
+	game["gold"] = 1200;
+	string save = game.serialize();
+	stat_set@ loaded = create_stats();
+	if (!loaded.deserialize(save)) {
+		alert("Error", "The save is damaged.");
+		return;
+	}
+	string[] lines = loaded;
+	alert("Loaded", join(lines, ", "));
+}

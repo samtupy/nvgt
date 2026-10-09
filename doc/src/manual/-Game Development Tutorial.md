@@ -427,7 +427,8 @@ This is where consts will save the day!
 
 Using them , we could rewrite our code like this:
 ```
-const int price_foldable_chair = 30;
+#include "speech.nvgt"
+const int price_folding_chair = 30;
 void main(){
     speak("Welcome to the camping store! You need to have " + price_folding_chair + " dollars to buy a folding chair.");
 }
@@ -703,7 +704,7 @@ If you are new, you can skip this brief section for now, as it's discussed in an
 
 There are a couple of  common misconceptions and mistakes made by even experienced coders when it comes to function parameters.
 
-For performance, it may seem intuitive to declare your primitive functions as const x &in references, but this is almost always useless, except in the case of strings.
+For performance, it may seem intuitive to declare your primitive functions as const x&in references, but this is almost always useless, except in the case of strings.
 
 The reason for this is the fundamental property of a reference: a pointer itself is a value of 8 bytes storing a memory address. As opposed to most primitives (ints etc), there is no advantage, as the new bytes still need to be allocated - it is just a different value that is placed into them (the address instead of a copy of the value).
 

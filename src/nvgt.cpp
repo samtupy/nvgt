@@ -1,8 +1,8 @@
 /* nvgt.cpp - program entry point
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -47,9 +47,10 @@
 	#include "../user/nvgt_config.h"
 #endif
 #include "random.h"    // random_seed()
+#include "random_interface.h"    // cleanup_default_random()
 #include "serialize.h" // current location of g_StringTypeid (subject to change)
 #include "sound.h"
-#include "srspeech.h"
+#include "tts.h"
 #include "UI.h" // message
 #include "version.h"
 #include "xplatform.h"
@@ -101,15 +102,12 @@ protected:
 		SetDllDirectoryW(dir_u.c_str());
 		CreateMutexW(nullptr, false, L"NVGTApplication"); // This mutex will automatically be freed by the OS on process termination so we don't need a handle to it, this exists only so the NVGT windows installer or anything else on windows can tell that NVGT is running without process enumeration.
 		#elif defined(__APPLE__)
-		std::string resources_dir = Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString();
-		if (Environment::has("MACOS_BUNDLED_APP")) {
-			// Use GUI instead of stdout and chdir to Resources directory.
+		if (Environment::has("MACOS_BUNDLED_APP") || running_on_mobile()) {
+			// Use GUI instead of stdout.
 			config().setString("application.gui", "");
-			#ifdef NVGT_STUB
-			ChDir(resources_dir);
-			#endif
 		}
 		#ifndef NVGT_STUB
+		string resources_dir = Path(config().getString("application.dir")).parent().pushDirectory("Resources").toString();
 		if (File(resources_dir).exists())
 			g_IncludeDirs.push_back(Path(resources_dir).pushDirectory("include").toString());
 		#endif
@@ -123,14 +121,14 @@ protected:
 		g_ScriptEngine = asCreateScriptEngine();
 		if (!g_ScriptEngine || PreconfigureEngine(g_ScriptEngine) < 0) throw ApplicationException("unable to initialize script engine");
 	}
-	void setupCommandLineProperty(const vector<string> &argv, int offset = 0) {
+	void setupCommandLineProperty(const vector<string>& argv, int offset = 0) {
 		// Prepare the COMMAND_LINE property used by scripts by combining all arguments into one string, for bgt backwards compatibility. NVGT also has a new ARGS array which we will also set up here.
 		if (!g_StringTypeid)
 			g_StringTypeid = g_ScriptEngine->GetStringFactory();
 		g_command_line_args = CScriptArray::Create(g_ScriptEngine->GetTypeInfoByDecl("string[]"));
 		for (unsigned int i = offset; i < argv.size(); i++) {
 			g_CommandLine += argv[i];
-			g_command_line_args->InsertLast((void *)&argv[i]);
+			g_command_line_args->InsertLast((void*)&argv[i]);
 			if (i < argv.size() - 1)
 				g_CommandLine += " ";
 		}
@@ -140,7 +138,7 @@ protected:
 		Application::defineOptions(options);
 		options.addOption(Option("compile", "c", "compile script in release mode").group("compiletype"));
 		options.addOption(Option("compile-debug", "C", "compile script in debug mode").group("compiletype"));
-		options.addOption(Option("platform", "p", "select target platform to compile for (auto|windows|linux|mac|android)", false, "platform", true).validator(new RegExpValidator("^(auto|windows|linux|mac|android)$")));
+		options.addOption(Option("platform", "p", "select target platform to compile for (auto|windows|linux|mac|android|ios)", false, "platform", true).validator(new RegExpValidator("^(auto|windows|linux|mac|android|ios)$")));
 		options.addOption(Option("quiet", "q", "do not output anything upon successful compilation").binding("application.quiet").group("quiet"));
 		options.addOption(Option("QUIET", "Q", "do not output anything (work in progress), error status must be determined by process exit code (intended for automation)").binding("application.QUIET").group("quiet"));
 		options.addOption(Option("debug", "d", "run with the Angelscript debugger").binding("application.as_debug"));
@@ -210,7 +208,7 @@ protected:
 	}
 	std::string UILauncher() {
 		// If the user launches NVGT's compiler without a terminal, let them select what to do from various options provided by simple dialogs. Currently the choice selection is one-shot and then we exit, but it might be turned into some sort of do-loop later so that the user can perform multiple selections in one application run.
-		std::vector<string> options = {"`Run a script", "Compile a script in release mode", "Compile a script in debug mode", "View version information", "View command line options", "Visit nvgt.gg on the web", "~Exit"};
+		std::vector<string> options = {"`Run a script", "Compile a script in release mode", "Compile a script in debug mode", "View version information", "View command line options", "Visit nvgt.dev on the web", "~Exit"};
 		#ifdef NVGT_MOBILE
 		options[1].insert(options[1].begin(), '\0');
 		options[2].insert(options[2].begin(), '\0');
@@ -222,8 +220,8 @@ protected:
 		} else if (option >= 1 && option <= 3) {
 			if (option >= 2) {
 				// compiling, select platform
-				vector<string> platforms = {"auto", "windows", "mac", "linux", "android"};
-				int platform_selection = message_box("NVGT Compiler", "Please select a platform to compile for.", {format("`Host platform (%s)", Environment::osName()), "Windows", "MacOS", "Linux", "Android", "~cancel"}, SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT);
+				vector<string> platforms = {"auto", "windows", "mac", "linux", "android", "ios"};
+				int platform_selection = message_box("NVGT Compiler", "Please select a platform to compile for.", {format("`Host platform (%s)", Environment::osName()), "Windows", "MacOS", "Linux", "Android", "iOS", "~cancel"}, SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT);
 				if (platform_selection <= 0 || platform_selection > platforms.size()) {
 					mode = NVGT_EXIT;
 					return "";
@@ -235,26 +233,20 @@ protected:
 				mode = NVGT_EXIT;
 				return "";
 			}
-			if (option > 1)
-				g_debug = option == 3;
+			if (option > 1) g_debug = option == 3;
 			mode = option == 1 ? NVGT_RUN : NVGT_COMPILE;
-			try {
-				// Try to change to the directory containing the selected script.
-				ChDir(Poco::Path(script).parent().toString());
-			} catch (...) {
-			} // If it fails, so be it.
 			return script;
 		} else if (option == 4 || option == 5) {
 			mode = option == 4 ? NVGT_VERSIONINFO : NVGT_HELP;
 			return "";
 		} else if (option == 6) {
 			mode = NVGT_EXIT;
-			urlopen("https://nvgt.gg");
+			urlopen("https://nvgt.dev");
 			return "";
 		}
 		return ""; // How did we get here?
 	}
-	virtual int main(const std::vector<std::string> &args) override {
+	virtual int main(const std::vector<std::string>& args) override {
 		// Determine the script file that is to be executed.
 		string scriptfile = "";
 		#if defined(__APPLE__) || defined(__ANDROID__)
@@ -310,9 +302,9 @@ protected:
 			return Application::EXIT_CONFIG;
 		}
 		#endif
-		g_scriptpath = Path(scriptfile).makeParent().toString();
+		g_scriptpath = Path(scriptfile).makeAbsolute().makeParent().toString();
 		setupCommandLineProperty(args, 1);
-		g_command_line_args->InsertAt(0, (void *)&scriptfile);
+		g_command_line_args->InsertAt(0, (void*)&scriptfile);
 		ConfigureEngineOptions(g_ScriptEngine);
 		if (mode == NVGT_RUN) {
 			if (CompileScript(g_ScriptEngine, scriptfile.c_str()) < 0) {
@@ -338,16 +330,20 @@ protected:
 		return retcode;
 	}
 	#else
-	virtual int main(const std::vector<std::string> &args) override {
+	virtual int main(const std::vector<std::string>& args) override {
 		setupCommandLineProperty(args);
 		std::string path_tmp;
-		g_command_line_args->InsertAt(0, (void *)&path_tmp);
+		g_command_line_args->InsertAt(0, (void*)&path_tmp);
 		int retcode = Application::EXIT_OK;
 		if (LoadCompiledExecutable(g_ScriptEngine) < 0 || (retcode = ExecuteScript(g_ScriptEngine, commandName().c_str())) < 0) {
 			ShowAngelscriptMessages();
 			return Application::EXIT_DATAERR;
 		}
+		#if defined(__APPLE__) && defined(NVGT_MOBILE)
+		_exit(retcode); // It's not recommended to call exit() on IOS but it does function, we'll let it work here but will recommend against it in docs.
+		#else
 		return retcode;
+		#endif
 	}
 	#endif
 	void uninitialize() override {
@@ -356,10 +352,11 @@ protected:
 		#ifdef _WIN32
 		timeEndPeriod(1);
 		#endif
-		ScreenReaderUnload();
+		screen_reader_unload();
 		InputDestroy();
 		uninit_sound();
 		anticheat_deinit();
+		cleanup_default_random();
 		if (g_ScriptEngine)
 			g_ScriptEngine->ShutDownAndRelease();
 		g_ScriptEngine = nullptr;
@@ -371,7 +368,7 @@ protected:
 #undef SDL_MAIN_HANDLED
 #undef SDL_main_h_
 #include <SDL3/SDL_main.h>
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
 	AutoPtr<Application> app = new nvgt_application();
 	try {
 		app->init(argc, argv);

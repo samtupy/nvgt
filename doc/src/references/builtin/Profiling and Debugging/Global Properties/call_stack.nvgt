@@ -1,0 +1,15 @@
+/**
+	Returns a description of the current call stack, that is the chain of function calls that led to the point where this property is read.
+	const string call_stack;
+	## Remarks:
+		The text begins with a line giving the call stack size, followed by one entry per function. The most recent function call comes first and `main` or another entry point comes last. Each entry gives the function's declaration, the file it is in, and the line and column currently being executed in it.
+		This is useful for logging and debugging, for example to record where an unexpected situation was detected. To get the call stack at the point where an exception was thrown, use `last_exception_call_stack` from within a catch block instead.
+*/
+
+// Example:
+void main() {
+	show_location();
+}
+void show_location() {
+	alert("Call stack", call_stack);
+}

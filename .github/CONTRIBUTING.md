@@ -3,7 +3,7 @@ Contributions to NVGT are extremely welcome and are what help the project grow. 
 
 ## issues
 If you've discovered a bug, please open a GitHub issue so we can try to fix it. However, please keep the following in mind when you do so:
-1. Please check the [Blog](https://nvgt.gg/blog/), the todo list and the existing list of issues and pull requests in case a record of the problem already exists, avoiding duplicate reports is appreciated.
+1. Please check the [Blog](https://nvgt.dev/blog/), the todo list and the existing list of issues and pull requests in case a record of the problem already exists, avoiding duplicate reports is appreciated.
 2. Please avoid 1 or 2 sentence issues such as "The speak function isn't working" or "Compiled script won't run on my Mac." At the moment there is not much strictness in how issues must be written, however it is asked that you please put some effort into your issue descriptions E. if code doesn't work how you expect, please provide preferably a sample or at least steps to reproduce, or if something won't run, please provide preferably debug output like a stack trace or at least platform details and/or an exact error message.
 3. Please keep your issue comments strictly on topic, and try editing them rather than double posting if you come up with an amendment to your comment shortly after posting it. Avoid repeated queries.
 4. If you have a question rather than a bug to report, please open a discussion rather than an issue.
@@ -22,5 +22,10 @@ Pull requests are also very welcome and are generally the quickest path to getti
     2. Any license which requires only source code attribution or conditional attribution and does not mandate binary attribution; and
     3. Any license which employs non-viral copyleft measures, such as file-based copyleft, when such measures do not extend to the entire project or derivative works created by end-users.
     If you wish to add code or a dependency that requires binary attribution, please start a discussion to get approval first. This gives us time to evaluate how it might affect downstream users, since such attribution impacts everyone regardless of who they are or their experience level. We aim to avoid placing this burden on downstream users, but we recognize that it might not always be possible.
+
+## AI-generated code
+
+1. If your pull request contains code substantively authored by an AI model, or if you utilize an AI model for code review assistance, you are strictly required to review and test the changes as thoroughly as possible. You must ensure that you fully understand the logic, implementation details, and potential side effects of the code you are submitting. It is your responsibility to verify that the submission integrates correctly with the existing codebase and does not introduce regressions or breaking changes. Pull requests that fail to meet this standard of verification will be rejected.
+2. Do not submit pull requests that are wholly authored by AI models. We actively audit submissions for AI-generated content; such PRs will be identified and rejected upon discovery. Violations of this rule will result in a formal warning process. Contributors will be issued up to two warnings for infractions. If this rule is violated after warnings have been provided, you will be permanently banned from submitting future pull requests to the NVGT project.
 
 Please note that these guidelines may be updated at any time. Thanks for your interest in contributing!

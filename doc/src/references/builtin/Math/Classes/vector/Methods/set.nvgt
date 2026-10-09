@@ -1,0 +1,15 @@
+/**
+	Set new values on a vector.
+	void vector::set(float x, float y, float z);
+	## Arguments:
+		* float x: The new x point or coordinate this vector represents.
+		* float y: The new y point or coordinate this vector represents.
+		* float z: The new z point or coordinate this vector represents.
+*/
+
+// Example:
+void main() {
+	vector v1(5, 5, 5);
+	v1.set(10, 12, 14);
+	alert("example", "the new vector is "+v1.x + ", " + v1.y + ", " + v1.z); // will show that the vector is 10, 12, 14.
+}

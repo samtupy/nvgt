@@ -1,0 +1,11 @@
+/**
+	Represents the minimum coordinates (bottom left corner) of the box.
+	vector aabb::min const;
+*/
+
+// Example:
+void main() {
+	aabb b;
+	b.min = vector(1, 3, 5);
+	alert("The bottom left corner of the box is located at", round(b.min.x, 0)+", "+round(b.min.y, 0)+", "+round(b.min.z, 0));
+}

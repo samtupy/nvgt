@@ -1,0 +1,17 @@
+/**
+	The operating system the program is running on, as a value from the `OPERATING_SYSTEM` enum.
+	const OPERATING_SYSTEM OS;
+	## Remarks:
+		This value is decided when NVGT itself is built, so it describes the operating system family the running copy of NVGT was made for. For example, it is `OS_WINDOWS_NT` on every version of Windows and `OS_DARWIN` on both macOS and iOS.
+		If you only need a human readable name or a simple check, the `PLATFORM` property and functions such as `system_is_windows` may be easier to use.
+*/
+
+// Example:
+void main() {
+	if (OS == OS_WINDOWS_NT)
+		alert("Example", "This program is running on Windows.");
+	else if (OS == OS_LINUX || OS == OS_ANDROID)
+		alert("Example", "This program is running on Linux or Android.");
+	else
+		alert("Example", "The operating system code is " + OS);
+}

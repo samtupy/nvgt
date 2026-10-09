@@ -3,7 +3,7 @@
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2025 Sam Tupy
- * https://nvgt.gg
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -210,6 +210,6 @@ void RegisterScriptCombination(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("combination", "bool generate_unique_combinations(int items, int size)", asMETHODPR(combination_api, generate_unique_combinations, (int, int), bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("combination", "bool generate_unique_combinations(int items, int min_size, int max_size)", asMETHODPR(combination_api, generate_unique_combinations, (int, int, int), bool), asCALL_THISCALL);
 	engine->RegisterObjectMethod("combination", "bool generate_permutations(int items)", asMETHOD(combination_api, generate_permutations), asCALL_THISCALL);
-	engine->RegisterObjectMethod("combination", "bool next(int[]@ list)", asMETHOD(combination_api, next), asCALL_THISCALL);
+	engine->RegisterObjectMethod("combination", "bool next(int[]@+ list)", asMETHOD(combination_api, next), asCALL_THISCALL);
 	engine->RegisterObjectMethod("combination", "bool get_active() property", asMETHOD(combination_api, is_active), asCALL_THISCALL);
 }

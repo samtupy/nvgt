@@ -1,21 +1,25 @@
 LOCAL_PATH := $(call my-dir)
-LIBPATH := ../droidev/libs/$(TARGET_ARCH_ABI)
+LIBPATH := ../droidev/lib
 ifneq ($(wildcard Custom.mk),)
 include Custom.mk
 endif
 include $(CLEAR_VARS)
 
 # static libraries
+LOCAL_MODULE    := tiny-aes-c
+LOCAL_SRC_FILES := $(LIBPATH)/libtiny-aes-c.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := tinyexpr
+LOCAL_SRC_FILES := $(LIBPATH)/libtinyexpr.a
+include $(PREBUILT_STATIC_LIBRARY)
+
 LOCAL_MODULE    := libPocoFoundation
 LOCAL_SRC_FILES := $(LIBPATH)/libPocoFoundation.a
 include $(PREBUILT_STATIC_LIBRARY)
 
 LOCAL_MODULE    := libPocoCrypto
 LOCAL_SRC_FILES := $(LIBPATH)/libPocoCrypto.a
-include $(PREBUILT_STATIC_LIBRARY)
-
-LOCAL_MODULE    := libPocoDataSQLite
-LOCAL_SRC_FILES := $(LIBPATH)/libPocoDataSQLite.a
 include $(PREBUILT_STATIC_LIBRARY)
 
 LOCAL_MODULE    := libPocoJSON
@@ -38,8 +42,12 @@ LOCAL_MODULE    := libPocoXML
 LOCAL_SRC_FILES := $(LIBPATH)/libPocoXML.a
 include $(PREBUILT_STATIC_LIBRARY)
 
-LOCAL_MODULE    := libPocoZip
-LOCAL_SRC_FILES := $(LIBPATH)/libPocoZip.a
+LOCAL_MODULE    := libffi
+LOCAL_SRC_FILES := $(LIBPATH)/libffi.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libz
+LOCAL_SRC_FILES := $(LIBPATH)/libz.a
 include $(PREBUILT_STATIC_LIBRARY)
 
 LOCAL_MODULE    := libangelscript
@@ -50,8 +58,20 @@ LOCAL_MODULE    := libcrypto
 LOCAL_SRC_FILES := $(LIBPATH)/libcrypto.a
 include $(PREBUILT_STATIC_LIBRARY)
 
-LOCAL_MODULE    := libenet6
-LOCAL_SRC_FILES := $(LIBPATH)/libenet6.a
+LOCAL_MODULE    := libpcre2-8
+LOCAL_SRC_FILES := $(LIBPATH)/libpcre2-8.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libutf8proc
+LOCAL_SRC_FILES := $(LIBPATH)/libutf8proc.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libexpat
+LOCAL_SRC_FILES := $(LIBPATH)/libexpat.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libenet
+LOCAL_SRC_FILES := $(LIBPATH)/libenet.a
 include $(PREBUILT_STATIC_LIBRARY)
 
 LOCAL_MODULE    := libreactphysics3d
@@ -62,12 +82,40 @@ LOCAL_MODULE    := libssl
 LOCAL_SRC_FILES := $(LIBPATH)/libssl.a
 include $(PREBUILT_STATIC_LIBRARY)
 
+LOCAL_MODULE    := libSDL3_ttf
+LOCAL_SRC_FILES := $(LIBPATH)/libSDL3_ttf.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libfreetype
+LOCAL_SRC_FILES := $(LIBPATH)/libfreetype.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libbz2
+LOCAL_SRC_FILES := $(LIBPATH)/libbz2.a
+include $(PREBUILT_STATIC_LIBRARY)
+
 LOCAL_MODULE    := libogg
 LOCAL_SRC_FILES := $(LIBPATH)/libogg.a
 include $(PREBUILT_STATIC_LIBRARY)
 
 LOCAL_MODULE    := libvorbis
 LOCAL_SRC_FILES := $(LIBPATH)/libvorbis.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libvorbisfile
+LOCAL_SRC_FILES := $(LIBPATH)/libvorbisfile.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libopusfile
+LOCAL_SRC_FILES := $(LIBPATH)/libopusfile.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libopusenc
+LOCAL_SRC_FILES := $(LIBPATH)/libopusenc.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libopus
+LOCAL_SRC_FILES := $(LIBPATH)/libopus.a
 include $(PREBUILT_STATIC_LIBRARY)
 
 # shared libraries
@@ -87,13 +135,13 @@ $(shell python "${LOCAL_PATH}/../build/version_sconscript.py")
 LOCAL_SRC_FILES_COMMON := \
     $(subst $(LOCAL_PATH)/,, \
     $(wildcard $(LOCAL_PATH)/../ASAddon/src/*.cpp)\
-    ../dep/aes.c ../dep/cmp.c ../dep/entities.cpp ../dep/ma_reverb_node.c ../dep/micropather.cpp ../dep/miniaudio.c ../dep/miniaudio_libvorbis.c ../dep/miniaudio_phonon.c ../dep/miniaudio_wdl_resampler.cpp ../dep/monocypher.c ../dep/resample.cpp ../dep/rng_get_bytes.c ../dep/singleheader.cpp ../dep/sonic.c ../dep/tonar.c ../dep/tinyexpr.c ../dep/uncompr.c\
+    ../dep/cmp.c ../dep/entities.cpp ../dep/ma_reverb_node.c ../dep/micropather.cpp ../dep/miniaudio_libopus.c ../dep/miniaudio_libvorbis.c ../dep/miniaudio_phonon.c ../dep/miniaudio_wdl_resampler.cpp ../dep/monocypher.c ../dep/resample.cpp ../dep/rng_get_bytes.c ../dep/singleheader.cpp ../dep/sonic.c ../dep/tonar.c ../dep/uncompr.c\
     $(wildcard $(LOCAL_PATH)/../src/*.cpp))
 LOCAL_C_INCLUDES_COMMON := $(LOCAL_PATH)/../droidev/include $(LOCAL_PATH)/../ASAddon/include $(LOCAL_PATH)/../dep
 LOCAL_CXXFLAGS_COMMON := -DPOCO_STATIC -DNVGT_BUILDING -DAS_USE_STLNAMES=1 -std=c++20 -fms-extensions -ffunction-sections -O2 -fpermissive -O2 -Wno-narrowing -Wno-int-to-pointer-cast -Wno-delete-incomplete -Wno-unused-result -Wno-deprecated-array-compare -Wno-implicit-const-int-float-conversion -Wno-deprecated-enum-enum-conversion -Wno-absolute-value
 LOCAL_LDFLAGS_COMMON = -Wl,--no-fatal-warnings -Wl,--no-undefined -Wl,--gc-sections
 LOCAL_SHARED_LIBRARIES_COMMON := SDL3 phonon
-LOCAL_STATIC_LIBRARIES_COMMON := libPocoFoundation libPocoCrypto libPocoDataSQLite libPocoJSON libPocoNet libPocoNetSSL libPocoUtil libPocoXML libPocoZip libangelscript libcrypto libenet6 libreactphysics3d libssl libogg libvorbis
+LOCAL_STATIC_LIBRARIES_COMMON := libPocoFoundation libPocoCrypto libPocoJSON libPocoNet libPocoNetSSL libPocoUtil libPocoXML libffi libz libangelscript libcrypto libpcre2-8 libutf8proc libexpat libenet libreactphysics3d libssl libSDL3_ttf libfreetype libbz2 libogg libvorbisfile libvorbis libopusfile libopusenc libopus libtinyexpr libtiny-aes-c
 LOCAL_LDLIBS_COMMON := -lGLESv1_CM -lGLESv2 -lOpenSLES -llog -landroid
 LOCAL_CPP_FEATURES_COMMON := rtti exceptions
 

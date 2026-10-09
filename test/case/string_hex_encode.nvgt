@@ -1,0 +1,11 @@
+void test_string_hex_encode() {
+	string test_str = "This is a test of this thing";
+	string hex = string_to_hex(test_str);
+	
+	// Hex string should be twice the length of original (each byte becomes 2 hex chars)
+	assert(hex.length() == test_str.length() * 2);
+	
+	// Test specific encoding
+	assert(string_to_hex("A") == "41");  // 'A' = 0x41
+	assert(string_to_hex("Hello") == "48656c6c6f");
+}

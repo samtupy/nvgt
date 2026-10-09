@@ -2,8 +2,8 @@
  * Warning, the author of this code is not an expert on encryption. While the functions here will protect your data, they have by no means been battletested by a cryptography expert and/or they may not follow standards perfectly. Please feel free to report any vulnerabilities.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -38,6 +38,7 @@ void string_unpad(std::string& str) {
 	str.resize(new_size);
 }
 std::string string_aes_encrypt(const std::string& original_text, std::string key) {
+	if (original_text.empty()) return "";
 	std::string text = original_text;
 	Poco::SHA2Engine hash;
 	hash.update(key);
@@ -62,7 +63,7 @@ std::string string_aes_encrypt_r(const std::string& text, std::string& key) {
 	return t;
 }
 std::string string_aes_decrypt(const std::string& original_text, std::string key) {
-	if (original_text.size() % 16 != 0) return "";
+	if (original_text.empty() || original_text.size() % 16 != 0) return "";
 	std::string text = original_text;
 	Poco::SHA2Engine hash;
 	hash.update(key);
@@ -107,6 +108,7 @@ chacha_ostreambuf::chacha_ostreambuf(std::ostream &sink, const std::string &key,
 	// Todo discuss this with people. Blake2B is not appropriate for key derivation because it's fast, but for a game that needs to load thousands of assets in seconds, we can't really afford something like Argon2 either. We should probably decide on a default function and expose it in nvgt_config.h for commercial devs to customize.
 	crypto_blake2b(this->key, 32, (uint8_t *)key.data(), key.size());
 	memcpy(this->nonce, nonce.data(), 24);
+	keystream_pos = 0;
 	// Put the nonce directly into the sink in cleartext.
 	sink.write((const char *)this->nonce, nonce_length);
 	// Encrypt the magic asset identifier:
@@ -121,6 +123,7 @@ chacha_ostreambuf::~chacha_ostreambuf() {
 	// Should explicitly destroy the contents of the internal buffers.
 	crypto_wipe((void *)key, 32);
 	crypto_wipe((void *)nonce, nonce_length);
+	crypto_wipe((void *)keystream, 64);
 	if (owns_sink)
 		delete sink;
 }
@@ -128,9 +131,19 @@ void chacha_ostreambuf::own_sink(bool owns) {
 	this->owns_sink = owns;
 }
 int chacha_ostreambuf::writeToDevice(const char *buffer, std::streamsize length) {
-
-	counter = crypto_chacha20_x((uint8_t *)work, (const uint8_t *)buffer, length, key, nonce, counter);
-
+	for (std::streamsize i = 0; i < length; i++) {
+		if (keystream_pos == 0) {
+			if (length - i >= 64) {
+				counter = crypto_chacha20_x(work + i, (const uint8_t *)buffer + i, 64, key, nonce, counter);
+				i += 63;
+				continue;
+			}
+			uint8_t zeros[64] = {0};
+			counter = crypto_chacha20_x(keystream, zeros, 64, key, nonce, counter);
+		}
+		work[i] = (uint8_t)buffer[i] ^ keystream[keystream_pos];
+		keystream_pos = (keystream_pos + 1) % 64;
+	}
 	sink->write((const char *)work, length);
 	// Q: what am I expected to return here? The Poco docs don't say. A: count of bytes written... but why is the return type shorter than the length argument?
 	return (int)length;
@@ -153,6 +166,7 @@ std::streampos chacha_ostreambuf::seekpos(std::streampos pos, std::ios_base::ope
 	sink->seekp(nonce_length);
 	// Now rewrite the magic and reset the counter.
 	counter = 0;
+	keystream_pos = 0;
 	sputn((const char *)&chacha_iostream_magic, sizeof(chacha_iostream_magic));
 	return 0;
 }
@@ -260,10 +274,13 @@ std::streampos chacha_istreambuf::seekpos(std::streampos pos, std::ios_base::ope
 	// Now we're at the closest byte that we can seek to. Empty the buffer of stale data:
 	this->setg(NULL, NULL, NULL);
 	// Then fill it up again with fresh data:
-	underflow();
+	if (underflow() == std::char_traits<char>::eof())
+		return -1;
 	// Finally, throw away however many bytes stand between the start of the block we just selected and the byte that was actually requested by the caller.
-
-	gbump((int)pos - (((int)pos / 64) * 64));
+	int skip = (int)((uint64_t)pos % 64);
+	if (skip > egptr() - gptr())
+		return -1;
+	gbump(skip);
 	return counter * 64; // Block offset. Istream will consider its internal buffers when reporting the true position to the caller.
 }
 
@@ -309,6 +326,6 @@ std::ostream &chacha_ostream::own_sink(bool owns) {
 
 void RegisterScriptCrypto(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("string string_aes_encrypt(const string&in plaintext, string key)"), asFUNCTION(string_aes_encrypt), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string string_aes_decrypt(const string&in ciphertext, string)"), asFUNCTION(string_aes_decrypt), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string string_aes_decrypt(const string&in ciphertext, string key)"), asFUNCTION(string_aes_decrypt), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string random_bytes(uint count)"), asFUNCTION(random_bytes), asCALL_CDECL);
 }

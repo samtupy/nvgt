@@ -1,0 +1,12 @@
+diff --git a/config.sub b/config.sub
+index 2c5120f..631f174 100755
+--- a/config.sub
++++ b/config.sub
+@@ -1252,6 +1252,7 @@ case $cpu-$vendor in
+ 			| tic30 | tic4x | tic54x | tic55x | tic6x | tic80 \
+ 			| tron \
+ 			| ubicom32 \
++			| universal \
+ 			| v70 | v850 | v850e | v850e1 | v850es | v850e2 | v850e2v3 \
+ 			| vax \
+ 			| vc4 \

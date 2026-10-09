@@ -1,0 +1,19 @@
+/**
+	The output device that the default audio engine plays sound through.
+	int sound_output_device;
+	## Remarks:
+		The value is an index into the `sound_output_devices` array. Assign an index to switch devices, or assign -1 to use the system's default output device.
+		When read, this property returns the index of the device actually in use, so after assigning -1 it returns the index of the default device rather than -1. It returns -1 if the default audio engine has no device, for example if `sound_default_engine` was replaced with an engine created with `AUDIO_ENGINE_NO_DEVICE`.
+		Assigning an index that is out of range, or a device that can't be opened, has no effect and doesn't raise an error. Read the property again after assigning it if you need to know whether the switch succeeded.
+		Accessing this property starts the sound system if it hasn't been started yet.
+*/
+
+// Example:
+void main() {
+	int device = sound_output_device;
+	if (device < 0) {
+		alert("Output device", "No output device is in use.");
+		return;
+	}
+	alert("Output device", "Sound is playing through " + sound_output_devices[device] + ".");
+}

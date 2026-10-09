@@ -1,8 +1,8 @@
 /* network.h - enet implementation header
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -50,6 +50,7 @@ public:
 	bool is_client;
 	bool IPv6enabled;
 	bool receive_timeout_event;
+	bool send_immediately;
 	network();
 	void addRef();
 	void release();
@@ -73,8 +74,9 @@ public:
 		return send_peer(peer, message, channel);
 	}
 	bool send_unreliable_peer(asQWORD peer, const std::string& message, unsigned char channel) {
-		return send(peer, message, channel, false);
+		return send_peer(peer, message, channel, false);
 	}
+	bool flush();
 	bool disconnect_peer_softly(asQWORD peer_id);
 	bool disconnect_peer(asQWORD peer_id);
 	bool disconnect_peer_forcefully(asQWORD peer_id);

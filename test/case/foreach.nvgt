@@ -1,0 +1,20 @@
+void test_foreach_array() {
+	string[] arr = {"this", "is", "a", "test"};
+	string result = "";
+	foreach(string v : arr) {
+		result += v + " ";
+	}
+	assert(result == "this is a test ");
+}
+
+void test_foreach_dictionary() {
+	dictionary d = {{"test1", "testing1"}, {"test2", "testing2"}};
+	int count = 0;
+	foreach(auto v, string k : d) {
+		if (k == "test1") assert(string(v) == "testing1");
+		else if (k == "test2") assert(string(v) == "testing2");
+		else assert(false);  // Unexpected key
+		count++;
+	}
+	assert(count == 2);
+}

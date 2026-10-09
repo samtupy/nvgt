@@ -1,0 +1,13 @@
+/**
+	Reset the vector to 0, 0, 0.
+	void vector::setToZero();
+	## Arguments:
+		None.
+*/
+
+// Example:
+void main() {
+	vector v1(5, 5, 5);
+	v1.setToZero();
+	alert("example", "the new vector is "+v1.x + ", " + v1.y + ", " + v1.z); // will show that the vector is 0, 0, 0.
+}

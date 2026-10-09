@@ -1,0 +1,25 @@
+void test_datastreams() {
+	datastream ds;
+	ds.write("this is a test of what is actually a c++ stringstream. I should be able to read and write to it, theoretically. ");
+	ds.seek_end();
+	int old_pos = ds.pos;
+	ds.write("So lets try writing another sentense to the stream.");
+	assert(ds.pos > old_pos);
+	
+	ds.seek(8);
+	assert(ds.read(8) == "a test o");
+	
+	// Test hex encoding/decoding
+	datastream encoded;
+	hex_encoder h(encoded);
+	h.write("test?");
+	h.close();
+	encoded.seek(0);
+	assert(hex_decoder(encoded).read() == "test?");
+	
+	// Test datastream string access
+	ds.seek(0);
+	string full_content = ds.str();
+	assert(full_content.starts_with("this is a test"));
+	assert(full_content.ends_with("So lets try writing another sentense to the stream."));
+}

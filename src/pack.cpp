@@ -3,7 +3,7 @@
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2025 Sam Tupy
- * https://nvgt.gg
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -11,8 +11,8 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include "datastreams.h" // sdl_file_istream
 #include "pack.h"
-#include <Poco/FileStream.h>
 #include <Poco/StreamCopier.h>
 #include <Poco/Util/Application.h> // config
 #include <unordered_map> //For TOC in read mode.
@@ -266,7 +266,7 @@ toc_map& pack::write_mode_internals::get_toc_map() {
 	return toc;
 }
 void pack::set_pack_name(const std::string& name) {
-	pack_name = Poco::Path(name).absolute().toString();
+	pack_name = name;
 }
 pack::pack() : mutable_ptr(nullptr) {
 	open_mode = OPEN_NOT;
@@ -286,9 +286,9 @@ pack::~pack() {
 }
 bool pack::create(const std::string& filename, const std::string& key) {
 	close();
-	Poco::FileOutputStream* file = NULL;
+	sdl_file_output_stream* file = NULL;
 	try {
-		file = new Poco::FileOutputStream(filename);
+		file = new sdl_file_output_stream(filename);
 		write = std::make_shared<write_mode_internals>(*file, key);
 	} catch (std::exception&) {
 		// Don't delete here; internals may have chained several mutations onto the stream before it failed, so trust that it cleaned up.
@@ -302,9 +302,9 @@ bool pack::open(const std::string& filename, const std::string& key, uint64_t pa
 	close();
 	std::string pack_filename = filename;
 	if (!pack_size) find_embedded_pack(pack_filename, pack_offset, pack_size);
-	Poco::FileInputStream* file = NULL;
+	sdl_file_input_stream* file = NULL;
 	try {
-		file = new Poco::FileInputStream(pack_filename);
+		file = new sdl_file_input_stream(pack_filename);
 		read = std::make_shared<read_mode_internals>(*file, key, pack_offset, pack_size);
 	} catch (std::exception&) {
 		// Don't delete here; internals may have chained several mutations onto the stream before it failed, so trust that it cleaned up.
@@ -334,7 +334,7 @@ bool pack::add_file(const std::string& filename, const std::string& internal_nam
 	if (open_mode != OPEN_WRITE)
 		return false;
 	try {
-		Poco::FileInputStream fs(filename);
+		sdl_file_input_stream fs(filename);
 		return write->put(fs, internal_name);
 	} catch (std::exception& e) { return false; }
 }
@@ -357,6 +357,7 @@ bool pack::file_exists(const std::string& filename) {
 	return false;
 }
 int64_t pack::get_file_size(const std::string& filename) {
+	if (open_mode == OPEN_NOT) return -1;
 	const toc_entry* e = open_mode == OPEN_READ ? read->get(filename) : write->get(filename);
 	if (!e) return -1;
 	return e->size;
@@ -369,11 +370,11 @@ std::istream* pack::get_file(const std::string& filename) const {
 		return nullptr;
 	std::istream* fis = nullptr;
 	try {
-		fis = new Poco::FileInputStream(pack_name, std::ios_base::in);
+		fis = new sdl_file_input_stream(pack_name);
 		if (read->pack_offset != 0 || read->pack_size != 0)
 			fis = new section_istream(*fis, read->pack_offset, read->pack_size);
 		if (!key.empty())
-			fis = new chacha_istream(*fis, key);
+			fis = &(new chacha_istream(*fis, key))->own_source(true);
 		return new section_istream(*fis, entry->offset, entry->size);
 	} catch (std::exception&) {
 		delete fis;
@@ -394,7 +395,7 @@ datastream* pack::get_file_script(const std::string& filename, const std::string
 		return nullptr;
 	}
 }
-bool pack::get_active() {
+bool pack::get_is_active() const {
 	return open_mode != OPEN_NOT;
 }
 int64_t pack::get_file_count() {
@@ -429,7 +430,7 @@ bool pack::extract_file(const std::string& internal_name, const std::string& fil
 		return false;
 	bool result = false;
 	try {
-		Poco::FileOutputStream fos(file_on_disk, std::ios_base::out);
+		sdl_file_output_stream fos(file_on_disk);
 		Poco::StreamCopier::copyStream(*fis, fos);
 		result = true;
 	} catch (std::exception&) {
@@ -497,7 +498,7 @@ std::streampos section_istreambuf::seekoff(std::streamoff off, std::ios_base::se
 			// Istream uses 0 cur to implement tell, so just report the current position without moving anything.
 			if (off == 0)
 				return source->tellg() - (std::streampos) start - (std::streampos) in_avail();
-			return seekpos(source->tellg() - std::streampos(start - in_avail() + off));
+			return seekpos(source->tellg() - (std::streampos)start - (std::streampos)in_avail() + off);
 	}
 	return -1; // Can't get here.
 }
@@ -544,7 +545,7 @@ void write_embedded_packs(Poco::BinaryWriter& bw) {
 	bw.write7BitEncoded(uint32_t(embedding_packs.size()));
 	for (const auto& p : embedding_packs) {
 		bw << p.first;
-		Poco::FileInputStream fs(p.second);
+		sdl_file_input_stream fs(p.second);
 		bw << uint32_t(fs.size());
 		Poco::StreamCopier::copyStream(fs, bw.stream());
 		fs.close();
@@ -561,11 +562,7 @@ bool find_embedded_pack(std::string& filename, uint64_t& file_offset, uint64_t& 
 	#else
 	const auto& it = filename == "*" ? embedded_packs.begin() : embedded_packs.find(filename.substr(1));
 	if (it == embedded_packs.end()) return false;
-	#ifndef __ANDROID__
-	filename = Poco::Util::Application::instance().config().getString("application.path");
-	#else
-	filename = android_get_main_shared_object();
-	#endif
+	filename = get_data_location();
 	file_offset = it->second.offset;
 	file_size = it->second.size;
 	return true;
@@ -586,13 +583,13 @@ void RegisterScriptPack(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("pack_file", "bool open(const string &in filename, const string &in key = \"\", uint64 pack_offset = 0, uint64 pack_size = 0)", asMETHOD(pack, open), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "bool close()", asMETHOD(pack, close), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "bool add_file(const string &in filename, const string &in internal_name)", asMETHOD(pack, add_file), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack_file", "bool add_stream(const string &in internal_name, datastream@ ds)", asMETHOD(pack, add_stream), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "bool add_stream(const string &in internal_name, datastream@+ ds)", asMETHOD(pack, add_stream), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "bool add_memory(const string &in internal_name, const string&in data)", asMETHOD(pack, add_memory), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "bool file_exists(const string &in filename)", asMETHOD(pack, file_exists), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "int64 get_file_size(const string &in filename)", asMETHOD(pack, get_file_size), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "datastream @get_file(const string &in filename, const string &in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asMETHOD(pack, get_file_script), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "string get_pack_name() const property", asMETHOD(pack, get_pack_name), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack_file", "bool get_active() const property", asMETHOD(pack, get_active), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "bool get_active() const property", asMETHOD(pack, get_is_active), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "int64 get_file_count() const property", asMETHOD(pack, get_file_count), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "string[]@ list_files() const", asMETHOD(pack, list_files), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "bool extract_file(const string &in internal_name, const string &in file_on_disk)", asMETHOD(pack, extract_file), asCALL_THISCALL);

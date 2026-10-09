@@ -1,8 +1,0 @@
-// NonVisual Gaming Toolkit (NVGT)
-// Copyright (C) 2022-2024 Sam Tupy
-// License: zlib (see license.md in the root of the NVGT distribution)
-
-// Does angelscript support the ** operator yet at least for primatives?
-void main() {
-	alert("test", uint64(1024)** 4);
-}

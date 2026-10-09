@@ -1,0 +1,17 @@
+{
+  "name": "enet6",
+  "version": "6.1.2",
+  "homepage": "https://github.com/SirLynix/enet6",
+  "description": "A fork of ENet (reliable UDP networking library) in order to add IPv6 support",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}

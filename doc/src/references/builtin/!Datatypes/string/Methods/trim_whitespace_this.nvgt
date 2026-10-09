@@ -1,5 +1,5 @@
 /**
-	Trims any and all whitespace from the beginning and end of a string, returning a reference to it.
+	Trims any and all whitespace from the beginning and end of a string, modifying the calling string.
 	string& string::trim_whitespace_this();
 	## Returns:
 		string&: a reference to the specified string, with any trailing/leading whitespace removed.

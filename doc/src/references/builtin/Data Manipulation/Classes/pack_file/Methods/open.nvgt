@@ -1,0 +1,32 @@
+/**
+	Open an existing pack file for reading.
+	bool pack_file::open(const string&in filename, const string&in key = "", uint64 pack_offset = 0, uint64 pack_size = 0);
+	## Arguments:
+		* const string&in filename: the path of the pack file to open, or the name of an embedded pack prefixed with an asterisk (see remarks).
+		* const string&in key = "": the key the pack was encrypted with, or an empty string if it is not encrypted.
+		* uint64 pack_offset = 0: the position in the file where the pack begins, if the pack is stored inside a larger file.
+		* uint64 pack_size = 0: the size of the pack in bytes, if the pack is stored inside a larger file. Leave both this and pack_offset at 0 to treat the whole file as the pack.
+	## Returns:
+		bool: true if the pack was opened, false otherwise.
+	## Remarks:
+		Opening fails if the file doesn't exist, isn't a pack created by `pack_file`, is damaged, or if the key is wrong or missing. If this object already had a pack open, that pack is closed first, even if opening the new one fails.
+		To open a pack embedded with `#pragma embed`, prefix its name with an asterisk, for example `open("*sounds.dat")`. A filename of just `*` opens the first embedded pack, for BGT compatibility.
+		The pack_offset and pack_size arguments let you read a pack that is stored inside some other file. The data in that range must be an entire pack exactly as `create()` wrote it.
+*/
+
+// Example:
+void main() {
+	// Create a small pack so that there's something to open.
+	pack_file p;
+	p.create("example.dat");
+	p.add_memory("a.txt", "first file");
+	p.add_memory("b.txt", "second file");
+	p.close();
+	if (!p.open("example.dat")) {
+		alert("Error", "Unable to open the pack.");
+		return;
+	}
+	alert("Files in the pack", join(p.list_files(), ", "));
+	p.close();
+	file_delete("example.dat");
+}

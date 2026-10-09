@@ -1,0 +1,29 @@
+/**
+	Copy a file from disk into a pack that is open for writing.
+	bool pack_file::add_file(const string&in filename, const string&in internal_name);
+	## Arguments:
+		* const string&in filename: the path of the file on disk to add.
+		* const string&in internal_name: the name the file should have inside the pack.
+	## Returns:
+		bool: true if the file was added, false otherwise.
+	## Remarks:
+		This fails if the pack was not opened with `create()`, if the file on disk can't be read, or if the pack already contains a file with the given internal name. Files cannot be replaced or removed once added.
+		The internal name can be anything, including a path such as `sounds/step.ogg`. Slashes have no special meaning inside a pack, they are simply part of the name.
+*/
+
+// Example:
+void main() {
+	file f;
+	f.open("hello.txt", "wb");
+	f.write("Hello from disk!");
+	f.close();
+	pack_file p;
+	p.create("example.dat");
+	if (!p.add_file("hello.txt", "texts/hello.txt")) alert("Error", "Unable to add the file.");
+	p.close();
+	p.open("example.dat");
+	alert("texts/hello.txt", p.get_file("texts/hello.txt").read());
+	p.close();
+	file_delete("hello.txt");
+	file_delete("example.dat");
+}

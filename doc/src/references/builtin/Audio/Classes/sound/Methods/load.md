@@ -28,7 +28,7 @@ The syntax for the sound_length_callback is:
 > uint sound_length_callback(string user_data);
 
 The syntax for the sound_read_callback is:
-> int sound_read_callback(string &out buffer, uint length, string user_data);
+> int sound_read_callback(string&out buffer, uint length, string user_data);
 
 The syntax for the sound_seek_callback is:
 > bool sound_seek_callback(uint offset, string user_data);

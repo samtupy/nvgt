@@ -1,0 +1,12 @@
+/**
+	Allows the vector to be turned into a string.
+	string vector::opImplConv() const;
+	## Remarks
+		Note this currently does not trim redundant decimal places from the output.
+*/
+
+// Example:
+void main() {
+	vector v(2, 3, 5);
+	alert("Vector", v);
+}

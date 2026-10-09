@@ -2,8 +2,8 @@
  * This also contains helper menus which can be used both as examples of the classes usage as well as to aid in game development, such as a learn game sounds menu.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -40,7 +40,13 @@ class menu {
 	private bool _allow_escape = true; // If set to false, the user must click on an option manually and will not be able to use escape to exit the menu.
 	private bool _allow_go_to_index = true; // If set to false, the user can no longer press ctrl+g to select a menu item by number.
 	private bool _allow_search = true; // If set to false, the user can no longer press ctrl+f to search for an item in the menu by text.
-	pack_file@ pack_file; // Optionally set this to a pack containing sounds.
+	#if plugin_legacy_sound
+	pack@ pack_file = null;
+	#endif
+	#if_not plugin_legacy_sound
+	pack_file@ pack_file = null;
+	#endif
+	bool first_letter_nav = true;
 	menu() {
 		reset();
 	}
@@ -76,6 +82,13 @@ class menu {
 		}
 	}
 	// Item IDs are entirely optional.
+	void set_first_letter_navigation(bool state) property {
+		first_letter_nav = state;
+		form.set_list_multinavigation(f_list, state, false);
+	}
+	bool get_first_letter_navigation() property {
+		return first_letter_nav;
+	}
 	int add_item(const string&in text, const string&in id = "", int position = -1) {
 		if (!form.add_list_item(f_list, text, id, position, false, focus_first_item)) return -1;
 		if (position == -1) position = form.get_list_count(f_list) -1;
@@ -86,6 +99,9 @@ class menu {
 	}
 	bool delete_item(int index, bool reset_cursor = true) {
 		return form.delete_list_item(f_list, index, reset_cursor, false);
+	}
+	bool delete_all_items() {
+		return form.clear_list(f_list);
 	}
 	// Call this function to produce the intro sequence for the menu. You don't need to call it at all, if you like.
 	void intro() {
@@ -189,6 +205,7 @@ class menu {
 	private int last_selected_index;
 	private string last_selected_id;
 	// Simple sound management
+	#if plugin_legacy_sound
 	private sound@[] playing_sounds;
 	bool play(const string&in soundpath) {
 		if (soundpath.empty()) return false;
@@ -204,6 +221,13 @@ class menu {
 		playing_sounds.insert_last(s);
 		return r;
 	}
+	#endif
+	#if_not plugin_legacy_sound
+	bool play(const string&in soundpath) {
+		if (soundpath.empty()) return false;
+		return  sound_play(sounds_prefix + soundpath + sounds_suffix, pack_file = (@pack_file != null? pack_file : sound_default_pack)) != null;
+	}
+	#endif
 	private int on_form_list_event(audio_form@ f, int c, control_event_type event, dictionary@ args) {
 		if (event != event_list_cursor) return 0;
 		if (args.exists("boundary")) {
@@ -230,6 +254,7 @@ class menu {
 // learn_game_sounds: takes a dictionary of sound descriptions mapped to sound filenames or lists of sound filenames and displays a menu which allows users to press enter on sound descriptions to hear associated sounds.
 void learn_game_sounds_menu(const name_value_collection&in sfx, const string&in audio_prefix = "", menu@ m = null, string go_back = "Go back") {
 	sound audio;
+	regexp random_select("""(.*)\{(\d*)\.\.\.(\d*)\}(.*)""");
 	if (@m == null) @m = menu();
 	if (m.intro_text.empty()) m.intro_text = "Select a sound with the up and down arrow keys and press enter to preview it.";
 	string select_sound = m.select_sound;
@@ -256,6 +281,8 @@ void learn_game_sounds_menu(const name_value_collection&in sfx, const string&in 
 			string[]@ options = filename.split(",");
 			filename = options.random();
 		}
+		string[]@ randoms = random_select.split(filename);
+		while (randoms.length() == 5) @randoms = random_select.split((filename = randoms[1] + random(parse_float(randoms[2]), parse_float(randoms[3])) + randoms[4]));
 		bool loop = filename.starts_with("~");
 		if (loop) filename.erase(0, 1);
 		if (!filename.empty()) {
@@ -283,4 +310,16 @@ bool yes_no(const string&in prompt, menu@ m = null, string yes = "yes", string n
 		else break;
 	}
 	return m.selected_item == 1;
+}
+
+int choose_number(const string&in intro, int low, int high, int current) {
+	menu@ m = setup_menu(intro);
+	m.automatic_intro = false;
+	m.focus_first_item = false;
+	for (int i = low; i <= high; i++) m.add_item("" + i);
+	m.set_focused_item(fmax(0, fmin(current - low, high - low)), false);
+	m.intro();
+	while (m.monitor()) wait(5);
+	if (m.selected_item < 0) return -1;
+	return low + m.selected_item;
 }

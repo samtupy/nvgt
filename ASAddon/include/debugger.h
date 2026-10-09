@@ -55,6 +55,11 @@ public:
 	virtual asIScriptEngine *GetEngine();
 	virtual bool IsTakingCommands();
 	
+	// Sets the flag to decide if section name should be converted to just filename (true)
+	// or should not be converted and full path should be used instead (false).
+	virtual bool GetUseSectionFileNameOnly() const;
+	virtual void SetUseSectionFileNameOnly(bool useSectionFileNameOnly);
+
 protected:
 	enum DebugAction
 	{
@@ -82,6 +87,10 @@ protected:
 
 	// Registered callbacks for converting types to strings
 	std::map<const asITypeInfo*, ToStringCallback> m_toStringCallbacks;
+
+	// True (by default): For file breakpoints only the filename will be used instead the full path
+	// False: It wont convert the full path to just filename.
+	bool m_useSectionFileNameOnly;
 };
 
 END_AS_NAMESPACE

@@ -1,0 +1,17 @@
+/**
+	Modify a string with suitable escape sequencing.
+	string string::escape(bool strict_JSON = false);
+	## Arguments:
+		* strict_JSON: Use JSON escaping. Defaults to false if not specified.
+	## Returns:
+		string: A new string with the escaped data.
+	## Remarks
+		The strict_JSON parameter is only necessary under special circumstances, namely the escape behaviour for characters \x7 and \xb. If you know you won't be touching these characters, you can merely call escape without a parameter and it will still escape safely.
+*/
+
+// Example:
+void main() {
+	string test="test\xbtest";
+	alert("Escaped", test.escape(false));
+	alert("Escaped", test.escape(true));
+}

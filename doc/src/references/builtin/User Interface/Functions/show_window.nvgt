@@ -1,8 +1,9 @@
 /**
 	Shows a window with the specified title.
-	bool show_window(const string&in title);
+	bool show_window(const string&in title, uint flags = 0);
 	## Arguments:
 		* const string&in title: the title of the window.
+		* uint flags: An optional set of flags to control the window's appearance. This can be a combination of values from the `window_flags` enum.
 	## Returns:
 		bool: true if window creation was successful, false otherwise.
 	## Remarks:
@@ -12,7 +13,7 @@
 // Example:
 void main() {
 	alert("Info", "Press escape to close the window.");
-	show_window("Example");
+	show_window("Example", WINDOW_FLAG_RESIZABLE | WINDOW_FLAG_MAXIMIZED);
 	while (true) {
 		wait(5); // Don't hog all the CPU.
 		if (key_pressed(KEY_ESCAPE))

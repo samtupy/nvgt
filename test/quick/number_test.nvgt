@@ -1,8 +1,0 @@
-string[] number_as_words;
-
-void main() {
-    string append = ".ogg";
-    number_as_words = number_to_words(1234).split(" ",true);
-    string assembled = number_as_words[number_as_words.length() - 1] + append;
-    alert("assembled",assembled);
-}

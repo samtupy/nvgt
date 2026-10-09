@@ -1,0 +1,15 @@
+/**
+	Property that returns the current user's home directory.
+	const string DIRECTORY_HOME;
+	## remarks:
+		A slash character is already appended to the directory returned by this property.
+		This property may return different values depending on the operating system the application is being run on.
+			* On Windows, usually C:\Users\%username%\.
+			* On Linux and macOS, usually the directory in the HOME environment variable, such as /home/username/ or /Users/username/.
+		Games should usually not write files directly into the home directory. Use `DIRECTORY_APPDATA` or `DIRECTORY_LOCAL_APPDATA` for game data instead.
+*/
+
+// example:
+void main() {
+	alert("example", "Your home directory is " + DIRECTORY_HOME);
+}

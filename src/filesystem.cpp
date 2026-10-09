@@ -2,8 +2,8 @@
  * Originally these consisted of Angelscript's filesystem addon but with the class removed, however are in the process of being replaced with Poco::File.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -35,7 +35,7 @@ bool FileHardLink(const std::string& source, const std::string& target) {
 	} catch (Poco::Exception) {
 		return false;
 	}
-	return false;
+	return true;
 }
 
 bool FNMatch(const std::string& file, const std::string& pattern) {
@@ -66,11 +66,11 @@ CScriptArray* FindFiles(const string& path) {
 
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
+	std::wstring bufUTF16;
+	UnicodeConverter::toUTF16(path, bufUTF16);
 
 	WIN32_FIND_DATAW ffd;
-	HANDLE hFind = FindFirstFileExW(bufUTF16, FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
+	HANDLE hFind = FindFirstFileExW(bufUTF16.c_str(), FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
 	if (INVALID_HANDLE_VALUE == hFind)
 		return array;
 
@@ -145,11 +145,11 @@ CScriptArray* FindDirectories(const string& path) {
 
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
+	std::wstring bufUTF16;
+	UnicodeConverter::toUTF16(path, bufUTF16);
 
 	WIN32_FIND_DATAW ffd;
-	HANDLE hFind = FindFirstFileExW(bufUTF16, FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
+	HANDLE hFind = FindFirstFileExW(bufUTF16.c_str(), FindExInfoStandard, &ffd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
 	if (INVALID_HANDLE_VALUE == hFind)
 		return array;
 
@@ -235,11 +235,11 @@ bool DirectoryExists(const string& path) {
 bool FileExists(const string& path) {
 	#ifdef _WIN32
 	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
+	std::wstring bufUTF16;
+	UnicodeConverter::toUTF16(path, bufUTF16);
 
 	// Check if the path exists and is a directory
-	DWORD attrib = GetFileAttributesW(bufUTF16);
+	DWORD attrib = GetFileAttributesW(bufUTF16.c_str());
 	if (attrib == INVALID_FILE_ATTRIBUTES || (attrib & FILE_ATTRIBUTE_DIRECTORY))
 		return false;
 	return true;
@@ -258,12 +258,12 @@ bool FileExists(const string& path) {
 asINT64 FileGetSize(const string& path) {
 	#if defined(_WIN32)
 	// Windows uses UTF16 so it is necessary to convert the string
-	wchar_t bufUTF16[1024];
-	MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, bufUTF16, 1024);
+	std::wstring bufUTF16;
+	UnicodeConverter::toUTF16(path, bufUTF16);
 
 	// Get the size of the file
 	WIN32_FILE_ATTRIBUTE_DATA attrs;
-	if (!GetFileAttributesExW(bufUTF16, GetFileExInfoStandard, &attrs))
+	if (!GetFileAttributesExW(bufUTF16.c_str(), GetFileExInfoStandard, &attrs))
 		return -1;
 	LARGE_INTEGER size;
 	size.HighPart = attrs.nFileSizeHigh;
@@ -345,6 +345,16 @@ bool file_put_contents(const std::string& filename, const std::string& contents,
 	return result;
 }
 
+bool FileTouch(const string& filePath, const Timestamp& newTime) {
+	try {
+		Poco::File file(filePath);
+		if (!file.exists()) return false;
+		file.setLastModified(newTime);
+		return true;
+	} catch (...) {
+		return false;
+	}
+}
 
 void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
 	engine->RegisterEnum("glob_options");
@@ -357,7 +367,7 @@ void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool directory_delete(const string& in path, bool recursive = true)", asFUNCTION(DirectoryDelete), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_exists(const string& in path)", asFUNCTION(FileExists), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_delete(const string& in path)", asFUNCTION(FileDelete), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool file_copy(const string& in source, const string& in destination, bool)", asFUNCTION(FileCopy), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool file_copy(const string& in source, const string& in destination, bool overwrite)", asFUNCTION(FileCopy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_hard_link(const string& in source, const string&in destination)", asFUNCTION(FileHardLink), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_move(const string& in source, const string& in destination)", asFUNCTION(FileMove), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string[]@ find_directories(const string& in pattern)", asFUNCTION(FindDirectories), asCALL_CDECL);
@@ -371,4 +381,5 @@ void RegisterScriptFileSystemFunctions(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("string DIRECTORY_PREFERENCES(const string&in company_name, const string&in application_name)", asFUNCTION(get_preferences_path), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string file_get_contents(const string&in filename)", asFUNCTION(file_get_contents), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool file_put_contents(const string&in filename, const string&in contents, bool append = false)", asFUNCTION(file_put_contents), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool file_touch(const string& in path, const timestamp& in new_time = timestamp())", asFUNCTION(FileTouch), asCALL_CDECL);
 }

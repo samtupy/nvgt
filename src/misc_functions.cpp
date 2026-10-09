@@ -1,8 +1,8 @@
 /* misc_functions.cpp - code for any wrapped functions that we don't currently have a better place for
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -22,9 +22,8 @@
 	#include <direct.h>
 #else
 	#include <unistd.h>
-	#include <sys/types.h>
-	#include <sys/wait.h>
 #endif
+#include <Poco/AutoPtr.h>
 #include <Poco/Exception.h>
 #include <Poco/TextConverter.h>
 #include <Poco/TextIterator.h>
@@ -37,6 +36,7 @@
 #include <SDL3/SDL.h>
 #include <tinyexpr.h>
 #include <dbgtools.h>
+#include "datastreams.h"
 #include "nvgt_angelscript.h"
 #include "nvgt.h"
 #include "UI.h" // wait
@@ -44,10 +44,10 @@
 #include "obfuscate.h"
 #include "input.h"
 #include "misc_functions.h"
-#include <fast_float.h>
+#include <fast_float/fast_float.h>
 #include <system_error>
 
-BOOL ChDir(const std::string& d) {
+bool ChDir(const std::string& d) {
 	#ifdef _WIN32
 	return _chdir(d.c_str()) == 0;
 	#else
@@ -84,84 +84,196 @@ asQWORD timestamp() {
 std::string get_command_line() {
 	return g_CommandLine;
 }
-double Round(double n, int p) {
-	int P = powf(10, fabs(p));
-	if (p > 0)
-		return round(n * P) / P;
-	else if (p < 0)
-		return round(n / P) * P;
-	return round(n);
+template <typename T> T GenericRound(T n, int p) {
+	T P = std::pow(static_cast<T>(10), std::abs(p));
+	T result = (p > 0)? (std::round(n * P) / P) : (p < 0)? (std::round(n / P) * P) : std::round(n);
+	return (result == static_cast<T>(0)) ? static_cast<T>(0) : result;
 }
+float fRound(float n, int p)   { return GenericRound<float>(n, p); }
+double Round(double n, int p)  { return GenericRound<double>(n, p); }
+enum process_flags {
+	PROCESS_PIPE_STDIN = 1,        // connect stdin to a writable datastream
+	PROCESS_PIPE_STDOUT = 2,       // connect stdout to a readable datastream
+	PROCESS_PIPE_STDERR = 4,       // connect stderr to a readable datastream
+	PROCESS_STDERR_TO_STDOUT = 8,  // redirect stderr into stdout (ignored if PROCESS_PIPE_STDERR is set)
+	PROCESS_BACKGROUND = 16,       // run process detached from the console
+	PROCESS_WAIT = 32,             // block until the process exits (used by the bool run() overload)
+	PROCESS_FAIL_EXCEPTION = 64,   // throw a Poco::RuntimeException containing SDL_GetError() if the process fails to launch
+	PROCESS_CAPTURE = 128,         // convenience flag: forces PROCESS_PIPE_STDOUT | PROCESS_PIPE_STDERR
+};
+
+// close_cb called by datastream when closing. Detaches the underlying SDL_IOStream handle so that close doesn't try to SDL_CloseIO a stream owned by SDL_Process.
+static void process_stream_detach_cb(datastream* ds) {
+	if (ds->user) static_cast<sdl_file_ios*>(ds->user)->detach(); // user is then nulled by datastream::close() after calling the callback; the stream itself is deleted by the datastream as it owns _istr/_ostr.
+}
+
+class process {
+	SDL_Process* _proc;
+	Poco::AutoPtr<datastream> _stdin_ds;
+	Poco::AutoPtr<datastream> _stdout_ds;
+	Poco::AutoPtr<datastream> _stderr_ds;
+	mutable int _refcount;
+	datastream* make_stream(SDL_IOStream* io, std::ios::openmode mode) {
+		if (!io) return nullptr;
+		datastream* ds = mode & std::ios::in? new datastream(new sdl_file_input_stream(io), nullptr, "", Poco::BinaryReader::NATIVE_BYTE_ORDER, nullptr) : new datastream(nullptr, new sdl_file_output_stream(io), "", Poco::BinaryReader::NATIVE_BYTE_ORDER, nullptr);
+		ds->set_close_callback(process_stream_detach_cb);
+		ds->binary = false;
+		ds->skip_eof = true;
+		if (mode & std::ios::out) ds->autoflush = true;
+		return ds;
+	}
+	void detach_stream(Poco::AutoPtr<datastream>& ds) {
+		sdl_file_ios* fs = nullptr;
+		if (ds && ds->get_istr()) fs = dynamic_cast<sdl_file_ios*>(ds->get_istr());
+		else if (ds && ds->get_ostr()) fs = dynamic_cast<sdl_file_ios*>(ds->get_ostr());
+		if (fs) fs->detach();
+	}
+public:
+	process(SDL_Process* proc) : _proc(proc), _refcount(1) {}
+	~process() {
+		// Detach all stdio wrappers before destroying the SDL process; SDL_DestroyProcess frees the underlying SDL_IOStreams.
+		detach_stream(_stdin_ds);
+		detach_stream(_stdout_ds);
+		detach_stream(_stderr_ds);
+		if (_proc) SDL_DestroyProcess(_proc);
+	}
+	void duplicate() { asAtomicInc(_refcount); }
+	void release() { if (asAtomicDec(_refcount) < 1) delete this; }
+	bool is_valid() const { return _proc != nullptr; }
+	Sint64 get_pid() const {
+		if (!_proc) return -1;
+		return SDL_GetNumberProperty(SDL_GetProcessProperties(_proc), SDL_PROP_PROCESS_PID_NUMBER, -1);
+	}
+	bool kill(bool force = true) { return _proc && SDL_KillProcess(_proc, force); }
+	bool running() const { return _proc && !SDL_WaitProcess(_proc, false, nullptr); }
+	int wait() { int code = -1; if (_proc) SDL_WaitProcess(_proc, true, &code); return code; }
+	std::string read() {
+		if (!_proc) return "";
+		size_t datasize = 0;
+		void* data = SDL_ReadProcess(_proc, &datasize, nullptr);
+		if (!data) return "";
+		std::string result(static_cast<char*>(data), datasize);
+		SDL_free(data);
+		return result;
+	}
+	datastream* get_stdin() {
+		if (!_proc) return nullptr;
+		if (!_stdin_ds) {
+			SDL_IOStream* io = SDL_GetProcessInput(_proc);
+			datastream* ds = make_stream(io, std::ios::out);
+			if (ds) _stdin_ds = ds;
+			else return nullptr;
+		}
+		return _stdin_ds.get();
+	}
+	datastream* get_stdout() {
+		if (!_proc) return nullptr;
+		if (!_stdout_ds) {
+			SDL_IOStream* io = SDL_GetProcessOutput(_proc);
+			datastream* ds = make_stream(io, std::ios::in);
+			if (ds) _stdout_ds = ds;
+			else return nullptr;
+		}
+		return _stdout_ds.get();
+	}
+	datastream* get_stderr() {
+		if (!_proc) return nullptr;
+		if (!_stderr_ds) {
+			SDL_PropertiesID props = SDL_GetProcessProperties(_proc);
+			SDL_IOStream* io = props ? static_cast<SDL_IOStream*>(SDL_GetPointerProperty(props, SDL_PROP_PROCESS_STDERR_POINTER, nullptr)) : nullptr;
+			datastream* ds = make_stream(io, std::ios::in);
+			if (ds) _stderr_ds = ds;
+			else return nullptr;
+		}
+		return _stderr_ds.get();
+	}
+};
+
+process* run(const std::vector<std::string>& args, int flags, const std::string& workdir) {
+	if (args.empty()) return nullptr;
+	// Expand convenience flags and auto-pipe stdout/stderr when no console is available (e.g. GUI subsystem on Windows, where DuplicateHandle on invalid stdio handles would otherwise cause CreateProcessWithProperties to fail).
+	if ((flags & PROCESS_CAPTURE) || !is_console_available()) flags |= PROCESS_PIPE_STDOUT | PROCESS_PIPE_STDERR;
+	std::vector<const char*> argv;
+	argv.reserve(args.size() + 1);
+	for (const auto& a : args) argv.push_back(a.c_str());
+	argv.push_back(nullptr);
+	SDL_PropertiesID props = SDL_CreateProperties();
+	if (!props) return nullptr;
+	SDL_SetPointerProperty(props, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, argv.data());
+	if (!workdir.empty()) SDL_SetStringProperty(props, SDL_PROP_PROCESS_CREATE_WORKING_DIRECTORY_STRING, workdir.c_str());
+	if (flags & PROCESS_PIPE_STDIN) SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_APP);
+	if (flags & PROCESS_PIPE_STDOUT) SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP);
+	if (flags & PROCESS_PIPE_STDERR) SDL_SetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_APP);
+	if ((flags & PROCESS_STDERR_TO_STDOUT) && !(flags & PROCESS_PIPE_STDERR)) SDL_SetBooleanProperty(props, SDL_PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN, true);
+	if (flags & PROCESS_BACKGROUND) SDL_SetBooleanProperty(props, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true);
+	SDL_Process* proc = SDL_CreateProcessWithProperties(props);
+	SDL_DestroyProperties(props);
+	if (!proc) {
+		if (flags & PROCESS_FAIL_EXCEPTION) throw Poco::RuntimeException("process launch failed", SDL_GetError());
+		return nullptr;
+	}
+	process* result = new process(proc);
+	if (flags & PROCESS_WAIT) result->wait();
+	return result;
+}
+
+static process* run_script(CScriptArray* args, int flags = 0, const std::string& workdir = "") {
+	if (!args) return nullptr;
+	std::vector<std::string> vargs;
+	vargs.reserve(args->GetSize());
+	for (asUINT i = 0; i < args->GetSize(); i++) vargs.push_back(*static_cast<std::string*>(args->At(i)));
+	return run(vargs, flags, workdir);
+}
+
 bool run(const std::string& filename, const std::string& cmdline, bool wait_for_completion, bool background) {
-	#ifdef _WIN32
-	PROCESS_INFORMATION info;
-	STARTUPINFO si;
-	ZeroMemory(&si, sizeof(si));
-	si.cb = sizeof(si);
-	si.dwFlags = STARTF_USESHOWWINDOW;
-	si.wShowWindow = (background ? SW_HIDE : SW_SHOW);
-	char c_cmdline[32768];
-	c_cmdline[0] = 0;
-	if (cmdline.size() > 0) {
-		std::string tmp = "\"";
-		tmp += filename;
-		tmp += "\" ";
-		tmp += cmdline;
-		strncpy(c_cmdline, tmp.c_str(), tmp.size());
-		c_cmdline[tmp.size()] = 0;
+	std::vector<std::string> args;
+	args.push_back(filename);
+	if (!cmdline.empty()) {
+		std::istringstream iss(cmdline);
+		std::string token;
+		while (iss >> token) args.push_back(token);
 	}
-	std::wstring filename_u, cmdline_u;
-	Poco::UnicodeConverter::convert(filename, filename_u);
-	Poco::UnicodeConverter::convert(c_cmdline, cmdline_u);
-	BOOL r = CreateProcess(filename_u.c_str(), &cmdline_u[0], NULL, NULL, FALSE, INHERIT_CALLER_PRIORITY, NULL, NULL, &si, &info);
-	if (r == FALSE)
-		return false;
-	if (wait_for_completion) {
-		while (WaitForSingleObject(info.hProcess, 0) == WAIT_TIMEOUT)
-			wait(5);
-	}
-	CloseHandle(info.hProcess);
-	CloseHandle(info.hThread);
-	return true;
-	#else
-	int status;
-	pid_t pid = fork();
-	if (pid < 0) return false;
-	else if (pid == 0) {
-		std::string cmd = filename;
-		cmd += " ";
-		cmd += cmdline;
-		execl("/bin/sh", "/bin/sh", "-c", cmd.c_str(), NULL);
-		_exit(EXIT_FAILURE);
-	} else {
-		if (!wait_for_completion) return true;
-		else return waitpid(pid, &status, 0) == pid;
-	}
-	#endif
+	int flags = (wait_for_completion ? PROCESS_WAIT : 0) | (background ? PROCESS_BACKGROUND : 0);
+	Poco::AutoPtr<process> proc(run(args, flags, ""));
+	return proc != nullptr;
 }
 double tinyexpr(const std::string& expr) {
 	return te_interp(expr.c_str(), NULL);
 }
 
 std::string number_to_words(asINT64 number, bool include_and) {
-	if (number < 0) return "negative " + number_to_words(number * -1, include_and);
+	uint64_t magnitude = number < 0 ? 0 - uint64_t(number) : uint64_t(number);
 	std::string output(128, '\0');
-	size_t size = bl_number_to_words(number, &output[0], 96, include_and);
+	size_t size = bl_number_to_words(magnitude, &output[0], 96, include_and);
 	if (size > 96) {
 		output.resize(size);
-		size = bl_number_to_words(number, &output[0], size, include_and);
+		size = bl_number_to_words(magnitude, &output[0], size, include_and);
 	}
 	output.resize(size - 1); // It appears bl_number_to_words includes a trailing null byte in it's size calculation.
-	return output;
+	return number < 0 ? "negative " + output : output;
 }
 int get_last_error() {
 	int e = g_LastError;
 	g_LastError = 0;
 	return e;
 }
+asQWORD get_process_id() {
+	#ifdef _WIN32
+	return GetCurrentProcessId();
+	#else
+	return getpid();
+	#endif
+}
 
 double range_convert(double old_value, double old_min, double old_max, double new_min, double new_max) {
 	return ((old_value - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min;
+}
+float range_convert(float old_value, float old_min, float old_max, float new_min, float new_max) {
+	return ((old_value - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min;
+}
+float range_convert_midpoint(float old_value, float old_min, float old_midpoint, float old_max, float new_min, float new_midpoint, float new_max) {
+	if (old_value < old_midpoint) return range_convert(old_value, old_min, old_midpoint, new_min, new_midpoint);
+	else return range_convert(old_value, old_midpoint, old_max, new_midpoint, new_max);
 }
 std::string float_to_bytes(float f) {
 	return std::string((char*)&f, 4);
@@ -185,31 +297,39 @@ std::string string_to_upper_case(std::string s) {
 }
 
 //Following function originally from https://stackoverflow.com/questions/642213/how-to-implement-a-natural-sort-algorithm-in-c
-bool natural_number_sort(const std::string& a, const std::string& b) {
-	if (a.empty())
-		return true;
-	if (b.empty())
-		return false;
-	if (isdigit(a[0]) && !isdigit(b[0]))
-		return true;
-	if (!isdigit(a[0]) && isdigit(b[0]))
-		return false;
-	if (!isdigit(a[0]) && !isdigit(b[0])) {
-		if (a[0] == b[0])
-			return natural_number_sort(a.substr(1), b.substr(1));
-		return (string_to_upper_case(a) < string_to_upper_case(b));
+bool natural_number_sort(const std::string& first, const std::string& second) {
+	std::string a = first, b = second;
+	while (true) {
+		if (a.empty())
+			return true;
+		if (b.empty())
+			return false;
+		if (isdigit(a[0]) && !isdigit(b[0]))
+			return true;
+		if (!isdigit(a[0]) && isdigit(b[0]))
+			return false;
+		if (!isdigit(a[0]) && !isdigit(b[0])) {
+			if (a[0] != b[0])
+				return (string_to_upper_case(a) < string_to_upper_case(b));
+			size_t i = 1;
+			while (i < a.size() && i < b.size() && !isdigit(a[i]) && a[i] == b[i]) i++;
+			a.erase(0, i);
+			b.erase(0, i);
+			continue;
+		}
+		std::istringstream issa(a);
+		std::istringstream issb(b);
+		int ia, ib;
+		issa >> ia;
+		issb >> ib;
+		if (ia != ib)
+			return ia < ib;
+		std::string anew, bnew;
+		std::getline(issa, anew);
+		std::getline(issb, bnew);
+		a = anew;
+		b = bnew;
 	}
-	std::istringstream issa(a);
-	std::istringstream issb(b);
-	int ia, ib;
-	issa >> ia;
-	issb >> ib;
-	if (ia != ib)
-		return ia < ib;
-	std::string anew, bnew;
-	std::getline(issa, anew);
-	std::getline(issb, bnew);
-	return (natural_number_sort(anew, bnew));
 }
 
 refstring* new_refstring() {
@@ -346,6 +466,7 @@ script_memory_buffer& script_memory_buffer::from_array(CScriptArray* array) {
 	else std::memcpy(ptr, array->GetBuffer(), (array->GetSize() < size? array->GetSize() : size) * g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid));
 	return *this;
 }
+int script_memory_buffer::get_element_size() const {return g_ScriptEngine->GetSizeOfPrimitiveType(subtypeid); }
 void script_memory_buffer::make(script_memory_buffer* mem, asITypeInfo* subtype, void* ptr, int size) { new(mem) script_memory_buffer(subtype, ptr, size); }
 void script_memory_buffer::copy(script_memory_buffer* mem, asITypeInfo* subtype, const script_memory_buffer& other) { new(mem) script_memory_buffer(other); }
 void script_memory_buffer::destroy(script_memory_buffer* mem) { mem->~script_memory_buffer(); }
@@ -364,7 +485,8 @@ void script_memory_buffer::angelscript_register(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("memory_buffer<T>", "T& opIndex(uint64 index)", asMETHODPR(script_memory_buffer, at, (size_t), void*), asCALL_THISCALL);
 	engine->RegisterObjectMethod("memory_buffer<T>", "const T& opIndex(uint64 index) const", asMETHODPR(script_memory_buffer, at, (size_t) const, const void*), asCALL_THISCALL);
 	engine->RegisterObjectMethod("memory_buffer<T>", "array<T>@ opImplConv() const", asMETHOD(script_memory_buffer, to_array), asCALL_THISCALL);
-	engine->RegisterObjectMethod("memory_buffer<T>", "memory_buffer<T>& opAssign(array<T>@ array)", asMETHOD(script_memory_buffer, from_array), asCALL_THISCALL);
+	engine->RegisterObjectMethod("memory_buffer<T>", "memory_buffer<T>& opAssign(array<T>@+ array)", asMETHOD(script_memory_buffer, from_array), asCALL_THISCALL);
+	engine->RegisterObjectMethod("memory_buffer<T>", "int get_element_size() const property", asMETHOD(script_memory_buffer, get_element_size), asCALL_THISCALL);
 }
 void* string_get_address(std::string& str) {
 	if (str.size() < 1) return nullptr;
@@ -383,9 +505,32 @@ void RegisterMiscFunctions(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->RegisterGlobalFunction(_O("string[]@ get_preferred_locales()"), asFUNCTION(get_preferred_locales), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string get_COMMAND_LINE() property"), asFUNCTION(get_command_line), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool run(const string& in filename, const string& in arguments, bool wait_for_completion, bool background)"), asFUNCTION(run), asCALL_CDECL);
+	engine->RegisterEnum(_O("process_flags"));
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_PIPE_STDIN"), PROCESS_PIPE_STDIN);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_PIPE_STDOUT"), PROCESS_PIPE_STDOUT);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_PIPE_STDERR"), PROCESS_PIPE_STDERR);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_STDERR_TO_STDOUT"), PROCESS_STDERR_TO_STDOUT);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_BACKGROUND"), PROCESS_BACKGROUND);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_WAIT"), PROCESS_WAIT);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_FAIL_EXCEPTION"), PROCESS_FAIL_EXCEPTION);
+	engine->RegisterEnumValue(_O("process_flags"), _O("PROCESS_CAPTURE"), PROCESS_CAPTURE);
+	engine->RegisterObjectType(_O("process"), 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour(_O("process"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(process, duplicate), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour(_O("process"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(process, release), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("bool get_valid() const property"), asMETHOD(process, is_valid), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("int64 get_pid() const property"), asMETHOD(process, get_pid), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("bool get_running() const property"), asMETHOD(process, running), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("bool kill(bool force = true)"), asMETHOD(process, kill), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("int wait()"), asMETHOD(process, wait), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("string read()"), asMETHOD(process, read), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("datastream@+ get_stdin() property"), asMETHOD(process, get_stdin), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("datastream@+ get_stdout() property"), asMETHOD(process, get_stdout), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("process"), _O("datastream@+ get_stderr() property"), asMETHOD(process, get_stderr), asCALL_THISCALL);
+	engine->RegisterGlobalFunction(_O("process@ run(const string[]& in args, int flags = 0, const string& in workdir = \"\")"), asFUNCTION(run_script), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool run(const string& in filename, const string& in arguments, bool wait_for_completion, bool background)"), asFUNCTIONPR(run, (const std::string&, const std::string&, bool, bool), bool), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool is_debugger_present()"), asFUNCTION(debugger_present), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("int get_last_error()"), asFUNCTION(get_last_error), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("uint64 get_process_id()"), asFUNCTION(get_process_id), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->RegisterGlobalFunction(_O("double round(double number, int place)"), asFUNCTION(Round), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("double tinyexpr(const string &in expression)"), asFUNCTION(tinyexpr), asCALL_CDECL);

@@ -3,8 +3,8 @@
  * It also contains some function registrations (mostly from SDL3) to ease cross platform development. If a function's effect might dramatically change or even be available on certain platforms it is OK to register it here unless it fits better somewhere else.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -21,7 +21,9 @@
 #include <Poco/Environment.h>
 #include <Poco/File.h>
 #include <Poco/Path.h>
+#include <Poco/String.h>
 #include <Poco/Thread.h>
+#include <Poco/Util/Application.h>
 #include <obfuscate.h>
 #include <angelscript.h>
 #include "nvgt.h"
@@ -52,7 +54,7 @@ void determine_compile_platform() {
 }
 void xplatform_correct_path_to_stubs(Poco::Path& stubpath) {
 	#ifdef __APPLE__ // Stub may be in Resources directory of an app bundle.
-	if (!File(stubpath).exists() && stubpath[stubpath.depth() -2] == "MacOS" && stubpath[stubpath.depth() -3] == "Contents") stubpath.makeParent().makeParent().pushDirectory("Resources").pushDirectory("stub");
+	if (!File(stubpath).exists() && !icompare(stubpath[stubpath.depth() -2], "MacOS") && !icompare(stubpath[stubpath.depth() -3], "Contents")) stubpath.makeParent().makeParent().pushDirectory("Resources").pushDirectory("stub");
 	#endif
 }
 std::string get_nvgt_lib_directory(const std::string& platform) {
@@ -62,6 +64,7 @@ std::string get_nvgt_lib_directory(const std::string& platform) {
 	if (platform == "windows") dir = Poco::Environment::isWindows()? "lib" : "lib_windows";
 	else if (platform == "mac") dir = Environment::os() == POCO_OS_MAC_OS_X? (apple_bundle? "Frameworks" : "lib") : "lib_mac";
 	else if (platform == "linux") dir = Poco::Environment::os() == POCO_OS_LINUX? "lib" : "lib_linux";
+	else if (platform == "android") dir = "lib_android";
 	else return ""; // libs not applicable for this platform.
 	Path result(Path::self());
 	result.makeParent();
@@ -73,6 +76,23 @@ std::string get_nvgt_lib_directory(const std::string& platform) {
 	#endif
 	result.pushDirectory(dir);
 	return result.toString();
+}
+#else // NVGT_STUB
+std::string get_data_location() {
+	std::string executable = Poco::Util::Application::instance().commandPath();
+	#if defined(__ANDROID__)
+	return android_get_main_shared_object();
+	#elif defined(__APPLE__)
+		#ifndef NVGT_MOBILE
+		Path payload_file = Path(Util::Application::instance().commandPath()).makeParent().makeParent().append("Resources/exec");
+		#else
+		Path payload_file = Path(Util::Application::instance().commandPath()).makeParent().append("exec");
+		#endif
+		payload_file.makeFile();
+		return (Poco::Environment::has("MACOS_BUNDLED_APP") || running_on_mobile()) && File(payload_file).exists()? payload_file.toString() : executable;
+	#else
+		return executable;
+	#endif
 }
 #endif
 
@@ -110,6 +130,44 @@ std::string android_get_main_shared_object() {
 	return p;
 }
 #endif
+
+#ifndef _WIN32
+// Dummy versions of functions that are currently only implemented on windows. If some of these get defined on other platforms, this define can be made more complex to avoid the dummy versions clashing.
+void lost_window_focus_platform() {}
+void regained_window_focus_platform() {}
+#endif
+
+std::string get_font_path(const std::string& name) {
+	// If the name already ends in .ttf, treat it as a path directly.
+	if (name.size() >= 4 && name.substr(name.size() - 4) == ".ttf") return name;
+	// See if name+".ttf" already exists as a relative or absolute path.
+	std::string with_ext = name + ".ttf";
+	if (File(with_ext).exists()) return with_ext;
+	// Search platform system font directories.
+	static const char* font_dirs[] = {
+		#ifdef _WIN32
+		"C:/Windows/Fonts/",
+		#elif defined(__APPLE__)
+		"/Library/Fonts/",
+		"/System/Library/Fonts/",
+		"/System/Library/Fonts/Supplemental/",
+		#elif defined(__ANDROID__)
+		"/system/fonts/",
+		"/system/font/",
+		#else // Linux and other Unix-likes
+		"/usr/share/fonts/truetype/",
+		"/usr/share/fonts/",
+		"/usr/local/share/fonts/",
+		#endif
+		nullptr
+	};
+	for (int i = 0; font_dirs[i]; i++) {
+		std::string candidate = std::string(font_dirs[i]) + name + ".ttf";
+		if (File(candidate).exists()) return candidate;
+	}
+	// Couldn't resolve — return name+".ttf" and let the caller handle the error.
+	return with_ext;
+}
 
 // Anything below this point is function registrations.
 // Usually this involves defining no-op versions of functions that are only available on certain platforms, though can sometimes include wrappers as well to get around char* and other things that we can't directly register.
@@ -182,8 +240,8 @@ std::string get_directory_temp() {
 #endif
 void RegisterXplatform(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
-	engine->RegisterGlobalFunction("string set_linux_thread_priority(int64 thread_id, int priority)", asFUNCTION(SDL_SetLinuxThreadPriority), asCALL_CDECL);
-	engine->RegisterGlobalFunction("string set_linux_thread_priority_and_policy(int64 thread_id, int priority, int policy)", asFUNCTION(SDL_SetLinuxThreadPriorityAndPolicy), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool set_linux_thread_priority(int64 thread_id, int priority)", asFUNCTION(SDL_SetLinuxThreadPriority), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool set_linux_thread_priority_and_policy(int64 thread_id, int priority, int policy)", asFUNCTION(SDL_SetLinuxThreadPriorityAndPolicy), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void android_send_back_button()", asFUNCTION(SDL_SendAndroidBackButton), asCALL_CDECL);
 	engine->RegisterFuncdef("void android_permission_request_callback(string permission, bool granted, string user_data)");
 	engine->RegisterGlobalFunction("bool android_request_permission(const string&in permission, android_permission_request_callback@ callback = null, const string&in callback_data = \"\")", asFUNCTION(request_android_permission), asCALL_CDECL);

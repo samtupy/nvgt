@@ -1,0 +1,19 @@
+/**
+	Close the pack, finishing it first if it was being written.
+	bool pack_file::close();
+	## Returns:
+		bool: true if a pack was open and is now closed, false if no pack was open.
+	## Remarks:
+		When a pack that was opened with `create()` is closed, its table of contents is written to the file. A pack that was never closed cannot be opened again. Packs are also closed automatically when the pack_file object is destroyed, or when `create()` or `open()` is called on the same object.
+		Any datastreams previously returned by `get_file()` stay usable after the pack is closed.
+*/
+
+// Example:
+void main() {
+	pack_file p;
+	p.create("example.dat");
+	p.add_memory("data.txt", "some data");
+	alert("Closing an open pack", p.close() ? "succeeded" : "failed");
+	alert("Closing it again", p.close() ? "succeeded" : "failed");
+	file_delete("example.dat");
+}

@@ -4,6 +4,9 @@
 	## Arguments:
 		* uint pos: the position to start erasing from.
 		* int count = -1: the number of characters to erase after the specified index. If -1, erases all characters starting at the given pos until the end of the string.
+	## Remarks
+		Please note this modifies the calling string. To keep the original you will need to make a copy.
+		In the event of boundary errors (start + count >= length), an exception is thrown.
 */
 
 // Example:

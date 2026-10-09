@@ -1,0 +1,18 @@
+// NonVisual Gaming Toolkit (NVGT)
+// Copyright (C) 2022-2025 Sam Tupy
+// License: zlib (see license.md in the root of the NVGT distribution)
+
+#include "soundtrack.nvgt"
+
+void main() {
+	soundtrack s;
+	string bpm = "t120";
+	string general_mel_sets = "@2l16a1r5q11";
+	// Prelude Bach
+	string mel1 = "o5[C+<ED+EC+ED+E>]2[<AF+FF+C+F+FF+>]2[C<F+EF+D+F+EF+>]2[C+<G+F+G+EG+F+G+>]2[E<AG+AEAG+A>]2[D+<GFGD+GFG>]2[D+<G+GG+D+G+GG+>]2[C+<FD+FC+FD+F>]2[C+<F+FF+C+F+FF+>]2[<BF+EF+D+F+EF+>]2[<BG+F+G+EG+F+G+>]2[<AG+F+G+EG+F+G+>]2[<AD+C+D+C-D+C+D+>]2[<G+<BAB>E<BAB>>]2[<F+C+C-C+<A+>C+C-C+>]2[<F+D+C+D+CD+C+D+>]2";
+	string mel2 = "o3[C+G+F+G+EG+F+G+]2[C+AG+AF+AG+A]4[C+ED+EG+ED+E]2[C+>C+C-C+<A>C+C-C+<]2[C+A+G+A+GA+G+A+]2[C-BA+BG+BA+B]2[C-G+F+G+FG+F+G+]2[<A>AG+AF+AG+A]2[<A>D+C+D+F+D+C+D+]2[<G+>ED+EG+ED+E]2[C+ED+EAED+E]2[D+F+EF+AF+EF+]2[EG+F+G+AG+G+G+]2[EA+G+G+F+A+G+A+]2[D+F+EF+AF+EF+]2";
+	s.add_channel(bpm + general_mel_sets + mel1);
+	s.add_channel(bpm + general_mel_sets+ mel2);
+	sound@ output=s.write_sound();
+	output.play_wait();
+}

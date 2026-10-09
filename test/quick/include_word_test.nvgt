@@ -1,0 +1,4 @@
+#include "include_word.nvgt"
+void main() {
+	alert("included string", testing);
+}

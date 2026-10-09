@@ -1,0 +1,22 @@
+/**
+	Checks whether a ray (straight line) intersects the box, given a starting point, direction, and distance.
+	bool aabb::test_ray_intersect(const vector&in ray_origin, const vector&in ray_direction, float ray_max_fraction);
+	## Arguments:
+		* ray_origin: The starting position.
+		* ray_direction: The direction you expect to move.
+		* ray_max_fraction: The maximum distance you expect to travel.
+	## Remarks
+		This is useful for weapon aiming or pathfinding systems.
+*/
+
+// Example:
+void main() {
+	aabb b;
+	b.min = vector(1, 1, 1);
+	b.max = vector(10, 10, 2);
+	vector start = vector(50, 50, 1);
+	vector target = vector(5, 5, 1);
+	vector dir = (target - start);
+	dir.normalize();
+	if (b.test_ray_intersect(start, dir, 100)) alert("Boom!", "We collided.");
+}

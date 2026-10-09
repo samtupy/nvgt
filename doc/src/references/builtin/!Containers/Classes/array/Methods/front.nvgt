@@ -1,0 +1,15 @@
+/**
+	Retrieve the first element in the array.
+	T& array::front();
+	## Returns:
+		The first value in the array.
+	## Remarks:
+		This method is functionally equivalent to `array[0]`.
+	An exception will be thrown if the array is empty.
+*/
+
+// Example:
+void main() {
+	string[] items = {"Blah", "Bleh", "Blur"};
+	alert("First item", items.front());
+}

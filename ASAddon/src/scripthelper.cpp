@@ -285,7 +285,7 @@ int WriteConfigToStream(asIScriptEngine *engine, ostream &strm)
 		for( asUINT m = 0; m < ti->GetEnumValueCount(); m++ )
 		{
 			const char *valName;
-			int val;
+			asINT64 val;
 			valName = ti->GetEnumValueByIndex(m, &val);
 			strm << "enumval " << enumName << " " << valName << " " << val << "\n";
 		}
@@ -351,7 +351,7 @@ int WriteConfigToStream(asIScriptEngine *engine, ostream &strm)
 			strm << "access " << hex << (unsigned int)(accessMask) << dec << "\n";
 			currAccessMask = accessMask;
 		}
-		strm << "typedef " << ti->GetName() << " \"" << engine->GetTypeDeclaration(ti->GetTypedefTypeId()) << "\"\n";
+		strm << "typedef " << ti->GetName() << " \"" << engine->GetTypeDeclaration(ti->GetUnderlyingTypeId()) << "\"\n";
 	}
 
 	c = engine->GetFuncdefCount();
@@ -1002,8 +1002,8 @@ std::string ScriptGetExceptionModule()
 		return "";
 	asIScriptFunction* func=ctx->GetExceptionFunction();
 	if(!func) return "";
-	const char* section_name;
-	if (func->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0) return std::string(section_name);
+	const char* section_name = nullptr;
+	if (func->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0 && section_name) return std::string(section_name);
 	else return "";
 }
 
@@ -1016,7 +1016,7 @@ void RegisterExceptionRoutines(asIScriptEngine *engine)
 
 	if (strstr(asGetLibraryOptions(), "AS_MAX_PORTABILITY") == 0)
 	{
-		r = engine->RegisterGlobalFunction("void throw(const string &in)", asFUNCTION(ScriptThrow), asCALL_CDECL); assert(r >= 0);
+		r = engine->RegisterGlobalFunction("void throw(const string &in message)", asFUNCTION(ScriptThrow), asCALL_CDECL); assert(r >= 0);
 		r = engine->RegisterGlobalFunction("string get_exception_info()", asFUNCTION(ScriptGetExceptionInfo), asCALL_CDECL); assert(r >= 0);
 		r = engine->RegisterGlobalFunction("int get_exception_line()", asFUNCTION(ScriptGetExceptionLine), asCALL_CDECL); assert(r >= 0);
 		r = engine->RegisterGlobalFunction("string get_exception_function()", asFUNCTION(ScriptGetExceptionFunctionDecl), asCALL_CDECL); assert(r >= 0);
@@ -1024,7 +1024,7 @@ void RegisterExceptionRoutines(asIScriptEngine *engine)
 	}
 	else
 	{
-		r = engine->RegisterGlobalFunction("void throw(const string &in)", WRAP_FN(ScriptThrow), asCALL_GENERIC); assert(r >= 0);
+		r = engine->RegisterGlobalFunction("void throw(const string &in message)", WRAP_FN(ScriptThrow), asCALL_GENERIC); assert(r >= 0);
 		r = engine->RegisterGlobalFunction("string getExceptionInfo()", WRAP_FN(ScriptGetExceptionInfo), asCALL_GENERIC); assert(r >= 0);
 	}
 }

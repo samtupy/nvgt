@@ -27,7 +27,7 @@ changes under the same license.
 #ifndef speech_h
 #define speech_h
 
-short* speech_gen( int* samples_pairs_generated, char const* str, void* memctx );
+short* speech_gen( int* samples_pairs_generated, char const* str, float rate, float freq, int gain, void* memctx );
 void speech_free( short* sample_pairs, void* memctx );
 
 #endif /* speech_h */
@@ -2221,9 +2221,9 @@ static float tts_DBtoLIN(int dB) {
 
 
 
-static void tts_klatt_frame_init( struct tts_klatt_frame_t* klatt_frame ) {
-    klatt_frame->mF0FundamentalFreq = 1330;   
-    klatt_frame->mVoicingAmpdb = 60;              
+static void tts_klatt_frame_init( struct tts_klatt_frame_t* klatt_frame, float freq = 1330, int gain = 60 ) {
+    klatt_frame->mF0FundamentalFreq = freq;   
+    klatt_frame->mVoicingAmpdb = gain;              
     klatt_frame->mFormant1Freq = 500;  
     klatt_frame->mFormant1Bandwidth = 60;     
     klatt_frame->mFormant2Freq = 1500;            
@@ -2833,14 +2833,14 @@ static float tts_interpolate( struct tts_slope_t* aStartSlope, struct tts_slope_
 
 
 
-static void tts_klatt_initsynth( struct tts_klatt_t* klatt, int aElementCount,unsigned char *aElement ) {
+static void tts_klatt_initsynth( struct tts_klatt_t* klatt, int aElementCount,unsigned char *aElement, float freq ) {
     klatt->mElement = aElement;
     klatt->mElementCount = aElementCount;
     klatt->mElementIndex = 0;
     klatt->mLastElement = &tts_gElement[0];
     klatt->mTStress = 0;
     klatt->mNTStress = 0;
-    klatt->mKlattFramePars.mF0FundamentalFreq = 1330;
+    klatt->mKlattFramePars.mF0FundamentalFreq = freq;
     klatt->mTop = 1.1f * klatt->mKlattFramePars.mF0FundamentalFreq;
     klatt->mKlattFramePars.mNasalPoleFreq = (int)klatt->mLastElement->mInterpolator[TTS_ELM_FN].mSteady;
     klatt->mKlattFramePars.mFormant1ParallelBandwidth = klatt->mKlattFramePars.mFormant1Bandwidth = 60;
@@ -2855,7 +2855,7 @@ static void tts_klatt_initsynth( struct tts_klatt_t* klatt, int aElementCount,un
 }
 
 
-int tts_klatt_synth( struct tts_klatt_t* klatt, int aSampleCount, short *aSamplePointer) {
+int tts_klatt_synth( struct tts_klatt_t* klatt, int aSampleCount, short *aSamplePointer, float freq) {
     (void) aSampleCount;
 
     short *samp = aSamplePointer;
@@ -2982,7 +2982,7 @@ int tts_klatt_synth( struct tts_klatt_t* klatt, int aSampleCount, short *aSample
     if( klatt->count == 3 ) {
         klatt->mTStress = 0;
         klatt->mNTStress = 0;
-        klatt->mKlattFramePars.mF0FundamentalFreq = 1330;
+        klatt->mKlattFramePars.mF0FundamentalFreq = freq;
         klatt->mTop = 1.1f * klatt->mKlattFramePars.mF0FundamentalFreq;
         klatt->mKlattFramePars.mNasalPoleFreq = (int)klatt->mLastElement->mInterpolator[TTS_ELM_FN].mSteady;
         klatt->mKlattFramePars.mFormant1ParallelBandwidth = klatt->mKlattFramePars.mFormant1Bandwidth = 60;
@@ -3001,15 +3001,17 @@ int tts_klatt_synth( struct tts_klatt_t* klatt, int aSampleCount, short *aSample
 }
 
 
-static void tts_klatt_init( struct tts_klatt_t* klatt ) {
+static void tts_klatt_init( struct tts_klatt_t* klatt, float rate = 10.0f, float freq = 1330.0f, int gain = 60) {
     memset( klatt, 0, sizeof( *klatt ) );
-    tts_klatt_frame_init( &klatt->mKlattFramePars );
+    tts_klatt_frame_init( &klatt->mKlattFramePars, freq, gain );
     klatt->mSampleRate = 11025;
-    klatt->mF0Flutter = 0;
+    klatt->mVoicingAmpdb = gain;
+    klatt->mF0FundamentalFreq = freq;
+    klatt->mF0Flutter = 50;
 
     int FLPhz = (950 * klatt->mSampleRate) / 10000;
     int BLPhz = (630 * klatt->mSampleRate) / 10000;
-    klatt->mNspFr = (int)(klatt->mSampleRate * 10) / 1000;
+    klatt->mNspFr = (int)(klatt->mSampleRate * rate) / 1000;
 
     tts_resonator_initResonator( &klatt->mDownSampLowPassFilter, FLPhz, BLPhz, klatt->mSampleRate );
 
@@ -4153,9 +4155,9 @@ static int tts_xlate_word(const char *word, int n, struct tts_darray_t *phone, v
         }
     }
 
-    tts_darray_put( phone, ' ');
+    // tts_darray_put( phone, ' ');
 
-    return nph + 1;
+    return nph;
 }
 
 
@@ -4225,6 +4227,7 @@ static int tts_xlate_string(const char *string, struct tts_darray_t *phone, void
                             case '.': {
                                 s++;
                                 tts_darray_put( phone, ' ');
+                                tts_darray_put( phone, ' ');
                             } break;
 
                             case '"':                 /* change pitch ? */
@@ -4235,6 +4238,7 @@ static int tts_xlate_string(const char *string, struct tts_darray_t *phone, void
                             case '(':
                             case ')': {
                                 s++;
+                                tts_darray_put( phone, ' ');
                                 tts_darray_put( phone, ' ');
                             } break;
 
@@ -4276,7 +4280,7 @@ static int tts_xlate_string(const char *string, struct tts_darray_t *phone, void
 
 
 
-short* speech_gen( int* samples_pairs_generated, char const* str, void* memctx ) {
+short* speech_gen( int* samples_pairs_generated, char const* str, float rate, float freq, int gain, void* memctx ) {
     struct tts_darray_t element;
     tts_darray_init( &element, memctx );
 
@@ -4287,7 +4291,7 @@ short* speech_gen( int* samples_pairs_generated, char const* str, void* memctx )
     int frames = tts_phone_to_elm( tts_darray_getData( &phone ), tts_darray_getSize( &phone ), &element );
 
     struct tts_klatt_t synth;
-    tts_klatt_init( &synth );
+    tts_klatt_init( &synth, rate, freq, gain );
     
     int sample_count = synth.mNspFr * frames;
 
@@ -4296,11 +4300,11 @@ short* speech_gen( int* samples_pairs_generated, char const* str, void* memctx )
 
     short* samples = (short*) sample_pairs;
 
-    tts_klatt_initsynth( &synth, tts_darray_getSize( &element ), (unsigned char*) tts_darray_getData( &element )) ;
+    tts_klatt_initsynth( &synth, tts_darray_getSize( &element ), (unsigned char*) tts_darray_getData( &element ), freq);
     int x = 0;
     int pos = 0;
     while( x >= 0 ) {
-        x = tts_klatt_synth( &synth, 0, &samples[ pos ] );
+        x = tts_klatt_synth( &synth, 0, &samples[ pos ], freq );
         if( x < 0 ) break;
         pos += x;
     }

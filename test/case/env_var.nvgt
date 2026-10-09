@@ -1,0 +1,23 @@
+void test_environment_variable_expansion() {
+	// Test with a variable that exists on all platforms
+	// Try both Windows (%VAR%) and Unix ($VAR) style
+	string[] inputs = {"%PATH%", "$PATH", "%HOME%", "$HOME", "%USER%", "$USER"};
+	bool found_expansion = false;
+	
+	for (uint i = 0; i < inputs.length(); i++) {
+		string expanded = expand_environment_variables(inputs[i]);
+		if (expanded != inputs[i] && expanded.length() > 0) {
+			found_expansion = true;
+			break;
+		}
+	}
+	
+	// At least one variable should have been expanded
+	assert(found_expansion);
+	
+	// Test with non-existent variable  
+	string nonexistent = "%DEFINITELY_DOES_NOT_EXIST_VAR_12345%";
+	string result = expand_environment_variables(nonexistent);
+	// Non-existent vars are usually left as-is
+	assert(result == nonexistent);
+}

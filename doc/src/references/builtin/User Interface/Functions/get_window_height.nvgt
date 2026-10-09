@@ -1,0 +1,15 @@
+/**
+	Gets the height of the game window in pixels.
+	int get_window_height();
+	## Returns:
+		int: The height of the window in pixels, or 0 if no window is currently open.
+*/
+
+// Example:
+void main() {
+	show_window("Window Size Example");
+	wait(50); // Give the window time to appear
+	int width = get_window_width();
+	int height = get_window_height();
+	alert("Window Size", "The window is " + width + " pixels wide and " + height + " pixels high.");
+}

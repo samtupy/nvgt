@@ -1,0 +1,11 @@
+/**
+	Returns the number of times per second that `SYSTEM_PERFORMANCE_COUNTER` increases.
+	const uint64 SYSTEM_PERFORMANCE_FREQUENCY;
+	## Remarks:
+		Divide a difference between two readings of `SYSTEM_PERFORMANCE_COUNTER` by this value to convert it to seconds. The frequency depends on the system, but it does not change while the program is running.
+*/
+
+// Example:
+void main() {
+	alert("Example", "The performance counter increases " + SYSTEM_PERFORMANCE_FREQUENCY + " times per second.");
+}

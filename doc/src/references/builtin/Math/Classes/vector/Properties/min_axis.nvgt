@@ -1,0 +1,12 @@
+/**
+	Returns the index of the axis which contains the minimum value.
+	int vector::min_axis const;
+	## Remarks
+		The axis index is represent by a number: x = 0, y = 1, z = 2.
+*/
+
+// Example:
+void main() {
+	vector v(5, 7, 4);
+	alert("Minimum axis", v.min_axis);
+}

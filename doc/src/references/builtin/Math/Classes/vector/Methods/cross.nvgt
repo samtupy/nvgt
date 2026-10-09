@@ -1,0 +1,17 @@
+/**
+	Returns the cross product of two vectors.
+	vector vector::cross(const vector&in other);
+	## Arguments:
+		* other: The second vector to calculate from.
+
+	## Remarks
+		The cross product provides a third vector which is Perpendicular to (at right-angles with) the first two vectors. This is useful for working out relative directions (such as forwards, right, up) based on the world's orientation.
+*/
+
+// Example:
+void main() {
+	vector v1(0, 1, 0); // Forwards
+	vector v2(0, 0, 1); // Up
+	vector v3=v1.cross(v2); // right
+	alert("Cross", v3.x+", "+v3.y+", "+v3.z);
+}

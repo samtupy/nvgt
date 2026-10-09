@@ -1,0 +1,13 @@
+/**
+	Returns a random element in the array.
+	1. const T& array::random() const;
+	2. const T& array::random(random_interface@ rng) const;
+	## Remarks:
+		This method can be called without a parameter, in which case it will use the default random algorithm, with any of the several built-in random number generators, or any class that implements the random_interface.
+*/
+
+// Example:
+void main() {
+	string[] items = {"This", "is", "a", "test"};
+	alert("Random word", items.random());
+}

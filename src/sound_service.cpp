@@ -2,8 +2,8 @@
  * This is responsible for providing miniaudio with data to play from various sources, from an encrypted pack file to a custom stream from the internet.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -12,11 +12,12 @@
  */
 
 #include "sound_service.h"
-#include <Poco/FileStream.h>
+#include <Poco/URIStreamOpener.h>
 #include <vector>
 #include <cassert>
 #include <miniaudio.h>
 #include "crypto.h"
+#include "datastreams.h" // sdl_file_stream, prebuffer_istream
 #include "misc_functions.h" // is_valid_utf8
 #include "pack.h"
 #include <Poco/StringTokenizer.h>
@@ -27,6 +28,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <mutex>
+
 /**
  * The VFS is the glue between the sound service and MiniAudio.
  * We have an opaque structure -- in this case a pointer to the sound_service implementation -- and a series of callbacks which provide MiniAudio an interface to it.
@@ -60,9 +62,9 @@ class sound_service_impl : public sound_service {
 			return &instance;
 		}
 		virtual std::istream *open_uri(const char *uri, const directive_t directive) const {
-			Poco::FileInputStream *stream;
+			sdl_file_input_stream* stream;
 			try {
-				stream = new Poco::FileInputStream(uri);
+				stream = new sdl_file_input_stream(uri);
 				return stream;
 			} catch (std::exception &) {
 				return NULL; // Likely out of memory.
@@ -201,12 +203,12 @@ public:
 		return std::atomic_load(&default_protocol)->get();
 	}
 	bool is_default_protocol(size_t slot) {
-		if (slot < 0 || slot >= filters.size())
+		if (slot < 0 || slot >= protocols.size())
 			return false;
 		return protocols[slot] == std::atomic_load(&default_protocol);
 	}
 	bool set_default_filter(size_t slot) {
-		if (slot < 0 || slot > filters.size())
+		if (slot < 0 || slot >= filters.size())
 			return false;
 		std::atomic_store(&default_filter, filters[slot]);
 		return true;
@@ -321,11 +323,14 @@ private:
 		return MA_SUCCESS;
 	}
 	static ma_result onRead(ma_vfs *pVFS, ma_vfs_file file, void *pDst, size_t sizeInBytes, size_t *pBytesRead) {
+		if (pBytesRead) *pBytesRead = 0;
 		file_cast(file);
+		// Only a real end of stream stops a read; a failbit left behind by a refused seek (a live stream refuses seeks it can't satisfy) must not be mistaken for one.
+		if (stream->eof()) return MA_AT_END;
+		if (!stream->good()) stream->clear();
 		stream->read((char *)pDst, sizeInBytes);
 		if (pBytesRead) *pBytesRead = stream->gcount();
-
-		return MA_SUCCESS;
+		return stream->gcount() > 0? MA_SUCCESS : MA_AT_END;
 	}
 	static ma_result onSeek(ma_vfs *pVFS, ma_vfs_file file, ma_int64 offset, ma_seek_origin origin) {
 		file_cast(file);
@@ -345,12 +350,21 @@ private:
 				return MA_ERROR;
 		}
 		stream->seekg(offset, dir);
-
+		if (stream->fail()) {
+			stream->clear(); // the reads that follow still need this stream, so leave it usable
+			return MA_NOT_IMPLEMENTED;
+		}
 		return MA_SUCCESS;
 	}
 	static ma_result onTell(ma_vfs *pVFS, ma_vfs_file file, ma_int64 *pCursor) {
 		file_cast(file);
-		*pCursor = stream->tellg();
+		stream->clear(); // tellg refuses to answer on a failed stream, and the failure may not be its own
+		ma_int64 result = stream->tellg();
+		*pCursor = result != -1? result : 0;
+		if (result == -1) {
+			stream->clear();
+			return MA_NOT_IMPLEMENTED;
+		}
 		return MA_SUCCESS;
 	}
 	static ma_result onInfo(ma_vfs *pVFS, ma_vfs_file file, ma_file_info *pInfo) {
@@ -358,6 +372,11 @@ private:
 		stream->clear();
 		size_t cursor = stream->tellg();
 		stream->seekg(0, stream->end);
+		if (stream->fail()) {
+			pInfo->sizeInBytes = 0;
+			stream->clear();
+			return MA_NOT_IMPLEMENTED;
+		}
 		pInfo->sizeInBytes = stream->tellg();
 		stream->seekg(cursor, stream->beg);
 		return MA_SUCCESS;
@@ -390,7 +409,7 @@ std::istream *encryption_filter::wrap(std::istream &source, const directive_t di
 	if (key == nullptr)
 		return &source;
 	try {
-		return new chacha_istream(source, *key);
+		return &(new chacha_istream(source, *key))->own_source(true);
 	} catch (std::exception &) {
 		// Not encrypted or not valid.
 		return nullptr;
@@ -447,3 +466,16 @@ const pack_protocol pack_protocol::instance;
 const sound_service::protocol *pack_protocol::get_instance() {
 	return &instance;
 }
+
+// internet stream sound service protocol, combining Poco::UriStreamOpener with our prebuffer_istream.
+std::istream *netstream_protocol::open_uri(const char *uri, const directive_t directive) const {
+	try {
+		std::istream *stream = Poco::URIStreamOpener::defaultOpener().open(uri);
+		if (!stream) return nullptr; // Likely invalid URI. Figure out how to provide info about this to user?
+		return &(new prebuffer_istream(*stream))->own_source();
+	} catch(std::exception&) {} // Again figure out how to let user see exception details.
+	return nullptr;
+}
+const std::string netstream_protocol::get_suffix(const directive_t &directive) const { return "URI"; }
+const netstream_protocol netstream_protocol::instance;
+const sound_service::protocol *netstream_protocol::get_instance() { return &instance; }

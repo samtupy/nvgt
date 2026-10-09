@@ -1,0 +1,14 @@
+/**
+	Determine whether the pack is currently open, either for reading or for writing.
+	const bool pack_file::active;
+*/
+
+// Example:
+void main() {
+	pack_file p;
+	alert("Active before create", p.active ? "yes" : "no");
+	p.create("example.dat");
+	alert("Active after create", p.active ? "yes" : "no");
+	p.close();
+	file_delete("example.dat");
+}

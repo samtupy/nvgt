@@ -1,0 +1,21 @@
+/**
+	The display callback given to stats that are added without one.
+	stat_callback@ default_stat_callback;
+	## Remarks:
+		By default this is a function that replaces `%0` in the stat's text template with its value.
+		You can assign your own function to change how every stat added afterwards is displayed when no callback is passed to `stat_set::add()`. Stats that were already added keep the callback they were created with.
+*/
+
+// Example:
+#include "stat_set.nvgt"
+
+string shout(stat@ s) {
+	return s.text.format(string(s.val)).upper();
+}
+
+void main() {
+	@default_stat_callback = shout;
+	stat_set stats;
+	stats.add("greeting", "hello", "Message: %0");
+	alert("Example", string(stats["greeting"]));
+}

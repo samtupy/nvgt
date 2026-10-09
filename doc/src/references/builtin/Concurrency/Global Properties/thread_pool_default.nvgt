@@ -1,0 +1,20 @@
+/**
+	Returns NVGT's default thread pool, which can be used to run functions in the background without creating a thread pool of your own.
+	thread_pool& thread_pool_default;
+	## Remarks:
+		The default pool is created the first time it is used. It is named "default", starts with a capacity of 16 threads, and is shared by everything in your program that uses it.
+		Starting a function on a thread pool is usually cheaper than creating a new `thread` object each time, because the pool reuses threads that have finished their previous work.
+*/
+
+// Example:
+void background_task(dictionary@ args) {
+	string name;
+	args.get("name", name);
+	println("Hello from the background, " + name);
+}
+void main() {
+	dictionary args = {{"name", "player"}};
+	thread_pool_default.start(background_task, args);
+	thread_pool_default.join_all(); // Wait for the task to finish.
+	alert("Example", "The background task has finished.");
+}

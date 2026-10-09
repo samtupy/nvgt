@@ -1,0 +1,13 @@
+/**
+	A datastream connected to the program's standard error output.
+	datastream@ cerr;
+	## Remarks:
+		Standard error usually goes to the same console window as standard output, but it can be redirected separately. This makes it the conventional place for error and diagnostic messages, so that they don't get mixed into output that another program is reading.
+		The stream is opened in text mode. Calling `close()` on it has no effect, since the program's standard error output is not owned by the script.
+*/
+
+// Example:
+void main() {
+	if (!file_exists("settings.ini"))
+		cerr.write("Warning: settings.ini was not found, using the default settings.\n");
+}

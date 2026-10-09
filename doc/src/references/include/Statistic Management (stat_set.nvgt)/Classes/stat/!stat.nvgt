@@ -1,0 +1,32 @@
+/**
+	A single named statistic in a `stat_set`.
+	stat(const string&in name, var@ val, string text = "", stat_callback@ callback = default_stat_callback, dictionary@ user = null);
+	## Arguments:
+		* const string&in name: the name of the stat.
+		* var@ val: the starting value of the stat.
+		* string text = "": the text template used to display the stat, where `%0` is replaced with the value. If empty, it becomes `"%0"`.
+		* stat_callback@ callback = default_stat_callback: the function that produces the stat's display text. If null, `default_stat_callback` is used.
+		* dictionary@ user = null: optional data to attach to the stat, copied into its `user` property.
+	## Properties:
+		* string name: the name the stat is stored under in its set.
+		* var val: the current value of the stat. It can hold any type a `var` supports, usually a number or a string.
+		* string text: the template used to display the stat, where `%0` is replaced with the value. If empty when the stat is created, it becomes `"%0"`.
+		* stat_callback@ callback: the function that produces the stat's display text. It defaults to `default_stat_callback`, which fills `%0` in `text` with the value.
+		* dictionary user: free storage for any extra data you want to attach to the stat, such as a sound to play or a category for display. The stat_set never reads it, and it is not saved by `serialize()`.
+	## Remarks:
+		You normally don't create stats directly; use `stat_set::add()`, which creates the stat and returns a handle to it.
+		Converting a stat to a string gives its display text, from the callback. Converting it to a double gives its numeric value.
+		Stats support arithmetic with numbers, so you can write `stats["score"] += 10` or `stats["lives"]--` directly. The `+=` operator also works with strings, appending to a string stat. `++` and `--` keep whole number stats as whole numbers.
+		Comparisons and arithmetic on the stat itself, such as `stats["score"] * 2`, produce a plain number and don't change the stat.
+*/
+
+// Example:
+#include "stat_set.nvgt"
+
+void main() {
+	stat_set stats;
+	stat@ score = stats.add("score", 0, "Score: %0");
+	score += 150;
+	score++;
+	alert("Example", string(score) + ", doubled would be " + (score * 2));
+}

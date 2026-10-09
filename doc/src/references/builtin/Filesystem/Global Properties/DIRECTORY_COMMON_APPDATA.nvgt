@@ -1,0 +1,15 @@
+/**
+	Property that returns the system wide application data directory, which is shared by every user on the computer.
+	const string DIRECTORY_COMMON_APPDATA;
+	## remarks:
+		A slash character is already appended to the directory returned by this property.
+		This property may return different values depending on the operating system the application is being run on.
+			* On Windows, usually C:\ProgramData\.
+			* On Linux, usually /etc/.
+		This directory is often not writable without administrator or root privileges, so it is mostly useful for reading configuration that was put there by an installer. Per user data should go in `DIRECTORY_APPDATA` or `DIRECTORY_LOCAL_APPDATA` instead.
+*/
+
+// example:
+void main() {
+	alert("example", "shared configuration for the game could be read from " + DIRECTORY_COMMON_APPDATA + "my_game/");
+}

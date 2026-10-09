@@ -1,0 +1,334 @@
+// The basic soundtrack, originally from BGT, version 1
+//Copyright (C) 2010-2014 Blastbay Studios
+
+
+#include "bgt_compat.nvgt"
+
+class soundtrack {
+int default_length;
+int default_octave;
+int instrument;
+int tempo;
+int quantization;
+int volume;
+int attack;
+int release;
+int transpose;
+tone_synth synth;
+string channel_input;
+int channel_count;
+
+soundtrack() {
+channel_count = 0;
+}
+
+void add_channel(string commands) {
+default_length = 4;
+default_octave = 4;
+instrument = 1;
+tempo = 120;
+quantization = 8;
+volume = 100;
+attack = 1;
+release = 1;
+transpose = 0;
+channel_count++;
+synth.seek(0);
+uint cursor = process_commands(commands, 0);
+if(cursor < commands.length()) {
+signal_error("End of string expected", cursor);
+}
+}
+
+uint process_commands(string commands, uint cursor) {
+while(cursor < commands.length()) {
+string command = commands[cursor];
+if(command == "o") {
+cursor = cmd_o(commands, cursor);
+}
+else if(command == "<") {
+cursor = cmd_lt(commands, cursor);
+}
+else if(command == ">") {
+cursor = cmd_gt(commands, cursor);
+}
+else if(command == "l") {
+cursor = cmd_l(commands, cursor);
+}
+else if(command == "p") {
+cursor = cmd_p(commands, cursor);
+}
+else if(command>="A" && command<="G") {
+cursor = cmd_note(commands, cursor);
+}
+else if(command == "@") {
+cursor = cmd_at(commands, cursor);
+}
+else if(command == "t") {
+cursor = cmd_t(commands, cursor);
+}
+else if(command == "q") {
+cursor = cmd_q(commands, cursor);
+}
+else if(command == "[") {
+cursor = cmd_repeat(commands, cursor);
+}
+else if(command == "v") {
+cursor = cmd_v(commands, cursor);
+}
+else if(command == "a") {
+cursor = cmd_a(commands, cursor);
+}
+else if(command == "r") {
+cursor = cmd_r(commands, cursor);
+}
+else if(command == "n") {
+cursor = cmd_n(commands, cursor);
+}
+else if(command == "u") {
+cursor = cmd_u(commands, cursor);
+}
+else if(command == "d") {
+cursor = cmd_d(commands, cursor);
+}
+else {
+break;
+}
+}
+return cursor;
+}
+
+uint cmd_o(string channel_input, uint cursor) {
+cursor++; // Skip the o
+uint number_position = cursor;
+cursor = get_number(channel_input, cursor, default_octave);
+if(default_octave < 1 || default_octave > 6) {
+signal_error("Invalid octave " + default_octave + ". Valid octaves are 1-6", number_position);
+}
+return cursor;
+}
+
+uint cmd_lt(string channel_input, uint cursor) {
+cursor++; // Skip the <
+default_octave = (default_octave>1) ? default_octave-1 : 1;
+return cursor;
+}
+
+uint cmd_gt(string channel_input, uint cursor) {
+cursor++; // Skip the >
+default_octave = (default_octave<7) ? default_octave+1 : 7;
+return cursor;
+}
+
+uint cmd_l(string channel_input, uint cursor) {
+cursor++; // Skip the l
+uint number_position = cursor;
+cursor = get_number(channel_input, cursor, default_length);
+if(default_length < 1 || default_length > 64) {
+signal_error("Length " + default_length + " is invalid. Valid lengths are 1-64", number_position);
+}
+return cursor;
+}
+
+uint cmd_p(string channel_input, uint cursor) {
+cursor++; // Skip the p
+int pause_length;
+uint number_position = cursor;
+cursor = get_number(channel_input, cursor, pause_length);
+if(pause_length < 1 || pause_length > 64) {
+signal_error("Length " + pause_length + " is invalid. Valid lengths are 1-64", number_position);
+}
+double beats = 4.0 / pause_length;
+double ms = (60000.0 / tempo) * beats;
+synth.rest_ms(ms);
+return cursor;
+}
+
+uint cmd_note(string channel_input, uint cursor) {
+string note_letter = channel_input[cursor++];
+string to_generate = note_letter;
+if(cursor < channel_input.length() && channel_input[cursor] == "+") {
+to_generate += "#";
+cursor++;
+}
+else if(cursor < channel_input.length() && channel_input[cursor] == "-") {
+to_generate += "b";
+cursor++;
+}
+
+int length = default_length;
+
+if(check_number(channel_input, cursor)) {
+uint number_position = cursor;
+cursor = get_number(channel_input, cursor, length);
+if(length < 1 || length > 64) {
+signal_error("Length " + length + " is invalid. Valid lengths are 1-64", number_position);
+}
+}
+
+double beats = 4.0 / length;
+if(cursor < channel_input.length() && channel_input[cursor] == ".") {
+cursor++;
+beats *= 1.5;
+}
+double ms = (60000.0 / tempo) * beats;
+to_generate += default_octave;
+synth.waveform_type = instrument;
+synth.volume = volume - 100;
+synth.set_edge_fades(attack*10, release*10);
+synth.note_transpose = transpose;
+synth.note_ms(to_generate, ms*quantization/8.0);
+if(cursor >= channel_input.length() || channel_input[cursor] != "&") {
+synth.rest_ms(ms);
+}
+else {
+cursor++;
+}
+return cursor;
+}
+
+void signal_error(string message, uint cursor) {
+alert("Soundtrack error", "Channel " + channel_count + ", column " + (cursor+1) + ": " + message);
+exit();
+}
+
+uint cmd_at(string channel_input, uint cursor) {
+cursor++; // Skip the @
+uint number_position = cursor;
+cursor = get_number(channel_input, cursor, instrument);
+if(instrument<1 || instrument>4) {
+signal_error("Invalid instrument " + instrument + ". Valid instruments are 1-4", number_position);
+}
+return cursor;
+}
+
+uint cmd_t(string channel_input, uint cursor) {
+cursor++; // Skip the t
+uint number_position = cursor;
+cursor = get_number(channel_input, cursor, tempo);
+if(tempo < 60 || tempo > 240) {
+signal_error("Tempo " + tempo + " is invalid. Valid tempi are 60-240", number_position);
+}
+return cursor;
+}
+
+uint cmd_q(string channel_input, uint cursor) {
+cursor++; // Skip the q
+uint number_position = cursor;
+cursor = get_number(channel_input, cursor, quantization);
+if(quantization < 1 || quantization > 100) {
+signal_error("Invalid quantization " + quantization + ". Valid quantizations are 1-100", number_position);
+}
+return cursor;
+}
+
+uint cmd_repeat(string channel_input, uint cursor) {
+cursor++; // Skip the [
+uint cursor2 = process_commands(channel_input, cursor);
+if(cursor2 >= channel_input.length() || channel_input[cursor2] != "]") {
+signal_error("] expected", cursor2);
+}
+cursor2++;
+int repetitions;
+uint number_position = cursor2;
+cursor2 = get_number(channel_input, cursor2, repetitions);
+if(repetitions < 2 || repetitions > 100) {
+signal_error("Invalid repetition count " + repetitions + ". Valid repetition counts are 2-100", number_position);
+}
+repetitions--; // We already did one
+for(int i=0; i<repetitions; i++) {
+process_commands(channel_input, cursor);
+}
+return cursor2;
+}
+
+bool check_number(string channel_input, uint cursor) {
+if(cursor >= channel_input.length() || channel_input[cursor] < "0" || channel_input[cursor] > "9") {
+return false;
+}
+return true;
+}
+
+uint get_number(string channel_input, uint cursor, int &out number) {
+if(!check_number(channel_input, cursor)) {
+signal_error("Number expected", cursor);
+}
+uint saved_cursor = cursor;
+string digits = "";
+do {
+digits += channel_input[cursor++];
+} while(check_number(channel_input, cursor));
+if(digits.length() > 3) {
+signal_error("Number too long; please restrict to three decimal digits", saved_cursor);
+}
+number = string_to_number(digits);
+return cursor;
+}
+
+uint cmd_v(string channel_input, uint cursor) {
+cursor++; // Skip the v
+uint number_position = cursor;
+cursor = get_number(channel_input, cursor, volume);
+if(volume>100) {
+signal_error("Invalid volume " + volume + ". Valid volumes are 0-100", number_position);
+}
+return cursor;
+}
+
+uint cmd_a(string channel_input, uint cursor) {
+cursor++; // Skip the a
+uint number_position = cursor;
+cursor = get_number(channel_input, cursor, attack);
+if(attack > 100) {
+signal_error("Invalid attack value " + attack + ". Valid attack values are 0-100", number_position);
+}
+return cursor;
+}
+
+uint cmd_r(string channel_input, uint cursor) {
+cursor++; // Skip the r
+uint number_position = cursor;
+cursor = get_number(channel_input, cursor, release);
+if(release > 100) {
+signal_error("Invalid release value " + release + ". Valid release values are 0-100", number_position);
+}
+return cursor;
+}
+
+uint cmd_n(string channel_input, uint cursor) {
+cursor++; // Skip the n
+transpose = 0;
+return cursor;
+}
+
+uint cmd_u(string channel_input, uint cursor) {
+cursor++; // Skip the u
+uint number_position = cursor;
+cursor = get_number(channel_input, cursor, transpose);
+if(transpose < 1 || transpose > 11) {
+signal_error("Invalid transpose value " + transpose + ". Valid transpose values are 1-11", number_position);
+}
+return cursor;
+}
+
+uint cmd_d(string channel_input, uint cursor) {
+cursor++; // Skip the d
+uint number_position = cursor;
+cursor = get_number(channel_input, cursor, transpose);
+if(transpose < 1 || transpose > 11) {
+signal_error("Invalid transpose value " + transpose + ". Valid transpose values are 1-11", number_position);
+}
+transpose = -transpose;
+return cursor;
+}
+
+bool write(string filename) {
+return synth.write_wave_file(filename);
+}
+
+sound@ write_sound() {
+return synth.write_wave_sound();
+}
+
+}
+

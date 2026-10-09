@@ -1,0 +1,16 @@
+/**
+	Evaluates an expression and terminates the script execution if the result is false.
+	void assert(bool expression, string message = "");
+	## Arguments
+		* expression: The expression to evaluate.
+		* message: The message to display if false.
+	## Remarks
+		This is useful for testing and debugging scenarios, allowing you to report a problem.
+		In the event that the evaluated expression returns false, an exception is thrown, using the message parameter in the event that the exception is unhandled.
+		Please note that, unlike BGT, asserts can actually trigger in release builds.
+*/
+
+// Example:
+void main() {
+	assert(false, "I am an assertion violation. I love causing chaos!");
+}

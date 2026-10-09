@@ -1,0 +1,21 @@
+void test_deflate() {
+	string original = "aaaaaaaaaaaaaaaaaaaaaaaaaa! This is some compressed data! 0000aaaa0000aaaa0000aaaaaaaaaaaaaaaaaaaaaaaa!";
+	string compressed = string_deflate(original);
+	
+	// Compressed data should be smaller than original for this repetitive string
+	assert(compressed.length() < original.length());
+	
+	// Test inflation back to original
+	string inflated = string_inflate(compressed);
+	assert(inflated == original);
+}
+
+void test_inflate_invalid_data() {
+	bool exception_caught = false;
+	try {
+		string_inflate("oh snap!");
+	} catch {
+		exception_caught = true;
+	}
+	assert(exception_caught);
+}

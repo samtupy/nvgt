@@ -1,0 +1,12 @@
+/**
+	A read-only property representing the center of the box, calculated based on min and max.
+	vector aabb::center const;
+*/
+
+// Example:
+void main() {
+	aabb b;
+	b.min = vector(1, 3, 5);
+	b.max = vector(5, 3, 7);
+	alert("The center of the box is located at", round(b.center.x, 0)+", "+round(b.center.y, 0)+", "+round(b.center.z, 0));
+}

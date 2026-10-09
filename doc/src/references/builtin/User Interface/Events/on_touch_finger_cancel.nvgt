@@ -1,0 +1,25 @@
+/**
+	An event that is fired when a touch is interrupted instead of ending normally.
+	engine_touch_event on_touch_finger_cancel;
+	## Listener signatures:
+		* bool callback(uint64 device, const touch_finger& finger);
+		* void callback(uint64 device, const touch_finger& finger);
+		* A class implementing engine_touch_event_listener, with a `bool on_touch_finger_cancel(uint64 device, const touch_finger& finger)` or `void on_touch_finger_cancel(uint64 device, const touch_finger& finger)` method.
+	## Arguments passed to listeners:
+		* uint64 device: the ID of the touch device.
+		* const touch_finger& finger: the finger whose touch was canceled.
+	## Remarks:
+		The operating system cancels a touch when something else takes it over, for example a system gesture or a notification appearing. When this happens, `on_touch_finger_up` is not fired for that finger, so treat this event as the end of the touch but don't act on it as if the user had finished a tap.
+		The finger parameter must be declared exactly as `const touch_finger& finger`. Writing `const touch_finger&in finger` causes a "No matching signatures" error when adding the listener.
+		See the Events topic for how listeners are added, ordered and removed, and what their return values mean.
+*/
+
+// Example:
+void on_cancel(uint64 device, const touch_finger& finger) {
+	screen_reader_output("Touch canceled", true);
+}
+void main() {
+	show_window("Example");
+	on_touch_finger_cancel += on_cancel;
+	while (!key_pressed(KEY_ESCAPE) and !key_pressed(KEY_AC_BACK)) wait(5);
+}

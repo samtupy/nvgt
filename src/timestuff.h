@@ -1,8 +1,8 @@
 /* timestuff.h - header for datetime routines
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -44,8 +44,14 @@ class timer_queue {
 	uint64_t last_looped;
 	bool open_tick;
 	int RefCount;
+	void purge_deleting_timers();
 public:
 	std::string failures;
+	std::unordered_set<timer_queue_item*> executing_timers;
+	bool owns(timer_queue_item* t) {
+		auto it = timer_objects.find(t->id);
+		return it != timer_objects.end() && it->second == t;
+	}
 	timer_queue();
 	void add_ref();
 	void release();
@@ -72,6 +78,9 @@ public:
 		return timer_objects.size();
 	}
 	bool loop(int max_timers = 0, int max_catchup = 100);
+	uint64_t ticks_to_next_event(uint64_t max = 100) {
+		return timers.ticks_to_next_event(max);
+	}
 };
 
 class timer : public Poco::RefCountedObject {
@@ -101,3 +110,5 @@ public:
 };
 
 void RegisterScriptTimestuff(asIScriptEngine* engine);
+void RegisterScriptTimestuffCore(asIScriptEngine* engine);
+void RegisterScriptTimeGlobals(asIScriptEngine* engine);

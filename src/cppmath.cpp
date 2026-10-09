@@ -2,8 +2,8 @@
  * This originally started as the stock scriptmath addon from Angelscript before it was significantly added to and improved upon by Ethin P.
  *
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2024 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -29,6 +29,9 @@ template< class T >
 constexpr int bit_width( T x ) noexcept {
 	return std::numeric_limits<T>::digits - std::countl_zero(x);
 }
+
+float flerp(float a, float b, float c) { return std::lerp(a, b, c); }
+double dlerp(double a, double b, double c) { return std::lerp(a, b, c); }
 
 struct floating_point_characteristics;
 
@@ -386,22 +389,18 @@ void compute_fp_characteristics() {
 // functions for converting float values to IEEE 754 formatted values etc. This also allow us to 
 // provide a platform agnostic representation to the script so the scripts don't have to worry
 // about whether the CPU uses IEEE 754 floats or some other representation
-float fpFromIEEE(asUINT raw)
-{
+float fpFromIEEE(asUINT raw) {
 	// TODO: Identify CPU family to provide proper conversion
 	//        if the CPU doesn't natively use IEEE style floats
 	return *(reinterpret_cast<float*>(&raw));
 }
-asUINT fpToIEEE(float fp)
-{
+asUINT fpToIEEE(float fp) {
 	return *(reinterpret_cast<asUINT*>(&fp));
 }
-double fpFromIEEE(asQWORD raw)
-{
+double fpFromIEEE(asQWORD raw) {
 	return *(reinterpret_cast<double*>(&raw));
 }
-asQWORD fpToIEEE(double fp)
-{
+asQWORD fpToIEEE(double fp) {
 	return *(reinterpret_cast<asQWORD*>(&fp));
 }
 
@@ -415,8 +414,7 @@ asQWORD fpToIEEE(double fp)
 //
 // ref: http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 // ref: http://www.gamedev.net/topic/653449-scriptmath-and-closeto/
-bool closeTo(float a, float b, float epsilon)
-{
+bool closeTo(float a, float b, float epsilon) {
 	// Equal numbers and infinity will return immediately
 	if( a == b ) return true;
 
@@ -424,24 +422,26 @@ bool closeTo(float a, float b, float epsilon)
 	float diff = std::abs(a - b);
 	if( (a == 0 || b == 0) && (diff < epsilon) )
 		return true;
-	
+
 	// Otherwise we need to use relative comparison to account for precision
 	return diff / (std::abs(a) + std::abs(b)) < epsilon;
 }
 
-bool closeTo(double a, double b, double epsilon)
-{
+bool closeTo(double a, double b, double epsilon) {
 	if( a == b ) return true;
 
 	double diff = std::abs(a - b);
 	if( (a == 0 || b == 0) && (diff < epsilon) )
 		return true;
-	
+
 	return diff / (std::abs(a) + std::abs(b)) < epsilon;
 }
 
-void RegisterScriptMath(asIScriptEngine *engine)
-{
+template <class T> T scalbn_int64(T x, int64_t exp) {
+	return std::scalbln(x, long(std::clamp<int64_t>(exp, LONG_MIN, LONG_MAX)));
+}
+
+void RegisterScriptMath(asIScriptEngine *engine) {
 	compute_fp_characteristics();
 	using int8 = std::int8_t;
 	using int16 = std::int16_t;
@@ -452,14 +452,14 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	using uint32 = std::uint32_t;
 	using uint64 = std::uint64_t;
 	// Conversion between floating point and IEEE bits representations
-	engine->RegisterGlobalFunction("float fp_from_IEEE(uint)", asFUNCTIONPR(fpFromIEEE, (asUINT), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint fp_to_IEEE(float)", asFUNCTIONPR(fpToIEEE, (float), asUINT), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double fpFromIEEE(uint64)", asFUNCTIONPR(fpFromIEEE, (asQWORD), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("uint64 fpToIEEE(double)", asFUNCTIONPR(fpToIEEE, (double), asQWORD), asCALL_CDECL);
+	engine->RegisterGlobalFunction("float fp_from_IEEE(uint raw)", asFUNCTIONPR(fpFromIEEE, (asUINT), float), asCALL_CDECL);
+	engine->RegisterGlobalFunction("uint fp_to_IEEE(float fp)", asFUNCTIONPR(fpToIEEE, (float), asUINT), asCALL_CDECL);
+	engine->RegisterGlobalFunction("double fpFromIEEE(uint64 raw)", asFUNCTIONPR(fpFromIEEE, (asQWORD), double), asCALL_CDECL);
+	engine->RegisterGlobalFunction("uint64 fpToIEEE(double fp)", asFUNCTIONPR(fpToIEEE, (double), asQWORD), asCALL_CDECL);
 
-	// Close to comparison with epsilon 
-	engine->RegisterGlobalFunction("bool close_to(float, float, float = 0.00001f)", asFUNCTIONPR(closeTo, (float, float, float), bool), asCALL_CDECL);
-	engine->RegisterGlobalFunction("bool close_to(double, double, double = 0.0000000001)", asFUNCTIONPR(closeTo, (double, double, double), bool), asCALL_CDECL);
+	// Close to comparison with epsilon
+	engine->RegisterGlobalFunction("bool close_to(float a, float b, float epsilon = 0.00001f)", asFUNCTIONPR(closeTo, (float, float, float), bool), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool close_to(double a, double b, double epsilon = 0.0000000001)", asFUNCTIONPR(closeTo, (double, double, double), bool), asCALL_CDECL);
 
 	// Mathematical functions
 	engine->RegisterGlobalFunction("float absf(float v)", asFUNCTIONPR(std::abs, (float), float), asCALL_CDECL);
@@ -470,7 +470,7 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("float fmax(float a, float b)", asFUNCTIONPR(std::fmax, (float, float), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float fmin(float a, float b)", asFUNCTIONPR(std::fmin, (float, float), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float fdim(float a, float b)", asFUNCTIONPR(std::fdim, (float, float), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float lerp(float a, float b, float c)", asFUNCTIONPR(std::lerp, (float, float, float), float), asCALL_CDECL);
+	engine->RegisterGlobalFunction("float lerp(float a, float b, float c)", asFUNCTION(flerp), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float exp(float a)", asFUNCTIONPR(std::exp, (float), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float exp2(float a)", asFUNCTIONPR(std::exp2, (float), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float expm1(float a)", asFUNCTIONPR(std::expm1, (float), float), asCALL_CDECL);
@@ -509,7 +509,7 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("float ldexp(float x, int exp)", asFUNCTIONPR(std::ldexp, (float, int), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float modf(float num, float& out iptr)", asFUNCTIONPR(std::modf, (float, float*), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float scalbn(float x, int exp)", asFUNCTIONPR(std::scalbn, (float, int), float), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float scalbn(float x, int64 exp)", asFUNCTIONPR(std::scalbln, (float, long), float), asCALL_CDECL);
+	engine->RegisterGlobalFunction("float scalbn(float x, int64 exp)", asFUNCTION(scalbn_int64<float>), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int ilogb(float x)", asFUNCTIONPR(std::ilogb, (float), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float logb(float x)", asFUNCTIONPR(std::logb, (float), float), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float nextafter(float from, float to)", asFUNCTIONPR(std::nextafter, (float, float), float), asCALL_CDECL);
@@ -535,7 +535,7 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("double dmax(double a, double b)", asFUNCTIONPR(std::fmax, (double, double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double dmin(double a, double b)", asFUNCTIONPR(std::fmin, (double, double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double fdim(double a, double b)", asFUNCTIONPR(std::fdim, (double, double), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double lerp(double a, double b, double c)", asFUNCTIONPR(std::lerp, (double, double, double), double), asCALL_CDECL);
+	engine->RegisterGlobalFunction("double lerp(double a, double b, double c)", asFUNCTION(dlerp), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double exp(double a)", asFUNCTIONPR(std::exp, (double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double exp2(double a)", asFUNCTIONPR(std::exp2, (double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double expm1(double a)", asFUNCTIONPR(std::expm1, (double), double), asCALL_CDECL);
@@ -574,7 +574,7 @@ void RegisterScriptMath(asIScriptEngine *engine)
 	engine->RegisterGlobalFunction("double ldexp(double x, int exp)", asFUNCTIONPR(std::ldexp, (double, int), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double modf(double num, double& out iptr)", asFUNCTIONPR(std::modf, (double, double*), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double scalbn(double x, int exp)", asFUNCTIONPR(std::scalbn, (double, int), double), asCALL_CDECL);
-	engine->RegisterGlobalFunction("double scalbn(double x, int64 exp)", asFUNCTIONPR(std::scalbln, (double, long), double), asCALL_CDECL);
+	engine->RegisterGlobalFunction("double scalbn(double x, int64 exp)", asFUNCTION(scalbn_int64<double>), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int ilogb(double x)", asFUNCTIONPR(std::ilogb, (double), int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double logb(double x)", asFUNCTIONPR(std::logb, (double), double), asCALL_CDECL);
 	engine->RegisterGlobalFunction("double nextafter(double from, double to)", asFUNCTIONPR(std::nextafter, (double, double), double), asCALL_CDECL);

@@ -1,0 +1,21 @@
+void test_coordinate_map() {
+	coordinate_map m;
+	m.add_area(0, 10, 0, 10, 0, 0, 0, any("grass"), "grass", "", "", 1);
+	
+	coordinate_map_area@ A = m.add_area(0, 250000, 0, 250000, 0, 0, 0, any("water"), "water", "", "", 0);
+	assert(A.is_in_area(5, 5, 0) == true);
+	assert(A.minx == 0);
+	assert(A.maxx == 250000);
+	
+	coordinate_map_area@ a = m.get_area(5, 5, 0);
+	assert(@a != null);
+	assert(a.data1 == "grass");
+	assert(a.minx == 0 && a.maxx == 10);
+	
+	@a = m.get_area(10, 100, 0);
+	assert(@a != null);
+	assert(a.data1 == "water");
+	
+	coordinate_map_area@[]@ areas = m.get_areas(5, 5, 0, 150);
+	assert(areas.length() == 2);  // Should find both grass and water areas
+}

@@ -1,0 +1,12 @@
+void test_uuid9562() {
+	// check that functions give the versions we asked for
+	uuid v6 = uuid_generate_time_v6();
+	assert(v6.version == 6);
+	uuid v7 = uuid_generate_time_v7();
+	assert(v7.version == 7);
+	uuid v5 = uuid_create_from_name_sha1(uuid_namespace_dns(), "example.com");
+	assert(v5.version == 5);
+	// check that this UUID is equivalent to the same thing from another implementation (python uuid.uuid5)
+	uuid v5_known = uuid("cfbff0d1-9375-5685-968c-48ce8b15ae17");
+	assert(v5 == v5_known);
+}

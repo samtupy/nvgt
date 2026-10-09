@@ -1,0 +1,35 @@
+/**
+	An event that is fired whenever the user types text.
+	engine_character_event on_characters;
+	## Listener signatures:
+		* bool callback(string character);
+		* void callback(string character);
+		* A class implementing engine_character_event_listener, with a `bool on_characters(string character)` or `void on_characters(string character)` method.
+	## Arguments passed to listeners:
+		* string character: the text that was typed, encoded as UTF-8.
+	## Remarks:
+		Unlike the key events, this event receives the actual text produced by the keyboard, taking the keyboard layout, shift state and input methods into account. Although the argument is called character, it can contain more than one character, for example when an input method for Chinese or Japanese inserts a whole word at once.
+		Text input must be active for this event to fire. It is started automatically when your window is shown, except on platforms with a screen keyboard, where you need to call `start_text_input()` (see `SCREEN_KEYBOARD_SUPPORTED`).
+		The same text is also returned by `get_characters()`, so you can use either approach.
+		See the Events topic for how listeners are added, ordered and removed, and what their return values mean.
+*/
+
+// Example:
+string typed;
+void on_text(string text) {
+	typed += text;
+	screen_reader_output(text, true);
+}
+void main() {
+	show_window("Example");
+	on_characters += on_text;
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Type something, then press enter to hear all of it. Press escape to exit.", true);
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (key_pressed(KEY_RETURN)) {
+			screen_reader_output(typed.empty() ? "Nothing typed" : typed, true);
+			typed = "";
+		}
+	}
+}

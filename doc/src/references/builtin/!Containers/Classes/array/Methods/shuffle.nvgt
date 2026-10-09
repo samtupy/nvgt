@@ -1,0 +1,14 @@
+/**
+	Shuffles the contents of the array.
+	1. void array::shuffle();
+	2. void array::shuffle(random_interface@ rng);
+	## Remarks:
+		This method can be called without a parameter, in which case it will use the default random algorithm, with any of the several built-in random number generators, or any class that implements the random_interface.
+*/
+
+// Example:
+void main() {
+	string[] items = {"This", "is", "a", "test"};
+	items.shuffle();
+	alert("Garble", join(items, " "));
+}

@@ -4,8 +4,10 @@
 	## Arguments:
 		* int milliseconds: the number of milliseconds to wait for.
 	## Remarks:
-		This function blocks the thread it's ran from, meaning no other work can happen on that thread until the wait period is over.
-		Since this function internally calls refresh_window() if it's being run on the main thread, it is strongly advised to always put `wait(5);` in your main loops. This prevents your game from hogging the CPU, and also makes sure that the window remains responsive and has been updated with the latest input events from the user.
+		This function blocks the calling thread, meaning no other work can happen on that thread until the wait period is over.
+		On the main thread, it performs other essential tasks, such as incremental garbage collection, internal event processing, and refreshing the window.
+		It is strongly advised to always put `wait(5);` in your main loops. This prevents your game from hogging the CPU, and also makes sure that the window remains responsive and has been updated with the latest input events from the user.
+		Please note that, due to low-level operating system scheduling behaviors, the millisecond parameter is not an exact value, but rather a guaranteed minimum. This is even more important to remember when calling from the main thread given the additional tasks performed. It should therefore never be used as a time marker where accuracy is required.
 */
 
 // Example:

@@ -9,7 +9,7 @@
 // Example:
 void main() {
 	http h;
-	h.get("https://nvgt.gg");
+	h.get("https://nvgt.dev");
 	wait(20);
 	h.reset();
 	h.get("https://samtupy.com/ip.php");

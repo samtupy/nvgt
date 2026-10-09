@@ -1,9 +1,9 @@
 /* stat_set.nvgt - easy management and printing of game statistics.
  *
- * Copyright (c) 2024-2025 Quin G with modifications and additions by Sam Tupy, written for and distributed under the same license as
+ * Copyright (c) 2024-2026 Quin Gillespie with modifications and additions by Sam Tupy, written for and distributed under the same license as
  * NVGT - NonVisual Gaming Toolkit
- * Copyright (c) 2022-2025 Sam Tupy
- * https://nvgt.gg
+ * Copyright (c) 2022-2026 Sam Tupy
+ * https://nvgt.dev
  * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
  * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
@@ -54,12 +54,18 @@ class stat {
 		return this.val = value;
 	}
 
-	int opPostInc() {
-		return this.val++;
+	double opPostInc() {
+		double old = this.val;
+		if (this.val.is_integer) this.val += 1;
+		else this.val += 1.0;
+		return old;
 	}
 
-	int opPostDec() {
-		return this.val--;
+	double opPostDec() {
+		double old = this.val;
+		if (this.val.is_integer) this.val -= 1;
+		else this.val -= 1.0;
+		return old;
 	}
 
 	double opAdd(double value) {
@@ -179,7 +185,7 @@ class stat_set {
 		return result;
 	}
 
-	stat@[] get_stats() {	
+	stat@[]@ get_stats() const {
 		stat@[] r(stats.get_size());
 		string[]@ k = stats.get_keys();
 		for (uint i = 0; i < k.length(); i++) @r[i] = cast<stat@>(stats[k[i]]);
@@ -189,9 +195,9 @@ class stat_set {
 	bool exists(const string&in stat_name) const {return stats.exists(stat_name);}
 
 	string[]@ opImplConv() const {
-		string[] res;
-		string[]@ keys = stats.get_keys();
-		for (uint i = 0; i < keys.length(); i++) res.insert_last(string(this.stats[keys[i]]));
+		string[]@ names = list(STAT_SORT_MODE_ADD_ORDER);
+		string[] res(names.length());
+		for (uint i = 0; i < names.length(); i++) res[i] = this[names[i]];
 		return res;
 	}
 
@@ -212,28 +218,36 @@ class stat_set {
 		string[]@ k = stats.get_keys();
 		for (uint i = 0; i < k.length(); i++) {
 			var@ v = cast<stat@>(stats[k[i]]).val;
-			int t = v.is_string? 1 : v.is_numeric? v.is_integer? 2 : 3 : 4;
+			int t = v.is_string? 1 : v.is_numeric? v.is_integer? (int64(v) < 0? 5 : 2) : 3 : 4;
 			ds.write_string(k[i]);
 			ds.write_int8(t);
-			if (v.is_string) ds.write_string(v);
-			else if(v.is_integer) ds.write_7bit_encoded(v);
-			else if(v.is_numeric) ds.write_double(v);
+			if (t == 1) ds.write_string(v);
+			else if (t == 2) ds.write_7bit_encoded(v);
+			else if (t == 3) ds.write_double(v);
+			else if (t == 5) ds.write_int64(v);
 		}
 		return ds.str();
 	}
 
+	bool deserialize(const string&in data) {
+		datastream ds(data);
+		return deserialize(ds);
+	}
+
 	bool deserialize(datastream@ ds) {
+		if (@ds == null) return false;
 		int count = ds.read_int();
-		if (count < 1) return false;
-		for (uint i = 0; i < count; i++) {
-			if (!ds.good) return false;
+		if (!ds.good || count < 0) return false;
+		for (int i = 0; i < count; i++) {
 			string name = ds.read_string();
 			int8 t = ds.read_int8();
+			if (!ds.good) return false;
 			if (t == 1) update(name, ds.read_string());
 			else if (t == 2) update(name, ds.read_7bit_encoded());
 			else if (t == 3) update(name, ds.read_double());
+			else if (t == 5) update(name, ds.read_int64());
 		}
-		return true;
+		return ds.good;
 	}
 
 	string serialize_linear() {
@@ -250,13 +264,24 @@ class stat_set {
 		string[]@ ln = data.split("\n");
 		bool found_value = false;
 		for (uint i = 0; i < ln.length(); i++) {
-			string[]@ p = ln[i].split("=");
-			if (p.length() != 2) continue;
-			double number = parse_double(p[1]);
-			if (number != 0 or p[0] == "0") update(p[0], number);
-			else update(p[0], p[1]);
+			string line = ln[i];
+			if (!line.empty() and line[line.length() - 1] == "\r") line = line.substr(0, line.length() - 1);
+			int eq = line.find_first("=");
+			if (eq < 1) continue;
+			string name = line.substr(0, eq), value = line.substr(eq + 1);
+			if (string_is_number(value)) update(name, parse_double(value));
+			else update(name, value);
 			found_value = true;
 		}
 		return found_value;
+	}
+	private bool string_is_number(const string&in str) {
+		bool seen_digit = false, seen_point = false;
+		for (uint i = 0; i < str.length(); i++) {
+			if (str[i].is_digits()) seen_digit = true;
+			else if (str[i] == "." and !seen_point) seen_point = true;
+			else if (str[i] != "-" or i > 0) return false;
+		}
+		return seen_digit;
 	}
 }

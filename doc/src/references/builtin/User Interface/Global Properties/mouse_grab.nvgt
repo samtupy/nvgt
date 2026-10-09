@@ -1,0 +1,21 @@
+/**
+	Confines the mouse to your game's window, or determines whether it is currently confined.
+	bool mouse_grab;
+	## Remarks:
+		While the mouse is grabbed, the cursor can't leave the window, which is useful for games that are controlled by moving the mouse. This only has an effect while your game window exists, so set it after calling `show_window()`. Without a window, it reads false.
+		This is the same setting as `window.mouse_grab`.
+*/
+
+// Example:
+void main() {
+	show_window("Example");
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Press space to grab or release the mouse, or escape to exit.", true);
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (key_pressed(KEY_SPACE)) {
+			mouse_grab = !mouse_grab;
+			screen_reader_output(mouse_grab ? "Mouse grabbed" : "Mouse released", true);
+		}
+	}
+}

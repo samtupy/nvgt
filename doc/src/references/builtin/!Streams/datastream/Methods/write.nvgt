@@ -2,7 +2,7 @@
 	Write raw bytes to a stream.
 	uint write(string content);
 	## Arguments:
-		* string content: the content that is to be written.
+		* content: The content that is to be written.
 	## Returns:
 		uint: the number of bytes written.
 	## Remarks:

@@ -1,0 +1,18 @@
+/**
+	A list of the names of all sound output devices available on the system.
+	const string[]@ sound_output_devices;
+	## Remarks:
+		The index of a device in this array is the value you assign to `sound_output_device` to switch to that device. Assigning -1 instead selects the system's default output device.
+		It is the same array every time you access this property, so don't modify it. Make a copy first if you want to change it, for example to build a menu.
+		Reading this property starts the sound system if it hasn't been started yet.
+*/
+
+// Example:
+void main() {
+	const string[]@ devices = sound_output_devices;
+	if (devices.length() == 0) {
+		alert("Output devices", "No output devices were found.");
+		return;
+	}
+	alert("Output devices", "The following output devices are available: " + join(devices, ", "));
+}

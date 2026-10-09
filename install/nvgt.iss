@@ -1,8 +1,8 @@
 ; NVGT InnoSetup installation utility written by Ethin Probst
  ;
  ; NVGT - NonVisual Gaming Toolkit
- ; Copyright (c) 2022-2024 Sam Tupy and the NVGT developers
- ; [nvgt.gg](https://nvgt.gg)
+ ; Copyright (c) 2022-2025 Sam Tupy and the NVGT developers
+ ; [nvgt.dev](https://nvgt.dev)
  ;
  ; This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
  ;
@@ -65,6 +65,9 @@
 	#ifdef have_linux_stubs
 		name: "stubs\linux"; description: "Linux binary stub"; types: custom
 	#endif
+	#ifdef have_ios_stubs
+		name: "stubs\ios"; description: "iOS binary stub"; types: custom
+	#endif
 	#ifdef have_android_stubs
 		name: "stubs\android"; description: "Android binary stub"; types: custom
 		name: "androidtools"; description: "Android tools (external download required)"; types: custom
@@ -107,6 +110,10 @@
 	#endif
 	#ifdef have_android_stubs
 		source: "release\stub\nvgt_android.bin"; DestDir: "{app}\stub"; components: stubs\android
+		source: "release\lib_android\*"; DestDir: "{app}\lib_android"; components: stubs\android; Flags: recursesubdirs createallsubdirs
+	#endif
+	#ifdef have_ios_stubs
+		source: "release\stub\nvgt_ios*.bin"; DestDir: "{app}\stub"; components: stubs\ios
 	#endif
 	; Includes
 	source: "release\include\*.nvgt"; DestDir: "{app}\include"; components: includes
@@ -145,6 +152,12 @@
 		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_release"; ValueType: string; ValueName: ""; ValueData: "Android (Release)"; components: associate
 		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\android_release\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pandroid -c ""%L"""; components: associate
 	#endif
+	#ifdef have_ios_stubs
+		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\ios_debug"; ValueType: string; ValueName: ""; ValueData: "iOS (Debug)"; components: associate
+		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\ios_debug\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pios -C ""%L"""; components: associate
+		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\ios_release"; ValueType: string; ValueName: ""; ValueData: "iOS (Release)"; components: associate
+		root: HKA; subkey: "software\classes\NVGTScript\shell\compile\shell\ios_release\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe -pios -c ""%L"""; components: associate
+	#endif
 	Root: HKA; subkey: "software\classes\NVGTScript\shell\edit"; ValueType: string; ValueName: ""; ValueData: "Edit Script"; components: associate
 	Root: HKA; subkey: "software\classes\NVGTScript\shell\edit\command"; ValueType: string; ValueName: ""; ValueData: """notepad"" ""%L"""; components: associate
 	Root: HKA; subkey: "software\classes\NVGTScript\shell\open\command"; ValueType: string; ValueName: ""; ValueData: "{app}\nvgtw.exe ""%L"" -- %*"; components: associate\run
@@ -170,7 +183,7 @@
 [Run]
 	filename: "{app}\nvgtw.exe"; description: "Run NVGT Compiler"; flags: postinstall nowait runasoriginaluser unchecked
 	filename: "{app}\nvgt.chm"; description: "View documentation"; verb: "open"; flags: postinstall shellexec nowait runasoriginaluser unchecked
-	filename: "https://nvgt.gg"; description: "View NVGT website"; verb: "open"; flags: postinstall shellexec nowait runasoriginaluser unchecked
+	filename: "https://nvgt.dev"; description: "View NVGT website"; verb: "open"; flags: postinstall shellexec nowait runasoriginaluser unchecked
 
 [Messages]
 	SelectDirBrowseLabel = Select the directory in which you would like NVGT to be installed, then click Next to proceed. If you wish to browse for it, click Browse.
@@ -220,7 +233,7 @@
 		ErrorCode: Integer;
 	begin
 		AndroidSdkDownloadPage.Clear;
-		AndroidSdkDownloadPage.Add('https://nvgt.gg/downloads/android-tools.exe', 'android-tools.exe', '');
+		AndroidSdkDownloadPage.Add('https://nvgt.dev/downloads/android-tools.exe', 'android-tools.exe', '');
 		AndroidSdkDownloadPage.Show;
 		try
 			try
@@ -244,7 +257,7 @@
 	procedure DownloadDocs;
 	begin
 		DocsDownloadPage.Clear;
-		DocsDownloadPage.Add('https://nvgt.gg/docs/nvgt.chm', 'nvgt.chm', '');
+		DocsDownloadPage.Add('https://nvgt.dev/docs/nvgt.chm', 'nvgt.chm', '');
 		DocsDownloadPage.Show;
 		try
 			try

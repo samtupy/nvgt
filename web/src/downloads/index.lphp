@@ -31,11 +31,98 @@ function echo_version($ver) {
 	}
 	echo "</ul>\n";
 }
+
+// Performs a small HTTP GET, used to talk to the Github API. Returns the response body or null on any failure so callers can fall back to cached data.
+function http_get_with_timeout($url, $timeout_seconds) {
+	if (function_exists("curl_init")) {
+		$ch = curl_init($url);
+		curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ["User-Agent: nvgt.dev", "Accept: application/vnd.github+json"], CURLOPT_TIMEOUT => $timeout_seconds, CURLOPT_FOLLOWLOCATION => true,]);
+		$body = curl_exec($ch);
+		$code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		curl_close($ch);
+		return ($body === false || $code < 200 || $code >= 300) ? null : $body;
+	}
+	$ctx = stream_context_create(["http" => ["method" => "GET", "header" => "User-Agent: nvgt.dev\r\nAccept: application/vnd.github+json\r\n", "timeout" => $timeout_seconds, "ignore_errors" => true,]]);
+	$body = @file_get_contents($url, false, $ctx);
+	if ($body === false) return null;
+	foreach ($http_response_header ?? [] as $header) {
+		if (preg_match('#^HTTP/\S+\s+(\d+)#', $header, $m) && ((int)$m[1] < 200 || (int)$m[1] >= 300)) return null;
+	}
+	return $body;
+}
+
+// Fetches a Github release by tag (e.g. NVGT's "fallback" branch build) and caches the result in a temp file for $ttl_seconds so that we don't hammer Github's API. A file lock serializes concurrent requests so that a burst of traffic still only triggers one outbound Github request.
+function fetch_github_release_cached($repo, $tag, $ttl_seconds = 1800) {
+	$tmp = sys_get_temp_dir();
+	$key = preg_replace('/[^A-Za-z0-9_-]/', '_', $repo . "_" . $tag);
+	$cache_file = $tmp . DIRECTORY_SEPARATOR . "nvgt_gh_release_$key.json";
+	$lock_file = $cache_file . ".lock";
+	$read_cache = function() use ($cache_file) {
+		if (!is_file($cache_file)) return null;
+		$data = json_decode(file_get_contents($cache_file), true);
+		return is_array($data) ? $data : null;
+	};
+	// Fast path: fresh cache, no locking needed.
+	if (is_file($cache_file) && (time() - filemtime($cache_file)) < $ttl_seconds) {
+		$data = $read_cache();
+		if ($data !== null) return $data;
+	}
+	$fh = @fopen($lock_file, "c");
+	if ($fh === false || !flock($fh, LOCK_EX)) {
+		// Couldn't get a lock, serve whatever cache we have rather than risking a stampede of Github requests.
+		if ($fh !== false) fclose($fh);
+		return $read_cache();
+	}
+	// Another request may have refreshed the cache while we were waiting on the lock, so check again now that we hold it.
+	clearstatcache(true, $cache_file);
+	if (is_file($cache_file) && (time() - filemtime($cache_file)) < $ttl_seconds) {
+		$data = $read_cache();
+		flock($fh, LOCK_UN);
+		fclose($fh);
+		if ($data !== null) return $data;
+	}
+	$url = "https://api.github.com/repos/$repo/releases/tags/$tag";
+	$body = http_get_with_timeout($url, 5);
+	$data = null;
+	if ($body !== null) {
+		$decoded = json_decode($body, true);
+		if (is_array($decoded) && isset($decoded["assets"])) {
+			file_put_contents($cache_file, $body, LOCK_EX);
+			$data = $decoded;
+		}
+	}
+	if ($data === null) $data = $read_cache(); // Github request failed or returned something unexpected, fall back to old cache if any.
+	flock($fh, LOCK_UN);
+	fclose($fh);
+	return $data;
+}
+
+// Prints the information for the live fallback release fetched from Github.
+function echo_github_release($release) {
+	$published = strtotime($release["published_at"]) * 1000;
+	echo "<p>Published on <script>document.write(local_datetime_string(" . $published . "));</script>. This is fetched live from the <a href=\"" . htmlspecialchars($release["html_url"]) . "\">fallback release on Github</a>, and should update within 30 minutes of a new fallback release being posted.</p>\n";
+	echo "<ul>\n";
+	foreach ($release["assets"] as $asset) {
+		echo '<li><a href="' . htmlspecialchars($asset["browser_download_url"]) . '">' . htmlspecialchars($asset["name"]) . '</a> (' . size2string($asset["size"]) . ')</li>' . "\n";
+	}
+	echo "</ul>\n";
+}
 ?>
 
 <h1>Downloads</h1>
 <p>This page contains the latest stable binary releases for NVGT for windows, Mac OS and Linux.</p>
 <p>Starting after version 0.89.1-beta, you can also download binary releases including the absolute latest bleeding edge development version from the project's <a href="https://github.com/samtupy/nvgt/releases">Github releases</a> page.</p>
+
+<h2>fallback development build</h2>
+<p>NVGT's "fallback" release always tracks a confirmed-stable, relatively recent build of the project, intended as a place to grab a working version if the absolute latest bleeding edge code is temporarily broken or as a way to use newer NVGT features without gambling on the engine's main branch.</p>
+<?php
+$fallback_release = fetch_github_release_cached("samtupy/nvgt", "fallback");
+if ($fallback_release !== null && !empty($fallback_release["assets"])) {
+	echo_github_release($fallback_release);
+} else {
+	echo "<p>The fallback build information could not be retrieved from Github at this time, please check the <a href=\"https://github.com/samtupy/nvgt/releases/tag/fallback\">fallback release page</a> directly.</p>\n";
+}
+?>
 
 <?php
 if (count($versions) < 1) {

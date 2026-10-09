@@ -20,11 +20,11 @@ jobs:
         cd ..
         python3 docgen.py
         cd ..
-        curl -s -O https://nvgt.gg/ci/static/cobalt.exe
+        curl -s -O https://nvgt.dev/ci/static/cobalt.exe
         cd web
         ../cobalt build
         cd public_html
         tar -czf ../../public_html.tar.gz *
         cd ../..
-        curl -u "${{secrets.CIFTP}}" -s -T public_html.tar.gz ftp://nvgt.gg
-        curl -H "X-Auth: ${{secrets.CIPHP}}" -s https://nvgt.gg/ci/website_update.php
+        curl -u "${{secrets.CIFTP}}" -s -T public_html.tar.gz ftp://nvgt.dev
+        curl -H "X-Auth: ${{secrets.CIPHP}}" -s https://nvgt.dev/ci/website_update.php
