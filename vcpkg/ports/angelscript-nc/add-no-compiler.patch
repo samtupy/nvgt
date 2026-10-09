@@ -33,3 +33,17 @@ index 6f9d5409..c566b553 100644
  # Fix x64 issues on Linux
  if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64" AND UNIX AND NOT APPLE)
  	target_compile_options(${ANGELSCRIPT_LIBRARY_NAME} PRIVATE -fPIC)
+diff --git a/sdk/angelscript/source/as_builder.cpp b/sdk/angelscript/source/as_builder.cpp
+index 1111111..2222222 100644
+--- a/sdk/angelscript/source/as_builder.cpp
++++ b/sdk/angelscript/source/as_builder.cpp
+@@ -87,7 +87,9 @@ asCBuilder::asCBuilder(asCScriptEngine *_engine, asCModule *_module)
+ 	silent = false;
+ 	numWarnings = 0;
+ 	numErrors = 0;
++#ifndef AS_NO_COMPILER
+ 	hasCachedKnownTypes = false;
++#endif
+ }
+ 
+ asCBuilder::~asCBuilder()
