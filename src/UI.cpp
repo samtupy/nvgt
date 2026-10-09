@@ -319,27 +319,30 @@ void game_window::draw_circle(float cx, float cy, int radius, unsigned int r, un
 	if (!_renderer) return;
 	_renderer->set_draw_color(r, g, b, 255);
 	SDL_Renderer* rend = _renderer->get_renderer();
+	if (!rend) return;
 	int offsetx = 0, offsety = radius, d = radius - 1, status = 0;
+	bool drew = false;
 	while (offsety >= offsetx) {
 		if (filled) {
-			SDL_RenderLine(rend, cx - offsety, cy + offsetx, cx + offsety, cy + offsetx);
-			SDL_RenderLine(rend, cx - offsetx, cy + offsety, cx + offsetx, cy + offsety);
-			SDL_RenderLine(rend, cx - offsetx, cy - offsety, cx + offsetx, cy - offsety);
-			SDL_RenderLine(rend, cx - offsety, cy - offsetx, cx + offsety, cy - offsetx);
+			drew |= SDL_RenderLine(rend, cx - offsety, cy + offsetx, cx + offsety, cy + offsetx);
+			drew |= SDL_RenderLine(rend, cx - offsetx, cy + offsety, cx + offsetx, cy + offsety);
+			drew |= SDL_RenderLine(rend, cx - offsetx, cy - offsety, cx + offsetx, cy - offsety);
+			drew |= SDL_RenderLine(rend, cx - offsety, cy - offsetx, cx + offsety, cy - offsetx);
 		} else {
-			SDL_RenderPoint(rend, cx + offsetx, cy + offsety);
-			SDL_RenderPoint(rend, cx + offsety, cy + offsetx);
-			SDL_RenderPoint(rend, cx - offsetx, cy + offsety);
-			SDL_RenderPoint(rend, cx - offsety, cy + offsetx);
-			SDL_RenderPoint(rend, cx + offsetx, cy - offsety);
-			SDL_RenderPoint(rend, cx + offsety, cy - offsetx);
-			SDL_RenderPoint(rend, cx - offsetx, cy - offsety);
-			SDL_RenderPoint(rend, cx - offsety, cy - offsetx);
+			drew |= SDL_RenderPoint(rend, cx + offsetx, cy + offsety);
+			drew |= SDL_RenderPoint(rend, cx + offsety, cy + offsetx);
+			drew |= SDL_RenderPoint(rend, cx - offsetx, cy + offsety);
+			drew |= SDL_RenderPoint(rend, cx - offsety, cy + offsetx);
+			drew |= SDL_RenderPoint(rend, cx + offsetx, cy - offsety);
+			drew |= SDL_RenderPoint(rend, cx + offsety, cy - offsetx);
+			drew |= SDL_RenderPoint(rend, cx - offsetx, cy - offsety);
+			drew |= SDL_RenderPoint(rend, cx - offsety, cy - offsetx);
 		}
 		if (status >= 2 * offsetx) { status -= 2 * offsetx + 1; offsetx++; }
 		else if (d < 2 * radius) { status += 2 * offsety - 1; offsety--; }
 		else { status -= 2 * (offsetx - offsety + 1); offsety--; offsetx++; }
 	}
+	if (drew) _renderer->mark_dirty();
 }
 void game_window::draw_menu(CScriptArray* items, float x, float y) {
 	if (!_renderer || !_font || !items) return;
@@ -452,7 +455,14 @@ void refresh_window() {
 	#endif
 	SDL_PumpEvents();
 	update_joysticks(); // Update all active joystick instances
-	if (g_window && g_window->get_renderer()) g_window->get_renderer()->present();
+	if (g_window && !(g_window->get_flags() & SDL_WINDOW_HIDDEN)) {
+		graphics_renderer* renderer = g_window->get_renderer();
+		if (renderer && renderer->is_valid()) {
+			// Wayland needs one buffer before a new window appears. Let existing drawing be that first frame.
+			if (!renderer->has_presented() && !renderer->has_pending_frame()) g_window->clear(0, 0, 0);
+			renderer->present_if_dirty();
+		}
+	}
 	SDL_Event evt;
 	std::unordered_set<int> keys_pressed_this_frame;
 	while (SDL_PollEvent(&evt)) {
