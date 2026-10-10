@@ -28,39 +28,14 @@ enum callback_modes {
 };
 
 class hashpoint {
-	// https://stackoverflow.com/questions/16792751/hashmap-for-2d3d-coordinates-i-e-vector-of-ints/47928817
 public:
 	hashpoint(int x, int y, int z) : x(x), y(y), z(z) {};
 	int x, y, z;
 };
 struct hashpoint_hash {
+	using is_avalanching = void;
 	size_t operator()(const hashpoint& p) const {
-		// Morton code hash function for 3D points with negative coordinate support provided by chat gpt.
-		// Translate the coordinates so that the minimum value is 0
-		const int min_xy = (p.x < p.y ? p.x : p.y);
-		const int min_coord = min_xy < p.z ? min_xy : p.z;
-		const uint32_t x = static_cast<uint32_t>(p.x - min_coord);
-		const uint32_t y = static_cast<uint32_t>(p.y - min_coord);
-		const uint32_t z = static_cast<uint32_t>(p.z - min_coord);
-		// Interleave the bits of each coordinate
-		uint32_t xx = x;
-		uint32_t yy = y;
-		uint32_t zz = z;
-		xx = (xx | (xx << 16)) & 0x030000FF;
-		xx = (xx | (xx << 8)) & 0x0300F00F;
-		xx = (xx | (xx << 4)) & 0x030C30C3;
-		xx = (xx | (xx << 2)) & 0x09249249;
-		yy = (yy | (yy << 16)) & 0x030000FF;
-		yy = (yy | (yy << 8)) & 0x0300F00F;
-		yy = (yy | (yy << 4)) & 0x030C30C3;
-		yy = (yy | (yy << 2)) & 0x09249249;
-		zz = (zz | (zz << 16)) & 0x030000FF;
-		zz = (zz | (zz << 8)) & 0x0300F00F;
-		zz = (zz | (zz << 4)) & 0x030C30C3;
-		zz = (zz | (zz << 2)) & 0x09249249;
-		// Combine the interleaved bits into a single hash value and add back the minimum coordinate value
-		const size_t hash_val = static_cast<size_t>((xx << 2) | (yy << 1) | zz);
-		return hash_val + static_cast<size_t>(min_coord);
+		return ankerl::unordered_dense::detail::wyhash::hash(&p, sizeof(p));
 	}
 };
 struct hashpoint_equals {
