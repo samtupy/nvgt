@@ -612,9 +612,9 @@ void ConfigureEngineOptions(asIScriptEngine *engine) {
 	engine->SetEngineProperty(asEP_HEREDOC_TRIM_MODE, config.getInt("scripting.heredoc_trim_mode", 1));
 	engine->SetEngineProperty(asEP_ALTER_SYNTAX_NAMED_ARGS, config.getInt("scripting.alter_syntax_named_args", 2));
 	engine->SetEngineProperty(asEP_MEMBER_INIT_MODE, config.getInt("scripting.member_init_mode", 0));
-	engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_CONSTRUCT, config.getInt("scripting.always_impl_default_construct", 1));
-	engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_COPY, config.getInt("scripting.always_impl_default_copy", 1));
-	engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_COPY_CONSTRUCT, config.getInt("scripting.always_impl_default_copy_construct", 1));
+	engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_CONSTRUCT, config.getInt("scripting.always_impl_default_construct", 0));
+	engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_COPY, config.getInt("scripting.always_impl_default_copy", 0));
+	engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_COPY_CONSTRUCT, config.getInt("scripting.always_impl_default_copy_construct", 0));
 }
 int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
 	g_pending_plugins.clear();
