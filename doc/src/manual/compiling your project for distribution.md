@@ -77,9 +77,6 @@ At time of writing, the files are:
 * bass.dll is required for the sound object and the tts_voice object, though will not be later once we switch from bass to the miniaudio library. The moment one of these objects exists in your script, your program will crash if this dll is not present.
 * bassmix.dll is just as important as bass.dll and allows things like nvgt's mixer class to exist, where we can combine many bass channels into one. It is always required when bass.dll is used
 * bass_fx.dll is used for reverb, filters, etc and is also required whenever bass.dll is used.
-* nvdaControllerClient64.dll used to speak and Braille through the NVDA screen reader.
-* SAAPI64.dll used to speak and Braille through the System Access screen reader.
-* ZDSRAPI.dll used to speak and Braille through the ZDSR screen reader.
 * git2.dll is the libgit2 library which allows people to programmatically access git repositories (can be good for adding version control to your online game's map world for example). You don't usually need it.
 * git2nvgt.dll is the plugin for nvgt itself that wraps git2. So if your script does not include the line #pragma plugin git2nvgt, then you don't need either of the git2 dlls.
 * nvgt_curl.dll is another plugin that wraps the libcurl library. It used to be the only way to do http requests, but it's now being phased out in favor of more portable options. It's only required if your script includes the line #pragma plugin nvgt_curl
