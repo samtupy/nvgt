@@ -404,7 +404,7 @@ void RegisterAtomics(asIScriptEngine* engine) {
 template <class T> void scoped_lock_construct(void* mem, T* mutex) {
 	new (mem) ScopedLockWithUnlock<T>(*mutex);
 }
-template <class T> void scoped_lock_construct_ms(void* mem, T* mutex, long ms) {
+template <class T> void scoped_lock_construct_ms(void* mem, T* mutex, unsigned int ms) {
 	new (mem) ScopedLockWithUnlock<T>(*mutex, ms);
 }
 void scoped_rw_lock_construct(void* mem, RWLock* lock, bool write) {
@@ -428,15 +428,39 @@ void scoped_read_rw_lock_destruct(ScopedReadRWLock* mem) {
 void scoped_write_rw_lock_destruct(ScopedWriteRWLock* mem) {
 	mem->~ScopedWriteRWLock();
 }
-
+template <class T> void mutex_lock_ms(T* mutex, unsigned int ms) {
+	mutex->lock(ms);
+}
+template <class T> bool mutex_try_lock_ms(T* mutex, unsigned int ms) {
+	return mutex->tryLock(ms);
+}
+bool thread_sleep(unsigned int ms) {
+	if (!Thread::current()) {
+		Thread::sleep(ms);
+		return true;
+	}
+	return Thread::trySleep(ms);
+}
+bool thread_try_join(Thread* thread, unsigned int ms) {
+	return thread->tryJoin(ms);
+}
+void event_wait_ms(Event* event, unsigned int ms) {
+	event->wait(ms);
+}
+bool event_try_wait(Event* event, unsigned int ms) {
+	return event->tryWait(ms);
+}
+bool async_try_wait(async_result* result, unsigned int ms) {
+	return result->progress.tryWait(ms);
+}
 
 template <class T> void RegisterMutexType(asIScriptEngine* engine, const std::string& type) {
 	angelscript_refcounted_register<T>(engine, type.c_str());
 	if constexpr(std::is_same<T, NamedMutex>::value) engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ m(const string&in name)", type).c_str(), asFUNCTION((angelscript_refcounted_factory<T, const std::string&>)), asCALL_CDECL);
 	else {
 		engine->RegisterObjectBehaviour(type.c_str(), asBEHAVE_FACTORY, format("%s@ m()", type).c_str(), asFUNCTION(angelscript_refcounted_factory<T>), asCALL_CDECL);
-		engine->RegisterObjectMethod(type.c_str(), _O("void lock(uint milliseconds)"), asMETHODPR(T, lock, (long), void), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type.c_str(), _O("bool try_lock(uint milliseconds)"), asMETHODPR(T, tryLock, (long), bool), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type.c_str(), _O("void lock(uint milliseconds)"), asFUNCTION(mutex_lock_ms<T>), asCALL_CDECL_OBJFIRST);
+		engine->RegisterObjectMethod(type.c_str(), _O("bool try_lock(uint milliseconds)"), asFUNCTION(mutex_try_lock_ms<T>), asCALL_CDECL_OBJFIRST);
 	}
 	engine->RegisterObjectMethod(type.c_str(), _O("void lock()"), asMETHODPR(T, lock, (), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), _O("bool try_lock()"), asMETHODPR(T, tryLock, (), bool), asCALL_THISCALL);
@@ -463,7 +487,7 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("bool get_thread_is_main() property", asFUNCTION(thread_is_main), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint thread_current_id()"), asFUNCTION(Thread::currentOsTid), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void thread_yield()"), asFUNCTION(Thread::yield), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool thread_sleep(uint ms)"), asFUNCTION(Thread::trySleep), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool thread_sleep(uint ms)"), asFUNCTION(thread_sleep), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("thread@+ get_thread_current() property"), asFUNCTION(Thread::current), asCALL_CDECL);
 	engine->RegisterFuncdef(_O("void thread_callback(dictionary@ args)"));
 	engine->RegisterObjectBehaviour(_O("thread"), asBEHAVE_FACTORY, _O("thread@ t()"), asFUNCTION(angelscript_refcounted_factory<Thread>), asCALL_CDECL);
@@ -474,7 +498,7 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("thread"), _O("void set_name(const string&in name) property"), asMETHOD(Thread, setName), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("thread"), _O("string get_name() const property"), asMETHOD(Thread, getName), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("thread"), _O("void join()"), asMETHODPR(Thread, join, (), void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("thread"), _O("bool join(uint ms)"), asMETHOD(Thread, tryJoin), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("thread"), _O("bool join(uint ms)"), asFUNCTION(thread_try_join), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("thread"), _O("bool get_running() const property"), asMETHOD(Thread, isRunning), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("thread"), _O("void start(thread_callback@ routine, dictionary@ args = null)"), asFUNCTION(thread_begin), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("thread"), _O("void wake_up()"), asMETHOD(Thread, wakeUp), asCALL_THISCALL);
@@ -505,8 +529,8 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("thread_event", asBEHAVE_FACTORY, "thread_event@ e(thread_event_type type = THREAD_EVENT_AUTO_RESET)", asFUNCTION((angelscript_refcounted_factory<Event, Event::EventType>)), asCALL_CDECL);
 	engine->RegisterObjectMethod(_O("thread_event"), _O("void set()"), asMETHOD(Event, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("thread_event"), _O("void wait()"), asMETHODPR(Event, wait, (), void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("thread_event"), _O("void wait(uint ms)"), asMETHODPR(Event, wait, (long), void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("thread_event"), _O("bool try_wait(uint ms)"), asMETHOD(Event, tryWait), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("thread_event"), _O("void wait(uint ms)"), asFUNCTION(event_wait_ms), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("thread_event"), _O("bool try_wait(uint ms)"), asFUNCTION(event_try_wait), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("thread_event"), _O("void reset()"), asMETHOD(Event, reset), asCALL_THISCALL);
 	angelscript_refcounted_register<ThreadPool>(engine, "thread_pool");
 	engine->RegisterObjectBehaviour("thread_pool", asBEHAVE_FACTORY, format("thread_pool@ p(int min_capacity = 2, int max_capacity = 16, int idle_time = 60, int stack_size = %d)", POCO_THREAD_STACK_SIZE).c_str(), asFUNCTION((angelscript_refcounted_factory<ThreadPool, int, int, int, int>)), asCALL_CDECL);
@@ -541,6 +565,6 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("async<T>", "bool get_failed() const property", asMETHOD(async_result, failed), asCALL_THISCALL);
 	engine->RegisterObjectMethod("async<T>", "string get_exception() const property", asMETHOD(async_result, get_exception), asCALL_THISCALL);
 	engine->RegisterObjectMethod("async<T>", "void wait()", asMETHOD(Event, wait), asCALL_THISCALL, 0, asOFFSET(async_result, progress), false);
-	engine->RegisterObjectMethod("async<T>", "bool try_wait(uint ms)", asMETHOD(Event, tryWait), asCALL_THISCALL, 0, asOFFSET(async_result, progress), false);
+	engine->RegisterObjectMethod("async<T>", "bool try_wait(uint ms)", asFUNCTION(async_try_wait), asCALL_CDECL_OBJFIRST);
 	RegisterAtomics(engine);
 }
