@@ -313,7 +313,8 @@ bool yes_no(const string&in prompt, menu@ m = null, string yes = "yes", string n
 }
 
 int choose_number(const string&in intro, int low, int high, int current) {
-	menu@ m = setup_menu(intro);
+	menu@ m = menu();
+	m.intro_text = intro;
 	m.automatic_intro = false;
 	m.focus_first_item = false;
 	for (int i = low; i <= high; i++) m.add_item("" + i);
