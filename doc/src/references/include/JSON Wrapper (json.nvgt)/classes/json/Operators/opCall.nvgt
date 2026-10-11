@@ -1,0 +1,23 @@
+/**
+	Get a value out of a JSON object using a query.
+	var@ json::opCall(const string&in path, var@ def = null);
+	## Arguments:
+		- `const string&in path`: the JSON query (see the remarks section for details).
+		- `var@ def = null`: The default value to facilitate handling by having an alternative value in case the original value ends up in failure.
+	## Returns:
+		var@: a handle to the object, default value if not found.
+	## Remarks:
+		Queries are formatted like so:
+		> first_field.subfield.subfield
+		It can be as nested as you like.
+*/
+
+// Example:
+#include "json.nvgt"
+void main() {
+	string data = """{"countries":{"us":["Colorado", "Kansas", "Minnesota"]}}""";
+	json o;
+	o.loads(data);
+	string locations = o("countries.us", "Oops? Not found");
+	alert("My favorite states are", locations);
+}
