@@ -19,6 +19,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <cstdlib>
 #include <functional>
 #include <vector>
 #include <algorithm>
@@ -35,6 +36,7 @@
  * following map variable makes this possible.
  */
 static std::unordered_map<unsigned int, std::string> g_KeyNames;
+bool g_LegacyInputMode = true;
 static unsigned char g_KeysPressed[SDL_SCANCODE_COUNT];
 static unsigned char g_KeysRepeating[SDL_SCANCODE_COUNT];
 static unsigned char g_KeysForced[SDL_SCANCODE_COUNT];
@@ -108,7 +110,6 @@ bool InputEvent(SDL_Event* evt) {
 			on_key_repeat(evt->key.scancode);
 		}
 	} else if (evt->type == SDL_EVENT_KEY_UP) {
-		g_KeysPressed[evt->key.scancode] = 0;
 		g_KeysRepeating[evt->key.scancode] = 0;
 		g_KeysReleased[evt->key.scancode] = 1;
 		g_KeyboardStateChange = true;
@@ -124,7 +125,6 @@ bool InputEvent(SDL_Event* evt) {
 		g_MouseButtonsPressed[evt->button.button] = 1;
 		g_MouseButtonsReleased[evt->button.button] = 0;
 	} else if (evt->type == SDL_EVENT_MOUSE_BUTTON_UP && evt->button.button < 32) {
-		g_MouseButtonsPressed[evt->button.button] = 0;
 		g_MouseButtonsReleased[evt->button.button] = 1;
 	} else if (evt->type == SDL_EVENT_MOUSE_WHEEL) g_MouseAbsZ += evt->wheel.y;
 	else if (evt->type == SDL_EVENT_FINGER_DOWN) {
@@ -141,6 +141,13 @@ bool InputEvent(SDL_Event* evt) {
 		on_touch_finger_move(evt->tfinger.touchID, {evt->tfinger.fingerID, evt->tfinger.x, evt->tfinger.y, evt->tfinger.pressure}, evt->tfinger.dx, evt->tfinger.dy);
 	} else return false;
 	return true;
+}
+
+void InputClearFrame() {
+	memset(g_KeysPressed, 0, sizeof(g_KeysPressed));
+	memset(g_KeysReleased, 0, sizeof(g_KeysReleased));
+	memset(g_MouseButtonsPressed, 0, sizeof(g_MouseButtonsPressed));
+	memset(g_MouseButtonsReleased, 0, sizeof(g_MouseButtonsReleased));
 }
 
 void lost_window_focus() {
@@ -176,7 +183,8 @@ bool KeyPressed(int key) {
 	if (key < 0 || key >= SDL_SCANCODE_COUNT)
 		return false;
 	bool r = g_KeysPressed[key] == 1;
-	g_KeysPressed[key] = 0;
+	if (g_LegacyInputMode)
+		g_KeysPressed[key] = 0;
 	return r;
 }
 bool KeyRepeating(int key) {
@@ -195,11 +203,7 @@ bool key_down(int key) {
 bool KeyReleased(int key) {
 	if (key < 0 || key >= SDL_SCANCODE_COUNT || !g_KeysDown)
 		return false;
-	bool r = g_KeysReleased[key] == 1;
-	if (r && g_KeysDown[key] == 1)
-		return false;
-	g_KeysReleased[key] = 0;
-	return r;
+	return g_KeysReleased[key] == 1;
 }
 bool key_up(int key) {
 	return !key_down(key);
@@ -328,7 +332,8 @@ bool MousePressed(unsigned char button) {
 	if (button > 31)
 		return false;
 	bool r = g_MouseButtonsPressed[button] == 1;
-	g_MouseButtonsPressed[button] = 0;
+	if (g_LegacyInputMode)
+		g_MouseButtonsPressed[button] = 0;
 	return r;
 }
 bool mouse_down(unsigned char button) {
@@ -891,6 +896,7 @@ void joystick_power_info_destruct(void* mem) {
 }
 
 void RegisterInput(asIScriptEngine* engine) {
+	engine->RegisterGlobalProperty("bool legacy_input_mode", &g_LegacyInputMode);
 	engine->RegisterObjectType("touch_finger", sizeof(SDL_Finger), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<SDL_Finger>());
 	engine->RegisterObjectProperty("touch_finger", "const uint64 id", asOFFSET(SDL_Finger, id));
 	engine->RegisterObjectProperty("touch_finger", "const float x", asOFFSET(SDL_Finger, x));
