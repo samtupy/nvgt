@@ -157,6 +157,10 @@ CScriptArray* host_entry_get_aliases(const HostEntry& e) { return vector_to_scri
 CScriptArray* host_entry_get_addresses(const HostEntry& e) { return vector_to_scriptarray<IPAddress>(e.addresses(), "spec::ip_address"); }
 
 // In NVGT we tend to overuse std::string, make sure sockets can handle this datatype. We should try to register versions of SendBytes and ReceiveBytes that works with a lower level datatype when possible especially because of the unnecessary memory usage incurred with std::string in this case.
+template <class T> bool socket_bind(T& sock, const SocketAddress& address, bool reuse_address, bool ipv6_only) {
+	sock.bind(address, reuse_address, ipv6_only);
+	return true;
+}
 template <class T> int socket_send_bytes(T& sock, const string& data, int flags) { return sock.sendBytes(data.data(), data.size(), flags); }
 template <class T> string socket_receive_bytes(T& sock, int length, int flags) {
 	if (!length) return "";
@@ -496,7 +500,7 @@ template <class T> void RegisterStreamSocket(asIScriptEngine* engine, const std:
 		engine->RegisterObjectMethod(type.c_str(), "void connect(const socket_address&in address)", asMETHODPR(T, connect, (const SocketAddress&), void), asCALL_THISCALL);
 		engine->RegisterObjectMethod(type.c_str(), "void connect(const socket_address&in address, const timespan&in timeout)", asMETHODPR(T, connect, (const SocketAddress&, const Timespan&), void), asCALL_THISCALL);
 		engine->RegisterObjectMethod(type.c_str(), "void connect_nonblocking(const socket_address&in address)", asMETHOD(T, connectNB), asCALL_THISCALL);
-		engine->RegisterObjectMethod(type.c_str(), "bool bind(const socket_address&in address, bool reuse_address = false, bool IPv6_only = false)", asMETHOD(T, bind), asCALL_THISCALL);
+		engine->RegisterObjectMethod(type.c_str(), "bool bind(const socket_address&in address, bool reuse_address = false, bool IPv6_only = false)", asFUNCTION(socket_bind<T>), asCALL_CDECL_OBJFIRST);
 	}
 	engine->RegisterObjectMethod(type.c_str(), "void shutdown_receive()", asMETHOD(T, shutdownReceive), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "int shutdown_send()", asMETHOD(T, shutdownSend), asCALL_THISCALL);
