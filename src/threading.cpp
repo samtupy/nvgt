@@ -62,6 +62,10 @@ public:
 		else return value;
 	}
 	std::string get_exception() { return progress.tryWait(0) ? exception : ""; }
+	void wait() {
+		if (!ctx) throw NullValueException("Object not initialized");
+		progress.wait();
+	}
 	bool call(asIScriptGeneric* gen, ThreadPool* pool = nullptr) {
 		asIScriptContext* aCtx = asGetActiveContext();
 		asIScriptEngine* engine = aCtx->GetEngine();
@@ -566,7 +570,7 @@ void RegisterThreading(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("async<T>", "bool get_complete() const property", asMETHOD(async_result, complete), asCALL_THISCALL);
 	engine->RegisterObjectMethod("async<T>", "bool get_failed() const property", asMETHOD(async_result, failed), asCALL_THISCALL);
 	engine->RegisterObjectMethod("async<T>", "string get_exception() const property", asMETHOD(async_result, get_exception), asCALL_THISCALL);
-	engine->RegisterObjectMethod("async<T>", "void wait()", asMETHOD(Event, wait), asCALL_THISCALL, 0, asOFFSET(async_result, progress), false);
+	engine->RegisterObjectMethod("async<T>", "void wait()", asMETHOD(async_result, wait), asCALL_THISCALL);
 	engine->RegisterObjectMethod("async<T>", "bool try_wait(uint ms)", asFUNCTION(async_try_wait), asCALL_CDECL_OBJFIRST);
 	RegisterAtomics(engine);
 }
