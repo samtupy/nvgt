@@ -1,8 +1,8 @@
 # opPostDec
-Atomically decrements the current value. The operation is a read-modify-write operation. Specifically, performs atomic post-decrement. Equivalent to `return fetch_add(1);`.
+Atomically decrements the current value. The operation is a read-modify-write operation. Specifically, performs atomic post-decrement. Equivalent to `return fetch_sub(1);`.
 
 ```nvgt
-T opPostDec(int arg);
+T opPostDec();
 ```
 
 ## Remarks:

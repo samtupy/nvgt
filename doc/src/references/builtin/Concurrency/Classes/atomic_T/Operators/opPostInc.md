@@ -2,7 +2,7 @@
 Atomically increments the current value. The operation is a read-modify-write operation. Specifically, performs atomic post-increment. Equivalent to `return fetch_add(1);`.
 
 ```nvgt
-T opPostInc(int arg);
+T opPostInc();
 ```
 
 ## Remarks:
