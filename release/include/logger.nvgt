@@ -101,8 +101,8 @@ class logger {
 			if (TIME_HOUR > 0) {
 				hour12 = "" + TIME_HOUR;
 				hour12x0 = "" + TIME_HOUR;
-				daytime = "AM";
-				daytime_lc = "am";
+				daytime = TIME_HOUR == 12? "PM" : "AM";
+				daytime_lc = TIME_HOUR == 12? "pm" : "am";
 			}
 		}
 		if (TIME_HOUR < 10) {
