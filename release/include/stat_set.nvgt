@@ -180,7 +180,7 @@ class stat_set {
 			int idx = result.find(sort_behind[i]);
 			if (idx < 0) continue;
 			result.insert_last(result[idx]);
-			result.remove_at(idx + 1);
+			result.remove_at(idx);
 		}
 		return result;
 	}
