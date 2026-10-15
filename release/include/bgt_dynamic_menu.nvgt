@@ -269,9 +269,9 @@ class dynamic_menu {
 
 			// Determine where the joystick is aimed.
 			if (@stick != null) {
-				if (stick.y < -150)
+				if (stick.y < 32768 - 5000)
 					stick_aim = 1; // Up.
-				else if (stick.y > 150)
+				else if (stick.y > 32768 + 5000)
 					stick_aim = 2; // Down.
 				else
 					stick_aim = 0;
