@@ -122,6 +122,7 @@ class database_object {
 			bool ret = s.step() == SQLITE_DONE;
 			if (!ret)
 				_last_query_error = "db step: " + database.get_last_error_text();
+			return ret;
 		} else { // this row must be inserted from scratch.
 			database_property@[] updating_props;
 			string statement = "INSERT INTO '" + table + "' (";
