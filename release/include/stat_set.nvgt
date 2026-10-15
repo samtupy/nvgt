@@ -245,7 +245,7 @@ class stat_set {
 			if (t == 1) update(name, ds.read_string());
 			else if (t == 2) update(name, ds.read_7bit_encoded());
 			else if (t == 3) update(name, ds.read_double());
-			else if (t == 5) update(name, ds.read_int64());
+			else if (t == 5) update(name, double(ds.read_int64()));
 		}
 		return ds.good;
 	}
