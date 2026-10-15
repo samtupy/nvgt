@@ -90,7 +90,7 @@ Complex Complex::operator+(const Complex &other) const
 
 Complex Complex::operator-(const Complex &other) const
 {
-	return Complex(r - other.r, i + other.i);
+	return Complex(r - other.r, i - other.i);
 }
 
 Complex Complex::operator*(const Complex &other) const
