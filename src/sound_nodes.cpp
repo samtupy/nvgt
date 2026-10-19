@@ -579,6 +579,7 @@ class plugin_node_impl : public audio_node_impl, public virtual plugin_node {
 		cfg.pOutputChannels = &channels;
 		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*pn)) != MA_SUCCESS) throw std::runtime_error("failed to create plugin_node");
 		node = (ma_node_base*)&*pn;
+		pn->impl = this;
 	}
 	~plugin_node_impl() {
 		if (pn) ma_node_uninit(&*pn, nullptr);
