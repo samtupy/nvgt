@@ -1,0 +1,19 @@
+/**
+	Parses an unsigned integer from the beginning of a string.
+	uint64 parseUInt(const string&in str, uint base = 10, uint&out byteCount = 0);
+	## Arguments:
+		* const string&in str: the text to parse.
+		* uint base: numeric base; only 10 and 16 are supported.
+		* uint&out byteCount: receives the number of leading bytes consumed.
+	## Returns:
+		uint64: the parsed value, or 0 when no digits are consumed or the base is unsupported.
+	## Remarks:
+		Parsing starts at the first byte; signs, whitespace, and hexadecimal prefixes are not consumed. Parsing stops at the first character that is not a valid digit for the selected base.
+*/
+
+// Example:
+void main() {
+	uint consumed;
+	uint64 value = parseUInt("FFtail", 16, consumed);
+	alert("Parsing", value + " (" + consumed + " bytes read)");
+}

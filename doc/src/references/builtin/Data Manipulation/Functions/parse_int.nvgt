@@ -1,0 +1,19 @@
+/**
+	Parses a signed integer from the beginning of a string.
+	int64 parse_int(const string&in str, uint base = 10, uint&out byteCount = 0);
+	## Arguments:
+		* const string&in str: the text to parse.
+		* uint base: numeric base; only 10 and 16 are supported.
+		* uint&out byteCount: receives the number of leading bytes consumed, including an optional sign.
+	## Returns:
+		int64: the parsed value, or 0 when no digits are consumed or the base is unsupported.
+	## Remarks:
+		An optional leading `+` or `-` is accepted. Parsing stops at the first character that is not a valid digit for the selected base; whitespace is not skipped and hexadecimal prefixes are not consumed.
+*/
+
+// Example:
+void main() {
+	uint consumed;
+	int64 value = parse_int("-2Arest", 16, consumed);
+	alert("Parsing", value + " (" + consumed + " bytes read)");
+}

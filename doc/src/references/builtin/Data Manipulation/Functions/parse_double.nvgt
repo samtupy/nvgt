@@ -1,0 +1,21 @@
+/**
+	Parses a double-precision floating-point value from the beginning of a string.
+	double parse_double(const string&in number);
+	## Arguments:
+		* const string&in number: The text to parse the number from. It should be a string beginning with a floating-point number.
+	## Returns:
+		double: The parsed value, or `0` if parsing fails or the value is out of range.
+	## Remarks:
+		* The parser accepts a valid numeric prefix and does not require the entire string to be consumed.
+		* A leading minus sign (-) is supported as a valid prefix, but a leading plus sign (+) is not.
+		* A return value of 0 does not distinguish between a failed conversion, an out-of-range value, and a successfully parsed zero.
+*/
+
+//Example
+
+void main() {
+	string first_string = "abc15.32";
+	string second_string = "15.32abc";
+	alert("First parsing attempt", "The parsed number from the first string is " + parse_double(first_string)); //Will be 0 because the string does not start with a floating-point number.
+	alert("Second parsing attempt", "The parsed number from the second string is " + parse_double(second_string)); //Will be the floating-point number at the beginning of the second string, 15.32.
+}
