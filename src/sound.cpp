@@ -761,9 +761,21 @@ class audio_decoder_impl : public audio_data_source_impl, public virtual audio_d
 		bool mirrors_stream() const { return !window_full && !window_moved; }
 	};
 	unique_ptr<stream_cursor> cursor;
-	static ma_result on_read_datastream(ma_decoder *pDecoder, void *pDst, size_t sizeInBytes, size_t *pBytesRead) {
+	// ma_decoder_init never hands its decoders a tell callback, and the libvorbis and libopus decoders refuse to open without one, so datastreams are opened through a single-file vfs instead, which does pass tell along. The cursor itself is the vfs's only file.
+	struct datastream_vfs {
+		ma_vfs_callbacks cb;
+		stream_cursor* sc;
+	} vfs;
+	static ma_result on_open_datastream(ma_vfs* pVFS, const char* pFilePath, ma_uint32 openMode, ma_vfs_file* pFile) {
+		stream_cursor* sc = reinterpret_cast<datastream_vfs*>(pVFS)->sc;
+		if (!sc || !pFile) return MA_INVALID_ARGS;
+		*pFile = static_cast<ma_vfs_file>(sc);
+		return MA_SUCCESS;
+	}
+	static ma_result on_close_datastream(ma_vfs* pVFS, ma_vfs_file file) { return MA_SUCCESS; } // The cursor is owned by the decoder object and freed in close().
+	static ma_result on_read_datastream(ma_vfs* pVFS, ma_vfs_file file, void *pDst, size_t sizeInBytes, size_t *pBytesRead) {
 		if (pBytesRead) *pBytesRead = 0;
-		stream_cursor* sc = static_cast<stream_cursor*>(pDecoder->pUserData);
+		stream_cursor* sc = static_cast<stream_cursor*>(file);
 		if (!sc || !sc->ds) return MA_ERROR;
 		istream* stream = sc->ds->get_istr();
 		if (!stream) return MA_ERROR;
@@ -800,8 +812,8 @@ class audio_decoder_impl : public audio_data_source_impl, public virtual audio_d
 		if (pBytesRead) *pBytesRead = total;
 		return total ? MA_SUCCESS : MA_AT_END;
 	}
-	static ma_result on_seek_datastream(ma_decoder *pDecoder, ma_int64 offset, ma_seek_origin origin) {
-		stream_cursor* sc = static_cast<stream_cursor*>(pDecoder->pUserData);
+	static ma_result on_seek_datastream(ma_vfs* pVFS, ma_vfs_file file, ma_int64 offset, ma_seek_origin origin) {
+		stream_cursor* sc = static_cast<stream_cursor*>(file);
 		if (!sc || !sc->ds) return MA_ERROR;
 		istream* stream = sc->ds->get_istr();
 		if (!stream) return MA_ERROR;
@@ -840,12 +852,17 @@ class audio_decoder_impl : public audio_data_source_impl, public virtual audio_d
 		sc->window_moved = true;
 		return MA_SUCCESS;
 	}
-	static ma_result on_tell_datastream(ma_decoder *pDecoder, ma_int64 *pCursor) {
+	static ma_result on_tell_datastream(ma_vfs* pVFS, ma_vfs_file file, ma_int64 *pCursor) {
 		// The logical position, not the stream's, since the two differ while the window is being replayed.
-		stream_cursor* sc = static_cast<stream_cursor*>(pDecoder->pUserData);
-		if (!sc || !sc->ds) return MA_ERROR;
+		stream_cursor* sc = static_cast<stream_cursor*>(file);
+		if (!sc || !sc->ds || !pCursor) return MA_ERROR;
 		*pCursor = static_cast<ma_int64>(sc->pos);
 		return MA_SUCCESS;
+	}
+	static ma_result on_info_datastream(ma_vfs* pVFS, ma_vfs_file file, ma_file_info* pInfo) {
+		if (!pInfo) return MA_INVALID_ARGS;
+		pInfo->sizeInBytes = 0; // unknown, since a live stream has no length
+		return MA_NOT_IMPLEMENTED;
 	}
 	ma_decoder_config decoder_config_init(unsigned int sample_rate, unsigned int channels) {
 		init_sound();
@@ -860,7 +877,7 @@ class audio_decoder_impl : public audio_data_source_impl, public virtual audio_d
 		return cfg;
 	}
 public:
-	audio_decoder_impl(audio_engine* e) : audio_data_source_impl(e, nullptr), decoder(nullptr), datastream_ref(nullptr) {}
+	audio_decoder_impl(audio_engine* e) : audio_data_source_impl(e, nullptr), decoder(nullptr), datastream_ref(nullptr), vfs{{on_open_datastream, nullptr, on_close_datastream, on_read_datastream, nullptr, on_seek_datastream, on_tell_datastream, on_info_datastream}, nullptr} {}
 	~audio_decoder_impl() { close(); }
 	virtual bool open(const std::string& filename, const pack_interface* pack_file, unsigned int sample_rate, unsigned int channels) override {
 		if (decoder && !close()) return false;
@@ -879,10 +896,12 @@ public:
 		ma_decoder_config cfg = decoder_config_init(sample_rate, channels);
 		cursor = make_unique<stream_cursor>();
 		cursor->ds = ds;
-		// Note: We used to pass on_tell_datastream here until miniaudio update Jan 8 2026, if something breaks with raw decoders and end checking, look here.
-		if ((g_soundsystem_last_error = ma_decoder_init(on_read_datastream, on_seek_datastream, &*cursor, &cfg, &*decoder)) != MA_SUCCESS) {
+		vfs.sc = &*cursor;
+		// The path is only there because ma_decoder_init_vfs requires one; it has no extension, so every decoder is tried by content.
+		if ((g_soundsystem_last_error = ma_decoder_init_vfs(reinterpret_cast<ma_vfs*>(&vfs), "datastream", &cfg, &*decoder)) != MA_SUCCESS) {
 			decoder.reset();
 			cursor.reset();
+			vfs.sc = nullptr;
 			ds->release();
 		} else {
 			datastream_ref = ds;
@@ -900,6 +919,7 @@ public:
 		if ((g_soundsystem_last_error = ma_decoder_uninit(&*decoder)) != MA_SUCCESS ) return false;
 		decoder.reset();
 		cursor.reset(); // after uninit, since the callbacks read through this
+		vfs.sc = nullptr;
 		return true;
 	}
 	virtual unsigned int get_sample_rate() const override { return decoder? decoder->outputSampleRate : 0; }
