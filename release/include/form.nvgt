@@ -3473,7 +3473,7 @@ class control {
 		string paste = clipboard_get_text();
 		string[]@ paste_single = paste.split("\r\n", false);
 		if (!multiline)
-			paste = paste_single[0];
+			paste = paste_single.length() > 0 ? paste_single[0] : "";
 		paste = paste.replace("\r", "", true);
 		if (paste == "") {
 			speak("clipboard empty", true);
