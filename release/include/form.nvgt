@@ -2785,7 +2785,7 @@ class control {
 	void check(audio_form@ f, int tab_index) {
 		string char;
 		char = get_characters();
-		if ((type == ct_input) && key_up(KEY_LALT) && (focused)) {
+		if ((type == ct_input) && (key_up(KEY_LALT) || key_down(KEY_LCTRL) || key_down(KEY_RCTRL)) && (focused)) {
 			if (!read_only) {
 				if (char != "") {
 					if (this.disallowed_chars.length() > 0 && this.is_disallowed_char(char)) {
