@@ -194,7 +194,6 @@ elif env["NVGT_TARGET"] == "android":
 	for d in [runner_dest, stub_dest]:
 		android_deps.extend(env.Install(d, libcxx_path))
 		android_deps.extend(env.Install(d, os.path.join(env["NVGT_OSDEV_PATH"], "lib/libSDL3.so")))
-		android_deps.extend(env.Install(d, os.path.join(env["NVGT_OSDEV_PATH"], "lib/libphonon.so")))
 	# Finally, trigger Gradle to package the .bin and the APK
 	def run_gradle(target, source, env):
 		import subprocess
