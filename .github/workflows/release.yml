@@ -35,7 +35,7 @@ jobs:
         retention-days: 1
 
   mac_build:
-    runs-on: macos-15
+    runs-on: macos-26
     needs: generate_config
     steps:
     - uses: actions/checkout@v5
@@ -132,7 +132,7 @@ jobs:
         path: 'release'
 
   android_build:
-    runs-on: macos-15
+    runs-on: macos-26
     needs: generate_config
     steps:
     - uses: actions/checkout@v5
@@ -308,7 +308,7 @@ jobs:
         path: 'install/nvgt_${{env.nvgt_version}}.exe'
 
   mac_package:
-    runs-on: macos-15
+    runs-on: macos-26
     needs: ["android_build", "linux_build", "mac_build", "windows_build"]
     steps:
     - uses: actions/checkout@v5
