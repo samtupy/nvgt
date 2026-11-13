@@ -118,12 +118,19 @@ LOCAL_MODULE    := libopus
 LOCAL_SRC_FILES := $(LIBPATH)/libopus.a
 include $(PREBUILT_STATIC_LIBRARY)
 
-# shared libraries
-include $(CLEAR_VARS)
-LOCAL_MODULE    := phonon
-LOCAL_SRC_FILES := $(LIBPATH)/libphonon.so
-include $(PREBUILT_SHARED_LIBRARY)
+LOCAL_MODULE    := libphonon
+LOCAL_SRC_FILES := $(LIBPATH)/libphonon.a
+include $(PREBUILT_STATIC_LIBRARY)
 
+LOCAL_MODULE    := libpffft
+LOCAL_SRC_FILES := $(LIBPATH)/libpffft.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+LOCAL_MODULE    := libmysofa
+LOCAL_SRC_FILES := $(LIBPATH)/libmysofa.a
+include $(PREBUILT_STATIC_LIBRARY)
+
+# shared libraries
 include $(CLEAR_VARS)
 LOCAL_MODULE    := SDL3
 LOCAL_SRC_FILES := $(LIBPATH)/libSDL3.so
@@ -140,8 +147,8 @@ LOCAL_SRC_FILES_COMMON := \
 LOCAL_C_INCLUDES_COMMON := $(LOCAL_PATH)/../droidev/include $(LOCAL_PATH)/../ASAddon/include $(LOCAL_PATH)/../dep
 LOCAL_CXXFLAGS_COMMON := -DPOCO_STATIC -DNVGT_BUILDING -DAS_USE_STLNAMES=1 -std=c++20 -fms-extensions -ffunction-sections -O2 -fpermissive -O2 -Wno-narrowing -Wno-int-to-pointer-cast -Wno-delete-incomplete -Wno-unused-result -Wno-deprecated-array-compare -Wno-implicit-const-int-float-conversion -Wno-deprecated-enum-enum-conversion -Wno-absolute-value
 LOCAL_LDFLAGS_COMMON = -Wl,--no-fatal-warnings -Wl,--no-undefined -Wl,--gc-sections
-LOCAL_SHARED_LIBRARIES_COMMON := SDL3 phonon
-LOCAL_STATIC_LIBRARIES_COMMON := libPocoFoundation libPocoCrypto libPocoJSON libPocoNet libPocoNetSSL libPocoUtil libPocoXML libffi libz libangelscript libcrypto libpcre2-8 libutf8proc libexpat libenet libreactphysics3d libssl libSDL3_ttf libfreetype libbz2 libogg libvorbisfile libvorbis libopusfile libopusenc libopus libtinyexpr libtiny-aes-c
+LOCAL_SHARED_LIBRARIES_COMMON := SDL3
+LOCAL_STATIC_LIBRARIES_COMMON := libPocoFoundation libPocoCrypto libPocoJSON libPocoNet libPocoNetSSL libPocoUtil libPocoXML libffi libz libangelscript libcrypto libpcre2-8 libutf8proc libexpat libenet libreactphysics3d libssl libSDL3_ttf libfreetype libbz2 libogg libvorbisfile libvorbis libopusfile libopusenc libopus libphonon libpffft libmysofa libtinyexpr libtiny-aes-c
 LOCAL_LDLIBS_COMMON := -lGLESv1_CM -lGLESv2 -lOpenSLES -llog -landroid
 LOCAL_CPP_FEATURES_COMMON := rtti exceptions
 
