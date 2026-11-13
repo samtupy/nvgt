@@ -35,7 +35,7 @@ public:
 struct hashpoint_hash {
 	using is_avalanching = void;
 	size_t operator()(const hashpoint& p) const {
-		return ankerl::unordered_dense::detail::wyhash::hash(&p, sizeof(p));
+		return ankerl::unordered_dense::detail::hash_bytes(&p, sizeof(p));
 	}
 };
 struct hashpoint_equals {

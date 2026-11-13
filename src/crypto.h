@@ -41,7 +41,7 @@ public:
 	chacha_ostreambuf(std::ostream &sink, const std::string &key, const std::string &nonce);
 	virtual ~chacha_ostreambuf();
 	void own_sink(bool owns);
-	virtual int writeToDevice(const char *buffer, std::streamsize length);
+	virtual std::streamsize writeToDevice(const char *buffer, std::streamsize length);
 	/**
 	 * Extremely limited seeking support.
 	 * Only supports seeking to 0 cur (so that tellp works) and 0 beg (so that pack header updates can work).
@@ -63,7 +63,7 @@ public:
 	chacha_istreambuf(std::istream &source, const std::string &key);
 	virtual ~chacha_istreambuf();
 	void own_source(bool owns);
-	virtual int readFromDevice(char *buffer, std::streamsize length);
+	virtual std::streamsize readFromDevice(char *buffer, std::streamsize length);
 	virtual std::streampos seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in);
 	virtual std::streampos seekpos(std::streampos pos, std::ios_base::openmode which = std::ios_base::in);
 };

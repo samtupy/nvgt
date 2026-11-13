@@ -130,7 +130,7 @@ chacha_ostreambuf::~chacha_ostreambuf() {
 void chacha_ostreambuf::own_sink(bool owns) {
 	this->owns_sink = owns;
 }
-int chacha_ostreambuf::writeToDevice(const char *buffer, std::streamsize length) {
+std::streamsize chacha_ostreambuf::writeToDevice(const char *buffer, std::streamsize length) {
 	for (std::streamsize i = 0; i < length; i++) {
 		if (keystream_pos == 0) {
 			if (length - i >= 64) {
@@ -211,7 +211,7 @@ chacha_istreambuf::~chacha_istreambuf() {
 void chacha_istreambuf::own_source(bool owns) {
 	owns_source = owns;
 }
-int chacha_istreambuf::readFromDevice(char *buffer, std::streamsize length) {
+std::streamsize chacha_istreambuf::readFromDevice(char *buffer, std::streamsize length) {
 
 	if (length % 64 != 0) {
 		return -1; // Shouldn't happen, but cross this bridge if we get there (this is better than outputting garbage).

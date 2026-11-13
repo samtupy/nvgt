@@ -95,13 +95,13 @@ void sdl_file_stream_buf::flushToDisk() {
 	if (getMode() & std::ios::out) sync();
 	SDL_FlushIO(_handle);
 }
-int sdl_file_stream_buf::readFromDevice(char* buffer, std::streamsize length) {
+std::streamsize sdl_file_stream_buf::readFromDevice(char* buffer, std::streamsize length) {
 	if (!_handle) return -1;
 	size_t bytes_read = SDL_ReadIO(_handle, buffer, length);
 	if (bytes_read > 0) return bytes_read;
 	return SDL_GetIOStatus(_handle) == SDL_IO_STATUS_EOF? 0 : -1;
 }
-int sdl_file_stream_buf::writeToDevice(const char* buffer, std::streamsize length) {
+std::streamsize sdl_file_stream_buf::writeToDevice(const char* buffer, std::streamsize length) {
 	if (!_handle) return -1;
 	size_t bytes_written = SDL_WriteIO(_handle, buffer, length);
 	if (bytes_written > 0) return bytes_written;
@@ -168,7 +168,7 @@ bool prebuffer_istreambuf::fill_window() {
 	window.resize(source->gcount());
 	return !window.empty();
 }
-int prebuffer_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
+std::streamsize prebuffer_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
 	if (length <= 0) return 0;
 	std::streamsize bytes_read = 0;
 	if (window.empty() && !window_closed) fill_window();

@@ -42,8 +42,8 @@ public:
 	Poco::UInt64 size() const;
 	SDL_IOStream* nativeHandle() const;
 protected:
-	int readFromDevice(char* buffer, std::streamsize length) override;
-	int writeToDevice(const char* buffer, std::streamsize length) override;
+	std::streamsize readFromDevice(char* buffer, std::streamsize length) override;
+	std::streamsize writeToDevice(const char* buffer, std::streamsize length) override;
 };
 class sdl_file_ios : public virtual std::ios {
 public:
@@ -93,7 +93,7 @@ public:
 	prebuffer_istreambuf(std::istream& source, std::size_t prebuffer_size = 1024);
 	~prebuffer_istreambuf();
 	void own_source(bool owns);
-	virtual int readFromDevice(char* buffer, std::streamsize length);
+	virtual std::streamsize readFromDevice(char* buffer, std::streamsize length);
 	virtual std::streampos seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in);
 	virtual std::streampos seekpos(std::streampos pos, std::ios_base::openmode which = std::ios_base::in);
 };

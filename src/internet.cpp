@@ -193,7 +193,7 @@ template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, con
 	engine->RegisterObjectMethod(type.c_str(), "void set_opIndex(const string&in name, const string&in value) property", asMETHOD(T, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set(const string&in name, const string&in value)", asMETHOD(T, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void add(const string&in name, const string&in value)", asMETHOD(T, add), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "const string& get(const string&in name, const string&in default_value = \"\") const", asMETHODPR(T, get, (const string&, const string&) const, const string&), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "const string& get(const string&in name, const string&in default_value = \"\") const", asMETHODPR(T, get, (const string&, const string&) const, string), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool exists(const string&in name) const", asMETHOD(T, has), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool empty() const", asMETHOD(T, empty), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "uint64 size() const", asMETHOD(T, size), asCALL_THISCALL);

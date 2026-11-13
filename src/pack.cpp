@@ -477,7 +477,7 @@ section_istreambuf::section_istreambuf(std::istream& source, std::streamoff star
 section_istreambuf::~section_istreambuf() {
 	delete source;
 }
-int section_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
+std::streamsize section_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
 	std::streampos pos = source->tellg();
 	if (pos < start || pos >= start + size)
 		return -1;

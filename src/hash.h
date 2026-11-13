@@ -29,7 +29,7 @@ class checksum_ostreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_
 public:
 	checksum_ostreambuf(std::ostream &sink);
 	~checksum_ostreambuf();
-	int writeToDevice(const char *buffer, std::streamsize length);
+	std::streamsize writeToDevice(const char *buffer, std::streamsize length);
 	uint32_t get_checksum();
 };
 class checksum_ostream : public std::ostream {
@@ -44,7 +44,7 @@ class checksum_istreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_
 public:
 	checksum_istreambuf(std::istream &source);
 	~checksum_istreambuf();
-	int readFromDevice(char *buffer, std::streamsize length);
+	std::streamsize readFromDevice(char *buffer, std::streamsize length);
 	uint32_t get_checksum();
 };
 class checksum_istream : public std::istream {
