@@ -25,9 +25,7 @@
 #include <ctime>
 #include <iomanip>
 #include <stdexcept>
-#include <Poco/AtomicFlag.h>
 #include <Poco/UnicodeConverter.h>
-#include <UniversalSpeech.h>
 #include "win.h"
 
 using namespace std;
@@ -85,62 +83,6 @@ bool sapi5_engine::set_voice(int voice) {
 	return true;
 }
 int sapi5_engine::get_current_voice() { return sb_sapi_get_voice(inst); }
-
-static Poco::AtomicFlag g_sr_loaded;
-static Poco::AtomicFlag g_sr_available;
-bool screen_reader_load() {
-	if (g_sr_loaded) return true;
-	speechSetValue(SP_ENABLE_NATIVE_SPEECH, 0);
-	g_sr_available.set();
-	g_sr_loaded.set();
-	return true;
-}
-void screen_reader_unload() {
-	if (g_sr_loaded) g_sr_loaded.reset();
-}
-std::string screen_reader_detect() {
-	if (!screen_reader_load()) return "";
-	int engine = speechGetValue(SP_ENGINE);
-	if (engine < 0) return "";
-	const std::wstring srname = speechGetString(SP_ENGINE + engine);
-	std::string result;
-	Poco::UnicodeConverter::convert(srname, result);
-	return result;
-}
-bool screen_reader_has_speech() {
-	if (!screen_reader_load()) return false;
-	return speechGetValue(SP_ENGINE) > -1;
-}
-bool screen_reader_has_braille() {
-	if (!screen_reader_load()) return false;
-	return speechGetValue(SP_ENGINE) > -1;
-}
-bool screen_reader_is_speaking() {
-	if (!screen_reader_load()) return false;
-	return speechGetValue(SP_BUSY) != 0;
-}
-bool screen_reader_output(const std::string& text, bool interrupt) {
-	if (!screen_reader_load()) return false;
-	std::wstring textW;
-	Poco::UnicodeConverter::convert(text, textW);
-	return speechSay(textW.c_str(), interrupt) != 0 && brailleDisplay(textW.c_str()) != 0;
-}
-bool screen_reader_speak(const std::string& text, bool interrupt) {
-	if (!screen_reader_load()) return false;
-	std::wstring textW;
-	Poco::UnicodeConverter::convert(text, textW);
-	return speechSay(textW.c_str(), interrupt) != 0;
-}
-bool screen_reader_braille(const std::string& text) {
-	if (!screen_reader_load()) return false;
-	std::wstring textW;
-	Poco::UnicodeConverter::convert(text, textW);
-	return brailleDisplay(textW.c_str()) != 0;
-}
-bool screen_reader_silence() {
-	if (!screen_reader_load()) return false;
-	return speechStop();
-}
 
 // Thanks Quentin Cosendey (Universal Speech) for this jaws keyboard hook code as well as to male-srdiecko and silak for various improvements and fixes that have taken place since initial implementation.
 bool altPressed = false;
