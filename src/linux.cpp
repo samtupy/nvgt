@@ -93,53 +93,7 @@ bool speechd_engine::stop() {
 	return true;
 }
 
-bool screen_reader_is_speaking() { return false; }
-
 void register_native_tts() { tts_engine_register("speechd", []() -> shared_ptr<tts_engine> { return make_shared<speechd_engine>(); }); }
-
-static tts_voice* g_screen_reader_voice = nullptr;
-
-bool screen_reader_load() {
-	if (g_screen_reader_voice) return true;
-	g_screen_reader_voice = new tts_voice("speechd");
-	return g_screen_reader_voice != nullptr && g_screen_reader_voice->get_voice_count() > 0;
-}
-
-void screen_reader_unload() {
-	if (g_screen_reader_voice) {
-		g_screen_reader_voice->Release();
-		g_screen_reader_voice = nullptr;
-	}
-}
-
-std::string screen_reader_detect() {
-	if (!screen_reader_load()) return "";
-	return g_screen_reader_voice->get_voice_count() > 0 ? "Speech Dispatcher" : "";
-}
-
-bool screen_reader_has_speech() {
-	if (!screen_reader_load()) return false;
-	return g_screen_reader_voice->get_voice_count() > 0;
-}
-
-bool screen_reader_has_braille() { return false; }
-
-bool screen_reader_output(const std::string& text, bool interrupt) {
-	if (!screen_reader_load()) return false;
-	return g_screen_reader_voice->speak(text, interrupt);
-}
-
-bool screen_reader_speak(const std::string& text, bool interrupt) {
-	if (!screen_reader_load()) return false;
-	return g_screen_reader_voice->speak(text, interrupt);
-}
-
-bool screen_reader_braille(const std::string& text) { return false; }
-
-bool screen_reader_silence() {
-	if (!screen_reader_load()) return false;
-	return g_screen_reader_voice->stop();
-}
 
 unsigned long long system_running_milliseconds() {
 	struct timespec ts;

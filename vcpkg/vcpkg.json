@@ -65,8 +65,13 @@
       ]
     },
     {
-      "name": "universalspeech",
-      "platform": "windows"
+      "name": "ethindp-prism",
+      "platform": "windows|osx|linux"
+    },
+    {
+      "name": "dbus",
+      "default-features": false,
+      "platform": "linux"
     },
     {
       "name": "bass",
