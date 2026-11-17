@@ -415,10 +415,18 @@ make_add_units(hours, 0, abs(amount), 0, 0, 0)
 make_add_units(minutes, 0, 0, abs(amount), 0, 0)
 make_add_units(seconds, 0, 0, 0, abs(amount), 0)
 
+/**
+ * Returns a copy of the given object moved to another year, clamping February 29th to the 28th in non-leap years.
+*/
+template <class t> t with_year(const t &dt, int year) {
+	t result(dt);
+	result.assign(year, dt.month(), min(dt.day(), DateTime::daysOfMonth(year, dt.month())), dt.hour(), dt.minute(), dt.second(), dt.millisecond(), dt.microsecond());
+	return result;
+}
 template <class t> bool add_years(t &dt, asINT32 amount) {
 	if (amount == 0)
 		return false;
-	dt.assign(dt.year() + amount, dt.month(), dt.day(), dt.hour(), dt.minute(), dt.second(), dt.microsecond());
+	dt = with_year(dt, dt.year() + amount);
 	return true;
 }
 template <class t> bool add_months(t &dt, asINT32 amount) {
@@ -438,7 +446,7 @@ template <class t> bool add_months(t &dt, asINT32 amount) {
 		}
 	}
 	asINT32 yearToAssign = dt.year() + yearsToAdd;
-	dt.assign(dt.year() + yearsToAdd, monthToAssign, min(dt.day(), DateTime::daysOfMonth(yearToAssign, monthToAssign)), dt.hour(), dt.minute(), dt.second(), dt.microsecond());
+	dt.assign(dt.year() + yearsToAdd, monthToAssign, min(dt.day(), DateTime::daysOfMonth(yearToAssign, monthToAssign)), dt.hour(), dt.minute(), dt.second(), dt.millisecond(), dt.microsecond());
 	return true;
 }
 /**
@@ -469,19 +477,8 @@ template <class t> asINT64 diff_seconds(t &first, t &second) {
 	return (asINT64)make_diff_timespan(first, second).totalSeconds();
 }
 /**
- * Computes the total duration of the current year as represented by the given object.
- * Used internally by diff_years.
+ * Counts whole years up to the last anniversary of the earlier date, then adds the remaining time as a fraction of the year following that anniversary.
 */
-template <class t> Timespan::TimeDiff get_duration_of_year(t &dt) {
-	return t(dt.year() + 1, 1, 1).utcTime() - t(dt.year(), 1, 1).utcTime();
-}
-/**
- * Computes the amount of time that has elapsed since the start of the year as represented by the given object.
- * Used internally for diff_years.
-*/
-template <class t> double time_since_year_start(t &dt) {
-	return (dt.utcTime() - t(dt.year(), 1, 1).utcTime()) / (double)get_duration_of_year(dt);
-}
 template <class t> double diff_years(t &first, t &second) {
 	t *high, * low;
 	if (first.utcTime() > second.utcTime()) {
@@ -491,11 +488,12 @@ template <class t> double diff_years(t &first, t &second) {
 		high = &second;
 		low = &first;
 	}
-	asINT64 years = high->year() - low->year();
-	double delta = time_since_year_start(*low) - time_since_year_start(*high);
-	if (years > 0 && delta > 0)
-		years -= 1;
-	return years + abs(delta);
+	int years = high->year() - low->year();
+	t anniversary = with_year(*low, low->year() + years);
+	if (anniversary.utcTime() > high->utcTime())
+		anniversary = with_year(*low, low->year() + --years);
+	t next_anniversary = with_year(*low, low->year() + years + 1);
+	return years + (high->utcTime() - anniversary.utcTime()) / (double)(next_anniversary.utcTime() - anniversary.utcTime());
 }
 /**
  * Computes the span of time that has elapsed since midnight on the current day as represented by the given object.
@@ -523,13 +521,7 @@ template <class t> asINT64 diff_months(t &first, t &second) {
 		high = &second;
 		low = &first;
 	}
-	asINT64 months = 0;
-	if (high->year() != low->year())
-		months = (asINT64)diff_years(*high, *low) * 12;
-	if (low->month() > high->month() && low->year() < high->year())
-		months += (12 - abs(low->month() - high->month()));
-	else
-		months += abs(high->month() - low->month());
+	asINT64 months = asINT64(high->year() - low->year()) * 12 + high->month() - low->month();
 	if (is_further_into_month(*high, *low))
 		months--;
 	return months;

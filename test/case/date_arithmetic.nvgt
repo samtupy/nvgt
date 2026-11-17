@@ -1,0 +1,26 @@
+void test_date_arithmetic() {
+	datetime d(2026, 1, 15, 10, 30, 15, 123, 456);
+	d.add_months(1);
+	assert(d.month == 2 and d.millisecond == 123 and d.microsecond == 456, "add_months: ms=" + d.millisecond + " us=" + d.microsecond);
+	d.add_years(1);
+	assert(d.year == 2027 and d.millisecond == 123 and d.microsecond == 456, "add_years: ms=" + d.millisecond + " us=" + d.microsecond);
+	datetime leap(2024, 2, 29);
+	leap.add_years(1);
+	assert(leap.year == 2025 and leap.month == 2 and leap.day == 28, "add_years from Feb 29 gave " + leap.year + "-" + leap.month + "-" + leap.day);
+	datetime a(2020, 6, 15), b(2026, 6, 15), c(2026, 6, 14);
+	assert(a.diff_years(b) == 6, "diff_years exact anniversary: " + a.diff_years(b));
+	assert(b.diff_years(a) == 6, "diff_years reversed: " + b.diff_years(a));
+	double y = a.diff_years(c);
+	assert(y > 5.99 and y < 6, "diff_years one day short: " + y);
+	assert(a.diff_months(b) == 72, "diff_months exact: " + a.diff_months(b));
+	assert(a.diff_months(c) == 71, "diff_months one day short: " + a.diff_months(c));
+	datetime e(2026, 1, 1), f(2026, 3, 15);
+	y = e.diff_years(f);
+	assert(abs(y - 73 / 365.0) < 0.000001, "diff_years within a year: " + y);
+	assert(e.diff_months(f) == 2, "diff_months within a year: " + e.diff_months(f));
+	datetime g(2025, 11, 20), h(2026, 2, 10);
+	assert(g.diff_months(h) == 2, "diff_months across a year boundary: " + g.diff_months(h));
+	assert(g.diff_years(h) < 1, "diff_years across a year boundary: " + g.diff_years(h));
+	calendar ca(2020, 6, 15), cb(2026, 6, 15);
+	assert(ca.diff_years(cb) == 6 and ca.diff_months(cb) == 72, "calendar diff: " + ca.diff_years(cb) + ", " + ca.diff_months(cb));
+}
