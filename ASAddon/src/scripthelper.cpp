@@ -919,9 +919,9 @@ string GetExceptionInfo(asIScriptContext *ctx, bool showStack)
 	stringstream text;
 
 	const asIScriptFunction *function = ctx->GetExceptionFunction();
-	const char* section_name;
+	const char* section_name = nullptr;
 	text << "in function: " << function->GetDeclaration() << "\n";
-	if(function->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0)
+	if(function->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0 && section_name)
 		text << "file: " << (section_name) << "\n";
 	if(ctx->GetExceptionLineNumber())
 		text << "line: " << ctx->GetExceptionLineNumber() << "\n";
@@ -937,8 +937,11 @@ string GetExceptionInfo(asIScriptContext *ctx, bool showStack)
 			{
 				if( function->GetFuncType() == asFUNC_SCRIPT )
 				{
-					const char* section_name;
-					if (function->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0) text << (section_name) << " (" << ctx->GetLineNumber(n) << "): " << function->GetDeclaration() << "\n";
+					const char* section_name = nullptr;
+					int line = ctx->GetLineNumber(n);
+					if (function->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0 && section_name) text << section_name << " (" << line << "): ";
+					else if (line > 0) text << "line " << line << ": ";
+					text << function->GetDeclaration() << "\n";
 				}
 				else
 				{

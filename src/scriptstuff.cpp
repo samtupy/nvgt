@@ -381,12 +381,12 @@ CScriptDictionary* script_function_call(asIScriptFunction* func, CScriptDictiona
 	if (xr != asEXECUTION_FINISHED) {
 		if (xr == asEXECUTION_EXCEPTION) {
 			char msg[4096];
-			const char* section;
+			const char* section = nullptr;
 			int col;
 			const char* decl = ctx->GetExceptionFunction()->GetDeclaration();
 			const char* exc = ctx->GetExceptionString();
 			int line = ctx->GetExceptionLineNumber(&col, &section);
-			snprintf(msg, 4096, "Exception: %s in %s %s at line %d, %d", exc, section, decl, line, col);
+			snprintf(msg, 4096, "Exception: %s in %s %s at line %d, %d", exc, section ? section : "(unknown)", decl, line, col);
 			failure_reason = msg;
 		} else if (xr == asEXECUTION_SUSPENDED) {
 			char msg[128];
@@ -477,14 +477,13 @@ std::string script_function_get_namespace(asIScriptFunction* func) {
 }
 std::string script_function_get_declared_at(asIScriptFunction* func, int* row, int* col) {
 	const char* script = nullptr;
-	if (!func || func->GetDeclaredAt(&script, row, col) < 0) return "";
+	if (!func || func->GetDeclaredAt(&script, row, col) < 0 || !script) return "";
 	return std::string(script);
 }
 std::string script_function_get_script_property(asIScriptFunction* func) {
 	const char* script = nullptr;
 	int row, col;
-	if (!func || func->GetDeclaredAt(&script, &row, &col) < 0) return "";
-	if (!func || func->GetDeclaredAt(&script, &row, &col) < 0) return "";
+	if (!func || func->GetDeclaredAt(&script, &row, &col) < 0 || !script) return "";
 	return std::string(script);
 }
 void script_function_line_callback(asIScriptContext* ctx, script_function_call_data* data) {
