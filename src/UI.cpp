@@ -391,6 +391,7 @@ game_window* ShowNVGTWindow(const std::string& window_title, unsigned int flags)
 		return nullptr;
 	}
 	g_WindowThreadId = thread_current_thread_id();
+	ApplyMouseRelativeMode();
 	g_window->duplicate();
 	return g_window.get();
 }
@@ -752,6 +753,8 @@ void RegisterUI(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("game_window", "bool get_keyboard_grab() const property", asMETHOD(game_window, get_keyboard_grab), asCALL_THISCALL);
 	engine->RegisterObjectMethod("game_window", "bool set_mouse_grab(bool grabbed)", asMETHOD(game_window, set_mouse_grab), asCALL_THISCALL);
 	engine->RegisterObjectMethod("game_window", "bool get_mouse_grab() const property", asMETHOD(game_window, get_mouse_grab), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool set_mouse_relative_mode(bool enabled)", asMETHOD(game_window, set_mouse_relative_mode), asCALL_THISCALL);
+	engine->RegisterObjectMethod("game_window", "bool get_mouse_relative_mode() const property", asMETHOD(game_window, get_mouse_relative_mode), asCALL_THISCALL);
 	engine->RegisterObjectMethod("game_window", "bool set_opacity(float opacity)", asMETHOD(game_window, set_opacity), asCALL_THISCALL);
 	engine->RegisterObjectMethod("game_window", "float get_opacity() const property", asMETHOD(game_window, get_opacity), asCALL_THISCALL);
 	engine->RegisterObjectMethod("game_window", "bool flash(uint operation)", asMETHOD(game_window, flash), asCALL_THISCALL);

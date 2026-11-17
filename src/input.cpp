@@ -46,8 +46,9 @@ static unsigned char g_MouseButtonsReleased[32];
 std::string g_UserInput = "";
 float g_MouseX = 0, g_MouseY = 0, g_MouseZ = 0;
 float g_MouseAbsX = 0, g_MouseAbsY = 0, g_MouseAbsZ = 0;
-float g_MousePrevX = 0, g_MousePrevY = 0, g_MousePrevZ = 0;
+float g_MouseRelX = 0, g_MouseRelY = 0, g_MousePrevZ = 0;
 bool g_KeyboardStateChange = false;
+static bool g_MouseRelativeMode = false;
 SDL_TouchID g_TouchLastDevice = 0;
 static asITypeInfo* key_code_array_type = nullptr;
 static asITypeInfo* joystick_mapping_array_type = nullptr;
@@ -120,13 +121,25 @@ bool InputEvent(SDL_Event* evt) {
 	else if (evt->type == SDL_EVENT_MOUSE_MOTION) {
 		g_MouseAbsX = evt->motion.x;
 		g_MouseAbsY = evt->motion.y;
-	} else if (evt->type == SDL_EVENT_MOUSE_BUTTON_DOWN && evt->button.button < 32) {
-		g_MouseButtonsPressed[evt->button.button] = 1;
-		g_MouseButtonsReleased[evt->button.button] = 0;
-	} else if (evt->type == SDL_EVENT_MOUSE_BUTTON_UP && evt->button.button < 32) {
-		g_MouseButtonsPressed[evt->button.button] = 0;
-		g_MouseButtonsReleased[evt->button.button] = 1;
-	} else if (evt->type == SDL_EVENT_MOUSE_WHEEL) g_MouseAbsZ += evt->wheel.y;
+		g_MouseRelX += evt->motion.xrel;
+		g_MouseRelY += evt->motion.yrel;
+		on_mouse_move(evt->motion.x, evt->motion.y, evt->motion.xrel, evt->motion.yrel);
+	} else if (evt->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+		if (evt->button.button < 32) {
+			g_MouseButtonsPressed[evt->button.button] = 1;
+			g_MouseButtonsReleased[evt->button.button] = 0;
+		}
+		on_mouse_button_down(evt->button.button, evt->button.clicks);
+	} else if (evt->type == SDL_EVENT_MOUSE_BUTTON_UP) {
+		if (evt->button.button < 32) {
+			g_MouseButtonsPressed[evt->button.button] = 0;
+			g_MouseButtonsReleased[evt->button.button] = 1;
+		}
+		on_mouse_button_up(evt->button.button, evt->button.clicks);
+	} else if (evt->type == SDL_EVENT_MOUSE_WHEEL) {
+		g_MouseAbsZ += evt->wheel.y;
+		on_mouse_wheel(evt->wheel.x, evt->wheel.y);
+	}
 	else if (evt->type == SDL_EVENT_FINGER_DOWN) {
 		g_TouchLastDevice = evt->tfinger.touchID;
 		on_touch_finger_down(evt->tfinger.touchID, {evt->tfinger.fingerID, evt->tfinger.x, evt->tfinger.y, evt->tfinger.pressure});
@@ -349,11 +362,10 @@ bool mouse_up(unsigned char button) {
 	return !mouse_down(button);
 }
 void mouse_update() {
-	g_MouseX = g_MouseAbsX - g_MousePrevX;
-	g_MouseY = g_MouseAbsY - g_MousePrevY;
+	g_MouseX = g_MouseRelX;
+	g_MouseY = g_MouseRelY;
 	g_MouseZ = g_MouseAbsZ - g_MousePrevZ;
-	g_MousePrevX = g_MouseAbsX;
-	g_MousePrevY = g_MouseAbsY;
+	g_MouseRelX = g_MouseRelY = 0;
 	g_MousePrevZ = g_MouseAbsZ;
 }
 void SetCursorVisible(bool state) {
@@ -364,6 +376,16 @@ bool GetMouseGrab() {
 }
 void SetMouseGrab(bool grabbed) {
 	SDL_SetWindowMouseGrab(g_window ? g_window->get_sdl_window() : nullptr, grabbed);
+}
+bool GetMouseRelativeMode() {
+	return g_window ? SDL_GetWindowRelativeMouseMode(g_window->get_sdl_window()) : g_MouseRelativeMode;
+}
+void ApplyMouseRelativeMode() {
+	if (g_window) SDL_SetWindowRelativeMouseMode(g_window->get_sdl_window(), g_MouseRelativeMode);
+}
+void SetMouseRelativeMode(bool enabled) {
+	g_MouseRelativeMode = enabled;
+	ApplyMouseRelativeMode();
 }
 CScriptArray* GetKeyboards() {
 	return GetDevices(SDL_GetKeyboards);
@@ -933,6 +955,8 @@ void RegisterInput(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction(_O("bool get_MOUSE_AVAILABLE() property"), asFUNCTION(SDL_HasMouse), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_mouse_grab() property"), asFUNCTION(GetMouseGrab), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void set_mouse_grab(bool grabbed) property"), asFUNCTION(SetMouseGrab), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool get_mouse_relative_mode() property"), asFUNCTION(GetMouseRelativeMode), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void set_mouse_relative_mode(bool enabled) property"), asFUNCTION(SetMouseRelativeMode), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool get_cursor_visible() property"), asFUNCTION(SDL_CursorVisible), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("void set_cursor_visible(bool state) property"), asFUNCTION(SetCursorVisible), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("bool is_screen_keyboard_shown()"), asFUNCTION(ScreenKeyboardShown), asCALL_CDECL);

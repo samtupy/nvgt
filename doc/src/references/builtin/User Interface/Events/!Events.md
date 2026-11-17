@@ -23,5 +23,8 @@ Object listeners and method listeners only hold a weak reference to their object
 ## Available events
 * Key events, which pass the key code as an int: `on_key_press`, `on_key_repeat` and `on_key_release`. Their listener interface is `engine_key_event_listener`.
 * Text input: `on_characters`, which passes the typed text as a string. Its listener interface is `engine_character_event_listener`.
+* Mouse button events, which pass the button and the number of clicks: `on_mouse_button_down` and `on_mouse_button_up`. Their listener interface is `engine_mouse_button_event_listener`.
+* Mouse movement: `on_mouse_move`, which passes the new position and how far the mouse moved. Its listener interface is `engine_mouse_motion_event_listener`.
+* Mouse wheel: `on_mouse_wheel`, which passes how far the wheel scrolled. Its listener interface is `engine_mouse_wheel_event_listener`.
 * Touch events, which pass the touch device and a `touch_finger` structure: `on_touch_finger_down`, `on_touch_finger_up` and `on_touch_finger_cancel`. Their listener interface is `engine_touch_event_listener`.
 * Touch movement: `on_touch_finger_move`, which also passes how far the finger moved. Its listener interface is `engine_touch_motion_event_listener`.

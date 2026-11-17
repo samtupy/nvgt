@@ -1,0 +1,31 @@
+/**
+	Enables or disables relative mouse mode, or determines whether it is currently enabled.
+	bool mouse_relative_mode;
+	## Remarks:
+		In relative mouse mode, the cursor is hidden and kept inside your game's window, and `MOUSE_X` and `MOUSE_Y` keep reporting how far the mouse moved even after the cursor would have hit the edge of the window or screen. This is what games that turn the player or aim with the mouse need. Without it, mouse movement in a direction stops being reported once the cursor reaches the edge of the window or screen. Where the platform allows it, movement is read directly from the mouse, so it isn't affected by the operating system's pointer acceleration.
+		Relative mode is disabled by default, because players don't expect a game to take over their mouse unless they are actively playing with it. A common approach is to enable it when gameplay starts and disable it again whenever the game is paused or a menu is open, so players can always get their mouse back by pressing escape.
+		Relative mode includes everything `mouse_grab` does, so there's no need to enable both. The mouse is only captured while your window has focus. Switching to another window releases it until your window is focused again.
+		`MOUSE_ABSOLUTE_X` and `MOUSE_ABSOLUTE_Y` still stay within the window while relative mode is enabled, so use `MOUSE_X` and `MOUSE_Y` to track movement.
+		You can set this before or after calling `show_window()`; the setting is applied whenever the window is created. Once the window exists, this is the same setting as `window.mouse_relative_mode`.
+*/
+
+// Example:
+void main() {
+	show_window("Example");
+	mouse_relative_mode = true;
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Move the mouse left or right to turn, press space to toggle relative mode, or escape to exit.", true);
+	float facing = 0;
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		mouse_update();
+		if (key_pressed(KEY_SPACE)) {
+			mouse_relative_mode = !mouse_relative_mode;
+			screen_reader_output(mouse_relative_mode ? "Relative mode enabled" : "Relative mode disabled", true);
+		}
+		if (MOUSE_X == 0) continue;
+		facing = (facing + MOUSE_X * 0.25) % 360;
+		if (facing < 0) facing += 360;
+		screen_reader_output(round(facing, 0), true);
+	}
+}

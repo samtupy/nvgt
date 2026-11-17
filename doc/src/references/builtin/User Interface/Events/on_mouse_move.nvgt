@@ -1,0 +1,35 @@
+/**
+	An event that is fired whenever the mouse moves.
+	engine_mouse_motion_event on_mouse_move;
+	## Listener signatures:
+		* bool callback(float x, float y, float relative_x, float relative_y);
+		* void callback(float x, float y, float relative_x, float relative_y);
+		* A class implementing engine_mouse_motion_event_listener, with a `bool on_mouse_move(float x, float y, float relative_x, float relative_y)` or `void on_mouse_move(...)` method taking the same parameters.
+	## Arguments passed to listeners:
+		* float x: the new horizontal position of the mouse within your window, the same as `MOUSE_ABSOLUTE_X`.
+		* float y: the new vertical position of the mouse within your window, the same as `MOUSE_ABSOLUTE_Y`.
+		* float relative_x: how far the mouse moved horizontally since the last event. Positive values mean right.
+		* float relative_y: how far the mouse moved vertically since the last event. Positive values mean down.
+	## Remarks:
+		The relative values are the same movement that `MOUSE_X` and `MOUSE_Y` add up between calls to `mouse_update()`. Unless `mouse_relative_mode` is enabled, they stop reporting movement in a direction once the cursor reaches the edge of the window or screen.
+		This event can fire many times per second, so keep listeners quick.
+		See the Events topic for how listeners are added, ordered and removed, and what their return values mean.
+*/
+
+// Example:
+float facing = 0;
+void on_move(float x, float y, float relative_x, float relative_y) {
+	facing = (facing + relative_x * 0.25) % 360;
+	if (facing < 0) facing += 360;
+}
+void main() {
+	show_window("Example");
+	on_mouse_move += on_move;
+	mouse_relative_mode = true;
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Move the mouse left or right to turn, press space to hear your facing, or escape to exit.", true);
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (key_pressed(KEY_SPACE)) screen_reader_output(round(facing, 0) + " degrees", true);
+	}
+}

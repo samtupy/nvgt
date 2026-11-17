@@ -2,7 +2,10 @@
 	Confines the mouse to your game's window, or determines whether it is currently confined.
 	bool mouse_grab;
 	## Remarks:
-		While the mouse is grabbed, the cursor can't leave the window, which is useful for games that are controlled by moving the mouse. This only has an effect while your game window exists, so set it after calling `show_window()`. Without a window, it reads false.
+		While the mouse is grabbed, the cursor stays visible but can't leave the window. Because the cursor is still a normal cursor, `MOUSE_X` and `MOUSE_Y` stop reporting movement in a direction once the cursor reaches that edge of the window.
+		For games controlled by moving the mouse, `mouse_relative_mode` is usually what you want instead. It does everything grabbing does, keeping the mouse inside the window, and also hides the cursor and reports movement that never runs out at the window's edges. Grabbing is practically a subset of relative mode, so you don't need to enable both: while relative mode is enabled, the mouse is confined whether or not it is grabbed. Grabbing on its own is mainly useful when you want the cursor to stay visible and to keep its real position within the window, for example in a game where players click on things on screen.
+		Whether grabbed or in relative mode, the mouse is only confined while your window has focus. Switching to another window releases it until your window is focused again.
+		This only has an effect while your game window exists, so set it after calling `show_window()`. Without a window, it reads false. It also reads false while the mouse is only confined because relative mode is enabled.
 		This is the same setting as `window.mouse_grab`.
 */
 

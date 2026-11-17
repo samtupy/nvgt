@@ -101,6 +101,8 @@ public:
 	bool get_keyboard_grab() const { return SDL_GetWindowKeyboardGrab(_window); }
 	bool set_mouse_grab(bool grabbed) { return SDL_SetWindowMouseGrab(_window, grabbed); }
 	bool get_mouse_grab() const { return SDL_GetWindowMouseGrab(_window); }
+	bool set_mouse_relative_mode(bool enabled) { return SDL_SetWindowRelativeMouseMode(_window, enabled); }
+	bool get_mouse_relative_mode() const { return SDL_GetWindowRelativeMouseMode(_window); }
 	bool set_opacity(float opacity) { return SDL_SetWindowOpacity(_window, opacity); }
 	float get_opacity() const { return SDL_GetWindowOpacity(_window); }
 	bool flash(unsigned int operation) { return SDL_FlashWindow(_window, (SDL_FlashOperation)operation); }

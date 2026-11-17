@@ -8,6 +8,8 @@ The current position of the mouse within your game's window, and the total dista
 ## Remarks:
 MOUSE_ABSOLUTE_X and MOUSE_ABSOLUTE_Y are the mouse coordinates relative to the top left corner of your window. They are updated whenever the mouse moves over the window, and are 0 until it does. MOUSE_ABSOLUTE_Z starts at 0 and adds up every scroll of the mouse wheel. Scrolling away from the user usually increases it, though the direction is reversed if the operating system is set to reverse scrolling.
 
+While `mouse_relative_mode` is enabled, the operating system's cursor is hidden and these coordinates follow the mouse's movement but stay within the window. To track how far the mouse moves without limits, use `MOUSE_X` and `MOUSE_Y`.
+
 Unlike `MOUSE_X`, `MOUSE_Y` and `MOUSE_Z`, these properties don't depend on `mouse_update()`. They are updated as input arrives, which happens during calls such as `wait()`.
 
 ## Example:

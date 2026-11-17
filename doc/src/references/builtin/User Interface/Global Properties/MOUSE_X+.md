@@ -10,6 +10,8 @@ MOUSE_X and MOUSE_Y are the horizontal and vertical distance the mouse moved, in
 
 These values are only recalculated when you call `mouse_update()`, which is not called automatically. Call it once per iteration of your game loop, after `wait()`, and then read these properties. Calling `mouse_update()` more than once per iteration splits the movement between the calls, so later calls see smaller values.
 
+By default, the movement stops once the cursor reaches the edge of the window or screen. If your game is controlled by moving the mouse, enable `mouse_relative_mode` so these values keep reporting movement no matter how far the mouse is moved in one direction. To be notified of each movement as it happens instead, see `on_mouse_move`.
+
 To get the mouse position rather than how far it moved, see `MOUSE_ABSOLUTE_X`, `MOUSE_ABSOLUTE_Y` and `MOUSE_ABSOLUTE_Z`.
 
 ## Example:
