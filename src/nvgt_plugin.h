@@ -23,8 +23,10 @@
 class plugin_node;
 class audio_plugin_node_interface;
 class audio_engine;
+// A function a plugin can pass to nvgt_register_shutdown_notification, called once when NVGT shuts down.
+typedef void nvgt_plugin_shutdown_callback();
 
-#define NVGT_PLUGIN_API_VERSION 5
+#define NVGT_PLUGIN_API_VERSION 6
 
 // Subsystem flags, used for controling access to certain functions during development.
 enum NVGT_SUBSYSTEM {
@@ -83,7 +85,8 @@ enum NVGT_SUBSYSTEM {
 	X(void, nvgt_audio_plugin_node_register, (const std::string& nodename)) \
 	X(plugin_node*, nvgt_audio_plugin_node_create, (audio_plugin_node_interface* impl, unsigned char input_bus_count, unsigned char output_bus_count, unsigned int flags, audio_engine* engine)) \
 	X(audio_plugin_node_interface*, nvgt_audio_plugin_node_get, (plugin_node* node)) \
-	X(bool, running_on_mobile, ())
+	X(bool, running_on_mobile, ()) \
+	X(void, nvgt_register_shutdown_notification, (nvgt_plugin_shutdown_callback* callback))
 // Add more functions here...
 
 // Function typedefs:
@@ -195,6 +198,7 @@ bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e, nvgt_
 bool load_serialized_nvgt_plugins(Poco::BinaryReader& br);
 void serialize_nvgt_plugins(Poco::BinaryWriter& bw);
 void list_loaded_nvgt_plugins(std::vector<std::string>& output);
+void notify_nvgt_plugins_shutdown();
 void unload_nvgt_plugins();
 // Boilerplate to make registering a static plugin in the nvgt_config.h file consist of a single pretty looking line.
 #ifndef static_plugin

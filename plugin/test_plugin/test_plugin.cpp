@@ -10,6 +10,7 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include <stdio.h>
 #include <windows.h>
 #include "../../src/nvgt_plugin.h"
 
@@ -20,9 +21,14 @@ void do_exception() {
 	asGetActiveContext()->SetException("It's rare when an exception being thrown is a good thing...");
 }
 
+void on_shutdown() {
+	printf("test_plugin received the shutdown notification\n");
+}
+
 plugin_main(nvgt_plugin_shared* shared) {
 	prepare_plugin(shared);
 	shared->script_engine->RegisterGlobalFunction("void do_test()", asFUNCTION(do_test), asCALL_CDECL);
 	shared->script_engine->RegisterGlobalFunction("void do_exception()", asFUNCTION(do_exception), asCALL_CDECL);
+	nvgt_register_shutdown_notification(on_shutdown);
 	return true;
 }

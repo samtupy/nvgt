@@ -49,6 +49,23 @@ The next oddity here, why doesn't the plugin_main function declaration include a
 
 Finally, remember to call prepare_plugin(shared) as the first thing in your plugin, and note that if your entry point does not return true, this indicates an error condition and your plugin is not loaded.
 
+## Cleaning up when NVGT shuts down
+If your plugin starts background threads, opens connections or initializes an external library, it can ask to be notified when NVGT shuts down by passing a function to nvgt_register_shutdown_notification, usually from its entry point:
+```
+void on_shutdown() {
+	// Stop threads, close connections, release library state...
+}
+
+plugin_main(nvgt_plugin_shared* shared) {
+	prepare_plugin(shared);
+	nvgt_register_shutdown_notification(on_shutdown);
+	return true;
+}
+```
+This works the same way for both static and shared plugins. Each registered function is called exactly once on the main thread when NVGT shuts down, whether the script returned from main or called exit(), and registering the same function more than once has no extra effect. Functions are called in the reverse of the order they were registered, so plugins loaded later are cleaned up first.
+
+The notification arrives after the script has finished, its on_exit function (if any) has run and its module has been discarded, but before any of NVGT's subsystems are shut down. The Angelscript engine, sound, input, screen reader output and other NVGT functions are all still usable during the callback, though no more script code will run. NVGT doesn't unload a shared plugin's library after notifying it, the operating system does that when the process exits.
+
 ## NVGT's plugin building infrastructure
 As mentioned a couple of times above, NVGT's official repository already contains the infrastructure required to build plugins and integrate them with NVGT's existing build system, complete with the ability to exclude some of your more private plugins from being picked up by the repository. While it is not required that one use this setup and in fact one may not want to if they have a better workspace set up for themselves, we certainly recommend it especially if you are making a plugin that you may want to share with the NVGT community.
 
