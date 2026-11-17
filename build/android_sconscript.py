@@ -33,6 +33,6 @@ env["RANLIB"] = os.path.join(toolchain_bin, f"llvm-ranlib{exe_ext}")
 env["SHLINKCOM"] = "$LINK -o $TARGET $LINKFLAGS -shared $__RPATH $SOURCES $_LIBDIRFLAGS $_LIBFLAGS"
 env.Append(CCFLAGS = ["-fPIC"])
 env.Append(CXXFLAGS = ["-DAS_USE_STLNAMES=1", "-ffunction-sections", "-O2", "-Wno-deprecated-array-compare", "-Wno-implicit-const-int-float-conversion", "-Wno-deprecated-enum-enum-conversion", "-Wno-absolute-value"])
-env.Append(LINKFLAGS = ["-Wl,--no-fatal-warnings", "-Wl,--no-undefined", "-Wl,--gc-sections"])
+env.Append(LINKFLAGS = ["-Wl,--no-fatal-warnings", "-Wl,--no-undefined", "-Wl,--gc-sections", "-Wl,-z,max-page-size=16384"]) # 16 KB page size support is required by Google Play and by devices using 16 KB pages.
 env["PROGSUFFIX"] = ".so"
 env["SHLIBSUFFIX"] = ".so"
