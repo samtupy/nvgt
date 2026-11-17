@@ -281,7 +281,8 @@ int WriteConfigToStream(asIScriptEngine *engine, ostream &strm)
 			engine->SetDefaultNamespace(currNamespace.c_str());
 		}
 		const char *enumName = ti->GetName();
-		strm << "enum " << enumName << "\n";
+		const char* underlyingType = engine->GetTypeDeclaration(ti->GetUnderlyingTypeId());
+		strm << "enum " << enumName << " " << underlyingType << "\n";
 		for( asUINT m = 0; m < ti->GetEnumValueCount(); m++ )
 		{
 			const char *valName;
@@ -739,13 +740,18 @@ int ConfigEngineFromStream(asIScriptEngine *engine, istream &strm, const char *c
 		}
 		else if( token == "objprop" )
 		{
-			string name, decl, compositeOffset, isCompositeIndirect;
+			string name, decl, compositeOffset = "0", isCompositeIndirect = "0";
 			in::GetToken(engine, name, config, pos);
 			name = name.substr(1, name.length() - 2);
 			in::GetToken(engine, decl, config, pos);
 			decl = decl.substr(1, decl.length() - 2);
 			in::GetToken(engine, compositeOffset, config, pos);
 			in::GetToken(engine, isCompositeIndirect, config, pos);
+			if( !(isCompositeIndirect == "0" || isCompositeIndirect == "1") )
+			{
+				engine->WriteMessage(configFile, in::GetLineNumber(config, pos), 0, asMSGTYPE_ERROR, "Wrong value for composite indirect. Is it an old config version?");
+				return -1;
+			}
 
 			asITypeInfo *type = engine->GetTypeInfoById(engine->GetTypeIdByDecl(name.c_str()));
 			if( type == 0 )
@@ -856,10 +862,11 @@ int ConfigEngineFromStream(asIScriptEngine *engine, istream &strm, const char *c
 		}
 		else if( token == "enum" )
 		{
-			string type;
-			in::GetToken(engine, type, config, pos);
+			string typeName, typeOf;
+			in::GetToken(engine, typeName, config, pos);
+			in::GetToken(engine, typeOf, config, pos);
 
-			r = engine->RegisterEnum(type.c_str());
+			r = engine->RegisterEnum(typeName.c_str(), typeOf.c_str());
 			if( r < 0 )
 			{
 				engine->WriteMessage(configFile, in::GetLineNumber(config, pos), 0, asMSGTYPE_ERROR, "Failed to register enum type");
@@ -873,7 +880,7 @@ int ConfigEngineFromStream(asIScriptEngine *engine, istream &strm, const char *c
 			in::GetToken(engine, name, config, pos);
 			in::GetToken(engine, value, config, pos);
 
-			r = engine->RegisterEnumValue(type.c_str(), name.c_str(), atol(value.c_str()));
+			r = engine->RegisterEnumValue(type.c_str(), name.c_str(), atoll(value.c_str()));
 			if( r < 0 )
 			{
 				engine->WriteMessage(configFile, in::GetLineNumber(config, pos), 0, asMSGTYPE_ERROR, "Failed to register enum value");

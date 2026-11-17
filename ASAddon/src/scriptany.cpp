@@ -156,9 +156,9 @@ void RegisterScriptAny_Native(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("any", "void store(?&in value)", asMETHODPR(CScriptAny,Store,(void*,int),void), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("any", "void store(const int64&in value)", asMETHODPR(CScriptAny,Store,(asINT64&),void), asCALL_THISCALL); assert( r >= 0 );
 	r = engine->RegisterObjectMethod("any", "void store(const double&in value)", asMETHODPR(CScriptAny,Store,(double&),void), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("any", "bool retrieve(?&out value)", asMETHODPR(CScriptAny,Retrieve,(void*,int) const,bool), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("any", "bool retrieve(int64&out value)", asMETHODPR(CScriptAny,Retrieve,(asINT64&) const,bool), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("any", "bool retrieve(double&out value)", asMETHODPR(CScriptAny,Retrieve,(double&) const,bool), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("any", "bool retrieve(?&out value) const", asMETHODPR(CScriptAny,Retrieve,(void*,int) const,bool), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("any", "bool retrieve(int64&out value) const", asMETHODPR(CScriptAny,Retrieve,(asINT64&) const,bool), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("any", "bool retrieve(double&out value) const", asMETHODPR(CScriptAny,Retrieve,(double&) const,bool), asCALL_THISCALL); assert( r >= 0 );
 
 	// Register GC behaviours
 	r = engine->RegisterObjectBehaviour("any", asBEHAVE_GETREFCOUNT, "int f()", asMETHOD(CScriptAny,GetRefCount), asCALL_THISCALL); assert( r >= 0 );
@@ -235,7 +235,7 @@ int CScriptAny::CopyFrom(const CScriptAny *other)
 {
 	if( other == 0 ) return asINVALID_ARG;
 
-	*this = *(CScriptAny*)other;
+	*this = *other;
 
 	return 0;
 }
