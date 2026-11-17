@@ -19,16 +19,53 @@
 #include <Poco/Mutex.h>
 #include <prism.h>
 #include "tts.h"
+#ifdef _WIN32
+#include <windows.h>
+#include <tlhelp32.h>
+#endif
 
 static PrismContext* g_prism = nullptr;
 static PrismBackend* g_screen_reader = nullptr;
 static std::atomic<bool> g_screen_reader_stale{true};
 static Poco::FastMutex g_screen_reader_mutex;
 
+#ifdef _WIN32
+// Prism's UIA backend reports itself as available whenever any UI Automation client is listening, which is common without a screen reader. Its notifications are only spoken by Narrator, so it is only selected while Narrator is running. Scanning processes takes a few milliseconds, so it happens at most once every 5 seconds, and only when selection reaches UIA because no other screen reader is running. While UIA is selected or was skipped only because Narrator wasn't running, speech calls repeat the check on that schedule to notice Narrator starting or exiting, which Prism's availability callback can miss because UIA's availability often doesn't change with Narrator's.
+static bool g_watch_narrator = false;
+static bool g_narrator_running = false;
+static ULONGLONG g_narrator_checked_at = 0;
+static bool narrator_running() {
+	g_narrator_checked_at = GetTickCount64();
+	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (snapshot == INVALID_HANDLE_VALUE) return false;
+	PROCESSENTRY32W entry{sizeof(PROCESSENTRY32W)};
+	bool found = false;
+	for (BOOL more = Process32FirstW(snapshot, &entry); more && !found; more = Process32NextW(snapshot, &entry)) found = _wcsicmp(entry.szExeFile, L"Narrator.exe") == 0;
+	CloseHandle(snapshot);
+	return found;
+}
+static bool narrator_check_due() { return GetTickCount64() - g_narrator_checked_at >= 5000; }
+static bool narrator_state_changed() {
+	if (!g_watch_narrator || !narrator_check_due()) return false;
+	bool running = narrator_running();
+	if (running == g_narrator_running) return false;
+	g_narrator_running = running;
+	return true;
+}
+#endif
+
 // Screen reader output never falls back to a plain text to speech engine, except Speech Dispatcher, which is how Linux screen reader users usually hear applications. It skips the runtime probe because that only sees an already running daemon, while initializing it autospawns one.
 static bool is_screen_reader_candidate(PrismBackendId id, uint64_t features) {
 	if (id == PRISM_BACKEND_SPEECH_DISPATCHER) return true;
-	return (features & PRISM_BACKEND_IS_SCREEN_READER) && (features & PRISM_BACKEND_IS_SUPPORTED_AT_RUNTIME);
+	if (!(features & PRISM_BACKEND_IS_SCREEN_READER) || !(features & PRISM_BACKEND_IS_SUPPORTED_AT_RUNTIME)) return false;
+	#ifdef _WIN32
+	if (id == PRISM_BACKEND_UIA) {
+		g_watch_narrator = true;
+		if (narrator_check_due()) g_narrator_running = narrator_running();
+		return g_narrator_running;
+	}
+	#endif
+	return true;
 }
 
 static void PRISM_CALL screen_reader_availability_changed(void* userdata, PrismBackendId backend, const char* name, bool available) {
@@ -36,6 +73,9 @@ static void PRISM_CALL screen_reader_availability_changed(void* userdata, PrismB
 }
 
 static PrismBackend* select_screen_reader() {
+	#ifdef _WIN32
+	g_watch_narrator = false;
+	#endif
 	for (size_t i = 0; i < prism_registry_count(g_prism); i++) {
 		PrismBackendId id = prism_registry_id_at(g_prism, i);
 		PrismBackend* backend = prism_registry_create(g_prism, id);
@@ -58,6 +98,9 @@ static PrismBackend* get_screen_reader() {
 		g_prism = prism_init(&config);
 		if (!g_prism) return nullptr;
 	}
+	#ifdef _WIN32
+	if (narrator_state_changed()) g_screen_reader_stale = true;
+	#endif
 	if (g_screen_reader_stale.exchange(false)) {
 		if (g_screen_reader) prism_backend_free(g_screen_reader);
 		g_screen_reader = select_screen_reader();
