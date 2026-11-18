@@ -47,6 +47,10 @@ android {
 			dimension "version"
 			applicationId "com.samtupy.nvgt.stub"
 		}
+		stubnc { // compiler-less stub, packaged as nvgt_android_nc.bin
+			dimension "version"
+			applicationId "com.samtupy.nvgt.stub"
+		}
 	}
 
 	sourceSets {
@@ -58,9 +62,15 @@ android {
 			jniLibs.srcDirs = ['libs/stub']
 			assets.srcDirs = []
 		}
+		stubnc {
+			manifest.srcFile 'src/stub/AndroidManifest.xml'
+			java.srcDirs = ['src/stub/java']
+			jniLibs.srcDirs = ['libs/stub_nc']
+			assets.srcDirs = []
+		}
 	}
 	applicationVariants.all { variant ->
-		if (variant.productFlavors[0].name == "stub") {
+		if (variant.productFlavors[0].name in ["stub", "stubnc"]) {
 			variant.getAssembleProvider().configure() {
 				it.doLast { 
 					variant.outputs.each { output ->

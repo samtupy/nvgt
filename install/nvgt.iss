@@ -109,7 +109,7 @@
 		source: "release\lib_linux\*"; DestDir: "{app}\lib_linux"; components: stubs\linux
 	#endif
 	#ifdef have_android_stubs
-		source: "release\stub\nvgt_android.bin"; DestDir: "{app}\stub"; components: stubs\android
+		source: "release\stub\nvgt_android*.bin"; DestDir: "{app}\stub"; components: stubs\android
 		source: "release\lib_android\*"; DestDir: "{app}\lib_android"; components: stubs\android; Flags: recursesubdirs createallsubdirs
 	#endif
 	#ifdef have_ios_stubs
