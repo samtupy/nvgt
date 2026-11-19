@@ -19,7 +19,12 @@
 #else
 	#include <cstring>
 #endif
+#include <atomic>
+#include <cstdint>
+#include <deque>
 #include <map>
+#include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <string>
 #include <angelscript.h>
@@ -27,6 +32,13 @@
 
 extern bool g_enet_initialized;
 class network_event;
+// An event the host gave, with its peer's bookkeeping already done, waiting to become a network_event.
+struct network_pending_event {
+	ENetEventType type;
+	asQWORD peer_id;
+	unsigned char channel;
+	ENetPacket* packet;
+};
 class network {
 	int RefCount;
 	ENetHost* host;
@@ -34,6 +46,19 @@ class network {
 	asQWORD next_peer;
 	unsigned char channel_count;
 	ENetPeer* get_peer(asQWORD peer_id);
+	// Keeping connections alive while the script can't call request(): a modal file dialog, a menu being navigated, a message box, a long load. Without servicing, enet sends no acknowledgements or pings, and peers time out after 10 to 35 seconds. Once request() hasn't been called for keep_alive_time milliseconds, a background thread services the host, keeping each event it gets in held_events, in order, for request() to return. All use of the host is under mutex.
+	std::recursive_mutex mutex;
+	std::thread keeper;
+	std::atomic<bool> keeper_stop;
+	std::atomic<unsigned int> keep_alive_ms;
+	std::atomic<uint64_t> last_service;
+	std::deque<network_pending_event> held_events;
+	void start_keeper();
+	void stop_keeper();
+	void keeper_loop();
+	network_pending_event take_event(ENetEvent& event);
+	network_event* make_event(network_pending_event& pending);
+	void clear_held_events();
 	// Enet's total_sent/received counters are 32 bit integers that can overflow, work around that
 	asQWORD total_sent_data, total_sent_packets, total_received_data, total_received_packets;
 	void update_totals() {
@@ -46,6 +71,7 @@ class network {
 	void reset_totals() {
 		total_sent_data = total_sent_packets = total_received_data = total_received_packets = 0;
 	}
+	typedef std::lock_guard<std::recursive_mutex> host_lock;
 public:
 	bool is_client;
 	bool IPv6enabled;
@@ -77,6 +103,12 @@ public:
 		return send_peer(peer, message, channel, false);
 	}
 	bool flush();
+	unsigned int get_keep_alive_time() const {
+		return keep_alive_ms;
+	}
+	void set_keep_alive_time(unsigned int ms) {
+		keep_alive_ms = ms;
+	}
 	bool disconnect_peer_softly(asQWORD peer_id);
 	bool disconnect_peer(asQWORD peer_id);
 	bool disconnect_peer_forcefully(asQWORD peer_id);
@@ -84,34 +116,43 @@ public:
 	bool set_bandwidth_limits(unsigned int incoming, unsigned int outgoing);
 	void set_packet_compression(bool flag);
 	bool get_packet_compression() {
+		host_lock lock(mutex);
 		return host && host->compressor.context;
 	}
 	size_t get_connected_peers() {
+		host_lock lock(mutex);
 		return host ? host->connectedPeers : -1;
 	}
 	size_t get_bytes_received() {
+		host_lock lock(mutex);
 		update_totals();
 		return host ? total_received_data : -1;
 	}
 	size_t get_bytes_sent() {
+		host_lock lock(mutex);
 		update_totals();
 		return host ? total_sent_data : -1;
 	}
 	size_t get_packets_received() {
+		host_lock lock(mutex);
 		update_totals();
 		return host ? total_received_packets : -1;
 	}
 	size_t get_packets_sent() {
+		host_lock lock(mutex);
 		update_totals();
 		return host ? total_sent_packets : -1;
 	}
 	size_t get_duplicate_peers() {
+		host_lock lock(mutex);
 		return host ? host->duplicatePeers : -1;
 	}
 	void set_duplicate_peers(size_t peers) {
+		host_lock lock(mutex);
 		if (host) host->duplicatePeers = peers;
 	}
 	bool active() {
+		host_lock lock(mutex);
 		return host != NULL;
 	}
 };
