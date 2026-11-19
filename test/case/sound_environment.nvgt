@@ -276,3 +276,34 @@ void test_sound_environment_character_transparent() { // A sound inside a charac
 	c.acoustically_transparent = false;
 	assert(!world.get_acoustically_transparent(c.body));
 }
+void test_sound_environment_source_capacity() { // Steam Audio ignores sources beyond the simulator's capacity, so it must grow as sources are added rather than leaving the later ones without reflections.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.use_listener_reverb = false;
+	env.max_sources = 4;
+	env.set_raycaster(world);
+	e.set_listener_position(0, 0, 0, 1.6);
+	mixer@[] mixers;
+	for (int i = 0; i < 10; i++) {
+		mixer@ m = env.new_mixer();
+		m.set_position_3d(-4 + i * 0.8, 2, 1.5);
+		mixers.insert_last(m);
+	}
+	sound@ s = e.sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	sound_environment_test_wait_for_decoding(s);
+	s.set_mixer(mixers[9]);
+	sound_environment_source@ src = env.get_source(mixers[9]);
+	timer t;
+	while (!src.reflections_simulated and t.elapsed < 10000) {
+		sound_environment_test_pump(e, env, 1);
+		wait(1);
+	}
+	assert(env.max_sources >= 10, "the capacity should have grown to fit 10 sources, it is " + env.max_sources);
+	assert(sound_environment_test_wait_for_reflections(e, env, env.reflection_simulations + 2));
+	s.play();
+	sound_environment_test_energy(e, env, 20);
+	double tail = sound_environment_test_energy(e, env, 40);
+	assert(tail > 10, "the last of more sources than the initial capacity should reverberate, tail energy " + tail);
+}

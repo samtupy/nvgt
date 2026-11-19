@@ -545,11 +545,14 @@ bool environment_core::rebuild() { // Script thread, only while the worker is id
 	simulator->commit();
 	direct_simulator->commit();
 	audio_config c = audio_config::unpack(published_config);
-	c.generation++;
-	c.type = reflection_type;
-	c.order = order;
-	c.ir_size = max(1, (int)ceil(duration * audio_settings.samplingRate));
-	published_config = c.pack();
+	const int ir_size = max(1, (int)ceil(duration * audio_settings.samplingRate));
+	if (!c.generation || c.type != reflection_type || c.order != order || c.ir_size != ir_size) { // Recreating the audio effects cuts off every reverb tail, so they are only recreated when what they were created with changed rather than any setting of the simulator.
+		c.generation++;
+		c.type = reflection_type;
+		c.order = order;
+		c.ir_size = ir_size;
+		published_config = c.pack();
+	}
 	rebuild_needed = false;
 	return true;
 }
@@ -610,6 +613,16 @@ void environment_core::attach_new_sources(bool idle) { // Script thread. Direct 
 void environment_core::update() { // Script thread.
 	if (shut_down) return;
 	release_retired(false);
+	{
+		lock_guard<mutex> l(sources_mutex);
+		const int needed = (int)(sources.size() + retired.size()); // Retired sources stay in the simulator until their tails end.
+		if (needed > max_sources && max_sources < 1024) { // Steam Audio silently leaves sources beyond the simulator's capacity without reflections, so the capacity grows with the number of sources instead.
+			int capacity = max_sources;
+			while (capacity < needed) capacity *= 2;
+			max_sources = min(capacity, 1024);
+			rebuild_needed = true;
+		}
+	}
 	bool idle = !worker_busy;
 	if (idle && (rebuild_needed || scene_needed || !simulator)) {
 		if (!rebuild()) return;
