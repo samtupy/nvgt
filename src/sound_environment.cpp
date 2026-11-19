@@ -155,7 +155,7 @@ public:
 	atomic<int> rays = 2048, bounces = 32, order = 1, max_sources = 32, threads, diffuse_samples = 32, max_occlusion_samples = 16;
 	atomic<float> duration = 1.0f, irradiance_min_distance = 1.0f, interval = 0.1f, hybrid_transition_time = 1.0f, hybrid_overlap = 0.25f;
 	atomic<bool> use_reflection_mixer = true, binaural = true, use_listener_reverb = true;
-	atomic<float> reflections_level = 0.5f, reflections_width = 2.0f; // Toned down from physically accurate levels and widened from Steam Audio's binaural decoding, which tends to sound overpowering and narrow in games.
+	atomic<float> reflections_level = 0.5f, reflections_width = 4.0f, reflections_highpass = 160.0f; // Toned down from physically accurate levels and widened from Steam Audio's binaural decoding, which tends to sound overpowering and narrow in games.
 	atomic<unsigned long long> published_config = audio_config().pack(); // Audio effects are recreated when its generation changes.
 	// Listener orientation for ambisonic decoding, published by update.
 	mutex listener_mutex;
@@ -705,10 +705,14 @@ class environment_return : public effect_node_impl {
 	ipl_ref<api::IReflectionEffect> listener_effect;
 	ipl_ref<api::IAmbisonicsDecodeEffect> decode_effect, listener_decode_effect;
 	ipl_buffer ambisonics_buffer, decoded_buffer;
+	ma_hpf highpass;
+	bool highpass_ready = false;
+	float highpass_cutoff = 0;
 public:
 	environment_return(environment_core* core) : effect_node_impl(core->engine, 0, 0, 1, 1, MA_NODE_FLAG_CONTINUOUS_PROCESSING | MA_NODE_FLAG_ALLOW_NULL_INPUT), core(core) { core->retain(); }
 	~environment_return() {
 		destroy_node();
+		if (highpass_ready) ma_hpf_uninit(&highpass, nullptr);
 		core->audio_mixer = nullptr;
 		core->audio_mixer_generation = 0;
 		core->listener_reverb_generation = 0;
@@ -749,6 +753,17 @@ public:
 	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
 		render(frames_in, frame_count_in, frames_out, frame_count_out);
 		// Everything this node outputs is reflections. Binaurally decoded reverb is quite correlated between the ears and sounds narrow, so its side signal is scaled for a wider room.
+		// The low end of simulated reflections tends to sound boomy, so it can be filtered out.
+		float cutoff = core->reflections_highpass;
+		if (cutoff > 0) {
+			if (!highpass_ready || cutoff != highpass_cutoff) {
+				ma_hpf_config cfg = ma_hpf_config_init(ma_format_f32, core->channels, core->audio_settings.samplingRate, cutoff, 2);
+				if (highpass_ready) ma_hpf_reinit(&cfg, &highpass);
+				else highpass_ready = ma_hpf_init(&cfg, nullptr, &highpass) == MA_SUCCESS;
+				highpass_cutoff = cutoff;
+			}
+			if (highpass_ready) ma_hpf_process_pcm_frames(&highpass, frames_out[0], frames_out[0], *frame_count_out);
+		}
 		float width = core->reflections_width;
 		if (core->channels != 2 || width == 1.0f) return;
 		float* out = frames_out[0];
@@ -928,7 +943,9 @@ public:
 	bool get_binaural() const { return core->binaural; }
 	void set_binaural(bool v) { core->binaural = v; }
 	float get_reflections_width() const { return core->reflections_width; }
-	void set_reflections_width(float v) { core->reflections_width = clamp(v, 0.0f, 4.0f); }
+	void set_reflections_width(float v) { core->reflections_width = clamp(v, 0.0f, 8.0f); }
+	float get_reflections_highpass() const { return core->reflections_highpass; }
+	void set_reflections_highpass(float v) { core->reflections_highpass = clamp(v, 0.0f, core->audio_settings.samplingRate * 0.45f); }
 	float get_reflections_level() const { return core->reflections_level; }
 	void set_reflections_level(float v) { core->reflections_level = max(0.0f, v); }
 };
@@ -1023,5 +1040,6 @@ void RegisterSoundEnvironment(asIScriptEngine* engine) {
 	ENV_PROPERTY(bool, binaural)
 	ENV_PROPERTY(float, reflections_level)
 	ENV_PROPERTY(float, reflections_width)
+	ENV_PROPERTY(float, reflections_highpass)
 	#undef ENV_PROPERTY
 }
