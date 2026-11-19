@@ -48,6 +48,8 @@
 #include <Jolt/Physics/Collision/Shape/CylinderShape.h>
 #include <Jolt/Physics/Collision/Shape/TaperedCapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/TaperedCylinderShape.h>
+#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
+#include <Jolt/Physics/Character/Character.h>
 #include <Jolt/Physics/Collision/NarrowPhaseQuery.h>
 #include <Jolt/Physics/Collision/PhysicsMaterial.h>
 #include <Jolt/Physics/Body/BodyLock.h>
@@ -441,6 +443,7 @@ struct jolt_contact_event {
 
 // -- forward declaration --
 struct jolt_physics_world;
+struct jolt_character;
 
 class jolt_contact_listener : public ContactListener {
 public:
@@ -479,6 +482,7 @@ struct jolt_physics_world : public nvgt_raycast_provider {
 	asIScriptFunction* cb_contact_removed = nullptr;
 	mutex user_data_mutex;
 	unordered_map<uint32, CScriptAny*> user_data; // keyed by BodyID raw value
+	vector<jolt_character*> characters; // Non-owning, characters hold a reference to their world and remove themselves from this list when destroyed. PostSimulation is called on each after every update.
 
 	jolt_physics_world(uint max_bodies, uint max_body_pairs, uint max_contact_constraints) {
 		const uint temp_alloc_size = 10 * 1024 * 1024;
@@ -528,8 +532,10 @@ static void dispatch_contact_event(asIScriptFunction* cb, const jolt_contact_eve
 	if (new_ctx) g_ScriptEngine->ReturnContext(ctx); else ctx->PopState();
 }
 
+static void jolt_characters_post_simulation(jolt_physics_world* w);
 static void jolt_world_update(jolt_physics_world* w, float delta_time, int steps) {
 	w->system.Update(delta_time, steps, w->temp_alloc, w->job_system);
+	jolt_characters_post_simulation(w);
 	// Dispatch queued contact events on the main thread
 	vector<jolt_contact_event> events;
 	{ lock_guard<mutex> lk(w->contact_listener.events_mutex); events.swap(w->contact_listener.pending); }
@@ -789,6 +795,109 @@ static nvgt_raycast_provider* jolt_world_get_raycast_provider(void* world) {
 	w->retain();
 	return w;
 }
+
+// -- Characters --
+// jolt_character owns a JPH::Character, a keyframed body that the script moves by setting its velocity, which Jolt keeps on the ground and out of other bodies. The character's position is the bottom of its shape.
+struct jolt_character {
+	atomic<int> refcount = 1;
+	jolt_physics_world* world;
+	Ref<Character> character;
+	float max_separation_distance = 0.05f; // Passed to PostSimulation after each world update, contacts within this distance are considered for ground detection.
+	jolt_character(jolt_physics_world* world, const Shape* shape, Vec3Arg up, RVec3Arg position, QuatArg rotation, float mass, float friction, ObjectLayer layer) : world(world) {
+		world->AddRef();
+		CharacterSettings settings;
+		settings.mShape = shape;
+		settings.mUp = up;
+		settings.mSupportingVolume = Plane(up, -1.0e10f);
+		settings.mMass = mass;
+		settings.mFriction = friction;
+		settings.mLayer = layer;
+		character = new Character(&settings, position, rotation, 0, &world->system);
+		character->AddToPhysicsSystem(EActivation::Activate);
+		world->characters.push_back(this);
+	}
+	~jolt_character() {
+		character->RemoveFromPhysicsSystem();
+		character = nullptr;
+		world->characters.erase(std::find(world->characters.begin(), world->characters.end(), this));
+		world->Release();
+	}
+	CharacterBase* base() const { return character.GetPtr(); }
+	void AddRef() { refcount++; }
+	void Release() { if (--refcount <= 0) delete this; }
+};
+static void jolt_characters_post_simulation(jolt_physics_world* w) {
+	for (jolt_character* c : w->characters) c->character->PostSimulation(c->max_separation_distance);
+}
+static Vec3 jolt_world_up(jolt_physics_world* w) {
+	Vec3 g = w->system.GetGravity();
+	return g.IsNearZero() ? Vec3::sAxisY() : -g.Normalized();
+}
+static jolt_character* jolt_character_create(jolt_physics_world* w, jolt_shape_ref* shape, const Vec3& position, const Quat& rotation, float mass, float friction, uint16 layer) {
+	if (!w || !shape) return nullptr;
+	return new jolt_character(w, shape->shape.GetPtr(), jolt_world_up(w), position, rotation, mass, friction, layer);
+}
+static jolt_character* jolt_character_create_capsule(jolt_physics_world* w, float height, float radius, const Vec3& position, float mass, float friction, uint16 layer) { // A capsule standing on the character's position along its up axis, which is derived from the world's gravity.
+	if (!w || radius <= 0.0f || height < radius * 2.0f) return nullptr;
+	Vec3 up = jolt_world_up(w);
+	float half_height = height * 0.5f - radius;
+	RefConst<Shape> capsule = half_height > 0.0f ? (const Shape*)new CapsuleShape(half_height, radius) : (const Shape*)new SphereShape(radius);
+	RefConst<Shape> shape = new RotatedTranslatedShape(up * (height * 0.5f), Quat::sFromTo(Vec3::sAxisY(), up), capsule);
+	return new jolt_character(w, shape, up, position, Quat::sIdentity(), mass, friction, layer);
+}
+
+// Functions shared by every character type, registered for each through jolt_register_character_base. T must provide CharacterBase* base().
+template <class T> static float jolt_character_get_max_slope_angle(const T* c) { return acos(c->base()->GetCosMaxSlopeAngle()); }
+template <class T> static void jolt_character_set_max_slope_angle(T* c, float angle) { c->base()->SetMaxSlopeAngle(angle); }
+template <class T> static Vec3* jolt_character_get_up(const T* c) { return new_vec3(c->base()->GetUp()); }
+template <class T> static void jolt_character_set_up(T* c, const Vec3& up) { c->base()->SetUp(up.Normalized()); }
+template <class T> static bool jolt_character_is_slope_too_steep(const T* c, const Vec3& normal) { return c->base()->IsSlopeTooSteep(normal); }
+template <class T> static int jolt_character_get_ground_state(const T* c) { return (int)c->base()->GetGroundState(); }
+template <class T> static bool jolt_character_get_supported(const T* c) { return c->base()->IsSupported(); }
+template <class T> static Vec3* jolt_character_get_ground_position(const T* c) { return new_vec3(Vec3(c->base()->GetGroundPosition())); }
+template <class T> static Vec3* jolt_character_get_ground_normal(const T* c) { return new_vec3(c->base()->GetGroundNormal()); }
+template <class T> static Vec3* jolt_character_get_ground_velocity(const T* c) { return new_vec3(c->base()->GetGroundVelocity()); }
+template <class T> static BodyID jolt_character_get_ground_body(const T* c) { return c->base()->GetGroundBodyID(); }
+template <class T> static nvgt_physics_material* jolt_character_get_ground_material(const T* c) {
+	const PhysicsMaterial* m = c->base()->GetGroundMaterial();
+	if (!m || m == PhysicsMaterial::sDefault.GetPtr()) return nullptr;
+	nvgt_physics_material* mat = const_cast<nvgt_physics_material*>(static_cast<const nvgt_physics_material*>(m));
+	mat->AddRef();
+	return mat;
+}
+template <class T> static jolt_shape_ref* jolt_character_get_shape(const T* c) { return c->base()->GetShape() ? new jolt_shape_ref(c->base()->GetShape()) : nullptr; }
+template <class T> static void jolt_register_character_base(asIScriptEngine* engine, const char* type) {
+	engine->RegisterObjectMethod(type, "float get_max_slope_angle() const property", asFUNCTION(jolt_character_get_max_slope_angle<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "void set_max_slope_angle(float radians) property", asFUNCTION(jolt_character_set_max_slope_angle<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "vector@ get_up() const property", asFUNCTION(jolt_character_get_up<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "void set_up(const vector&in up) property", asFUNCTION(jolt_character_set_up<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "bool is_slope_too_steep(const vector&in normal) const", asFUNCTION(jolt_character_is_slope_too_steep<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "physics_ground_state get_ground_state() const property", asFUNCTION(jolt_character_get_ground_state<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "bool get_supported() const property", asFUNCTION(jolt_character_get_supported<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "vector@ get_ground_position() const property", asFUNCTION(jolt_character_get_ground_position<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "vector@ get_ground_normal() const property", asFUNCTION(jolt_character_get_ground_normal<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "vector@ get_ground_velocity() const property", asFUNCTION(jolt_character_get_ground_velocity<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "physics_body_id get_ground_body() const property", asFUNCTION(jolt_character_get_ground_body<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "physics_material@ get_ground_material() const property", asFUNCTION(jolt_character_get_ground_material<T>), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "physics_shape@ get_shape() const property", asFUNCTION(jolt_character_get_shape<T>), asCALL_CDECL_OBJFIRST);
+}
+
+// physics_character specific
+static BodyID jolt_character_get_body(const jolt_character* c) { return c->character->GetBodyID(); }
+static Vec3* jolt_character_get_position(const jolt_character* c) { return new_vec3(Vec3(c->character->GetPosition())); }
+static void jolt_character_set_position(jolt_character* c, const Vec3& p) { c->character->SetPosition(p); }
+static Quat* jolt_character_get_rotation(const jolt_character* c) { return new_quat(c->character->GetRotation()); }
+static void jolt_character_set_rotation(jolt_character* c, const Quat& r) { c->character->SetRotation(r); }
+static Vec3* jolt_character_get_center_of_mass_position(const jolt_character* c) { return new_vec3(Vec3(c->character->GetCenterOfMassPosition())); }
+static Vec3* jolt_character_get_linear_velocity(const jolt_character* c) { return new_vec3(c->character->GetLinearVelocity()); }
+static void jolt_character_set_linear_velocity(jolt_character* c, const Vec3& v) { c->character->SetLinearVelocity(v); }
+static void jolt_character_add_linear_velocity(jolt_character* c, const Vec3& v) { c->character->AddLinearVelocity(v); }
+static void jolt_character_add_impulse(jolt_character* c, const Vec3& v) { c->character->AddImpulse(v); }
+static void jolt_character_activate(jolt_character* c) { c->character->Activate(); }
+static uint16 jolt_character_get_layer(const jolt_character* c) { return c->character->GetLayer(); }
+static void jolt_character_set_layer(jolt_character* c, uint16 layer) { c->character->SetLayer(layer); }
+static bool jolt_character_set_shape(jolt_character* c, jolt_shape_ref* shape, float max_penetration_depth) { return shape && c->character->SetShape(shape->shape.GetPtr(), max_penetration_depth); }
+static jolt_physics_world* jolt_character_get_world(const jolt_character* c) { c->world->AddRef(); return c->world; }
 
 // -- Registration --
 
@@ -1144,6 +1253,36 @@ static void RegisterJoltShape(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("physics_tapered_cylinder_shape@ physics_tapered_cylinder_shape_create(float half_height, float top_radius, float bottom_radius, float convex_radius = 0.05f, physics_material@ mat = null)", asFUNCTION(jolt_tapered_cylinder_shape_create), asCALL_CDECL);
 }
 
+static void RegisterJoltCharacter(asIScriptEngine* engine) {
+	engine->RegisterEnum("physics_ground_state");
+	engine->RegisterEnumValue("physics_ground_state", "PHYSICS_GROUND_STATE_ON_GROUND", (int)CharacterBase::EGroundState::OnGround);
+	engine->RegisterEnumValue("physics_ground_state", "PHYSICS_GROUND_STATE_ON_STEEP_GROUND", (int)CharacterBase::EGroundState::OnSteepGround);
+	engine->RegisterEnumValue("physics_ground_state", "PHYSICS_GROUND_STATE_NOT_SUPPORTED", (int)CharacterBase::EGroundState::NotSupported);
+	engine->RegisterEnumValue("physics_ground_state", "PHYSICS_GROUND_STATE_IN_AIR", (int)CharacterBase::EGroundState::InAir);
+	engine->RegisterObjectType("physics_character", 0, asOBJ_REF);
+	engine->RegisterObjectBehaviour("physics_character", asBEHAVE_FACTORY, "physics_character@ f(physics_world@ world, physics_shape@ shape, const vector&in position, const quaternion&in rotation = IDENTITY_QUATERNION, float mass = 80.0f, float friction = 0.2f, uint16 layer = PHYSICS_LAYER_MOVING)", asFUNCTION(jolt_character_create), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("physics_character", asBEHAVE_FACTORY, "physics_character@ f(physics_world@ world, float height, float radius, const vector&in position, float mass = 80.0f, float friction = 0.2f, uint16 layer = PHYSICS_LAYER_MOVING)", asFUNCTION(jolt_character_create_capsule), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("physics_character", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_character, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("physics_character", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_character, Release), asCALL_THISCALL);
+	jolt_register_character_base<jolt_character>(engine, "physics_character");
+	engine->RegisterObjectMethod("physics_character", "physics_world@ get_world() const property", asFUNCTION(jolt_character_get_world), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "physics_body_id get_body() const property", asFUNCTION(jolt_character_get_body), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "vector@ get_position() const property", asFUNCTION(jolt_character_get_position), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "void set_position(const vector&in position) property", asFUNCTION(jolt_character_set_position), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "quaternion@ get_rotation() const property", asFUNCTION(jolt_character_get_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "void set_rotation(const quaternion&in rotation) property", asFUNCTION(jolt_character_set_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "vector@ get_center_of_mass_position() const property", asFUNCTION(jolt_character_get_center_of_mass_position), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "vector@ get_linear_velocity() const property", asFUNCTION(jolt_character_get_linear_velocity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "void set_linear_velocity(const vector&in velocity) property", asFUNCTION(jolt_character_set_linear_velocity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "void add_linear_velocity(const vector&in velocity)", asFUNCTION(jolt_character_add_linear_velocity), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "void add_impulse(const vector&in impulse)", asFUNCTION(jolt_character_add_impulse), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "void activate()", asFUNCTION(jolt_character_activate), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "uint16 get_layer() const property", asFUNCTION(jolt_character_get_layer), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "void set_layer(uint16 layer) property", asFUNCTION(jolt_character_set_layer), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "bool set_shape(physics_shape@ shape, float max_penetration_depth = FLOAT_MAX)", asFUNCTION(jolt_character_set_shape), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectProperty("physics_character", "float max_separation_distance", asOFFSET(jolt_character, max_separation_distance));
+}
+
 static void RegisterJoltWorld(asIScriptEngine* engine) {
 	engine->RegisterFuncdef("void physics_contact_added_callback(const physics_body_id&in body1, const physics_body_id&in body2, const vector&in world_normal, float penetration_depth)");
 	engine->RegisterFuncdef("void physics_contact_persisted_callback(const physics_body_id&in body1, const physics_body_id&in body2, const vector&in world_normal, float penetration_depth)");
@@ -1254,5 +1393,6 @@ void RegisterJolt(asIScriptEngine* engine) {
 	RegisterJoltBodyID(engine);
 	RegisterJoltShape(engine);
 	RegisterJoltWorld(engine);
+	RegisterJoltCharacter(engine);
 	nvgt_register_raycast_provider_type(engine->GetTypeIdByDecl("physics_world"), jolt_world_get_raycast_provider);
 }
