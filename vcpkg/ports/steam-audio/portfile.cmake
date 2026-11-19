@@ -12,6 +12,7 @@ vcpkg_from_github(
     use-vcpkg-deps.patch
     fix-arm64-windows.patch
     fix-unaligned-multiply-accumulate.patch # The unaligned path of ArrayMath::multiplyAccumulate loads the accumulator with an aligned load, which MSVC folds into an SSE instruction that faults on the misaligned rows the FFT based convolution uses when built without IPP or FFTS. Not yet fixed upstream as of 4.8.1.
+    parallel-reconstruction.patch # Reconstructs and partitions the impulse responses of all sources on the simulator's thread pool rather than one after another, which took most of each reflection simulation once there were many sources, and skips rays that have already escaped instead of tracing them again on every remaining bounce.
 )
 
 if(VCPKG_TARGET_IS_OSX OR VCPKG_TARGET_IS_IOS)
