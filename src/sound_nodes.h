@@ -123,6 +123,10 @@ public:
 
 bool set_global_hrtf(bool enabled);
 bool get_global_hrtf();
+bool phonon_init(); // Creates the Steam Audio context and default HRTF on first use for the default audio engine's sample rate.
+IPLContext phonon_get_context();
+IPLHRTF phonon_get_hrtf();
+const IPLAudioSettings& phonon_get_audio_settings();
 
 class phonon_binaural_node : public virtual audio_node {
 	public:
@@ -225,6 +229,15 @@ class freeverb_node : public virtual audio_node {
 	virtual bool get_frozen() const = 0;
 	static freeverb_node* create(audio_engine* engine);
 };
+struct audio_spatialization_parameters;
+class reverb3d;
+// Lets a subsystem such as sound_environment supply the node through which each source is sent to a reverb3d, for reverbs that need to process every source individually. The handler is owned by the reverb3d it is created with.
+class reverb3d_attachment_handler {
+public:
+	virtual ~reverb3d_attachment_handler() = default;
+	virtual splitter_node* create_attachment(reverb3d* verb, mixer* source) = 0; // Must return a node with one input and two output buses, bus 0 continuing the source's dry signal and bus 1 being the send that will be connected to verb.
+	virtual void update_attachment(reverb3d* verb, splitter_node* attachment, const audio_spatialization_parameters& params) = 0; // Called from the audio thread with the source's current spatialization parameters, in place of reverb3d's distance based send volume.
+};
 class reverb3d : public virtual passthrough_node {
 public:
 	virtual void set_reverb(audio_node* verb) = 0;
@@ -243,7 +256,10 @@ public:
 	virtual float get_volume_curve() const = 0;
 	virtual float get_volume_at(float distance) const = 0;
 	virtual splitter_node* create_attachment(audio_node* dry_input = nullptr, audio_node* dry_output = nullptr) = 0;
+	virtual splitter_node* create_source_attachment(mixer* source) = 0; // Used by audio_spatializer, creating the attachment through the handler if there is one.
+	virtual void update_attachment(splitter_node* attachment, const audio_spatialization_parameters& params) = 0;
 	static reverb3d* create(audio_node* reverb, mixer* destination = nullptr, audio_engine* e = g_audio_engine);
+	static reverb3d* create_with_handler(reverb3d_attachment_handler* handler, audio_node* reverb, mixer* destination = nullptr, audio_engine* e = g_audio_engine);
 };
 class plugin_node : public virtual audio_node {
 public:

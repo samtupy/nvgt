@@ -188,6 +188,10 @@ bool phonon_init() {
 	return true;
 }
 
+IPLContext phonon_get_context() { return g_phonon_context; }
+IPLHRTF phonon_get_hrtf() { return g_phonon_hrtf; }
+const IPLAudioSettings& phonon_get_audio_settings() { return g_phonon_audio_settings; }
+
 bool set_global_hrtf(bool enabled) {
 	if (enabled == get_global_hrtf()) return true;
 	if (enabled) {
@@ -479,9 +483,10 @@ freeverb_node* freeverb_node::create(audio_engine* e) { return new freeverb_node
 class reverb3d_impl : public passthrough_node_impl, public virtual reverb3d {
 	audio_node* reverb;
 	mixer* output_mixer;
+	unique_ptr<reverb3d_attachment_handler> handler;
 	float min_volume, max_volume, max_volume_distance, max_audible_distance, volume_curve;
 public:
-	reverb3d_impl(audio_engine* e, audio_node* reverb, mixer* destination) : passthrough_node_impl(e), output_mixer(destination), reverb(reverb), min_volume(-7), max_volume(-5), max_volume_distance(7), max_audible_distance(60), volume_curve(0.4) {
+	reverb3d_impl(audio_engine* e, audio_node* reverb, mixer* destination, reverb3d_attachment_handler* handler = nullptr) : passthrough_node_impl(e), output_mixer(destination), reverb(reverb), handler(handler), min_volume(-7), max_volume(-5), max_volume_distance(7), max_audible_distance(60), volume_curve(0.4) {
 		if (output_mixer) output_mixer->duplicate(); // reverb owns its own reference to output_mixer via attach_output_bus below; this is reverb3d_impl's separate reference for get_mixer().
 		if (reverb) {
 			attach_output_bus(0, reverb, 0); // reverb is owned automatically via audio_node_impl's output_connections tracking.
@@ -538,6 +543,19 @@ public:
 		}
 		return ma_volume_db_to_linear(clamp(v, -70.0f, max_volume));
 	}
+	splitter_node* create_source_attachment(mixer* source) override {
+		if (!handler) return create_attachment(nullptr, nullptr);
+		splitter_node* attachment = handler->create_attachment(this, source);
+		if (attachment && !attachment->attach_output_bus(1, this, 0)) {
+			attachment->release();
+			return nullptr;
+		}
+		return attachment;
+	}
+	void update_attachment(splitter_node* attachment, const audio_spatialization_parameters& params) override {
+		if (handler) handler->update_attachment(this, attachment, params);
+		else attachment->set_output_bus_volume(1, get_volume_at(params.listener_distance));
+	}
 	splitter_node* create_attachment(audio_node* dry_input, audio_node* dry_output) override {
 		splitter_node* splitter = splitter_node::create(get_engine(), get_output_channels(0));
 		if (dry_output && !splitter->attach_output_bus(0, dry_output, 0)) {
@@ -556,6 +574,7 @@ public:
 	}
 };
 reverb3d* reverb3d::create(audio_node* reverb, mixer* destination, audio_engine* e) { return new reverb3d_impl(e, reverb, destination); }
+reverb3d* reverb3d::create_with_handler(reverb3d_attachment_handler* handler, audio_node* reverb, mixer* destination, audio_engine* e) { return new reverb3d_impl(e, reverb, destination, handler); }
 
 typedef struct {
 	ma_node_base base;
@@ -808,9 +827,9 @@ public:
 			}
 		}
 		if (new_reverb) {
-			reverb_attachment = new_reverb->create_attachment();
+			reverb_attachment = new_reverb->create_source_attachment(attached_mixer);
 			if (!reverb_attachment) return;
-			if (attached_mixer && parameters_valid) reverb_attachment->set_output_bus_volume(1, new_reverb->get_volume_at(spatialization_params.listener_distance));
+			if (attached_mixer && parameters_valid) new_reverb->update_attachment(reverb_attachment, spatialization_params);
 			reverb_placement = placement;
 			position_reverb();
 			new_reverb->duplicate();
@@ -861,7 +880,7 @@ public:
 	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
 		if (attached_mixer && (panner || attenuator || reverb)) {
 			parameters_valid = attached_mixer->get_spatialization_parameters(spatialization_params);
-			if (parameters_valid && reverb) reverb_attachment->set_output_bus_volume(1, reverb->get_volume_at(spatialization_params.listener_distance));
+			if (parameters_valid && reverb) reverb->update_attachment(reverb_attachment, spatialization_params);
 		} else parameters_valid = false;
 	}
 	void on_panner_enabled_changed(int panner_id, bool enabled) override {
