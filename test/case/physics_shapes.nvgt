@@ -19,3 +19,41 @@ void test_cylinder_shape() {
 	vector pos = world.get_position(body);
 	assert(abs(pos.y - 1.5) < 0.05 and abs(pos.x) < 0.05 and abs(pos.z) < 0.05, "cylinder should rest on the floor at y 1.5, but is at " + pos);
 }
+void test_tapered_capsule_shape() {
+	physics_tapered_capsule_shape@ cap = physics_tapered_capsule_shape_create(1.0, 0.25, 0.5);
+	assert(cap !is null, "tapered capsule creation failed");
+	assert(abs(cap.half_height - 1.0) < 0.0001 and cap.top_radius == 0.25 and cap.bottom_radius == 0.5, "tapered capsule accessors gave " + cap.half_height + ", " + cap.top_radius + ", " + cap.bottom_radius);
+	assert(cap.sub_type == PHYSICS_SHAPE_TAPERED_CAPSULE, "tapered capsule sub type was " + cap.sub_type);
+	assert(cap.volume > 0, "tapered capsule volume was " + cap.volume);
+	physics_convex_shape@ c = cap;
+	assert(cast<physics_tapered_capsule_shape>(c) !is null and cast<physics_capsule_shape>(c) is null and cast<physics_tapered_cylinder_shape>(c) is null, "tapered capsule casts");
+	// When one end sphere swallows the other Jolt creates a sphere instead, which must not be handed out as a tapered capsule.
+	assert(physics_tapered_capsule_shape_create(0.1, 1.0, 0.1) is null, "an embedded sphere should not produce a tapered capsule");
+	assert(physics_tapered_capsule_shape_create(-1.0, 0.25, 0.5) is null, "a negative height should fail");
+	physics_world world;
+	world.create_and_add_body(physics_box_shape_create(vector(10, 0.5, 10)), vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	physics_body_id body = world.create_and_add_body(cap, vector(0, 5, 0), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	for (int i = 0; i < 600; i++) world.update(1.0 / 60);
+	vector pos = world.get_position(body);
+	assert(!world.is_active(body) and pos.y > 0.5 and pos.y < 3, "tapered capsule should come to rest on the floor, but is at " + pos);
+}
+void test_tapered_cylinder_shape() {
+	physics_tapered_cylinder_shape@ cyl = physics_tapered_cylinder_shape_create(1.0, 0.25, 0.5);
+	assert(cyl !is null, "tapered cylinder creation failed");
+	assert(abs(cyl.half_height - 1.0) < 0.0001 and cyl.top_radius == 0.25 and cyl.bottom_radius == 0.5 and abs(cyl.convex_radius - 0.05) < 0.0001, "tapered cylinder accessors gave " + cyl.half_height + ", " + cyl.top_radius + ", " + cyl.bottom_radius + ", " + cyl.convex_radius);
+	assert(cyl.sub_type == PHYSICS_SHAPE_TAPERED_CYLINDER, "tapered cylinder sub type was " + cyl.sub_type);
+	float expected_volume = 3.14159265 * 2.0 / 3.0 * (0.25 * 0.25 + 0.25 * 0.5 + 0.5 * 0.5); // Frustum of a cone.
+	assert(abs(cyl.volume - expected_volume) < 0.01, "tapered cylinder volume was " + cyl.volume + ", expected " + expected_volume);
+	physics_shape@ s = cyl;
+	physics_convex_shape@ c = cast<physics_convex_shape>(s);
+	assert(cast<physics_tapered_cylinder_shape>(c) !is null and cast<physics_cylinder_shape>(c) is null and cast<physics_tapered_capsule_shape>(c) is null, "tapered cylinder casts");
+	// Equal radii make Jolt create a plain cylinder instead, which must not be handed out as a tapered cylinder.
+	assert(physics_tapered_cylinder_shape_create(1.0, 0.5, 0.5) is null, "equal radii should not produce a tapered cylinder");
+	physics_world world;
+	world.create_and_add_body(physics_box_shape_create(vector(10, 0.5, 10)), vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	physics_body_id body = world.create_and_add_body(cyl, vector(0, 5, 0), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	for (int i = 0; i < 240; i++) world.update(1.0 / 60);
+	vector pos = world.get_position(body);
+	float expected_y = 0.5 + cyl.half_height; // Standing on its wide bottom face, which is half_height below the shape's origin. Note local_bounds can't be used here as it is centered on the center of mass, which is lower than the origin for a tapered cylinder.
+	assert(abs(pos.y - expected_y) < 0.05 and abs(pos.x) < 0.05 and abs(pos.z) < 0.05, "tapered cylinder should rest on the floor at y " + expected_y + ", but is at " + pos);
+}

@@ -46,6 +46,8 @@
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/CylinderShape.h>
+#include <Jolt/Physics/Collision/Shape/TaperedCapsuleShape.h>
+#include <Jolt/Physics/Collision/Shape/TaperedCylinderShape.h>
 #include <Jolt/Physics/Collision/NarrowPhaseQuery.h>
 #include <Jolt/Physics/Collision/PhysicsMaterial.h>
 #include <Jolt/Physics/Body/BodyLock.h>
@@ -233,6 +235,21 @@ static jolt_shape_ref* jolt_cylinder_shape_create(float half_height, float radiu
 	if (result.HasError()) return nullptr;
 	return new jolt_shape_ref(result.Get());
 }
+// Jolt substitutes a simpler shape for degenerate tapered shapes (a sphere when one end of a tapered capsule swallows the other, a plain cylinder when a tapered cylinder's radii are equal), so these return null in that case to guarantee that a typed shape handle always refers to the shape class its accessors cast to.
+static jolt_shape_ref* jolt_tapered_capsule_shape_create(float half_height, float top_radius, float bottom_radius, nvgt_physics_material* mat) {
+	TaperedCapsuleShapeSettings settings(half_height, top_radius, bottom_radius);
+	if (mat) settings.mMaterial = mat;
+	auto result = settings.Create();
+	if (result.HasError() || result.Get()->GetSubType() != EShapeSubType::TaperedCapsule) return nullptr;
+	return new jolt_shape_ref(result.Get());
+}
+static jolt_shape_ref* jolt_tapered_cylinder_shape_create(float half_height, float top_radius, float bottom_radius, float convex_radius, nvgt_physics_material* mat) {
+	TaperedCylinderShapeSettings settings(half_height, top_radius, bottom_radius, convex_radius);
+	if (mat) settings.mMaterial = mat;
+	auto result = settings.Create();
+	if (result.HasError() || result.Get()->GetSubType() != EShapeSubType::TaperedCylinder) return nullptr;
+	return new jolt_shape_ref(result.Get());
+}
 static uint8 jolt_shape_get_type(const jolt_shape_ref& s) { return (uint8)s.shape->GetType(); }
 static uint8 jolt_shape_get_sub_type(const jolt_shape_ref& s) { return (uint8)s.shape->GetSubType(); }
 static AABox* jolt_shape_get_local_bounds(const jolt_shape_ref& s) { return ::new (scoped_alloc<AABox>()) AABox(s.shape->GetLocalBounds()); }
@@ -258,6 +275,14 @@ static jolt_shape_ref* jolt_convex_to_capsule(jolt_shape_ref* s) {
 }
 static jolt_shape_ref* jolt_convex_to_cylinder(jolt_shape_ref* s) {
 	if (!s || s->shape->GetSubType() != EShapeSubType::Cylinder) return nullptr;
+	s->AddRef(); return s;
+}
+static jolt_shape_ref* jolt_convex_to_tapered_capsule(jolt_shape_ref* s) {
+	if (!s || s->shape->GetSubType() != EShapeSubType::TaperedCapsule) return nullptr;
+	s->AddRef(); return s;
+}
+static jolt_shape_ref* jolt_convex_to_tapered_cylinder(jolt_shape_ref* s) {
+	if (!s || s->shape->GetSubType() != EShapeSubType::TaperedCylinder) return nullptr;
 	s->AddRef(); return s;
 }
 // Implicit upcasts (always succeed)
@@ -288,6 +313,17 @@ static float jolt_capsule_shape_get_radius(const jolt_shape_ref* s) { return sta
 static float jolt_cylinder_shape_get_half_height(const jolt_shape_ref* s) { return static_cast<const CylinderShape*>(s->shape.GetPtr())->GetHalfHeight(); }
 static float jolt_cylinder_shape_get_radius(const jolt_shape_ref* s) { return static_cast<const CylinderShape*>(s->shape.GetPtr())->GetRadius(); }
 static float jolt_cylinder_shape_get_convex_radius(const jolt_shape_ref* s) { return static_cast<const CylinderShape*>(s->shape.GetPtr())->GetConvexRadius(); }
+
+// -- TaperedCapsuleShape specific --
+static float jolt_tapered_capsule_shape_get_half_height(const jolt_shape_ref* s) { return static_cast<const TaperedCapsuleShape*>(s->shape.GetPtr())->GetHalfHeight(); }
+static float jolt_tapered_capsule_shape_get_top_radius(const jolt_shape_ref* s) { return static_cast<const TaperedCapsuleShape*>(s->shape.GetPtr())->GetTopRadius(); }
+static float jolt_tapered_capsule_shape_get_bottom_radius(const jolt_shape_ref* s) { return static_cast<const TaperedCapsuleShape*>(s->shape.GetPtr())->GetBottomRadius(); }
+
+// -- TaperedCylinderShape specific --
+static float jolt_tapered_cylinder_shape_get_half_height(const jolt_shape_ref* s) { return static_cast<const TaperedCylinderShape*>(s->shape.GetPtr())->GetHalfHeight(); }
+static float jolt_tapered_cylinder_shape_get_top_radius(const jolt_shape_ref* s) { return static_cast<const TaperedCylinderShape*>(s->shape.GetPtr())->GetTopRadius(); }
+static float jolt_tapered_cylinder_shape_get_bottom_radius(const jolt_shape_ref* s) { return static_cast<const TaperedCylinderShape*>(s->shape.GetPtr())->GetBottomRadius(); }
+static float jolt_tapered_cylinder_shape_get_convex_radius(const jolt_shape_ref* s) { return static_cast<const TaperedCylinderShape*>(s->shape.GetPtr())->GetConvexRadius(); }
 
 // -- Vec3 (vector) factory/release/assign for scoped reference type --
 static Vec3* vec3_factory_default() { return new_vec3(0.0f, 0.0f, 0.0f); }
@@ -898,6 +934,8 @@ static void RegisterJoltEnums(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_TRIANGLE", (int)EShapeSubType::Triangle);
 	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_CAPSULE", (int)EShapeSubType::Capsule);
 	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_CYLINDER", (int)EShapeSubType::Cylinder);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_TAPERED_CAPSULE", (int)EShapeSubType::TaperedCapsule);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_TAPERED_CYLINDER", (int)EShapeSubType::TaperedCylinder);
 	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_CONVEX_HULL", (int)EShapeSubType::ConvexHull);
 	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_STATIC_COMPOUND", (int)EShapeSubType::StaticCompound);
 	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_MUTABLE_COMPOUND", (int)EShapeSubType::MutableCompound);
@@ -927,6 +965,8 @@ static void RegisterJoltShape(asIScriptEngine* engine) {
 	engine->RegisterObjectType("physics_box_shape", 0, asOBJ_REF);
 	engine->RegisterObjectType("physics_capsule_shape", 0, asOBJ_REF);
 	engine->RegisterObjectType("physics_cylinder_shape", 0, asOBJ_REF);
+	engine->RegisterObjectType("physics_tapered_capsule_shape", 0, asOBJ_REF);
+	engine->RegisterObjectType("physics_tapered_cylinder_shape", 0, asOBJ_REF);
 	// physics_shape (base)
 	engine->RegisterObjectType("physics_shape", 0, asOBJ_REF);
 	engine->RegisterObjectBehaviour("physics_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
@@ -952,6 +992,8 @@ static void RegisterJoltShape(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_convex_shape", "physics_box_shape@ opCast()", asFUNCTION(jolt_convex_to_box), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_convex_shape", "physics_capsule_shape@ opCast()", asFUNCTION(jolt_convex_to_capsule), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_convex_shape", "physics_cylinder_shape@ opCast()", asFUNCTION(jolt_convex_to_cylinder), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_convex_shape", "physics_tapered_capsule_shape@ opCast()", asFUNCTION(jolt_convex_to_tapered_capsule), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_convex_shape", "physics_tapered_cylinder_shape@ opCast()", asFUNCTION(jolt_convex_to_tapered_cylinder), asCALL_CDECL_OBJFIRST);
 
 	// jolt_sphere_shape
 	engine->RegisterObjectBehaviour("physics_sphere_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
@@ -1013,11 +1055,46 @@ static void RegisterJoltShape(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_cylinder_shape", "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_cylinder_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
 
+	// jolt_tapered_capsule_shape
+	engine->RegisterObjectBehaviour("physics_tapered_capsule_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("physics_tapered_capsule_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "aabb@ get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "float get_half_height() const property", asFUNCTION(jolt_tapered_capsule_shape_get_half_height), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "float get_top_radius() const property", asFUNCTION(jolt_tapered_capsule_shape_get_top_radius), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "float get_bottom_radius() const property", asFUNCTION(jolt_tapered_capsule_shape_get_bottom_radius), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+
+	// jolt_tapered_cylinder_shape
+	engine->RegisterObjectBehaviour("physics_tapered_cylinder_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour("physics_tapered_cylinder_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "aabb@ get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "float get_half_height() const property", asFUNCTION(jolt_tapered_cylinder_shape_get_half_height), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "float get_top_radius() const property", asFUNCTION(jolt_tapered_cylinder_shape_get_top_radius), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "float get_bottom_radius() const property", asFUNCTION(jolt_tapered_cylinder_shape_get_bottom_radius), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "float get_convex_radius() const property", asFUNCTION(jolt_tapered_cylinder_shape_get_convex_radius), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+
 	// Factory functions return specific typed shapes
 	engine->RegisterGlobalFunction("physics_sphere_shape@ physics_sphere_shape_create(float radius, physics_material@ mat = null)", asFUNCTION(jolt_sphere_shape_create), asCALL_CDECL);
 	engine->RegisterGlobalFunction("physics_box_shape@ physics_box_shape_create(const vector&in half_extents, float convex_radius = 0.05f, physics_material@ mat = null)", asFUNCTION(jolt_box_shape_create), asCALL_CDECL);
 	engine->RegisterGlobalFunction("physics_capsule_shape@ physics_capsule_shape_create(float half_height, float radius, physics_material@ mat = null)", asFUNCTION(jolt_capsule_shape_create), asCALL_CDECL);
 	engine->RegisterGlobalFunction("physics_cylinder_shape@ physics_cylinder_shape_create(float half_height, float radius, float convex_radius = 0.05f, physics_material@ mat = null)", asFUNCTION(jolt_cylinder_shape_create), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_tapered_capsule_shape@ physics_tapered_capsule_shape_create(float half_height, float top_radius, float bottom_radius, physics_material@ mat = null)", asFUNCTION(jolt_tapered_capsule_shape_create), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_tapered_cylinder_shape@ physics_tapered_cylinder_shape_create(float half_height, float top_radius, float bottom_radius, float convex_radius = 0.05f, physics_material@ mat = null)", asFUNCTION(jolt_tapered_cylinder_shape_create), asCALL_CDECL);
 }
 
 static void RegisterJoltWorld(asIScriptEngine* engine) {
