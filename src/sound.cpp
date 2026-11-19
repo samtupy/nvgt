@@ -1199,7 +1199,7 @@ public:
 		snd = make_unique<ma_sound>();
 		ma_sound_group_init(e->get_ma_engine(), 0, nullptr, &*snd);
 		node = (ma_node_base *)&*snd;
-		set_max_distance(70);
+		set_max_distance(50);
 		ma_sound_group_set_rolloff(&*snd, 0); // Our own spatializer controls attenuation.
 		ma_sound_group_set_directional_attenuation_factor(&*snd, 0); // Our spatializer also controls panning.
 		attach_output_bus(0, node_chain, 0);
@@ -1587,7 +1587,7 @@ class sound_impl final : public mixer_impl, public virtual sound {
 		loaded_filename = filename;
 		node = (ma_node_base *)&*snd;
 		set_spatialization_enabled(false);                  // The user must call set_position_3d or manually enable spatialization or else their ambience and UI sounds will be spatialized.
-		set_max_distance(70);
+		set_max_distance(50);
 		ma_sound_set_rolloff(&*snd, 0);
 		ma_sound_set_directional_attenuation_factor(&*snd, 0);
 		attach_output_bus(0, node_chain, 0);

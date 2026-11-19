@@ -38,17 +38,15 @@ void test_hrtf_spatialization() {
 	assert(near[0] + near[1] > 1 and near[1] > near[0] * 2, "a sound to the right should be louder in the right ear, got " + near[0] + ", " + near[1]);
 	assert(far[0] + far[1] < (near[0] + near[1]) / 2, "the attenuator should make a farther sound quieter, energy " + (near[0] + near[1]) + " near and " + (far[0] + far[1]) + " far");
 }
-void test_hrtf_attenuation_curve() {
+double[]@ hrtf_test_distance_energies(bool hrtf, const float[]@ distances) {
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	sound@ s = e.sound();
 	assert(s.load_pcm(hrtf_test_noise(2), 44100, 2));
 	hrtf_test_wait(s);
-	s.hrtf = true;
-	assert(s.preferred_3d_attenuator == audio_attenuator_hrtf and s.preferred_3d_panner == audio_panner_hrtf, "set_hrtf should select the built in HRTF panner and attenuator");
+	s.hrtf = hrtf;
 	s.set_3d_panner(audio_panner_basic); // The HRTF panner blends to unspatialized sound close to the listener, which would change the level as well.
 	e.set_listener_position(0, 0, 0, 0);
 	double[] energies;
-	float[] distances = {1, 2, 8};
 	s.play_looped();
 	for (uint i = 0; i < distances.length(); i++) {
 		s.set_position_3d(0, distances[i], 0);
@@ -56,9 +54,18 @@ void test_hrtf_attenuation_curve() {
 		double[]@ e2 = hrtf_test_render(e, 20);
 		energies.insert_last(e2[0] + e2[1]);
 	}
-	// Inverse distance: amplitude halves at twice the reference distance, so energy is about a quarter, and an eighth of the amplitude at 8 meters.
-	assert(abs(energies[1] / energies[0] - 0.25) < 0.08, "energy at 2 meters should be about a quarter of that at 1 meter, got " + (energies[1] / energies[0]));
-	assert(abs(energies[2] / energies[0] - 1.0 / 64) < 0.01, "energy at 8 meters should be about a 64th of that at 1 meter, got " + (energies[2] / energies[0]));
+	return energies;
+}
+void test_hrtf_attenuation_curve() { // Every attenuator uses NVGT's distance curve, about half volume 10 units away and a quarter 20 units away by default.
+	float[] distances = {1, 10, 20, 45};
+	double[] expected = {1, 0.557, 0.266, 0.0133}; // Gains from the curve with the default rolloff of 0.3, minimum distance of 1 and maximum distance of 50.
+	for (int hrtf = 0; hrtf < 2; hrtf++) {
+		double[]@ energies = hrtf_test_distance_energies(hrtf == 1, distances);
+		for (uint i = 1; i < distances.length(); i++) {
+			double gain = sqrt(energies[i] / energies[0]);
+			assert(abs(gain - expected[i]) < expected[i] * 0.15, (hrtf == 1 ? "hrtf" : "basic") + " attenuator gain at " + distances[i] + " units should be about " + expected[i] + ", got " + gain);
+		}
+	}
 }
 void test_fdn_reverb_node() {
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);

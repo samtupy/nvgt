@@ -766,7 +766,7 @@ private:
 public:
 	audio_spatializer_impl(mixer* mixer, audio_engine* engine) : audio_node_chain_impl(nullptr, nullptr, engine), panner(nullptr), attenuator(nullptr), reverb(nullptr), reverb_attachment(nullptr), reverb_placement(postpan), attached_mixer(mixer), spatialization_params{}, parameters_valid(false), preferred_panner_id(-1), preferred_attenuator_id(-1), current_panner_id(-1), current_attenuator_id(-1) {
 		if (!mixer) throw std::invalid_argument("mixer cannot be null");
-		spatialization_params.rolloff = 1.0f;
+		spatialization_params.rolloff = 0.3f; // See basic_attenuator::attenuation.
 		spatialization_params.directional_attenuation_factor = 1.0f;
 		g_tracked_spatializers.insert(this);
 	}
@@ -1029,20 +1029,14 @@ public:
 		ma_gainer_process_pcm_frames(&gainer, frames_out[0], frames_in[0], frameCount);
 	}
 };
-float basic_attenuator::attenuation(const audio_spatialization_parameters& params, float distance) { // Decibels per meter beyond the minimum distance.
-	if (distance >= params.min_distance) distance -= params.min_distance;
-	return clamp(distance <= params.max_distance - params.min_distance? ma_volume_db_to_linear(-distance * params.rolloff * 1.75) : 0, params.min_volume, params.max_volume);
+// NVGT's distance curve, shared by its attenuators so that a sound sounds about as loud at a distance whichever is in use: 1.75 decibels per unit of distance beyond the minimum distance for a rolloff of 1, faded smoothly to silence at the maximum distance. Audio games rarely treat a unit of distance as a meter, as a step is often a whole unit, so the default rolloff of 0.3 and maximum distance of 50 keep a sound at about half volume 10 units away and a quarter 20 units away, almost inaudible beyond 40.
+float basic_attenuator::attenuation(const audio_spatialization_parameters& params, float distance) {
+	if (distance >= params.max_distance) return params.min_volume;
+	const float beyond = distance > params.min_distance ? distance - params.min_distance : 0.0f, fade = params.max_distance > 0 ? distance / params.max_distance : 0.0f;
+	return clamp(ma_volume_db_to_linear(-beyond * params.rolloff * 1.75f) * (1.0f - fade * fade), params.min_volume, params.max_volume);
 }
 spatializer_component_node* basic_attenuator::create(audio_spatializer* spatializer, audio_engine* engine) { return new curve_attenuator_impl<basic_attenuator, basic_attenuator::attenuation>(spatializer, engine); }
-float hrtf_attenuator::attenuation(const audio_spatialization_parameters& params, float distance) { // Synthizer's inverse distance model, the minimum distance being its reference distance, silent beyond the maximum distance like the other attenuators.
-	if (distance > params.max_distance) return params.min_volume;
-	microsynthiser::distance_params model;
-	model.model = microsynthiser::distance_model::inverse;
-	model.ref = max(params.min_distance, 0.01f);
-	model.max = params.max_distance;
-	model.rolloff = params.rolloff;
-	return clamp((float)microsynthiser::distance_gain(model, distance), params.min_volume, params.max_volume);
-}
+float hrtf_attenuator::attenuation(const audio_spatialization_parameters& params, float distance) { return basic_attenuator::attenuation(params, distance); } // NVGT's distance curve, as physical models such as Synthizer's inverse distance fall off far too quickly for audio games.
 spatializer_component_node* hrtf_attenuator::create(audio_spatializer* spatializer, audio_engine* engine) { return new curve_attenuator_impl<hrtf_attenuator, hrtf_attenuator::attenuation>(spatializer, engine); }
 
 
