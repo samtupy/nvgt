@@ -260,8 +260,8 @@ class reverb3d;
 class reverb3d_attachment_handler {
 public:
 	virtual ~reverb3d_attachment_handler() = default;
-	virtual splitter_node* create_attachment(reverb3d* verb, mixer* source) = 0; // Must return a node with one input and two output buses, bus 0 continuing the source's dry signal and bus 1 being the send that will be connected to verb.
-	virtual void update_attachment(reverb3d* verb, splitter_node* attachment, const audio_spatialization_parameters& params) = 0; // Called from the audio thread with the source's current spatialization parameters, in place of reverb3d's distance based send volume.
+	virtual audio_node* create_attachment(reverb3d* verb, mixer* source) = 0; // Must return a node with one input and two output buses, bus 0 continuing the source's dry signal and bus 1 being the send that will be connected to verb, such as a plugin_node.
+	virtual void update_attachment(reverb3d* verb, audio_node* attachment, const audio_spatialization_parameters& params) = 0; // Called from the audio thread with the source's current spatialization parameters, in place of reverb3d's distance based send volume.
 };
 class reverb3d : public virtual passthrough_node {
 public:
@@ -281,8 +281,8 @@ public:
 	virtual float get_volume_curve() const = 0;
 	virtual float get_volume_at(float distance) const = 0;
 	virtual splitter_node* create_attachment(audio_node* dry_input = nullptr, audio_node* dry_output = nullptr) = 0;
-	virtual splitter_node* create_source_attachment(mixer* source) = 0; // Used by audio_spatializer, creating the attachment through the handler if there is one.
-	virtual void update_attachment(splitter_node* attachment, const audio_spatialization_parameters& params) = 0;
+	virtual audio_node* create_source_attachment(mixer* source) = 0; // Used by audio_spatializer, creating the attachment through the handler if there is one.
+	virtual void update_attachment(audio_node* attachment, const audio_spatialization_parameters& params) = 0;
 	static reverb3d* create(audio_node* reverb, mixer* destination = nullptr, audio_engine* e = g_audio_engine);
 	static reverb3d* create_with_handler(reverb3d_attachment_handler* handler, audio_node* reverb, mixer* destination = nullptr, audio_engine* e = g_audio_engine);
 };
@@ -339,7 +339,7 @@ public:
 	virtual float get_directional_attenuation_factor() const = 0;
 	virtual void set_reverb3d(reverb3d* new_reverb, audio_spatializer_reverb3d_placement placement = postpan) = 0;
 	virtual reverb3d* get_reverb3d() const = 0;
-	virtual splitter_node* get_reverb3d_attachment() const = 0;
+	virtual audio_node* get_reverb3d_attachment() const = 0;
 	virtual audio_spatializer_reverb3d_placement get_reverb3d_placement() const = 0;
 	virtual mixer* get_mixer() const = 0;
 	virtual bool get_parameters(audio_spatialization_parameters& params) = 0;
@@ -394,6 +394,13 @@ struct spatializer_component {
 	spatializer_attenuation_function attenuation;
 };
 
+// Implemented by plugins to provide a 3d panner or attenuator through create_plugin_spatializer_component (nvgt_audio_spatializer_component_create). NVGT calls process on the audio thread with the sound's current spatialization parameters, passing the audio through unchanged while there are none, and deletes the implementation with its node.
+class audio_plugin_spatializer_component_interface {
+public:
+	virtual ~audio_plugin_spatializer_component_interface() = default;
+	virtual void process(const audio_spatialization_parameters& params, const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
+};
+spatializer_component_node* create_plugin_spatializer_component(audio_plugin_spatializer_component_interface* impl, audio_spatializer* spatializer, audio_engine* engine, unsigned int input_channels, unsigned int output_channels);
 int register_audio_panner(spatializer_component_node_factory factory, bool default_enabled = true);
 int register_audio_attenuator(spatializer_component_node_factory factory, bool default_enabled = true, spatializer_attenuation_function attenuation = nullptr);
 float get_audio_attenuation(int attenuator_id, const audio_spatialization_parameters& params, float distance); // Uses the basic attenuator's curve for attenuators without one.

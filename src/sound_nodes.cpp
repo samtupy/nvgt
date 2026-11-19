@@ -610,16 +610,16 @@ public:
 		}
 		return ma_volume_db_to_linear(clamp(v, -70.0f, max_volume));
 	}
-	splitter_node* create_source_attachment(mixer* source) override {
+	audio_node* create_source_attachment(mixer* source) override {
 		if (!handler) return create_attachment(nullptr, nullptr);
-		splitter_node* attachment = handler->create_attachment(this, source);
+		audio_node* attachment = handler->create_attachment(this, source);
 		if (attachment && !attachment->attach_output_bus(1, this, 0)) {
 			attachment->release();
 			return nullptr;
 		}
 		return attachment;
 	}
-	void update_attachment(splitter_node* attachment, const audio_spatialization_parameters& params) override {
+	void update_attachment(audio_node* attachment, const audio_spatialization_parameters& params) override {
 		if (handler) handler->update_attachment(this, attachment, params);
 		else attachment->set_output_bus_volume(1, get_volume_at(params.listener_distance));
 	}
@@ -655,14 +655,16 @@ class plugin_node_impl : public audio_node_impl, public virtual plugin_node {
 	unique_ptr<ma_plugin_node> pn;
 	audio_plugin_node_interface* impl;
 	ma_node_vtable vtable; // The user should be able to configure custom settings.
+	vector<ma_uint32> input_channels, output_channels; // One per bus, as miniaudio reads a channel count for each.
 	public:
 	plugin_node_impl(audio_plugin_node_interface* impl, unsigned char input_bus_count, unsigned char output_bus_count, unsigned int flags, audio_engine* engine) : pn(make_unique<ma_plugin_node>()), audio_node_impl(nullptr, engine), impl(impl) {
 		vtable = { ma_plugin_node_process_pcm_frames, nullptr, input_bus_count, output_bus_count, flags };
 		ma_node_config cfg = ma_node_config_init();
-		ma_uint32 channels = get_engine()->get_channels();
+		input_channels.assign(max<int>(input_bus_count, 1), get_engine()->get_channels());
+		output_channels.assign(max<int>(output_bus_count, 1), get_engine()->get_channels());
 		cfg.vtable          = &vtable;
-		cfg.pInputChannels  = &channels;
-		cfg.pOutputChannels = &channels;
+		cfg.pInputChannels  = input_channels.data();
+		cfg.pOutputChannels = output_channels.data();
 		if ((g_soundsystem_last_error = ma_node_init(ma_engine_get_node_graph(get_engine()->get_ma_engine()), &cfg, nullptr, (ma_node_base*)&*pn)) != MA_SUCCESS) throw std::runtime_error("failed to create plugin_node");
 		node = (ma_node_base*)&*pn;
 		pn->impl = this;
@@ -799,7 +801,7 @@ private:
 	spatializer_component_node* panner;
 	spatializer_component_node* attenuator;
 	reverb3d* reverb;
-	splitter_node* reverb_attachment;
+	audio_node* reverb_attachment;
 	audio_spatializer_reverb3d_placement reverb_placement;
 	mixer* attached_mixer;
 	audio_spatialization_parameters spatialization_params;
@@ -912,7 +914,7 @@ public:
 	spatializer_component_node* get_panner() const override { return panner; }
 	spatializer_component_node* get_attenuator() const override { return attenuator; }
 	reverb3d* get_reverb3d() const override { return reverb; }
-	splitter_node* get_reverb3d_attachment() const override { return reverb_attachment; }
+	audio_node* get_reverb3d_attachment() const override { return reverb_attachment; }
 	audio_spatializer_reverb3d_placement get_reverb3d_placement() const override { return reverb_placement; }
 	mixer* get_mixer() const override { return attached_mixer; }
 	void set_panner_by_id(int panner_id) override {
@@ -1000,6 +1002,27 @@ public:
 	}
 	audio_spatializer* get_spatializer() const override { return spatializer; }
 };
+
+class plugin_spatializer_component_impl : public spatializer_component_node_impl {
+	unique_ptr<audio_plugin_spatializer_component_interface> impl;
+public:
+	plugin_spatializer_component_impl(audio_plugin_spatializer_component_interface* impl, audio_spatializer* spatializer, audio_engine* e, unsigned int input_channels, unsigned int output_channels) : spatializer_component_node_impl(spatializer, e, input_channels, output_channels), impl(impl) {}
+	~plugin_spatializer_component_impl() { destroy_node(); }
+	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
+		audio_spatialization_parameters params;
+		if (impl && spatializer && spatializer->get_parameters(params)) impl->process(params, frames_in, frame_count_in, frames_out, frame_count_out);
+		else ma_copy_pcm_frames(frames_out[0], frames_in[0], min(*frame_count_in, *frame_count_out), ma_format_f32, get_engine()->get_channels());
+	}
+};
+spatializer_component_node* create_plugin_spatializer_component(audio_plugin_spatializer_component_interface* impl, audio_spatializer* spatializer, audio_engine* engine, unsigned int input_channels, unsigned int output_channels) {
+	if (!impl) return nullptr;
+	try {
+		return new plugin_spatializer_component_impl(impl, spatializer, engine, input_channels, output_channels);
+	} catch (std::exception&) {
+		delete impl;
+		return nullptr;
+	}
+}
 
 class basic_panner_impl : public spatializer_component_node_impl, public virtual basic_panner {
 	ma_panner panner;

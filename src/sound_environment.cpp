@@ -1083,8 +1083,8 @@ class environment_attachment_handler : public reverb3d_attachment_handler {
 public:
 	environment_attachment_handler(environment_core* core) : core(core) { core->retain(); }
 	~environment_attachment_handler() { core->release(); }
-	splitter_node* create_attachment(reverb3d* verb, mixer* source) override { return new environment_source(core); }
-	void update_attachment(reverb3d* verb, splitter_node* attachment, const audio_spatialization_parameters& params) override { if (environment_source* s = dynamic_cast<environment_source*>(attachment)) s->update_position(params); } // dynamic_cast as splitter_node is a virtual base.
+	audio_node* create_attachment(reverb3d* verb, mixer* source) override { return new environment_source(core); }
+	void update_attachment(reverb3d* verb, audio_node* attachment, const audio_spatialization_parameters& params) override { if (environment_source* s = dynamic_cast<environment_source*>(attachment)) s->update_position(params); } // dynamic_cast as splitter_node is a virtual base.
 };
 
 // The script facing environment.
