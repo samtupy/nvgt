@@ -1,0 +1,54 @@
+// test/case/pathfinder.nvgt - Regression tests for the pathfinder class.
+// See https://github.com/samtupy/nvgt/issues/293
+
+int simple_calls = 0;
+int simple_pfc(int x, int y, int z, any@ d = null) {
+	simple_calls++;
+	if (x > 1 && x < 9 && y > 1 && y < 9) return 10; // A fully enclosed box.
+	return 0;
+}
+void test_pathfinder_basic() {
+	pathfinder pf;
+	pf.allow_diagonals = true;
+	pf.set_callback_function(simple_pfc);
+	vector[]@ path = pf.find(0, 0, 0, 10, 10, 0, null);
+	assert(path.length() > 0, "expected a path around the obstacle");
+	assert(path[path.length() - 1].x == 10 && path[path.length() - 1].y == 10, "path should end at the destination");
+	assert(pf.total_cost > 0);
+	// A destination sealed inside the box must be reported unreachable, not hang.
+	@path = pf.find(0, 0, 0, 5, 5, 0, null);
+	assert(path.length() == 0, "destination inside a sealed box should be unreachable");
+}
+
+int selfquery_calls = 0;
+int advanced_pfc(int x, int y, int z, int px, int py, int pz, any@ d = null) {
+	// Mirrors BGT-style callbacks (issue #293): never written to expect a
+	// query where the "parent" is the destination cell itself, and they
+	// answer "impossible" (10) if asked that way.
+	if (x == px && y == py && z == pz) {
+		selfquery_calls++;
+		return 10;
+	}
+	if (x == 5 && y == 5) return 10; // One easily-routed-around blocked cell.
+	return 0;
+}
+void test_pathfinder_advanced_no_hang() {
+	pathfinder pf(1024, false); // cache must be off to use the "ex" callback.
+	pf.allow_diagonals = true;
+	pf.set_callback_function(advanced_pfc);
+	vector[]@ path = pf.find(0, 0, 0, 9, 9, 0, null);
+	assert(path.length() > 0, "pathfinder should not hang or fail on a destination self-query");
+	assert(selfquery_calls == 0, "the heuristic must never query the callback with parent == destination");
+}
+
+int large_pfc(int x, int y, int z, any@ d = null) {
+	return 0; // Open terrain everywhere.
+}
+void test_pathfinder_large_coordinates() {
+	pathfinder pf;
+	pf.allow_diagonals = true;
+	pf.set_callback_function(large_pfc);
+	vector[]@ path = pf.find(300000, -300000, 0, 300010, -299990, 0, null);
+	assert(path.length() > 0, "pathfinder should support coordinates in the hundreds of thousands");
+	assert(path[path.length() - 1].x == 300010 && path[path.length() - 1].y == -299990);
+}
