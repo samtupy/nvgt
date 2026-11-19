@@ -220,3 +220,52 @@ void test_sound_environment_tail_after_release() { // A sound released while its
 	sound_environment_test_energy(e, env, 200); // Longer than the reflection duration.
 	assert(env.retired_source_count == 0 and env.source_count == 0, "the released sound should be freed once its tail ends, " + env.retired_source_count + " retired and " + env.source_count + " sources remain");
 }
+void test_sound_environment_attack() { // A sound played and updated before the audio thread first processes it must not be simulated at a stale position, which muted and faded in its start.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.reflections_level = 0;
+	env.set_raycaster(world);
+	e.set_listener_position(0, 0, 0, 1.6);
+	sound_environment_test_pump(e, env, 2);
+	sound@ plain = e.sound();
+	assert(plain.load_pcm(sound_environment_test_burst(), 44100, 2));
+	plain.set_position_3d(0, 1, 0.05);
+	plain.play();
+	double expected = sound_environment_test_energy(e, env, 2);
+	sound_environment_test_energy(e, env, 20);
+	sound@ s = env.new_sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	s.set_position_3d(0, 1, 0.05);
+	s.play();
+	env.update();
+	double got = sound_environment_test_energy(e, env, 2);
+	assert(got > expected * 0.8, "the start of a new environment sound should be as loud as without the environment, " + got + " against " + expected);
+}
+void test_sound_environment_character_transparent() { // A sound inside a character's capsule, such as its footsteps, must still have reflections.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	physics_character@ c = physics_character(world, 1.8, 0.3, vector(0, 0, 0.01));
+	assert(c.acoustically_transparent and world.get_acoustically_transparent(c.body), "characters should be acoustically transparent by default");
+	sound_environment env(e);
+	env.use_listener_reverb = false;
+	env.set_raycaster(world);
+	e.set_listener_position(0, 0, 0, 1.6);
+	mixer@ m = env.new_mixer();
+	m.set_position_3d(0, 0, 0.9);
+	sound@ s = e.sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	s.set_mixer(m);
+	sound_environment_source@ src = env.get_source(m);
+	timer t;
+	while (!src.reflections_simulated and t.elapsed < 10000) {
+		sound_environment_test_pump(e, env, 1);
+		wait(1);
+	}
+	s.play();
+	sound_environment_test_energy(e, env, 20);
+	double tail = sound_environment_test_energy(e, env, 40);
+	assert(tail > 10, "a sound inside an acoustically transparent character should reverberate, tail energy " + tail);
+	c.acoustically_transparent = false;
+	assert(!world.get_acoustically_transparent(c.body));
+}

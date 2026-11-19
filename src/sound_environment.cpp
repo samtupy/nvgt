@@ -277,6 +277,7 @@ public:
 	source_slot reflection_source, direct_source;
 	atomic<unsigned int> ready_at = 0; // The reflection simulation after which this source's own reflections are available, 0 if none has been scheduled yet.
 	atomic<bool> has_position = false, tail_remaining = false;
+	atomic<bool> direct_ready = false; // Whether the direct source has been simulated, before which its outputs read as fully occluded, muting the start of new sounds when their first audio was processed before the simulation.
 	atomic<float> x = 0.0f, y = 0.0f, z = 0.0f;
 	bool retired = false; // Guarded by the core's sources_mutex.
 	chrono::steady_clock::time_point retired_at;
@@ -344,7 +345,7 @@ public:
 			IPLDirectEffectParams direct_params = outputs.direct;
 			direct_params.flags = (IPLDirectEffectFlags)((apply_occlusion ? IPL_DIRECTEFFECTFLAGS_APPLYOCCLUSION : 0) | (apply_occlusion && apply_transmission ? IPL_DIRECTEFFECTFLAGS_APPLYTRANSMISSION : 0));
 			direct_params.transmissionType = IPL_TRANSMISSIONTYPE_FREQDEPENDENT;
-			if (direct_params.flags) {
+			if (direct_params.flags && direct_ready) {
 				direct_effect->apply(&direct_params, &in_buffer.b, &out_buffer.b);
 				ctx->interleaveAudioBuffer(&out_buffer.b, dry + offset * core->channels);
 			}
@@ -500,6 +501,7 @@ bool environment_core::rebuild() { // Script thread, only while the worker is id
 		for (environment_source* s : current) {
 			s->reflection_source.publish(nullptr);
 			s->direct_source.publish(nullptr);
+			s->direct_ready = false;
 			s->ready_at = 0;
 		}
 	}
@@ -564,6 +566,7 @@ void environment_core::attach_new_sources(bool idle) { // Script thread. Direct 
 				api::ISource* created = nullptr;
 				if (direct_simulator->createSource(&source_settings, &created) == IPL_STATUS_SUCCESS) {
 					created->add(direct_simulator.get());
+					s->direct_ready = false;
 					s->direct_source.publish(created);
 					created->release();
 					direct_changed = true;
@@ -648,7 +651,11 @@ void environment_core::update() { // Script thread.
 		s->direct_source.script->setInputs(IPL_SIMULATIONFLAGS_DIRECT, &in);
 	}
 	direct_simulator->runDirect();
-	for (environment_source* s : current) if (s->has_position) s->read_results();
+	for (environment_source* s : current) {
+		if (!s->has_position) continue;
+		s->read_results();
+		if (s->direct_source.script) s->direct_ready = true;
+	}
 	// Reflections on the worker thread at the configured interval, inputs can only be changed while it is idle.
 	auto now = chrono::steady_clock::now();
 	if (idle && chrono::duration<float>(now - last_reflections).count() >= interval) {
