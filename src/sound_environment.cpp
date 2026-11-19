@@ -193,6 +193,13 @@ public:
 	reflection_group* groups[MAX_REFLECTION_GROUPS] = {};
 	atomic<int> group_count = 0; // Groups are published to the audio thread by storing the pointer before raising the count.
 	atomic<int> active_groups = 0;
+	// Probes, at which reverb and the paths sound takes between them can be baked ahead of time. Steam Audio can't list the probes of a batch, so their spheres are kept to know whether the listener is among them and to rebuild the batch when probes change, which discards its baked data. Script thread state.
+	vector<IPLSphere> probe_spheres;
+	ipl_ref<api::IProbeBatch> probes;
+	bool baked_reverb = false, baked_paths = false;
+	atomic<bool> use_baked_reverb = true, pathing = false;
+	atomic<float> pathing_level = 1.0f, pathing_time = 0.0f;
+	ipl_ref<api::ISimulator> path_simulator; // Only while pathing is enabled and paths are baked.
 	// Audio thread state.
 	api::IReflectionMixer* audio_mixer = nullptr; // Owned by the return node.
 	IPLCoordinateSpace3 audio_listener{{1, 0, 0}, {0, 0, 1}, {0, 1, 0}, {0, 0, 0}};
@@ -204,7 +211,7 @@ public:
 	bool rebuild_needed = true, scene_needed = true;
 	mutex sources_mutex; // Guards the following, as sources can be released from any thread.
 	vector<environment_source*> sources;
-	vector<api::ISource*> removed_direct_sources; // Retained direct sources whose nodes were destroyed, removed from the direct simulator by the next update.
+	vector<api::ISource*> removed_direct_sources, removed_path_sources; // Retained sources whose nodes were destroyed, removed from their simulators by the next update.
 	thread worker;
 	mutex worker_mutex;
 	condition_variable worker_cv;
@@ -212,7 +219,7 @@ public:
 	atomic<bool> worker_busy = false;
 	atomic<unsigned int> reflection_runs = 0; // Completed reflection simulations, the run scheduled next is number reflection_runs + 1.
 	atomic<float> reflection_time = 0, direct_time = 0; // Milliseconds the most recent reflection and direct simulations took.
-	chrono::steady_clock::time_point last_reflections;
+	chrono::steady_clock::time_point last_reflections, last_pathing;
 	bool shut_down = false;
 
 	environment_core(audio_engine* e) : engine(e), context(reinterpret_cast<api::IContext*>(phonon_get_context())), channels(e->get_channels()) {
@@ -233,10 +240,13 @@ public:
 	~environment_core() {
 		shutdown();
 		for (api::ISource* s : removed_direct_sources) s->release();
+		for (api::ISource* s : removed_path_sources) s->release();
 		for (int i = 0; i < group_count; i++) delete groups[i];
 		listener_group.source.publish(nullptr);
 		simulator.reset();
 		direct_simulator.reset();
+		path_simulator.reset();
+		probes.reset();
 		scene.reset();
 		if (provider) provider->release();
 		if (scene_provider) scene_provider->release();
@@ -280,10 +290,17 @@ public:
 		lock_guard<mutex> l(sources_mutex);
 		sources.push_back(s);
 	}
-	void remove_direct_source(api::ISource* direct) {
-		if (!direct) return;
+	void remove_sources(api::ISource* direct, api::ISource* path) { // The node's references are handed over and released once the sources are removed from their simulators.
 		lock_guard<mutex> l(sources_mutex);
-		removed_direct_sources.push_back(direct); // The node's reference is handed over and released once the source is removed from the direct simulator.
+		if (direct) removed_direct_sources.push_back(direct);
+		if (path) removed_path_sources.push_back(path);
+	}
+	void wait_until_idle() { // Script thread, for changes that can't be made while the worker simulates reflections.
+		while (worker_busy) this_thread::sleep_for(chrono::milliseconds(1));
+	}
+	bool listener_among_probes(float x, float y, float z) const {
+		for (const IPLSphere& p : probe_spheres) if ((x - p.center.x) * (x - p.center.x) + (y - p.center.y) * (y - p.center.y) + (z - p.center.z) * (z - p.center.z) <= p.radius * p.radius) return true;
+		return false;
 	}
 	bool visible(float ax, float ay, float az, float bx, float by, float bz) { // Script thread, whether nothing blocks the straight line between two points.
 		if (!provider) return true;
@@ -295,13 +312,15 @@ public:
 		provider->any_hits(1, &ray, &min_distance, &length, &occluded);
 		return !occluded;
 	}
+	bool ensure_scene();
+	bool rebuild_probes();
 	bool rebuild();
 	void attach_new_sources();
 	void assign_groups(const vector<environment_source*>& current, float lx, float ly, float lz);
 	void update();
 };
 
-// The node every sound attached to an environment is sent through, published to scripts as sound_environment_source. Bus 0 carries the sound's dry signal with occlusion and transmission applied. The sound's reflections are applied by its reflection group in the environment's return node, so bus 1, the send to the environment's reverb3d, is silent.
+// The node every sound attached to an environment is sent through, published to scripts as sound_environment_source. Bus 0 carries the sound's dry signal with occlusion and transmission applied. The sound's reflections are applied by its reflection group in the environment's return node, so bus 1, the send to the environment's reverb3d, only carries the sound's pathing, which the path effect has already spatialized.
 class environment_source : public effect_node_impl, public virtual splitter_node {
 	// Audio thread state.
 	audio_config config;
@@ -309,16 +328,20 @@ class environment_source : public effect_node_impl, public virtual splitter_node
 	ipl_buffer in_buffer, out_buffer, mono_buffer;
 	float previous_level = 0.0f;
 	reflection_group* sending = nullptr; // The group this source's signal is added to, which changes with a crossfade over one frame.
+	ipl_ref<api::IPathEffect> path_effect; // Created once pathing is first used.
+	float previous_path_weight = 0.0f;
+	bool path_tail = false;
 public:
 	environment_core* core;
-	source_slot direct_source;
+	source_slot direct_source, path_source;
 	atomic<bool> has_position = false;
 	atomic<bool> direct_ready = false; // Whether the direct source has been simulated, before which its outputs read as fully occluded, muting the start of new sounds when their first audio was processed before the simulation.
 	atomic<float> x = 0.0f, y = 0.0f, z = 0.0f;
+	atomic<float> min_distance = 0.0f, max_distance = 0.0f, min_volume = 0.0f, max_volume = 1.0f, rolloff = 1.0f; // The sound's distance attenuation settings, for pathing.
 	reflection_group* assigned = nullptr; // Script thread, the source's reflection group or null for the listener's.
 	atomic<reflection_group*> group = nullptr; // assigned, published to the audio thread.
 	// Settings.
-	atomic<bool> apply_occlusion = true, apply_transmission = true, apply_reflections = true;
+	atomic<bool> apply_occlusion = true, apply_transmission = true, apply_reflections = true, apply_pathing = true;
 	atomic<float> reflections_level = 1.0f, occlusion_radius = 1.0f;
 	atomic<int> occlusion_type = occlusion_raycast, occlusion_samples = 16, transmission_rays = 3;
 	// Simulation results, copied after each direct simulation for scripts to read.
@@ -332,7 +355,7 @@ public:
 	}
 	~environment_source() {
 		destroy_node(); // Stop processing before tearing down audio state.
-		core->remove_direct_source(direct_source.detach_script());
+		core->remove_sources(direct_source.detach_script(), path_source.detach_script());
 		core->release();
 	}
 	void release() override { // The environment's update duplicates its sources while holding sources_mutex, so a source must leave that list under the same lock before it can be deleted, or update could revive one whose last reference is being released.
@@ -352,6 +375,7 @@ public:
 		if (available < frames) memset(dry + available * channels, 0, (frames - available) * channels * sizeof(float));
 		memset(frames_out[1], 0, frames * channels * sizeof(float));
 		api::ISource* direct = direct_source.take();
+		api::ISource* path = path_source.take();
 		if (!direct || !prepare()) return;
 		api::IContext* ctx = core->context;
 		const int frame_size = core->audio_settings.frameSize;
@@ -373,8 +397,9 @@ public:
 				direct_effect->apply(&direct_params, &in_buffer.b, &out_buffer.b);
 				ctx->interleaveAudioBuffer(&out_buffer.b, dry + offset * channels);
 			}
-			// Reflections, only on whole Steam Audio frames as each group's effect is applied to exactly one frame per audio graph pass.
-			if (n != frame_size) continue;
+			if (n != frame_size) continue; // Steam Audio's effects can only be applied to whole frames.
+			if (path && (path_tail || core->pathing)) apply_path(path, direct_params.occlusion, frames_out[1] + offset * channels);
+			// Reflections, applied by each group to exactly one frame per audio graph pass.
 			reflection_group* previous = sending;
 			sending = target;
 			if (!target && !previous) continue;
@@ -406,6 +431,33 @@ public:
 			previous_level = level;
 		}
 	}
+	void apply_path(api::ISource* path, float occlusion, float* out) { // Sound reaching the listener around obstacles. Steam Audio's paths include the direct path whenever the source is in view, which the dry signal already carries, so pathing is heard in proportion to how much the direct sound is occluded.
+		api::IContext* ctx = core->context;
+		const int n = core->audio_settings.frameSize;
+		float weight = core->pathing && apply_pathing && apply_occlusion && direct_ready ? (1.0f - occlusion) * core->pathing_level * 3.5449f : 0.0f; // Steam Audio's path coefficients are normalized spherical harmonics, whose omnidirectional term of 1 / sqrt(4 pi) leaves the path effect 11dB quieter than the dry sound of a source at the same distance.
+		if (weight <= 0.0f && previous_path_weight <= 0.0f && !path_tail) return;
+		if (!path_effect) {
+			IPLPathEffectSettings settings{1, IPL_TRUE, speaker_layout_for_channels(core->channels), reinterpret_cast<IPLHRTF>(core->hrtf.get())};
+			if (ctx->createPathEffect(&core->audio_settings, &settings, path_effect.put()) != IPL_STATUS_SUCCESS) return;
+		}
+		IPLSimulationOutputs outputs{};
+		path->getOutputs(IPL_SIMULATIONFLAGS_PATHING, &outputs);
+		IPLPathEffectParams params = outputs.pathing;
+		params.order = 1;
+		params.binaural = core->binaural && core->channels == 2 ? IPL_TRUE : IPL_FALSE;
+		params.hrtf = reinterpret_cast<IPLHRTF>(core->hrtf.get());
+		params.listener = core->audio_listener;
+		params.normalizeEQ = IPL_FALSE;
+		IPLAudioEffectState state;
+		if (weight > 0.0f || previous_path_weight > 0.0f) {
+			ctx->downmixAudioBuffer(&in_buffer.b, &mono_buffer.b);
+			for (int i = 0; i < n; i++) mono_buffer.b.data[0][i] *= previous_path_weight + (weight - previous_path_weight) * (i / (float)n);
+			state = path_effect->apply(&params, &mono_buffer.b, &out_buffer.b);
+		} else state = path_effect->getTail(&out_buffer.b);
+		previous_path_weight = weight;
+		path_tail = state == IPL_AUDIOEFFECTSTATE_TAILREMAINING;
+		ctx->interleaveAudioBuffer(&out_buffer.b, out);
+	}
 	bool prepare() { // Creates or recreates the audio thread's effects when the environment's configuration changed.
 		audio_config c = audio_config::unpack(core->published_config);
 		if (c.generation == config.generation && direct_effect) return true;
@@ -422,7 +474,22 @@ public:
 		x = params.sound_x;
 		y = params.sound_y;
 		z = params.sound_z;
+		min_distance = params.min_distance;
+		max_distance = params.max_distance;
+		min_volume = params.min_volume;
+		max_volume = params.max_volume;
+		rolloff = params.rolloff;
 		has_position = true;
+	}
+	static float IPLCALL distance_attenuation(IPLfloat32 distance, void* user) { // Pathed sound is attenuated over the length of its path like NVGT's attenuators attenuate a dry sound over the same distance, rather than by Steam Audio's own physical model.
+		const environment_source* s = static_cast<const environment_source*>(user);
+		const float min_d = s->min_distance, max_d = s->max_distance, min_v = s->min_volume, max_v = s->max_volume;
+		if (get_global_hrtf()) { // The phonon attenuator, inverse distance over positions scaled by its rolloff.
+			if (distance > max_d) return min_v;
+			return clamp(1.0f / max(distance * s->rolloff * 0.7f, max(min_d, 0.0001f)), min_v, max_v);
+		}
+		float d = distance >= min_d ? distance - min_d : distance; // The basic attenuator, decibels per meter.
+		return clamp(d <= max_d - min_d ? ma_volume_db_to_linear(-d * s->rolloff * 1.75f) : 0.0f, min_v, max_v);
 	}
 	IPLSimulationInputs direct_inputs() const {
 		IPLSimulationInputs in{};
@@ -456,6 +523,8 @@ public:
 	void set_apply_occlusion(bool v) { apply_occlusion = v; }
 	bool get_apply_transmission() const { return apply_transmission; }
 	void set_apply_transmission(bool v) { apply_transmission = v; }
+	bool get_apply_pathing() const { return apply_pathing; }
+	void set_apply_pathing(bool v) { apply_pathing = v; }
 	bool get_apply_reflections() const { return apply_reflections; }
 	void set_apply_reflections(bool v) { apply_reflections = v; }
 	float get_reflections_level() const { return reflections_level; }
@@ -490,15 +559,46 @@ static api::ISource* create_reflection_source(api::ISimulator* simulator) {
 	created->add(simulator);
 	return created;
 }
+bool environment_core::ensure_scene() { // Script thread, only while the worker is idle. Creates the scene for the current raycaster.
+	if (!scene_needed && scene) return true;
+	IPLSceneSettings scene_settings{};
+	scene_settings.type = IPL_SCENETYPE_CUSTOM;
+	scene_settings.closestHitCallback = scene_closest_hit;
+	scene_settings.anyHitCallback = scene_any_hit;
+	scene_settings.batchedClosestHitCallback = scene_batched_closest_hit;
+	scene_settings.batchedAnyHitCallback = scene_batched_any_hit;
+	scene_settings.userData = provider ? provider : &g_empty_raycast_provider;
+	if (context->createScene(&scene_settings, scene.put()) != IPL_STATUS_SUCCESS) return false;
+	if (provider) provider->retain();
+	if (scene_provider) scene_provider->release();
+	scene_provider = provider;
+	scene->commit();
+	scene_needed = false;
+	rebuild_needed = true; // The simulators must use the new scene.
+	return true;
+}
+bool environment_core::rebuild_probes() { // Script thread. Makes a new probe batch from probe_spheres, without baked data.
+	probes.reset();
+	baked_reverb = baked_paths = false;
+	rebuild_needed = true;
+	if (probe_spheres.empty()) return true;
+	if (context->createProbeBatch(probes.put()) != IPL_STATUS_SUCCESS) return false;
+	for (const IPLSphere& p : probe_spheres) probes->addProbe(p);
+	probes->commit();
+	return true;
+}
 bool environment_core::rebuild() { // Script thread, only while the worker is idle.
 	vector<environment_source*> current;
 	{
 		lock_guard<mutex> l(sources_mutex);
 		current = sources;
-		for (api::ISource* s : removed_direct_sources) s->release(); // The old direct simulator is going away with them.
+		for (api::ISource* s : removed_direct_sources) s->release(); // The old simulators are going away with them.
+		for (api::ISource* s : removed_path_sources) s->release();
 		removed_direct_sources.clear();
+		removed_path_sources.clear();
 		for (environment_source* s : current) {
 			s->direct_source.publish(nullptr);
+			s->path_source.publish(nullptr);
 			s->direct_ready = false;
 		}
 	}
@@ -508,21 +608,7 @@ bool environment_core::rebuild() { // Script thread, only while the worker is id
 		groups[i]->source.publish(nullptr);
 		groups[i]->ready_at = 0;
 	}
-	if (scene_needed || !scene) {
-		IPLSceneSettings scene_settings{};
-		scene_settings.type = IPL_SCENETYPE_CUSTOM;
-		scene_settings.closestHitCallback = scene_closest_hit;
-		scene_settings.anyHitCallback = scene_any_hit;
-		scene_settings.batchedClosestHitCallback = scene_batched_closest_hit;
-		scene_settings.batchedAnyHitCallback = scene_batched_any_hit;
-		scene_settings.userData = provider ? provider : &g_empty_raycast_provider;
-		if (context->createScene(&scene_settings, scene.put()) != IPL_STATUS_SUCCESS) return false;
-		if (provider) provider->retain();
-		if (scene_provider) scene_provider->release();
-		scene_provider = provider;
-		scene->commit();
-		scene_needed = false;
-	}
+	if (!ensure_scene()) return false;
 	IPLSimulationSettings settings{};
 	settings.flags = IPL_SIMULATIONFLAGS_REFLECTIONS;
 	settings.sceneType = IPL_SCENETYPE_CUSTOM;
@@ -543,6 +629,17 @@ bool environment_core::rebuild() { // Script thread, only while the worker is id
 	if (!create_simulator(context, settings, direct_simulator)) return false;
 	simulator->setScene(scene.get());
 	direct_simulator->setScene(scene.get());
+	if (probes && baked_reverb) simulator->addProbeBatch(probes.get()); // For the listener's baked reverb.
+	path_simulator.reset();
+	if (pathing && probes && baked_paths) {
+		settings.flags = IPL_SIMULATIONFLAGS_PATHING;
+		settings.numVisSamples = 4; // For checking whether baked paths are still open, and finding alternatives when they aren't.
+		if (create_simulator(context, settings, path_simulator)) {
+			path_simulator->setScene(scene.get());
+			path_simulator->addProbeBatch(probes.get());
+			path_simulator->commit();
+		}
+	}
 	// The pool of groups, each with a reflections source that is simulated while the group has members.
 	const int pool = max_sources;
 	while (group_count < pool) {
@@ -576,30 +673,42 @@ bool environment_core::rebuild() { // Script thread, only while the worker is id
 	rebuild_needed = false;
 	return true;
 }
-void environment_core::attach_new_sources() { // Script thread. Direct sources can be added to the direct simulator at any time, as only the script thread uses it.
-	bool changed = false;
-	vector<api::ISource*> removed;
+void environment_core::attach_new_sources() { // Script thread. Direct and path sources can be added to their simulators at any time, as only the script thread uses them.
+	bool direct_changed = false, path_changed = false;
+	vector<api::ISource*> removed_direct, removed_path;
+	auto add = [](api::ISimulator* simulator, IPLSimulationFlags flags, source_slot& slot) {
+		IPLSourceSettings source_settings{flags};
+		api::ISource* created = nullptr;
+		if (simulator->createSource(&source_settings, &created) != IPL_STATUS_SUCCESS) return false;
+		created->add(simulator);
+		slot.publish(created);
+		created->release();
+		return true;
+	};
 	{
 		lock_guard<mutex> l(sources_mutex);
-		removed.swap(removed_direct_sources);
+		removed_direct.swap(removed_direct_sources);
+		removed_path.swap(removed_path_sources);
 		for (environment_source* s : sources) {
-			if (s->direct_source.script) continue;
-			IPLSourceSettings source_settings{IPL_SIMULATIONFLAGS_DIRECT};
-			api::ISource* created = nullptr;
-			if (direct_simulator->createSource(&source_settings, &created) != IPL_STATUS_SUCCESS) continue;
-			created->add(direct_simulator.get());
-			s->direct_ready = false;
-			s->direct_source.publish(created);
-			created->release();
-			changed = true;
+			if (!s->direct_source.script && add(direct_simulator.get(), IPL_SIMULATIONFLAGS_DIRECT, s->direct_source)) {
+				s->direct_ready = false;
+				direct_changed = true;
+			}
+			if (path_simulator && !s->path_source.script && add(path_simulator.get(), IPL_SIMULATIONFLAGS_PATHING, s->path_source)) path_changed = true;
 		}
 	}
-	for (api::ISource* s : removed) {
+	for (api::ISource* s : removed_direct) {
 		s->remove(direct_simulator.get());
 		s->release();
-		changed = true;
+		direct_changed = true;
 	}
-	if (changed) direct_simulator->commit();
+	for (api::ISource* s : removed_path) { // Path sources outlive their simulator when pathing was turned off since.
+		if (path_simulator) s->remove(path_simulator.get());
+		s->release();
+		path_changed = true;
+	}
+	if (direct_changed) direct_simulator->commit();
+	if (path_changed && path_simulator) path_simulator->commit();
 }
 void environment_core::assign_groups(const vector<environment_source*>& current, float lx, float ly, float lz) { // Script thread. Assigns every source with reflections to a reflection group, see reflection_group.
 	struct candidate {
@@ -760,11 +869,15 @@ void environment_core::update() { // Script thread.
 		last_reflections = now;
 		const unsigned int run = reflection_runs + 1;
 		simulator->setSharedInputs(IPL_SIMULATIONFLAGS_REFLECTIONS, &shared);
-		auto set_inputs = [&](reflection_group* g, bool active, const IPLCoordinateSpace3& space) {
+		auto set_inputs = [&](reflection_group* g, bool active, const IPLCoordinateSpace3& space, bool baked = false) {
 			if (!g->source.script) return;
 			IPLSimulationInputs in{};
 			in.flags = active ? IPL_SIMULATIONFLAGS_REFLECTIONS : (IPLSimulationFlags)0;
 			in.source = space;
+			if (baked) { // Reverb looked up from the probes around the listener rather than simulated.
+				in.baked = IPL_TRUE;
+				in.bakedDataIdentifier = {IPL_BAKEDDATATYPE_REFLECTIONS, IPL_BAKEDDATAVARIATION_REVERB, {}};
+			}
 			in.distanceAttenuationModel.type = IPL_DISTANCEATTENUATIONTYPE_DEFAULT;
 			in.airAbsorptionModel.type = IPL_AIRABSORPTIONTYPE_DEFAULT;
 			in.reverbScale[0] = in.reverbScale[1] = in.reverbScale[2] = 1.0f;
@@ -773,7 +886,7 @@ void environment_core::update() { // Script thread.
 			g->source.script->setInputs(IPL_SIMULATIONFLAGS_REFLECTIONS, &in);
 			if (active && !g->ready_at) g->ready_at = run;
 		};
-		set_inputs(&listener_group, use_listener_reverb, listener_space);
+		set_inputs(&listener_group, use_listener_reverb, listener_space, use_baked_reverb && baked_reverb && listener_among_probes(pos.GetX(), pos.GetY(), pos.GetZ()));
 		const int pool = min<int>(max_sources, group_count);
 		for (int i = 0; i < pool; i++) {
 			reflection_group* g = groups[i];
@@ -786,6 +899,34 @@ void environment_core::update() { // Script thread.
 			worker_run = true;
 		}
 		worker_cv.notify_one();
+	}
+	// Pathing on the script thread at the same interval, finding the paths sound takes around obstacles from the paths baked between probes.
+	if (path_simulator && chrono::duration<float>(now - last_pathing).count() >= interval) {
+		last_pathing = now;
+		auto pathing_start = chrono::steady_clock::now();
+		path_simulator->setSharedInputs(IPL_SIMULATIONFLAGS_PATHING, &shared);
+		bool any = false;
+		for (environment_source* s : current) {
+			if (!s->path_source.script || !s->has_position) continue;
+			IPLSimulationInputs in{};
+			in.flags = s->apply_pathing ? IPL_SIMULATIONFLAGS_PATHING : (IPLSimulationFlags)0;
+			in.source = {{1, 0, 0}, {0, 0, 1}, {0, 1, 0}, {s->x, s->y, s->z}};
+			in.distanceAttenuationModel.type = IPL_DISTANCEATTENUATIONTYPE_CALLBACK;
+			in.distanceAttenuationModel.callback = environment_source::distance_attenuation;
+			in.distanceAttenuationModel.userData = s;
+			in.airAbsorptionModel.type = IPL_AIRABSORPTIONTYPE_DEFAULT;
+			in.pathingProbes = reinterpret_cast<IPLProbeBatch>(probes.get());
+			in.visRadius = 0.5f;
+			in.visThreshold = 0.1f;
+			in.visRange = 1000.0f;
+			in.pathingOrder = 1;
+			in.enableValidation = IPL_TRUE; // Baked paths blocked since baking, by a closed door for example, are checked for and replaced by others where there are any.
+			in.findAlternatePaths = IPL_TRUE;
+			s->path_source.script->setInputs(IPL_SIMULATIONFLAGS_PATHING, &in);
+			any = any || s->apply_pathing;
+		}
+		if (any) path_simulator->runPathing();
+		pathing_time = chrono::duration<float, milli>(chrono::steady_clock::now() - pathing_start).count();
 	}
 	for (environment_source* s : current) s->release();
 }
@@ -847,8 +988,14 @@ public:
 		for (unsigned int i = 0; i < frames; i++) for (int c = 0; c < channels; c++) out[i * channels + c] += decoded_buffer.b.data[c][i];
 	}
 	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
-		render(frames_in, frame_count_in, frames_out, frame_count_out);
-		// Everything this node outputs is reflections. Binaurally decoded reverb is quite correlated between the ears and sounds narrow, so its side signal is scaled for a wider room.
+		render(frames_out[0], *frame_count_out);
+		filter(frames_out[0], *frame_count_out);
+		// The sends of the sources, their pathing, pass through unfiltered.
+		const unsigned int available = frames_in && frames_in[0] ? min(*frame_count_in, *frame_count_out) : 0; // With MA_NODE_FLAG_ALLOW_NULL_INPUT the input array itself is null once nothing is attached.
+		for (unsigned int i = 0; i < available * core->channels; i++) frames_out[0][i] += frames_in[0][i];
+	}
+	void filter(float* out, unsigned int frames) {
+		// Binaurally decoded reverb is quite correlated between the ears and sounds narrow, so its side signal is scaled for a wider room.
 		// The low end of simulated reflections tends to sound boomy, so it can be filtered out.
 		float cutoff = core->reflections_highpass;
 		if (cutoff > 0) {
@@ -858,12 +1005,11 @@ public:
 				else highpass_ready = ma_hpf_init(&cfg, nullptr, &highpass) == MA_SUCCESS;
 				highpass_cutoff = cutoff;
 			}
-			if (highpass_ready) ma_hpf_process_pcm_frames(&highpass, frames_out[0], frames_out[0], *frame_count_out);
+			if (highpass_ready) ma_hpf_process_pcm_frames(&highpass, out, out, frames);
 		}
 		float width = core->reflections_width;
 		if (core->channels != 2 || width == 1.0f) return;
-		float* out = frames_out[0];
-		for (unsigned int i = 0; i < *frame_count_out; i++) {
+		for (unsigned int i = 0; i < frames; i++) {
 			float mid = (out[i * 2] + out[i * 2 + 1]) * 0.5f, side = (out[i * 2] - out[i * 2 + 1]) * 0.5f * width;
 			out[i * 2] = mid + side;
 			out[i * 2 + 1] = mid - side;
@@ -889,12 +1035,8 @@ public:
 		}
 		if (send_active) g->send.clear();
 	}
-	void render(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) {
-		const unsigned int frames = *frame_count_out;
-		const unsigned int available = frames_in && frames_in[0] ? min(*frame_count_in, frames) : 0; // With MA_NODE_FLAG_ALLOW_NULL_INPUT the input array itself is null once nothing is attached.
-		float* out = frames_out[0];
-		if (available) memcpy(out, frames_in[0], available * core->channels * sizeof(float));
-		if (available < frames) memset(out + available * core->channels, 0, (frames - available) * core->channels * sizeof(float));
+	void render(float* out, unsigned int frames) { // The reflections of every group.
+		memset(out, 0, frames * core->channels * sizeof(float));
 		{
 			unique_lock<mutex> l(core->listener_mutex, try_to_lock); // Never block the audio thread, the previous orientation is fine if update holds the lock.
 			if (l.owns_lock()) core->audio_listener = core->listener;
@@ -997,6 +1139,161 @@ public:
 		if (s) s->duplicate();
 		return s;
 	}
+	// Probes and baking. Probes mark places the listener can be, and baking simulates ahead of time the reverb at each of them and the paths sound can take between them, so that the listener's reverb is looked up rather than simulated and sounds can be heard around obstacles. Changing the probes discards baked data.
+	unsigned int generate_probes(const vector3& minimum, const vector3& maximum, float spacing, float height) { // Places probes height meters above every floor within a box, spacing meters apart, returning how many were placed.
+		if (!core->provider || spacing <= 0.0f) return 0;
+		core->wait_until_idle();
+		if (!core->ensure_scene()) return 0;
+		ipl_ref<api::IProbeArray> array;
+		if (core->context->createProbeArray(array.put()) != IPL_STATUS_SUCCESS) return 0;
+		vector3 size = maximum - minimum, center = (minimum + maximum) * 0.5f;
+		IPLProbeGenerationParams params{};
+		params.type = IPL_PROBEGENERATIONTYPE_UNIFORMFLOOR;
+		params.spacing = spacing;
+		params.height = height;
+		// Steam Audio generates probes in a unit cube centered on the origin transformed by this row major matrix, looking for floors along the cube's negative y axis. NVGT's up is z, so the cube's y axis is mapped to z and its z axis to y.
+		params.transform = {{{size.GetX(), 0, 0, center.GetX()}, {0, 0, size.GetY(), center.GetY()}, {0, size.GetZ(), 0, center.GetZ()}, {0, 0, 0, 1}}};
+		array->generateProbes(core->scene.get(), &params);
+		const int count = array->getNumProbes();
+		for (int i = 0; i < count; i++) core->probe_spheres.push_back(array->getProbe(i));
+		core->rebuild_probes();
+		return count;
+	}
+	void add_probe(const vector3& position, float radius) {
+		core->wait_until_idle();
+		core->probe_spheres.push_back({{position.GetX(), position.GetY(), position.GetZ()}, max(0.01f, radius)});
+		core->rebuild_probes();
+	}
+	void clear_probes() {
+		core->wait_until_idle();
+		core->probe_spheres.clear();
+		core->rebuild_probes();
+	}
+	unsigned int get_probe_count() const { return (unsigned int)core->probe_spheres.size(); }
+	bool get_has_baked_reverb() const { return core->baked_reverb; }
+	bool get_has_baked_paths() const { return core->baked_paths; }
+	struct bake_progress {
+		asIScriptFunction* callback;
+		float start, span, last;
+	};
+	static void IPLCALL report_progress(IPLfloat32 fraction, void* user) { // Steam Audio reports progress on the thread that bakes.
+		bake_progress* p = static_cast<bake_progress*>(user);
+		float progress = p->start + p->span * clamp(fraction, 0.0f, 1.0f);
+		if (!p->callback || progress < p->last + 0.01f) return;
+		p->last = progress;
+		asIScriptContext* ctx = asGetActiveContext();
+		bool nested = ctx && ctx->PushState() >= 0;
+		if (!nested) ctx = p->callback->GetEngine()->RequestContext();
+		if (!ctx) return;
+		if (ctx->Prepare(p->callback) >= 0) {
+			ctx->SetArgFloat(0, progress);
+			ctx->Execute();
+		}
+		if (nested) ctx->PopState();
+		else p->callback->GetEngine()->ReturnContext(ctx);
+	}
+	bool bake(asIScriptFunction* callback) { // Bakes the reverb at every probe and the paths between them with the environment's reflection settings, reporting progress from 0 to 1 to the callback if given. This blocks until baking is done.
+		bake_progress progress{callback, 0.0f, 0.75f, -1.0f};
+		bool ok = core->provider && !core->probe_spheres.empty();
+		if (ok) {
+			core->wait_until_idle();
+			ok = core->ensure_scene() && (core->probes || core->rebuild_probes()) && core->probes;
+		}
+		if (ok) {
+			const int threads = max(1, (int)thread::hardware_concurrency());
+			IPLReflectionsBakeParams reflections{};
+			reflections.scene = reinterpret_cast<IPLScene>(core->scene.get());
+			reflections.probeBatch = reinterpret_cast<IPLProbeBatch>(core->probes.get());
+			reflections.sceneType = IPL_SCENETYPE_CUSTOM;
+			reflections.identifier = {IPL_BAKEDDATATYPE_REFLECTIONS, IPL_BAKEDDATAVARIATION_REVERB, {}};
+			reflections.bakeFlags = (IPLReflectionsBakeFlags)(IPL_REFLECTIONSBAKEFLAGS_BAKECONVOLUTION | IPL_REFLECTIONSBAKEFLAGS_BAKEPARAMETRIC);
+			reflections.numRays = core->rays * 2; // Baking is done once, so it can afford more rays than real time simulation.
+			reflections.numDiffuseSamples = core->diffuse_samples;
+			reflections.numBounces = core->bounces;
+			reflections.simulatedDuration = reflections.savedDuration = core->duration;
+			reflections.order = core->order;
+			reflections.numThreads = threads;
+			reflections.rayBatchSize = 64;
+			reflections.irradianceMinDistance = core->irradiance_min_distance;
+			reflections.bakeBatchSize = 1;
+			core->context->bakeReflections(&reflections, report_progress, &progress);
+			IPLPathBakeParams paths{};
+			paths.scene = reflections.scene;
+			paths.probeBatch = reflections.probeBatch;
+			paths.identifier = {IPL_BAKEDDATATYPE_PATHING, IPL_BAKEDDATAVARIATION_DYNAMIC, {}};
+			paths.numSamples = 1;
+			paths.radius = 0.5f;
+			paths.threshold = 0.1f;
+			paths.visRange = 1000.0f;
+			paths.pathRange = 1000.0f;
+			paths.numThreads = threads;
+			progress.start = 0.75f;
+			progress.span = 0.25f;
+			core->context->bakePaths(&paths, report_progress, &progress);
+			core->baked_reverb = core->baked_paths = true;
+			core->rebuild_needed = true;
+			progress.last = -1.0f;
+			report_progress(1.0f, &progress);
+		}
+		if (callback) callback->Release();
+		return ok;
+	}
+	// Baked data is saved as the probes followed by Steam Audio's serialized probe batch.
+	static constexpr char BAKED_DATA_MAGIC[8] = {'N', 'V', 'G', 'T', 'S', 'E', 'N', 'V'};
+	static constexpr unsigned int BAKED_DATA_VERSION = 1;
+	string save_baked_data() const {
+		string data(BAKED_DATA_MAGIC, sizeof(BAKED_DATA_MAGIC));
+		auto put = [&data](const void* p, size_t size) { data.append(static_cast<const char*>(p), size); };
+		unsigned int header[3] = {BAKED_DATA_VERSION, (core->baked_reverb ? 1u : 0u) | (core->baked_paths ? 2u : 0u), (unsigned int)core->probe_spheres.size()};
+		put(header, sizeof(header));
+		if (!core->probe_spheres.empty()) put(core->probe_spheres.data(), core->probe_spheres.size() * sizeof(IPLSphere));
+		ipl_ref<api::ISerializedObject> serialized;
+		IPLSerializedObjectSettings settings{};
+		unsigned long long size = 0;
+		if (core->probes && core->context->createSerializedObject(&settings, serialized.put()) == IPL_STATUS_SUCCESS) {
+			core->probes->save(serialized.get());
+			size = serialized->getSize();
+		}
+		put(&size, sizeof(size));
+		if (size) put(serialized->getData(), size);
+		return data;
+	}
+	bool load_baked_data(const string& data) {
+		size_t offset = 0;
+		auto get = [&](void* p, size_t size) {
+			if (offset + size > data.size()) return false;
+			memcpy(p, data.data() + offset, size);
+			offset += size;
+			return true;
+		};
+		char magic[sizeof(BAKED_DATA_MAGIC)];
+		unsigned int header[3];
+		if (!get(magic, sizeof(magic)) || memcmp(magic, BAKED_DATA_MAGIC, sizeof(magic)) || !get(header, sizeof(header)) || header[0] != BAKED_DATA_VERSION) return false;
+		vector<IPLSphere> spheres(header[2]);
+		unsigned long long size = 0;
+		if ((header[2] && !get(spheres.data(), spheres.size() * sizeof(IPLSphere))) || !get(&size, sizeof(size)) || offset + size != data.size()) return false;
+		ipl_ref<api::IProbeBatch> batch;
+		if (size) {
+			IPLSerializedObjectSettings settings{reinterpret_cast<IPLbyte*>(const_cast<char*>(data.data() + offset)), (IPLsize)size};
+			ipl_ref<api::ISerializedObject> serialized;
+			if (core->context->createSerializedObject(&settings, serialized.put()) != IPL_STATUS_SUCCESS || core->context->loadProbeBatch(serialized.get(), batch.put()) != IPL_STATUS_SUCCESS) return false;
+			batch->commit();
+		}
+		core->wait_until_idle();
+		core->probe_spheres = move(spheres);
+		core->probes.reset(batch.get() ? batch.get()->retain() : nullptr);
+		core->baked_reverb = batch && (header[1] & 1);
+		core->baked_paths = batch && (header[1] & 2);
+		core->rebuild_needed = true;
+		return true;
+	}
+	bool get_use_baked_reverb() const { return core->use_baked_reverb; }
+	void set_use_baked_reverb(bool v) { core->use_baked_reverb = v; }
+	bool get_pathing() const { return core->pathing; }
+	void set_pathing(bool v) { if (v != core->pathing) { core->pathing = v; core->rebuild_needed = true; } }
+	float get_pathing_level() const { return core->pathing_level; }
+	void set_pathing_level(float v) { core->pathing_level = max(0.0f, v); }
+	float get_pathing_simulation_time() const { return core->pathing_time; }
 	void update() { core->update(); }
 	reverb3d* get_reverb3d() const { return verb; }
 	audio_engine* get_engine() const { return core->engine; }
@@ -1022,7 +1319,7 @@ public:
 	int get_reflection_bounces() const { return core->bounces; }
 	void set_reflection_bounces(int v) { core->bounces = clamp(v, 1, 64); }
 	int get_max_sources() const { return core->max_sources; }
-	void set_max_sources(int v) { v = clamp(v, 1, MAX_REFLECTION_GROUPS); if (v != core->max_sources) { core->max_sources = v; core->rebuild_needed = true; } }
+	void set_max_sources(int v) { v = clamp(v, 0, MAX_REFLECTION_GROUPS); if (v != core->max_sources) { core->max_sources = v; core->rebuild_needed = true; } }
 	int get_simulation_threads() const { return core->threads; }
 	void set_simulation_threads(int v) { v = clamp(v, 1, 64); if (v != core->threads) { core->threads = v; core->rebuild_needed = true; } }
 	int get_diffuse_samples() const { return core->diffuse_samples; }
@@ -1100,7 +1397,10 @@ void RegisterSoundEnvironment(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("sound_environment_source", "float get_reverb_time_low() const property", asFUNCTION((band_getter<environment_source, &environment_source::get_reverb_time, 0>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound_environment_source", "float get_reverb_time_mid() const property", asFUNCTION((band_getter<environment_source, &environment_source::get_reverb_time, 1>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound_environment_source", "float get_reverb_time_high() const property", asFUNCTION((band_getter<environment_source, &environment_source::get_reverb_time, 2>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound_environment_source", "bool get_apply_pathing() const property", asFUNCTION((source_call<&environment_source::get_apply_pathing, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound_environment_source", "void set_apply_pathing(bool enabled) property", asFUNCTION((source_call<&environment_source::set_apply_pathing, void, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectType("sound_environment", 0, asOBJ_REF);
+	engine->RegisterFuncdef("void sound_environment_bake_callback(float progress)");
 	engine->RegisterObjectBehaviour("sound_environment", asBEHAVE_FACTORY, "sound_environment@ f(audio_engine@+ engine = sound_default_engine)", asFUNCTION(sound_environment::create), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("sound_environment", asBEHAVE_ADDREF, "void f()", asMETHOD(sound_environment, add_ref), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("sound_environment", asBEHAVE_RELEASE, "void f()", asMETHOD(sound_environment, release), asCALL_THISCALL);
@@ -1115,6 +1415,16 @@ void RegisterSoundEnvironment(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("sound_environment", "void detach(sound@+ snd)", asFUNCTION(environment_detach_sound), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound_environment", "sound_environment_source@ get_source(sound@+ snd) const", asFUNCTION(environment_get_sound_source), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound_environment", "void update()", asMETHOD(sound_environment, update), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "uint generate_probes(const vector&in minimum, const vector&in maximum, float spacing = 2, float height = 1.5)", asMETHOD(sound_environment, generate_probes), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "void add_probe(const vector&in position, float radius = 2)", asMETHOD(sound_environment, add_probe), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "void clear_probes()", asMETHOD(sound_environment, clear_probes), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "uint get_probe_count() const property", asMETHOD(sound_environment, get_probe_count), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "bool bake(sound_environment_bake_callback@ progress = null)", asMETHOD(sound_environment, bake), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "bool get_has_baked_reverb() const property", asMETHOD(sound_environment, get_has_baked_reverb), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "bool get_has_baked_paths() const property", asMETHOD(sound_environment, get_has_baked_paths), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "string save_baked_data() const", asMETHOD(sound_environment, save_baked_data), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "bool load_baked_data(const string&in data)", asMETHOD(sound_environment, load_baked_data), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "float get_pathing_simulation_time() const property", asMETHOD(sound_environment, get_pathing_simulation_time), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "reverb3d@+ get_reverb3d() const property", asMETHOD(sound_environment, get_reverb3d), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "audio_engine@+ get_engine() const property", asMETHOD(sound_environment, get_engine), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "mixer@+ get_output_mixer() const property", asMETHOD(sound_environment, get_output_mixer), asCALL_THISCALL);
@@ -1147,5 +1457,8 @@ void RegisterSoundEnvironment(asIScriptEngine* engine) {
 	ENV_PROPERTY(float, reflections_level)
 	ENV_PROPERTY(float, reflections_width)
 	ENV_PROPERTY(float, reflections_highpass)
+	ENV_PROPERTY(bool, use_baked_reverb)
+	ENV_PROPERTY(bool, pathing)
+	ENV_PROPERTY(float, pathing_level)
 	#undef ENV_PROPERTY
 }

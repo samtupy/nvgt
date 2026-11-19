@@ -336,3 +336,77 @@ void test_sound_environment_reflection_budget() { // With more sounds than refle
 	double tail = sound_environment_test_energy(e, env, 40);
 	assert(tail > 10, "a sound sharing a group should reverberate, tail energy " + tail);
 }
+void test_sound_environment_probes_and_baking() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	assert(env.generate_probes(vector(-5, -5, 0), vector(5, 5, 4), 2, 1.5) == 0, "probes can't be generated without a raycaster");
+	env.set_raycaster(world);
+	assert(env.generate_probes(vector(-5, -5, 0), vector(5, 5, 4), 2, 1.5) == 36, "a 10 meter square room should get a 6 by 6 grid of probes 2 meters apart, got " + env.probe_count);
+	assert(!env.has_baked_reverb and !env.has_baked_paths, "nothing is baked yet");
+	string unbaked = env.save_baked_data();
+	assert(env.bake() and env.has_baked_reverb and env.has_baked_paths, "baking should bake reverb and paths");
+	string data = env.save_baked_data();
+	assert(data.length() > unbaked.length() + 36 * 1000, "baked data should hold reverb for every probe, " + data.length() + " bytes against " + unbaked.length() + " unbaked");
+	sound_environment loaded(e);
+	assert(loaded.load_baked_data(data) and loaded.probe_count == 36 and loaded.has_baked_reverb and loaded.has_baked_paths, "baked data should load with its probes");
+	assert(loaded.save_baked_data() == data, "loaded baked data should save the same");
+	assert(!loaded.load_baked_data(data.substr(0, data.length() - 1)) and !loaded.load_baked_data("not baked data") and loaded.probe_count == 36, "invalid data should be refused and leave the probes as they were");
+	loaded.add_probe(vector(0, 0, 3));
+	assert(loaded.probe_count == 37 and !loaded.has_baked_reverb, "changing the probes discards the baked data");
+	loaded.clear_probes();
+	assert(loaded.probe_count == 0, "clear_probes should remove every probe");
+}
+double sound_environment_test_baked_tail(bool use_baked_reverb) {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.max_sources = 0; // Only the listener's reverb.
+	env.set_raycaster(world);
+	env.generate_probes(vector(-5, -5, 0), vector(5, 5, 4), 2, 1.5);
+	assert(env.bake());
+	env.set_raycaster(null); // Simulated in real time, the listener's reverb would now be silent.
+	env.use_baked_reverb = use_baked_reverb;
+	e.set_listener_position(0, -1, -1, 1.5);
+	sound@ s = env.new_sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	sound_environment_test_wait_for_decoding(s);
+	s.set_position_3d(1, 1, 1.5);
+	assert(sound_environment_test_wait_for_reflections(e, env, env.reflection_simulations + 3));
+	s.play();
+	sound_environment_test_energy(e, env, 20);
+	return sound_environment_test_energy(e, env, 40);
+}
+void test_sound_environment_baked_reverb() { // The listener's reverb can be looked up from baked probes rather than simulated.
+	double baked = sound_environment_test_baked_tail(true), unbaked = sound_environment_test_baked_tail(false);
+	assert(baked > 10 and unbaked < baked / 100, "the baked reverb should be heard where real time simulation hears nothing, tail energy " + baked + " baked and " + unbaked + " simulated");
+}
+double sound_environment_test_pathing_energy(bool pathing, bool baked) { // A sound on the other side of a wall with a gap at one end, heard without transmission or reflections.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	world.create_and_add_body(physics_box_shape_create(vector(0.1, 3.5, 2), 0.05, physics_material_get("brick")), vector(0, -1.5, 2), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING); // The wall at x 0, open from y 2 to 5.
+	sound_environment env(e);
+	env.set_raycaster(world);
+	env.reflections_level = 0;
+	env.generate_probes(vector(-5, -5, 0), vector(5, 5, 4), 1.5, 1.5);
+	if (baked) assert(env.bake());
+	env.pathing = pathing;
+	e.set_listener_position(0, -3, -3, 1.5);
+	mixer@ m = env.new_mixer();
+	m.set_position_3d(3, -3, 1.5);
+	env.get_source(m).apply_transmission = false;
+	sound@ s = e.sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	sound_environment_test_wait_for_decoding(s);
+	s.set_mixer(m);
+	sound_environment_test_pump(e, env, 20);
+	s.play_looped();
+	sound_environment_test_energy(e, env, 10);
+	return sound_environment_test_energy(e, env, 40);
+}
+void test_sound_environment_pathing() { // Pathing lets a sound be heard around the wall between it and the listener, through the gap at the wall's end.
+	double without = sound_environment_test_pathing_energy(false, true), with_pathing = sound_environment_test_pathing_energy(true, true), unbaked = sound_environment_test_pathing_energy(true, false);
+	assert(without < 0.001, "with the direct path blocked and nothing else enabled, the sound should be silent, energy " + without);
+	assert(with_pathing > 1, "with pathing, the sound should be heard around the wall, energy " + with_pathing);
+	assert(unbaked < 0.001, "pathing needs baked paths, energy " + unbaked);
+}

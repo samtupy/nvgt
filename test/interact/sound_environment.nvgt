@@ -4,6 +4,7 @@
 // This shows the recommended shape: each object (here the player and the sonar) gets one mixer from the environment, positioned with the object, and every sound the object makes plays through its mixer, so the object is simulated once rather than every sound being a new source.
 // Up and down arrows walk forward and back, left and right arrows sidestep, Q and E turn by 45 degrees. C speaks your position and the area you're in, S speaks simulation details for the sonar, R toggles reflections, P pauses the sonar, escape exits.
 // Enter, near the doorway between the hall and the lounge, closes it with a drywall wall or opens it again, so the lounge can be heard without the hall.
+// The map's probes are baked when the test starts, so that the listener's reverb is looked up from them and pathing, off by default and toggled from the settings, lets sounds be heard around walls, such as the sonar from the hall through the doorway. Closing the doorway closes that path too.
 // Backspace toggles a microphone loopback: what you say into the default microphone plays from a point in the world through the environment, which shift with the arrows moves a meter north, south, west or east. Use headphones, or the speakers will feed back into the microphone.
 // Left and right brackets select a setting of the environment, of the sonar's source or of how you move, and minus and equals lower or raise it. max sources is the number of reflection groups, and reflection grouping how far apart, as a fraction of their distance from you, sounds can be and still share one. Toggles flip and choices cycle with either key. Changing the rays, duration, order, threads, diffuse samples, max sources or reflection type rebuilds the simulator, so reflections drop out briefly. The movement settings are last, so left bracket reaches them quickly: walk speed, and step size, which when above 0 makes each press of an arrow walk that far.
 #pragma console
@@ -26,7 +27,7 @@ physics_body_id doorway_wall;
 bool doorway_closed = false;
 float reflections_on_level; // The level R restores when turning reflections back on.
 sound_environment_source@ sonar_source;
-const string[] setting_names = {"reflections level", "reflections width", "reflections highpass", "reflection type", "reflection rays", "reflection bounces", "reflection duration", "reflection order", "diffuse samples", "irradiance min distance", "simulation interval", "simulation threads", "max sources", "hybrid transition time", "hybrid overlap", "reflection mixer", "listener reverb", "binaural reflections", "HRTF", "sonar occlusion", "sonar transmission", "sonar reflections", "sonar reflections level", "sonar occlusion type", "sonar occlusion radius", "sonar transmission rays", "walk speed", "step size", "reflection grouping"};
+const string[] setting_names = {"reflections level", "reflections width", "reflections highpass", "reflection type", "reflection rays", "reflection bounces", "reflection duration", "reflection order", "diffuse samples", "irradiance min distance", "simulation interval", "simulation threads", "max sources", "hybrid transition time", "hybrid overlap", "reflection mixer", "listener reverb", "binaural reflections", "HRTF", "sonar occlusion", "sonar transmission", "sonar reflections", "sonar reflections level", "sonar occlusion type", "sonar occlusion radius", "sonar transmission rays", "walk speed", "step size", "reflection grouping", "pathing", "pathing level", "baked reverb"};
 const sound_environment_reflection_type[] reflection_types = {SOUND_ENVIRONMENT_REFLECTIONS_CONVOLUTION, SOUND_ENVIRONMENT_REFLECTIONS_HYBRID, SOUND_ENVIRONMENT_REFLECTIONS_PARAMETRIC};
 const string[] reflection_type_names = {"convolution", "hybrid", "parametric"};
 int setting = 0;
@@ -62,6 +63,9 @@ string setting_value(int i) {
 		case 26: return round(walk_speed, 1) + " meters per second";
 		case 27: return step_size > 0 ? round(step_size, 2) + " meters" : "off, hold to walk";
 		case 28: return round(env.reflection_grouping, 2) + " of the distance";
+		case 29: return on_off(env.pathing);
+		case 30: return "" + round(env.pathing_level, 2);
+		case 31: return on_off(env.use_baked_reverb);
 	}
 	return "";
 }
@@ -96,6 +100,9 @@ void change_setting(int i, int dir) { // dir is 1 to raise and -1 to lower. The 
 		case 26: walk_speed = fmax(0.2, walk_speed + 0.2 * dir); break;
 		case 27: step_size = fmax(0, step_size + 0.25 * dir); break;
 		case 28: env.reflection_grouping = env.reflection_grouping + 0.05 * dir; break;
+		case 29: env.pathing = !env.pathing; break;
+		case 30: env.pathing_level = env.pathing_level + 0.1 * dir; break;
+		case 31: env.use_baked_reverb = !env.use_baked_reverb; break;
 	}
 }
 
@@ -234,6 +241,12 @@ void main() {
 	set_sound_global_hrtf(true);
 	build_map();
 	env.set_raycaster(world);
+	// Probes 1.5 meters above every floor of the map, at which the listener's reverb and the paths sound takes are baked. Baking takes about a second here, a game would bake once and save the result with save_baked_data.
+	screen_reader_speak("Baking.");
+	timer bake_time;
+	env.generate_probes(vector(-20, -20, -0.5), vector(40, 18, 4.2), 2, 1.5);
+	env.bake();
+	string baked_message = env.probe_count + " probes baked in " + round(bake_time.elapsed / 1000.0, 1) + " seconds. ";
 	@player = physics_character(world, 1.8, 0.3, vector(3, 3, 0.1));
 	@player_mixer = env.new_mixer();
 	mixer@ sonar_mixer = env.new_mixer();
@@ -243,7 +256,7 @@ void main() {
 	@mic_mixer = env.new_mixer();
 	mic_mixer.set_position_3d(mic_position.x, mic_position.y, mic_position.z);
 	reflections_on_level = env.reflections_level;
-	screen_reader_speak("Sound environment test. You are in a concrete hall facing north. Arrows to move and turn.");
+	screen_reader_speak(baked_message + "Sound environment test. You are in a concrete hall facing north. Arrows to move and turn.");
 	timer frame_time, bump_time;
 	float physics_accumulator = 0, step_distance = 0, blocked_time = 0, step_remaining = 0;
 	vector step_direction;

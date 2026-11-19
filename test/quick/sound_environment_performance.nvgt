@@ -1,7 +1,7 @@
 // Measures how much sound_environment costs as the number of sources and the reflection settings grow, to find how much a game can use without the audio glitching or reflections lagging behind.
 // Audio is rendered by an engine without a device, paced to real time so that the reflection worker runs at the rate it would in a game, and nothing is played. Every source plays looping noise, as silent sources skip their convolution.
 // Reflections are simulated for at most max_sources reflection groups, which nearby sounds share, so the cost levels off once there are more sounds than groups. For each scenario this prints how long a reflection simulation takes (reflections follow changes by at least this long), how many reflection simulations completed per second (at most 10 with the default simulation_interval of 0.1 seconds), the audio thread's load as a percentage of real time (the average and the worst block, over 100% being an audible glitch with a device), and how long sound_environment.update takes on the script thread.
-// Run with nvgt sound_environment_performance.nvgt -- followed by the groups to run: sources (the number of sources with a still and a moving listener, the default), settings (64 sources with different reflection settings), audio (what the audio thread's cost depends on), threads (how the reflection simulation scales with threads), bursts (two guns firing short sounds every 50ms, each sound its own source or played through one mixer per gun), or all.
+// Run with nvgt sound_environment_performance.nvgt -- followed by the groups to run: sources (the number of sources with a still and a moving listener, the default), settings (64 sources with different reflection settings), audio (what the audio thread's cost depends on), threads (how the reflection simulation scales with threads), bursts (two guns firing short sounds every 50ms, each sound its own source or played through one mixer per gun), spikes (whether the audio thread's worst blocks come from reflection updates), pathing (with the map's probes baked and pathing enabled), or all.
 #pragma console
 
 const int SAMPLE_RATE = 48000, CHANNELS = 2, BLOCK_FRAMES = 512; // NVGT's audio period.
@@ -15,6 +15,7 @@ class scenario {
 	bool moving = false;
 	int groups = 0; // The number of reflection groups, 0 for the default.
 	float interval = 0.1; // The simulation interval.
+	bool pathing = false; // Whether probes are baked and pathing is enabled.
 	int guns = 0; // Guns firing a short sound every 50ms, in addition to the looping sources.
 	bool gun_mixers = false; // Whether each gun plays its shots through one mixer of the environment, rather than every shot being a new environment sound.
 	sound_environment_reflection_type type = SOUND_ENVIRONMENT_REFLECTIONS_CONVOLUTION;
@@ -105,6 +106,11 @@ void run(scenario@ sc, const float[]@ noise, const float[]@ gunshot) {
 	env.reflection_type = sc.type;
 	if (sc.threads > 0) env.simulation_threads = sc.threads;
 	env.set_raycaster(world);
+	if (sc.pathing) {
+		env.generate_probes(vector(-20, -20, -0.5), vector(40, 18, 4.2), 2, 1.5);
+		env.bake();
+		env.pathing = true;
+	}
 	random_state = 12345;
 	mixer@[] mixers;
 	sound@[] sounds;
@@ -133,7 +139,7 @@ void run(scenario@ sc, const float[]@ noise, const float[]@ gunshot) {
 	float next_shot = 0;
 	uint most_sources = 0, most_groups = 0;
 	const double block_ms = BLOCK_FRAMES * 1000.0 / SAMPLE_RATE;
-	double audio_ms = 0, audio_worst = 0, update_ms = 0, update_worst = 0, reflection_ms = 0, reflection_worst = 0;
+	double audio_ms = 0, audio_worst = 0, update_ms = 0, update_worst = 0, reflection_ms = 0, reflection_worst = 0, pathing_worst = 0;
 	int blocks = 0, overruns = 0, reflection_count = 0;
 	uint last_runs = env.reflection_simulations;
 	timer wall(0, MICROSECONDS), measure;
@@ -178,6 +184,7 @@ void run(scenario@ sc, const float[]@ noise, const float[]@ gunshot) {
 			if (read_ms > block_ms) overruns++;
 			update_ms += up_ms;
 			if (up_ms > update_worst) update_worst = up_ms;
+			if (env.pathing_simulation_time > pathing_worst) pathing_worst = env.pathing_simulation_time;
 			if (env.reflection_simulations != last_runs) {
 				last_runs = env.reflection_simulations;
 				reflection_count++;
@@ -190,7 +197,7 @@ void run(scenario@ sc, const float[]@ noise, const float[]@ gunshot) {
 	float seconds = measure.elapsed / 1000.0;
 	string reflections = reflection_count > 0 ? round(reflection_ms / reflection_count, 1) + " ms (worst " + round(reflection_worst, 1) + ")" : "none finished";
 	println(pad(sc.name, 34) + pad(reflections, 28) + pad(round(reflection_count / seconds, 1) + "/s", 9) + pad(round(audio_ms / blocks / block_ms * 100, 1) + "% (worst " + round(audio_worst / block_ms * 100, 0) + "%, " + overruns + " over)", 30) + round(update_ms / blocks, 2) + " ms (worst " + round(update_worst, 1) + ")");
-	println("    at most " + most_sources + " sources in " + most_groups + " of " + env.max_sources + " reflection groups");
+	println("    at most " + most_sources + " sources in " + most_groups + " of " + env.max_sources + " reflection groups" + (sc.pathing ? ", " + env.probe_count + " probes, pathing at most " + round(pathing_worst, 2) + " ms" : ""));
 	for (uint i = 0; i < sounds.length(); i++) sounds[i].close();
 	for (uint i = 0; i < shots.length(); i++) shots[i].close();
 }
@@ -240,6 +247,10 @@ void main() {
 		{ scenario sc("16 still, 2 threads", 16, false); sc.threads = 2; scenarios.insert_last(sc); }
 		{ scenario sc("16 still, 4 threads", 16, false); sc.threads = 4; scenarios.insert_last(sc); }
 		{ scenario sc("16 still, 6 threads", 16, false); sc.threads = 6; scenarios.insert_last(sc); }
+	}
+	if (all or groups.find("pathing") > -1) { // The cost of pathing, with the map's probes baked.
+		{ scenario sc("16 moving, pathing", 16, true); sc.pathing = true; scenarios.insert_last(sc); }
+		{ scenario sc("64 moving, pathing", 64, true); sc.pathing = true; scenarios.insert_last(sc); }
 	}
 	if (all or groups.find("bursts") > -1) { // Inexperienced users might play every shot of a machine gun as a new environment sound rather than through one mixer per gun.
 		{ scenario sc("8 loops", 8, true); scenarios.insert_last(sc); }
