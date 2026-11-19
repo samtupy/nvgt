@@ -226,12 +226,12 @@ public:
 	chrono::steady_clock::time_point last_reflections, last_pathing;
 	bool shut_down = false;
 
-	environment_core(audio_engine* e) : engine(e), context(reinterpret_cast<api::IContext*>(phonon_get_context())), channels(e->get_channels()) {
+	environment_core(audio_engine* e) : engine(e), context(phonon_get_context()), channels(e->get_channels()) {
 		engine->duplicate();
 		context->retain();
 		audio_settings = {(IPLint32)engine->get_sample_rate(), SOUNDSYSTEM_FRAMESIZE};
 		threads = max(1, (int)thread::hardware_concurrency() / 2);
-		if (phonon_get_audio_settings().samplingRate == audio_settings.samplingRate) hrtf.reset(reinterpret_cast<api::IHRTF*>(phonon_get_hrtf())->retain());
+		if (phonon_get_audio_settings().samplingRate == audio_settings.samplingRate) hrtf.reset(phonon_get_hrtf()->retain());
 		else {
 			IPLHRTFSettings hrtf_settings{};
 			hrtf_settings.type = IPL_HRTFTYPE_DEFAULT;

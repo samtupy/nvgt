@@ -1,0 +1,57 @@
+// Tests for the Steam Audio based audio nodes, the HRTF panner and attenuator and phonon_binaural_node. Audio is rendered by an engine without a device so nothing is played.
+float[]@ phonon_test_noise(int channels) {
+	float[] noise(44100 / 2 * channels);
+	for (uint i = 0; i < noise.length(); i++) noise[i] = random(-1000, 1000) / 4000.0;
+	return noise;
+}
+double[]@ phonon_test_render(audio_engine@ e, int blocks) { // The energy of the left and right channels.
+	double[] energy = {0, 0};
+	for (int b = 0; b < blocks; b++) {
+		float[]@ frames = e.read(512);
+		for (uint i = 0; i + 1 < frames.length(); i += 2) {
+			energy[0] += frames[i] * frames[i];
+			energy[1] += frames[i + 1] * frames[i + 1];
+		}
+	}
+	return energy;
+}
+void phonon_test_wait(sound@ s) {
+	timer t;
+	while (!s.load_complete and t.elapsed < 5000) wait(1);
+	assert(s.load_complete, "the test sound should finish decoding");
+}
+void test_phonon_binaural_node() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	sound@ s = e.sound();
+	assert(s.load_pcm(phonon_test_noise(2), 44100, 2));
+	phonon_test_wait(s);
+	phonon_binaural_node binaural(e, 2, 44100);
+	s.set_mixer(null);
+	assert(s.attach_output_bus(0, binaural, 0) and binaural.attach_output_bus(0, e.endpoint, 0), "the binaural node should connect between the sound and the engine");
+	binaural.set_direction(1, 0, 0, 10); // To the right, fully spatialized.
+	s.play_looped();
+	double[]@ right = phonon_test_render(e, 20);
+	binaural.set_direction(-1, 0, 0, 10);
+	phonon_test_render(e, 4);
+	double[]@ left = phonon_test_render(e, 20);
+	assert(right[0] + right[1] > 1, "the binaural node should pass sound through, energy " + right[0] + ", " + right[1]);
+	assert(right[1] > right[0] * 2 and left[0] > left[1] * 2, "a sound to the right should be louder in the right ear and one to the left in the left ear, got " + right[0] + ", " + right[1] + " and " + left[0] + ", " + left[1]);
+}
+void test_phonon_hrtf_spatialization() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	sound@ s = e.sound();
+	assert(s.load_pcm(phonon_test_noise(2), 44100, 2));
+	phonon_test_wait(s);
+	s.hrtf = true;
+	assert(s.hrtf, "the sound should use the HRTF panner and attenuator");
+	e.set_listener_position(0, 0, 0, 0);
+	s.set_position_3d(3, 0, 0); // The listener faces y, so this is to the right.
+	s.play_looped();
+	phonon_test_render(e, 4);
+	double[]@ near = phonon_test_render(e, 20);
+	s.set_position_3d(30, 0, 0);
+	phonon_test_render(e, 4);
+	double[]@ far = phonon_test_render(e, 20);
+	assert(near[0] + near[1] > 1 and near[1] > near[0] * 2, "a sound to the right should be louder in the right ear, got " + near[0] + ", " + near[1]);
+	assert(far[0] + far[1] < (near[0] + near[1]) / 2, "the attenuator should make a farther sound quieter, energy " + (near[0] + near[1]) + " near and " + (far[0] + far[1]) + " far");
+}

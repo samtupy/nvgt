@@ -12,7 +12,6 @@
 
 #include <exception>
 #include <angelscript.h> // asAtomic
-#include <miniaudio_phonon.h>
 #include <phonon.h>
 #include <unordered_map>
 #include <vector>
@@ -124,8 +123,9 @@ public:
 bool set_global_hrtf(bool enabled);
 bool get_global_hrtf();
 bool phonon_init(); // Creates the Steam Audio context and default HRTF on first use for the default audio engine's sample rate.
-IPLContext phonon_get_context();
-IPLHRTF phonon_get_hrtf();
+namespace api { class IContext; class IHRTF; } // From Steam Audio's phonon_interfaces.h.
+api::IContext* phonon_get_context();
+api::IHRTF* phonon_get_hrtf();
 const IPLAudioSettings& phonon_get_audio_settings();
 
 class phonon_binaural_node : public virtual audio_node {
