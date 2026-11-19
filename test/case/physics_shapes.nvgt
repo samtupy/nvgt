@@ -1,0 +1,21 @@
+// Tests for the physics shape wrappers, including simulating bodies built from them.
+void test_cylinder_shape() {
+	physics_cylinder_shape@ cyl = physics_cylinder_shape_create(1.0, 0.5);
+	assert(cyl !is null, "cylinder creation failed");
+	assert(cyl.half_height == 1.0 and cyl.radius == 0.5 and abs(cyl.convex_radius - 0.05) < 0.0001, "cylinder accessors gave " + cyl.half_height + ", " + cyl.radius + ", " + cyl.convex_radius);
+	assert(cyl.sub_type == PHYSICS_SHAPE_CYLINDER, "cylinder sub type was " + cyl.sub_type);
+	assert(abs(cyl.volume - 3.14159265 * 0.25 * 2.0) < 0.001, "cylinder volume was " + cyl.volume);
+	assert(physics_cylinder_shape_create(1.0, 0.5, 0.1).convex_radius == 0.1, "explicit convex radius");
+	aabb bounds = cyl.local_bounds;
+	assert(abs(bounds.max.y - 1.0) < 0.0001 and abs(bounds.max.x - 0.5) < 0.0001, "cylinder bounds max was " + bounds.max);
+	physics_shape@ s = cyl;
+	physics_convex_shape@ c = cast<physics_convex_shape>(s);
+	assert(c !is null and cast<physics_cylinder_shape>(c) !is null, "cylinder should downcast from physics_shape");
+	assert(cast<physics_box_shape>(c) is null and cast<physics_capsule_shape>(c) is null, "cylinder must not cast to other shapes");
+	physics_world world;
+	world.create_and_add_body(physics_box_shape_create(vector(10, 0.5, 10)), vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	physics_body_id body = world.create_and_add_body(cyl, vector(0, 5, 0), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	for (int i = 0; i < 240; i++) world.update(1.0 / 60);
+	vector pos = world.get_position(body);
+	assert(abs(pos.y - 1.5) < 0.05 and abs(pos.x) < 0.05 and abs(pos.z) < 0.05, "cylinder should rest on the floor at y 1.5, but is at " + pos);
+}
