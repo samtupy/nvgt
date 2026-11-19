@@ -691,6 +691,18 @@ static void jolt_world_set_friction(jolt_physics_world* w, const BodyID& id, flo
 static float jolt_world_get_restitution(jolt_physics_world* w, const BodyID& id) { return w->system.GetBodyInterface().GetRestitution(id); }
 static void jolt_world_set_restitution(jolt_physics_world* w, const BodyID& id, float v) { w->system.GetBodyInterface().SetRestitution(id, v); }
 static float jolt_world_get_gravity_factor(jolt_physics_world* w, const BodyID& id) { return w->system.GetBodyInterface().GetGravityFactor(id); }
+// NVGT uses Jolt's per body user data for flags. Acoustically transparent bodies are ignored by the raycast provider, for bodies such as characters that contain the listener or the sounds they make, which would otherwise block every path sound could take to or from them.
+static constexpr uint64 BODY_ACOUSTICALLY_TRANSPARENT = 1;
+class acoustic_body_filter final : public BodyFilter {
+public:
+	bool ShouldCollideLocked(const Body& body) const override { return (body.GetUserData() & BODY_ACOUSTICALLY_TRANSPARENT) == 0; }
+};
+static void jolt_world_set_acoustically_transparent(jolt_physics_world* w, const BodyID& id, bool transparent) {
+	BodyInterface& bi = w->system.GetBodyInterface();
+	uint64 data = bi.GetUserData(id);
+	bi.SetUserData(id, transparent ? data | BODY_ACOUSTICALLY_TRANSPARENT : data & ~BODY_ACOUSTICALLY_TRANSPARENT);
+}
+static bool jolt_world_get_acoustically_transparent(jolt_physics_world* w, const BodyID& id) { return (w->system.GetBodyInterface().GetUserData(id) & BODY_ACOUSTICALLY_TRANSPARENT) != 0; }
 static void jolt_world_set_gravity_factor(jolt_physics_world* w, const BodyID& id, float v) { w->system.GetBodyInterface().SetGravityFactor(id, v); }
 
 // -- Body interface: spatial queries --
@@ -759,7 +771,7 @@ void jolt_physics_world::closest_hits(int count, const nvgt_ray* rays, const flo
 		float length;
 		RRayCast ray = make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, length);
 		ClosestHitCollisionCollector<CastRayCollector> collector;
-		query.CastRay(ray, settings, collector);
+		query.CastRay(ray, settings, collector, {}, {}, acoustic_body_filter());
 		if (!collector.HadHit()) continue;
 		const RayCastResult& result = collector.mHit;
 		nvgt_acoustic_material& material = g_raycast_hit_materials[i];
@@ -796,7 +808,7 @@ void jolt_physics_world::any_hits(int count, const nvgt_ray* rays, const float* 
 		}
 		float length;
 		AnyHitCollisionCollector<CastRayCollector> collector;
-		query.CastRay(make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, length), settings, collector);
+		query.CastRay(make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, length), settings, collector, {}, {}, acoustic_body_filter());
 		occluded[i] = collector.HadHit() ? 1 : 0;
 	}
 }
@@ -824,6 +836,7 @@ struct jolt_character {
 		settings.mLayer = layer;
 		character = new Character(&settings, position, rotation, 0, &world->system);
 		character->AddToPhysicsSystem(EActivation::Activate);
+		jolt_world_set_acoustically_transparent(world, character->GetBodyID(), true); // The listener and the character's own sounds are usually inside its shape.
 		world->characters.push_back(this);
 	}
 	~jolt_character() {
@@ -904,6 +917,8 @@ static void jolt_character_set_linear_velocity(jolt_character* c, const Vec3& v)
 static void jolt_character_add_linear_velocity(jolt_character* c, const Vec3& v) { c->character->AddLinearVelocity(v); }
 static void jolt_character_add_impulse(jolt_character* c, const Vec3& v) { c->character->AddImpulse(v); }
 static void jolt_character_activate(jolt_character* c) { c->character->Activate(); }
+static bool jolt_character_get_acoustically_transparent(const jolt_character* c) { return jolt_world_get_acoustically_transparent(c->world, c->character->GetBodyID()); }
+static void jolt_character_set_acoustically_transparent(jolt_character* c, bool transparent) { jolt_world_set_acoustically_transparent(c->world, c->character->GetBodyID(), transparent); }
 static uint16 jolt_character_get_layer(const jolt_character* c) { return c->character->GetLayer(); }
 static void jolt_character_set_layer(jolt_character* c, uint16 layer) { c->character->SetLayer(layer); }
 static bool jolt_character_set_shape(jolt_character* c, jolt_shape_ref* shape, float max_penetration_depth) { return shape && c->character->SetShape(shape->shape.GetPtr(), max_penetration_depth); }
@@ -1287,6 +1302,8 @@ static void RegisterJoltCharacter(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_character", "void add_linear_velocity(const vector&in velocity)", asFUNCTION(jolt_character_add_linear_velocity), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_character", "void add_impulse(const vector&in impulse)", asFUNCTION(jolt_character_add_impulse), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_character", "void activate()", asFUNCTION(jolt_character_activate), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "bool get_acoustically_transparent() const property", asFUNCTION(jolt_character_get_acoustically_transparent), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "void set_acoustically_transparent(bool transparent) property", asFUNCTION(jolt_character_set_acoustically_transparent), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_character", "uint16 get_layer() const property", asFUNCTION(jolt_character_get_layer), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_character", "void set_layer(uint16 layer) property", asFUNCTION(jolt_character_set_layer), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_character", "bool set_shape(physics_shape@ shape, float max_penetration_depth = FLOAT_MAX)", asFUNCTION(jolt_character_set_shape), asCALL_CDECL_OBJFIRST);
@@ -1364,6 +1381,8 @@ static void RegisterJoltWorld(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_world", "float get_restitution(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_restitution), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "void set_restitution(const physics_body_id&in id, float v)", asFUNCTION(jolt_world_set_restitution), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "float get_gravity_factor(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_gravity_factor), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_acoustically_transparent(const physics_body_id&in id, bool transparent)", asFUNCTION(jolt_world_set_acoustically_transparent), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "bool get_acoustically_transparent(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_acoustically_transparent), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "void set_gravity_factor(const physics_body_id&in id, float v)", asFUNCTION(jolt_world_set_gravity_factor), asCALL_CDECL_OBJFIRST);
 
 	// Spatial queries
