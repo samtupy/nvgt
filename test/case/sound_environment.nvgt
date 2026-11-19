@@ -220,6 +220,11 @@ void test_sound_environment_tail_after_release() { // A sound released while its
 	sound_environment_test_energy(e, env, 200); // Longer than the reflection duration.
 	assert(env.retired_source_count == 0 and env.source_count == 0, "the released sound should be freed once its tail ends, " + env.retired_source_count + " retired and " + env.source_count + " sources remain");
 }
+void sound_environment_test_wait_for_decoding(sound@ s) {
+	timer t;
+	while (!s.load_complete and t.elapsed < 5000) wait(1);
+	assert(s.load_complete, "the test sound should finish decoding");
+}
 void test_sound_environment_attack() { // A sound played and updated before the audio thread first processes it must not be simulated at a stale position, which muted and faded in its start.
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	physics_world@ world = sound_environment_test_room(false);
@@ -230,12 +235,14 @@ void test_sound_environment_attack() { // A sound played and updated before the 
 	sound_environment_test_pump(e, env, 2);
 	sound@ plain = e.sound();
 	assert(plain.load_pcm(sound_environment_test_burst(), 44100, 2));
+	sound_environment_test_wait_for_decoding(plain); // A sound played before its asynchronous decoding has produced anything starts a block late, with or without the environment.
 	plain.set_position_3d(0, 1, 0.05);
 	plain.play();
 	double expected = sound_environment_test_energy(e, env, 2);
 	sound_environment_test_energy(e, env, 20);
 	sound@ s = env.new_sound();
 	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	sound_environment_test_wait_for_decoding(s);
 	s.set_position_3d(0, 1, 0.05);
 	s.play();
 	env.update();
