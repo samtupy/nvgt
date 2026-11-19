@@ -146,3 +146,77 @@ void test_sound_environment_settings_changes() { // Changing settings that rebui
 	uint simulations = env.reflection_simulations;
 	assert(sound_environment_test_wait_for_reflections(e, env, simulations + 2), "reflections should still be simulated after the changes");
 }
+float[]@ sound_environment_test_burst() {
+	float[] burst(4410 * 2);
+	random_xorshift rng(uint(3));
+	for (uint i = 0; i < burst.length(); i++) burst[i] = rng.nextf() * 2 - 1;
+	return burst;
+}
+double sound_environment_test_energy(audio_engine@ e, sound_environment@ env, int blocks) {
+	double energy = 0;
+	for (int b = 0; b < blocks; b++) {
+		float[]@ frames = e.read(256);
+		env.update();
+		for (uint i = 0; i < frames.length(); i++) energy += frames[i] * frames[i];
+	}
+	return energy;
+}
+void test_sound_environment_new_sources() { // New sounds are heard with the listener reverb until their own reflections are simulated, and are occluded straight away even while reflections are being simulated.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(true);
+	sound_environment env(e);
+	env.set_raycaster(world);
+	e.set_listener_position(0, -2.5, -2, 1.5);
+	sound_environment_test_pump(e, env, 2);
+	assert(sound_environment_test_wait_for_reflections(e, env, 3), "reflection simulations should complete");
+	sound@ s = env.new_sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	s.set_position_3d(-2, 2, 1.5);
+	s.play();
+	sound_environment_source@ src = env.get_source(s);
+	sound_environment_test_energy(e, env, 20); // The 0.1 second burst, 17 blocks.
+	assert(!src.reflections_simulated, "a source's own reflections can't have been simulated this soon");
+	double with_listener_reverb = sound_environment_test_energy(e, env, 32);
+	env.use_listener_reverb = false;
+	sound_environment_test_energy(e, env, 250); // Let the first sound's reverb die away.
+	@s = env.new_sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	s.set_position_3d(-2, 2, 1.5);
+	s.play();
+	sound_environment_test_energy(e, env, 20);
+	double without = sound_environment_test_energy(e, env, 32);
+	assert(with_listener_reverb > 10 and without < with_listener_reverb / 100, "a new sound should reverberate straight away with the listener reverb, energy after the burst " + with_listener_reverb + " with it and " + without + " without it");
+	env.simulation_interval = 0; // Keep the worker as busy as possible.
+	mixer@ m = env.new_mixer();
+	m.set_position_3d(2.5, 0, 1.5); // Behind the wall.
+	@src = env.get_source(m);
+	sound_environment_test_pump(e, env, 2);
+	assert(src.simulated and src.occlusion < 0.01, "a new source behind a wall should be occluded after a couple of updates, simulated " + src.simulated + ", occlusion " + src.occlusion);
+}
+void test_sound_environment_tail_after_release() { // A sound released while its reflections are still ringing keeps ringing until they end, then is freed.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.use_listener_reverb = false; // So that only the released sound's own reflections can be heard.
+	env.set_raycaster(world);
+	e.set_listener_position(0, -2, 0, 1.5);
+	sound@ s = env.new_sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	s.set_position_3d(2, 2, 1.5);
+	sound_environment_source@ src = env.get_source(s);
+	timer t;
+	while (!src.reflections_simulated and t.elapsed < 10000) {
+		sound_environment_test_pump(e, env, 1);
+		wait(1);
+	}
+	assert(src.reflections_simulated, "the sound's own reflections should be simulated before it plays");
+	s.play();
+	sound_environment_test_energy(e, env, 12); // The burst and a little more.
+	@src = null;
+	@s = null;
+	assert(env.retired_source_count == 1, "the released sound should be kept to finish its reverb tail, " + env.retired_source_count + " are retired");
+	double tail = sound_environment_test_energy(e, env, 40);
+	assert(tail > 1, "the released sound's reverb tail should continue, energy " + tail);
+	sound_environment_test_energy(e, env, 200); // Longer than the reflection duration.
+	assert(env.retired_source_count == 0 and env.source_count == 0, "the released sound should be freed once its tail ends, " + env.retired_source_count + " retired and " + env.source_count + " sources remain");
+}
