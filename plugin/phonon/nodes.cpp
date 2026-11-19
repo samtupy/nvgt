@@ -16,7 +16,7 @@
 #include <atomic>
 #include <stdexcept>
 #include "../../src/sound_nodes.h"
-#include "phonon.h"
+#include "nvgt_phonon.h"
 
 using namespace std;
 
@@ -60,11 +60,9 @@ static spatializer_component_node* create_phonon_panner(audio_spatializer* spati
 	}
 }
 
-// Steam Audio's inverse distance attenuation and air absorption. The distance is scaled by the sound's rolloff, so that a rolloff of 1 attenuates about as much as the other attenuators.
-static float phonon_attenuation(const audio_spatialization_parameters& params, float distance) {
-	if (distance > params.max_distance) return params.min_volume;
-	return clamp(1.0f / max(distance * params.rolloff * 0.7f, max(params.min_distance, 0.0001f)), params.min_volume, params.max_volume);
-}
+// NVGT's distance curve, which every attenuator shares, with Steam Audio's air absorption muffling distant sounds. Units of distance are taken to be about 0.3 meters for air absorption, as audio games rarely treat a unit as a meter.
+static float phonon_attenuation(const audio_spatialization_parameters& params, float distance) { return nvgt_get_audio_attenuation(-1, &params, distance); } // NVGT's own curve for an attenuator it doesn't know.
+static constexpr float METERS_PER_UNIT = 0.3f;
 class phonon_attenuator : public audio_plugin_spatializer_component_interface {
 	ipl_ref<api::IDirectEffect> effect;
 	IPLDirectEffectParams effect_params{};
@@ -81,7 +79,7 @@ public:
 	}
 	void process(const audio_spatialization_parameters& params, const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
 		api::IContext* ctx = phonon_context();
-		const float scale = params.rolloff * 0.7f;
+		const float scale = METERS_PER_UNIT;
 		IPLAirAbsorptionModel air{};
 		air.type = IPL_AIRABSORPTIONTYPE_DEFAULT;
 		ctx->calculateAirAbsorption({params.sound_x * scale, params.sound_y * scale, params.sound_z * scale}, {params.listener_x * scale, params.listener_y * scale, params.listener_z * scale}, &air, effect_params.airAbsorption);

@@ -1,4 +1,4 @@
-/* phonon.h - shared declarations of the nvgt_phonon plugin
+/* nvgt_phonon.h - shared declarations of the nvgt_phonon plugin
  * nvgt_phonon provides Steam Audio to NVGT: its HRTF panner and attenuator, phonon_binaural_node and sound_environment, which simulates occlusion, transmission, reflections and pathing through a game's world. It creates its own Steam Audio context and uses it only through the object interfaces of phonon_interfaces.h, and uses NVGT's audio only through the plugin API and the virtual methods of NVGT's audio objects, so that it works whether it is loaded as a shared library or linked statically.
  * Every compilation unit of the plugin must include nvgt_plugin.h (with NVGT_PLUGIN_INCLUDE defined) before this header.
  *

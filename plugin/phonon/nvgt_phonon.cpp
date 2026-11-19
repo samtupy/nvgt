@@ -1,4 +1,4 @@
-/* nvgt_phonon.cpp - the nvgt_phonon plugin's entry point and Steam Audio context, see phonon.h
+/* nvgt_phonon.cpp - the nvgt_phonon plugin's entry point and Steam Audio context, see nvgt_phonon.h
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2025 Sam Tupy
@@ -13,7 +13,7 @@
 #include "../../src/nvgt_plugin.h"
 #include <mutex>
 #include "../../src/sound.h"
-#include "phonon.h"
+#include "nvgt_phonon.h"
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX

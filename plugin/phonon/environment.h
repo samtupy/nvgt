@@ -25,7 +25,7 @@
 #include <thread>
 #include <vector>
 #include "../../src/sound_nodes.h"
-#include "phonon.h"
+#include "nvgt_phonon.h"
 
 using namespace std;
 
