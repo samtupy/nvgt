@@ -2,6 +2,7 @@
 // A concrete hall with a brick north wall, a wooden table and a metal cabinet opens through a doorway onto a carpeted lounge with drywall, a cardboard partition, a fabric couch and a glass display case. A sonar pings in the lounge. A doorway in the hall's south wall, just behind where you start, leads outside onto a street with a brick building across it.
 // This shows the recommended shape: each object (here the player and the sonar) gets one mixer from the environment, positioned with the object, and every sound the object makes plays through its mixer, so the object is simulated once rather than every sound being a new source.
 // Up and down arrows walk forward and back, left and right arrows sidestep, Q and E turn by 45 degrees. C speaks your position, S speaks simulation details for the sonar, R toggles reflections, P pauses the sonar, escape exits.
+// Backspace toggles a microphone loopback: what you say into the default microphone plays from a point in the world through the environment, which shift with the arrows moves a meter north, south, west or east. Use headphones, or the speakers will feed back into the microphone.
 // Left and right brackets select a setting of the environment or of the sonar's source, and minus and equals lower or raise it. Toggles flip and choices cycle with either key. Changing the rays, duration, order, threads, diffuse samples, max sources or reflection type rebuilds the simulator, so reflections drop out briefly.
 #pragma console
 
@@ -10,6 +11,9 @@ sound_environment env;
 physics_character@ player;
 mixer@ player_mixer;
 sound@ sonar;
+microphone@ mic;
+mixer@ mic_mixer;
+vector mic_position(6, 5, 1.5); // The middle of the hall, at head height.
 sound@[] playing;
 physics_body_id[] wall_bodies;
 string[] wall_materials;
@@ -163,6 +167,8 @@ void main() {
 	sonar_mixer.set_position_3d(19, 3, 1.2);
 	@sonar = play("sonar", sonar_mixer, true);
 	@sonar_source = env.get_source(sonar_mixer);
+	@mic_mixer = env.new_mixer();
+	mic_mixer.set_position_3d(mic_position.x, mic_position.y, mic_position.z);
 	reflections_on_level = env.reflections_level;
 	screen_reader_speak("Sound environment test. You are in a concrete hall facing north. Arrows to move and turn.");
 	timer frame_time, bump_time;
@@ -177,10 +183,13 @@ void main() {
 		if (key_pressed(KEY_E)) { facing = (facing + 315) % 360; screen_reader_speak(direction_name()); }
 		vector forward = facing_vector(), left(-forward.y, forward.x, 0);
 		vector move(0, 0, 0);
-		if (key_down(KEY_UP)) move += forward;
-		if (key_down(KEY_DOWN)) move -= forward;
-		if (key_down(KEY_LEFT)) move += left;
-		if (key_down(KEY_RIGHT)) move -= left;
+		bool shift = key_down(KEY_LSHIFT) or key_down(KEY_RSHIFT); // Shift with the arrows moves the microphone instead of the player.
+		if (!shift) {
+			if (key_down(KEY_UP)) move += forward;
+			if (key_down(KEY_DOWN)) move -= forward;
+			if (key_down(KEY_LEFT)) move += left;
+			if (key_down(KEY_RIGHT)) move -= left;
+		}
 		bool moving = move.length() > 0.01;
 		if (moving) move = move.normalized();
 		vector v = player.linear_velocity;
@@ -235,7 +244,24 @@ void main() {
 			else sonar.play_looped();
 			screen_reader_speak(sonar.playing ? "sonar playing" : "sonar paused");
 		}
+		if (key_pressed(KEY_BACK)) {
+			if (mic is null) {
+				@mic = microphone();
+				mic.attach_output_bus(0, mic_mixer, 0);
+				screen_reader_speak("microphone on at " + round(mic_position.x, 1) + ", " + round(mic_position.y, 1));
+			} else {
+				mic.detach_all_output_buses();
+				@mic = null;
+				screen_reader_speak("microphone off");
+			}
+		}
 		// key_pressed consumes the press, so each key is only checked once.
+		vector mic_move = !shift ? vector(0, 0, 0) : key_pressed(KEY_UP) ? vector(0, 1, 0) : key_pressed(KEY_DOWN) ? vector(0, -1, 0) : key_pressed(KEY_LEFT) ? vector(-1, 0, 0) : key_pressed(KEY_RIGHT) ? vector(1, 0, 0) : vector(0, 0, 0);
+		if (mic_move.length() > 0) {
+			mic_position += mic_move;
+			mic_mixer.set_position_3d(mic_position.x, mic_position.y, mic_position.z);
+			screen_reader_speak("microphone at " + round(mic_position.x, 1) + ", " + round(mic_position.y, 1));
+		}
 		int select = key_pressed(KEY_LEFTBRACKET) ? -1 : key_pressed(KEY_RIGHTBRACKET) ? 1 : 0;
 		if (select != 0) {
 			setting = (setting + select + setting_names.length()) % setting_names.length();
