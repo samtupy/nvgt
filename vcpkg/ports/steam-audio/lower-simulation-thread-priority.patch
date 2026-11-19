@@ -1,0 +1,46 @@
+diff --git a/core/src/core/thread_pool.cpp b/core/src/core/thread_pool.cpp
+--- a/core/src/core/thread_pool.cpp
++++ b/core/src/core/thread_pool.cpp
+@@ -16,6 +16,18 @@
+ 
+ #include "thread_pool.h"
+ 
++#if defined(_WIN32)
++#define WIN32_LEAN_AND_MEAN
++#define NOMINMAX
++#include <windows.h>
++#elif defined(__APPLE__)
++#include <pthread.h>
++#elif defined(__linux__)
++#include <sys/resource.h>
++#include <sys/syscall.h>
++#include <unistd.h>
++#endif
++
+ namespace ipl {
+ 
+ // --------------------------------------------------------------------------------------------------------------------
+@@ -81,8 +93,23 @@
+     mCancel = true;
+ }
+ 
++// Simulation threads run below normal priority, so that the audio thread and the rest of the application are not starved
++// while the simulation keeps every core busy.
++static void lowerCurrentThreadPriority()
++{
++#if defined(_WIN32)
++    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
++#elif defined(__APPLE__)
++    pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
++#elif defined(__linux__)
++    setpriority(PRIO_PROCESS, static_cast<id_t>(syscall(SYS_gettid)), 5);
++#endif
++}
++
+ void ThreadPool::threadFunc(int threadId)
+ {
++    lowerCurrentThreadPriority();
++
+     while (true)
+     {
+         std::unique_lock<std::mutex> lock(mMutex);
