@@ -24,6 +24,7 @@
 #include <scripthandle.h>
 #include "filesystem.h" // FileExists, FileDelete
 #include "jolt.h" // vector3
+#include "sound_environment.h"
 #include "misc_functions.h" // script_memory_buffer
 #include "nvgt.h" // g_ScriptEngine
 #include "nvgt_angelscript.h" // get_array_type
@@ -2686,6 +2687,7 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	RegisterSoundsystemNodes(engine);
 	RegisterSoundsystemEncoders(engine);
 	RegisterSoundsystemShapes(engine);
+	RegisterSoundEnvironment(engine);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
 	engine->RegisterObjectMethod("sound", "bool load(const string&in filename, const pack_interface@+ pack = sound_default_pack)", asFUNCTION((virtual_call < sound, &sound::load, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool stream(const string&in filename, const pack_interface@+ pack = sound_default_pack)", asFUNCTION((virtual_call < sound, &sound::stream, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
