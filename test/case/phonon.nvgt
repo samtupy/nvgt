@@ -37,21 +37,3 @@ void test_phonon_binaural_node() {
 	assert(right[0] + right[1] > 1, "the binaural node should pass sound through, energy " + right[0] + ", " + right[1]);
 	assert(right[1] > right[0] * 2 and left[0] > left[1] * 2, "a sound to the right should be louder in the right ear and one to the left in the left ear, got " + right[0] + ", " + right[1] + " and " + left[0] + ", " + left[1]);
 }
-void test_phonon_hrtf_spatialization() {
-	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
-	sound@ s = e.sound();
-	assert(s.load_pcm(phonon_test_noise(2), 44100, 2));
-	phonon_test_wait(s);
-	s.hrtf = true;
-	assert(s.hrtf, "the sound should use the HRTF panner and attenuator");
-	e.set_listener_position(0, 0, 0, 0);
-	s.set_position_3d(3, 0, 0); // The listener faces y, so this is to the right.
-	s.play_looped();
-	phonon_test_render(e, 4);
-	double[]@ near = phonon_test_render(e, 20);
-	s.set_position_3d(30, 0, 0);
-	phonon_test_render(e, 4);
-	double[]@ far = phonon_test_render(e, 20);
-	assert(near[0] + near[1] > 1 and near[1] > near[0] * 2, "a sound to the right should be louder in the right ear, got " + near[0] + ", " + near[1]);
-	assert(far[0] + far[1] < (near[0] + near[1]) / 2, "the attenuator should make a farther sound quieter, energy " + (near[0] + near[1]) + " near and " + (far[0] + far[1]) + " far");
-}

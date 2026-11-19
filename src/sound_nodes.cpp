@@ -19,6 +19,7 @@
 #include <ma_reverb_node.h>
 #include "misc_functions.h" // range_convert
 #include "sound_nodes.h"
+#include "microsynthiser.hpp"
 #define STEAMAUDIO_SKIP_API_FUNCTIONS
 #include <phonon_interfaces.h>
 
@@ -201,18 +202,9 @@ static void phonon_free_buffer(IPLAudioBuffer& buffer) { if (buffer.data) g_phon
 
 bool set_global_hrtf(bool enabled) {
 	if (enabled == get_global_hrtf()) return true;
-	if (enabled) {
-		if (!phonon_init()) return false;
-		if (!sound_set_spatialization(g_audio_phonon_hrtf_panner, g_audio_phonon_attenuator)) return false;
-	} else {
-		if (sound_get_default_3d_panner() == g_audio_phonon_hrtf_panner) sound_set_default_3d_panner(g_audio_basic_panner);
-		if (sound_get_default_3d_attenuator() == g_audio_phonon_attenuator) sound_set_default_3d_attenuator(g_audio_basic_attenuator);
-		set_audio_panner_enabled(g_audio_phonon_hrtf_panner, false);
-		set_audio_attenuator_enabled(g_audio_phonon_attenuator, false);
-	}
-	return true;
+	return sound_set_spatialization(enabled ? g_audio_hrtf_panner : g_audio_basic_panner, enabled ? g_audio_hrtf_attenuator : g_audio_basic_attenuator);
 }
-bool get_global_hrtf() { return get_audio_panner_enabled(g_audio_phonon_hrtf_panner) && get_audio_attenuator_enabled(g_audio_phonon_attenuator); }
+bool get_global_hrtf() { return sound_get_default_3d_panner() == g_audio_hrtf_panner && sound_get_default_3d_attenuator() == g_audio_hrtf_attenuator; }
 
 class phonon_binaural_node_impl : public effect_node_impl, public virtual phonon_binaural_node {
 	api::IBinauralEffect* effect = nullptr;
@@ -489,6 +481,44 @@ class delay_node_impl : public audio_node_impl, public virtual delay_node {
 };
 delay_node* delay_node::create(unsigned int delay_in_frames, float decay, audio_engine* engine) { return new delay_node_impl(delay_in_frames, decay, engine); }
 
+class fdn_reverb_node_impl : public effect_node_impl, public virtual fdn_reverb_node {
+	microsynthiser::fdn_reverb_effect verb;
+	vector<float> silence; // Input while nothing is attached, so that the tail continues.
+public:
+	fdn_reverb_node_impl(audio_engine* e) : effect_node_impl(e ? e : g_audio_engine, 0, 0, 1, 1, MA_NODE_FLAG_CONTINUOUS_PROCESSING | MA_NODE_FLAG_ALLOW_NULL_INPUT), verb(get_engine()->get_sample_rate(), get_engine()->get_channels()) {}
+	~fdn_reverb_node_impl() { destroy_node(); }
+	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
+		const unsigned int frames = *frame_count_out, channels = get_engine()->get_channels();
+		const float* in = frames_in && frames_in[0] && *frame_count_in >= frames ? frames_in[0] : nullptr;
+		if (!in) {
+			if (silence.size() < frames * channels) silence.resize(frames * channels);
+			in = silence.data();
+		}
+		verb.process(in, frames_out[0], frames);
+	}
+	void reset() override { verb.reset(); }
+	float get_tail_length() const override { return verb.get_tail_length(); }
+	#define FDN_REVERB_PROPERTY(type, name, setter, getter) void set_##name(type value) override { verb.setter(value); } type get_##name() const override { return verb.getter(); }
+	FDN_REVERB_PROPERTY(float, wet, set_wet, get_wet)
+	FDN_REVERB_PROPERTY(float, dry, set_dry, get_dry)
+	FDN_REVERB_PROPERTY(float, width, set_width, get_width)
+	FDN_REVERB_PROPERTY(bool, frozen, set_freeze, get_freeze)
+	FDN_REVERB_PROPERTY(float, input_lowpass, set_input_lowpass, get_input_lowpass)
+	FDN_REVERB_PROPERTY(float, input_highpass, set_input_highpass, get_input_highpass)
+	FDN_REVERB_PROPERTY(float, mean_free_path, set_mean_free_path, get_mean_free_path)
+	FDN_REVERB_PROPERTY(float, t60, set_t60, get_t60)
+	FDN_REVERB_PROPERTY(float, lf_rolloff, set_lf_rolloff, get_lf_rolloff)
+	FDN_REVERB_PROPERTY(float, lf_reference, set_lf_reference, get_lf_reference)
+	FDN_REVERB_PROPERTY(float, hf_rolloff, set_hf_rolloff, get_hf_rolloff)
+	FDN_REVERB_PROPERTY(float, hf_reference, set_hf_reference, get_hf_reference)
+	FDN_REVERB_PROPERTY(float, diffusion, set_diffusion, get_diffusion)
+	FDN_REVERB_PROPERTY(float, modulation_depth, set_modulation_depth, get_modulation_depth)
+	FDN_REVERB_PROPERTY(float, modulation_frequency, set_modulation_frequency, get_modulation_frequency)
+	FDN_REVERB_PROPERTY(float, late_reflections_delay, set_late_reflections_delay, get_late_reflections_delay)
+	#undef FDN_REVERB_PROPERTY
+};
+fdn_reverb_node* fdn_reverb_node::create(audio_engine* e) { return new fdn_reverb_node_impl(e); }
+
 class freeverb_node_impl : public audio_node_impl, public virtual freeverb_node {
 	unique_ptr<ma_reverb_node> rn;
 	public:
@@ -658,14 +688,18 @@ static std::unordered_set<audio_spatializer*> g_tracked_spatializers;
 
 int register_audio_panner(spatializer_component_node_factory factory, bool default_enabled) {
 	int id = g_next_panner_id++;
-	g_audio_panners[id] = {factory, default_enabled};
+	g_audio_panners[id] = {factory, default_enabled, nullptr};
 	return id;
 }
 
-int register_audio_attenuator(spatializer_component_node_factory factory, bool default_enabled) {
+int register_audio_attenuator(spatializer_component_node_factory factory, bool default_enabled, spatializer_attenuation_function attenuation) {
 	int id = g_next_attenuator_id++;
-	g_audio_attenuators[id] = {factory, default_enabled};
+	g_audio_attenuators[id] = {factory, default_enabled, attenuation};
 	return id;
+}
+float get_audio_attenuation(int attenuator_id, const audio_spatialization_parameters& params, float distance) {
+	auto it = g_audio_attenuators.find(attenuator_id);
+	return it != g_audio_attenuators.end() && it->second.attenuation ? it->second.attenuation(params, distance) : basic_attenuator::attenuation(params, distance);
 }
 
 spatializer_component_node* create_audio_panner(int id, audio_spatializer* spatializer, audio_engine* engine) {
@@ -735,7 +769,9 @@ int sound_get_default_3d_attenuator() {
 // Global  spatializer component registrations
 int g_audio_basic_panner = g_default_3d_panner = register_audio_panner(basic_panner::create, true);
 int g_audio_phonon_hrtf_panner = register_audio_panner(phonon_hrtf_panner::create, false);
-int g_audio_basic_attenuator = g_default_3d_attenuator = register_audio_attenuator(basic_attenuator::create, true);
+int g_audio_basic_attenuator = g_default_3d_attenuator = register_audio_attenuator(basic_attenuator::create, true, basic_attenuator::attenuation);
+int g_audio_hrtf_panner = register_audio_panner(hrtf_panner::create, true); // Always available, the global HRTF setting chooses whether sounds use them by default.
+int g_audio_hrtf_attenuator = register_audio_attenuator(hrtf_attenuator::create, true, hrtf_attenuator::attenuation);
 int g_audio_phonon_attenuator = register_audio_attenuator(phonon_attenuator::create, false);
 
 bool sound_set_spatialization(int panner, int attenuator, bool disable_previous, bool set_default) {
@@ -988,6 +1024,49 @@ public:
 };
 spatializer_component_node* basic_panner::create(audio_spatializer* spatializer, audio_engine* engine) { return new basic_panner_impl(spatializer, engine); }
 
+class hrtf_panner_impl : public spatializer_component_node_impl, public virtual hrtf_panner {
+	microsynthiser::hrtf_effect hrtf;
+	vector<float> mono, binaural;
+	float spatial_blend = -1.0f; // How much of the output is spatialized, the rest being the input unchanged, so that sounds at the listener's position aren't snapped to one direction.
+public:
+	hrtf_panner_impl(audio_spatializer* spatializer, audio_engine* e) : spatializer_component_node_impl(spatializer, e, 0, 2), hrtf(e->get_sample_rate()) {
+		microsynthiser::distance_params no_attenuation; // The attenuator attenuates.
+		no_attenuation.model = microsynthiser::distance_model::none;
+		hrtf.set_distance_params(no_attenuation);
+	}
+	~hrtf_panner_impl() { destroy_node(); }
+	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
+		const unsigned int frames = min(*frame_count_in, *frame_count_out), channels = get_engine()->get_channels();
+		audio_spatialization_parameters params;
+		if (!spatializer || !spatializer->get_parameters(params)) {
+			ma_copy_pcm_frames(frames_out[0], frames_in[0], frames, ma_format_f32, channels);
+			return;
+		}
+		// The direction is listener relative with x right, y up and z behind, microsynthiser's has y ahead and z up.
+		hrtf.set_position({params.listener_direction_x, -params.listener_direction_z, params.listener_direction_y});
+		const float fully_spatialized_distance = 5.0f;
+		float blend = clamp(params.listener_distance * params.directional_attenuation_factor / fully_spatialized_distance, 0.0f, 1.0f);
+		if (spatial_blend < 0.0f) spatial_blend = blend;
+		if (mono.size() < frames) mono.resize(frames);
+		if (binaural.size() < frames * 2) binaural.resize(frames * 2);
+		const float* in = frames_in[0];
+		for (unsigned int i = 0; i < frames; i++) {
+			float sum = 0.0f;
+			for (unsigned int c = 0; c < channels; c++) sum += in[i * channels + c];
+			mono[i] = sum / channels;
+		}
+		hrtf.process(mono.data(), binaural.data(), frames);
+		float* out = frames_out[0];
+		for (unsigned int i = 0; i < frames; i++) {
+			const float b = spatial_blend + (blend - spatial_blend) * (i / (float)frames), left = channels > 1 ? in[i * channels] : in[i], right = channels > 1 ? in[i * channels + 1] : in[i];
+			out[i * 2] = binaural[i * 2] * b + left * (1.0f - b);
+			out[i * 2 + 1] = binaural[i * 2 + 1] * b + right * (1.0f - b);
+		}
+		spatial_blend = blend;
+	}
+};
+spatializer_component_node* hrtf_panner::create(audio_spatializer* spatializer, audio_engine* engine) { return new hrtf_panner_impl(spatializer, engine); }
+
 class phonon_hrtf_panner_impl : public spatializer_component_node_impl, public virtual phonon_hrtf_panner {
 	api::IBinauralEffect* iplEffect;
 	IPLBinauralEffectParams iplEffectParams;
@@ -1044,37 +1123,44 @@ public:
 };
 spatializer_component_node* phonon_hrtf_panner::create(audio_spatializer* spatializer, audio_engine* engine) { return new phonon_hrtf_panner_impl(spatializer, engine); }
 
-class basic_attenuator_impl : public spatializer_component_node_impl, public virtual basic_attenuator {
+// An attenuator applying a distance curve, which is also registered so that others can attenuate a sound over other distances the same way.
+template <class base, spatializer_attenuation_function curve> class curve_attenuator_impl : public spatializer_component_node_impl, public virtual base {
 	ma_gainer gainer;
 public:
-	basic_attenuator_impl(audio_spatializer* spatializer, audio_engine* e) : spatializer_component_node_impl(spatializer, e) {
+	curve_attenuator_impl(audio_spatializer* spatializer, audio_engine* e) : spatializer_component_node_impl(spatializer, e) {
 		ma_gainer_config gainer_config = ma_gainer_config_init(e->get_channels(), 1.0f);
-		if (ma_gainer_init(&gainer_config, nullptr, &gainer) != MA_SUCCESS) {
-			throw std::runtime_error("Failed to initialize gainer");
-		}
+		if (ma_gainer_init(&gainer_config, nullptr, &gainer) != MA_SUCCESS) throw std::runtime_error("Failed to initialize gainer");
 	}
-	~basic_attenuator_impl() {
+	~curve_attenuator_impl() {
 		destroy_node();
 		ma_gainer_uninit(&gainer, nullptr);
 	}
 	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
-		float distance = 0, volume = 0;
-		ma_uint32 frameCount = *frame_count_out;
-		if (!spatializer) goto fail;
+		ma_uint32 frameCount = min(*frame_count_out, *frame_count_in);
 		audio_spatialization_parameters params;
-		if (!spatializer->get_parameters(params)) goto fail;
-		distance = params.listener_distance;
-		if (distance >= params.min_distance) distance -= params.min_distance;
-		volume = clamp(distance <= params.max_distance - params.min_distance? ma_volume_db_to_linear(-distance * params.rolloff * 1.75) : 0, params.min_volume, params.max_volume);
-		ma_gainer_set_master_volume(&gainer, volume);
-		if (frameCount > *frame_count_in) frameCount = *frame_count_in;
-		ma_gainer_process_pcm_frames(&gainer, frames_out[0], frames_in[0], frameCount);
-		return;
-		fail:
+		if (!spatializer || !spatializer->get_parameters(params)) {
 			ma_copy_pcm_frames(frames_out[0], frames_in[0], *frame_count_in, ma_format_f32, get_engine()->get_channels());
+			return;
+		}
+		ma_gainer_set_master_volume(&gainer, curve(params, params.listener_distance));
+		ma_gainer_process_pcm_frames(&gainer, frames_out[0], frames_in[0], frameCount);
 	}
 };
-spatializer_component_node* basic_attenuator::create(audio_spatializer* spatializer, audio_engine* engine) { return new basic_attenuator_impl(spatializer, engine); }
+float basic_attenuator::attenuation(const audio_spatialization_parameters& params, float distance) { // Decibels per meter beyond the minimum distance.
+	if (distance >= params.min_distance) distance -= params.min_distance;
+	return clamp(distance <= params.max_distance - params.min_distance? ma_volume_db_to_linear(-distance * params.rolloff * 1.75) : 0, params.min_volume, params.max_volume);
+}
+spatializer_component_node* basic_attenuator::create(audio_spatializer* spatializer, audio_engine* engine) { return new curve_attenuator_impl<basic_attenuator, basic_attenuator::attenuation>(spatializer, engine); }
+float hrtf_attenuator::attenuation(const audio_spatialization_parameters& params, float distance) { // Synthizer's inverse distance model, the minimum distance being its reference distance, silent beyond the maximum distance like the other attenuators.
+	if (distance > params.max_distance) return params.min_volume;
+	microsynthiser::distance_params model;
+	model.model = microsynthiser::distance_model::inverse;
+	model.ref = max(params.min_distance, 0.01f);
+	model.max = params.max_distance;
+	model.rolloff = params.rolloff;
+	return clamp((float)microsynthiser::distance_gain(model, distance), params.min_volume, params.max_volume);
+}
+spatializer_component_node* hrtf_attenuator::create(audio_spatializer* spatializer, audio_engine* engine) { return new curve_attenuator_impl<hrtf_attenuator, hrtf_attenuator::attenuation>(spatializer, engine); }
 
 class phonon_attenuator_impl : public spatializer_component_node_impl, public virtual phonon_attenuator {
 	api::IDirectEffect* iplEffect;

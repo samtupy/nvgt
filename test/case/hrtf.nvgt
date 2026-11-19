@@ -1,0 +1,85 @@
+// Tests for NVGT's built in HRTF panner and attenuator and the FDN reverb node, from microsynthiser. Audio is rendered by an engine without a device so nothing is played.
+float[]@ hrtf_test_noise(int channels) {
+	float[] noise(44100 / 2 * channels);
+	for (uint i = 0; i < noise.length(); i++) noise[i] = random(-1000, 1000) / 4000.0;
+	return noise;
+}
+double[]@ hrtf_test_render(audio_engine@ e, int blocks) { // The energy of the left and right channels.
+	double[] energy = {0, 0};
+	for (int b = 0; b < blocks; b++) {
+		float[]@ frames = e.read(512);
+		for (uint i = 0; i + 1 < frames.length(); i += 2) {
+			energy[0] += frames[i] * frames[i];
+			energy[1] += frames[i + 1] * frames[i + 1];
+		}
+	}
+	return energy;
+}
+void hrtf_test_wait(sound@ s) {
+	timer t;
+	while (!s.load_complete and t.elapsed < 5000) wait(1);
+	assert(s.load_complete, "the test sound should finish decoding");
+}
+void test_hrtf_spatialization() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	sound@ s = e.sound();
+	assert(s.load_pcm(hrtf_test_noise(2), 44100, 2));
+	hrtf_test_wait(s);
+	s.hrtf = true;
+	assert(s.hrtf, "the sound should use the HRTF panner and attenuator");
+	e.set_listener_position(0, 0, 0, 0);
+	s.set_position_3d(3, 0, 0); // The listener faces y, so this is to the right.
+	s.play_looped();
+	hrtf_test_render(e, 4);
+	double[]@ near = hrtf_test_render(e, 20);
+	s.set_position_3d(30, 0, 0);
+	hrtf_test_render(e, 4);
+	double[]@ far = hrtf_test_render(e, 20);
+	assert(near[0] + near[1] > 1 and near[1] > near[0] * 2, "a sound to the right should be louder in the right ear, got " + near[0] + ", " + near[1]);
+	assert(far[0] + far[1] < (near[0] + near[1]) / 2, "the attenuator should make a farther sound quieter, energy " + (near[0] + near[1]) + " near and " + (far[0] + far[1]) + " far");
+}
+void test_hrtf_attenuation_curve() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	sound@ s = e.sound();
+	assert(s.load_pcm(hrtf_test_noise(2), 44100, 2));
+	hrtf_test_wait(s);
+	s.hrtf = true;
+	assert(s.preferred_3d_attenuator == audio_attenuator_hrtf and s.preferred_3d_panner == audio_panner_hrtf, "set_hrtf should select the built in HRTF panner and attenuator");
+	s.set_3d_panner(audio_panner_basic); // The HRTF panner blends to unspatialized sound close to the listener, which would change the level as well.
+	e.set_listener_position(0, 0, 0, 0);
+	double[] energies;
+	float[] distances = {1, 2, 8};
+	s.play_looped();
+	for (uint i = 0; i < distances.length(); i++) {
+		s.set_position_3d(0, distances[i], 0);
+		hrtf_test_render(e, 4);
+		double[]@ e2 = hrtf_test_render(e, 20);
+		energies.insert_last(e2[0] + e2[1]);
+	}
+	// Inverse distance: amplitude halves at twice the reference distance, so energy is about a quarter, and an eighth of the amplitude at 8 meters.
+	assert(abs(energies[1] / energies[0] - 0.25) < 0.08, "energy at 2 meters should be about a quarter of that at 1 meter, got " + (energies[1] / energies[0]));
+	assert(abs(energies[2] / energies[0] - 1.0 / 64) < 0.01, "energy at 8 meters should be about a 64th of that at 1 meter, got " + (energies[2] / energies[0]));
+}
+void test_fdn_reverb_node() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	sound@ s = e.sound();
+	float[] burst(4410 * 2);
+	for (uint i = 0; i < burst.length(); i++) burst[i] = random(-1000, 1000) / 2000.0;
+	assert(s.load_pcm(burst, 44100, 2));
+	hrtf_test_wait(s);
+	audio_fdn_reverb_node verb(e);
+	verb.dry = 0;
+	verb.wet = 1;
+	verb.t60 = 1;
+	assert(verb.t60 == 1 and verb.dry == 0 and verb.tail_length > 0.5, "the reverb's settings should apply, tail length " + verb.tail_length);
+	s.set_mixer(null);
+	assert(s.attach_output_bus(0, verb, 0) and verb.attach_output_bus(0, e.endpoint, 0));
+	s.play();
+	hrtf_test_render(e, 9); // The 0.1 second burst.
+	double[]@ tail = hrtf_test_render(e, 40); // The following half second, after the burst ended.
+	assert(tail[0] + tail[1] > 1, "the reverb should ring on after its input ends, energy " + (tail[0] + tail[1]));
+	verb.reset();
+	hrtf_test_render(e, 2);
+	double[]@ after = hrtf_test_render(e, 10);
+	assert(after[0] + after[1] < 0.001, "reset should silence the tail, energy " + (after[0] + after[1]));
+}
