@@ -733,9 +733,11 @@ static void jolt_ensure_init() {
 // -- Raycast provider --
 // Rays are cast with convex shapes treated as hollow and back faces ignored, so that a ray starting inside a body (such as the listener inside a character's capsule) or one continuing from a point just inside a wall it previously hit passes out of that body rather than reporting a hit at its origin. Rays are offset to start at their minimum distance so that hits nearer than it can't hide farther ones.
 static thread_local vector<nvgt_acoustic_material> g_raycast_hit_materials; // Per thread copies of hit materials, as a body and its material could be destroyed by another thread while the caller is still reading the hit.
-static inline RRayCast make_jolt_ray(const nvgt_ray& ray, float min_dist, float max_dist) {
+static inline RRayCast make_jolt_ray(const nvgt_ray& ray, float min_dist, float max_dist, const AABox& world_bounds, float& length) { // Callers such as Steam Audio's reflection simulation pass an infinite maximum distance, so rays are clamped to the farthest distance at which they could still hit anything in the world.
 	Vec3 dir(ray.direction[0], ray.direction[1], ray.direction[2]);
-	return RRayCast(RVec3(ray.origin[0], ray.origin[1], ray.origin[2]) + dir * min_dist, dir * (max_dist - min_dist));
+	Vec3 origin = Vec3(ray.origin[0], ray.origin[1], ray.origin[2]) + dir * min_dist;
+	length = min(max_dist - min_dist, (origin - world_bounds.GetCenter()).Length() + world_bounds.GetExtent().Length() + 0.01f);
+	return RRayCast(origin, dir * length);
 }
 static RayCastSettings make_jolt_ray_settings() {
 	RayCastSettings settings;
@@ -749,11 +751,13 @@ void jolt_physics_world::closest_hits(int count, const nvgt_ray* rays, const flo
 	const NarrowPhaseQuery& query = system.GetNarrowPhaseQuery();
 	const BodyLockInterface& locks = system.GetBodyLockInterface();
 	const RayCastSettings settings = make_jolt_ray_settings();
+	const AABox bounds = system.GetBounds();
 	for (int i = 0; i < count; i++) {
 		nvgt_ray_hit& hit = hits[i];
 		hit = {INFINITY, -1, -1, -1, {0.0f, 0.0f, 0.0f}, nullptr};
-		if (max_distances[i] <= min_distances[i]) continue;
-		RRayCast ray = make_jolt_ray(rays[i], min_distances[i], max_distances[i]);
+		if (max_distances[i] <= min_distances[i] || !bounds.IsValid()) continue;
+		float length;
+		RRayCast ray = make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, length);
 		ClosestHitCollisionCollector<CastRayCollector> collector;
 		query.CastRay(ray, settings, collector);
 		if (!collector.HadHit()) continue;
@@ -769,7 +773,7 @@ void jolt_physics_world::closest_hits(int count, const nvgt_ray* rays, const flo
 			if (m && m != PhysicsMaterial::sDefault.GetPtr()) material = static_cast<const nvgt_physics_material*>(m)->acoustic; // NVGT only ever creates nvgt_physics_material, Jolt substitutes sDefault for shapes without one.
 			hit.object_index = (int)body.GetID().GetIndex();
 		}
-		hit.distance = min_distances[i] + result.mFraction * (max_distances[i] - min_distances[i]);
+		hit.distance = min_distances[i] + result.mFraction * length;
 		hit.normal[0] = normal.GetX();
 		hit.normal[1] = normal.GetY();
 		hit.normal[2] = normal.GetZ();
@@ -780,13 +784,19 @@ void jolt_physics_world::closest_hits(int count, const nvgt_ray* rays, const flo
 void jolt_physics_world::any_hits(int count, const nvgt_ray* rays, const float* min_distances, const float* max_distances, unsigned char* occluded) {
 	const NarrowPhaseQuery& query = system.GetNarrowPhaseQuery();
 	const RayCastSettings settings = make_jolt_ray_settings();
+	const AABox bounds = system.GetBounds();
 	for (int i = 0; i < count; i++) {
 		if (max_distances[i] <= min_distances[i]) {
 			occluded[i] = 1;
 			continue;
 		}
+		if (!bounds.IsValid()) {
+			occluded[i] = 0;
+			continue;
+		}
+		float length;
 		AnyHitCollisionCollector<CastRayCollector> collector;
-		query.CastRay(make_jolt_ray(rays[i], min_distances[i], max_distances[i]), settings, collector);
+		query.CastRay(make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, length), settings, collector);
 		occluded[i] = collector.HadHit() ? 1 : 0;
 	}
 }
