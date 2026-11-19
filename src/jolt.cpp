@@ -165,6 +165,7 @@ static inline void* scoped_alloc() { return JPH::AlignedAllocate(sizeof(T), alig
 
 // new_vec3: the public factory used by subsystems and jolt.cpp internally
 JPH::Vec3* new_vec3(float x, float y, float z) { return ::new (scoped_alloc<Vec3>()) Vec3(x, y, z); }
+static Quat* new_quat(QuatArg q) { return ::new (scoped_alloc<Quat>()) Quat(q); }
 
 // Template: call a const member function on SelfT returning RetT by value, heap-allocating the result.
 // Usage: scoped_ret<RetT, SelfT, &SelfT::Method, ExtraArgTypes...>
@@ -191,7 +192,7 @@ static void physics_transform_destruct(physics_transform* t) { t->~physics_trans
 
 static Vec3* physics_transform_get_position(const physics_transform& t) { return new_vec3(t.GetPosition()); }
 static void physics_transform_set_position(physics_transform& t, const Vec3& p) { t.SetPosition(p); }
-static Quat physics_transform_get_rotation(const physics_transform& t) { return t.GetRotation(); }
+static Quat* physics_transform_get_rotation(const physics_transform& t) { return new_quat(t.GetRotation()); }
 static void physics_transform_set_rotation(physics_transform& t, const Quat& r) { t.SetRotation(r); }
 
 // -- jolt_shape_ref: ref-counted wrapper around a Jolt Shape --
@@ -304,13 +305,22 @@ static float nvgt_clamp_float(float v, float lo, float hi) { return v < lo ? lo 
 // -- AABox additional wrappers --
 static void aabb_inflate(AABox& b, float x, float y, float z) { Vec3 e(x, y, z); b.mMin -= e; b.mMax += e; }
 
-// -- Quat wrappers --
-static void quat_default_construct(void* mem) { new (mem) Quat(Quat::sIdentity()); }
-static void quat_xyzw_construct(void* mem, float x, float y, float z, float w) { new (mem) Quat(x, y, z, w); }
-static void quat_copy_construct(void* mem, const Quat& o) { new (mem) Quat(o); }
+// -- Quat (quaternion) factory/release/assign for scoped reference type; Jolt passes QuatArg and Vec3Arg by value, so every method taking one goes through a wrapper accepting a reference to match the script's &in declaration --
+static Quat* quat_factory_default() { return new_quat(Quat::sIdentity()); }
+static Quat* quat_factory_xyzw(float x, float y, float z, float w) { return new_quat(Quat(x, y, z, w)); }
+static Quat* quat_factory_copy(const Quat& o) { return new_quat(o); }
+static void quat_release(Quat* q) { q->~Quat(); JPH::AlignedFree(q); }
+static Quat& quat_opAssign(Quat& self, const Quat& other) { self = other; return self; }
+static Quat* quat_mul_quat(const Quat& self, const Quat& other) { return new_quat(self * other); }
 static Vec3* quat_mul_vec3(const Quat& q, const Vec3& v) { return new_vec3(q * v); }
-static Quat quaternion_from_axis_angle(const Vec3& axis, float angle) { return Quat::sRotation(axis.Normalized(), angle); }
-static Quat quaternion_from_euler_angles(const Vec3& angles) { return Quat::sEulerAngles(angles); }
+static bool quat_equals(const Quat& self, const Quat& other) { return self == other; }
+static float quat_dot(const Quat& self, const Quat& other) { return self.Dot(other); }
+static float quat_get_rotation_angle(const Quat& self, const Vec3& axis) { return self.GetRotationAngle(axis); }
+static Quat* quat_slerp(const Quat& self, const Quat& dest, float t) { return new_quat(self.SLERP(dest, t)); }
+static Quat* quat_lerp(const Quat& self, const Quat& dest, float t) { return new_quat(self.LERP(dest, t)); }
+static Quat* quat_sIdentity() { return new_quat(Quat::sIdentity()); }
+static Quat* quaternion_from_axis_angle(const Vec3& axis, float angle) { return new_quat(Quat::sRotation(axis.Normalized(), angle)); }
+static Quat* quaternion_from_euler_angles(const Vec3& angles) { return new_quat(Quat::sEulerAngles(angles)); }
 static physics_transform jolt_identity_transform() { return physics_transform(); }
 static string quat_to_string(const Quat& q) {
 	return "quaternion(" + to_string(q.GetX()) + ", " + to_string(q.GetY()) + ", " + to_string(q.GetZ()) + ", " + to_string(q.GetW()) + ")";
@@ -485,7 +495,7 @@ static bool jolt_world_were_bodies_in_contact(jolt_physics_world* w, const BodyI
 // Position/rotation
 static Vec3* jolt_world_get_position(jolt_physics_world* w, const BodyID& id) { return new_vec3(w->system.GetBodyInterface().GetPosition(id)); }
 static void jolt_world_set_position(jolt_physics_world* w, const BodyID& id, const Vec3& pos, int activation) { w->system.GetBodyInterface().SetPosition(id, pos, (EActivation)activation); }
-static Quat jolt_world_get_rotation(jolt_physics_world* w, const BodyID& id) { return w->system.GetBodyInterface().GetRotation(id); }
+static Quat* jolt_world_get_rotation(jolt_physics_world* w, const BodyID& id) { return new_quat(w->system.GetBodyInterface().GetRotation(id)); }
 static void jolt_world_set_rotation(jolt_physics_world* w, const BodyID& id, const Quat& rot, int activation) { w->system.GetBodyInterface().SetRotation(id, rot, (EActivation)activation); }
 static void jolt_world_set_position_and_rotation(jolt_physics_world* w, const BodyID& id, const Vec3& pos, const Quat& rot, int activation) { w->system.GetBodyInterface().SetPositionAndRotation(id, pos, rot, (EActivation)activation); }
 static Vec3* jolt_world_get_center_of_mass_position(jolt_physics_world* w, const BodyID& id) { return new_vec3(w->system.GetBodyInterface().GetCenterOfMassPosition(id)); }
@@ -740,8 +750,8 @@ static void RegisterJoltMathTypes(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("vector", "float length() const", asMETHOD(Vec3, Length), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "float length_sq() const", asMETHOD(Vec3, LengthSq), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "vector@ normalized() const", asFUNCTION((scoped_ret<Vec3, Vec3, &Vec3::Normalized>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("vector", "bool is_normalized() const", asMETHOD(Vec3, IsNormalized), asCALL_THISCALL);
-	engine->RegisterObjectMethod("vector", "bool is_near_zero() const", asMETHOD(Vec3, IsNearZero), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "bool is_normalized(float tolerance = 1.0e-6f) const", asMETHOD(Vec3, IsNormalized), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "bool is_near_zero(float max_dist_sq = 1.0e-12f) const", asMETHOD(Vec3, IsNearZero), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "float get_min_value() const property", asMETHOD(Vec3, ReduceMin), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "float get_max_value() const property", asMETHOD(Vec3, ReduceMax), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "vector@ abs() const", asFUNCTION((scoped_ret<Vec3, Vec3, &Vec3::Abs>)), asCALL_CDECL_OBJFIRST);
@@ -757,12 +767,13 @@ static void RegisterJoltMathTypes(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("int clamp(int value, int min, int max)", asFUNCTION(nvgt_clamp_int), asCALL_CDECL);
 	engine->RegisterGlobalFunction("float clamp(float value, float min, float max)", asFUNCTION(nvgt_clamp_float), asCALL_CDECL);
 
-	// quaternion (Quat)
-	engine->RegisterObjectType("quaternion", sizeof(Quat), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Quat>() | asOBJ_APP_CLASS_ALLFLOATS);
-	engine->RegisterObjectBehaviour("quaternion", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(quat_default_construct), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("quaternion", asBEHAVE_CONSTRUCT, "void f(float x, float y, float z, float w)", asFUNCTION(quat_xyzw_construct), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("quaternion", asBEHAVE_CONSTRUCT, "void f(const quaternion&in)", asFUNCTION(quat_copy_construct), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectBehaviour("quaternion", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(jolt_destruct<Quat>), asCALL_CDECL_OBJFIRST);
+	// quaternion (JPH::Quat - 16-byte SIMD aligned; registered as scoped reference type to guarantee alignment)
+	engine->RegisterObjectType("quaternion", 0, asOBJ_REF | asOBJ_SCOPED);
+	engine->RegisterObjectBehaviour("quaternion", asBEHAVE_FACTORY, "quaternion@ f()", asFUNCTION(quat_factory_default), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("quaternion", asBEHAVE_FACTORY, "quaternion@ f(float x, float y, float z, float w)", asFUNCTION(quat_factory_xyzw), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("quaternion", asBEHAVE_FACTORY, "quaternion@ f(const quaternion&in)", asFUNCTION(quat_factory_copy), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("quaternion", asBEHAVE_RELEASE, "void f()", asFUNCTION(quat_release), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("quaternion", "quaternion& opAssign(const quaternion&in)", asFUNCTION(quat_opAssign), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("quaternion", "float get_x() const property", asMETHOD(Quat, GetX), asCALL_THISCALL);
 	engine->RegisterObjectMethod("quaternion", "float get_y() const property", asMETHOD(Quat, GetY), asCALL_THISCALL);
 	engine->RegisterObjectMethod("quaternion", "float get_z() const property", asMETHOD(Quat, GetZ), asCALL_THISCALL);
@@ -771,25 +782,25 @@ static void RegisterJoltMathTypes(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("quaternion", "void set_y(float) property", asMETHOD(Quat, SetY), asCALL_THISCALL);
 	engine->RegisterObjectMethod("quaternion", "void set_z(float) property", asMETHOD(Quat, SetZ), asCALL_THISCALL);
 	engine->RegisterObjectMethod("quaternion", "void set_w(float) property", asMETHOD(Quat, SetW), asCALL_THISCALL);
-	engine->RegisterObjectMethod("quaternion", "quaternion opMul(const quaternion&in) const", asMETHODPR(Quat, operator*, (QuatArg) const, Quat), asCALL_THISCALL);
+	engine->RegisterObjectMethod("quaternion", "quaternion@ opMul(const quaternion&in) const", asFUNCTION(quat_mul_quat), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("quaternion", "vector@ opMul(const vector&in) const", asFUNCTION(quat_mul_vec3), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("quaternion", "bool opEquals(const quaternion&in) const", asMETHODPR(Quat, operator==, (QuatArg) const, bool), asCALL_THISCALL);
+	engine->RegisterObjectMethod("quaternion", "bool opEquals(const quaternion&in) const", asFUNCTION(quat_equals), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("quaternion", "float length() const", asMETHOD(Quat, Length), asCALL_THISCALL);
-	engine->RegisterObjectMethod("quaternion", "quaternion normalized() const", asMETHOD(Quat, Normalized), asCALL_THISCALL);
-	engine->RegisterObjectMethod("quaternion", "quaternion conjugated() const", asMETHOD(Quat, Conjugated), asCALL_THISCALL);
-	engine->RegisterObjectMethod("quaternion", "quaternion inversed() const", asMETHOD(Quat, Inversed), asCALL_THISCALL);
-	engine->RegisterObjectMethod("quaternion", "bool is_normalized() const", asMETHODPR(Quat, IsNormalized, (float) const, bool), asCALL_THISCALL);
-	engine->RegisterObjectMethod("quaternion", "float dot(const quaternion&in) const", asMETHOD(Quat, Dot), asCALL_THISCALL);
-	engine->RegisterObjectMethod("quaternion", "float get_rotation_angle(const vector&in axis) const", asMETHOD(Quat, GetRotationAngle), asCALL_THISCALL);
+	engine->RegisterObjectMethod("quaternion", "quaternion@ normalized() const", asFUNCTION((scoped_ret<Quat, Quat, &Quat::Normalized>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("quaternion", "quaternion@ conjugated() const", asFUNCTION((scoped_ret<Quat, Quat, &Quat::Conjugated>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("quaternion", "quaternion@ inversed() const", asFUNCTION((scoped_ret<Quat, Quat, &Quat::Inversed>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("quaternion", "bool is_normalized(float tolerance = 1.0e-5f) const", asMETHOD(Quat, IsNormalized), asCALL_THISCALL);
+	engine->RegisterObjectMethod("quaternion", "float dot(const quaternion&in) const", asFUNCTION(quat_dot), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("quaternion", "float get_rotation_angle(const vector&in axis) const", asFUNCTION(quat_get_rotation_angle), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("quaternion", "vector@ rotate_axis_x() const", asFUNCTION((scoped_ret<Vec3, Quat, &Quat::RotateAxisX>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("quaternion", "vector@ rotate_axis_y() const", asFUNCTION((scoped_ret<Vec3, Quat, &Quat::RotateAxisY>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("quaternion", "vector@ rotate_axis_z() const", asFUNCTION((scoped_ret<Vec3, Quat, &Quat::RotateAxisZ>)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("quaternion", "quaternion slerp(const quaternion&in dest, float t) const", asMETHOD(Quat, SLERP), asCALL_THISCALL);
-	engine->RegisterObjectMethod("quaternion", "quaternion lerp(const quaternion&in dest, float t) const", asMETHOD(Quat, LERP), asCALL_THISCALL);
+	engine->RegisterObjectMethod("quaternion", "quaternion@ slerp(const quaternion&in dest, float t) const", asFUNCTION(quat_slerp), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("quaternion", "quaternion@ lerp(const quaternion&in dest, float t) const", asFUNCTION(quat_lerp), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("quaternion", "string opImplConv() const", asFUNCTION(quat_to_string), asCALL_CDECL_OBJFIRST);
-	engine->RegisterGlobalFunction("quaternion get_IDENTITY_QUATERNION() property", asFUNCTION(Quat::sIdentity), asCALL_CDECL);
-	engine->RegisterGlobalFunction("quaternion quaternion_from_axis_angle(const vector&in axis, float angle)", asFUNCTION(quaternion_from_axis_angle), asCALL_CDECL);
-	engine->RegisterGlobalFunction("quaternion quaternion_from_euler_angles(const vector&in angles)", asFUNCTION(quaternion_from_euler_angles), asCALL_CDECL);
+	engine->RegisterGlobalFunction("quaternion@ get_IDENTITY_QUATERNION() property", asFUNCTION(quat_sIdentity), asCALL_CDECL);
+	engine->RegisterGlobalFunction("quaternion@ quaternion_from_axis_angle(const vector&in axis, float angle)", asFUNCTION(quaternion_from_axis_angle), asCALL_CDECL);
+	engine->RegisterGlobalFunction("quaternion@ quaternion_from_euler_angles(const vector&in angles)", asFUNCTION(quaternion_from_euler_angles), asCALL_CDECL);
 
 	// aabb (AABox) - scoped reference type; Vec3 members require 16-byte SIMD alignment that AS value types don't guarantee
 	engine->RegisterObjectType("aabb", 0, asOBJ_REF | asOBJ_SCOPED);
@@ -827,7 +838,7 @@ static void RegisterJoltMathTypes(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(physics_transform_destruct), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_transform", "vector@ get_position() const property", asFUNCTION(physics_transform_get_position), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_transform", "void set_position(const vector&in) property", asFUNCTION(physics_transform_set_position), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_transform", "quaternion get_rotation() const property", asFUNCTION(physics_transform_get_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_transform", "quaternion@ get_rotation() const property", asFUNCTION(physics_transform_get_rotation), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_transform", "void set_rotation(const quaternion&in) property", asFUNCTION(physics_transform_set_rotation), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_transform", "bool opEquals(const physics_transform&in) const", asMETHODPR(physics_transform, operator==, (const physics_transform&) const, bool), asCALL_THISCALL);
 	engine->RegisterObjectProperty("physics_transform", "float px", asOFFSET(physics_transform, px));
@@ -1004,7 +1015,7 @@ static void RegisterJoltWorld(asIScriptEngine* engine) {
 	// Transform
 	engine->RegisterObjectMethod("physics_world", "vector@ get_position(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_position), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "void set_position(const physics_body_id&in id, const vector&in pos, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_position), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_world", "quaternion get_rotation(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "quaternion@ get_rotation(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_rotation), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "void set_rotation(const physics_body_id&in id, const quaternion&in rot, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_rotation), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "void set_position_and_rotation(const physics_body_id&in id, const vector&in pos, const quaternion&in rot, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_position_and_rotation), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "vector@ get_center_of_mass_position(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_center_of_mass_position), asCALL_CDECL_OBJFIRST);
