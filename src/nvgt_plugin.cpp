@@ -22,6 +22,7 @@
 #include "datastreams.h"
 #include "nvgt.h"
 #include "nvgt_plugin.h"
+#include "sound_nodes.h"
 #include "UI.h"
 #include "xplatform.h"
 
@@ -55,6 +56,8 @@ nvgt_raycast_provider* nvgt_get_raycast_provider(void* object, int type_id) { //
 	auto it = raycast_provider_types.find(type_id & ~(asTYPEID_OBJHANDLE | asTYPEID_HANDLETOCONST));
 	return it == raycast_provider_types.end() ? nullptr : it->second(object);
 }
+int nvgt_register_audio_panner(nvgt_spatializer_component_factory* factory, bool default_enabled) { return factory ? register_audio_panner(factory, default_enabled) : -1; }
+int nvgt_register_audio_attenuator(nvgt_spatializer_component_factory* factory, bool default_enabled) { return factory ? register_audio_attenuator(factory, default_enabled) : -1; }
 void notify_nvgt_plugins_shutdown() {
 	while (!plugin_shutdown_callbacks.empty()) {
 		nvgt_plugin_shutdown_callback* callback = plugin_shutdown_callbacks.back();

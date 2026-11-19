@@ -26,7 +26,7 @@ class audio_engine;
 // A function a plugin can pass to nvgt_register_shutdown_notification, called once when NVGT shuts down.
 typedef void nvgt_plugin_shutdown_callback();
 
-#define NVGT_PLUGIN_API_VERSION 7
+#define NVGT_PLUGIN_API_VERSION 8
 
 // Raycasting against world geometry, implemented by objects such as physics_world so that subsystems which need to trace rays through a game's world (such as acoustic simulation) can do so without depending on how that world is represented. The structures are laid out identically to Steam Audio's IPLMaterial, IPLRay and IPLHit so that they can be passed to it without conversion.
 struct nvgt_acoustic_material {
@@ -56,6 +56,10 @@ public:
 };
 // Returns a retained raycast provider for an object of the type it was registered for, or null.
 typedef nvgt_raycast_provider* nvgt_raycast_provider_getter(void* object);
+// 3d panners and attenuators, the components of a sound's spatializer, are created by factories registered with nvgt_register_audio_panner and nvgt_register_audio_attenuator, which return the id scripts select them by (sound.set_3d_panner and sound.set_3d_attenuator). The node must derive from spatializer_component_node in NVGT's sound_nodes.h.
+class audio_spatializer;
+class spatializer_component_node;
+typedef spatializer_component_node* nvgt_spatializer_component_factory(audio_spatializer* spatializer, audio_engine* engine);
 
 // Subsystem flags, used for controling access to certain functions during development.
 enum NVGT_SUBSYSTEM {
@@ -117,7 +121,7 @@ enum NVGT_SUBSYSTEM {
 	X(bool, running_on_mobile, ()) \
 	X(void, nvgt_register_shutdown_notification, (nvgt_plugin_shutdown_callback* callback)) \
 	X(void, nvgt_register_raycast_provider_type, (int type_id, nvgt_raycast_provider_getter* getter)) \
-	X(nvgt_raycast_provider*, nvgt_get_raycast_provider, (void* object, int type_id))
+	X(nvgt_raycast_provider*, nvgt_get_raycast_provider, (void* object, int type_id)) 	X(int, nvgt_register_audio_panner, (nvgt_spatializer_component_factory* factory, bool default_enabled)) 	X(int, nvgt_register_audio_attenuator, (nvgt_spatializer_component_factory* factory, bool default_enabled))
 // Add more functions here...
 
 // Function typedefs:
