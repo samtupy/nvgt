@@ -583,6 +583,7 @@ class plugin_node_impl : public audio_node_impl, public virtual plugin_node {
 	}
 	~plugin_node_impl() {
 		if (pn) ma_node_uninit(&*pn, nullptr);
+		if (impl) impl->on_node_destroyed(this);
 	}
 	audio_plugin_node_interface* get_plugin_interface() const override { return impl; }
 	virtual void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {

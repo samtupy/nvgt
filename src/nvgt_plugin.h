@@ -26,7 +26,7 @@ class audio_engine;
 // A function a plugin can pass to nvgt_register_shutdown_notification, called once when NVGT shuts down.
 typedef void nvgt_plugin_shutdown_callback();
 
-#define NVGT_PLUGIN_API_VERSION 6
+#define NVGT_PLUGIN_API_VERSION 7
 
 // Subsystem flags, used for controling access to certain functions during development.
 enum NVGT_SUBSYSTEM {
@@ -195,7 +195,7 @@ inline void prepare_plugin_shared(nvgt_plugin_shared* shared, asIScriptEngine* e
 namespace Poco { class BinaryReader; class BinaryWriter; }
 bool load_nvgt_plugin(const std::string& name, std::string* errmsg = nullptr, void* user = NULL);
 bool register_static_plugin(const std::string& name, nvgt_plugin_entry* e, nvgt_plugin_version_func* v);
-bool load_serialized_nvgt_plugins(Poco::BinaryReader& br);
+bool read_serialized_nvgt_plugins(Poco::BinaryReader& br, std::vector<std::string>& names);
 void serialize_nvgt_plugins(Poco::BinaryWriter& bw);
 void list_loaded_nvgt_plugins(std::vector<std::string>& output);
 void notify_nvgt_plugins_shutdown();
@@ -244,4 +244,5 @@ class pack_interface {
 class audio_plugin_node_interface {
 public:
 	virtual void process(audio_plugin_node_interface* node, const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
+	virtual void on_node_destroyed(plugin_node* node) {} // Called once when the plugin_node wrapping this implementation is destroyed, after it has been removed from the audio graph so process will never be called again. A plugin that allocated its implementation for the node should free it here, as memory must be released by the module that allocated it.
 };

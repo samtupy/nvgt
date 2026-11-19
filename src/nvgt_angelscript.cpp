@@ -762,7 +762,8 @@ int LoadCompiledScript(asIScriptEngine *engine, unsigned char* code, asUINT size
 	codestream.set(code, size);
 	nvgt_bytecode_istream istr(&codestream);
 	BinaryReader br(istr);
-	if (!load_serialized_nvgt_plugins(br)) return -1;
+	vector<string> plugins;
+	if (!read_serialized_nvgt_plugins(br, plugins)) return -1;
 	int ns_count;
 	br >> ns_count;
 	for (int i = 0; i < ns_count; i++) {
@@ -771,6 +772,13 @@ int LoadCompiledScript(asIScriptEngine *engine, unsigned char* code, asUINT size
 		g_system_namespaces[k] = v;
 	}
 	if (ConfigureEngine(engine) < 0) return -1;
+	for (const string& name : plugins) { // Plugins are loaded after the engine is configured as they are when running from source, so that a plugin can register types depending on builtin ones such as those of the sound system.
+		string errmsg = Poco::format("Unable to load %s, exiting.", name);
+		if (!load_nvgt_plugin(name, &errmsg)) {
+			message(errmsg, "error");
+			return -1;
+		}
+	}
 	for (int i = 0; i < asEP_LAST_PROPERTY; i++) {
 		UInt64 val;
 		br.read7BitEncoded(val);

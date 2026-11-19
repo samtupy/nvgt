@@ -109,20 +109,15 @@ void list_loaded_nvgt_plugins(std::vector<std::string>& output) {
 	for (auto kv : loaded_plugins) output.push_back(kv.first);
 }
 
-bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
+bool read_serialized_nvgt_plugins(Poco::BinaryReader& br, std::vector<std::string>& names) {
 	unsigned short count;
 	br >> count;
-	if (!count) return true;
 	for (int i = 0; i < count; i++) {
 		std::string name;
 		br >> name;
-		std::string errmsg = Poco::format("Unable to load %s, exiting.", name);
-		if (!load_nvgt_plugin(name, &errmsg)) {
-			message(errmsg, "error");
-			return false;
-		}
+		names.push_back(name);
 	}
-	return true;
+	return br.good();
 }
 
 void serialize_nvgt_plugins(Poco::BinaryWriter& bw) {
