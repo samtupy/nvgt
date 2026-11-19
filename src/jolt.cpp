@@ -53,9 +53,11 @@
 #include <Jolt/Physics/Body/BodyLock.h>
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
 
 #include "nvgt.h"
+#include "nvgt_plugin.h"
 #include "nvgt_angelscript.h"
 #include "UI.h" // temp alert
 
@@ -70,36 +72,61 @@ public:
 	float friction;
 	float restitution;
 	string debug_name;
-	IPLMaterial acoustic;
+	nvgt_acoustic_material acoustic;
 	nvgt_physics_material(float friction = 0.2f, float restitution = 0.0f, const string& name = "") : friction(friction), restitution(restitution), debug_name(name), acoustic{{0.10f,0.20f,0.30f}, 0.05f, {0.100f,0.050f,0.030f}} {}
 	const char* GetDebugName() const override { return debug_name.c_str(); }
 	void as_addref() { AddRef(); }
 	void as_release() { Release(); }
 };
-static string& physics_material_get_name(nvgt_physics_material* m) { return m->debug_name; }
+static string physics_material_get_name(nvgt_physics_material* m) { return m->debug_name; }
 static void physics_material_set_name(nvgt_physics_material* m, const string& v) { m->debug_name = v; }
 
-// Named acoustic material presets: {absorption[low,mid,high], scattering, transmission[low,mid,high]}.
-static unordered_map<string, IPLMaterial> g_acoustic_presets = {
-	{"generic",  {{0.10f,0.20f,0.30f}, 0.05f, {0.100f,0.050f,0.030f}}},
-	{"brick",    {{0.03f,0.04f,0.07f}, 0.05f, {0.015f,0.015f,0.015f}}},
-	{"concrete", {{0.05f,0.07f,0.08f}, 0.05f, {0.015f,0.002f,0.001f}}},
-	{"ceramic",  {{0.01f,0.02f,0.02f}, 0.05f, {0.060f,0.044f,0.011f}}},
-	{"gravel",   {{0.60f,0.70f,0.80f}, 0.05f, {0.031f,0.012f,0.008f}}},
-	{"carpet",   {{0.24f,0.69f,0.73f}, 0.05f, {0.020f,0.005f,0.003f}}},
-	{"glass",    {{0.06f,0.03f,0.02f}, 0.05f, {0.060f,0.044f,0.011f}}},
-	{"plaster",  {{0.12f,0.06f,0.04f}, 0.05f, {0.056f,0.056f,0.004f}}},
-	{"wood",     {{0.11f,0.07f,0.06f}, 0.05f, {0.070f,0.014f,0.005f}}},
-	{"metal",    {{0.20f,0.07f,0.06f}, 0.05f, {0.200f,0.025f,0.010f}}},
-	{"rock",     {{0.13f,0.20f,0.24f}, 0.05f, {0.015f,0.002f,0.001f}}},
-	{"sand",     {{0.45f,0.65f,0.75f}, 0.90f, {0.010f,0.003f,0.002f}}},
-	{"snow",     {{0.45f,0.75f,0.90f}, 0.60f, {0.008f,0.003f,0.001f}}},
-	{"soil",     {{0.50f,0.60f,0.70f}, 0.80f, {0.012f,0.005f,0.002f}}},
-	{"foliage",  {{0.30f,0.50f,0.70f}, 0.85f, {0.050f,0.030f,0.020f}}},
-	{"water",    {{0.01f,0.01f,0.02f}, 0.10f, {0.001f,0.001f,0.001f}}},
+// Builtin named materials. The acoustic values for generic through rock are Steam Audio's own presets, the rest are approximations derived from published absorption coefficients for those materials, mapped onto Steam Audio's low (400Hz), mid (2.5kHz) and high (15kHz) bands. Friction and restitution are typical values for each kind of surface.
+struct physics_material_preset { const char* name; float friction, restitution; nvgt_acoustic_material acoustic; };
+static const physics_material_preset g_physics_material_presets[] = {
+	{"generic", 0.50f, 0.10f, {{0.10f,0.20f,0.30f}, 0.05f, {0.100f,0.050f,0.030f}}},
+	{"brick", 0.60f, 0.10f, {{0.03f,0.04f,0.07f}, 0.05f, {0.015f,0.015f,0.015f}}},
+	{"concrete", 0.60f, 0.10f, {{0.05f,0.07f,0.08f}, 0.05f, {0.015f,0.002f,0.001f}}},
+	{"ceramic", 0.50f, 0.20f, {{0.01f,0.02f,0.02f}, 0.05f, {0.060f,0.044f,0.011f}}},
+	{"gravel", 0.60f, 0.05f, {{0.60f,0.70f,0.80f}, 0.05f, {0.031f,0.012f,0.008f}}},
+	{"carpet", 0.70f, 0.05f, {{0.24f,0.69f,0.73f}, 0.05f, {0.020f,0.005f,0.003f}}},
+	{"glass", 0.40f, 0.30f, {{0.06f,0.03f,0.02f}, 0.05f, {0.060f,0.044f,0.011f}}},
+	{"plaster", 0.50f, 0.10f, {{0.12f,0.06f,0.04f}, 0.05f, {0.056f,0.056f,0.004f}}},
+	{"wood", 0.50f, 0.20f, {{0.11f,0.07f,0.06f}, 0.05f, {0.070f,0.014f,0.005f}}},
+	{"metal", 0.40f, 0.30f, {{0.20f,0.07f,0.06f}, 0.05f, {0.200f,0.025f,0.010f}}},
+	{"rock", 0.70f, 0.10f, {{0.13f,0.20f,0.24f}, 0.05f, {0.015f,0.002f,0.001f}}},
+	{"sand", 0.60f, 0.00f, {{0.45f,0.65f,0.75f}, 0.90f, {0.010f,0.003f,0.002f}}},
+	{"snow", 0.20f, 0.00f, {{0.45f,0.75f,0.90f}, 0.60f, {0.008f,0.003f,0.001f}}},
+	{"soil", 0.60f, 0.05f, {{0.50f,0.60f,0.70f}, 0.80f, {0.012f,0.005f,0.002f}}},
+	{"foliage", 0.50f, 0.05f, {{0.30f,0.50f,0.70f}, 0.85f, {0.050f,0.030f,0.020f}}},
+	{"water", 0.05f, 0.00f, {{0.01f,0.01f,0.02f}, 0.10f, {0.001f,0.001f,0.001f}}},
+	{"drywall", 0.50f, 0.10f, {{0.08f,0.06f,0.09f}, 0.05f, {0.120f,0.040f,0.020f}}},
+	{"marble", 0.40f, 0.20f, {{0.01f,0.01f,0.02f}, 0.05f, {0.010f,0.002f,0.001f}}},
+	{"asphalt", 0.70f, 0.10f, {{0.03f,0.04f,0.06f}, 0.10f, {0.010f,0.002f,0.001f}}},
+	{"grass", 0.50f, 0.05f, {{0.20f,0.50f,0.65f}, 0.70f, {0.030f,0.010f,0.005f}}},
+	{"fabric", 0.60f, 0.05f, {{0.30f,0.60f,0.65f}, 0.30f, {0.350f,0.250f,0.150f}}},
+	{"cardboard", 0.50f, 0.10f, {{0.10f,0.15f,0.20f}, 0.10f, {0.300f,0.150f,0.080f}}},
+	{"plastic", 0.40f, 0.30f, {{0.03f,0.05f,0.07f}, 0.05f, {0.100f,0.050f,0.020f}}},
+	{"rubber", 0.90f, 0.60f, {{0.04f,0.08f,0.10f}, 0.05f, {0.050f,0.020f,0.010f}}},
+	{"foam", 0.60f, 0.10f, {{0.30f,0.90f,0.95f}, 0.30f, {0.400f,0.200f,0.100f}}},
+	{"ice", 0.05f, 0.10f, {{0.01f,0.02f,0.03f}, 0.05f, {0.020f,0.010f,0.005f}}},
 };
+static const nvgt_acoustic_material g_default_acoustic_material = g_physics_material_presets[0].acoustic; // Used for surfaces without a physics_material.
+static unordered_map<string, Ref<nvgt_physics_material>>* g_physics_materials = nullptr; // Populated by jolt_ensure_init, as Jolt's allocator must be registered before materials can be created.
+static void physics_material_registry_init() {
+	if (g_physics_materials) return;
+	g_physics_materials = new unordered_map<string, Ref<nvgt_physics_material>>();
+	for (const auto& p : g_physics_material_presets) {
+		nvgt_physics_material* m = new nvgt_physics_material(p.friction, p.restitution, p.name);
+		m->acoustic = p.acoustic;
+		(*g_physics_materials)[p.name] = m;
+	}
+}
 static void physics_material_define_acoustics(const string& name, float abs_low, float abs_mid, float abs_high, float scattering, float trans_low, float trans_mid, float trans_high) {
-	g_acoustic_presets[name] = {{abs_low, abs_mid, abs_high}, scattering, {trans_low, trans_mid, trans_high}};
+	if (name.empty()) return;
+	Ref<nvgt_physics_material>& m = (*g_physics_materials)[name];
+	if (!m) m = new nvgt_physics_material(0.5f, 0.1f, name);
+	m->acoustic = {{abs_low, abs_mid, abs_high}, scattering, {trans_low, trans_mid, trans_high}};
 }
 
 // -- Object layer definitions --
@@ -438,8 +465,8 @@ public:
 };
 
 // -- Physics world wrapper --
-struct jolt_physics_world {
-	int refcount = 1;
+struct jolt_physics_world : public nvgt_raycast_provider {
+	atomic<int> refcount = 1; // Atomic as acoustic simulation threads may hold references through the raycast provider interface.
 	TempAllocatorImpl* temp_alloc;
 	JobSystemThreadPool* job_system;
 	JoltBPLayerInterface bp_layer_iface;
@@ -472,6 +499,10 @@ struct jolt_physics_world {
 	}
 	void AddRef() { refcount++; }
 	void Release() { if (--refcount <= 0) delete this; }
+	void retain() override { AddRef(); }
+	void release() override { Release(); }
+	void closest_hits(int count, const nvgt_ray* rays, const float* min_distances, const float* max_distances, nvgt_ray_hit* hits) override;
+	void any_hits(int count, const nvgt_ray* rays, const float* min_distances, const float* max_distances, unsigned char* occluded) override;
 };
 
 static jolt_physics_world* jolt_world_factory(uint max_bodies, uint max_body_pairs, uint max_contact_constraints) {
@@ -626,9 +657,26 @@ static bool jolt_world_cast_ray(jolt_physics_world* w, const Vec3& origin, const
 static nvgt_physics_material* physics_material_create(float friction, float restitution, const string& name) {
 	auto* m = new nvgt_physics_material(friction, restitution, name);
 	m->AddRef();
-	auto it = g_acoustic_presets.find(name);
-	if (it != g_acoustic_presets.end()) m->acoustic = it->second;
+	auto it = g_physics_materials->find(name);
+	if (it != g_physics_materials->end()) m->acoustic = it->second->acoustic;
 	return m;
+}
+static nvgt_physics_material* physics_material_get(const string& name) {
+	auto it = g_physics_materials->find(name);
+	if (it == g_physics_materials->end()) return nullptr;
+	it->second->AddRef();
+	return it->second.GetPtr();
+}
+static bool physics_material_register(nvgt_physics_material* m) {
+	if (!m || m->debug_name.empty()) return false;
+	(*g_physics_materials)[m->debug_name] = m;
+	return true;
+}
+static CScriptArray* physics_material_list() {
+	asIScriptContext* ctx = asGetActiveContext();
+	CScriptArray* names = CScriptArray::Create(ctx->GetEngine()->GetTypeInfoByDecl("array<string>"));
+	for (const auto& [name, mat] : *g_physics_materials) names->InsertLast((void*)&name);
+	return names;
 }
 
 // -- Body interface: material properties --
@@ -673,77 +721,73 @@ static void jolt_ensure_init() {
 	RegisterDefaultAllocator();
 	Factory::sInstance = new Factory();
 	RegisterTypes();
+	physics_material_registry_init();
 }
 
-// -- Steam Audio custom scene callbacks --
-
-// Helper: cast one ray and fill hit. query and lock_iface must already be retrieved from the world.
-static void jolt_ipl_trace_ray(const NarrowPhaseQuery& query, const BodyLockInterface& lock_iface, const IPLRay& ipl_ray, IPLfloat32 min_dist, IPLfloat32 max_dist, IPLHit& hit) {
-	hit.distance = INFINITY;
-	hit.triangleIndex = -1;
-	hit.objectIndex = -1;
-	hit.materialIndex = -1;
-	hit.normal = {0.0f, 0.0f, 0.0f};
-	hit.material = nullptr;
-	if (max_dist <= min_dist) return;
-	Vec3 origin(ipl_ray.origin.x, ipl_ray.origin.y, ipl_ray.origin.z);
-	Vec3 dir(ipl_ray.direction.x, ipl_ray.direction.y, ipl_ray.direction.z);
-	RRayCast jolt_ray{origin, dir * max_dist};
-	RayCastResult result;
-	if (!query.CastRay(jolt_ray, result)) return;
-	float hit_dist = result.mFraction * max_dist;
-	if (hit_dist < min_dist) return;
-	hit.distance = hit_dist;
-	BodyLockRead lock(lock_iface, result.mBodyID);
-	if (!lock.Succeeded()) return;
-	const Body& body = lock.GetBody();
-	RVec3 world_hit = jolt_ray.GetPointOnRay(result.mFraction);
-	Vec3 normal = body.GetWorldSpaceSurfaceNormal(result.mSubShapeID2, world_hit);
-	hit.normal = {normal.GetX(), normal.GetY(), normal.GetZ()};
-	if (const auto* cs = dynamic_cast<const ConvexShape*>(body.GetShape())) {
-		if (const auto* mat = dynamic_cast<const nvgt_physics_material*>(cs->GetMaterial())) {
-			hit.material = const_cast<IPLMaterial*>(&mat->acoustic);
-			hit.materialIndex = 0;
+// -- Raycast provider --
+// Rays are cast with convex shapes treated as hollow and back faces ignored, so that a ray starting inside a body (such as the listener inside a character's capsule) or one continuing from a point just inside a wall it previously hit passes out of that body rather than reporting a hit at its origin. Rays are offset to start at their minimum distance so that hits nearer than it can't hide farther ones.
+static thread_local vector<nvgt_acoustic_material> g_raycast_hit_materials; // Per thread copies of hit materials, as a body and its material could be destroyed by another thread while the caller is still reading the hit.
+static inline RRayCast make_jolt_ray(const nvgt_ray& ray, float min_dist, float max_dist) {
+	Vec3 dir(ray.direction[0], ray.direction[1], ray.direction[2]);
+	return RRayCast(RVec3(ray.origin[0], ray.origin[1], ray.origin[2]) + dir * min_dist, dir * (max_dist - min_dist));
+}
+static RayCastSettings make_jolt_ray_settings() {
+	RayCastSettings settings;
+	settings.SetBackFaceMode(EBackFaceMode::IgnoreBackFaces);
+	settings.mTreatConvexAsSolid = false;
+	return settings;
+}
+void jolt_physics_world::closest_hits(int count, const nvgt_ray* rays, const float* min_distances, const float* max_distances, nvgt_ray_hit* hits) {
+	if (count < 1) return;
+	if (g_raycast_hit_materials.size() < (size_t)count) g_raycast_hit_materials.resize(count);
+	const NarrowPhaseQuery& query = system.GetNarrowPhaseQuery();
+	const BodyLockInterface& locks = system.GetBodyLockInterface();
+	const RayCastSettings settings = make_jolt_ray_settings();
+	for (int i = 0; i < count; i++) {
+		nvgt_ray_hit& hit = hits[i];
+		hit = {INFINITY, -1, -1, -1, {0.0f, 0.0f, 0.0f}, nullptr};
+		if (max_distances[i] <= min_distances[i]) continue;
+		RRayCast ray = make_jolt_ray(rays[i], min_distances[i], max_distances[i]);
+		ClosestHitCollisionCollector<CastRayCollector> collector;
+		query.CastRay(ray, settings, collector);
+		if (!collector.HadHit()) continue;
+		const RayCastResult& result = collector.mHit;
+		nvgt_acoustic_material& material = g_raycast_hit_materials[i];
+		material = g_default_acoustic_material;
+		Vec3 normal = -ray.mDirection.Normalized();
+		BodyLockRead lock(locks, result.mBodyID);
+		if (lock.Succeeded()) {
+			const Body& body = lock.GetBody();
+			normal = body.GetWorldSpaceSurfaceNormal(result.mSubShapeID2, ray.GetPointOnRay(result.mFraction));
+			const PhysicsMaterial* m = body.GetShape()->GetMaterial(result.mSubShapeID2);
+			if (m && m != PhysicsMaterial::sDefault.GetPtr()) material = static_cast<const nvgt_physics_material*>(m)->acoustic; // NVGT only ever creates nvgt_physics_material, Jolt substitutes sDefault for shapes without one.
+			hit.object_index = (int)body.GetID().GetIndex();
 		}
+		hit.distance = min_distances[i] + result.mFraction * (max_distances[i] - min_distances[i]);
+		hit.normal[0] = normal.GetX();
+		hit.normal[1] = normal.GetY();
+		hit.normal[2] = normal.GetZ();
+		hit.material_index = 0;
+		hit.material = &material;
 	}
 }
-
-void IPLCALL jolt_ipl_closest_hit(const IPLRay* ray, IPLfloat32 min_dist, IPLfloat32 max_dist, IPLHit* hit, void* user_data) {
-	auto* world = static_cast<jolt_physics_world*>(user_data);
-	jolt_ipl_trace_ray(world->system.GetNarrowPhaseQuery(), world->system.GetBodyLockInterface(), *ray, min_dist, max_dist, *hit);
-}
-
-void IPLCALL jolt_ipl_any_hit(const IPLRay* ray, IPLfloat32 min_dist, IPLfloat32 max_dist, IPLuint8* occluded, void* user_data) {
-	auto* world = static_cast<jolt_physics_world*>(user_data);
-	if (max_dist <= min_dist) { *occluded = 1; return; }
-	Vec3 origin(ray->origin.x, ray->origin.y, ray->origin.z);
-	Vec3 dir(ray->direction.x, ray->direction.y, ray->direction.z);
-	RRayCast jolt_ray{origin, dir * max_dist};
-	RayCastResult result;
-	bool hit = world->system.GetNarrowPhaseQuery().CastRay(jolt_ray, result);
-	*occluded = (hit && result.mFraction * max_dist >= min_dist) ? 1 : 0;
-}
-
-void IPLCALL jolt_ipl_batched_closest_hit(IPLint32 num_rays, const IPLRay* rays, const IPLfloat32* min_dists, const IPLfloat32* max_dists, IPLHit* hits, void* user_data) {
-	auto* world = static_cast<jolt_physics_world*>(user_data);
-	const NarrowPhaseQuery& query = world->system.GetNarrowPhaseQuery();
-	const BodyLockInterface& lock_iface = world->system.GetBodyLockInterface();
-	for (IPLint32 i = 0; i < num_rays; i++)
-		jolt_ipl_trace_ray(query, lock_iface, rays[i], min_dists[i], max_dists[i], hits[i]);
-}
-
-void IPLCALL jolt_ipl_batched_any_hit(IPLint32 num_rays, const IPLRay* rays, const IPLfloat32* min_dists, const IPLfloat32* max_dists, IPLuint8* occluded, void* user_data) {
-	auto* world = static_cast<jolt_physics_world*>(user_data);
-	const NarrowPhaseQuery& query = world->system.GetNarrowPhaseQuery();
-	for (IPLint32 i = 0; i < num_rays; i++) {
-		if (max_dists[i] <= min_dists[i]) { occluded[i] = 1; continue; }
-		Vec3 origin(rays[i].origin.x, rays[i].origin.y, rays[i].origin.z);
-		Vec3 dir(rays[i].direction.x, rays[i].direction.y, rays[i].direction.z);
-		RRayCast jolt_ray{origin, dir * max_dists[i]};
-		RayCastResult result;
-		bool hit = query.CastRay(jolt_ray, result);
-		occluded[i] = (hit && result.mFraction * max_dists[i] >= min_dists[i]) ? 1 : 0;
+void jolt_physics_world::any_hits(int count, const nvgt_ray* rays, const float* min_distances, const float* max_distances, unsigned char* occluded) {
+	const NarrowPhaseQuery& query = system.GetNarrowPhaseQuery();
+	const RayCastSettings settings = make_jolt_ray_settings();
+	for (int i = 0; i < count; i++) {
+		if (max_distances[i] <= min_distances[i]) {
+			occluded[i] = 1;
+			continue;
+		}
+		AnyHitCollisionCollector<CastRayCollector> collector;
+		query.CastRay(make_jolt_ray(rays[i], min_distances[i], max_distances[i]), settings, collector);
+		occluded[i] = collector.HadHit() ? 1 : 0;
 	}
+}
+static nvgt_raycast_provider* jolt_world_get_raycast_provider(void* world) {
+	jolt_physics_world* w = static_cast<jolt_physics_world*>(world);
+	w->retain();
+	return w;
 }
 
 // -- Registration --
@@ -756,7 +800,7 @@ static void RegisterJoltMaterial(asIScriptEngine* engine) {
 	engine->RegisterObjectProperty("physics_material", "float restitution", asOFFSET(nvgt_physics_material, restitution));
 	engine->RegisterObjectMethod("physics_material", "string get_name() const property", asFUNCTION(physics_material_get_name), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_material", "void set_name(const string&in) property", asFUNCTION(physics_material_set_name), asCALL_CDECL_OBJFIRST);
-	// Acoustic properties (Steam Audio IPLMaterial fields exposed as individual named properties).
+	// Acoustic properties (the fields of nvgt_acoustic_material, laid out like Steam Audio's IPLMaterial) exposed as individual named properties.
 	// absorption: fraction of sound absorbed at low (400Hz), mid (2.5kHz), high (15kHz) frequencies.
 	// scattering: 0 = pure specular reflection, 1 = pure diffuse.
 	// transmission: fraction of sound transmitted through at low, mid, high frequencies.
@@ -770,6 +814,9 @@ static void RegisterJoltMaterial(asIScriptEngine* engine) {
 	engine->RegisterObjectProperty("physics_material", "float acoustic_transmission_high",ab + 6 * (int)sizeof(float));
 	engine->RegisterGlobalFunction("physics_material@ physics_material_create(float friction = 0.2f, float restitution = 0.0f, const string&in name = \"\")", asFUNCTION(physics_material_create), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void physics_material_define_acoustics(const string&in name, float abs_low, float abs_mid, float abs_high, float scattering, float trans_low, float trans_mid, float trans_high)", asFUNCTION(physics_material_define_acoustics), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_material@ physics_material_get(const string&in name)", asFUNCTION(physics_material_get), asCALL_CDECL);
+	engine->RegisterGlobalFunction("bool physics_material_register(physics_material@ material)", asFUNCTION(physics_material_register), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string[]@ physics_material_list()", asFUNCTION(physics_material_list), asCALL_CDECL);
 }
 
 static void RegisterJoltMathTypes(asIScriptEngine* engine) {
@@ -1207,4 +1254,5 @@ void RegisterJolt(asIScriptEngine* engine) {
 	RegisterJoltBodyID(engine);
 	RegisterJoltShape(engine);
 	RegisterJoltWorld(engine);
+	nvgt_register_raycast_provider_type(engine->GetTypeIdByDecl("physics_world"), jolt_world_get_raycast_provider);
 }

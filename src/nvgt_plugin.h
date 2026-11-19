@@ -28,6 +28,35 @@ typedef void nvgt_plugin_shutdown_callback();
 
 #define NVGT_PLUGIN_API_VERSION 7
 
+// Raycasting against world geometry, implemented by objects such as physics_world so that subsystems which need to trace rays through a game's world (such as acoustic simulation) can do so without depending on how that world is represented. The structures are laid out identically to Steam Audio's IPLMaterial, IPLRay and IPLHit so that they can be passed to it without conversion.
+struct nvgt_acoustic_material {
+	float absorption[3]; // Fraction of sound energy absorbed on reflection at low, mid and high frequencies.
+	float scattering; // Fraction of reflected sound energy that is scattered diffusely rather than specularly.
+	float transmission[3]; // Fraction of sound energy transmitted through the surface at low, mid and high frequencies.
+};
+struct nvgt_ray {
+	float origin[3];
+	float direction[3]; // Unit length.
+};
+struct nvgt_ray_hit {
+	float distance; // INFINITY if nothing was hit.
+	int triangle_index; // -1 if not provided.
+	int object_index; // -1 if not provided.
+	int material_index; // -1 if not provided.
+	float normal[3]; // Unit length surface normal at the hit point.
+	nvgt_acoustic_material* material; // Must be valid when anything was hit, and must remain valid at least until the next call to the provider from the same thread.
+};
+class nvgt_raycast_provider {
+public:
+	virtual void retain() = 0;
+	virtual void release() = 0;
+	// Both functions may be called concurrently from many threads, including while the world is being updated. Rays must only report hits at distances between min_distances[i] and max_distances[i], and rays whose max distance is not greater than their min distance are ignored (reported as no hit by closest_hits, but as occluded by any_hits).
+	virtual void closest_hits(int count, const nvgt_ray* rays, const float* min_distances, const float* max_distances, nvgt_ray_hit* hits) = 0;
+	virtual void any_hits(int count, const nvgt_ray* rays, const float* min_distances, const float* max_distances, unsigned char* occluded) = 0;
+};
+// Returns a retained raycast provider for an object of the type it was registered for, or null.
+typedef nvgt_raycast_provider* nvgt_raycast_provider_getter(void* object);
+
 // Subsystem flags, used for controling access to certain functions during development.
 enum NVGT_SUBSYSTEM {
 	NVGT_SUBSYSTEM_GENERAL = 0x01,
@@ -86,7 +115,9 @@ enum NVGT_SUBSYSTEM {
 	X(plugin_node*, nvgt_audio_plugin_node_create, (audio_plugin_node_interface* impl, unsigned char input_bus_count, unsigned char output_bus_count, unsigned int flags, audio_engine* engine)) \
 	X(audio_plugin_node_interface*, nvgt_audio_plugin_node_get, (plugin_node* node)) \
 	X(bool, running_on_mobile, ()) \
-	X(void, nvgt_register_shutdown_notification, (nvgt_plugin_shutdown_callback* callback))
+	X(void, nvgt_register_shutdown_notification, (nvgt_plugin_shutdown_callback* callback)) \
+	X(void, nvgt_register_raycast_provider_type, (int type_id, nvgt_raycast_provider_getter* getter)) \
+	X(nvgt_raycast_provider*, nvgt_get_raycast_provider, (void* object, int type_id))
 // Add more functions here...
 
 // Function typedefs:

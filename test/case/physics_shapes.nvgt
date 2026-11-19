@@ -57,3 +57,21 @@ void test_tapered_cylinder_shape() {
 	float expected_y = 0.5 + cyl.half_height; // Standing on its wide bottom face, which is half_height below the shape's origin. Note local_bounds can't be used here as it is centered on the center of mass, which is lower than the origin for a tapered cylinder.
 	assert(abs(pos.y - expected_y) < 0.05 and abs(pos.x) < 0.05 and abs(pos.z) < 0.05, "tapered cylinder should rest on the floor at y " + expected_y + ", but is at " + pos);
 }
+void test_physics_material_registry() {
+	physics_material@ concrete = physics_material_get("concrete");
+	assert(concrete !is null and concrete.name == "concrete", "builtin concrete material missing");
+	assert(abs(concrete.acoustic_absorption_low - 0.05) < 0.0001 and abs(concrete.acoustic_transmission_high - 0.001) < 0.0001, "concrete acoustics");
+	assert(physics_material_get("concrete") is concrete, "the registry should hand out shared instances");
+	assert(physics_material_get("no_such_material") is null);
+	string[]@ names = physics_material_list();
+	assert(names.find("cardboard") > -1 and names.find("carpet") > -1 and names.find("generic") > -1, "builtin materials should be listed");
+	physics_material@ custom = physics_material_create(0.3, 0.4, "brick");
+	assert(custom !is physics_material_get("brick") and custom.friction == 0.3 and abs(custom.acoustic_absorption_mid - 0.04) < 0.0001, "physics_material_create should copy the acoustics of a registered material with the same name");
+	physics_material@ slime = physics_material_create(0.9, 0.0, "test_slime");
+	slime.acoustic_absorption_mid = 0.8;
+	assert(physics_material_register(slime) and physics_material_get("test_slime") is slime, "registering a material");
+	assert(!physics_material_register(physics_material_create()), "a material without a name can't be registered");
+	physics_material_define_acoustics("test_goo", 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7);
+	physics_material@ goo = physics_material_get("test_goo");
+	assert(goo !is null and abs(goo.acoustic_scattering - 0.4) < 0.0001 and abs(goo.acoustic_transmission_high - 0.7) < 0.0001, "define_acoustics should create a registered material");
+}
