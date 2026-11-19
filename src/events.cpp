@@ -60,21 +60,21 @@ void engine_event::clean_inactive_listeners() {
 	}
 }
 bool engine_event::insert(const engine_event_listener& listener, int index = -1) {
-	if (find(listener) > -1) return false;
+	if (index < -1 || index > (int)listeners.size() || find(listener) > -1) return false;
 	if (index == -1) index = listeners.size();
 	listeners.insert(listeners.begin() + index, listener);
 	return true;
 }
 std::string engine_event::callback_declaration() const { return "on_"s + name + "("s + args + ")"; }
-int engine_event::find(asIScriptObject* obj) const { return find(engine_event_listener(obj, this)); }
-int engine_event::find(asIScriptFunction* func) const { return find(engine_event_listener(func)); }
+int engine_event::find(asIScriptObject* obj) const { return obj? find(engine_event_listener(obj, this)) : -1; }
+int engine_event::find(asIScriptFunction* func) const { return func? find(engine_event_listener(func)) : -1; }
 int engine_event::find(const engine_event_listener& listener) const {
 	auto it = std::find(listeners.begin(), listeners.end(), listener);
 	if (it == listeners.end()) return -1;
 	return distance(listeners.begin(), it);
 }
-bool engine_event::insert(asIScriptObject* obj, int index) { return insert(engine_event_listener(obj, this), index); }
-bool engine_event::insert(asIScriptFunction* func, int index) { return insert(engine_event_listener(func), index); }
+bool engine_event::insert(asIScriptObject* obj, int index) { return obj && insert(engine_event_listener(obj, this), index); }
+bool engine_event::insert(asIScriptFunction* func, int index) { return func && insert(engine_event_listener(func), index); }
 bool engine_event::remove(asIScriptObject* obj) { return remove(find(obj)); }
 bool engine_event::remove(asIScriptFunction* func) { return remove(find(func)); }
 bool engine_event::remove(unsigned int index) {
@@ -95,13 +95,14 @@ void engine_event::angelscript_register(asIScriptEngine* engine, engine_event* g
 		engine->RegisterFuncdef(Poco::format("bool %s_callback(%s)", type_name, args).c_str());
 		engine->RegisterFuncdef(Poco::format("void %s_passthrough_callback(%s)", type_name, args).c_str());
 		engine->RegisterObjectType(type_name.c_str(), 0, asOBJ_REF | asOBJ_NOHANDLE);
-		for (const std::string& t : listener_types) {
-			bool is_interface = t == listener_name;
-			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("int find(%s@ listener) const", t).c_str(), is_interface? asMETHODPR(engine_event, find, (asIScriptObject*) const, int) : asMETHODPR(engine_event, find, (asIScriptFunction*) const, int), asCALL_THISCALL);
-			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool insert(%s@ listener, int index = -1)", t).c_str(), is_interface? asMETHODPR(engine_event, insert, (asIScriptObject*, int), bool) : asMETHODPR(engine_event, insert, (asIScriptFunction*, int), bool), asCALL_THISCALL);
-			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool opAddAssign(%s@ listener)", t).c_str(), is_interface? asMETHODPR(engine_event, operator+=, (asIScriptObject*), bool) : asMETHODPR(engine_event, operator+=, (asIScriptFunction*), bool), asCALL_THISCALL);
-			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool remove(%s@ listener)", t).c_str(), is_interface? asMETHODPR(engine_event, remove, (asIScriptObject*), bool) : asMETHODPR(engine_event, remove, (asIScriptFunction*), bool), asCALL_THISCALL);
-			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool opSubAssign(%s@ listener)", t).c_str(), is_interface? asMETHODPR(engine_event, operator-=, (asIScriptObject*), bool) : asMETHODPR(engine_event, operator-=, (asIScriptFunction*), bool), asCALL_THISCALL);
+		for (const std::string& listener_type : listener_types) {
+			bool is_interface = listener_type == listener_name;
+			std::string t = is_interface? listener_type + "@+" : listener_type + "@";
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("int find(%s listener) const", t).c_str(), is_interface? asMETHODPR(engine_event, find, (asIScriptObject*) const, int) : asMETHODPR(engine_event, find, (asIScriptFunction*) const, int), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool insert(%s listener, int index = -1)", t).c_str(), is_interface? asMETHODPR(engine_event, insert, (asIScriptObject*, int), bool) : asMETHODPR(engine_event, insert, (asIScriptFunction*, int), bool), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool opAddAssign(%s listener)", t).c_str(), is_interface? asMETHODPR(engine_event, operator+=, (asIScriptObject*), bool) : asMETHODPR(engine_event, operator+=, (asIScriptFunction*), bool), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool remove(%s listener)", t).c_str(), is_interface? asMETHODPR(engine_event, remove, (asIScriptObject*), bool) : asMETHODPR(engine_event, remove, (asIScriptFunction*), bool), asCALL_THISCALL);
+			engine->RegisterObjectMethod(type_name.c_str(), Poco::format("bool opSubAssign(%s listener)", t).c_str(), is_interface? asMETHODPR(engine_event, operator-=, (asIScriptObject*), bool) : asMETHODPR(engine_event, operator-=, (asIScriptFunction*), bool), asCALL_THISCALL);
 		}
 		engine->RegisterObjectMethod(type_name.c_str(), "bool remove(uint index)", asMETHODPR(engine_event, remove, (unsigned int), bool), asCALL_THISCALL);
 		engine->RegisterObjectMethod(type_name.c_str(), Poco::format("void opCall(%s)", args).c_str(), fire_func, asCALL_THISCALL);
@@ -117,6 +118,10 @@ engine_key_event on_key_press("key_press");
 engine_key_event on_key_repeat("key_repeat");
 engine_key_event on_key_release("key_release");
 engine_character_event on_characters("characters");
+engine_mouse_button_event on_mouse_button_down("mouse_button_down");
+engine_mouse_button_event on_mouse_button_up("mouse_button_up");
+engine_mouse_motion_event on_mouse_move("mouse_move");
+engine_mouse_wheel_event on_mouse_wheel("mouse_wheel");
 engine_touch_event on_touch_finger_down("touch_finger_down");
 engine_touch_event on_touch_finger_up("touch_finger_up");
 engine_touch_motion_event on_touch_finger_move("touch_finger_move");
@@ -127,6 +132,10 @@ void RegisterEvents(asIScriptEngine* engine) {
 	on_key_repeat.angelscript_register(engine, &on_key_repeat);
 	on_key_release.angelscript_register(engine, &on_key_release);
 	on_characters.angelscript_register(engine, &on_characters);
+	on_mouse_button_down.angelscript_register(engine, &on_mouse_button_down);
+	on_mouse_button_up.angelscript_register(engine, &on_mouse_button_up);
+	on_mouse_move.angelscript_register(engine, &on_mouse_move);
+	on_mouse_wheel.angelscript_register(engine, &on_mouse_wheel);
 	on_touch_finger_down.angelscript_register(engine, &on_touch_finger_down);
 	on_touch_finger_up.angelscript_register(engine, &on_touch_finger_up);
 	on_touch_finger_move.angelscript_register(engine, &on_touch_finger_move);

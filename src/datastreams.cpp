@@ -95,13 +95,13 @@ void sdl_file_stream_buf::flushToDisk() {
 	if (getMode() & std::ios::out) sync();
 	SDL_FlushIO(_handle);
 }
-int sdl_file_stream_buf::readFromDevice(char* buffer, std::streamsize length) {
+std::streamsize sdl_file_stream_buf::readFromDevice(char* buffer, std::streamsize length) {
 	if (!_handle) return -1;
 	size_t bytes_read = SDL_ReadIO(_handle, buffer, length);
 	if (bytes_read > 0) return bytes_read;
 	return SDL_GetIOStatus(_handle) == SDL_IO_STATUS_EOF? 0 : -1;
 }
-int sdl_file_stream_buf::writeToDevice(const char* buffer, std::streamsize length) {
+std::streamsize sdl_file_stream_buf::writeToDevice(const char* buffer, std::streamsize length) {
 	if (!_handle) return -1;
 	size_t bytes_written = SDL_WriteIO(_handle, buffer, length);
 	if (bytes_written > 0) return bytes_written;
@@ -155,55 +155,65 @@ sdl_file_stream::sdl_file_stream(const std::string& path, const std::string& mod
 sdl_file_stream::sdl_file_stream(SDL_IOStream* io, std::ios::openmode mode) : std::iostream(&_buf) { attach(io, mode); }
 
 // Prebuffered input stream implementation
-prebuffer_istreambuf::prebuffer_istreambuf(std::istream& source, std::size_t prebuffer_size) : BasicBufferedStreamBuf(4096, std::ios_base::in), source(&source), prebuffer_size(prebuffer_size), prebuffer_pos(0), prebuffer_discarded(false), owns_source(false) {
+prebuffer_istreambuf::prebuffer_istreambuf(std::istream& source, std::size_t prebuffer_size) : BasicBufferedStreamBuf(4096, std::ios_base::in), source(&source), initial_fill(prebuffer_size), window_pos(0), window_closed(false), owns_source(false) {
 	if (!source.good()) throw std::invalid_argument("Source stream is invalid.");
-	prebuffer.reserve(prebuffer_size);
+	window.reserve(WINDOW_CAP); // once, so that appending never reallocates while audio is being served
 }
 prebuffer_istreambuf::~prebuffer_istreambuf() { if (owns_source) delete source; }
 void prebuffer_istreambuf::own_source(bool owns) { owns_source = owns; }
-bool prebuffer_istreambuf::fill_prebuffer() {
-	if (!prebuffer.empty() || prebuffer_discarded) return true;
-	prebuffer.resize(prebuffer_size);
-	source->read(prebuffer.data(), prebuffer_size);
-	std::size_t bytes_read = source->gcount();
-	prebuffer.resize(bytes_read);
-	return bytes_read > 0;
+bool prebuffer_istreambuf::fill_window() {
+	if (!window.empty() || window_closed) return true;
+	window.resize(initial_fill);
+	source->read(window.data(), initial_fill);
+	window.resize(source->gcount());
+	return !window.empty();
 }
-int prebuffer_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
+std::streamsize prebuffer_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
 	if (length <= 0) return 0;
 	std::streamsize bytes_read = 0;
-	if (prebuffer.empty() && !prebuffer_discarded) fill_prebuffer();
-	if (!prebuffer_discarded && prebuffer_pos < prebuffer.size()) {
-		std::size_t available_in_prebuffer = prebuffer.size() - prebuffer_pos;
-		std::size_t to_copy = std::min(static_cast<std::size_t>(length), available_in_prebuffer);
-		std::memcpy(buffer, prebuffer.data() + prebuffer_pos, to_copy);
-		prebuffer_pos += to_copy;
+	if (window.empty() && !window_closed) fill_window();
+	// Anything still inside the window is replayed from memory rather than pulled again.
+	if (window_pos < window.size()) {
+		std::size_t to_copy = std::min(static_cast<std::size_t>(length), window.size() - window_pos);
+		std::memcpy(buffer, window.data() + window_pos, to_copy);
+		window_pos += to_copy;
 		buffer += to_copy;
 		length -= to_copy;
 		bytes_read += to_copy;
-		if (prebuffer_pos >= prebuffer.size()) {
-			prebuffer.clear();
-			prebuffer.shrink_to_fit();
-			prebuffer_discarded = true;
-		}
 	}
 	if (length > 0) {
 		source->read(buffer, length);
-		std::streamsize source_bytes_read = source->gcount();
-		bytes_read += source_bytes_read;
+		std::streamsize got = source->gcount();
+		if (!window_closed && got > 0) {
+			// Keeps every byte read so far so the window's end tracks the source's real position; once it hits WINDOW_CAP it's of no further use, so it's freed immediately rather than held for no reason.
+			std::size_t room = WINDOW_CAP - window.size();
+			window.insert(window.end(), buffer, buffer + std::min(static_cast<std::size_t>(got), room));
+			if (window.size() >= WINDOW_CAP) {
+				window.clear();
+				window.shrink_to_fit();
+				window_closed = true;
+			}
+		}
+		window_pos += got;
+		bytes_read += got;
 	}
 	return static_cast<int>(bytes_read);
 }
 std::streampos prebuffer_istreambuf::seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
-	if (dir == std::ios_base::beg && off == 0) return seekpos(0);
-	return -1;
+	// Where the reader actually is: the base class reads ahead of it, so those bytes have to come back off window_pos.
+	std::streamoff consumed = static_cast<std::streamoff>(window_pos) - (egptr() - gptr());
+	if (dir == std::ios_base::cur && off == 0) return consumed; // tellg() arrives here as this; answering it is what lets ma_vfs's onTell succeed
+	if (dir == std::ios_base::end) return -1; // the length is unknown, so this genuinely cannot be answered
+	return seekpos(dir == std::ios_base::beg ? off : consumed + off, which);
 }
 std::streampos prebuffer_istreambuf::seekpos(std::streampos pos, std::ios_base::openmode which) {
-	if (pos != 0 || prebuffer_discarded) return -1;
-	if (prebuffer.empty()) fill_prebuffer();
-	prebuffer_pos = 0;
-	setg(nullptr, nullptr, nullptr);
-	return 0;
+	std::streamoff target = pos;
+	if (target < 0 || window_closed) return -1;
+	if (window.empty()) fill_window();
+	if (static_cast<std::size_t>(target) > window.size()) return -1; // past what was kept, and the source cannot go back
+	window_pos = static_cast<std::size_t>(target);
+	setg(nullptr, nullptr, nullptr); // drop what the base class had buffered, so it reads through us again
+	return pos;
 }
 prebuffer_istream::prebuffer_istream(std::istream& source, std::size_t prebuffer_size) : basic_istream(new prebuffer_istreambuf(source, prebuffer_size)) {}
 prebuffer_istream::~prebuffer_istream() { delete rdbuf(); }
@@ -221,6 +231,9 @@ datastream* ds_cerr = nullptr;
 bool datastream::open(std::istream* istr, std::ostream* ostr, const std::string& encoding, int byteorder, datastream* obj) {
 	if (no_close)
 		return false; // This stream cannot be reopened.
+	for (datastream* parent = obj; parent; parent = parent->ds) {
+		if (parent == this) return false;
+	}
 	if (r || w)
 		close();
 	if (!istr && !ostr)
@@ -328,8 +341,8 @@ bool datastream::rseek_end(unsigned long long offset) {
 	return _istr ? _istr->good() : false;
 }
 bool datastream::rseek_relative(long long offset) {
-	if (_istr && offset < 0) {
-		if (r->eof())
+	if (_istr) {
+		if (r->eof() && offset < 0)
 			_istr->clear();
 		_istr->seekg(offset, std::ios::cur);
 	}
@@ -527,10 +540,10 @@ datastream* datastream_simple_factory(f_streamargs) {
 // This function set registers all generic methods and/or properties of a datastream class, sans all non-default factory/open functions. The template parameter should be the c++ stream type being wrapped, such as stringstream of FileStream.
 template <typename T>
 void RegisterDatastreamReadwrite(asIScriptEngine* engine, const std::string& classname, const std::string& type_name) {
-	engine->RegisterObjectMethod(classname.c_str(), format("%s& opShr(%s&out)", classname, type_name).c_str(), asMETHODPR(datastream, read<T>, (T&), datastream&), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), format("%s& opShr(%s&out value)", classname, type_name).c_str(), asMETHODPR(datastream, read<T>, (T&), datastream&), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), format("%s read_%s()", type_name, type_name).c_str(), asMETHODPR(datastream, read<T>, (), T), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), format("%s& opShl(%s)", classname, type_name).c_str(), asMETHODPR(datastream, write<T>, (T), datastream&), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), format("%s& write_%s(%s)", classname, type_name, type_name).c_str(), asMETHODPR(datastream, write<T>, (T), datastream&), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), format("%s& opShl(%s value)", classname, type_name).c_str(), asMETHODPR(datastream, write<T>, (T), datastream&), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), format("%s& write_%s(%s value)", classname, type_name, type_name).c_str(), asMETHODPR(datastream, write<T>, (T), datastream&), asCALL_THISCALL);
 }
 template <class T, datastream_factory_type factory>
 void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classname) {
@@ -546,29 +559,29 @@ void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classnam
 	if (classname != "datastream")
 		engine->RegisterObjectMethod(classname.c_str(), "datastream@ opImplCast()", asFUNCTION(datastream_cast_to), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datastream", format("%s@ opCast()", classname).c_str(), asFUNCTION(datastream_cast_from<T>), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(classname.c_str(), "bool close(bool = false)", asMETHOD(datastream, close), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool close(bool close_all = false)", asMETHOD(datastream, close), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool close_all()", asMETHOD(datastream, close_all), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "bool get_active() const property", asMETHOD(datastream, active), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "uint64 get_available() const property", asMETHOD(datastream, available), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool seek(uint64)", asMETHOD(datastream, seek), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool seek_end(uint64 = 0)", asMETHOD(datastream, seek_end), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool seek_relative(int64)", asMETHOD(datastream, seek_relative), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool seek(uint64 offset)", asMETHOD(datastream, seek), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool seek_end(uint64 offset = 0)", asMETHOD(datastream, seek_end), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool seek_relative(int64 offset)", asMETHOD(datastream, seek_relative), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "int64 get_pos() const property", asMETHOD(datastream, get_pos), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool rseek(uint64)", asMETHOD(datastream, rseek), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool rseek_end(uint64 = 0)", asMETHOD(datastream, rseek_end), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool rseek_relative(int64)", asMETHOD(datastream, rseek_relative), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool rseek(uint64 offset)", asMETHOD(datastream, rseek), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool rseek_end(uint64 offset = 0)", asMETHOD(datastream, rseek_end), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool rseek_relative(int64 offset)", asMETHOD(datastream, rseek_relative), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "int64 get_rpos() const property", asMETHOD(datastream, get_rpos), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool wseek(uint64)", asMETHOD(datastream, wseek), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool wseek_end(uint64 = 0)", asMETHOD(datastream, wseek_end), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool wseek_relative(int64)", asMETHOD(datastream, wseek_relative), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "int64 get_wpos() const property", asMETHOD(datastream, get_pos), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "string read(uint = 0)", asMETHODPR(datastream, read, (unsigned int), std::string), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool wseek(uint64 offset)", asMETHOD(datastream, wseek), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool wseek_end(uint64 offset = 0)", asMETHOD(datastream, wseek_end), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool wseek_relative(int64 offset)", asMETHOD(datastream, wseek_relative), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "int64 get_wpos() const property", asMETHOD(datastream, get_wpos), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "string read(uint count = 0)", asMETHODPR(datastream, read, (unsigned int), std::string), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read_line()", asMETHOD(datastream, read_line), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "string read_until(const string&in text, bool require_full)", asMETHOD(datastream, read_until), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "uint64 read_7bit_encoded()", asMETHODPR(datastream, read_7bit_encoded, (), UInt64), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "void read_7bit_encoded(uint64&out integer)", asMETHODPR(datastream, read_7bit_encoded, (UInt64&), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod(classname.c_str(), "void write_7bit_encoded(uint64 integer)", asMETHODPR(datastream, write_7bit_encoded, (UInt64), void), asCALL_THISCALL);
-	engine->RegisterObjectMethod(classname.c_str(), "uint write(const string&in)", asMETHODPR(datastream, write, (const std::string&), unsigned int), asCALL_THISCALL);
+	engine->RegisterObjectMethod(classname.c_str(), "uint write(const string&in data)", asMETHODPR(datastream, write, (const std::string&), unsigned int), asCALL_THISCALL);
 	RegisterDatastreamReadwrite<char>(engine, classname, "int8");
 	RegisterDatastreamReadwrite<unsigned char>(engine, classname, "uint8");
 	RegisterDatastreamReadwrite<short>(engine, classname, "int16");
@@ -604,6 +617,10 @@ datastream* generic_stream_factory(Args... args, f_streamargs) {
 }
 
 // The below template functions can handle the basic registration of any generic stream that connects to another one, including those that take arguments. The angelscript registration functions include factories and open functions for such streams, meaning that only custom functions on streams need to be registered. Sadly given my current experience we need to register them twice, once with and once without argument support. Even more sadly each version must have different names otherwise even when using asFUNCTIONPR with angelscript only some compilers complain about ambiguous calls, cross platform+lack of knowledge is exhausting sometimes!
+inline bool connect_stream_fail(datastream* ds_connect) {
+	ds_connect->release();
+	return false;
+}
 template <class T, class S>
 bool connect_stream_open_argless(datastream* ds, datastream* ds_connect, f_streamargs) {
 	if (!ds_connect)
@@ -611,34 +628,42 @@ bool connect_stream_open_argless(datastream* ds, datastream* ds_connect, f_strea
 	S* stream;
 	if constexpr(std::is_same<S, std::istream>::value) {
 		if (!ds_connect->get_istr())
-			return false;
+			return connect_stream_fail(ds_connect);
 		stream = new T(*ds_connect->get_istr());
-		return ds->open(stream, nullptr, p_streamargs, ds_connect);
+		if (!ds->open(stream, nullptr, p_streamargs, ds_connect))
+			return connect_stream_fail(ds_connect);
+		return true;
 	} else if constexpr(std::is_same<S, std::ostream>::value) {
 		if (!ds_connect->get_ostr())
-			return false;
+			return connect_stream_fail(ds_connect);
 		stream = new T(*ds_connect->get_ostr());
-		return ds->open(nullptr, stream, p_streamargs, ds_connect);
+		if (!ds->open(nullptr, stream, p_streamargs, ds_connect))
+			return connect_stream_fail(ds_connect);
+		return true;
 	} else if constexpr(std::is_same<S, std::iostream>::value) {
 		if (!ds_connect->get_iostr())
-			return false;
+			return connect_stream_fail(ds_connect);
 		stream = new T(*ds_connect->get_iostr());
-		return ds->open(stream, stream, p_streamargs, ds_connect);
+		if (!ds->open(stream, stream, p_streamargs, ds_connect))
+			return connect_stream_fail(ds_connect);
+		return true;
 	}
 	return false;
 }
 template <class T, class S>
 datastream* connect_stream_factory_argless(datastream* ds_connect, f_streamargs) {
 	datastream* ds = new datastream();
-	if (!connect_stream_open_argless<T, S>(ds, ds_connect, p_streamargs))
+	if (!connect_stream_open_argless<T, S>(ds, ds_connect, p_streamargs)) {
+		ds->release();
 		throw InvalidArgumentException("Unable to attach given stream");
+	}
 	return ds;
 }
 template <class T, datastream_factory_type factory, class S>
 void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classname) {
 	RegisterDatastreamType<T, factory>(engine, classname);
-	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(datastream@, const string&in = \"\", int byteorder = 1)", classname).c_str(), asFUNCTION((connect_stream_factory_argless<T, S>)), asCALL_CDECL);
-	engine->RegisterObjectMethod(classname.c_str(), "bool open(datastream@, const string&in = \"\", int byteorder = 1)", asFUNCTION((connect_stream_open_argless<T, S>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(datastream@ stream, const string&in encoding = \"\", int byteorder = 1)", classname).c_str(), asFUNCTION((connect_stream_factory_argless<T, S>)), asCALL_CDECL);
+	engine->RegisterObjectMethod(classname.c_str(), "bool open(datastream@ stream, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((connect_stream_open_argless<T, S>)), asCALL_CDECL_OBJFIRST);
 }
 template <class T, class S, typename... Args>
 bool connect_stream_open(datastream* ds, datastream* ds_connect, Args... args, f_streamargs) {
@@ -647,34 +672,42 @@ bool connect_stream_open(datastream* ds, datastream* ds_connect, Args... args, f
 	S* stream;
 	if constexpr(std::is_same<S, std::istream>::value) {
 		if (!ds_connect->get_istr())
-			return false;
+			return connect_stream_fail(ds_connect);
 		stream = new T(*ds_connect->get_istr(), args...);
-		return ds->open(stream, nullptr, p_streamargs, ds_connect);
+		if (!ds->open(stream, nullptr, p_streamargs, ds_connect))
+			return connect_stream_fail(ds_connect);
+		return true;
 	} else if constexpr(std::is_same<S, std::ostream>::value) {
 		if (!ds_connect->get_ostr())
-			return false;
+			return connect_stream_fail(ds_connect);
 		stream = new T(*ds_connect->get_ostr(), args...);
-		return ds->open(nullptr, stream, p_streamargs, ds_connect);
+		if (!ds->open(nullptr, stream, p_streamargs, ds_connect))
+			return connect_stream_fail(ds_connect);
+		return true;
 	} else if constexpr(std::is_same<S, std::iostream>::value) {
 		if (!ds_connect->get_iostr())
-			return false;
+			return connect_stream_fail(ds_connect);
 		stream = new T(*ds_connect->get_iostr(), args...);
-		return ds->open(stream, stream, p_streamargs, ds_connect);
+		if (!ds->open(stream, stream, p_streamargs, ds_connect))
+			return connect_stream_fail(ds_connect);
+		return true;
 	}
 	return false;
 }
 template <class T, class S, typename... Args>
 datastream* connect_stream_factory(datastream* ds_connect, Args... args, f_streamargs) {
 	datastream* ds = new datastream();
-	if (!connect_stream_open<T, S, Args...>(ds, ds_connect, args..., p_streamargs))
+	if (!connect_stream_open<T, S, Args...>(ds, ds_connect, args..., p_streamargs)) {
+		ds->release();
 		throw InvalidArgumentException("Unable to attach given stream");
+	}
 	return ds;
 }
 template <class T, datastream_factory_type factory, class S, typename... Args>
 void RegisterDatastreamType(asIScriptEngine* engine, const std::string& classname, const std::string& arg_types) {
 	RegisterDatastreamType<T, factory>(engine, classname);
-	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(datastream@, %s, const string&in = \"\", int byteorder = 1)", classname, arg_types).c_str(), asFUNCTION((connect_stream_factory<T, S, Args...>)), asCALL_CDECL);
-	engine->RegisterObjectMethod(classname.c_str(), format("bool open(datastream@, %s, const string&in = \"\", int byteorder = 1)", arg_types).c_str(), asFUNCTION((connect_stream_open<T, S, Args...>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour(classname.c_str(), asBEHAVE_FACTORY, format("%s@ s(datastream@ stream, %s, const string&in encoding = \"\", int byteorder = 1)", classname, arg_types).c_str(), asFUNCTION((connect_stream_factory<T, S, Args...>)), asCALL_CDECL);
+	engine->RegisterObjectMethod(classname.c_str(), format("bool open(datastream@ stream, %s, const string&in encoding = \"\", int byteorder = 1)", arg_types).c_str(), asFUNCTION((connect_stream_open<T, S, Args...>)), asCALL_CDECL_OBJFIRST);
 }
 template <class T>
 void RegisterInputDatastreamType(asIScriptEngine* engine, const std::string& classname) { RegisterDatastreamType<T, datastream_factory_closed, std::istream>(engine, classname); }
@@ -750,17 +783,19 @@ void duplicating_stream_close(datastream* ds) {
 		return;
 	for (datastream* s : *streams)
 		s->release();
-	streams->clear();
+	delete streams;
 }
 datastream* duplicating_stream_add(datastream* ds, datastream* ds_connect) {
+	ds->duplicate();
 	if (!ds_connect)
 		return ds;
 	TeeIOS* ios = dynamic_cast<TeeIOS*>(ds->stream());
-	if (!ios)
-		throw InvalidArgumentException("not a duplicating reader or writer");
 	std::ostream* ostr = ds_connect->get_ostr();
-	if (!ostr)
-		throw InvalidArgumentException("non-writer was connected to duplicator");
+	if (!ios || !ostr) {
+		ds->release();
+		ds_connect->release();
+		throw InvalidArgumentException(!ios ? "not a duplicating reader or writer" : "non-writer was connected to duplicator");
+	}
 	std::vector<datastream*>* streams = ds->user ? (std::vector<datastream*>*)ds->user : new std::vector<datastream*>;
 	streams->push_back(ds_connect);
 	ios->addStream(*ostr);
@@ -768,18 +803,17 @@ datastream* duplicating_stream_add(datastream* ds, datastream* ds_connect) {
 		ds->user = streams;
 		ds->set_close_callback(duplicating_stream_close);
 	}
-	ds->duplicate();
 	return ds;
 }
 void RegisterDuplicatingStream(asIScriptEngine* engine) {
 	RegisterInputDatastreamType<TeeInputStream>(engine, "duplicating_reader");
-	engine->RegisterObjectMethod("duplicating_reader", "duplicating_reader@ opAdd(datastream@)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("duplicating_reader", "duplicating_reader@ opAddAssign(datastream@)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("duplicating_reader", "duplicating_reader@ add(datastream@)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("duplicating_reader", "duplicating_reader@ opAdd(datastream@ stream)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("duplicating_reader", "duplicating_reader@ opAddAssign(datastream@ stream)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("duplicating_reader", "duplicating_reader@ add(datastream@ stream)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
 	RegisterDatastreamType<TeeOutputStream, datastream_factory_opened, std::ostream>(engine, "duplicating_writer");
-	engine->RegisterObjectMethod("duplicating_writer", "duplicating_writer@ opAdd(datastream@)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("duplicating_writer", "duplicating_writer@ opAddAssign(datastream@)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("duplicating_writer", "duplicating_writer@ add(datastream@)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("duplicating_writer", "duplicating_writer@ opAdd(datastream@ stream)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("duplicating_writer", "duplicating_writer@ opAddAssign(datastream@ stream)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("duplicating_writer", "duplicating_writer@ add(datastream@ stream)", asFUNCTION(duplicating_stream_add), asCALL_CDECL_OBJFIRST);
 }
 
 // counting streams
@@ -831,10 +865,10 @@ void RegisterCountingStream(asIScriptEngine* engine, const std::string& type) {
 	engine->RegisterObjectMethod(type.c_str(), "int64 get_lines() property", asFUNCTION(counting_stream_lines), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "int64 get_current_line() property", asFUNCTION(counting_stream_get_current_line), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type.c_str(), "void reset()", asFUNCTION(counting_stream_reset), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void set_current_line(int64)", asFUNCTION(counting_stream_set_current_line), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void add_chars(int64)", asFUNCTION(counting_stream_add_chars), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void add_lines(int64)", asFUNCTION(counting_stream_add_lines), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(type.c_str(), "void add_pos(int64)", asFUNCTION(counting_stream_add_pos), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void set_current_line(int64 line)", asFUNCTION(counting_stream_set_current_line), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void add_chars(int64 count)", asFUNCTION(counting_stream_add_chars), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void add_lines(int64 count)", asFUNCTION(counting_stream_add_lines), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type.c_str(), "void add_pos(int64 count)", asFUNCTION(counting_stream_add_pos), asCALL_CDECL_OBJFIRST);
 }
 
 // Wrappers around cin, cout and cerr from the stl. The first function just performs any common setup used for all 3 streams.
@@ -880,7 +914,7 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->RegisterGlobalProperty("const string NEWLINE_LF", (void*)&LineEnding::NEWLINE_LF);
 	engine->SetDefaultNamespace("");
 	RegisterDatastreamType<std::stringstream, datastream_factory_none>(engine, "datastream");
-	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in = \"\")", asFUNCTION(stringstream_implicit_factory), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in initial_data = \"\")", asFUNCTION(stringstream_implicit_factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("datastream", asBEHAVE_FACTORY, "datastream@ d(const string&in initial_data, const string&in encoding, int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_factory), asCALL_CDECL);
 	engine->RegisterObjectMethod("datastream", "bool open(const string&in initial_data = \"\", const string&in encoding = \"\", int byteorder = STREAM_BYTE_ORDER_NATIVE)", asFUNCTION(stringstream_open), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("datastream", "string str()", asFUNCTION(stringstream_str), asCALL_CDECL_OBJFIRST);
@@ -891,8 +925,8 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("datastream@ get_cerr() property", asFUNCTION(get_cerr), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_FS);
 	RegisterDatastreamType<FileStream, datastream_factory_closed>(engine, "file");
-	engine->RegisterObjectBehaviour("file", asBEHAVE_FACTORY, "file@ d(const string&in, const string&in, const string&in = \"\", int byteorder = 1)", asFUNCTION(file_stream_factory), asCALL_CDECL);
-	engine->RegisterObjectMethod("file", "bool open(const string&in, const string&in, const string&in = \"\", int byteorder = 1)", asFUNCTION(file_stream_open), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("file", asBEHAVE_FACTORY, "file@ d(const string&in path, const string&in mode, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION(file_stream_factory), asCALL_CDECL);
+	engine->RegisterObjectMethod("file", "bool open(const string&in path, const string&in mode, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION(file_stream_open), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("file", "uint64 get_size() const property", asFUNCTION(file_stream_size), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_DATA);
 	RegisterInputDatastreamType<HexBinaryDecoder>(engine, "hex_decoder");
@@ -916,10 +950,10 @@ void RegisterScriptDatastreams(asIScriptEngine* engine) {
 	RegisterInputDatastreamType<chacha_istream, const std::string&>(engine, "asset_decryptor", "const string& in key");
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_RAW_MEMORY);
 	RegisterDatastreamType<MemoryInputStream, datastream_factory_closed>(engine, "memory_reader");
-	engine->RegisterObjectBehaviour("memory_reader", asBEHAVE_FACTORY, "memory_reader@ d(uint64, uint64, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_factory<MemoryInputStream, const char*, size_t>)), asCALL_CDECL);
-	engine->RegisterObjectMethod("memory_reader", "bool open(uint64, uint64, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_open<MemoryInputStream, const char*, size_t>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("memory_reader", asBEHAVE_FACTORY, "memory_reader@ d(uint64 address, uint64 size, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_factory<MemoryInputStream, const char*, size_t>)), asCALL_CDECL);
+	engine->RegisterObjectMethod("memory_reader", "bool open(uint64 address, uint64 size, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_open<MemoryInputStream, const char*, size_t>)), asCALL_CDECL_OBJFIRST);
 	RegisterDatastreamType<MemoryOutputStream, datastream_factory_closed>(engine, "memory_writer");
-	engine->RegisterObjectBehaviour("memory_writer", asBEHAVE_FACTORY, "memory_writer@ d(uint64, uint64, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_factory<MemoryOutputStream, char*, size_t>)), asCALL_CDECL);
-	engine->RegisterObjectMethod("memory_writer", "bool open(uint64, uint64, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_open<MemoryOutputStream, char*, size_t>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectBehaviour("memory_writer", asBEHAVE_FACTORY, "memory_writer@ d(uint64 address, uint64 size, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_factory<MemoryOutputStream, char*, size_t>)), asCALL_CDECL);
+	engine->RegisterObjectMethod("memory_writer", "bool open(uint64 address, uint64 size, const string&in encoding = \"\", int byteorder = 1)", asFUNCTION((generic_stream_open<MemoryOutputStream, char*, size_t>)), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 }

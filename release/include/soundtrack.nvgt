@@ -177,13 +177,10 @@ synth.waveform_type = instrument;
 synth.volume = volume - 100;
 synth.set_edge_fades(attack*10, release*10);
 synth.note_transpose = transpose;
-synth.note_ms(to_generate, ms*quantization/8.0);
-if(cursor >= channel_input.length() || channel_input[cursor] != "&") {
+bool tied = cursor < channel_input.length() && channel_input[cursor] == "&";
+synth.note_ms(to_generate, tied? ms : ms*quantization/8.0);
 synth.rest_ms(ms);
-}
-else {
-cursor++;
-}
+if(tied) cursor++;
 return cursor;
 }
 

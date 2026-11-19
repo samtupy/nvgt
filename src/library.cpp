@@ -107,6 +107,8 @@ poco_shared<Poco::Dynamic::Var>* library_function::invoke(asIScriptGeneric* gen,
 	std::vector<const char*> cstrs; // keeps char* values addressable through ffi_call
 	std::vector<std::wstring> wstrs; // keeps wchar_t buffers alive through ffi_call
 	std::vector<const wchar_t*> wptrs; // addressable wchar_t* values into wstrs
+	union ffi_value { int8_t s8; uint8_t u8; int16_t s16; uint16_t u16; int32_t s32; uint32_t u32; int64_t s64; uint64_t u64; float f; double d; void* p; };
+	std::vector<ffi_value> values(nffi);
 	arg_ptrs.reserve(nffi);
 	cstrs.reserve(nffi);
 	wstrs.reserve(nffi);
@@ -129,11 +131,40 @@ poco_shared<Poco::Dynamic::Var>* library_function::invoke(asIScriptGeneric* gen,
 				cstrs.push_back(str->c_str());
 				arg_ptrs.push_back(&cstrs.back());
 			}
-		} else {
-			// GetArgAddress returns a pointer to the argument value — exactly
-			// what ffi_call's avalue[i] expects for all other types.
+		} else if (tid != asTYPEID_VOID && !(tid & asTYPEID_MASK_OBJECT) && g_ScriptEngine->GetSizeOfPrimitiveType(tid) > 0) {
+			void* addr = gen->GetArgAddress(n);
+			int64_t iv = 0;
+			double dv = 0;
+			bool is_float = false;
+			switch (tid) {
+				case asTYPEID_BOOL: iv = *(bool*)addr; break;
+				case asTYPEID_INT8: iv = *(int8_t*)addr; break;
+				case asTYPEID_UINT8: iv = *(uint8_t*)addr; break;
+				case asTYPEID_INT16: iv = *(int16_t*)addr; break;
+				case asTYPEID_UINT16: iv = *(uint16_t*)addr; break;
+				case asTYPEID_UINT32: iv = *(uint32_t*)addr; break;
+				case asTYPEID_INT64: case asTYPEID_UINT64: iv = *(int64_t*)addr; break;
+				case asTYPEID_FLOAT: dv = *(float*)addr; is_float = true; break;
+				case asTYPEID_DOUBLE: dv = *(double*)addr; is_float = true; break;
+				default: {
+					int size = g_ScriptEngine->GetSizeOfPrimitiveType(tid);
+					iv = size == 1? *(int8_t*)addr : size == 2? *(int16_t*)addr : size == 8? *(int64_t*)addr : *(int32_t*)addr;
+					break;
+				}
+			}
+			ffi_value& v = values[i];
+			switch (arg_types[i]->type) {
+				case FFI_TYPE_FLOAT: v.f = is_float? (float)dv : (float)iv; break;
+				case FFI_TYPE_DOUBLE: v.d = is_float? dv : (double)iv; break;
+				case FFI_TYPE_UINT8: case FFI_TYPE_SINT8: v.s8 = (int8_t)(is_float? (int64_t)dv : iv); break;
+				case FFI_TYPE_UINT16: case FFI_TYPE_SINT16: v.s16 = (int16_t)(is_float? (int64_t)dv : iv); break;
+				case FFI_TYPE_UINT32: case FFI_TYPE_SINT32: case FFI_TYPE_INT: v.s32 = (int32_t)(is_float? (int64_t)dv : iv); break;
+				default: v.s64 = is_float? (int64_t)dv : iv; break;
+			}
+			arg_ptrs.push_back(&v);
+		} else if (arg_types[i] == &ffi_type_pointer) {
 			arg_ptrs.push_back(gen->GetArgAddress(n));
-		}
+		} else throw Poco::InvalidArgumentException("argument " + std::to_string(i + 1) + " can't be converted to " + arg_type_strings[i]);
 	}
 	union { ffi_arg i; float f; double d; } retval = {};
 	ffi_call(&cif, FFI_FN(func_ptr), &retval, nffi > 0 ? arg_ptrs.data() : nullptr);

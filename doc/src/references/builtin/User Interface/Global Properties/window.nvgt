@@ -1,0 +1,23 @@
+/**
+	A handle to your game's main window, which gives access to more window settings than the global window functions provide.
+	game_window@ window;
+	## Remarks:
+		This property is read only. It is null until a window has been created with `show_window()`, and becomes null again after `destroy_window()`. Check for null before using it if your code can run without a window.
+		Through this handle you can, for example, change the window's title, size and position, make it fullscreen, or draw text and shapes into it. See the game_window class for everything it offers.
+*/
+
+// Example:
+void main() {
+	show_window("Example");
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Press space to change the window title, or escape to exit.", true);
+	int presses = 0;
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (key_pressed(KEY_SPACE)) {
+			presses++;
+			window.set_title("Space pressed " + presses + (presses == 1 ? " time" : " times"));
+			screen_reader_output(window.title, true);
+		}
+	}
+}

@@ -75,7 +75,7 @@ void add_game_asset_to_bundle(const string& path, int flags) {
 	while (semi && semi != string::npos && path[semi -1] == '\\' ) semi = path.find_first_of(';', semi + 1);
 	return add_game_asset_to_bundle(path.substr(0, semi), path.substr(semi +1 ), flags);
 }
-set<string> g_bundle_libraries = {"nvdaControllerClient64", "phonon", "SAAPI64", "zdsrapi"};
+set<string> g_bundle_libraries;
 void nvgt_bundle_shared_library(const string& libname) {
 	g_bundle_libraries.insert(libname);
 }
@@ -211,7 +211,8 @@ class nvgt_compilation_output_impl : public virtual nvgt_compilation_output {
 	Mutex status_text_mtx;
 	void error(const exception& exc, const std::string& error) {
 		error_text = error;
-		throw;
+		if (std::current_exception()) throw;
+		throw Exception(error, exc.what());
 	}
 public:
 	nvgt_compilation_output_impl(const string& input_file) : input_file(input_file), platform(g_platform), stub(g_stub), stub_size(0), config(Util::Application::instance().config()) {}
@@ -324,6 +325,7 @@ protected:
 		// Copy any needed shared libraries to the output package, handling excludes and already existent files.
 		set_status("copying libraries...");
 		File libpathF(libpath);
+		if (g_bundle_libraries.empty()) return; // No libraries need bundling.
 		// Determine whether to create, replace, or update shared libraries.
 		if (!libpathF.exists()) libpathF.createDirectories();
 		else if(config.hasOption("build.shared_library_recopy")) libpathF.remove(true);
@@ -463,7 +465,7 @@ protected:
 		bw.writeRaw("\xCA\xFE");
 		if (bundle_mode) {
 			fs.close();
-			fs.open(Path(workplace.path()).append("Contents/resources/exec").toString(), std::ios::out | std::ios::trunc); // App bundles must store their embedded packs and bytecode as a resource so the app bundle can be signed.
+			fs.open(Path(workplace.path()).append("Contents/Resources/exec").toString(), std::ios::out | std::ios::trunc); // App bundles must store their embedded packs and bytecode as a resource so the app bundle can be signed.
 		}
 	}
 	void finalize_output_stream() override {

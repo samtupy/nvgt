@@ -348,6 +348,7 @@ protected:
 	#endif
 	void uninitialize() override {
 		g_shutting_down = true;
+		notify_nvgt_plugins_shutdown();
 		Application::uninitialize();
 		#ifdef _WIN32
 		timeEndPeriod(1);

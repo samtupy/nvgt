@@ -11,4 +11,10 @@ void test_string_functions() {
 	assert("HELLO".lower() == "hello");
 	assert("test string".starts_with("test") == true);
 	assert("  spaces  ".trim_whitespace() == "spaces");
+
+	// Test replace_range_this (in-place variant of replace_range)
+	string s = "hello world";
+	s.replace_range_this(6, 5, "there");
+	assert(s == "hello there");
+	assert(s.replace_range_this(0, 5, "HELLO") == "HELLO there");
 }

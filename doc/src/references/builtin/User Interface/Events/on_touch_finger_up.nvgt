@@ -1,0 +1,33 @@
+/**
+	An event that is fired whenever a finger is lifted from a touch device.
+	engine_touch_event on_touch_finger_up;
+	## Listener signatures:
+		* bool callback(uint64 device, const touch_finger& finger);
+		* void callback(uint64 device, const touch_finger& finger);
+		* A class implementing engine_touch_event_listener, with a `bool on_touch_finger_up(uint64 device, const touch_finger& finger)` or `void on_touch_finger_up(uint64 device, const touch_finger& finger)` method.
+	## Arguments passed to listeners:
+		* uint64 device: the ID of the touch device.
+		* const touch_finger& finger: the finger that was lifted, with its last position and pressure. Its id matches the one passed to `on_touch_finger_down` when it first touched the device.
+	## Remarks:
+		If the touch is interrupted rather than ending normally, `on_touch_finger_cancel` is fired instead of this event.
+		The finger parameter must be declared exactly as `const touch_finger& finger`. Writing `const touch_finger&in finger` causes a "No matching signatures" error when adding the listener.
+		See the Events topic for how listeners are added, ordered and removed, and what their return values mean.
+*/
+
+// Example:
+class tap_counter : engine_touch_event_listener {
+	int taps = 0;
+	void on_touch_finger_up(uint64 device, const touch_finger& finger) {
+		taps++;
+		screen_reader_output(taps + (taps == 1 ? " tap" : " taps"), true);
+	}
+}
+void main() {
+	show_window("Example");
+	tap_counter counter;
+	on_touch_finger_up += counter;
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Tap the screen to count taps. Press escape or back to exit.", true);
+	while (!key_pressed(KEY_ESCAPE) and !key_pressed(KEY_AC_BACK)) wait(5);
+	on_touch_finger_up -= counter;
+}

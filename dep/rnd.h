@@ -47,9 +47,10 @@ int rnd_xorshift_range( rnd_xorshift_t* xorshift, int min, int max );
 
 static inline int64_t rnd_xorshift_range64(rnd_xorshift_t* state, int64_t min, int64_t max) {
     uint64_t u = rnd_xorshift_next(state);
-    uint64_t span = (uint64_t)(max - min) + 1;
-    int64_t offset = (int64_t)(u % span);
-    return min + offset;
+    if (max < min) return min;
+    uint64_t span = (uint64_t)max - (uint64_t)min + 1;
+    if (span == 0) return (int64_t)u;
+    return (int64_t)((uint64_t)min + u % span);
 }
 
 #endif /* rnd_h */
@@ -404,10 +405,10 @@ float rnd_pcg_nextf( rnd_pcg_t* pcg )
 
 int rnd_pcg_range( rnd_pcg_t* pcg, int min, int max )
     {
-    int const range = ( max - min ) + 1;
+    long long const range = ( (long long) max - min ) + 1;
     if( range <= 0 ) return min;
-    int const value = (int) ( rnd_pcg_nextf( pcg ) * range );
-    return min + value; 
+    long long const value = (long long) ( rnd_pcg_nextf( pcg ) * range );
+    return (int) ( min + value ); 
     }
 
 
@@ -445,10 +446,10 @@ float rnd_well_nextf( rnd_well_t* well )
 
 int rnd_well_range( rnd_well_t* well, int min, int max )
     {
-    int const range = ( max - min ) + 1;
+    long long const range = ( (long long) max - min ) + 1;
     if( range <= 0 ) return min;
-    int const value = (int) ( rnd_well_nextf( well ) * range );
-    return min + value; 
+    long long const value = (long long) ( rnd_well_nextf( well ) * range );
+    return (int) ( min + value ); 
     }
 
 
@@ -477,10 +478,10 @@ float rnd_gamerand_nextf( rnd_gamerand_t* gamerand )
 
 int rnd_gamerand_range( rnd_gamerand_t* gamerand, int min, int max )
     {
-    int const range = ( max - min ) + 1;
+    long long const range = ( (long long) max - min ) + 1;
     if( range <= 0 ) return min;
-    int const value = (int) ( rnd_gamerand_nextf( gamerand ) * range );
-    return min + value; 
+    long long const value = (long long) ( rnd_gamerand_nextf( gamerand ) * range );
+    return (int) ( min + value ); 
     }
 
 
@@ -514,10 +515,10 @@ float rnd_xorshift_nextf( rnd_xorshift_t* xorshift )
 
 int rnd_xorshift_range( rnd_xorshift_t* xorshift, int min, int max )
     {
-    int const range = ( max - min ) + 1;
+    long long const range = ( (long long) max - min ) + 1;
     if( range <= 0 ) return min;
-    int const value = (int) ( rnd_xorshift_nextf( xorshift ) * range );
-    return min + value; 
+    long long const value = (long long) ( rnd_xorshift_nextf( xorshift ) * range );
+    return (int) ( min + value ); 
    }
 
 

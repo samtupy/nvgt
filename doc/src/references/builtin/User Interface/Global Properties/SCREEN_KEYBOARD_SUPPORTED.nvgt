@@ -1,0 +1,13 @@
+/**
+	Determines whether the platform provides an on-screen keyboard, such as the virtual keyboard on a phone or tablet.
+	const bool SCREEN_KEYBOARD_SUPPORTED;
+	## Remarks:
+		On platforms with a screen keyboard, text input is not started automatically when your window is shown, because doing so would cover part of the screen with the keyboard. Call `start_text_input()` when your game wants the user to type, and `stop_text_input()` when it is done. On other platforms, text input is started automatically by `show_window()`.
+		To check whether the screen keyboard is currently showing, see `is_screen_keyboard_shown()`.
+*/
+
+// Example:
+void main() {
+	show_window("Example");
+	alert("Screen keyboard", SCREEN_KEYBOARD_SUPPORTED ? "This device has a screen keyboard." : "This device does not have a screen keyboard.");
+}

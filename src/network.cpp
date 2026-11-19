@@ -176,7 +176,7 @@ bool network::send(asQWORD peer_id, const std::string& message, unsigned char ch
 bool network::send_peer(asQWORD peer, const std::string& message, unsigned char channel, bool reliable) {
 	if (!host || channel > channel_count) return false;
 	ENetPeer* peer_obj = reinterpret_cast<ENetPeer*>(peer);
-	if (!peer_obj) return false;
+	if (peer < asQWORD(host->peers) || peer >= asQWORD(host->peers + host->peerCount) || (peer - asQWORD(host->peers)) % sizeof(ENetPeer) != 0) return false;
 	ENetPacket* packet = enet_packet_create(message.c_str(), message.size(), (reliable ? ENET_PACKET_FLAG_RELIABLE : 0));
 	if (!packet) return false;
 	bool r = enet_peer_send(peer_obj, channel, packet) == 0;
@@ -281,7 +281,7 @@ void RegisterScriptNetwork(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("network_event"), asBEHAVE_FACTORY, _O("network_event @e()"), asFUNCTION(ScriptNetwork_event_Factory), asCALL_CDECL);
 	engine->RegisterObjectBehaviour(_O("network_event"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(network_event, addRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("network_event"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(network_event, release), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("network_event"), _O("network_event& opAssign(const network_event &in)"), asMETHOD(network_event, operator=), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network_event"), _O("network_event& opAssign(const network_event &in other)"), asMETHOD(network_event, operator=), asCALL_THISCALL);
 	engine->RegisterObjectProperty(_O("network_event"), _O("const network_event_type type"), asOFFSET(network_event, type));
 	engine->RegisterObjectProperty(_O("network_event"), _O("const uint64 peer_id"), asOFFSET(network_event, peer_id));
 	engine->RegisterObjectProperty(_O("network_event"), _O("const uint channel"), asOFFSET(network_event, channel));

@@ -1,7 +1,7 @@
 # find_first_of
 Find the first occurrence of any character in the search string.
 
-`int string::find_first_of(const string &in search, uint start = 0);`
+`int string::find_first_of(const string&in search, uint start = 0);`
 
 ## Arguments:
 * search: A string of characters to search for.

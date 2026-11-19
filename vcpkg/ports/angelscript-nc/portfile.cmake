@@ -1,19 +1,20 @@
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
-    REPO anjo76/angelscript
-    REF 3fc00a6abc07c7ad2dec4ed14ff6018a194a54d6
-    SHA512 9a70378733240d4236cd2b1e8a0c297650e117862ea792546728c34c9204ac5a68deb26ffb3dc545fc94bec66bdd103c14168cea374594890e44114738ba03c6
+    REPO samtupy/angelscript
+    REF dc86e47cbc3e4fa7ad98c1e9612f381bd215aa87
+    SHA512 e5568dafb1ffa88f32df6b7b345ebfb52b0a0055b6ea87322ea2c29576c3dbfad06b0042cd090ab908d42fd3b8716ace5949ee56bb6616f233e807882b912111
     HEAD_REF master
     PATCHES
         add-no-compiler.patch
         mark-threads-private.patch
         fix-dependency.patch
+        fix-double-literal-precision.patch
 )
 
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}/sdk/angelscript/projects/cmake"
     OPTIONS
-        "-DAS_NO_COMPILER=OFF" "-DCMAKE_CXX_STANDARD=11"
+        "-DAS_NO_COMPILER=ON" "-DCMAKE_CXX_STANDARD=11"
 )
 
 vcpkg_cmake_install()

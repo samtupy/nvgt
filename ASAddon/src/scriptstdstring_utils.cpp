@@ -159,7 +159,7 @@ static string StringSlice(int start, int end, const string &str)
 		start = size + start;
 	if (end <= 0)
 		end = size + end;
-	if (end >= size)
+	if (end >= 0 && asUINT(end) >= size)
 		end = size;
 	int count = end - start;
 	if (start < 0 || count <= 0 || start >= size)
@@ -175,11 +175,25 @@ static string StringReplaceRange(asUINT start, int count, const string &replace,
 {
 	if (start >= str.size() || count < 1)
 		return str;
+	if (asUINT(count) > str.size() - start)
+		count = int(str.size() - start);
 	// Recreate the string so that the original stays in tact.
 	string ret(&str[0], start);
 	ret += replace;
 	ret.append(str, start + count, str.size() - (start + count));
 	return ret;
+}
+
+// Like replace_range, but modifies the string in place instead of returning a new one.
+//
+// AngelScript signature:
+// string& string::replace_range_this(uint start, int count, const string &in replace)
+static string &StringReplaceRangeThis(asUINT start, int count, const string &replace, string &str)
+{
+	if (start >= str.size() || count < 1)
+		return str;
+	str.replace(start, (size_t)count, replace);
+	return str;
 }
 
 // This function replaces a given substring of text with another.
@@ -240,6 +254,15 @@ static void StringReplaceRange_Generic(asIScriptGeneric *gen)
 	string *replace = reinterpret_cast<string *>(gen->GetArgAddress(3));
 	string *self = reinterpret_cast<string *>(gen->GetObject());
 	*reinterpret_cast<string *>(gen->GetAddressOfReturnLocation()) = StringReplaceRange(start, count, *replace, *self);
+}
+
+static void StringReplaceRangeThis_Generic(asIScriptGeneric *gen)
+{
+	asUINT start = gen->GetArgDWord(0);
+	int count = gen->GetArgDWord(1);
+	string *replace = reinterpret_cast<string *>(gen->GetArgAddress(2));
+	string *self = reinterpret_cast<string *>(gen->GetObject());
+	gen->SetReturnAddress(&StringReplaceRangeThis(start, count, *replace, *self));
 }
 
 static void StringReplace_Generic(asIScriptGeneric *gen)
@@ -426,36 +449,40 @@ void RegisterStdStringUtils(asIScriptEngine *engine)
 
 	if (strstr(asGetLibraryOptions(), "AS_MAX_PORTABILITY"))
 	{
-		r = engine->RegisterObjectMethod("string", "array<string>@ split(const string &in, bool = true, bool=false) const", asFUNCTION(StringSplit_Generic), asCALL_GENERIC);
+		r = engine->RegisterObjectMethod("string", "array<string>@ split(const string &in delimiter, bool full = true, bool allow_blanks = false) const", asFUNCTION(StringSplit_Generic), asCALL_GENERIC);
 		assert(r >= 0);
-		r = engine->RegisterGlobalFunction("string join(const array<string> &in, const string &in, int = 0, int = -1)", asFUNCTION(StringJoin_Generic), asCALL_GENERIC);
+		r = engine->RegisterGlobalFunction("string join(const array<string> &in arr, const string &in delimiter, int start = 0, int count = -1)", asFUNCTION(StringJoin_Generic), asCALL_GENERIC);
 		assert(r >= 0);
 		r = engine->RegisterObjectMethod("string", "string slice(int start = 0, int end = 0) const", asFUNCTION(StringSlice_Generic), asCALL_GENERIC);
 		assert(r >= 0);
-		r = engine->RegisterObjectMethod("string", "string replace_range(uint start, int count, const string& in) const", asFUNCTION(StringReplaceRange_Generic), asCALL_GENERIC);
+		r = engine->RegisterObjectMethod("string", "string replace_range(uint start, int count, const string& in replacement) const", asFUNCTION(StringReplaceRange_Generic), asCALL_GENERIC);
 		assert(r >= 0);
-		r = engine->RegisterObjectMethod("string", "string replace(const string& in, const string& in, bool = true, uint = 0) const", asFUNCTION(StringReplace_Generic), asCALL_GENERIC);
+		r = engine->RegisterObjectMethod("string", "string& replace_range_this(uint start, int count, const string& in replacement)", asFUNCTION(StringReplaceRangeThis_Generic), asCALL_GENERIC);
+		assert(r >= 0);
+		r = engine->RegisterObjectMethod("string", "string replace(const string& in search, const string& in replacement, bool replace_all = true, uint offset = 0) const", asFUNCTION(StringReplace_Generic), asCALL_GENERIC);
 		assert(r >= 0);
 	}
 	else
 	{
-		r = engine->RegisterObjectMethod("string", "array<string>@ split(const string &in, bool = true, bool=false) const", asFUNCTION(StringSplit), asCALL_CDECL_OBJLAST);
+		r = engine->RegisterObjectMethod("string", "array<string>@ split(const string &in delimiter, bool full = true, bool allow_blanks = false) const", asFUNCTION(StringSplit), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
-		r = engine->RegisterGlobalFunction("string join(const array<string> &in, const string &in, int = 0, int = -1)", asFUNCTION(StringJoin), asCALL_CDECL);
+		r = engine->RegisterGlobalFunction("string join(const array<string> &in arr, const string &in delimiter, int start = 0, int count = -1)", asFUNCTION(StringJoin), asCALL_CDECL);
 		assert(r >= 0);
 		r = engine->RegisterObjectMethod("string", "string slice(int start = 0, int end = 0) const", asFUNCTION(StringSlice), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
-		r = engine->RegisterObjectMethod("string", "string replace_range(uint start, int count, const string& in) const", asFUNCTION(StringReplaceRange), asCALL_CDECL_OBJLAST);
+		r = engine->RegisterObjectMethod("string", "string replace_range(uint start, int count, const string& in replacement) const", asFUNCTION(StringReplaceRange), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
-		r = engine->RegisterObjectMethod("string", "string replace(const string& in, const string& in, bool = true, uint = 0) const", asFUNCTION(StringReplace), asCALL_CDECL_OBJLAST);
+		r = engine->RegisterObjectMethod("string", "string& replace_range_this(uint start, int count, const string& in replacement)", asFUNCTION(StringReplaceRangeThis), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
-		r = engine->RegisterObjectMethod("string", "string& replace_this(const string& in, const string& in, bool = true, uint = 0) const", asFUNCTION(StringReplaceThis), asCALL_CDECL_OBJLAST);
+		r = engine->RegisterObjectMethod("string", "string replace(const string& in search, const string& in replacement, bool replace_all = true, uint offset = 0) const", asFUNCTION(StringReplace), asCALL_CDECL_OBJLAST);
+		assert(r >= 0);
+		r = engine->RegisterObjectMethod("string", "string& replace_this(const string& in search, const string& in replacement, bool replace_all = true, uint offset = 0)", asFUNCTION(StringReplaceThis), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
 		r = engine->RegisterObjectMethod("string", "string reverse_bytes() const", asFUNCTION(StringReverse), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
-		r = engine->RegisterObjectMethod("string", "string opMul(uint) const", asFUNCTION(string_multiply), asCALL_CDECL_OBJFIRST);
+		r = engine->RegisterObjectMethod("string", "string opMul(uint count) const", asFUNCTION(string_multiply), asCALL_CDECL_OBJFIRST);
 		assert(r >= 0);
-		r = engine->RegisterObjectMethod("string", "string& opMulAssign(uint)", asFUNCTION(string_multiply_assign), asCALL_CDECL_OBJFIRST);
+		r = engine->RegisterObjectMethod("string", "string& opMulAssign(uint count)", asFUNCTION(string_multiply_assign), asCALL_CDECL_OBJFIRST);
 		assert(r >= 0);
 		r = engine->RegisterObjectMethod("string", "uint64 count(const string&in search, uint64 start = 0) const", asFUNCTION(string_count), asCALL_CDECL_OBJFIRST);
 		assert(r >= 0);

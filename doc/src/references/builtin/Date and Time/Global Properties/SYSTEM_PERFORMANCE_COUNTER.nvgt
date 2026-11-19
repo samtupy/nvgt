@@ -1,0 +1,16 @@
+/**
+	Returns the current value of the system's high resolution performance counter.
+	const uint64 SYSTEM_PERFORMANCE_COUNTER;
+	## Remarks:
+		The counter's value on its own has no meaning. It is only useful for measuring the time between two readings: subtract the first reading from the second, then divide by `SYSTEM_PERFORMANCE_FREQUENCY` to get the elapsed time in seconds.
+		This is the most precise timer available, which makes it useful for measuring very short durations. For everyday timing, the `timer` class is easier to use.
+*/
+
+// Example:
+void main() {
+	uint64 start = SYSTEM_PERFORMANCE_COUNTER;
+	wait(100);
+	uint64 elapsed = SYSTEM_PERFORMANCE_COUNTER - start;
+	double milliseconds = elapsed * 1000.0 / SYSTEM_PERFORMANCE_FREQUENCY;
+	alert("Example", "Waiting for 100 milliseconds actually took " + milliseconds + " milliseconds.");
+}

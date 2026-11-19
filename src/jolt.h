@@ -12,8 +12,11 @@
 
 #pragma once
 
+// These must match the definitions Jolt was compiled with or JPH::RegisterTypes aborts. Jolt's CMake only enables floating point exceptions for MSVC debug builds, so only define it when we link against that library.
 #define JPH_OBJECT_STREAM
-#define JPH_FLOATING_POINT_EXCEPTIONS_ENABLED
+#if defined(_MSC_VER) && !defined(NDEBUG)
+	#define JPH_FLOATING_POINT_EXCEPTIONS_ENABLED
+#endif
 #include <Jolt/Jolt.h>
 #include <Jolt/Math/Vec3.h>
 #include <phonon.h>

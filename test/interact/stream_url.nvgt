@@ -5,7 +5,7 @@
 void main() {
 	show_window("loading...");
 	sound s;
-	if (!s.stream_url("https://nwm.streamguys1.com/ktis-fm")) {
+	if (!s.stream_url("https://radio.weatherusa.net/NWR/KEC65.mp3")) {
 		alert("error", "initialize stream fail");
 		return;
 	}

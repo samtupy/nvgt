@@ -1,0 +1,28 @@
+/**
+	Copy a file out of the pack and save it to disk.
+	bool pack_file::extract_file(const string&in internal_name, const string&in file_on_disk);
+	## Arguments:
+		* const string&in internal_name: the name of the file inside the pack.
+		* const string&in file_on_disk: the path to save the file to. An existing file at this path is replaced.
+	## Returns:
+		bool: true if the file was extracted, false otherwise.
+	## Remarks:
+		This fails if the pack is not open for reading, if it doesn't contain the requested file, or if the destination can't be written.
+*/
+
+// Example:
+void main() {
+	pack_file p;
+	p.create("example.dat");
+	p.add_memory("readme.txt", "Thanks for playing!");
+	p.close();
+	p.open("example.dat");
+	if (p.extract_file("readme.txt", "readme_extracted.txt")) {
+		file f("readme_extracted.txt", "rb");
+		alert("Extracted file", f.read());
+		f.close();
+		file_delete("readme_extracted.txt");
+	}
+	p.close();
+	file_delete("example.dat");
+}

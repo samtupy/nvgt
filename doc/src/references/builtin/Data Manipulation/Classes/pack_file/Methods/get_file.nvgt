@@ -1,0 +1,31 @@
+/**
+	Get a datastream for reading a file from the pack.
+	datastream@ pack_file::get_file(const string&in filename, const string&in encoding = "", int byteorder = STREAM_BYTE_ORDER_NATIVE);
+	## Arguments:
+		* const string&in filename: the internal name of the file to read.
+		* const string&in encoding = "": the text encoding to use when reading strings from the stream (see the datastream class).
+		* int byteorder = STREAM_BYTE_ORDER_NATIVE: the byte order to use when reading binary numbers from the stream.
+	## Returns:
+		datastream@: a stream for reading the file. If the file doesn't exist or the pack is not open for reading, an inactive stream is returned instead, so check its `active` property.
+	## Remarks:
+		Each stream is independent of the pack_file object, so you can read several files at once, and a stream stays readable after the pack is closed. The stream supports seeking, and its positions are relative to the start of the file inside the pack.
+		Data is read from disk as you read from the stream rather than all at once, so this is suitable for large files.
+		Each stream keeps the pack file open on disk until the stream is closed or destroyed. On some platforms, including Windows, this means the pack can't be deleted or replaced while any of its streams are still in use.
+*/
+
+// Example:
+void main() {
+	pack_file p;
+	p.create("example.dat");
+	p.add_memory("numbers.txt", "0123456789");
+	p.close();
+	p.open("example.dat");
+	datastream@ ds = p.get_file("numbers.txt");
+	ds.seek(4);
+	alert("3 characters from position 4", ds.read(3));
+	datastream@ missing = p.get_file("missing.txt");
+	alert("Stream for a missing file is active", missing.active ? "yes" : "no");
+	ds.close(); // The pack file can't be deleted while a stream still has it open.
+	p.close();
+	file_delete("example.dat");
+}

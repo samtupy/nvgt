@@ -1,3 +1,5 @@
 *.nvgt linguist-language=angelscript
 _SConscript linguist-language=python
 test/data/** binary
+vcpkg/ports/** text eol=lf
+vcpkg/triplets/** text eol=lf

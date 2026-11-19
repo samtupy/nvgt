@@ -1,0 +1,26 @@
+/**
+	Add a file to a pack that is open for writing, using data read from a datastream.
+	bool pack_file::add_stream(const string&in internal_name, datastream@ ds);
+	## Arguments:
+		* const string&in internal_name: the name the file should have inside the pack.
+		* datastream@ ds: the stream to read the file's contents from.
+	## Returns:
+		bool: true if the data was added, false otherwise.
+	## Remarks:
+		The stream is read from its current position until its end, so anything before the current position is not included. This lets you add any kind of datastream to a pack, such as a file, a decoder, or a stream from another pack, without loading all of it into memory first.
+		This fails if the pack was not opened with `create()`, if the stream is null or can't be read from, or if the pack already contains a file with the given internal name.
+*/
+
+// Example:
+void main() {
+	datastream ds("HEADERthe actual data");
+	ds.seek(6); // Skip the header.
+	pack_file p;
+	p.create("example.dat");
+	p.add_stream("data.bin", ds);
+	p.close();
+	p.open("example.dat");
+	alert("data.bin", p.get_file("data.bin").read());
+	p.close();
+	file_delete("example.dat");
+}

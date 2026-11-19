@@ -1,0 +1,20 @@
+/**
+	A datastream connected to the program's standard input.
+	datastream@ cin;
+	## Remarks:
+		Standard input is usually what the user types into the console window, or data piped into the program from another one. Reading from cin waits until enough input is available, so a program that reads it may appear to hang if nothing is ever typed or piped in.
+		The stream is opened in text mode. Calling `close()` on it has no effect, since the program's standard input is not owned by the script.
+		When all input has been consumed, for example because the input was piped from a file that has ended, the stream's `eof` property becomes true and further reads return empty strings.
+		In a windowed program that has no console, there may be no standard input to read from at all. See `is_console_available()`.
+*/
+
+// Example:
+void main() {
+	cout.write("What is your name? ");
+	string name = cin.read_line();
+	if (cin.eof) {
+		println("No input was available.");
+		return;
+	}
+	println("Hello, " + name + "!");
+}

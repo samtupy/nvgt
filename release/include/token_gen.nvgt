@@ -27,7 +27,7 @@ string generate_token(int token_length, int mode = TOKEN_CHARACTERS | TOKEN_NUMB
 	return generate_custom_token(token_length, ch);
 }
 
-string generate_custom_token(int token_length, string[]@ values) {
+string generate_custom_token(int token_length, const string[] &in values) {
 	if (values.is_empty() || token_length <= 0) return "";
 	string final_token;
 	final_token.resize(token_length);
@@ -35,6 +35,11 @@ string generate_custom_token(int token_length, string[]@ values) {
 		final_token[i] = values[random(0, values.length()-1)];
 	return final_token;
 }
-string generate_custom_token(int token_length, const string&in characters) {
-	return generate_custom_token(token_length, {characters});
+string generate_custom_token(int token_length, const string &in characters) {
+	string[] values;
+	if (characters.length() < 1) return "";
+	for (uint i = 0; i < characters.length(); i++) {
+		values.insert_last(characters[i]);
+	}
+	return generate_custom_token(token_length, values);
 }

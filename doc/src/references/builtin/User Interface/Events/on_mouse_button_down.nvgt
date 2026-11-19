@@ -1,0 +1,27 @@
+/**
+	An event that is fired whenever a mouse button is pressed down.
+	engine_mouse_button_event on_mouse_button_down;
+	## Listener signatures:
+		* bool callback(int button, int clicks);
+		* void callback(int button, int clicks);
+		* A class implementing engine_mouse_button_event_listener, with a `bool on_mouse_button_down(int button, int clicks)` or `void on_mouse_button_down(int button, int clicks)` method.
+	## Arguments passed to listeners:
+		* int button: the button that was pressed. 1 is the left button, 2 is the middle button, 3 is the right button, and 4 and 5 are the side buttons found on some mice. These are the same numbers used by `mouse_pressed()`.
+		* int clicks: 1 for a single click, 2 for a double click, and so on. The operating system decides how quickly clicks must follow each other to count together.
+	## Remarks:
+		While this event is being handled, `MOUSE_ABSOLUTE_X` and `MOUSE_ABSOLUTE_Y` hold the position of the mouse at the time of the click.
+		See the Events topic for how listeners are added, ordered and removed, and what their return values mean.
+*/
+
+// Example:
+void on_click(int button, int clicks) {
+	string name = button == 1 ? "Left" : button == 2 ? "Middle" : button == 3 ? "Right" : "Button " + button;
+	screen_reader_output(name + (clicks == 2 ? " double click" : " click"), true);
+}
+void main() {
+	show_window("Example");
+	on_mouse_button_down += on_click;
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Click or double click any mouse button, or press escape to exit.", true);
+	while (!key_pressed(KEY_ESCAPE)) wait(5);
+}

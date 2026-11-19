@@ -1,0 +1,22 @@
+/**
+	Adds an amount to a stat's value.
+	1. void stat_set::mod(const string&in name, int64 value);
+	2. void stat_set::mod(const string&in name, double value);
+	## Arguments:
+		* const string&in name: the name of the stat to change.
+		* int64/double value: the amount to add. Use a negative number to subtract.
+	## Remarks:
+		Nothing happens if there is no stat with the given name.
+		This is the same as `stats[name] += value`, except that it doesn't fail when the stat doesn't exist.
+*/
+
+// Example:
+#include "stat_set.nvgt"
+
+void main() {
+	stat_set stats;
+	stats.add("health", 100, "Health: %0");
+	stats.mod("health", -25);
+	stats.mod("mana", 10); // Ignored, there is no mana stat.
+	alert("Example", string(stats["health"]));
+}

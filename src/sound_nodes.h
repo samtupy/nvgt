@@ -15,6 +15,7 @@
 #include <miniaudio_phonon.h>
 #include <phonon.h>
 #include <unordered_map>
+#include <vector>
 #include "sound.h"
 
 class audio_node_impl : public virtual audio_node {
@@ -22,13 +23,17 @@ protected:
 	ma_node_base* node; // Must be set by subclasses
 	audio_engine *engine;
 	int refcount;
+	std::vector<audio_node*> output_connections; // Owns a reference to whatever each output bus is currently attached to, so an attached node can't be freed out from under the graph.
 public:
 	audio_node_impl(ma_node_base *node, audio_engine *engine) : audio_node(), node(node), engine(engine), refcount(1) {
 		if (!init_sound()) throw std::runtime_error("sound system was not initialized");
 		if (!engine) this->engine = g_audio_engine;
 		if (dynamic_cast<audio_node_impl*>(this->engine) != this) this->engine->duplicate();
 	}
-	~audio_node_impl() { if (engine && dynamic_cast<audio_node_impl*>(this->engine) != this) engine->release(); }
+	~audio_node_impl() {
+		for (audio_node *n : output_connections) if (n) n->release();
+		if (engine && dynamic_cast<audio_node_impl*>(this->engine) != this) engine->release();
+	}
 	void duplicate() { asAtomicInc(refcount); }
 	void release() {
 		if (asAtomicDec(refcount) < 1)
@@ -40,9 +45,30 @@ public:
 	unsigned int get_output_bus_count() { return node ? ma_node_get_output_bus_count(node) : 0; }
 	unsigned int get_input_channels(unsigned int bus) { return node ? ma_node_get_input_channels(node, bus) : 0; }
 	unsigned int get_output_channels(unsigned int bus) { return node ? ma_node_get_output_channels(node, bus) : 0; }
-	bool attach_output_bus(unsigned int output_bus, audio_node *destination, unsigned int destination_input_bus) { return node ? (g_soundsystem_last_error = ma_node_attach_output_bus(node, output_bus, destination->get_ma_node(), destination_input_bus)) == MA_SUCCESS : false; }
-	bool detach_output_bus(unsigned int bus) { return node ? (g_soundsystem_last_error = ma_node_detach_output_bus(node, bus)) == MA_SUCCESS : false; }
-	bool detach_all_output_buses() { return node ? (g_soundsystem_last_error = ma_node_detach_all_output_buses(node)) == MA_SUCCESS : false; }
+	bool attach_output_bus(unsigned int output_bus, audio_node *destination, unsigned int destination_input_bus) {
+		if (!node) return false;
+		if ((g_soundsystem_last_error = ma_node_attach_output_bus(node, output_bus, destination->get_ma_node(), destination_input_bus)) != MA_SUCCESS) return false;
+		if (output_bus >= output_connections.size()) output_connections.resize(output_bus + 1, nullptr);
+		if (output_connections[output_bus]) output_connections[output_bus]->release();
+		output_connections[output_bus] = destination;
+		destination->duplicate();
+		return true;
+	}
+	bool detach_output_bus(unsigned int bus) {
+		if (!node) return false;
+		if ((g_soundsystem_last_error = ma_node_detach_output_bus(node, bus)) != MA_SUCCESS) return false;
+		if (bus < output_connections.size() && output_connections[bus]) {
+			output_connections[bus]->release();
+			output_connections[bus] = nullptr;
+		}
+		return true;
+	}
+	bool detach_all_output_buses() {
+		if (!node) return false;
+		if ((g_soundsystem_last_error = ma_node_detach_all_output_buses(node)) != MA_SUCCESS) return false;
+		for (audio_node *&n : output_connections) { if (n) { n->release(); n = nullptr; } }
+		return true;
+	}
 	bool set_output_bus_volume(unsigned int bus, float volume) { return node ? (g_soundsystem_last_error = ma_node_set_output_bus_volume(node, bus, volume)) == MA_SUCCESS : false; }
 	float get_output_bus_volume(unsigned int bus) { return node ? ma_node_get_output_bus_volume(node, bus) : 0; }
 	bool set_state(ma_node_state state) { return node ? (g_soundsystem_last_error = ma_node_set_state(node, state)) == MA_SUCCESS : false; }

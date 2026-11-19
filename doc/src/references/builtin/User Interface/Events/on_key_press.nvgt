@@ -1,0 +1,27 @@
+/**
+	An event that is fired whenever a key is pressed down.
+	engine_key_event on_key_press;
+	## Listener signatures:
+		* bool callback(int key);
+		* void callback(int key);
+		* A class implementing engine_key_event_listener, with a `bool on_key_press(int key)` or `void on_key_press(int key)` method.
+	## Arguments passed to listeners:
+		* int key: the code of the key that was pressed, one of the values in the `key_code` enum.
+	## Remarks:
+		This fires once when a key goes down. While the key is held, the operating system's key repeats fire `on_key_repeat` instead.
+		See the Events topic for how listeners are added, ordered and removed, and what their return values mean.
+*/
+
+// Example:
+bool on_key(int key) {
+	if (key == KEY_ESCAPE) exit();
+	screen_reader_output(get_key_name(key), true);
+	return true;
+}
+void main() {
+	show_window("Example");
+	on_key_press += on_key;
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Press any key to hear its name, or escape to exit.", true);
+	while (true) wait(5);
+}

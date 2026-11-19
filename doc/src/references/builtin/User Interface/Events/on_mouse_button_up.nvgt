@@ -1,0 +1,35 @@
+/**
+	An event that is fired whenever a mouse button is released.
+	engine_mouse_button_event on_mouse_button_up;
+	## Listener signatures:
+		* bool callback(int button, int clicks);
+		* void callback(int button, int clicks);
+		* A class implementing engine_mouse_button_event_listener, with a `bool on_mouse_button_up(int button, int clicks)` or `void on_mouse_button_up(int button, int clicks)` method.
+	## Arguments passed to listeners:
+		* int button: the button that was released. 1 is the left button, 2 is the middle button, 3 is the right button, and 4 and 5 are the side buttons found on some mice.
+		* int clicks: 1 if this release ends a single click, 2 if it ends a double click, and so on.
+	## Remarks:
+		See the Events topic for how listeners are added, ordered and removed, and what their return values mean.
+*/
+
+// Example:
+class hold_timer : engine_mouse_button_event_listener {
+	timer held;
+	void on_mouse_button_down(int button, int clicks) {
+		if (button == 1) held.restart();
+	}
+	void on_mouse_button_up(int button, int clicks) {
+		if (button == 1) screen_reader_output("Held for " + held.elapsed + " milliseconds", true);
+	}
+}
+void main() {
+	show_window("Example");
+	hold_timer ht;
+	on_mouse_button_down += ht;
+	on_mouse_button_up += ht;
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Hold and release the left mouse button to hear how long you held it. Press escape to exit.", true);
+	while (!key_pressed(KEY_ESCAPE)) wait(5);
+	on_mouse_button_down -= ht;
+	on_mouse_button_up -= ht;
+}

@@ -89,7 +89,7 @@ class section_istreambuf : public Poco::BasicBufferedStreamBuf<char, std::char_t
 public:
 	section_istreambuf(std::istream& source, std::streamoff start, std::streamsize size);
 	~section_istreambuf();
-	int readFromDevice(char* buffer, std::streamsize length);
+	std::streamsize readFromDevice(char* buffer, std::streamsize length);
 	std::streampos seekoff(std::streamoff off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in);
 	std::streampos seekpos(std::streampos pos, std::ios_base::openmode which = std::ios_base::in);
 };

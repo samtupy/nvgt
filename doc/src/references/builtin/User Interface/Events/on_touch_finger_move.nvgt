@@ -1,0 +1,35 @@
+/**
+	An event that is fired whenever a finger moves while touching a touch device.
+	engine_touch_motion_event on_touch_finger_move;
+	## Listener signatures:
+		* bool callback(uint64 device, const touch_finger& finger, float relative_x, float relative_y);
+		* void callback(uint64 device, const touch_finger& finger, float relative_x, float relative_y);
+		* A class implementing engine_touch_motion_event_listener, with a `bool on_touch_finger_move(uint64 device, const touch_finger& finger, float relative_x, float relative_y)` or `void on_touch_finger_move(...)` method taking the same parameters.
+	## Arguments passed to listeners:
+		* uint64 device: the ID of the touch device.
+		* const touch_finger& finger: the finger that moved, with its new position.
+		* float relative_x: how far the finger moved horizontally since the last event, from -1 to 1 across the device. Positive values mean right.
+		* float relative_y: how far the finger moved vertically since the last event, from -1 to 1 across the device. Positive values mean down.
+	## Remarks:
+		The finger parameter must be declared exactly as `const touch_finger& finger`. Writing `const touch_finger&in finger` causes a "No matching signatures" error when adding the listener.
+		See the Events topic for how listeners are added, ordered and removed, and what their return values mean.
+*/
+
+// Example:
+float swipe_x = 0;
+void on_move(uint64 device, const touch_finger& finger, float relative_x, float relative_y) {
+	swipe_x += relative_x;
+}
+void on_up(uint64 device, const touch_finger& finger) {
+	if (swipe_x > 0.2) screen_reader_output("Swiped right", true);
+	else if (swipe_x < -0.2) screen_reader_output("Swiped left", true);
+	swipe_x = 0;
+}
+void main() {
+	show_window("Example");
+	on_touch_finger_move += on_move;
+	on_touch_finger_up += on_up;
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Swipe left or right. Press escape or back to exit.", true);
+	while (!key_pressed(KEY_ESCAPE) and !key_pressed(KEY_AC_BACK)) wait(5);
+}

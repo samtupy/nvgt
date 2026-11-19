@@ -94,10 +94,10 @@ public:
 	void Sort(asUINT startAt, asUINT count, bool asc);
 	void Sort(asIScriptFunction *less, asUINT startAt, asUINT count);
 	void Reverse();
-	int  Find(void *value) const;
-	int  Find(asUINT startAt, void *value) const;
-	int  FindByRef(void *ref) const;
-	int  FindByRef(asUINT startAt, void *ref) const;
+	int  Find(const void *value) const;
+	int  Find(asUINT startAt, const void *value) const;
+	int  FindByRef(const void *ref) const;
+	int  FindByRef(asUINT startAt, const void *ref) const;
 
 	// Return the address of internal buffer for direct manipulation of elements
 	void *GetBuffer();
@@ -138,6 +138,9 @@ protected:
 	void  Construct(SArrayBuffer *buf, asUINT start, asUINT end);
 	void  Destruct(SArrayBuffer *buf, asUINT start, asUINT end);
 	bool  Equals(const void *a, const void *b, asIScriptContext *ctx, SArrayCache *cache) const;
+
+private:
+	struct customLess;
 };
 
 void RegisterScriptArray(asIScriptEngine *engine, bool defaultArray);

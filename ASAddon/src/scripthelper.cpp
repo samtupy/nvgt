@@ -281,7 +281,8 @@ int WriteConfigToStream(asIScriptEngine *engine, ostream &strm)
 			engine->SetDefaultNamespace(currNamespace.c_str());
 		}
 		const char *enumName = ti->GetName();
-		strm << "enum " << enumName << "\n";
+		const char* underlyingType = engine->GetTypeDeclaration(ti->GetUnderlyingTypeId());
+		strm << "enum " << enumName << " " << underlyingType << "\n";
 		for( asUINT m = 0; m < ti->GetEnumValueCount(); m++ )
 		{
 			const char *valName;
@@ -739,13 +740,18 @@ int ConfigEngineFromStream(asIScriptEngine *engine, istream &strm, const char *c
 		}
 		else if( token == "objprop" )
 		{
-			string name, decl, compositeOffset, isCompositeIndirect;
+			string name, decl, compositeOffset = "0", isCompositeIndirect = "0";
 			in::GetToken(engine, name, config, pos);
 			name = name.substr(1, name.length() - 2);
 			in::GetToken(engine, decl, config, pos);
 			decl = decl.substr(1, decl.length() - 2);
 			in::GetToken(engine, compositeOffset, config, pos);
 			in::GetToken(engine, isCompositeIndirect, config, pos);
+			if( !(isCompositeIndirect == "0" || isCompositeIndirect == "1") )
+			{
+				engine->WriteMessage(configFile, in::GetLineNumber(config, pos), 0, asMSGTYPE_ERROR, "Wrong value for composite indirect. Is it an old config version?");
+				return -1;
+			}
 
 			asITypeInfo *type = engine->GetTypeInfoById(engine->GetTypeIdByDecl(name.c_str()));
 			if( type == 0 )
@@ -856,10 +862,11 @@ int ConfigEngineFromStream(asIScriptEngine *engine, istream &strm, const char *c
 		}
 		else if( token == "enum" )
 		{
-			string type;
-			in::GetToken(engine, type, config, pos);
+			string typeName, typeOf;
+			in::GetToken(engine, typeName, config, pos);
+			in::GetToken(engine, typeOf, config, pos);
 
-			r = engine->RegisterEnum(type.c_str());
+			r = engine->RegisterEnum(typeName.c_str(), typeOf.c_str());
 			if( r < 0 )
 			{
 				engine->WriteMessage(configFile, in::GetLineNumber(config, pos), 0, asMSGTYPE_ERROR, "Failed to register enum type");
@@ -873,7 +880,7 @@ int ConfigEngineFromStream(asIScriptEngine *engine, istream &strm, const char *c
 			in::GetToken(engine, name, config, pos);
 			in::GetToken(engine, value, config, pos);
 
-			r = engine->RegisterEnumValue(type.c_str(), name.c_str(), atol(value.c_str()));
+			r = engine->RegisterEnumValue(type.c_str(), name.c_str(), atoll(value.c_str()));
 			if( r < 0 )
 			{
 				engine->WriteMessage(configFile, in::GetLineNumber(config, pos), 0, asMSGTYPE_ERROR, "Failed to register enum value");
@@ -919,9 +926,9 @@ string GetExceptionInfo(asIScriptContext *ctx, bool showStack)
 	stringstream text;
 
 	const asIScriptFunction *function = ctx->GetExceptionFunction();
-	const char* section_name;
+	const char* section_name = nullptr;
 	text << "in function: " << function->GetDeclaration() << "\n";
-	if(function->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0)
+	if(function->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0 && section_name)
 		text << "file: " << (section_name) << "\n";
 	if(ctx->GetExceptionLineNumber())
 		text << "line: " << ctx->GetExceptionLineNumber() << "\n";
@@ -937,8 +944,11 @@ string GetExceptionInfo(asIScriptContext *ctx, bool showStack)
 			{
 				if( function->GetFuncType() == asFUNC_SCRIPT )
 				{
-					const char* section_name;
-					if (function->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0) text << (section_name) << " (" << ctx->GetLineNumber(n) << "): " << function->GetDeclaration() << "\n";
+					const char* section_name = nullptr;
+					int line = ctx->GetLineNumber(n);
+					if (function->GetDeclaredAt(&section_name, nullptr, nullptr) >= 0 && section_name) text << section_name << " (" << line << "): ";
+					else if (line > 0) text << "line " << line << ": ";
+					text << function->GetDeclaration() << "\n";
 				}
 				else
 				{
@@ -1016,7 +1026,7 @@ void RegisterExceptionRoutines(asIScriptEngine *engine)
 
 	if (strstr(asGetLibraryOptions(), "AS_MAX_PORTABILITY") == 0)
 	{
-		r = engine->RegisterGlobalFunction("void throw(const string &in)", asFUNCTION(ScriptThrow), asCALL_CDECL); assert(r >= 0);
+		r = engine->RegisterGlobalFunction("void throw(const string &in message)", asFUNCTION(ScriptThrow), asCALL_CDECL); assert(r >= 0);
 		r = engine->RegisterGlobalFunction("string get_exception_info()", asFUNCTION(ScriptGetExceptionInfo), asCALL_CDECL); assert(r >= 0);
 		r = engine->RegisterGlobalFunction("int get_exception_line()", asFUNCTION(ScriptGetExceptionLine), asCALL_CDECL); assert(r >= 0);
 		r = engine->RegisterGlobalFunction("string get_exception_function()", asFUNCTION(ScriptGetExceptionFunctionDecl), asCALL_CDECL); assert(r >= 0);
@@ -1024,7 +1034,7 @@ void RegisterExceptionRoutines(asIScriptEngine *engine)
 	}
 	else
 	{
-		r = engine->RegisterGlobalFunction("void throw(const string &in)", WRAP_FN(ScriptThrow), asCALL_GENERIC); assert(r >= 0);
+		r = engine->RegisterGlobalFunction("void throw(const string &in message)", WRAP_FN(ScriptThrow), asCALL_GENERIC); assert(r >= 0);
 		r = engine->RegisterGlobalFunction("string getExceptionInfo()", WRAP_FN(ScriptGetExceptionInfo), asCALL_GENERIC); assert(r >= 0);
 	}
 }

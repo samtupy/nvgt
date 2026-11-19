@@ -1,0 +1,20 @@
+/**
+	An array containing the command line arguments that were passed to your program.
+	const string[]@ ARGS;
+	## Remarks:
+		Unlike `COMMAND_LINE`, which joins every argument into a single string, ARGS keeps each argument separate, so arguments that contain spaces are not split apart.
+		The first element is reserved for the program itself. When running a script from source, ARGS[0] is the filename of the script. In a compiled game, ARGS[0] is an empty string. The arguments that were actually passed to the program start at ARGS[1].
+		When running a script from source on the command line, arguments meant for the script go after a `--`, for example `nvgt game.nvgt -- first "second argument"`.
+*/
+
+// Example:
+void main() {
+	if (ARGS.length() < 2) {
+		alert("Command line", "No arguments were provided.");
+		return;
+	}
+	string list;
+	for (uint i = 1; i < ARGS.length(); i++)
+		list += i + ": " + ARGS[i] + "\n";
+	alert("Command line arguments", list);
+}

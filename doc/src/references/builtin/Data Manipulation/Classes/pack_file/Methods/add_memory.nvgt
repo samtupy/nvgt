@@ -1,0 +1,21 @@
+/**
+	Add a file to a pack that is open for writing, using data from a string.
+	bool pack_file::add_memory(const string&in internal_name, const string&in data);
+	## Arguments:
+		* const string&in internal_name: the name the file should have inside the pack.
+		* const string&in data: the contents of the new file.
+	## Returns:
+		bool: true if the data was added, false otherwise.
+	## Remarks:
+		This fails if the pack was not opened with `create()`, or if the pack already contains a file with the given internal name. Files cannot be replaced or removed once added.
+*/
+
+// Example:
+void main() {
+	pack_file p;
+	p.create("example.dat");
+	p.add_memory("level1.txt", "a maze of twisty little passages");
+	alert("Adding a second file with the same name", p.add_memory("level1.txt", "something else") ? "succeeded" : "failed");
+	p.close();
+	file_delete("example.dat");
+}

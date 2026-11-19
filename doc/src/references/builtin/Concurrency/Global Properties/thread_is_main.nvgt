@@ -1,0 +1,19 @@
+/**
+	Determines whether the calling code is running on the main thread.
+	const bool thread_is_main;
+	## Remarks:
+		Some operations, especially those involving the game window, keyboard and other parts of the user interface, should only be performed on the main thread. This property lets code that might run on any thread check where it is.
+		The main thread is the one your script's `main()` function runs on.
+*/
+
+// Example:
+bool worker_is_main = true;
+void worker(dictionary@ args) {
+	worker_is_main = thread_is_main;
+}
+void main() {
+	thread t;
+	t.start(worker);
+	t.join();
+	alert("Example", "main() is on the main thread: " + thread_is_main + ". The worker thread is on the main thread: " + worker_is_main + ".");
+}

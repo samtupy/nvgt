@@ -48,14 +48,14 @@ shared class person {
 	string name;
 	int age;
 
-	person(const string& in name, int age) {
+	person(const string&in name, int age) {
 		this.name = name;
 		this.age = age;
 	}
 }
 
 // Say we want the subscripting code to be able to create a new person.
-person@ new_person(const string& in name, int age) {
+person@ new_person(const string&in name, int age) {
 	person p(name, age);
 	people.insert_last(p);
 	return p;
@@ -69,7 +69,7 @@ person@[]@ get_people() property { return @people; }
 Now lets create a section of code that imports the functions. This way, the user who writes subscripting code doesn't have to do it.
 
 ```
-string imports = """import person@ new_person(const string& in, int) from "nvgt_game";
+string imports = """import person@ new_person(const string&in, int) from "nvgt_game";
 import person@[]@ get_people() property from "nvgt_game";
 external shared class person;
 """;
@@ -147,7 +147,7 @@ Finally, I'll leave you with some useful functions that show how it's very easy 
 ```
 dictionary shared_function_cache; // It's useful to cache function lookups in a dictionary for performance, else Angelscript needs to keep looping through all shared functions to find the matching signature.
 
-script_function@ find_shared_function(const string& in decl) {
+script_function@ find_shared_function(const string&in decl) {
 	script_function@ ret = null;
 	if (shared_function_cache.get(decl, @ret)) return @ret;
 	@ret = script_mod_shared.get_function_by_decl(decl);
@@ -155,7 +155,7 @@ script_function@ find_shared_function(const string& in decl) {
 	return @ret;
 }
 
-dictionary@ call_shared(const string& in decl, dictionary@ args = null, string[]@ errors = null) {
+dictionary@ call_shared(const string&in decl, dictionary@ args = null, string[]@ errors = null) {
 	script_function@ func = find_shared_function(decl);
 	return call_shared(func, args, errors);
 }

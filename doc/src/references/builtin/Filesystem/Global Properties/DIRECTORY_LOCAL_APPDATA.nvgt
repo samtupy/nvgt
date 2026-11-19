@@ -1,0 +1,15 @@
+/**
+	Property that returns the user's local application data directory, which is suitable for data that should stay on the current machine.
+	const string DIRECTORY_LOCAL_APPDATA;
+	## remarks:
+		A slash character is already appended to the directory returned by this property.
+		This property may return different values depending on the operating system the application is being run on.
+			* On Windows, usually C:\Users\%username%\appdata\local\.
+			* On Linux, usually ~/.local/share/.
+		On Windows, the difference from `DIRECTORY_APPDATA` is that the roaming directory may be synchronized between computers on some networks, while the local directory never is. Large files or data that only makes sense on one computer, such as caches, belong in the local directory.
+*/
+
+// example:
+void main() {
+	alert("example", "a cache for the game could be stored at " + DIRECTORY_LOCAL_APPDATA + "my_game/cache/");
+}

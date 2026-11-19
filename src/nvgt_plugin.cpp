@@ -11,8 +11,10 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include <algorithm>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <Poco/BinaryReader.h>
 #include <Poco/BinaryWriter.h>
 #include <Poco/Format.h>
@@ -36,6 +38,19 @@ typedef struct {
 } static_plugin_vtable;
 std::unordered_map<std::string, SDL_SharedObject*> loaded_plugins; // Contains handles to sdl objects.
 std::unordered_map<std::string, static_plugin_vtable>* static_plugins = NULL; // Contains pointers to static plugin entry points. This doesn't contain entry points for plugins loaded from a dll, rather those that have been linked statically into the executable produced by a custom build of nvgt. This is a pointer because the map is initialized the first time register_static_plugin is called so that we are not trusting in global initialization order.
+std::vector<nvgt_plugin_shutdown_callback*> plugin_shutdown_callbacks; // Called in reverse registration order by notify_nvgt_plugins_shutdown.
+
+void nvgt_register_shutdown_notification(nvgt_plugin_shutdown_callback* callback) {
+	if (!callback || std::find(plugin_shutdown_callbacks.begin(), plugin_shutdown_callbacks.end(), callback) != plugin_shutdown_callbacks.end()) return;
+	plugin_shutdown_callbacks.push_back(callback);
+}
+void notify_nvgt_plugins_shutdown() {
+	while (!plugin_shutdown_callbacks.empty()) {
+		nvgt_plugin_shutdown_callback* callback = plugin_shutdown_callbacks.back();
+		plugin_shutdown_callbacks.pop_back();
+		callback();
+	}
+}
 
 bool load_nvgt_plugin(const std::string& name, std::string* errmsg, void* user) {
 	nvgt_plugin_entry* entry = NULL;
@@ -118,6 +133,7 @@ void serialize_nvgt_plugins(Poco::BinaryWriter& bw) {
 }
 
 void unload_nvgt_plugins() {
+	notify_nvgt_plugins_shutdown();
 	for (const auto& i : loaded_plugins) {
 		if (i.second) SDL_UnloadObject(i.second);
 	}

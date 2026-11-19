@@ -125,7 +125,7 @@ checksum_ostreambuf::checksum_ostreambuf(std::ostream& sink)
 }
 checksum_ostreambuf::~checksum_ostreambuf() {
 }
-int checksum_ostreambuf::writeToDevice(const char* buffer, std::streamsize length) {
+std::streamsize checksum_ostreambuf::writeToDevice(const char* buffer, std::streamsize length) {
 	check.update(buffer, (uint32_t)length);
 	sink->write(buffer, length);
 	return (int)length;
@@ -152,7 +152,7 @@ checksum_istreambuf::checksum_istreambuf(std::istream& source)
 }
 checksum_istreambuf::~checksum_istreambuf() {
 }
-int checksum_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
+std::streamsize checksum_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
 	if (!source->good())
 		return -1;
 	source->read(buffer, length);

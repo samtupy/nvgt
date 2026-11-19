@@ -1,0 +1,25 @@
+/**
+	Gets the names of the stats in the set, optionally sorted.
+	string[]@ stat_set::list(stat_sort_mode sort_mode = STAT_SORT_MODE_NONE, const string[]@ sort_in_front = {}, const string[]@ sort_behind = {}) const;
+	## Arguments:
+		* stat_sort_mode sort_mode = STAT_SORT_MODE_NONE: how to order the names (see `stat_sort_mode`).
+		* const string[]@ sort_in_front = {}: names to move to the start of the list, in the given order, after sorting.
+		* const string[]@ sort_behind = {}: names to move to the end of the list, in the given order, after sorting.
+	## Returns:
+		string[]@: the names of the stats.
+	## Remarks:
+		Names in sort_in_front or sort_behind that aren't in the set are ignored. This makes it easy to keep a few important stats, such as a player's name, at the top of a display no matter how the rest are sorted.
+*/
+
+// Example:
+#include "stat_set.nvgt"
+
+void main() {
+	stat_set stats;
+	stats.add("kills", 12);
+	stats.add("deaths", 3);
+	stats.add("assists", 7);
+	stats.add("name", "Alex");
+	string[]@ names = stats.list(STAT_SORT_MODE_ADD_ORDER, {"name"});
+	alert("Example", join(names, ", "));
+}

@@ -1,0 +1,19 @@
+/**
+	Splits a value into its whole number and fractional parts.
+	1. double modf(double num, double&out iptr);
+	2. float modf(float num, float&out iptr);
+	## Arguments:
+		* double/float num: the value to split.
+		* double/float&out iptr: a variable that receives the whole number part of the value.
+	## Returns:
+		double/float: the fractional part of the value.
+	## Remarks:
+		Both parts keep the sign of the original value, so splitting -3.75 gives a fractional part of -0.75 and a whole number part of -3.
+*/
+
+// Example:
+void main() {
+	double whole;
+	double fraction = modf(3.75, whole);
+	alert("Example", "3.75 has a whole number part of " + whole + " and a fractional part of " + fraction);
+}

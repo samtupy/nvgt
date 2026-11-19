@@ -1,0 +1,22 @@
+/**
+	Get the names of every file in the pack.
+	string[]@ pack_file::list_files() const;
+	## Returns:
+		string[]@: a handle to an array containing the internal name of every file in the pack. The array is empty if no pack is open.
+	## Remarks:
+		This works for packs opened with either `create()` or `open()`. The order of the names is not guaranteed, so sort the array if you need a particular order.
+*/
+
+// Example:
+void main() {
+	pack_file p;
+	p.create("example.dat");
+	p.add_memory("c.txt", "");
+	p.add_memory("a.txt", "");
+	p.add_memory("b.txt", "");
+	string[]@ names = p.list_files();
+	names.sort_ascending();
+	alert("Files in the pack", join(names, ", "));
+	p.close();
+	file_delete("example.dat");
+}

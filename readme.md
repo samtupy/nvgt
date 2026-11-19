@@ -9,7 +9,7 @@ It aims to remove some of the headaches that anyone interested in audio game dev
 Find out more at [nvgt.dev](https://nvgt.dev).
 
 ## Building
-You will need a C++ build toolchain if you want to build NVGT from source. On Windows we recommend the Visual Studio Build command line tools or the very latest version of Visual Studio 2022. On Mac-OS you will need at least the command line development tools if not Xcode, and a functioning GNU/G++ compiler collection is expected to be available on Linux.
+You will need a C++ build toolchain if you want to build NVGT from source. On Windows we recommend the Visual Studio Build command line tools or the very latest version of Visual Studio 2026. On Mac-OS you will need at least the command line development tools if not Xcode, and a functioning GNU/G++ compiler collection is expected to be available on Linux.
 
 NVGT uses SCons, a Python build system. If you have Python, you can get it by running `pip install scons`.
 

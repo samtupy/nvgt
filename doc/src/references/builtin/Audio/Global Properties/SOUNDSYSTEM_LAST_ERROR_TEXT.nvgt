@@ -1,0 +1,13 @@
+/**
+	A short English description of the error code in `SOUNDSYSTEM_LAST_ERROR`.
+	const string SOUNDSYSTEM_LAST_ERROR_TEXT;
+	## Remarks:
+		If the most recent operation succeeded, this is "No error". The descriptions are general, for example a sound that failed to load may only report "Unknown error", so treat this as a hint for debugging rather than a message to show players.
+*/
+
+// Example:
+void main() {
+	sound s;
+	if (!s.load("this_file_does_not_exist.ogg"))
+		alert("Unable to load the sound", SOUNDSYSTEM_LAST_ERROR_TEXT);
+}

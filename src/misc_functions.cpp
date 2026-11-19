@@ -242,15 +242,15 @@ double tinyexpr(const std::string& expr) {
 }
 
 std::string number_to_words(asINT64 number, bool include_and) {
-	if (number < 0) return "negative " + number_to_words(number * -1, include_and);
+	uint64_t magnitude = number < 0 ? 0 - uint64_t(number) : uint64_t(number);
 	std::string output(128, '\0');
-	size_t size = bl_number_to_words(number, &output[0], 96, include_and);
+	size_t size = bl_number_to_words(magnitude, &output[0], 96, include_and);
 	if (size > 96) {
 		output.resize(size);
-		size = bl_number_to_words(number, &output[0], size, include_and);
+		size = bl_number_to_words(magnitude, &output[0], size, include_and);
 	}
 	output.resize(size - 1); // It appears bl_number_to_words includes a trailing null byte in it's size calculation.
-	return output;
+	return number < 0 ? "negative " + output : output;
 }
 int get_last_error() {
 	int e = g_LastError;
@@ -297,31 +297,39 @@ std::string string_to_upper_case(std::string s) {
 }
 
 //Following function originally from https://stackoverflow.com/questions/642213/how-to-implement-a-natural-sort-algorithm-in-c
-bool natural_number_sort(const std::string& a, const std::string& b) {
-	if (a.empty())
-		return true;
-	if (b.empty())
-		return false;
-	if (isdigit(a[0]) && !isdigit(b[0]))
-		return true;
-	if (!isdigit(a[0]) && isdigit(b[0]))
-		return false;
-	if (!isdigit(a[0]) && !isdigit(b[0])) {
-		if (a[0] == b[0])
-			return natural_number_sort(a.substr(1), b.substr(1));
-		return (string_to_upper_case(a) < string_to_upper_case(b));
+bool natural_number_sort(const std::string& first, const std::string& second) {
+	std::string a = first, b = second;
+	while (true) {
+		if (a.empty())
+			return true;
+		if (b.empty())
+			return false;
+		if (isdigit(a[0]) && !isdigit(b[0]))
+			return true;
+		if (!isdigit(a[0]) && isdigit(b[0]))
+			return false;
+		if (!isdigit(a[0]) && !isdigit(b[0])) {
+			if (a[0] != b[0])
+				return (string_to_upper_case(a) < string_to_upper_case(b));
+			size_t i = 1;
+			while (i < a.size() && i < b.size() && !isdigit(a[i]) && a[i] == b[i]) i++;
+			a.erase(0, i);
+			b.erase(0, i);
+			continue;
+		}
+		std::istringstream issa(a);
+		std::istringstream issb(b);
+		int ia, ib;
+		issa >> ia;
+		issb >> ib;
+		if (ia != ib)
+			return ia < ib;
+		std::string anew, bnew;
+		std::getline(issa, anew);
+		std::getline(issb, bnew);
+		a = anew;
+		b = bnew;
 	}
-	std::istringstream issa(a);
-	std::istringstream issb(b);
-	int ia, ib;
-	issa >> ia;
-	issb >> ib;
-	if (ia != ib)
-		return ia < ib;
-	std::string anew, bnew;
-	std::getline(issa, anew);
-	std::getline(issb, bnew);
-	return (natural_number_sort(anew, bnew));
 }
 
 refstring* new_refstring() {
@@ -477,7 +485,7 @@ void script_memory_buffer::angelscript_register(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("memory_buffer<T>", "T& opIndex(uint64 index)", asMETHODPR(script_memory_buffer, at, (size_t), void*), asCALL_THISCALL);
 	engine->RegisterObjectMethod("memory_buffer<T>", "const T& opIndex(uint64 index) const", asMETHODPR(script_memory_buffer, at, (size_t) const, const void*), asCALL_THISCALL);
 	engine->RegisterObjectMethod("memory_buffer<T>", "array<T>@ opImplConv() const", asMETHOD(script_memory_buffer, to_array), asCALL_THISCALL);
-	engine->RegisterObjectMethod("memory_buffer<T>", "memory_buffer<T>& opAssign(array<T>@ array)", asMETHOD(script_memory_buffer, from_array), asCALL_THISCALL);
+	engine->RegisterObjectMethod("memory_buffer<T>", "memory_buffer<T>& opAssign(array<T>@+ array)", asMETHOD(script_memory_buffer, from_array), asCALL_THISCALL);
 	engine->RegisterObjectMethod("memory_buffer<T>", "int get_element_size() const property", asMETHOD(script_memory_buffer, get_element_size), asCALL_THISCALL);
 }
 void* string_get_address(std::string& str) {

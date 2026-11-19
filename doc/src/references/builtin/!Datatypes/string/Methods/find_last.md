@@ -1,7 +1,7 @@
 # find_last
 Find the position of a substring from within a string, searching right to left.
 
-`int string::find_last(const string &in search, uint start = -1);`
+`int string::find_last(const string&in search, uint start = -1);`
 
 ## Arguments:
 * search: The string to search for.

@@ -41,12 +41,12 @@ class database_object {
 		@__DBO_CONSTRUCTING__ = null;
 	}
 	string get_row_filter() property {
-		if (primary_column_value.length() > 0) return primary_column + "='" + primary_column_value + "'";
+		if (primary_column_value.length() > 0) return primary_column + "='" + primary_column_value.replace("'", "''") + "'";
 		int i;
 		if (!property_names.get(primary_column, i) or i >= properties.length()) return "";
 		if (!properties[i].modified and !properties[i].retrieved) return ""; // Primary column cannot be retrieved, instead it must always be provided.
 		primary_column_value = properties[i].text();
-		return primary_column + "='" + primary_column_value + "'";
+		return primary_column + "='" + primary_column_value.replace("'", "''") + "'";
 	}
 	string get_schema() property {
 		if (table == "" or properties.length() < 1) return "";
@@ -122,6 +122,7 @@ class database_object {
 			bool ret = s.step() == SQLITE_DONE;
 			if (!ret)
 				_last_query_error = "db step: " + database.get_last_error_text();
+			return ret;
 		} else { // this row must be inserted from scratch.
 			database_property@[] updating_props;
 			string statement = "INSERT INTO '" + table + "' (";

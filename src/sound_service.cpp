@@ -203,12 +203,12 @@ public:
 		return std::atomic_load(&default_protocol)->get();
 	}
 	bool is_default_protocol(size_t slot) {
-		if (slot < 0 || slot >= filters.size())
+		if (slot < 0 || slot >= protocols.size())
 			return false;
 		return protocols[slot] == std::atomic_load(&default_protocol);
 	}
 	bool set_default_filter(size_t slot) {
-		if (slot < 0 || slot > filters.size())
+		if (slot < 0 || slot >= filters.size())
 			return false;
 		std::atomic_store(&default_filter, filters[slot]);
 		return true;
@@ -325,11 +325,12 @@ private:
 	static ma_result onRead(ma_vfs *pVFS, ma_vfs_file file, void *pDst, size_t sizeInBytes, size_t *pBytesRead) {
 		if (pBytesRead) *pBytesRead = 0;
 		file_cast(file);
-		if (!stream->good()) return MA_AT_END;
+		// Only a real end of stream stops a read; a failbit left behind by a refused seek (a live stream refuses seeks it can't satisfy) must not be mistaken for one.
+		if (stream->eof()) return MA_AT_END;
+		if (!stream->good()) stream->clear();
 		stream->read((char *)pDst, sizeInBytes);
 		if (pBytesRead) *pBytesRead = stream->gcount();
-
-		return MA_SUCCESS;
+		return stream->gcount() > 0? MA_SUCCESS : MA_AT_END;
 	}
 	static ma_result onSeek(ma_vfs *pVFS, ma_vfs_file file, ma_int64 offset, ma_seek_origin origin) {
 		file_cast(file);
@@ -349,13 +350,22 @@ private:
 				return MA_ERROR;
 		}
 		stream->seekg(offset, dir);
-		return stream->good()? MA_SUCCESS : MA_NOT_IMPLEMENTED;
+		if (stream->fail()) {
+			stream->clear(); // the reads that follow still need this stream, so leave it usable
+			return MA_NOT_IMPLEMENTED;
+		}
+		return MA_SUCCESS;
 	}
 	static ma_result onTell(ma_vfs *pVFS, ma_vfs_file file, ma_int64 *pCursor) {
 		file_cast(file);
+		stream->clear(); // tellg refuses to answer on a failed stream, and the failure may not be its own
 		ma_int64 result = stream->tellg();
 		*pCursor = result != -1? result : 0;
-		return result != -1? MA_SUCCESS : MA_NOT_IMPLEMENTED;
+		if (result == -1) {
+			stream->clear();
+			return MA_NOT_IMPLEMENTED;
+		}
+		return MA_SUCCESS;
 	}
 	static ma_result onInfo(ma_vfs *pVFS, ma_vfs_file file, ma_file_info *pInfo) {
 		file_cast(file);
@@ -399,7 +409,7 @@ std::istream *encryption_filter::wrap(std::istream &source, const directive_t di
 	if (key == nullptr)
 		return &source;
 	try {
-		return new chacha_istream(source, *key);
+		return &(new chacha_istream(source, *key))->own_source(true);
 	} catch (std::exception &) {
 		// Not encrypted or not valid.
 		return nullptr;

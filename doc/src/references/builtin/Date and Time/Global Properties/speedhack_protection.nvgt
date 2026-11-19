@@ -1,0 +1,16 @@
+/**
+	Determines whether newly created timers are protected against speed hacks by default.
+	bool speedhack_protection;
+	## Remarks:
+		Speed hacking tools make a game run faster or slower by tampering with the clock that programs normally use to measure elapsed time. A timer with speed hack protection, also called a secure timer, measures time with the system's wall clock instead, which such tools usually leave alone.
+		This property is true by default. Its value is only read when a timer is created, so changing it does not affect existing timers. You can still choose protection for an individual timer by passing a value to its constructor, or later through its `secure` property.
+		The downside of a secure timer is that, because it follows the wall clock, it can jump forward or backward if the system time is changed while the timer is running. If that matters more to your game than speed hacks, set this property to false at the start of your program.
+*/
+
+// Example:
+void main() {
+	timer protected_timer;
+	speedhack_protection = false;
+	timer unprotected_timer;
+	alert("Example", "The first timer is " + (protected_timer.secure ? "protected" : "not protected") + ", and the second timer is " + (unprotected_timer.secure ? "protected" : "not protected") + ".");
+}

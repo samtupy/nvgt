@@ -42,7 +42,8 @@ class engine_event {
 protected:
 	template <typename... Args> void fire(Args&... args) {
 		clean_inactive_listeners();
-		for (engine_event_listener& l : listeners) {
+		for (size_t i = 0; i < listeners.size(); i++) {
+			engine_event_listener l = listeners[i];
 			if (l.fire(std::forward<Args>(args)...)) break;
 		}
 	}
@@ -97,14 +98,24 @@ public:
 	engine_key_event(const std::string& name) : engine_event(name, "key", "int key", asMETHOD(engine_key_event, operator())) {}
 	void operator()(int key) { fire<int>(key); }
 };
-class engine_mouse_event : public engine_event {
+class engine_mouse_button_event : public engine_event {
 public:
-	engine_mouse_event(const std::string& name) : engine_event(name, "mouse", "int button", asMETHOD(engine_mouse_event, operator())) {}
-	void operator()(int button) { fire<int>(button); }
+	engine_mouse_button_event(const std::string& name) : engine_event(name, "mouse_button", "int button, int clicks", asMETHOD(engine_mouse_button_event, operator())) {}
+	void operator()(int button, int clicks) { fire<int, int>(button, clicks); }
+};
+class engine_mouse_motion_event : public engine_event {
+public:
+	engine_mouse_motion_event(const std::string& name) : engine_event(name, "mouse_motion", "float x, float y, float relative_x, float relative_y", asMETHOD(engine_mouse_motion_event, operator())) {}
+	void operator()(float x, float y, float relative_x, float relative_y) { fire<float, float, float, float>(x, y, relative_x, relative_y); }
+};
+class engine_mouse_wheel_event : public engine_event {
+public:
+	engine_mouse_wheel_event(const std::string& name) : engine_event(name, "mouse_wheel", "float x, float y", asMETHOD(engine_mouse_wheel_event, operator())) {}
+	void operator()(float x, float y) { fire<float, float>(x, y); }
 };
 class engine_character_event : public engine_event {
 public:
-	engine_character_event(const std::string& name) : engine_event(name, "character", "string character", asMETHOD(engine_key_event, operator())) {}
+	engine_character_event(const std::string& name) : engine_event(name, "character", "string character", asMETHOD(engine_character_event, operator())) {}
 	void operator()(std::string character) { fire<std::string>(character); }
 };
 class engine_touch_event : public engine_event {
@@ -123,6 +134,10 @@ extern engine_key_event on_key_press;
 extern engine_key_event on_key_repeat;
 extern engine_key_event on_key_release;
 extern engine_character_event on_characters;
+extern engine_mouse_button_event on_mouse_button_down;
+extern engine_mouse_button_event on_mouse_button_up;
+extern engine_mouse_motion_event on_mouse_move;
+extern engine_mouse_wheel_event on_mouse_wheel;
 extern engine_touch_event on_touch_finger_down;
 extern engine_touch_event on_touch_finger_up;
 extern engine_touch_motion_event on_touch_finger_move;

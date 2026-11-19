@@ -32,7 +32,7 @@
 #include <Poco/Thread.h>
 #include <Poco/Timestamp.h>
 #include <Poco/UnbufferedStreamBuf.h>
-#include <Poco/zlib.h>
+#include <zlib.h>
 #include <Poco/Util/Application.h>
 #include <SDL3/SDL.h>
 #include "nvgt_angelscript.h"
@@ -413,6 +413,7 @@ int PreconfigureEngine(asIScriptEngine* engine) {
 	engine->SetEngineProperty(asEP_INIT_GLOBAL_VARS_AFTER_BUILD, false);
 	engine->SetEngineProperty(asEP_MEMBER_INIT_MODE, 0);
 	engine->SetEngineProperty(asEP_BOOL_CONVERSION_MODE, true);
+	engine->SetEngineProperty(asEP_ENABLE_VALUE_TYPED_COMPOUND_PROPERTY_ACCESSORS, true); // Scoped SIMD types such as vector and aabb expose x/y/z through accessors, and scripts expect v.x += 1 to work.
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->BeginConfigGroup("core");
 	RegisterStdString(engine);
@@ -526,7 +527,7 @@ int ConfigureEngine(asIScriptEngine *engine) {
 	engine->EndConfigGroup();
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_OS);
 	engine->BeginConfigGroup("core");
-	engine->RegisterGlobalFunction("void exit(int=0)", asFUNCTION(Exit), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void exit(int retcode=0)", asFUNCTION(Exit), asCALL_CDECL);
 	engine->EndConfigGroup();
 	engine->BeginConfigGroup("threading");
 	RegisterThreading(engine);
@@ -590,8 +591,6 @@ void ConfigureEngineOptions(asIScriptEngine *engine) {
 		engine->SetEngineProperty(asEP_IGNORE_DUPLICATE_SHARED_INTF, true);
 	if (config.hasOption("scripting.private_prop_as_protected"))
 		engine->SetEngineProperty(asEP_PRIVATE_PROP_AS_PROTECTED, true);
-	if (config.hasOption("scripting.always_impl_default_construct"))
-		engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_CONSTRUCT, true);
 	if (config.hasOption("scripting.expand_default_array_to_template"))
 		engine->SetEngineProperty(asEP_EXPAND_DEF_ARRAY_TO_TMPL, true);
 	if (config.hasOption("scripting.require_enum_scope"))
@@ -600,6 +599,10 @@ void ConfigureEngineOptions(asIScriptEngine *engine) {
 		engine->SetEngineProperty(asEP_OPTIMIZE_BYTECODE, false);
 	if (config.hasOption("scripting.disable_bool_conversion_mode"))
 		engine->SetEngineProperty(asEP_BOOL_CONVERSION_MODE, false);
+	if (config.hasOption("scripting.disable_script_class_gc"))
+		engine->SetEngineProperty(asEP_DISABLE_SCRIPT_CLASS_GC, true);
+	if (config.hasOption("scripting.disable_foreach"))
+		engine->SetEngineProperty(asEP_FOREACH_SUPPORT, false);
 	engine->SetEngineProperty(asEP_MAX_NESTED_CALLS, config.getInt("scripting.max_nested_calls", 10000));
 	engine->SetEngineProperty(asEP_MAX_STACK_SIZE, config.getInt("scripting.max_stack_size", 0));
 	engine->SetEngineProperty(asEP_MAX_CALL_STACK_SIZE, config.getInt("scripting.max_call_stack_size", 0));
@@ -610,6 +613,9 @@ void ConfigureEngineOptions(asIScriptEngine *engine) {
 	engine->SetEngineProperty(asEP_HEREDOC_TRIM_MODE, config.getInt("scripting.heredoc_trim_mode", 1));
 	engine->SetEngineProperty(asEP_ALTER_SYNTAX_NAMED_ARGS, config.getInt("scripting.alter_syntax_named_args", 2));
 	engine->SetEngineProperty(asEP_MEMBER_INIT_MODE, config.getInt("scripting.member_init_mode", 0));
+	engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_CONSTRUCT, config.getInt("scripting.always_impl_default_construct", 0));
+	engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_COPY, config.getInt("scripting.always_impl_default_copy", 0));
+	engine->SetEngineProperty(asEP_ALWAYS_IMPL_DEFAULT_COPY_CONSTRUCT, config.getInt("scripting.always_impl_default_copy_construct", 0));
 }
 int CompileScript(asIScriptEngine *engine, const string &scriptFile) {
 	g_pending_plugins.clear();
@@ -1126,8 +1132,8 @@ void RegisterUnsorted(asIScriptEngine *engine) {
 	engine->RegisterGlobalProperty("const int NVGT_VERSION_PATCH", (void*)&NVGT_VERSION_PATCH);
 	engine->RegisterGlobalProperty("const string NVGT_VERSION_TYPE", (void*)&NVGT_VERSION_TYPE);
 	engine->RegisterGlobalFunction("void debug_break()", asFUNCTION(asDebugBreak), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void debug_add_file_breakpoint(const string&in, int)", asFUNCTION(asDebuggerAddFileBreakpoint), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void debug_add_func_breakpoint(const string&in)", asFUNCTION(asDebuggerAddFuncBreakpoint), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void debug_add_file_breakpoint(const string&in filename, int line)", asFUNCTION(asDebuggerAddFileBreakpoint), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void debug_add_func_breakpoint(const string&in function_name)", asFUNCTION(asDebuggerAddFuncBreakpoint), asCALL_CDECL);
 	engine->RegisterGlobalProperty("const string[]@ ARGS", &g_command_line_args);
 	engine->RegisterGlobalProperty("const timestamp SCRIPT_BUILD_TIME", &g_script_build_time);
 	//engine->RegisterObjectMethod("dictionary", "bool get(const string&in key, string&out value) const", asFUNCTION(script_dictionary_get_string), asCALL_CDECL_OBJFIRST);

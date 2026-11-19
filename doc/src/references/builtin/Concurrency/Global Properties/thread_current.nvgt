@@ -1,0 +1,20 @@
+/**
+	Returns a handle to the thread object that the calling code is running on.
+	thread@ thread_current;
+	## Remarks:
+		When read from a function that was started with the `thread` class or a `thread_pool`, this returns the thread running that function, which lets the function look up details such as its name or id.
+		When read from the main thread, or from any other thread that NVGT did not start, this returns null. Always check for null before using the result.
+*/
+
+// Example:
+void worker(dictionary@ args) {
+	thread@ current = thread_current;
+	if (current !is null)
+		println("This function is running on the thread named " + current.name);
+}
+void main() {
+	alert("Example", "On the main thread, thread_current is " + (thread_current is null ? "null" : "not null"));
+	thread t("worker thread");
+	t.start(worker);
+	t.join();
+}

@@ -10,7 +10,7 @@ void main() {
 }
 
 // Function with random unused parameters to showcase the function signatures.
-bool random_func(const string& in a, int b, uint64 c, uint8 = 1) {
+bool random_func(const string&in a, int b, uint64 c, uint8 = 1) {
 	alert("The current function is", SCRIPT_CURRENT_FUNCTION);
 	return true;
 }

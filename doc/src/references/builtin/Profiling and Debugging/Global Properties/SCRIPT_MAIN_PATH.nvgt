@@ -1,0 +1,12 @@
+/**
+	Returns the path of the directory containing your main (entry) script.
+	string SCRIPT_MAIN_PATH;
+	## Remarks:
+		If you're running from source, this will return the path containing your NVGT script.
+		If you're running an executable, this will return the path containing the executable file.
+*/
+
+// Example:
+void main() {
+	alert("The entry path is", SCRIPT_MAIN_PATH);
+}

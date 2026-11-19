@@ -1,0 +1,19 @@
+/**
+	Saves the values of every stat in the set as readable text, one `name=value` line per stat.
+	string stat_set::serialize_linear();
+	## Returns:
+		string: the stats as text lines, to be loaded with `deserialize_linear()`.
+	## Remarks:
+		This format is easy to read and edit by hand, which is useful for settings files or debugging, but it is larger than `serialize()` and can't store values that contain line breaks.
+		As with `serialize()`, only names and values are saved.
+*/
+
+// Example:
+#include "stat_set.nvgt"
+
+void main() {
+	stat_set stats;
+	stats.add("difficulty", "hard");
+	stats.add("volume", -10);
+	alert("Example", stats.serialize_linear());
+}

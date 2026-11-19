@@ -1,0 +1,28 @@
+/**
+	Create a new pack file on disk and open it for writing.
+	bool pack_file::create(const string&in filename, const string&in key = "");
+	## Arguments:
+		* const string&in filename: the path of the pack file to create.
+		* const string&in key = "": an optional key used to encrypt the pack. If empty, the pack is not encrypted.
+	## Returns:
+		bool: true if the pack was created, false otherwise.
+	## Remarks:
+		If a file already exists at the given path, it is replaced. If this object already had a pack open, that pack is closed first.
+		While the pack is open for writing, add files to it with `add_file()`, `add_memory()` or `add_stream()`. The pack is not complete until `close()` is called or the object is destroyed, because that is when its table of contents is written.
+		If you pass a key here, you must pass the same key to `open()` to read the pack later.
+*/
+
+// Example:
+void main() {
+	pack_file p;
+	if (!p.create("secret.dat", "my password")) {
+		alert("Error", "Unable to create the pack.");
+		return;
+	}
+	p.add_memory("note.txt", "Nobody can read this without the key.");
+	p.close();
+	alert("Encrypted pack opens without the key", p.open("secret.dat") ? "yes" : "no");
+	alert("Encrypted pack opens with the key", p.open("secret.dat", "my password") ? "yes" : "no");
+	p.close();
+	file_delete("secret.dat");
+}

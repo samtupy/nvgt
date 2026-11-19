@@ -1,0 +1,16 @@
+/**
+	A 3x3 identity matrix, with ones along its diagonal and zeros everywhere else.
+	const matrix3x3 IDENTITY_MATRIX;
+	## Remarks:
+		Multiplying a vector or another matrix by the identity matrix leaves it unchanged, which makes this a useful starting point when building up rotations or other transformations.
+		A new matrix with the same value is returned every time this property is read, so modifying the result does not affect the property.
+*/
+
+// Example:
+void main() {
+	matrix3x3 m = IDENTITY_MATRIX;
+	vector v(1, 2, 3);
+	vector result = m * v;
+	alert("Identity matrix", m);
+	alert("Vector multiplied by the identity matrix", result.x + ", " + result.y + ", " + result.z);
+}

@@ -1,7 +1,7 @@
 # rfind
 Find the position of a substring from within a string, searching right to left.
 
-`int string::rfind(const string &in search, uint start = -1);`
+`int string::rfind(const string&in search, uint start = -1);`
 
 ## Arguments:
 * search: The string to search for.

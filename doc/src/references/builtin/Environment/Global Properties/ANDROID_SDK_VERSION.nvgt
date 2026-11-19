@@ -1,0 +1,15 @@
+/**
+	The API level of the Android version the program is running on.
+	const int ANDROID_SDK_VERSION;
+	## Remarks:
+		This is the Android API level, such as 34 for Android 14, not the user facing version number. It can be used to check whether features that need a particular Android version are available.
+		On platforms other than Android, this is -1.
+*/
+
+// Example:
+void main() {
+	if (ANDROID_SDK_VERSION < 0)
+		alert("Example", "This program is not running on Android.");
+	else
+		alert("Example", "The Android API level is " + ANDROID_SDK_VERSION);
+}

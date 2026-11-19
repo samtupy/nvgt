@@ -10,6 +10,8 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include <cstdarg>
+#include <cstdio>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -19,9 +21,7 @@
 #include <scriptany.h>
 #include <scriptarray.h>
 
-#define JPH_OBJECT_STREAM
-#define JPH_FLOATING_POINT_EXCEPTIONS_ENABLED
-#include <Jolt/Jolt.h>
+#include "jolt.h"
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Core/Factory.h>
 #include <Jolt/Core/Memory.h>
@@ -54,7 +54,6 @@
 
 #include "nvgt.h"
 #include "nvgt_angelscript.h"
-#include "jolt.h"
 #include "UI.h" // temp alert
 
 using namespace JPH;
@@ -596,10 +595,18 @@ static bool jolt_world_apply_buoyancy_impulse(jolt_physics_world* w, const BodyI
 }
 
 // -- Global Jolt initialization (called once) --
+static void jolt_trace(const char* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	vfprintf(stderr, fmt, args);
+	va_end(args);
+	fputc('\n', stderr);
+}
 static bool g_jolt_initialized = false;
 static void jolt_ensure_init() {
 	if (g_jolt_initialized) return;
 	g_jolt_initialized = true;
+	Trace = jolt_trace;
 	RegisterDefaultAllocator();
 	Factory::sInstance = new Factory();
 	RegisterTypes();

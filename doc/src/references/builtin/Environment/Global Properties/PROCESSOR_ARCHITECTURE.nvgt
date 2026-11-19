@@ -1,0 +1,17 @@
+/**
+	The processor architecture the program is running on, as a value from the `ARCHITECTURE` enum.
+	const ARCHITECTURE PROCESSOR_ARCHITECTURE;
+	## Remarks:
+		This value is decided when NVGT itself is built, so it describes the architecture the running copy of NVGT was compiled for. For example, a 64 bit Intel or AMD build reports `ARCH_AMD64`. If an x64 build is running under emulation on an ARM processor, it still reports `ARCH_AMD64`.
+		For a human readable architecture name, see the `PLATFORM_ARCHITECTURE` property.
+*/
+
+// Example:
+void main() {
+	if (PROCESSOR_ARCHITECTURE == ARCH_AMD64)
+		alert("Example", "This is a 64 bit Intel or AMD build.");
+	else if (PROCESSOR_ARCHITECTURE == ARCH_ARM64)
+		alert("Example", "This is a 64 bit ARM build.");
+	else
+		alert("Example", "The architecture code is " + PROCESSOR_ARCHITECTURE);
+}

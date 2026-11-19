@@ -1,7 +1,7 @@
 # find_last_of
 Find the first occurrence of any character in the search string, searching right to left.
 
-`int string::find_last_of(const string &in search, uint start = 0);`
+`int string::find_last_of(const string&in search, uint start = 0);`
 
 ## Arguments:
 * search: a string of characters to search for.

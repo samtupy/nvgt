@@ -1,8 +1,8 @@
 /**
 	Gets the data from a given key.
-	bool dictionary::get(const string &in key, ?&out value);
+	bool dictionary::get(const string&in key, ?&out value);
 	## Arguments:
-		* const string &in key: the key to look for.
+		* const string&in key: the key to look for.
 		* ?&out value: the variable for the value to be associated, see remarks.
 	## Returns:
 		bool: true if the dictionary retrieves the value of the key, false otherwise.

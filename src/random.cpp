@@ -91,6 +91,11 @@ void random_shuffle(CScriptArray* array) {
 	array->Resize(array->GetSize() + 1);
 	for (asUINT i = array->GetSize() - 2; i > 0; i--) {
 		int j = random(0, i);
+		if (j < 0 || j > int64_t(i)) {
+			array->Resize(array->GetSize() - 1);
+			if (asIScriptContext* active = asGetActiveContext()) active->SetException("random generator returned an index out of range");
+			return;
+		}
 		array->SetValue(array->GetSize() - 1, array->At(i));
 		array->SetValue(i, array->At(j));
 		array->SetValue(j, array->At(array->GetSize() - 1));
@@ -157,15 +162,15 @@ void RegisterScriptRandom(asIScriptEngine* engine) {
 	default_rng->release(); // init_default_random already added a ref
 	g_random_xorshift = new random_xorshift();
 	// Register legacy global functions for backwards compatibility
-	engine->RegisterGlobalFunction(_O("bool random_set_state(const string& in)"), asFUNCTION(random_set_state), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool random_set_state(const string& in state)"), asFUNCTION(random_set_state), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("string random_get_state()"), asFUNCTION(random_get_state), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint random_seed()"), asFUNCTION(random_seed), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("uint64 random_seed64()"), asFUNCTION(random_seed64), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("int random(int, int)"), WRAP_FN_PR(random, (int, int), int), asCALL_GENERIC);
-	engine->RegisterGlobalFunction(_O("int64 random64(int64, int64)"), asFUNCTION(random64), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("int random(int min, int max)"), WRAP_FN_PR(random, (int, int), int), asCALL_GENERIC);
+	engine->RegisterGlobalFunction(_O("int64 random64(int64 min, int64 max)"), asFUNCTION(random64), asCALL_CDECL);
 	engine->RegisterGlobalFunction(_O("float random_float()"), asFUNCTION(random_float), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("bool random_bool(int = 50)"), asFUNCTION(random_bool), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("string random_character(const string& in, const string& in)"), asFUNCTION(random_character), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("bool random_bool(int percent = 50)"), asFUNCTION(random_bool), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("string random_character(const string& in min, const string& in max)"), asFUNCTION(random_character), asCALL_CDECL);
 	// Register the base random_interface as both a concrete type (for C++ objects) and an interface (for script inheritance)
 	engine->RegisterObjectType(_O("random_interface"), 0, asOBJ_REF | asOBJ_NOCOUNT);
 	engine->RegisterObjectMethod(_O("random_interface"), _O("uint next()"), asMETHOD(random_interface, next), asCALL_THISCALL);
@@ -185,14 +190,14 @@ void RegisterScriptRandom(asIScriptEngine* engine) {
 	engine->RegisterInterfaceMethod(_O("random_generator"), _O("bool next_bool(int percent = 50)"));
 	engine->RegisterInterfaceMethod(_O("random_generator"), _O("string next_character(const string &in min, const string &in max)"));
 	engine->RegisterGlobalFunction(_O("random_interface@ get_default_random()"), asFUNCTION(get_default_random), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("void set_default_random(random_interface@)"), asFUNCTION(set_default_random), asCALL_CDECL);
-	engine->RegisterGlobalFunction(_O("void set_default_random(random_generator@)"), asFUNCTION(set_default_random_script), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void set_default_random(random_interface@ generator)"), asFUNCTION(set_default_random), asCALL_CDECL);
+	engine->RegisterGlobalFunction(_O("void set_default_random(random_generator@+ generator)"), asFUNCTION(set_default_random_script), asCALL_CDECL);
 	engine->RegisterObjectMethod(_O("array<T>"), _O("const T& random() const"), WRAP_OBJ_FIRST(random_choice), asCALL_GENERIC);
 	engine->RegisterObjectMethod(_O("array<T>"), _O("const T& random(random_interface@ rng) const"), WRAP_OBJ_FIRST(random_array_choice), asCALL_GENERIC);
 	engine->RegisterObjectMethod(_O("array<T>"), _O("const T& random(random_generator@ rng) const"), WRAP_OBJ_FIRST(random_script_array_choice), asCALL_GENERIC);
 	engine->RegisterObjectMethod(_O("array<T>"), _O("void shuffle()"), asFUNCTION(random_shuffle), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(_O("array<T>"), _O("void shuffle(random_interface@ rng)"), asFUNCTION(random_array_shuffle), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod(_O("array<T>"), _O("void shuffle(random_generator@ rng)"), asFUNCTION(random_script_array_shuffle), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(_O("array<T>"), _O("void shuffle(random_generator@+ rng)"), asFUNCTION(random_script_array_shuffle), asCALL_CDECL_OBJFIRST);
 	// Register new random generator classes with interface inheritance
 	// PCG generator
 	engine->RegisterObjectType(_O("random_pcg"), 0, asOBJ_REF);

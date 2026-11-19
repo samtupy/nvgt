@@ -21,7 +21,7 @@
     "angelscript",
     "angelscript-nc",
     "joltphysics",
-    "steam-audio-official",
+    "steam-audio",
     {
       "name": "openssl",
       "default-features": false
@@ -65,8 +65,13 @@
       ]
     },
     {
-      "name": "universalspeech",
-      "platform": "windows"
+      "name": "ethindp-prism",
+      "platform": "windows|osx|linux"
+    },
+    {
+      "name": "dbus",
+      "default-features": false,
+      "platform": "linux"
     },
     {
       "name": "bass",
@@ -124,5 +129,5 @@
       ]
     }
   ],
-  "builtin-baseline": "a0b1c8d3a477c1cb4813d8e127a56961707ca42b"
+  "builtin-baseline": "53a1d7a4031b2b19592d4c34a43737f4d1594758"
 }

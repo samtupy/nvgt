@@ -1,0 +1,15 @@
+/**
+	The filename of the pack that is currently open.
+	const string pack_file::pack_name;
+	## Remarks:
+		This is the path the pack was opened or created with, exactly as it was passed. For an embedded pack, it is the path of the file the pack was actually read from. It is empty if no pack has been opened yet.
+*/
+
+// Example:
+void main() {
+	pack_file p;
+	p.create("example.dat");
+	alert("Pack name", p.pack_name);
+	p.close();
+	file_delete("example.dat");
+}

@@ -1,0 +1,29 @@
+/**
+	An event that is fired whenever the mouse wheel is scrolled.
+	engine_mouse_wheel_event on_mouse_wheel;
+	## Listener signatures:
+		* bool callback(float x, float y);
+		* void callback(float x, float y);
+		* A class implementing engine_mouse_wheel_event_listener, with a `bool on_mouse_wheel(float x, float y)` or `void on_mouse_wheel(float x, float y)` method.
+	## Arguments passed to listeners:
+		* float x: how far the wheel scrolled horizontally, on mice and touchpads that support it. Positive values mean right.
+		* float y: how far the wheel scrolled vertically. Positive values usually mean the wheel was scrolled away from the user.
+	## Remarks:
+		If the operating system is set to reverse the scrolling direction, the signs are reversed as well. Some mice and touchpads scroll in fractions of a step. The vertical amount is also added to `MOUSE_ABSOLUTE_Z`.
+		See the Events topic for how listeners are added, ordered and removed, and what their return values mean.
+*/
+
+// Example:
+int volume = 50;
+void on_wheel(float x, float y) {
+	if (y == 0) return;
+	volume = clamp(volume + (y > 0 ? 5 : -5), 0, 100);
+	screen_reader_output(volume + " percent", true);
+}
+void main() {
+	show_window("Example");
+	on_mouse_wheel += on_wheel;
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Scroll the mouse wheel to change the volume, or press escape to exit.", true);
+	while (!key_pressed(KEY_ESCAPE)) wait(5);
+}

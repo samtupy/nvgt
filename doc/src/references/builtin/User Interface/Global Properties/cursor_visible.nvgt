@@ -1,0 +1,21 @@
+/**
+	Shows or hides the mouse cursor, or determines whether it is currently visible.
+	bool cursor_visible;
+	## Remarks:
+		Hiding the cursor only stops it from being drawn, the mouse still moves and generates input as normal. To keep the mouse inside your game's window, see `mouse_grab`.
+		This property only reports accurate information once your game window has been shown with `show_window()`. Before that, it reads false.
+*/
+
+// Example:
+void main() {
+	show_window("Example");
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Press space to show or hide the mouse cursor, or escape to exit.", true);
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (key_pressed(KEY_SPACE)) {
+			cursor_visible = !cursor_visible;
+			screen_reader_output(cursor_visible ? "Cursor shown" : "Cursor hidden", true);
+		}
+	}
+}

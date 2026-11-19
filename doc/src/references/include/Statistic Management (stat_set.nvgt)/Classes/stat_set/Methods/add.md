@@ -6,9 +6,9 @@ Adds a stat to the set.
 ## Arguments:
 * const string&in name: the name of the stat to add.
 * var@ value: the starting value for this stat.
-* const string&in text = "": an optional text template to be used when getting the value of this stat. In this template, use %0 anywhere you want to output the raw value of the stat itself.
-* stat_callback@ callback = null: an optional callback to call every time the value of this stat is requested. One of text or callback has to be provided in order for a stat to work correctly.
-* dictionary@ user = null: Not touched by the stat_set itself, allows the linkage of any user values to a stat to help with display.
+* const string&in text = "": an optional text template used when displaying the stat, where `%0` is replaced with the stat's value. If empty, the stat displays just its value.
+* stat_callback@ callback = null: an optional function that produces the stat's display text, for when a template isn't flexible enough. If null, `default_stat_callback` is used.
+* dictionary@ user = null: optional data to attach to the stat. The set never reads it, and it isn't saved by `serialize()`.
 
 ## Returns:
-stat@: a handle to the newly added stat object.
+stat@: a handle to the newly added stat, or null if the set already contains a stat with that name.

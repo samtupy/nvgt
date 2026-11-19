@@ -1,0 +1,17 @@
+/**
+	Returns the number of function calls currently on the call stack.
+	const int call_stack_size;
+	## Remarks:
+		When read from `main`, this is 1. Every nested function call adds one, so a function called from `main` sees 2, a function called from that one sees 3, and so on.
+		This can be used to detect runaway recursion before the script runs out of stack space.
+*/
+
+// Example:
+void main() {
+	alert("Example", "The call stack size in main is " + call_stack_size);
+	count_down(3);
+}
+void count_down(int remaining) {
+	alert("Example", "The call stack size is now " + call_stack_size);
+	if (remaining > 1) count_down(remaining - 1);
+}

@@ -1,0 +1,12 @@
+/**
+	Returns the current time as a Unix timestamp, that is the number of whole seconds that have passed since midnight UTC on January 1st, 1970.
+	const uint64 TIME_STAMP;
+	## Remarks:
+		The value comes from the system clock, so it changes if the user changes their system time. To measure how much time has passed while your program runs, use a `timer` or the `ticks()` function instead.
+		Unix timestamps are a convenient way to save a point in time to a file, for example to remember when a player last played. For more detailed date and time handling, see the `datetime` and `timestamp` classes.
+*/
+
+// Example:
+void main() {
+	alert("Example", TIME_STAMP + " seconds have passed since January 1st, 1970.");
+}

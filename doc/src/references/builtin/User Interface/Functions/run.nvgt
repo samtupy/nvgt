@@ -3,7 +3,7 @@ Allows for running exsacutable files from within your program.
 `bool run(const string&in filename, const string&in arguments, bool wait_for_completion, bool background);`
 ## Arguments:
 * const string&in filename: The exsacutable to run.
-* string&in arguments: The arguments to provide to the exsacutable.
+* const string&in arguments: The arguments to provide to the executable.
 * bool wait_for_completion: Determines if the program pauses until the run function completes before continuing.
 *bool background: Determines if a window is displayed.
 ## Returns

@@ -1,7 +1,7 @@
 /**
 	A class containing x, y and z coordinates, usually used to represent a 3d point in space.
 	1. vector();
-	2. vector(const vector& in vec);
+	2. vector(const vector&in vec);
 	3. vector(float x, float y = 0.0, float z = 0.0);
 	## Arguments (3):
 		* float x: The initial x point or coordinate this vector represents.

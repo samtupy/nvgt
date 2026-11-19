@@ -1,0 +1,14 @@
+/**
+	The master volume of the default audio engine, in decibels.
+	float sound_master_volume;
+	## Remarks:
+		This volume applies on top of the volume of every sound and mixer played through the default audio engine. 0 is full volume and -100 is silent. Values above 0 or below -100 are ignored and leave the volume unchanged.
+		Accessing this property starts the sound system if it isn't running yet, so it can be set at any time, including at the very start of your game.
+*/
+
+// Example:
+void main() {
+	sound_master_volume = -10;
+	alert("Master volume", "The master volume is now " + sound_master_volume + " dB.");
+	sound_master_volume = 0;
+}

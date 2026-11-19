@@ -1,0 +1,20 @@
+/**
+	The panner that newly positioned sounds use to place themselves between the speakers.
+	const int sound_default_3d_panner;
+	void set_sound_default_3d_panner(int panner_id);
+	## Arguments (set_sound_default_3d_panner):
+		* int panner_id: the panner to use, usually one of the values in the `audio_panner` enum.
+	## Remarks:
+		This property is read only. To change it, call `set_sound_default_3d_panner()`.
+		The default is `audio_panner_basic`, which pans sounds with simple left and right volume changes. `audio_panner_phonon_hrtf` uses Steam Audio's HRTF processing to make sounds seem to come from a direction around the listener, and works best with headphones. Calling `set_sound_global_hrtf(true)` sets this property to `audio_panner_phonon_hrtf` and also enables that panner, which is easier than changing the panner yourself.
+		The default only affects sounds that start being positioned after it changes. It is used when a sound hasn't been given a panner of its own.
+*/
+
+// Example:
+void main() {
+	alert("Default panner", sound_default_3d_panner == audio_panner_basic ? "basic" : "HRTF");
+	if (set_sound_global_hrtf(true))
+		alert("Default panner after enabling HRTF", sound_default_3d_panner == audio_panner_basic ? "basic" : "HRTF");
+	set_sound_global_hrtf(false);
+	set_sound_default_3d_panner(audio_panner_basic);
+}

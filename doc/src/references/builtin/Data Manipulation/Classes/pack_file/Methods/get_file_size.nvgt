@@ -1,0 +1,21 @@
+/**
+	Get the size of a file in the pack.
+	int64 pack_file::get_file_size(const string&in filename);
+	## Arguments:
+		* const string&in filename: the internal name of the file.
+	## Returns:
+		int64: the size of the file in bytes, or -1 if the file doesn't exist or no pack is open.
+	## Remarks:
+		This works for packs opened with either `create()` or `open()`.
+*/
+
+// Example:
+void main() {
+	pack_file p;
+	p.create("example.dat");
+	p.add_memory("data.txt", "1234567890");
+	alert("Size of data.txt", p.get_file_size("data.txt") + " bytes");
+	alert("Size of a missing file", p.get_file_size("missing.txt"));
+	p.close();
+	file_delete("example.dat");
+}

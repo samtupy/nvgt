@@ -357,6 +357,7 @@ bool pack::file_exists(const std::string& filename) {
 	return false;
 }
 int64_t pack::get_file_size(const std::string& filename) {
+	if (open_mode == OPEN_NOT) return -1;
 	const toc_entry* e = open_mode == OPEN_READ ? read->get(filename) : write->get(filename);
 	if (!e) return -1;
 	return e->size;
@@ -476,7 +477,7 @@ section_istreambuf::section_istreambuf(std::istream& source, std::streamoff star
 section_istreambuf::~section_istreambuf() {
 	delete source;
 }
-int section_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
+std::streamsize section_istreambuf::readFromDevice(char* buffer, std::streamsize length) {
 	std::streampos pos = source->tellg();
 	if (pos < start || pos >= start + size)
 		return -1;
@@ -582,7 +583,7 @@ void RegisterScriptPack(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("pack_file", "bool open(const string &in filename, const string &in key = \"\", uint64 pack_offset = 0, uint64 pack_size = 0)", asMETHOD(pack, open), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "bool close()", asMETHOD(pack, close), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "bool add_file(const string &in filename, const string &in internal_name)", asMETHOD(pack, add_file), asCALL_THISCALL);
-	engine->RegisterObjectMethod("pack_file", "bool add_stream(const string &in internal_name, datastream@ ds)", asMETHOD(pack, add_stream), asCALL_THISCALL);
+	engine->RegisterObjectMethod("pack_file", "bool add_stream(const string &in internal_name, datastream@+ ds)", asMETHOD(pack, add_stream), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "bool add_memory(const string &in internal_name, const string&in data)", asMETHOD(pack, add_memory), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "bool file_exists(const string &in filename)", asMETHOD(pack, file_exists), asCALL_THISCALL);
 	engine->RegisterObjectMethod("pack_file", "int64 get_file_size(const string &in filename)", asMETHOD(pack, get_file_size), asCALL_THISCALL);

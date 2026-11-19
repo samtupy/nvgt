@@ -71,7 +71,12 @@ public:
 	native_window_t get_native_window() const { return _native_window; }
 	graphics_renderer* get_renderer() { return _renderer.get(); }
 	text_font* get_font() { return _font.get(); }
-	bool show() { return SDL_ShowWindow(_window); }
+	bool show() {
+		bool was_hidden = (SDL_GetWindowFlags(_window) & SDL_WINDOW_HIDDEN) != 0;
+		bool ok = SDL_ShowWindow(_window);
+		if (ok && was_hidden && _renderer) _renderer->require_initial_frame();
+		return ok;
+	}
 	bool hide() { return SDL_HideWindow(_window); }
 	bool raise() { return SDL_RaiseWindow(_window); }
 	bool maximize() { return SDL_MaximizeWindow(_window); }
@@ -96,6 +101,8 @@ public:
 	bool get_keyboard_grab() const { return SDL_GetWindowKeyboardGrab(_window); }
 	bool set_mouse_grab(bool grabbed) { return SDL_SetWindowMouseGrab(_window, grabbed); }
 	bool get_mouse_grab() const { return SDL_GetWindowMouseGrab(_window); }
+	bool set_mouse_relative_mode(bool enabled) { return SDL_SetWindowRelativeMouseMode(_window, enabled); }
+	bool get_mouse_relative_mode() const { return SDL_GetWindowRelativeMouseMode(_window); }
 	bool set_opacity(float opacity) { return SDL_SetWindowOpacity(_window, opacity); }
 	float get_opacity() const { return SDL_GetWindowOpacity(_window); }
 	bool flash(unsigned int operation) { return SDL_FlashWindow(_window, (SDL_FlashOperation)operation); }

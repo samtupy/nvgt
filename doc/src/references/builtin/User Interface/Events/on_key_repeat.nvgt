@@ -1,0 +1,32 @@
+/**
+	An event that is fired each time the operating system repeats a key that is being held down.
+	engine_key_event on_key_repeat;
+	## Listener signatures:
+		* bool callback(int key);
+		* void callback(int key);
+		* A class implementing engine_key_event_listener, with a `bool on_key_repeat(int key)` or `void on_key_repeat(int key)` method.
+	## Arguments passed to listeners:
+		* int key: the code of the key being repeated, one of the values in the `key_code` enum.
+	## Remarks:
+		The first press of a key fires `on_key_press`, not this event. The delay before repeating starts, and the speed of the repeats, come from the user's keyboard settings.
+		See the Events topic for how listeners are added, ordered and removed, and what their return values mean.
+*/
+
+// Example:
+int repeats = 0;
+void on_repeat(int key) {
+	if (key == KEY_SPACE) repeats++;
+}
+void main() {
+	show_window("Example");
+	on_key_repeat += on_repeat;
+	wait(50); // Give screen readers time to speak the window title.
+	screen_reader_output("Hold space, then release it to hear how many times it repeated. Press escape to exit.", true);
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		if (key_released(KEY_SPACE)) {
+			screen_reader_output(repeats + " repeats", true);
+			repeats = 0;
+		}
+	}
+}

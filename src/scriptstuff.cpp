@@ -23,6 +23,7 @@
 #include <Poco/Util/Application.h>
 #include <Poco/Exception.h>
 #include <Poco/Format.h>
+#include <Poco/Path.h>
 #include <Poco/Thread.h>
 #include <scriptany.h>
 #include <scriptarray.h>
@@ -169,8 +170,7 @@ std::string generate_profile(bool reset = true) {
 	int size = results.size();
 	char tmp[128];
 	unsigned int total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - profiler_start).count();
-	int r = snprintf(tmp, 128, "total functions called: %d\r\ntotal execution time: %ums\r\n\r\n", size, total_ms);
-	tmp[r] = 0;
+	snprintf(tmp, 128, "total functions called: %d\r\ntotal execution time: %ums\r\n\r\n", size, total_ms);
 	std::string output(tmp);
 	for (int i = 0; i < size; i++) {
 		char text[4096];
@@ -178,8 +178,7 @@ std::string generate_profile(bool reset = true) {
 		const char* decl = results[i]->GetDeclaration(true, true, true);
 		float ms = std::chrono::duration_cast<std::chrono::milliseconds>(profiler_cache[results[i]] - profiler_start).count();
 		float p = (ms / total_ms) * 100.0;
-		int r = snprintf(text, 4096, "%s: %.0fms (%.3f%%)\r\n", decl, ms, p);
-		text[r] = 0;
+		snprintf(text, 4096, "%s: %.0fms (%.3f%%)\r\n", decl, ms, p);
 		output += text;
 	}
 	if (reset) reset_profiler();
@@ -243,20 +242,27 @@ std::string get_script_executable() {
 	return Poco::Util::Application::instance().config().getString("application.path");
 }
 std::string get_script_path() {
-	return g_scriptpath;
+	if (!script_compiled()) return g_scriptpath;
+	return Poco::Path(get_script_executable()).makeAbsolute().makeParent().toString();
 }
 std::string get_function_signature(void* function, int type_id) {
 	asIScriptContext* ctx = asGetActiveContext();
 	if (!ctx) return "";
 	asIScriptEngine* engine = ctx ? ctx->GetEngine() : g_ScriptEngine;
 	asITypeInfo* t = engine->GetTypeInfoById(type_id);
-	asIScriptFunction* sig = t->GetFuncdefSignature();
+	asIScriptFunction* sig = t? t->GetFuncdefSignature() : nullptr;
 	if (!sig) {
 		ctx->SetException("not a function");
 		return "";
 	}
-	if (type_id & asTYPEID_OBJHANDLE)
-		return (*(asIScriptFunction**)function)->GetDeclaration();
+	if (type_id & asTYPEID_OBJHANDLE) {
+		asIScriptFunction* handle = *(asIScriptFunction**)function;
+		if (!handle) {
+			ctx->SetException("null function handle");
+			return "";
+		}
+		return handle->GetDeclaration();
+	}
 	else
 		return sig->GetDeclaration();
 }
@@ -334,9 +340,18 @@ CScriptDictionary* script_function_call(asIScriptFunction* func, CScriptDictiona
 			goto failure;
 		}
 		if ((arg_type_id & asTYPEID_MASK_OBJECT)) {
+			int value_type_id = k.GetTypeId();
 			const void* o = k.GetAddressOfValue();
-			if (arg_type_id & asTYPEID_OBJHANDLE) ctx->SetArgObject(arg_index - 1, *(void**)o);
-			else ctx->SetArgObject(arg_index - 1, (void*)o);
+			void* obj = (value_type_id & asTYPEID_OBJHANDLE)? *(void**)o : (void*)o;
+			asITypeInfo* value_type = g_ScriptEngine->GetTypeInfoById(value_type_id);
+			asITypeInfo* arg_type = g_ScriptEngine->GetTypeInfoById(arg_type_id);
+			bool compatible = value_type && arg_type && (value_type == arg_type || value_type->DerivesFrom(arg_type) || value_type->Implements(arg_type));
+			if (!compatible || (!obj && !(arg_type_id & asTYPEID_OBJHANDLE))) {
+				failure_reason = "ERROR: Type mismatch for parameter ";
+				failure_reason += std::to_string(arg_index);
+				goto failure;
+			}
+			ctx->SetArgObject(arg_index - 1, obj);
 		} else if (!k.GetValue(arg_value, arg_type_id)) {
 			if (arg_type_id == asTYPEID_INT32) {
 				asINT64 val;
@@ -366,12 +381,12 @@ CScriptDictionary* script_function_call(asIScriptFunction* func, CScriptDictiona
 	if (xr != asEXECUTION_FINISHED) {
 		if (xr == asEXECUTION_EXCEPTION) {
 			char msg[4096];
-			const char* section;
+			const char* section = nullptr;
 			int col;
 			const char* decl = ctx->GetExceptionFunction()->GetDeclaration();
 			const char* exc = ctx->GetExceptionString();
 			int line = ctx->GetExceptionLineNumber(&col, &section);
-			snprintf(msg, 4096, "Exception: %s in %s %s at line %d, %d", exc, section, decl, line, col);
+			snprintf(msg, 4096, "Exception: %s in %s %s at line %d, %d", exc, section ? section : "(unknown)", decl, line, col);
 			failure_reason = msg;
 		} else if (xr == asEXECUTION_SUSPENDED) {
 			char msg[128];
@@ -422,8 +437,19 @@ failure:
 		errors->Release();
 	return NULL;
 }
+static bool function_matches_signature(asIScriptFunction* func, asIScriptFunction* sig) {
+	asDWORD func_flags, sig_flags;
+	if (func->GetObjectType() || func->GetReturnTypeId(&func_flags) != sig->GetReturnTypeId(&sig_flags) || func_flags != sig_flags || func->GetParamCount() != sig->GetParamCount()) return false;
+	for (asUINT i = 0; i < func->GetParamCount(); i++) {
+		int func_type, sig_type;
+		if (func->GetParam(i, &func_type, &func_flags) < 0 || sig->GetParam(i, &sig_type, &sig_flags) < 0 || func_type != sig_type || func_flags != sig_flags) return false;
+	}
+	return true;
+}
 bool script_function_retrieve(asIScriptFunction* func, asIScriptFunction** out_func, int type_id) {
-	if (type_id & asTYPEID_OBJHANDLE) {
+	asITypeInfo* ti = g_ScriptEngine->GetTypeInfoById(type_id);
+	asIScriptFunction* sig = ti? ti->GetFuncdefSignature() : nullptr;
+	if ((type_id & asTYPEID_OBJHANDLE) && sig && function_matches_signature(func, sig)) {
 		*out_func = func;
 		func->AddRef();
 		return true;
@@ -451,14 +477,13 @@ std::string script_function_get_namespace(asIScriptFunction* func) {
 }
 std::string script_function_get_declared_at(asIScriptFunction* func, int* row, int* col) {
 	const char* script = nullptr;
-	if (!func || func->GetDeclaredAt(&script, row, col) < 0) return "";
+	if (!func || func->GetDeclaredAt(&script, row, col) < 0 || !script) return "";
 	return std::string(script);
 }
 std::string script_function_get_script_property(asIScriptFunction* func) {
 	const char* script = nullptr;
 	int row, col;
-	if (!func || func->GetDeclaredAt(&script, &row, &col) < 0) return "";
-	if (!func || func->GetDeclaredAt(&script, &row, &col) < 0) return "";
+	if (!func || func->GetDeclaredAt(&script, &row, &col) < 0 || !script) return "";
 	return std::string(script);
 }
 void script_function_line_callback(asIScriptContext* ctx, script_function_call_data* data) {
@@ -495,13 +520,14 @@ public:
 	}
 };
 class script_module {
-	asIScriptModule* mod;
+	std::string mod_name;
+	asIScriptModule* get_mod() { return g_ScriptEngine->GetModule(mod_name.c_str(), asGM_ONLY_IF_EXISTS); }
 	int RefCount;
 	bool exists;
 public:
 	unsigned int max_statement_count;
 	script_module(asIScriptModule* module, bool e) {
-		mod = module;
+		mod_name = module->GetName();
 		exists = e;
 		RefCount = 1;
 		max_statement_count = 0;
@@ -514,40 +540,42 @@ public:
 			delete this;
 	}
 	int add_section(const std::string& name, const std::string& code, int line_offset = 0) {
-		if (mod == NULL)
+		if (!get_mod())
 			return asNO_MODULE;
-		return mod->AddScriptSection(name.c_str(), code.c_str(), code.size(), line_offset);
+		return get_mod()->AddScriptSection(name.c_str(), code.c_str(), code.size(), line_offset);
 	}
 	int build(CScriptArray* errors) {
-		if (mod == NULL)
+		if (!get_mod())
 			return asNO_MODULE;
 		g_ScriptEngine->SetMessageCallback(asFUNCTION(script_message_callback), errors, asCALL_CDECL);
-		int result = mod->Build();
+		int result = get_mod()->Build();
 		g_ScriptEngine->ClearMessageCallback();
 		if (errors)
 			errors->Release();
 		return result;
 	}
 	std::string get_bytecode(bool release) {
-		if (mod == NULL) return "";
+		if (!get_mod()) return "";
 		script_module_bytecode_stream b;
-		if (mod->SaveByteCode(&b, release) < 0) return "";
+		if (get_mod()->SaveByteCode(&b, release) < 0) return "";
 		return b.get();
 	}
 	int set_bytecode(const std::string& code, bool* release = NULL, CScriptArray* errors = NULL) {
-		if (mod == NULL) {
+		if (!get_mod()) {
 			if (errors)
 				errors->Release();
 			return asNO_MODULE;
 		}
 		g_ScriptEngine->SetMessageCallback(asFUNCTION(script_message_callback), errors, asCALL_CDECL);
 		script_module_bytecode_stream b(code);
-		int ret = mod->LoadByteCode(&b, release);
+		int ret = get_mod()->LoadByteCode(&b, release);
 		g_ScriptEngine->ClearMessageCallback();
+		if (errors)
+			errors->Release();
 		return ret;
 	}
 	int reset_globals(CScriptArray* errors) {
-		if (mod == NULL) {
+		if (!get_mod()) {
 			if (errors)
 				errors->Release();
 			return asNO_MODULE;
@@ -563,7 +591,7 @@ public:
 				errors->Release();
 			return asERROR;
 		}
-		int result = mod->ResetGlobalVars(ctx);
+		int result = get_mod()->ResetGlobalVars(ctx);
 		g_ScriptEngine->ClearMessageCallback();
 		if (ctx) {
 			ctx->Unprepare();
@@ -574,25 +602,25 @@ public:
 		return result;
 	}
 	int bind_all_imported_functions() {
-		if (!mod)
+		if (!get_mod())
 			return asNO_MODULE;
-		return mod->BindAllImportedFunctions();
+		return get_mod()->BindAllImportedFunctions();
 	}
 	int bind_imported_function(asUINT index, asIScriptFunction* func) {
-		if (!mod)
+		if (!get_mod())
 			return asNO_MODULE;
 		if (!func)
 			return asNO_FUNCTION;
-		return mod->BindImportedFunction(index, func);
+		return get_mod()->BindImportedFunction(index, func);
 	}
 	asIScriptFunction* compile_function(const std::string& section_name, const std::string& code, CScriptArray* errors, bool add_to_module = false, asDWORD line_offset = 0) {
-		if (mod == NULL) {
+		if (!get_mod()) {
 			if (errors) errors->Release();
 			return NULL;
 		}
 		g_ScriptEngine->SetMessageCallback(asFUNCTION(script_message_callback), errors, asCALL_CDECL);
 		asIScriptFunction* out_ptr;
-		int result = mod->CompileFunction(section_name.c_str(), code.c_str(), line_offset, (add_to_module ? asCOMP_ADD_TO_MODULE : 0), &out_ptr);
+		int result = get_mod()->CompileFunction(section_name.c_str(), code.c_str(), line_offset, (add_to_module ? asCOMP_ADD_TO_MODULE : 0), &out_ptr);
 		g_ScriptEngine->ClearMessageCallback();
 		if (result < 0) {
 			if (errors) errors->Release();
@@ -602,113 +630,114 @@ public:
 		return out_ptr;
 	}
 	int compile_global(const std::string& section_name, const std::string& code, CScriptArray* errors, asDWORD line_offset = 0) {
-		if (mod == NULL) {
+		if (!get_mod()) {
 			if (errors) errors->Release();
 			return asNO_MODULE;
 		}
 		g_ScriptEngine->SetMessageCallback(asFUNCTION(script_message_callback), errors, asCALL_CDECL);
-		int result = mod->CompileGlobalVar(section_name.c_str(), code.c_str(), line_offset);
+		int result = get_mod()->CompileGlobalVar(section_name.c_str(), code.c_str(), line_offset);
 		g_ScriptEngine->ClearMessageCallback();
 		if (errors) errors->Release();
 		return result;
 	}
 	void discard() {
-		if (!mod) return;
-		mod->Discard();
+		if (!get_mod()) return;
+		get_mod()->Discard();
 	}
 	asDWORD get_function_count() {
-		if (!mod) return 0;
-		return mod->GetFunctionCount();
+		if (!get_mod()) return 0;
+		return get_mod()->GetFunctionCount();
 	}
 	asDWORD get_global_count() {
-		if (!mod) return 0;
-		return mod->GetGlobalVarCount();
+		if (!get_mod()) return 0;
+		return get_mod()->GetGlobalVarCount();
 	}
 	asDWORD get_imported_function_count() {
-		if (!mod) return 0;
-		return mod->GetImportedFunctionCount();
+		if (!get_mod()) return 0;
+		return get_mod()->GetImportedFunctionCount();
 	}
 	asDWORD set_access_mask(asDWORD mask) {
-		if (!mod) return 0;
-		return mod->SetAccessMask(mask);
+		if (!get_mod()) return 0;
+		return get_mod()->SetAccessMask(mask);
 	}
 	asIScriptFunction* get_function_by_index(int index) {
-		if (!mod) return NULL;
-		return mod->GetFunctionByIndex(index);
+		if (!get_mod()) return NULL;
+		return get_mod()->GetFunctionByIndex(index);
 	}
 	asIScriptFunction* get_function_by_name(const std::string& name) {
-		if (!mod) return NULL;
-		return mod->GetFunctionByName(name.c_str());
+		if (!get_mod()) return NULL;
+		return get_mod()->GetFunctionByName(name.c_str());
 	}
 	asIScriptFunction* get_function_by_decl(const std::string& name) {
-		if (!mod) return NULL;
-		return mod->GetFunctionByDecl(name.c_str());
+		if (!get_mod()) return NULL;
+		return get_mod()->GetFunctionByDecl(name.c_str());
 	}
 	const std::string get_imported_function_decl(asDWORD index) {
-		if (!mod)
+		if (!get_mod())
 			return "";
-		const char* result = mod->GetImportedFunctionDeclaration(index);
+		const char* result = get_mod()->GetImportedFunctionDeclaration(index);
 		if (!result) return "";
 		return std::string(result);
 	}
 	int get_imported_function_index(const std::string& decl) {
-		if (!mod)
+		if (!get_mod())
 			return asNO_MODULE;
-		return mod->GetImportedFunctionIndexByDecl(decl.c_str());
+		return get_mod()->GetImportedFunctionIndexByDecl(decl.c_str());
 	}
 	const std::string get_imported_function_module(asDWORD index) {
-		if (!mod)
+		if (!get_mod())
 			return "";
-		const char* result = mod->GetImportedFunctionSourceModule(index);
+		const char* result = get_mod()->GetImportedFunctionSourceModule(index);
 		if (!result) return "";
 		return std::string(result);
 	}
 	CScriptAny* get_global(asDWORD index) {
-		if (!mod)
+		if (!get_mod())
 			return NULL;
 		const char* name;
 		int type_id;
-		if (mod->GetGlobalVar(index, &name, NULL, &type_id) < 0)
+		if (get_mod()->GetGlobalVar(index, &name, NULL, &type_id) < 0)
 			return NULL;
-		void* ref = mod->GetAddressOfGlobalVar(index);
+		void* ref = get_mod()->GetAddressOfGlobalVar(index);
 		if (!ref) return NULL;
 		return new CScriptAny(ref, type_id, g_ScriptEngine);
 	}
 	const std::string get_global_decl(asDWORD index) {
-		if (!mod)
+		if (!get_mod())
 			return "";
-		const char* result = mod->GetGlobalVarDeclaration(index);
+		const char* result = get_mod()->GetGlobalVarDeclaration(index);
 		if (!result) return "";
 		return std::string(result);
 	}
 	int get_global_index_by_decl(const std::string& decl) {
-		if (!mod)
+		if (!get_mod())
 			return asNO_MODULE;
-		return mod->GetGlobalVarIndexByDecl(decl.c_str());
+		return get_mod()->GetGlobalVarIndexByDecl(decl.c_str());
 	}
 	int get_global_index_by_name(const std::string& decl) {
-		if (!mod)
+		if (!get_mod())
 			return asNO_MODULE;
-		return mod->GetGlobalVarIndexByName(decl.c_str());
+		return get_mod()->GetGlobalVarIndexByName(decl.c_str());
 	}
 	const std::string get_global_name(asDWORD index) {
-		if (!mod)
+		if (!get_mod())
 			return "";
 		const char* result;
-		if (mod->GetGlobalVar(index, &result) < 0) return "";
+		if (get_mod()->GetGlobalVar(index, &result) < 0) return "";
 		if (!result) return "";
 		return std::string(result);
 	}
 	const std::string get_name() {
-		if (!mod)
+		if (!get_mod())
 			return "";
-		const char* result = mod->GetName();
+		const char* result = get_mod()->GetName();
 		if (!result) return "";
 		return std::string(result);
 	}
 	void set_name(const std::string& name) {
-		if (!mod) return;
-		mod->SetName(name.c_str());
+		if (!get_mod()) return;
+		get_mod()->SetName(name.c_str());
+		mod_name = name;
 	}
 };
 script_module* script_get_module(const std::string& name, int mode) {
@@ -745,47 +774,47 @@ void RegisterScripting(asIScriptEngine* engine) {
 	engine->RegisterObjectBehaviour(_O("script_module"), asBEHAVE_ADDREF, _O("void f()"), asMETHOD(script_module, AddRef), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour(_O("script_module"), asBEHAVE_RELEASE, _O("void f()"), asMETHOD(script_module, Release), asCALL_THISCALL);
 	engine->RegisterObjectProperty(_O("script_module"), _O("uint max_statement_count"), asOFFSET(script_module, max_statement_count));
-	engine->RegisterObjectMethod(_O("script_module"), _O("int add_section(const string&in, const string&in, uint=0)"), asMETHOD(script_module, add_section), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("int build(string[]@=null)"), asMETHOD(script_module, build), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("string get_bytecode(bool)"), asMETHOD(script_module, get_bytecode), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("int set_bytecode(const string&in, bool&out, string[]@=null)"), asMETHOD(script_module, set_bytecode), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("int reset_globals(string[]@=null)"), asMETHOD(script_module, reset_globals), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("int add_section(const string&in name, const string&in code, uint line_offset=0)"), asMETHOD(script_module, add_section), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("int build(string[]@ errors=null)"), asMETHOD(script_module, build), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("string get_bytecode(bool strip_debug_info)"), asMETHOD(script_module, get_bytecode), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("int set_bytecode(const string&in code, bool&out debug_info_was_stripped, string[]@ errors=null)"), asMETHOD(script_module, set_bytecode), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("int reset_globals(string[]@ errors=null)"), asMETHOD(script_module, reset_globals), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("int bind_all_imported_functions()"), asMETHOD(script_module, bind_all_imported_functions), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("int bind_imported_function(uint, script_function@)"), asMETHOD(script_module, bind_imported_function), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("int compile_global(const string&in, const string&in, uint=0)"), asMETHOD(script_module, compile_global), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@ compile_function(const string&in, const string&in, string[]@=null, bool=false, uint=0)"), asMETHOD(script_module, compile_function), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("int bind_imported_function(uint index, script_function@+ func)"), asMETHOD(script_module, bind_imported_function), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("int compile_global(const string&in section_name, const string&in code, uint line_offset=0)"), asMETHOD(script_module, compile_global), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@ compile_function(const string&in section_name, const string&in code, string[]@ errors=null, bool add_to_module=false, uint line_offset=0)"), asMETHOD(script_module, compile_function), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("void discard()"), asMETHOD(script_module, discard), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@+ get_function_by_decl(const string&in)"), asMETHOD(script_module, get_function_by_decl), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@+ get_function_by_index(uint)"), asMETHOD(script_module, get_function_by_index), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@+ get_function_by_name(const string&in)"), asMETHOD(script_module, get_function_by_name), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("any@ get_global(uint)"), asMETHOD(script_module, get_global), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("const string get_global_decl(uint)"), asMETHOD(script_module, get_global_decl), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("int get_global_index_by_decl(const string&in)"), asMETHOD(script_module, get_global_index_by_decl), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("int get_global_index_by_name(const string&in)"), asMETHOD(script_module, get_global_index_by_name), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("const string get_global_name(uint)"), asMETHOD(script_module, get_global_name), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@+ get_function_by_decl(const string&in decl)"), asMETHOD(script_module, get_function_by_decl), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@+ get_function_by_index(uint index)"), asMETHOD(script_module, get_function_by_index), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@+ get_function_by_name(const string&in name)"), asMETHOD(script_module, get_function_by_name), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("any@ get_global(uint index)"), asMETHOD(script_module, get_global), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("const string get_global_decl(uint index)"), asMETHOD(script_module, get_global_decl), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("int get_global_index_by_decl(const string&in decl)"), asMETHOD(script_module, get_global_index_by_decl), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("int get_global_index_by_name(const string&in name)"), asMETHOD(script_module, get_global_index_by_name), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("const string get_global_name(uint index)"), asMETHOD(script_module, get_global_name), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("uint get_function_count()"), asMETHOD(script_module, get_function_count), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("uint get_global_count()"), asMETHOD(script_module, get_global_count), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("uint get_imported_function_count()"), asMETHOD(script_module, get_imported_function_count), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("uint set_access_mask(uint)"), asMETHOD(script_module, set_access_mask), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("const string get_imported_function_decl(uint)"), asMETHOD(script_module, get_imported_function_decl), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("int get_imported_function_index(const string&in)"), asMETHOD(script_module, get_imported_function_index), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("const string get_imported_function_module(uint)"), asMETHOD(script_module, get_imported_function_module), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("uint set_access_mask(uint mask)"), asMETHOD(script_module, set_access_mask), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("const string get_imported_function_decl(uint index)"), asMETHOD(script_module, get_imported_function_decl), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("int get_imported_function_index(const string&in decl)"), asMETHOD(script_module, get_imported_function_index), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("const string get_imported_function_module(uint index)"), asMETHOD(script_module, get_imported_function_module), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("string get_name() property"), asMETHOD(script_module, get_name), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("void set_name(const string&in) property"), asMETHOD(script_module, set_name), asCALL_THISCALL);
-	engine->RegisterGlobalFunction(_O("script_module@ script_get_module(const string&in, int=1)"), asFUNCTION(script_get_module), asCALL_CDECL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("void set_name(const string&in name) property"), asMETHOD(script_module, set_name), asCALL_THISCALL);
+	engine->RegisterGlobalFunction(_O("script_module@ script_get_module(const string&in name, int mode=1)"), asFUNCTION(script_get_module), asCALL_CDECL);
 }
 void RegisterScriptstuff(asIScriptEngine* engine) {
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	engine->RegisterGlobalProperty("const bool profiler_is_running", &is_profiling);
 	engine->RegisterGlobalFunction("int get_garbage_collect_mode() property", asFUNCTION(get_garbage_collect_mode), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void set_garbage_collect_mode(int) property", asFUNCTION(set_garbage_collect_mode), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_garbage_collect_mode(int mode) property", asFUNCTION(set_garbage_collect_mode), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_garbage_collect_auto_frequency() property", asFUNCTION(get_garbage_collect_auto_frequency), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void set_garbage_collect_auto_frequency(int) property", asFUNCTION(set_garbage_collect_auto_frequency), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void garbage_collect(bool = true)", asFUNCTION(garbage_collect), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void set_garbage_collect_auto_frequency(int frequency) property", asFUNCTION(set_garbage_collect_auto_frequency), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void garbage_collect(bool full = true)", asFUNCTION(garbage_collect), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void start_profiling()", asFUNCTION(start_profiling), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void stop_profiling()", asFUNCTION(stop_profiling), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void reset_profiler()", asFUNCTION(reset_profiler), asCALL_CDECL);
-	engine->RegisterGlobalFunction("string generate_profile(bool = true)", asFUNCTION(generate_profile), asCALL_CDECL);
+	engine->RegisterGlobalFunction("string generate_profile(bool reset = true)", asFUNCTION(generate_profile), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_GENERAL);
 	engine->RegisterGlobalFunction("string get_call_stack() property", asFUNCTION(get_call_stack), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_call_stack_size() property", asFUNCTION(get_call_stack_size), asCALL_CDECL);
@@ -793,7 +822,7 @@ void RegisterScriptstuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("string get_SCRIPT_CURRENT_FILE() property", asFUNCTION(get_script_current_file), asCALL_CDECL);
 	engine->RegisterGlobalFunction("int get_SCRIPT_CURRENT_LINE() property", asFUNCTION(get_script_current_line), asCALL_CDECL);
 	engine->RegisterGlobalFunction("string get_SCRIPT_MAIN_PATH() property", asFUNCTION(get_script_path), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void assert(bool, const string&in = \"\")", asFUNCTION(script_assert), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void assert(bool expression, const string&in fail_text = \"\")", asFUNCTION(script_assert), asCALL_CDECL);
 	engine->SetDefaultAccessMask(NVGT_SUBSYSTEM_UNCLASSIFIED);
 	engine->RegisterGlobalFunction("string get_SCRIPT_EXECUTABLE() property", asFUNCTION(get_script_executable), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool get_SCRIPT_COMPILED() property", asFUNCTION(script_compiled), asCALL_CDECL);
@@ -802,6 +831,6 @@ void RegisterScriptstuff(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("void release_exclusive_lock()", asFUNCTION(asReleaseExclusiveLock), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void acquire_shared_lock()", asFUNCTION(asAcquireSharedLock), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void release_shared_lock()", asFUNCTION(asReleaseSharedLock), asCALL_CDECL);
-	engine->RegisterGlobalFunction("void script_dump_engine_configuration(datastream@+)", asFUNCTION(dump_angelscript_engine_configuration), asCALL_CDECL);
+	engine->RegisterGlobalFunction("void script_dump_engine_configuration(datastream@+ output)", asFUNCTION(dump_angelscript_engine_configuration), asCALL_CDECL);
 	RegisterScripting(engine);
 }
