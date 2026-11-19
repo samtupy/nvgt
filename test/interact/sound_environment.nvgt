@@ -1,11 +1,13 @@
 // Walk around a small physics world with Steam Audio occlusion, transmission and reflections.
 // A concrete hall with a brick north wall, a wooden table and a metal cabinet opens through a doorway onto a carpeted lounge with drywall, a cardboard partition, a fabric couch and a glass display case. A sonar pings in the lounge.
+// This shows the recommended shape: each object (here the player and the sonar) gets one mixer from the environment, positioned with the object, and every sound the object makes plays through its mixer, so the object is simulated once rather than every sound being a new source.
 // Up and down arrows walk, left and right turn by 45 degrees. C speaks your position, S speaks simulation details for the sonar, R toggles reflections, O toggles occlusion of the sonar, M toggles the reflection mixer, T cycles the reflection type, H toggles HRTF, escape exits.
 #pragma console
 
 physics_world world;
 sound_environment env;
 physics_character@ player;
+mixer@ player_mixer;
 sound@ sonar;
 sound@[] playing;
 physics_body_id[] wall_bodies;
@@ -45,13 +47,13 @@ void build_map() {
 	add_box(13.5, 14.5, 8, 9, 0, 1.5, "glass"); // Display case.
 	world.optimize_broadphase();
 }
-sound@ play(const string&in name, const vector&in position, bool looped = false) {
-	sound@ s = env.new_sound();
+sound@ play(const string&in name, mixer@ object, bool looped = false) { // Plays a sound through an object's mixer, which positions it.
+	sound@ s = sound();
 	if (!s.load("../data/audio/" + name + ".ogg")) {
 		screen_reader_speak("failed to load " + name);
 		return null;
 	}
-	s.set_position_3d(position);
+	s.set_mixer(object);
 	if (looped) s.play_looped();
 	else {
 		s.play();
@@ -79,7 +81,10 @@ void main() {
 	build_map();
 	env.set_raycaster(world);
 	@player = physics_character(world, 1.8, 0.3, vector(3, 3, 0.1));
-	@sonar = play("sonar", vector(19, 3, 1.2), true);
+	@player_mixer = env.new_mixer();
+	mixer@ sonar_mixer = env.new_mixer();
+	sonar_mixer.set_position_3d(19, 3, 1.2);
+	@sonar = play("sonar", sonar_mixer, true);
 	screen_reader_speak("Sound environment test. You are in a concrete hall facing north. Arrows to move and turn.");
 	timer frame_time, step_time, bump_time;
 	float physics_accumulator = 0;
@@ -102,19 +107,19 @@ void main() {
 		vector pos = player.position;
 		vector head(pos.x, pos.y, pos.z + eye_height);
 		sound_default_engine.set_listener_position(0, head);
+		player_mixer.set_position_3d(pos.x, pos.y, pos.z + 0.9); // The middle of the player, sounds such as footsteps and bumps all come from about here.
 		sound_default_engine.set_listener_direction(0, facing_vector());
 		if (speed != 0 and player.supported) {
 			if (!walking or step_time.elapsed >= step_interval * 1000) {
 				physics_material@ ground = player.ground_material;
 				string surface = ground !is null and ground.name == "carpet" ? "carpet" : "concrete";
-				play(surface + "_step" + random(1, 5), vector(pos.x, pos.y, pos.z + 0.05));
+				play(surface + "_step" + random(1, 5), player_mixer);
 				step_time.restart();
 			}
 			walking = true;
 			string wall = speed > 0 ? material_ahead() : "";
 			if (wall != "" and bump_time.elapsed > 600) {
-				vector ahead = facing_vector() * 0.5;
-				play(wall == "cardboard" ? "wall_cardboard" : "wall_brick", vector(pos.x + ahead.x, pos.y + ahead.y, pos.z + 1));
+				play(wall == "cardboard" ? "wall_cardboard" : "wall_brick", player_mixer);
 				bump_time.restart();
 			}
 		} else walking = false;
@@ -125,11 +130,11 @@ void main() {
 			screen_reader_speak(round(pos.x, 1) + ", " + round(pos.y, 1) + ", facing " + direction_name() + ", on " + (ground is null ? "nothing" : ground.name));
 		}
 		if (key_pressed(KEY_S)) {
-			sound_environment_source@ src = env.get_source(sonar);
+			sound_environment_source@ src = env.get_source(sonar_mixer);
 			screen_reader_speak("sonar occlusion " + round(src.occlusion, 2) + ", transmission " + round(src.transmission_low, 2) + " " + round(src.transmission_mid, 2) + " " + round(src.transmission_high, 2) + ", " + env.reflection_simulations + " reflection simulations");
 		}
 		if (key_pressed(KEY_R)) { env.reflections_level = env.reflections_level > 0 ? 0 : 1; screen_reader_speak(env.reflections_level > 0 ? "reflections on" : "reflections off"); }
-		if (key_pressed(KEY_O)) { sound_environment_source@ src = env.get_source(sonar); src.apply_occlusion = !src.apply_occlusion; screen_reader_speak(src.apply_occlusion ? "sonar occlusion on" : "sonar occlusion off"); }
+		if (key_pressed(KEY_O)) { sound_environment_source@ src = env.get_source(sonar_mixer); src.apply_occlusion = !src.apply_occlusion; screen_reader_speak(src.apply_occlusion ? "sonar occlusion on" : "sonar occlusion off"); }
 		if (key_pressed(KEY_M)) { env.use_reflection_mixer = !env.use_reflection_mixer; screen_reader_speak(env.use_reflection_mixer ? "reflection mixer" : "per source reflections"); }
 		if (key_pressed(KEY_T)) {
 			env.reflection_type = env.reflection_type == SOUND_ENVIRONMENT_REFLECTIONS_CONVOLUTION ? SOUND_ENVIRONMENT_REFLECTIONS_HYBRID : env.reflection_type == SOUND_ENVIRONMENT_REFLECTIONS_HYBRID ? SOUND_ENVIRONMENT_REFLECTIONS_PARAMETRIC : SOUND_ENVIRONMENT_REFLECTIONS_CONVOLUTION;
