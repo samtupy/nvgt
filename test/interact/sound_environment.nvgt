@@ -1,7 +1,7 @@
 // Walk around a small physics world with Steam Audio occlusion, transmission and reflections.
 // A concrete hall with a brick north wall, a wooden table and a metal cabinet opens through a doorway onto a carpeted lounge with drywall, a cardboard partition, a fabric couch and a glass display case. A sonar pings in the lounge.
 // This shows the recommended shape: each object (here the player and the sonar) gets one mixer from the environment, positioned with the object, and every sound the object makes plays through its mixer, so the object is simulated once rather than every sound being a new source.
-// Up and down arrows walk, left and right turn by 45 degrees. C speaks your position, S speaks simulation details for the sonar, R toggles reflections, O toggles occlusion of the sonar, M toggles the reflection mixer, T cycles the reflection type, H toggles HRTF, escape exits.
+// Up and down arrows walk forward and back, left and right arrows sidestep, Q and E turn by 45 degrees. C speaks your position, S speaks simulation details for the sonar, R toggles reflections, minus and equals change the reflections level, brackets change the reflections width, O toggles occlusion of the sonar, M toggles the reflection mixer, T cycles the reflection type, H toggles HRTF, escape exits.
 #pragma console
 
 physics_world world;
@@ -13,7 +13,7 @@ sound@[] playing;
 physics_body_id[] wall_bodies;
 string[] wall_materials;
 float facing = 90; // Degrees counterclockwise from east, so 90 faces north.
-const float walk_speed = 1.4, step_interval = 0.5, eye_height = 1.6;
+const float walk_speed = 1.4, step_length = 0.7, eye_height = 1.6;
 
 void add_box(float minx, float maxx, float miny, float maxy, float minz, float maxz, const string&in material) {
 	vector half((maxx - minx) / 2, (maxy - miny) / 2, (maxz - minz) / 2);
@@ -66,12 +66,12 @@ string direction_name() {
 	string[] names = {"east", "north east", "north", "north west", "west", "south west", "south", "south east"};
 	return names[int(round(facing / 45, 0)) % 8];
 }
-string material_ahead() { // The material of a wall or object within reach in front of the player, if any.
-	vector origin = player.position + facing_vector() * 0.35; // Start just outside the player's capsule (radius 0.3), as a ray starting inside it would hit the player.
+string material_toward(const vector&in direction) { // The material of a wall or object within reach of the player in a horizontal direction, if any.
+	vector origin = player.position + direction * 0.31; // Start just outside the player's capsule (radius 0.3), as a ray starting inside it would hit the player. If the player is pressed against a wall the ray starts inside it, which still counts as a hit.
 	origin.z += 1;
 	physics_body_id hit;
 	float fraction;
-	if (!world.cast_ray(origin, facing_vector() * 0.35, hit, fraction)) return "";
+	if (!world.cast_ray(origin, direction * 0.4, hit, fraction)) return "";
 	for (uint i = 0; i < wall_bodies.length(); i++) if (wall_bodies[i] == hit) return wall_materials[i];
 	return "";
 }
@@ -86,43 +86,61 @@ void main() {
 	sonar_mixer.set_position_3d(19, 3, 1.2);
 	@sonar = play("sonar", sonar_mixer, true);
 	screen_reader_speak("Sound environment test. You are in a concrete hall facing north. Arrows to move and turn.");
-	timer frame_time, step_time, bump_time;
-	float physics_accumulator = 0;
+	timer frame_time, bump_time;
+	float physics_accumulator = 0, step_distance = 0, blocked_time = 0, reflections_level = env.reflections_level;
 	bool walking = false;
+	string surface = "concrete";
 	while (!key_pressed(KEY_ESCAPE)) {
 		wait(5);
 		float dt = frame_time.elapsed / 1000.0;
 		frame_time.restart();
-		if (key_pressed(KEY_LEFT)) { facing = (facing + 45) % 360; screen_reader_speak(direction_name()); }
-		if (key_pressed(KEY_RIGHT)) { facing = (facing + 315) % 360; screen_reader_speak(direction_name()); }
-		float speed = key_down(KEY_UP) ? walk_speed : key_down(KEY_DOWN) ? -walk_speed : 0;
+		if (key_pressed(KEY_Q)) { facing = (facing + 45) % 360; screen_reader_speak(direction_name()); }
+		if (key_pressed(KEY_E)) { facing = (facing + 315) % 360; screen_reader_speak(direction_name()); }
+		vector forward = facing_vector(), left(-forward.y, forward.x, 0);
+		vector move(0, 0, 0);
+		if (key_down(KEY_UP)) move += forward;
+		if (key_down(KEY_DOWN)) move -= forward;
+		if (key_down(KEY_LEFT)) move += left;
+		if (key_down(KEY_RIGHT)) move -= left;
+		bool moving = move.length() > 0.01;
+		if (moving) move = move.normalized();
 		vector v = player.linear_velocity;
-		vector move = facing_vector() * speed;
-		player.linear_velocity = vector(move.x, move.y, v.z);
+		player.linear_velocity = vector(move.x * walk_speed, move.y * walk_speed, v.z);
+		vector before = player.position;
+		float simulated = 0;
 		physics_accumulator += dt;
 		while (physics_accumulator >= 1.0 / 60) {
 			world.update(1.0 / 60);
 			physics_accumulator -= 1.0 / 60;
+			simulated += 1.0 / 60;
 		}
 		vector pos = player.position;
 		vector head(pos.x, pos.y, pos.z + eye_height);
 		sound_default_engine.set_listener_position(0, head);
 		player_mixer.set_position_3d(pos.x, pos.y, pos.z + 0.9); // The middle of the player, sounds such as footsteps and bumps all come from about here.
 		sound_default_engine.set_listener_direction(0, facing_vector());
-		if (speed != 0 and player.supported) {
-			if (!walking or step_time.elapsed >= step_interval * 1000) {
-				physics_material@ ground = player.ground_material;
-				string surface = ground !is null and ground.name == "carpet" ? "carpet" : "concrete";
+		physics_material@ ground = player.ground_material;
+		if (ground !is null) surface = ground.name == "carpet" ? "carpet" : "concrete";
+		if (moving) {
+			// Footsteps by distance walked, and a bump when walking but blocked by something, judged by how far the player actually moved.
+			float moved = sqrt((pos.x - before.x) * (pos.x - before.x) + (pos.y - before.y) * (pos.y - before.y));
+			step_distance += moved;
+			if (!walking or step_distance >= step_length) {
 				play(surface + "_step" + random(1, 5), player_mixer);
-				step_time.restart();
+				step_distance = 0;
 			}
 			walking = true;
-			string wall = speed > 0 ? material_ahead() : "";
-			if (wall != "" and bump_time.elapsed > 600) {
+			if (simulated > 0) blocked_time = moved < walk_speed * simulated * 0.3 ? blocked_time + simulated : 0;
+			if (blocked_time >= 0.1 and bump_time.elapsed > 500) {
+				string wall = material_toward(move);
 				play(wall == "cardboard" ? "wall_cardboard" : "wall_brick", player_mixer);
 				bump_time.restart();
 			}
-		} else walking = false;
+		} else {
+			walking = false;
+			step_distance = 0;
+			blocked_time = 0;
+		}
 		env.update();
 		for (int i = playing.length() - 1; i >= 0; i--) if (!playing[i].playing) playing.remove_at(i);
 		if (key_pressed(KEY_C)) {
@@ -133,7 +151,17 @@ void main() {
 			sound_environment_source@ src = env.get_source(sonar_mixer);
 			screen_reader_speak("sonar occlusion " + round(src.occlusion, 2) + ", transmission " + round(src.transmission_low, 2) + " " + round(src.transmission_mid, 2) + " " + round(src.transmission_high, 2) + ", " + env.reflection_simulations + " reflection simulations");
 		}
-		if (key_pressed(KEY_R)) { env.reflections_level = env.reflections_level > 0 ? 0 : 1; screen_reader_speak(env.reflections_level > 0 ? "reflections on" : "reflections off"); }
+		if (key_pressed(KEY_R)) { env.reflections_level = env.reflections_level > 0 ? 0 : reflections_level; screen_reader_speak(env.reflections_level > 0 ? "reflections on" : "reflections off"); }
+		if (key_pressed(KEY_MINUS) or key_pressed(KEY_EQUALS)) {
+			reflections_level += key_pressed(KEY_MINUS) ? -0.1 : 0.1;
+			if (reflections_level < 0) reflections_level = 0;
+			env.reflections_level = reflections_level;
+			screen_reader_speak("reflections level " + round(reflections_level, 1));
+		}
+		if (key_pressed(KEY_LEFTBRACKET) or key_pressed(KEY_RIGHTBRACKET)) {
+			env.reflections_width = env.reflections_width + (key_pressed(KEY_LEFTBRACKET) ? -0.25 : 0.25);
+			screen_reader_speak("reflections width " + round(env.reflections_width, 2));
+		}
 		if (key_pressed(KEY_O)) { sound_environment_source@ src = env.get_source(sonar_mixer); src.apply_occlusion = !src.apply_occlusion; screen_reader_speak(src.apply_occlusion ? "sonar occlusion on" : "sonar occlusion off"); }
 		if (key_pressed(KEY_M)) { env.use_reflection_mixer = !env.use_reflection_mixer; screen_reader_speak(env.use_reflection_mixer ? "reflection mixer" : "per source reflections"); }
 		if (key_pressed(KEY_T)) {
