@@ -155,7 +155,7 @@ public:
 	atomic<int> rays = 2048, bounces = 32, order = 1, max_sources = 32, threads, diffuse_samples = 32, max_occlusion_samples = 16;
 	atomic<float> duration = 1.0f, irradiance_min_distance = 1.0f, interval = 0.1f, hybrid_transition_time = 1.0f, hybrid_overlap = 0.25f;
 	atomic<bool> use_reflection_mixer = true, binaural = true, use_listener_reverb = true;
-	atomic<float> reflections_level = 1.0f;
+	atomic<float> reflections_level = 0.5f, reflections_width = 2.0f; // Toned down from physically accurate levels and widened from Steam Audio's binaural decoding, which tends to sound overpowering and narrow in games.
 	atomic<unsigned long long> published_config = audio_config().pack(); // Audio effects are recreated when its generation changes.
 	// Listener orientation for ambisonic decoding, published by update.
 	mutex listener_mutex;
@@ -747,6 +747,18 @@ public:
 		for (unsigned int i = 0; i < frames; i++) for (int c = 0; c < channels; c++) out[i * channels + c] += decoded_buffer.b.data[c][i];
 	}
 	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
+		render(frames_in, frame_count_in, frames_out, frame_count_out);
+		// Everything this node outputs is reflections. Binaurally decoded reverb is quite correlated between the ears and sounds narrow, so its side signal is scaled for a wider room.
+		float width = core->reflections_width;
+		if (core->channels != 2 || width == 1.0f) return;
+		float* out = frames_out[0];
+		for (unsigned int i = 0; i < *frame_count_out; i++) {
+			float mid = (out[i * 2] + out[i * 2 + 1]) * 0.5f, side = (out[i * 2] - out[i * 2 + 1]) * 0.5f * width;
+			out[i * 2] = mid + side;
+			out[i * 2 + 1] = mid - side;
+		}
+	}
+	void render(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) {
 		const unsigned int frames = *frame_count_out;
 		const unsigned int available = frames_in && frames_in[0] ? min(*frame_count_in, frames) : 0; // With MA_NODE_FLAG_ALLOW_NULL_INPUT the input array itself is null once nothing is attached, as for a retired source finishing its reverb tail.
 		float* out = frames_out[0];
@@ -915,6 +927,8 @@ public:
 	void set_use_reflection_mixer(bool v) { core->use_reflection_mixer = v; }
 	bool get_binaural() const { return core->binaural; }
 	void set_binaural(bool v) { core->binaural = v; }
+	float get_reflections_width() const { return core->reflections_width; }
+	void set_reflections_width(float v) { core->reflections_width = clamp(v, 0.0f, 4.0f); }
 	float get_reflections_level() const { return core->reflections_level; }
 	void set_reflections_level(float v) { core->reflections_level = max(0.0f, v); }
 };
@@ -1008,5 +1022,6 @@ void RegisterSoundEnvironment(asIScriptEngine* engine) {
 	ENV_PROPERTY(bool, use_listener_reverb)
 	ENV_PROPERTY(bool, binaural)
 	ENV_PROPERTY(float, reflections_level)
+	ENV_PROPERTY(float, reflections_width)
 	#undef ENV_PROPERTY
 }
