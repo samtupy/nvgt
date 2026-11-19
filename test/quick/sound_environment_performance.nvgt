@@ -1,10 +1,10 @@
 // Measures how much sound_environment costs as the number of sources and the reflection settings grow, to find how much a game can use without the audio glitching or reflections lagging behind.
 // Audio is rendered by an engine without a device, paced to real time so that the reflection worker runs at the rate it would in a game, and nothing is played. Every source plays looping noise, as silent sources skip their convolution.
 // For each scenario this prints how long a reflection simulation takes (reflections follow changes by at least this long), how many reflection simulations completed per second (at most 10 with the default simulation_interval of 0.1 seconds), the audio thread's load as a percentage of real time (the average and the worst block, over 100% being an audible glitch with a device), and how long sound_environment.update takes on the script thread.
-// Run with nvgt sound_environment_performance.nvgt -- followed by the groups to run: sources (the number of sources with a still and a moving listener, the default), settings (64 sources with different reflection settings), or all.
+// Run with nvgt sound_environment_performance.nvgt -- followed by the groups to run: sources (the number of sources with a still and a moving listener, the default), settings (64 sources with different reflection settings), audio (what the audio thread's cost depends on), threads (how the reflection simulation scales with threads), bursts (two guns firing short sounds every 50ms, each sound its own source or played through one mixer per gun), or all.
 #pragma console
 
-const int SAMPLE_RATE = 48000, CHANNELS = 2, BLOCK_FRAMES = 480; // 10ms blocks, like a typical device period.
+const int SAMPLE_RATE = 48000, CHANNELS = 2, BLOCK_FRAMES = 512; // NVGT's audio period.
 const float WARMUP_SECONDS = 1.5, MEASURE_SECONDS = 5;
 physics_world world;
 
@@ -13,6 +13,8 @@ class scenario {
 	int sources = 32, rays = 2048, bounces = 32, order = 1, threads = 0;
 	float duration = 1;
 	bool moving = false;
+	int guns = 0; // Guns firing a short sound every 50ms, in addition to the looping sources.
+	bool gun_mixers = false; // Whether each gun plays its shots through one mixer of the environment, rather than every shot being a new environment sound.
 	sound_environment_reflection_type type = SOUND_ENVIRONMENT_REFLECTIONS_CONVOLUTION;
 	scenario(const string&in name, int sources, bool moving) { this.name = name; this.sources = sources; this.moving = moving; }
 }
@@ -71,6 +73,14 @@ vector listener_position(float t, bool moving) { // Walks at 1.4 meters per seco
 	}
 	return path[0];
 }
+float[]@ make_gunshot() { // 150ms of noise with a fast decay.
+	float[] shot(int(SAMPLE_RATE * 0.15) * CHANNELS);
+	for (uint i = 0; i < shot.length(); i += CHANNELS) {
+		float v = (next_random() * 2 - 1) * 0.5 * pow(0.001, float(i) / shot.length());
+		for (int c = 0; c < CHANNELS; c++) shot[i + c] = v;
+	}
+	return shot;
+}
 float[]@ make_noise() {
 	float[] noise(SAMPLE_RATE * CHANNELS);
 	for (uint i = 0; i < noise.length(); i++) noise[i] = (next_random() * 2 - 1) * 0.1;
@@ -81,7 +91,7 @@ string pad(const string&in text, uint width) {
 	while (r.length() < width) r += " ";
 	return r;
 }
-void run(scenario@ sc, const float[]@ noise) {
+void run(scenario@ sc, const float[]@ noise, const float[]@ gunshot) {
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, SAMPLE_RATE, CHANNELS);
 	sound_environment env(e);
 	env.max_sources = sc.sources < 1 ? 1 : sc.sources;
@@ -109,6 +119,16 @@ void run(scenario@ sc, const float[]@ noise) {
 		while (!sounds[i].load_complete) wait(1);
 		sounds[i].play_looped();
 	}
+	mixer@[] gun_mixers;
+	vector[] gun_positions = {vector(9, 8, 1.2), vector(19, 2, 1.2)};
+	for (int i = 0; i < sc.guns; i++) {
+		mixer@ m = env.new_mixer();
+		m.set_position_3d(gun_positions[i].x, gun_positions[i].y, gun_positions[i].z);
+		gun_mixers.insert_last(m);
+	}
+	sound@[] shots;
+	float next_shot = 0;
+	uint most_sources = 0, most_retired = 0;
 	const double block_ms = BLOCK_FRAMES * 1000.0 / SAMPLE_RATE;
 	double audio_ms = 0, audio_worst = 0, update_ms = 0, update_worst = 0, reflection_ms = 0, reflection_worst = 0;
 	int blocks = 0, overruns = 0, reflection_count = 0;
@@ -127,6 +147,20 @@ void run(scenario@ sc, const float[]@ noise) {
 		vector lp = listener_position(t, sc.moving), ahead = listener_position(t + 0.5, sc.moving) - lp;
 		e.set_listener_position(0, lp);
 		if (ahead.length() > 0.01) e.set_listener_direction(0, ahead.normalized());
+		while (sc.guns > 0 and t >= next_shot) { // Every 50ms each gun fires a short sound, loaded as a game would load it.
+			next_shot += 0.05;
+			for (int i = 0; i < sc.guns; i++) {
+				sound@ shot = sc.gun_mixers ? e.sound() : env.new_sound();
+				shot.load_pcm(gunshot, SAMPLE_RATE, CHANNELS);
+				if (sc.gun_mixers) shot.set_mixer(gun_mixers[i]);
+				else shot.set_position_3d(gun_positions[i].x, gun_positions[i].y, gun_positions[i].z);
+				shot.play();
+				shots.insert_last(shot);
+			}
+		}
+		for (int i = shots.length() - 1; i >= 0; i--) if (!shots[i].playing and shots[i].load_complete) shots.remove_at(i); // Released sounds whose reflections are still ringing are kept by the environment until they end.
+		if (env.source_count > most_sources) most_sources = env.source_count;
+		if (env.retired_source_count > most_retired) most_retired = env.retired_source_count;
 		timer block(0, MICROSECONDS);
 		e.read(BLOCK_FRAMES);
 		double read_ms = block.elapsed / 1000.0;
@@ -153,11 +187,13 @@ void run(scenario@ sc, const float[]@ noise) {
 	float seconds = measure.elapsed / 1000.0;
 	string reflections = reflection_count > 0 ? round(reflection_ms / reflection_count, 1) + " ms (worst " + round(reflection_worst, 1) + ")" : "none finished";
 	println(pad(sc.name, 34) + pad(reflections, 28) + pad(round(reflection_count / seconds, 1) + "/s", 9) + pad(round(audio_ms / blocks / block_ms * 100, 1) + "% (worst " + round(audio_worst / block_ms * 100, 0) + "%, " + overruns + " over)", 30) + round(update_ms / blocks, 2) + " ms (worst " + round(update_worst, 1) + ")");
+	if (sc.guns > 0) println("    at most " + most_sources + " sources and " + most_retired + " retired sources ringing out");
 	for (uint i = 0; i < sounds.length(); i++) sounds[i].close();
+	for (uint i = 0; i < shots.length(); i++) shots[i].close();
 }
 void main() {
 	build_map();
-	float[]@ noise = make_noise();
+	float[]@ noise = make_noise(), gunshot = make_gunshot();
 	string[] groups;
 	for (uint i = 1; i < ARGS.length(); i++) groups.insert_last(ARGS[i]);
 	if (groups.length() < 1) groups.insert_last("sources");
@@ -195,6 +231,11 @@ void main() {
 		int[] threads = {1, 2, 4, 8, 12, 16};
 		for (uint i = 0; i < threads.length(); i++) { scenario sc("16, moving, " + threads[i] + " threads", 16, true); sc.threads = threads[i]; scenarios.insert_last(sc); }
 	}
+	if (all or groups.find("bursts") > -1) { // Inexperienced users might play every shot of a machine gun as a new environment sound rather than through one mixer per gun.
+		{ scenario sc("8 loops", 8, true); scenarios.insert_last(sc); }
+		{ scenario sc("8 loops, 2 guns, a source per shot", 8, true); sc.guns = 2; scenarios.insert_last(sc); }
+		{ scenario sc("8 loops, 2 guns, a mixer per gun", 8, true); sc.guns = 2; sc.gun_mixers = true; scenarios.insert_last(sc); }
+	}
 	println(pad("scenario", 34) + pad("reflection simulation", 28) + pad("rate", 9) + pad("audio thread load", 30) + "update");
-	for (uint i = 0; i < scenarios.length(); i++) run(scenarios[i], noise);
+	for (uint i = 0; i < scenarios.length(); i++) run(scenarios[i], noise, gunshot);
 }
