@@ -1,7 +1,7 @@
 // Walk around a small physics world with Steam Audio occlusion, transmission and reflections.
-// A concrete hall with a brick north wall, a wooden table and a metal cabinet opens through a doorway onto a carpeted lounge with drywall, a cardboard partition, a fabric couch and a glass display case. A sonar pings in the lounge.
+// A concrete hall with a brick north wall, a wooden table and a metal cabinet opens through a doorway onto a carpeted lounge with drywall, a cardboard partition, a fabric couch and a glass display case. A sonar pings in the lounge. A doorway in the hall's south wall, just behind where you start, leads outside onto a street with a brick building across it.
 // This shows the recommended shape: each object (here the player and the sonar) gets one mixer from the environment, positioned with the object, and every sound the object makes plays through its mixer, so the object is simulated once rather than every sound being a new source.
-// Up and down arrows walk forward and back, left and right arrows sidestep, Q and E turn by 45 degrees. C speaks your position, S speaks simulation details for the sonar, R toggles reflections, minus and equals change the reflections level, brackets change the reflections width, O toggles occlusion of the sonar, M toggles the reflection mixer, T cycles the reflection type, H toggles HRTF, escape exits.
+// Up and down arrows walk forward and back, left and right arrows sidestep, Q and E turn by 45 degrees. C speaks your position, S speaks simulation details for the sonar, R toggles reflections, minus and equals change the reflections level, brackets change the reflections width, comma and period change the reflections highpass cutoff, P pauses the sonar, O toggles occlusion of the sonar, M toggles the reflection mixer, T cycles the reflection type, H toggles HRTF, escape exits.
 #pragma console
 
 physics_world world;
@@ -28,7 +28,10 @@ void build_map() {
 	add_box(-t, 12, -t, 10 + t, -t, 0, "concrete");
 	add_box(-t, 12, -t, 10 + t, h, h + t, "concrete");
 	add_box(-t, 0, 0, 10, 0, h, "concrete");
-	add_box(0, 12, -t, 0, 0, h, "concrete");
+	// The south wall, with a doorway outside from x 2 to 4.
+	add_box(0, 2, -t, 0, 0, h, "concrete");
+	add_box(4, 12, -t, 0, 0, h, "concrete");
+	add_box(2, 4, -t, 0, 2.2, h, "concrete");
 	add_box(0, 12, 10, 10 + t, 0, h, "brick");
 	add_box(4, 6, 6, 7, 0, 0.8, "wood"); // Table.
 	add_box(10.8, 11.8, 0.2, 0.8, 0, 2, "metal"); // Cabinet.
@@ -45,6 +48,11 @@ void build_map() {
 	add_box(17, 17.05, 0, 4, 0, 2, "cardboard"); // Partition.
 	add_box(18.5, 20.5, 8.6, 9.5, 0, 0.9, "fabric"); // Couch.
 	add_box(13.5, 14.5, 8, 9, 0, 1.5, "glass"); // Display case.
+	// Outside, south of the building: an asphalt street with grass along it, a brick building across the street and a wooden fence, with open sky above.
+	add_box(-20, 40, -10, -t, -t, 0, "asphalt");
+	add_box(-20, 40, -14, -10, -t, 0, "grass");
+	add_box(-5, 25, -20, -14, -t, 6, "brick"); // The building across the street, its wall facing the street at y -14.
+	add_box(-15, -14.9, -14, -t, 0, 1.5, "wood"); // Fence along the west side.
 	world.optimize_broadphase();
 }
 sound@ play(const string&in name, mixer@ object, bool looped = false) { // Plays a sound through an object's mixer, which positions it.
@@ -152,15 +160,28 @@ void main() {
 			screen_reader_speak("sonar occlusion " + round(src.occlusion, 2) + ", transmission " + round(src.transmission_low, 2) + " " + round(src.transmission_mid, 2) + " " + round(src.transmission_high, 2) + ", " + env.reflection_simulations + " reflection simulations");
 		}
 		if (key_pressed(KEY_R)) { env.reflections_level = env.reflections_level > 0 ? 0 : reflections_level; screen_reader_speak(env.reflections_level > 0 ? "reflections on" : "reflections off"); }
-		if (key_pressed(KEY_MINUS) or key_pressed(KEY_EQUALS)) {
-			reflections_level += key_pressed(KEY_MINUS) ? -0.1 : 0.1;
+		// key_pressed consumes the press, so each key is only checked once.
+		float level_change = key_pressed(KEY_MINUS) ? -0.1 : key_pressed(KEY_EQUALS) ? 0.1 : 0;
+		if (level_change != 0) {
+			reflections_level += level_change;
 			if (reflections_level < 0) reflections_level = 0;
 			env.reflections_level = reflections_level;
 			screen_reader_speak("reflections level " + round(reflections_level, 1));
 		}
-		if (key_pressed(KEY_LEFTBRACKET) or key_pressed(KEY_RIGHTBRACKET)) {
-			env.reflections_width = env.reflections_width + (key_pressed(KEY_LEFTBRACKET) ? -0.25 : 0.25);
+		float width_change = key_pressed(KEY_LEFTBRACKET) ? -0.25 : key_pressed(KEY_RIGHTBRACKET) ? 0.25 : 0;
+		if (width_change != 0) {
+			env.reflections_width = env.reflections_width + width_change;
 			screen_reader_speak("reflections width " + round(env.reflections_width, 2));
+		}
+		float highpass_change = key_pressed(KEY_COMMA) ? -20 : key_pressed(KEY_PERIOD) ? 20 : 0;
+		if (highpass_change != 0) {
+			env.reflections_highpass = env.reflections_highpass + highpass_change;
+			screen_reader_speak("reflections highpass " + round(env.reflections_highpass, 0) + " hertz");
+		}
+		if (key_pressed(KEY_P)) {
+			if (sonar.playing) sonar.pause();
+			else sonar.play_looped();
+			screen_reader_speak(sonar.playing ? "sonar playing" : "sonar paused");
 		}
 		if (key_pressed(KEY_O)) { sound_environment_source@ src = env.get_source(sonar_mixer); src.apply_occlusion = !src.apply_occlusion; screen_reader_speak(src.apply_occlusion ? "sonar occlusion on" : "sonar occlusion off"); }
 		if (key_pressed(KEY_M)) { env.use_reflection_mixer = !env.use_reflection_mixer; screen_reader_speak(env.use_reflection_mixer ? "reflection mixer" : "per source reflections"); }
