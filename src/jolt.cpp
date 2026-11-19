@@ -13,6 +13,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -693,10 +694,6 @@ static void jolt_world_set_restitution(jolt_physics_world* w, const BodyID& id, 
 static float jolt_world_get_gravity_factor(jolt_physics_world* w, const BodyID& id) { return w->system.GetBodyInterface().GetGravityFactor(id); }
 // NVGT uses Jolt's per body user data for flags. Acoustically transparent bodies are ignored by the raycast provider, for bodies such as characters that contain the listener or the sounds they make, which would otherwise block every path sound could take to or from them.
 static constexpr uint64 BODY_ACOUSTICALLY_TRANSPARENT = 1;
-class acoustic_body_filter final : public BodyFilter {
-public:
-	bool ShouldCollideLocked(const Body& body) const override { return (body.GetUserData() & BODY_ACOUSTICALLY_TRANSPARENT) == 0; }
-};
 static void jolt_world_set_acoustically_transparent(jolt_physics_world* w, const BodyID& id, bool transparent) {
 	BodyInterface& bi = w->system.GetBodyInterface();
 	uint64 data = bi.GetUserData(id);
@@ -757,59 +754,119 @@ static RayCastSettings make_jolt_ray_settings() {
 	settings.mTreatConvexAsSolid = false;
 	return settings;
 }
+// Rays are traced in batches through BroadPhaseQuery::CastRays, added by NVGT's Jolt patch, which takes the broadphase's query lock once per batch rather than once per ray. Acoustic simulation traces millions of rays a second from many threads, and that lock alone made each ray cost four times as much with eight threads as with one. Each candidate body's shape is cast against directly while the body is locked, rather than through NarrowPhaseQuery, so the material and normal of a hit are read under the same lock.
+template <class shape_collector> class acoustic_ray_collector : public RayCastBodyCollector {
+public:
+	const BodyLockInterface& locks;
+	RayCast ray;
+	const RayCastSettings& settings;
+	acoustic_ray_collector(const BodyLockInterface& locks, const RayCast& ray, const RayCastSettings& settings) : locks(locks), ray(ray), settings(settings) {}
+	virtual bool hit_body(const Body& body, shape_collector& collector) = 0; // Called with the body locked when its shape was hit, returns false to stop the query.
+	void AddHit(const BroadPhaseCastResult& result) override {
+		BodyLockRead lock(locks, result.mBodyID);
+		if (!lock.SucceededAndIsInBroadPhase()) return; // The body could have been removed since the broadphase found it.
+		const Body& body = lock.GetBody();
+		if (body.GetUserData() & BODY_ACOUSTICALLY_TRANSPARENT) return;
+		shape_collector collector;
+		collector.UpdateEarlyOutFraction(GetEarlyOutFraction());
+		body.GetShape()->CastRay(ray.Transformed(body.GetInverseCenterOfMassTransform()), settings, SubShapeIDCreator(), collector, {});
+		if (collector.HadHit() && !hit_body(body, collector)) ForceEarlyOut();
+	}
+};
+class acoustic_closest_hit : public acoustic_ray_collector<ClosestHitCollisionCollector<CastRayCollector>> {
+public:
+	float fraction = 1.0f;
+	Vec3 normal;
+	nvgt_acoustic_material material;
+	int object_index = -1;
+	bool had_hit = false;
+	using acoustic_ray_collector::acoustic_ray_collector;
+	bool hit_body(const Body& body, ClosestHitCollisionCollector<CastRayCollector>& collector) override {
+		const RayCastResult& result = collector.mHit;
+		had_hit = true;
+		fraction = result.mFraction;
+		normal = body.GetWorldSpaceSurfaceNormal(result.mSubShapeID2, ray.GetPointOnRay(result.mFraction));
+		const PhysicsMaterial* m = body.GetShape()->GetMaterial(result.mSubShapeID2);
+		material = m && m != PhysicsMaterial::sDefault.GetPtr() ? static_cast<const nvgt_physics_material*>(m)->acoustic : g_default_acoustic_material; // NVGT only ever creates nvgt_physics_material, Jolt substitutes sDefault for shapes without one.
+		object_index = (int)body.GetID().GetIndex();
+		UpdateEarlyOutFraction(fraction); // Farther bodies can be skipped.
+		return true;
+	}
+};
+class acoustic_any_hit : public acoustic_ray_collector<AnyHitCollisionCollector<CastRayCollector>> {
+public:
+	bool had_hit = false;
+	using acoustic_ray_collector::acoustic_ray_collector;
+	bool hit_body(const Body& body, AnyHitCollisionCollector<CastRayCollector>& collector) override {
+		had_hit = true;
+		return false;
+	}
+};
+static constexpr int ACOUSTIC_RAY_BATCH = 64; // Rays are passed to the broadphase in batches of up to this many.
 void jolt_physics_world::closest_hits(int count, const nvgt_ray* rays, const float* min_distances, const float* max_distances, nvgt_ray_hit* hits) {
 	if (count < 1) return;
 	if (g_raycast_hit_materials.size() < (size_t)count) g_raycast_hit_materials.resize(count);
-	const NarrowPhaseQuery& query = system.GetNarrowPhaseQuery();
+	const BroadPhaseQuery& query = system.GetBroadPhaseQuery();
 	const BodyLockInterface& locks = system.GetBodyLockInterface();
 	const RayCastSettings settings = make_jolt_ray_settings();
 	const AABox bounds = system.GetBounds();
-	for (int i = 0; i < count; i++) {
-		nvgt_ray_hit& hit = hits[i];
-		hit = {INFINITY, -1, -1, -1, {0.0f, 0.0f, 0.0f}, nullptr};
-		if (max_distances[i] <= min_distances[i] || !bounds.IsValid()) continue;
-		float length;
-		RRayCast ray = make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, length);
-		ClosestHitCollisionCollector<CastRayCollector> collector;
-		query.CastRay(ray, settings, collector, {}, {}, acoustic_body_filter());
-		if (!collector.HadHit()) continue;
-		const RayCastResult& result = collector.mHit;
-		nvgt_acoustic_material& material = g_raycast_hit_materials[i];
-		material = g_default_acoustic_material;
-		Vec3 normal = -ray.mDirection.Normalized();
-		BodyLockRead lock(locks, result.mBodyID);
-		if (lock.Succeeded()) {
-			const Body& body = lock.GetBody();
-			normal = body.GetWorldSpaceSurfaceNormal(result.mSubShapeID2, ray.GetPointOnRay(result.mFraction));
-			const PhysicsMaterial* m = body.GetShape()->GetMaterial(result.mSubShapeID2);
-			if (m && m != PhysicsMaterial::sDefault.GetPtr()) material = static_cast<const nvgt_physics_material*>(m)->acoustic; // NVGT only ever creates nvgt_physics_material, Jolt substitutes sDefault for shapes without one.
-			hit.object_index = (int)body.GetID().GetIndex();
+	optional<acoustic_closest_hit> collectors[ACOUSTIC_RAY_BATCH];
+	RayCast batch_rays[ACOUSTIC_RAY_BATCH];
+	RayCastBodyCollector* batch_collectors[ACOUSTIC_RAY_BATCH];
+	int indices[ACOUSTIC_RAY_BATCH];
+	float lengths[ACOUSTIC_RAY_BATCH];
+	for (int start = 0; start < count; start += ACOUSTIC_RAY_BATCH) {
+		int n = 0;
+		for (int i = start; i < count && i < start + ACOUSTIC_RAY_BATCH; i++) {
+			hits[i] = {INFINITY, -1, -1, -1, {0.0f, 0.0f, 0.0f}, nullptr};
+			if (max_distances[i] <= min_distances[i] || !bounds.IsValid()) continue;
+			batch_rays[n] = RayCast(make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, lengths[n]));
+			batch_collectors[n] = &collectors[n].emplace(locks, batch_rays[n], settings);
+			indices[n++] = i;
 		}
-		hit.distance = min_distances[i] + result.mFraction * length;
-		hit.normal[0] = normal.GetX();
-		hit.normal[1] = normal.GetY();
-		hit.normal[2] = normal.GetZ();
-		hit.material_index = 0;
-		hit.material = &material;
+		if (n) query.CastRays(n, batch_rays, batch_collectors);
+		for (int j = 0; j < n; j++) {
+			const acoustic_closest_hit& c = *collectors[j];
+			if (c.had_hit) {
+				const int i = indices[j];
+				nvgt_ray_hit& hit = hits[i];
+				g_raycast_hit_materials[i] = c.material;
+				hit.distance = min_distances[i] + c.fraction * lengths[j];
+				hit.normal[0] = c.normal.GetX();
+				hit.normal[1] = c.normal.GetY();
+				hit.normal[2] = c.normal.GetZ();
+				hit.object_index = c.object_index;
+				hit.material_index = 0;
+				hit.material = &g_raycast_hit_materials[i];
+			}
+			collectors[j].reset();
+		}
 	}
 }
 void jolt_physics_world::any_hits(int count, const nvgt_ray* rays, const float* min_distances, const float* max_distances, unsigned char* occluded) {
-	const NarrowPhaseQuery& query = system.GetNarrowPhaseQuery();
+	const BroadPhaseQuery& query = system.GetBroadPhaseQuery();
+	const BodyLockInterface& locks = system.GetBodyLockInterface();
 	const RayCastSettings settings = make_jolt_ray_settings();
 	const AABox bounds = system.GetBounds();
-	for (int i = 0; i < count; i++) {
-		if (max_distances[i] <= min_distances[i]) {
-			occluded[i] = 1;
-			continue;
+	optional<acoustic_any_hit> collectors[ACOUSTIC_RAY_BATCH];
+	RayCast batch_rays[ACOUSTIC_RAY_BATCH];
+	RayCastBodyCollector* batch_collectors[ACOUSTIC_RAY_BATCH];
+	int indices[ACOUSTIC_RAY_BATCH];
+	for (int start = 0; start < count; start += ACOUSTIC_RAY_BATCH) {
+		int n = 0;
+		for (int i = start; i < count && i < start + ACOUSTIC_RAY_BATCH; i++) {
+			occluded[i] = max_distances[i] <= min_distances[i] ? 1 : 0; // Rays of no length, such as those Steam Audio passes for paths it has already ruled out, count as occluded.
+			if (occluded[i] || !bounds.IsValid()) continue;
+			float length;
+			batch_rays[n] = RayCast(make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, length));
+			batch_collectors[n] = &collectors[n].emplace(locks, batch_rays[n], settings);
+			indices[n++] = i;
 		}
-		if (!bounds.IsValid()) {
-			occluded[i] = 0;
-			continue;
+		if (n) query.CastRays(n, batch_rays, batch_collectors);
+		for (int j = 0; j < n; j++) {
+			if (collectors[j]->had_hit) occluded[indices[j]] = 1;
+			collectors[j].reset();
 		}
-		float length;
-		AnyHitCollisionCollector<CastRayCollector> collector;
-		query.CastRay(make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, length), settings, collector, {}, {}, acoustic_body_filter());
-		occluded[i] = collector.HadHit() ? 1 : 0;
 	}
 }
 static nvgt_raycast_provider* jolt_world_get_raycast_provider(void* world) {

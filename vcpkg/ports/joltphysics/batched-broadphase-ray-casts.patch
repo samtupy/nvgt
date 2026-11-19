@@ -1,0 +1,86 @@
+diff --git a/Jolt/Physics/Collision/BroadPhase/BroadPhase.cpp b/Jolt/Physics/Collision/BroadPhase/BroadPhase.cpp
+--- a/Jolt/Physics/Collision/BroadPhase/BroadPhase.cpp
++++ b/Jolt/Physics/Collision/BroadPhase/BroadPhase.cpp
+@@ -5,6 +5,7 @@
+ #include <Jolt/Jolt.h>
+ 
+ #include <Jolt/Physics/Collision/BroadPhase/BroadPhase.h>
++#include <Jolt/Physics/Collision/RayCast.h>
+ 
+ JPH_NAMESPACE_BEGIN
+ 
+@@ -13,4 +14,10 @@
+ 	mBodyManager = inBodyManager;
+ }
+ 
++void BroadPhaseQuery::CastRays(uint inNumRays, const RayCast *inRays, RayCastBodyCollector *const *ioCollectors, const BroadPhaseLayerFilter &inBroadPhaseLayerFilter, const ObjectLayerFilter &inObjectLayerFilter) const
++{
++	for (uint i = 0; i < inNumRays; ++i)
++		CastRay(inRays[i], *ioCollectors[i], inBroadPhaseLayerFilter, inObjectLayerFilter);
++}
++
+ JPH_NAMESPACE_END
+diff --git a/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.cpp b/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.cpp
+--- a/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.cpp
++++ b/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.cpp
+@@ -440,6 +440,35 @@
+ 	}
+ }
+ 
++void BroadPhaseQuadTree::CastRays(uint inNumRays, const RayCast *inRays, RayCastBodyCollector *const *ioCollectors, const BroadPhaseLayerFilter &inBroadPhaseLayerFilter, const ObjectLayerFilter &inObjectLayerFilter) const
++{
++	JPH_PROFILE_FUNCTION();
++
++	JPH_ASSERT(mMaxBodies == mBodyManager->GetMaxBodies());
++
++	// Prevent this from running in parallel with node deletion in FrameSync(), see notes there. The lock is shared, but taking it for every ray
++	// still writes to the same cache line from every thread, which limits how well ray casting from many threads scales.
++	shared_lock lock(mQueryLocks[mQueryLockIdx]);
++
++	for (uint i = 0; i < inNumRays; ++i)
++	{
++		const RayCast &ray = inRays[i];
++		RayCastBodyCollector &collector = *ioCollectors[i];
++
++		// Loop over all layers and test the ones that could hit
++		for (BroadPhaseLayer::Type l = 0; l < mNumLayers; ++l)
++		{
++			const QuadTree &tree = mLayers[l];
++			if (tree.HasBodies() && inBroadPhaseLayerFilter.ShouldCollide(BroadPhaseLayer(l)))
++			{
++				tree.CastRay(ray, collector, inObjectLayerFilter, mTracking);
++				if (collector.ShouldEarlyOut())
++					break;
++			}
++		}
++	}
++}
++
+ void BroadPhaseQuadTree::CollideAABox(const AABox &inBox, CollideShapeBodyCollector &ioCollector, const BroadPhaseLayerFilter &inBroadPhaseLayerFilter, const ObjectLayerFilter &inObjectLayerFilter) const
+ {
+ 	JPH_PROFILE_FUNCTION();
+diff --git a/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.h b/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.h
+--- a/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.h
++++ b/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuadTree.h
+@@ -34,6 +34,7 @@
+ 	virtual void			NotifyBodiesAABBChanged(BodyID *ioBodies, int inNumber, bool inTakeLock) override;
+ 	virtual void			NotifyBodiesLayerChanged(BodyID *ioBodies, int inNumber) override;
+ 	virtual void			CastRay(const RayCast &inRay, RayCastBodyCollector &ioCollector, const BroadPhaseLayerFilter &inBroadPhaseLayerFilter, const ObjectLayerFilter &inObjectLayerFilter) const override;
++	virtual void			CastRays(uint inNumRays, const RayCast *inRays, RayCastBodyCollector *const *ioCollectors, const BroadPhaseLayerFilter &inBroadPhaseLayerFilter, const ObjectLayerFilter &inObjectLayerFilter) const override;
+ 	virtual void			CollideAABox(const AABox &inBox, CollideShapeBodyCollector &ioCollector, const BroadPhaseLayerFilter &inBroadPhaseLayerFilter, const ObjectLayerFilter &inObjectLayerFilter) const override;
+ 	virtual void			CollideSphere(Vec3Arg inCenter, float inRadius, CollideShapeBodyCollector &ioCollector, const BroadPhaseLayerFilter &inBroadPhaseLayerFilter, const ObjectLayerFilter &inObjectLayerFilter) const override;
+ 	virtual void			CollidePoint(Vec3Arg inPoint, CollideShapeBodyCollector &ioCollector, const BroadPhaseLayerFilter &inBroadPhaseLayerFilter, const ObjectLayerFilter &inObjectLayerFilter) const override;
+diff --git a/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuery.h b/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuery.h
+--- a/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuery.h
++++ b/Jolt/Physics/Collision/BroadPhase/BroadPhaseQuery.h
+@@ -34,6 +34,10 @@
+ 	/// Cast a ray and add any hits to ioCollector
+ 	virtual void		CastRay(const RayCast &inRay, RayCastBodyCollector &ioCollector, const BroadPhaseLayerFilter &inBroadPhaseLayerFilter = { }, const ObjectLayerFilter &inObjectLayerFilter = { }) const = 0;
+ 
++	/// Cast several rays, adding the hits of each ray to its own collector. Implementations can take their query locks once for the whole batch,
++	/// which is much cheaper than taking them for every ray when many threads cast rays at the same time.
++	virtual void		CastRays(uint inNumRays, const RayCast *inRays, RayCastBodyCollector *const *ioCollectors, const BroadPhaseLayerFilter &inBroadPhaseLayerFilter = { }, const ObjectLayerFilter &inObjectLayerFilter = { }) const;
++
+ 	/// Get bodies intersecting with inBox and any hits to ioCollector
+ 	virtual void		CollideAABox(const AABox &inBox, CollideShapeBodyCollector &ioCollector, const BroadPhaseLayerFilter &inBroadPhaseLayerFilter = { }, const ObjectLayerFilter &inObjectLayerFilter = { }) const = 0;
+ 

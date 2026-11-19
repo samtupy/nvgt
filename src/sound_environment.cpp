@@ -533,7 +533,7 @@ bool environment_core::rebuild() { // Script thread, only while the worker is id
 	settings.maxOrder = order;
 	settings.maxNumSources = max_sources + 1; // Including the listener reverb.
 	settings.numThreads = threads;
-	settings.rayBatchSize = 16;
+	settings.rayBatchSize = 64; // Rays reach the raycast provider in batches of this many. Larger batches spread the provider's per call costs, such as Jolt's broadphase lock, over more rays, while 2048 rays still make 32 jobs to share among the simulation threads.
 	settings.samplingRate = audio_settings.samplingRate;
 	settings.frameSize = audio_settings.frameSize;
 	if (!create_simulator(context, settings, simulator)) return false;
