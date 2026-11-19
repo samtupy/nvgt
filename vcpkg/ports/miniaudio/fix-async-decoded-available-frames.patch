@@ -1,0 +1,23 @@
+diff --git a/miniaudio.h b/miniaudio.h
+index b8f6137..4a50aba 100644
+--- a/miniaudio.h
++++ b/miniaudio.h
+@@ -71916,7 +71916,17 @@ MA_API ma_result ma_resource_manager_data_buffer_get_available_frames(ma_resourc
+ 
+         case ma_resource_manager_data_supply_type_decoded:
+         {
+-            return ma_audio_buffer_get_available_frames(&pDataBuffer->connector.buffer, pAvailableFrames);
++            /* The buffer is allocated for the whole sound up front but may still be being decoded, in which case only the frames decoded so far are available. Using the buffer's size here let reads run into the undecoded part of the buffer while asynchronously loading, playing silence and skipping the start of the sound. */
++            ma_uint64 cursor;
++            ma_audio_buffer_get_cursor_in_pcm_frames(&pDataBuffer->connector.buffer, &cursor);
++
++            if (pDataBuffer->pNode->data.backend.decoded.decodedFrameCount > cursor) {
++                *pAvailableFrames = pDataBuffer->pNode->data.backend.decoded.decodedFrameCount - cursor;
++            } else {
++                *pAvailableFrames = 0;
++            }
++
++            return MA_SUCCESS;
+         };
+ 
+         case ma_resource_manager_data_supply_type_decoded_paged:
