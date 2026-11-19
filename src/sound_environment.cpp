@@ -149,7 +149,10 @@ struct reflection_group {
 	float x = 0.0f, y = 0.0f, z = 0.0f; // The simulated position, the centroid of the members.
 	float sum_x = 0.0f, sum_y = 0.0f, sum_z = 0.0f, nearest = 0.0f; // Gathered while assigning sounds. nearest is the distance from the listener of the nearest member, which decides which group gives way when a nearer sound needs one.
 	int members = 0;
+	atomic<unsigned int> placement = 0; // Raised whenever the group is moved to a new place, so that the audio thread clears its effect of the old place's sound.
+	atomic<bool> ringing = false; // Whether the group had input or a reverb tail at the last audio pass, so that groups are preferably not reused until their tails end.
 	// Audio thread state.
+	unsigned int audio_placement = 0;
 	audio_config config;
 	ipl_ref<api::IReflectionEffect> effect;
 	ipl_ref<api::IAmbisonicsDecodeEffect> decode;
@@ -164,6 +167,7 @@ struct reflection_group {
 		y = py;
 		z = pz;
 		ready_at = 0;
+		placement++;
 	}
 };
 static constexpr int MAX_REFLECTION_GROUPS = 1024;
@@ -773,8 +777,8 @@ void environment_core::assign_groups(const vector<environment_source*>& current,
 			join(*c, best);
 			continue;
 		}
-		reflection_group* free_group = nullptr;
-		for (int i = 0; i < pool && !free_group; i++) if (!groups[i]->members) free_group = groups[i];
+		reflection_group* free_group = nullptr; // Groups still ringing are left to finish their tails where they are, and are only taken when nothing else is free.
+		for (int i = 0; i < pool && !free_group; i++) if (!groups[i]->members && !groups[i]->ringing) free_group = groups[i];
 		if (!free_group) {
 			reflection_group* farthest = nullptr;
 			for (int i = 0; i < pool; i++) if (!farthest || groups[i]->nearest > farthest->nearest) farthest = groups[i];
@@ -785,6 +789,7 @@ void environment_core::assign_groups(const vector<environment_source*>& current,
 				free_group->sum_x = free_group->sum_y = free_group->sum_z = 0.0f;
 			}
 		}
+		for (int i = 0; i < pool && !free_group; i++) if (!groups[i]->members) free_group = groups[i];
 		if (free_group) {
 			free_group->place(c->x, c->y, c->z);
 			join(*c, free_group);
@@ -1018,6 +1023,12 @@ public:
 	void render_group(reflection_group* g, float* out, unsigned int frames, IPLAmbisonicsDecodeEffectParams& decode) {
 		const bool send_active = g->send_active;
 		g->send_active = false;
+		const unsigned int placement = g->placement;
+		if (placement != g->audio_placement) { // A group moved elsewhere while ringing would play the rest of its old tail through its new place's reflections, so the tail is cut instead.
+			g->audio_placement = placement;
+			if (g->effect) g->effect->reset();
+			g->tail = false;
+		}
 		api::ISource* src = g->source.take();
 		if ((send_active || g->tail) && src && prepare_group(g)) {
 			IPLSimulationOutputs outputs{};
@@ -1032,7 +1043,9 @@ public:
 				add_decoded(out, frames);
 			}
 			g->tail = state == IPL_AUDIOEFFECTSTATE_TAILREMAINING;
+			if (!send_active && !g->tail) g->effect->reset(); // Steam Audio's convolution keeps the input it was given after its tail has ended, and would play that again with the group's next input.
 		}
+		g->ringing = send_active || g->tail;
 		if (send_active) g->send.clear();
 	}
 	void render(float* out, unsigned int frames) { // The reflections of every group.

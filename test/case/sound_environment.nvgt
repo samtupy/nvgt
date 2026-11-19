@@ -410,3 +410,30 @@ void test_sound_environment_pathing() { // Pathing lets a sound be heard around 
 	assert(with_pathing > 1, "with pathing, the sound should be heard around the wall, energy " + with_pathing);
 	assert(unbaked < 0.001, "pathing needs baked paths, energy " + unbaked);
 }
+void test_sound_environment_tail_history() { // Once a reflection group's tail has ended, the sound it was given before must not play again when it gets input again.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.use_listener_reverb = false;
+	env.set_raycaster(world);
+	e.set_listener_position(0, -2, 0, 1.5);
+	sound@ s = env.new_sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	sound_environment_test_wait_for_decoding(s);
+	s.set_position_3d(2, 2, 1.5);
+	sound_environment_source@ src = env.get_source(s);
+	timer t;
+	while (!src.reflections_simulated and t.elapsed < 10000) {
+		sound_environment_test_pump(e, env, 1);
+		wait(1);
+	}
+	assert(src.reflections_simulated);
+	double[] tails;
+	for (int i = 0; i < 2; i++) {
+		s.play();
+		sound_environment_test_energy(e, env, 12);
+		tails.insert_last(sound_environment_test_energy(e, env, 40));
+		sound_environment_test_energy(e, env, 200); // Longer than the reflection duration, so the tail ends.
+	}
+	assert(tails[0] > 1 and tails[1] < tails[0] * 1.3, "the second burst should reverberate like the first, rather than with the first burst's reverb again, tail energy " + tails[0] + " then " + tails[1]);
+}
