@@ -88,8 +88,8 @@ While the current audio form will always be here for backwards compatibility, it
 ### input_box on Linux and Mobile
 The input_box function is currently only implemented on Windows and MacOS, we need to get it working on all platforms.
 
-### reactphysics3d
-We're working on integrating a physics engine into NVGT for much more advanced games. There are many of these out there, we chose reactphysics3d because it builds on all of our desired platforms, it's not utterly massive, it seems to contain many of the features we can imagine needing, and it does not come with a huge learning curve. Much work has been put into implementing reactphysics, though  most of it is on a different branch at this time called rp3d.
+### Physics
+We're working on integrating a physics engine into NVGT for much more advanced games. We originally chose reactphysics3d, but have since moved to JoltPhysics because it builds on all of our desired platforms, is actively maintained, and can run its simulation across multiple threads. Jolt's collision queries can also be used to drive Steam Audio's acoustic simulation. Most of this work is currently on a different branch called jolt.
 
 ### tts_voice parameter scaling
 In bgt, tts_voice parameters went from -10 to 10 for rate and pitch, and -100 to 0 for volume. However in NVGT, this currently differs per platform. We need to set up a couple of conversion functions that make bgt's old values work across the board, though possibly in floatingpoint so as to give NVGT users more precision if they desire it.
