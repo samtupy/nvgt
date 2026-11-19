@@ -5,7 +5,7 @@
 // Up and down arrows walk forward and back, left and right arrows sidestep, Q and E turn by 45 degrees. C speaks your position and the area you're in, S speaks simulation details for the sonar, R toggles reflections, P pauses the sonar, escape exits.
 // Enter, near the doorway between the hall and the lounge, closes it with a drywall wall or opens it again, so the lounge can be heard without the hall.
 // Backspace toggles a microphone loopback: what you say into the default microphone plays from a point in the world through the environment, which shift with the arrows moves a meter north, south, west or east. Use headphones, or the speakers will feed back into the microphone.
-// Left and right brackets select a setting of the environment, of the sonar's source or of how you move, and minus and equals lower or raise it. Toggles flip and choices cycle with either key. Changing the rays, duration, order, threads, diffuse samples, max sources or reflection type rebuilds the simulator, so reflections drop out briefly. The movement settings are last, so left bracket reaches them quickly: walk speed, and step size, which when above 0 makes each press of an arrow walk that far.
+// Left and right brackets select a setting of the environment, of the sonar's source or of how you move, and minus and equals lower or raise it. max sources is the number of reflection groups, and reflection grouping how far apart, as a fraction of their distance from you, sounds can be and still share one. Toggles flip and choices cycle with either key. Changing the rays, duration, order, threads, diffuse samples, max sources or reflection type rebuilds the simulator, so reflections drop out briefly. The movement settings are last, so left bracket reaches them quickly: walk speed, and step size, which when above 0 makes each press of an arrow walk that far.
 #pragma console
 
 physics_world world;
@@ -26,7 +26,7 @@ physics_body_id doorway_wall;
 bool doorway_closed = false;
 float reflections_on_level; // The level R restores when turning reflections back on.
 sound_environment_source@ sonar_source;
-const string[] setting_names = {"reflections level", "reflections width", "reflections highpass", "reflection type", "reflection rays", "reflection bounces", "reflection duration", "reflection order", "diffuse samples", "irradiance min distance", "simulation interval", "simulation threads", "max sources", "hybrid transition time", "hybrid overlap", "reflection mixer", "listener reverb", "binaural reflections", "HRTF", "sonar occlusion", "sonar transmission", "sonar reflections", "sonar reflections level", "sonar occlusion type", "sonar occlusion radius", "sonar transmission rays", "walk speed", "step size"};
+const string[] setting_names = {"reflections level", "reflections width", "reflections highpass", "reflection type", "reflection rays", "reflection bounces", "reflection duration", "reflection order", "diffuse samples", "irradiance min distance", "simulation interval", "simulation threads", "max sources", "hybrid transition time", "hybrid overlap", "reflection mixer", "listener reverb", "binaural reflections", "HRTF", "sonar occlusion", "sonar transmission", "sonar reflections", "sonar reflections level", "sonar occlusion type", "sonar occlusion radius", "sonar transmission rays", "walk speed", "step size", "reflection grouping"};
 const sound_environment_reflection_type[] reflection_types = {SOUND_ENVIRONMENT_REFLECTIONS_CONVOLUTION, SOUND_ENVIRONMENT_REFLECTIONS_HYBRID, SOUND_ENVIRONMENT_REFLECTIONS_PARAMETRIC};
 const string[] reflection_type_names = {"convolution", "hybrid", "parametric"};
 int setting = 0;
@@ -61,6 +61,7 @@ string setting_value(int i) {
 		case 25: return "" + sonar_source.transmission_rays;
 		case 26: return round(walk_speed, 1) + " meters per second";
 		case 27: return step_size > 0 ? round(step_size, 2) + " meters" : "off, hold to walk";
+		case 28: return round(env.reflection_grouping, 2) + " of the distance";
 	}
 	return "";
 }
@@ -94,6 +95,7 @@ void change_setting(int i, int dir) { // dir is 1 to raise and -1 to lower. The 
 		case 25: sonar_source.transmission_rays = sonar_source.transmission_rays + dir; break;
 		case 26: walk_speed = fmax(0.2, walk_speed + 0.2 * dir); break;
 		case 27: step_size = fmax(0, step_size + 0.25 * dir); break;
+		case 28: env.reflection_grouping = env.reflection_grouping + 0.05 * dir; break;
 	}
 }
 
@@ -327,7 +329,7 @@ void main() {
 			screen_reader_speak(round(pos.x, 1) + ", " + round(pos.y, 1) + " in " + area_name(pos) + ", facing " + direction_name() + ", on " + (ground is null ? "nothing" : ground.name));
 		}
 		if (key_pressed(KEY_S)) {
-			screen_reader_speak("sonar occlusion " + round(sonar_source.occlusion, 2) + ", transmission " + round(sonar_source.transmission_low, 2) + " " + round(sonar_source.transmission_mid, 2) + " " + round(sonar_source.transmission_high, 2) + ", " + env.reflection_simulations + " reflection simulations");
+			screen_reader_speak("sonar occlusion " + round(sonar_source.occlusion, 2) + ", transmission " + round(sonar_source.transmission_low, 2) + " " + round(sonar_source.transmission_mid, 2) + " " + round(sonar_source.transmission_high, 2) + ", reflection group " + sonar_source.reflection_group + ", " + env.active_reflection_groups + " of " + env.max_sources + " groups in use, " + env.reflection_simulations + " reflection simulations");
 		}
 		if (key_pressed(KEY_RETURN)) toggle_doorway(pos);
 		if (key_pressed(KEY_R)) { env.reflections_level = env.reflections_level > 0 ? 0 : reflections_on_level; screen_reader_speak(env.reflections_level > 0 ? "reflections on" : "reflections off"); }

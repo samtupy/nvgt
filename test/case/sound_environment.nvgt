@@ -193,7 +193,7 @@ void test_sound_environment_new_sources() { // New sounds are heard with the lis
 	sound_environment_test_pump(e, env, 2);
 	assert(src.simulated and src.occlusion < 0.01, "a new source behind a wall should be occluded after a couple of updates, simulated " + src.simulated + ", occlusion " + src.occlusion);
 }
-void test_sound_environment_tail_after_release() { // A sound released while its reflections are still ringing keeps ringing until they end, then is freed.
+void test_sound_environment_tail_after_release() { // A sound released while its reflections are still ringing leaves the environment straight away, while its reflection group rings on.
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	physics_world@ world = sound_environment_test_room(false);
 	sound_environment env(e);
@@ -214,11 +214,10 @@ void test_sound_environment_tail_after_release() { // A sound released while its
 	sound_environment_test_energy(e, env, 12); // The burst and a little more.
 	@src = null;
 	@s = null;
-	assert(env.retired_source_count == 1, "the released sound should be kept to finish its reverb tail, " + env.retired_source_count + " are retired");
+	assert(env.source_count == 0, "the released sound should leave the environment, " + env.source_count + " sources remain");
 	double tail = sound_environment_test_energy(e, env, 40);
 	assert(tail > 1, "the released sound's reverb tail should continue, energy " + tail);
-	sound_environment_test_energy(e, env, 200); // Longer than the reflection duration.
-	assert(env.retired_source_count == 0 and env.source_count == 0, "the released sound should be freed once its tail ends, " + env.retired_source_count + " retired and " + env.source_count + " sources remain");
+	assert(env.active_reflection_groups == 0, "the group should have no members left, " + env.active_reflection_groups + " are active");
 }
 void sound_environment_test_wait_for_decoding(sound@ s) {
 	timer t;
@@ -276,11 +275,40 @@ void test_sound_environment_character_transparent() { // A sound inside a charac
 	c.acoustically_transparent = false;
 	assert(!world.get_acoustically_transparent(c.body));
 }
-void test_sound_environment_source_capacity() { // Steam Audio ignores sources beyond the simulator's capacity, so it must grow as sources are added rather than leaving the later ones without reflections.
+int[] sound_environment_test_groups(bool divided, const vector[]@ positions, const vector&in listener) { // The reflection group each of the given positions is assigned to.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(divided);
+	sound_environment env(e);
+	env.set_raycaster(world);
+	e.set_listener_position(0, listener);
+	mixer@[] mixers;
+	for (uint i = 0; i < positions.length(); i++) {
+		mixer@ m = env.new_mixer();
+		m.set_position_3d(positions[i].x, positions[i].y, positions[i].z);
+		mixers.insert_last(m);
+	}
+	sound_environment_test_pump(e, env, 4);
+	int[] groups;
+	for (uint i = 0; i < mixers.length(); i++) groups.insert_last(env.get_source(mixers[i]).reflection_group);
+	return groups;
+}
+void test_sound_environment_reflection_grouping() { // Sounds near each other share a reflection group over a distance that grows with their distance from the listener, unless something stands between them.
+	vector listener(-4, -4, 1.6);
+	int[]@ far = sound_environment_test_groups(false, {vector(3, 3, 1.5), vector(3.8, 3, 1.5)}, listener);
+	assert(far[0] >= 0 and far[0] == far[1], "two sounds 0.8 meters apart and 10 meters away should share a group, got " + far[0] + " and " + far[1]);
+	int[]@ near = sound_environment_test_groups(false, {vector(-3, -3, 1.5), vector(-3, -2.2, 1.5)}, listener);
+	assert(near[0] >= 0 and near[1] >= 0 and near[0] != near[1], "two sounds 0.8 meters apart right by the listener should have groups of their own, got " + near[0] + " and " + near[1]);
+	vector[] across = {vector(-0.6, 3, 1.5), vector(0.6, 3, 1.5)};
+	int[]@ open = sound_environment_test_groups(false, across, listener);
+	assert(open[0] >= 0 and open[0] == open[1], "two sounds 1.2 meters apart and 8 meters away should share a group, got " + open[0] + " and " + open[1]);
+	int[]@ walled = sound_environment_test_groups(true, across, listener);
+	assert(walled[0] >= 0 and walled[1] >= 0 and walled[0] != walled[1], "two sounds on either side of a wall should not share a group, got " + walled[0] + " and " + walled[1]);
+}
+void test_sound_environment_reflection_budget() { // With more sounds than reflection groups, sounds share groups rather than going without reflections.
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	physics_world@ world = sound_environment_test_room(false);
 	sound_environment env(e);
-	env.use_listener_reverb = false;
+	env.use_listener_reverb = false; // So that only the groups' reflections can be heard.
 	env.max_sources = 4;
 	env.set_raycaster(world);
 	e.set_listener_position(0, 0, 0, 1.6);
@@ -300,10 +328,11 @@ void test_sound_environment_source_capacity() { // Steam Audio ignores sources b
 		sound_environment_test_pump(e, env, 1);
 		wait(1);
 	}
-	assert(env.max_sources >= 10, "the capacity should have grown to fit 10 sources, it is " + env.max_sources);
-	assert(sound_environment_test_wait_for_reflections(e, env, env.reflection_simulations + 2));
+	assert(src.reflections_simulated, "the farthest of 10 sounds should have its reflections simulated in a shared group");
+	assert(env.max_sources == 4 and env.active_reflection_groups <= 4, "no more than 4 groups should be in use, " + env.active_reflection_groups + " are");
+	for (uint i = 0; i < mixers.length(); i++) assert(env.get_source(mixers[i]).reflection_group >= 0, "sound " + i + " should belong to a group");
 	s.play();
 	sound_environment_test_energy(e, env, 20);
 	double tail = sound_environment_test_energy(e, env, 40);
-	assert(tail > 10, "the last of more sources than the initial capacity should reverberate, tail energy " + tail);
+	assert(tail > 10, "a sound sharing a group should reverberate, tail energy " + tail);
 }

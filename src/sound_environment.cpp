@@ -1,5 +1,5 @@
 /* sound_environment.cpp - Steam Audio scene simulation (occlusion, transmission and reflections) for 3d sounds
- * The design follows Steam Audio's own engine integrations. Every sound or mixer created by or attached to a sound_environment is sent through the environment's reverb3d, whose attachment handler gives each of them a sound_environment_source node. That node applies the simulated occlusion and transmission to the sound's dry signal, and sends the sound to a per source reflection effect that accumulates into a reflection mixer shared by the whole environment, like the spatialize effect of the FMOD integration. The reverb3d's reverb node is the environment's return node, which applies the reflection mixer and decodes the resulting ambisonic sound field once for all sources, like the FMOD integration's mix return effect.
+ * The design follows Steam Audio's own engine integrations. Every sound or mixer created by or attached to a sound_environment is sent through the environment's reverb3d, whose attachment handler gives each of them a sound_environment_source node. That node applies the simulated occlusion and transmission to the sound's dry signal, like the spatialize effect of the FMOD integration. Reflections are simulated for a limited pool of reflection groups rather than for every sound: each sound adds its signal to the group nearest to it (see reflection_group), and the reverb3d's reverb node, the environment's return node, applies each group's reflection effect into a reflection mixer shared by the whole environment and decodes the resulting ambisonic sound field once, like the FMOD integration's mix return effect.
  * Simulation is scheduled like the Unity integration: sound_environment::update, called by the script each frame, runs the cheap direct simulation (occlusion and transmission) on the script thread and periodically hands the expensive reflection simulation to a worker thread, while changes to the simulator such as adding or removing sources are only made when that thread is idle. The scene is a Steam Audio custom scene that traces rays through an nvgt_raycast_provider such as a physics_world, so Steam Audio's own simulation threads and the provider (Jolt's narrow phase queries for physics_world) work in parallel.
  * This file only uses public NVGT interfaces and talks to Steam Audio through the object interfaces in phonon_interfaces.h, so that it could be moved into a plugin that receives the Steam Audio context from NVGT.
  *
@@ -141,6 +141,33 @@ struct source_slot {
 	}
 };
 
+// A simulated reflection source shared by every sound near its position. Sounds don't convolve their own reflections: each adds its mono signal to the input of the group it belongs to, and the return node applies one reflection effect per group, so the cost of reflections depends on the number of groups rather than the number of sounds, and a sound that ends simply stops adding to its group while the group's reverb tail rings on. The environment keeps a pool of max_sources groups and assigns sounds to them every update, nearest sounds first. Sounds farther from the listener share groups over larger distances, and when every group is taken, sounds join the nearest group they can or the listener's group, whose reflections are simulated at the listener's position.
+struct reflection_group {
+	// Script thread state.
+	source_slot source; // A Steam Audio reflections source, simulated at the group's position while it has members.
+	atomic<unsigned int> ready_at = 0; // The reflection simulation after which the group's reflections match its position, 0 if none has been scheduled since it was moved.
+	float x = 0.0f, y = 0.0f, z = 0.0f; // The simulated position, the centroid of the members.
+	float sum_x = 0.0f, sum_y = 0.0f, sum_z = 0.0f, nearest = 0.0f; // Gathered while assigning sounds. nearest is the distance from the listener of the nearest member, which decides which group gives way when a nearer sound needs one.
+	int members = 0;
+	// Audio thread state.
+	audio_config config;
+	ipl_ref<api::IReflectionEffect> effect;
+	ipl_ref<api::IAmbisonicsDecodeEffect> decode;
+	ipl_buffer send; // Mono sum of the members' signals this audio pass.
+	bool send_active = false, tail = false;
+	bool ready(unsigned int runs) const {
+		unsigned int at = ready_at;
+		return at && runs >= at;
+	}
+	void place(float px, float py, float pz) { // Script thread, moves the group to where a new member is.
+		x = px;
+		y = py;
+		z = pz;
+		ready_at = 0;
+	}
+};
+static constexpr int MAX_REFLECTION_GROUPS = 1024;
+
 // State shared by a sound_environment, its sources and its return node. Members marked as audio thread state are only touched from the thread processing the environment's audio engine, everything published from the script thread to the audio thread is atomic.
 class environment_core {
 	atomic<int> refcount = 1;
@@ -152,24 +179,23 @@ public:
 	int channels;
 	// Settings, set from the script thread. Changing those that the simulators or the audio effects are created with causes them to be rebuilt. The defaults are Unity's, except that fewer rays with many more bounces are traced for a similar cost, as the length of the reverb tail depends on the number of bounces while Steam Audio averages out the noise of fewer rays across simulations.
 	atomic<int> reflection_type = reflections_convolution;
-	atomic<int> rays = 2048, bounces = 32, order = 1, max_sources = 32, threads, diffuse_samples = 32, max_occlusion_samples = 16;
+	atomic<int> rays = 2048, bounces = 32, order = 1, max_sources = 16, threads, diffuse_samples = 32, max_occlusion_samples = 16;
 	atomic<float> duration = 1.0f, irradiance_min_distance = 1.0f, interval = 0.1f, hybrid_transition_time = 1.0f, hybrid_overlap = 0.25f;
+	atomic<float> reflection_grouping = 0.25f; // Sounds within this fraction of their distance from the listener of each other can share a reflection group.
 	atomic<bool> use_reflection_mixer = true, binaural = true, use_listener_reverb = true;
 	atomic<float> reflections_level = 0.5f, reflections_width = 4.0f, reflections_highpass = 160.0f; // Toned down from physically accurate levels and widened from Steam Audio's binaural decoding, which tends to sound overpowering and narrow in games.
 	atomic<unsigned long long> published_config = audio_config().pack(); // Audio effects are recreated when its generation changes.
 	// Listener orientation for ambisonic decoding, published by update.
 	mutex listener_mutex;
 	IPLCoordinateSpace3 listener{{1, 0, 0}, {0, 0, 1}, {0, 1, 0}, {0, 0, 0}};
-	// Reverb simulated at the listener's position, which sources use until their own reflections have been simulated so that new sounds, footsteps for example, reverberate immediately.
-	source_slot listener_source;
-	atomic<unsigned int> listener_ready_at = 0;
+	// Reflection groups. Groups are created as max_sources grows and live as long as the environment, so sources and the audio thread can refer to them without counting references. The listener's group is used by sounds without a group of their own, so that new sounds, footsteps for example, reverberate straight away.
+	reflection_group listener_group;
+	reflection_group* groups[MAX_REFLECTION_GROUPS] = {};
+	atomic<int> group_count = 0; // Groups are published to the audio thread by storing the pointer before raising the count.
+	atomic<int> active_groups = 0;
 	// Audio thread state.
 	api::IReflectionMixer* audio_mixer = nullptr; // Owned by the return node.
-	unsigned int audio_mixer_generation = 0; // Sources only write into the mixer if it was created for the same configuration as their effects.
 	IPLCoordinateSpace3 audio_listener{{1, 0, 0}, {0, 0, 1}, {0, 1, 0}, {0, 0, 0}};
-	ipl_buffer listener_send; // Mono sum of the sources sent to the listener reverb this audio pass, applied by the return node.
-	bool listener_send_active = false;
-	unsigned int listener_reverb_generation = 0; // The configuration generation the return node's listener reverb is ready for, 0 if it isn't.
 	// Simulation state, owned by the script thread. The reflection simulator is also used by the worker thread while it runs reflections, during which it can't be changed, so direct simulation (occlusion and transmission) has a simulator of its own that new sources can always be added to straight away.
 	ipl_ref<api::IScene> scene;
 	ipl_ref<api::ISimulator> simulator, direct_simulator;
@@ -178,8 +204,7 @@ public:
 	bool rebuild_needed = true, scene_needed = true;
 	mutex sources_mutex; // Guards the following, as sources can be released from any thread.
 	vector<environment_source*> sources;
-	vector<environment_source*> retired; // Sources released while their reverb tail was still playing, owned here until it finishes.
-	vector<api::ISource*> removed_sources, removed_direct_sources; // Retained sources whose nodes were destroyed, removed from their simulators later.
+	vector<api::ISource*> removed_direct_sources; // Retained direct sources whose nodes were destroyed, removed from the direct simulator by the next update.
 	thread worker;
 	mutex worker_mutex;
 	condition_variable worker_cv;
@@ -202,14 +227,14 @@ public:
 			hrtf_settings.volume = 1.0f;
 			context->createHRTF(&audio_settings, &hrtf_settings, hrtf.put());
 		}
-		listener_send.allocate(context, 1, audio_settings.frameSize);
-		listener_send.clear();
+		listener_group.send.allocate(context, 1, audio_settings.frameSize);
+		listener_group.send.clear();
 	}
 	~environment_core() {
 		shutdown();
-		for (api::ISource* s : removed_sources) s->release();
 		for (api::ISource* s : removed_direct_sources) s->release();
-		listener_source.publish(nullptr);
+		for (int i = 0; i < group_count; i++) delete groups[i];
+		listener_group.source.publish(nullptr);
 		simulator.reset();
 		direct_simulator.reset();
 		scene.reset();
@@ -255,35 +280,43 @@ public:
 		lock_guard<mutex> l(sources_mutex);
 		sources.push_back(s);
 	}
-	void retire_sources(api::ISource* simulated, api::ISource* direct) {
+	void remove_direct_source(api::ISource* direct) {
+		if (!direct) return;
 		lock_guard<mutex> l(sources_mutex);
-		if (simulated) removed_sources.push_back(simulated); // The node's references are handed over and released once the sources are removed from their simulators.
-		if (direct) removed_direct_sources.push_back(direct);
+		removed_direct_sources.push_back(direct); // The node's reference is handed over and released once the source is removed from the direct simulator.
 	}
-	void release_retired(bool all);
+	bool visible(float ax, float ay, float az, float bx, float by, float bz) { // Script thread, whether nothing blocks the straight line between two points.
+		if (!provider) return true;
+		float dx = bx - ax, dy = by - ay, dz = bz - az, length = sqrt(dx * dx + dy * dy + dz * dz);
+		if (length < 0.001f) return true;
+		nvgt_ray ray{{ax, ay, az}, {dx / length, dy / length, dz / length}};
+		float min_distance = 0.0f;
+		unsigned char occluded = 0;
+		provider->any_hits(1, &ray, &min_distance, &length, &occluded);
+		return !occluded;
+	}
 	bool rebuild();
-	void attach_new_sources(bool idle);
+	void attach_new_sources();
+	void assign_groups(const vector<environment_source*>& current, float lx, float ly, float lz);
 	void update();
 };
 
-// The node every sound attached to an environment is sent through, published to scripts as sound_environment_source. Bus 0 carries the sound's dry signal with occlusion and transmission applied, bus 1 is the send to the environment's reverb3d, which is silent while the reflection mixer or listener reverb is in use as those are applied by the environment's return node.
+// The node every sound attached to an environment is sent through, published to scripts as sound_environment_source. Bus 0 carries the sound's dry signal with occlusion and transmission applied. The sound's reflections are applied by its reflection group in the environment's return node, so bus 1, the send to the environment's reverb3d, is silent.
 class environment_source : public effect_node_impl, public virtual splitter_node {
 	// Audio thread state.
 	audio_config config;
 	ipl_ref<api::IDirectEffect> direct_effect;
-	ipl_ref<api::IReflectionEffect> reflection_effect;
-	ipl_ref<api::IAmbisonicsDecodeEffect> decode_effect;
-	ipl_buffer in_buffer, out_buffer, mono_buffer, ambisonics_buffer, decoded_buffer;
+	ipl_buffer in_buffer, out_buffer, mono_buffer;
 	float previous_level = 0.0f;
+	reflection_group* sending = nullptr; // The group this source's signal is added to, which changes with a crossfade over one frame.
 public:
 	environment_core* core;
-	source_slot reflection_source, direct_source;
-	atomic<unsigned int> ready_at = 0; // The reflection simulation after which this source's own reflections are available, 0 if none has been scheduled yet.
-	atomic<bool> has_position = false, tail_remaining = false;
+	source_slot direct_source;
+	atomic<bool> has_position = false;
 	atomic<bool> direct_ready = false; // Whether the direct source has been simulated, before which its outputs read as fully occluded, muting the start of new sounds when their first audio was processed before the simulation.
 	atomic<float> x = 0.0f, y = 0.0f, z = 0.0f;
-	bool retired = false; // Guarded by the core's sources_mutex.
-	chrono::steady_clock::time_point retired_at;
+	reflection_group* assigned = nullptr; // Script thread, the source's reflection group or null for the listener's.
+	atomic<reflection_group*> group = nullptr; // assigned, published to the audio thread.
 	// Settings.
 	atomic<bool> apply_occlusion = true, apply_transmission = true, apply_reflections = true;
 	atomic<float> reflections_level = 1.0f, occlusion_radius = 1.0f;
@@ -299,49 +332,37 @@ public:
 	}
 	~environment_source() {
 		destroy_node(); // Stop processing before tearing down audio state.
-		core->retire_sources(reflection_source.detach_script(), direct_source.detach_script());
+		core->remove_direct_source(direct_source.detach_script());
 		core->release();
 	}
-	void release() override { // The environment's update duplicates its sources while holding sources_mutex, so a source must leave that list under the same lock before it can be deleted, or update could revive one whose last reference is being released. A source whose reflections are still ringing out is kept alive by the environment until they finish.
+	void release() override { // The environment's update duplicates its sources while holding sources_mutex, so a source must leave that list under the same lock before it can be deleted, or update could revive one whose last reference is being released.
 		environment_core* c = core;
 		{
 			lock_guard<mutex> l(c->sources_mutex);
 			if (asAtomicDec(refcount) > 0) return;
 			c->sources.erase(std::remove(c->sources.begin(), c->sources.end(), this), c->sources.end());
-			if (!retired && tail_remaining && !c->shut_down) {
-				retired = true;
-				retired_at = chrono::steady_clock::now();
-				asAtomicInc(refcount);
-				c->retired.push_back(this);
-				return;
-			}
 		}
 		delete this;
 	}
-	bool own_reflections_ready() const {
-		unsigned int at = ready_at;
-		return at && core->reflection_runs >= at;
-	}
 	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
-		// Always produce every requested frame, treating missing input as silence, so that reflection tails continue after the sound stops.
 		const unsigned int frames = *frame_count_out, channels = core->channels;
-		const unsigned int available = frames_in && frames_in[0] ? min(*frame_count_in, frames) : 0; // With MA_NODE_FLAG_ALLOW_NULL_INPUT the input array itself is null once nothing is attached, as for a retired source finishing its reverb tail.
+		const unsigned int available = frames_in && frames_in[0] ? min(*frame_count_in, frames) : 0; // With MA_NODE_FLAG_ALLOW_NULL_INPUT the input array itself is null once nothing is attached.
 		float* dry = frames_out[0];
-		float* send = frames_out[1];
 		if (available) memcpy(dry, frames_in[0], available * channels * sizeof(float)); // The input is processed in place in the dry output, each chunk being read before it is written.
 		if (available < frames) memset(dry + available * channels, 0, (frames - available) * channels * sizeof(float));
-		const float* in = dry;
-		memset(send, 0, frames * channels * sizeof(float));
+		memset(frames_out[1], 0, frames * channels * sizeof(float));
 		api::ISource* direct = direct_source.take();
-		api::ISource* reflections_src = reflection_source.take();
-		if (!direct || !prepare(frames)) return;
+		if (!direct || !prepare()) return;
 		api::IContext* ctx = core->context;
 		const int frame_size = core->audio_settings.frameSize;
-		const bool own_ready = reflections_src && own_reflections_ready();
+		const unsigned int runs = core->reflection_runs;
+		reflection_group* target = group.load();
+		if (!target || !target->ready(runs)) target = core->use_listener_reverb && core->listener_group.ready(runs) ? &core->listener_group : nullptr; // Until a group's reflections have been simulated where it is, its members are heard with the listener's.
+		if (!apply_reflections) target = nullptr;
 		for (unsigned int offset = 0; offset < frames; offset += frame_size) {
 			const int n = (int)min<unsigned int>(frame_size, frames - offset);
 			in_buffer.b.numSamples = out_buffer.b.numSamples = n;
-			ctx->deinterleaveAudioBuffer(const_cast<float*>(in) + offset * core->channels, &in_buffer.b);
+			ctx->deinterleaveAudioBuffer(dry + offset * channels, &in_buffer.b);
 			// Dry path: occlusion and transmission.
 			IPLSimulationOutputs outputs{};
 			direct->getOutputs(IPL_SIMULATIONFLAGS_DIRECT, &outputs);
@@ -350,67 +371,50 @@ public:
 			direct_params.transmissionType = IPL_TRANSMISSIONTYPE_FREQDEPENDENT;
 			if (direct_params.flags && direct_ready) {
 				direct_effect->apply(&direct_params, &in_buffer.b, &out_buffer.b);
-				ctx->interleaveAudioBuffer(&out_buffer.b, dry + offset * core->channels);
+				ctx->interleaveAudioBuffer(&out_buffer.b, dry + offset * channels);
 			}
-			// Reflections, only on whole Steam Audio frames as the reflection mixer and listener reverb accumulate exactly one frame per source per audio graph pass.
-			if (!apply_reflections || n != frame_size) continue;
-			api::IReflectionMixer* mixer = core->audio_mixer_generation == config.generation ? core->audio_mixer : nullptr; // While the return node hasn't caught up with a new configuration this source decodes its own reflections.
-			bool silent = true; // A stopped or retired sound, whose input may still be attached but silent. Steam Audio's effects only count their tails down through getTail, as apply keeps reporting a tail for as long as it's called, and skipping silence entirely once the tail is over saves the convolution.
+			// Reflections, only on whole Steam Audio frames as each group's effect is applied to exactly one frame per audio graph pass.
+			if (n != frame_size) continue;
+			reflection_group* previous = sending;
+			sending = target;
+			if (!target && !previous) continue;
+			bool silent = true; // Skipping silence saves the downmix, the groups ring on by themselves.
 			for (int c = 0; c < in_buffer.b.numChannels && silent; c++) for (int i = 0; i < n; i++) if (in_buffer.b.data[c][i] != 0.0f) {
 				silent = false;
 				break;
 			}
-			if (silent) {
-				if (!own_ready || !tail_remaining) continue;
-				IPLAudioEffectState state = reflection_effect->getTail(&ambisonics_buffer.b, mixer);
-				if (!mixer) {
-					IPLAmbisonicsDecodeEffectParams decode{config.order, reinterpret_cast<IPLHRTF>(core->hrtf.get()), core->audio_listener, core->binaural && core->channels == 2 ? IPL_TRUE : IPL_FALSE};
-					decode_effect->apply(&decode, &ambisonics_buffer.b, &decoded_buffer.b);
-					ctx->interleaveAudioBuffer(&decoded_buffer.b, send + offset * core->channels);
-				}
-				tail_remaining = state == IPL_AUDIOEFFECTSTATE_TAILREMAINING;
-				continue;
-			}
+			if (silent) continue;
 			ctx->downmixAudioBuffer(&in_buffer.b, &mono_buffer.b);
 			float level = reflections_level * core->reflections_level;
-			for (int i = 0; i < n; i++) mono_buffer.b.data[0][i] *= previous_level + (level - previous_level) * (i / (float)n); // Ramp level changes to avoid clicks.
-			previous_level = level;
-			if (!own_ready) { // Until this source's own reflections have been simulated, it is heard with the reverb at the listener's position.
-				if (core->use_listener_reverb && core->listener_reverb_generation == config.generation) {
-					for (int i = 0; i < n; i++) core->listener_send.b.data[0][i] += mono_buffer.b.data[0][i];
-					core->listener_send_active = true;
+			const float* mono = mono_buffer.b.data[0];
+			if (previous == target) { // Ramp level changes to avoid clicks.
+				float* send = target->send.b.data[0];
+				for (int i = 0; i < n; i++) send[i] += mono[i] * (previous_level + (level - previous_level) * (i / (float)n));
+				target->send_active = true;
+			} else { // Crossfade from the previous group to the new one.
+				if (previous) {
+					float* send = previous->send.b.data[0];
+					for (int i = 0; i < n; i++) send[i] += mono[i] * previous_level * (1.0f - i / (float)n);
+					previous->send_active = true;
 				}
-				continue;
+				if (target) {
+					float* send = target->send.b.data[0];
+					for (int i = 0; i < n; i++) send[i] += mono[i] * level * (i / (float)n);
+					target->send_active = true;
+				}
 			}
-			reflections_src->getOutputs(IPL_SIMULATIONFLAGS_REFLECTIONS, &outputs);
-			IPLReflectionEffectParams reflections = outputs.reflections;
-			reflections.type = (IPLReflectionEffectType)config.type;
-			reflections.numChannels = config.channels();
-			reflections.irSize = config.ir_size;
-			IPLAudioEffectState state = reflection_effect->apply(&reflections, &mono_buffer.b, &ambisonics_buffer.b, mixer);
-			if (!mixer) {
-				IPLAmbisonicsDecodeEffectParams decode{config.order, reinterpret_cast<IPLHRTF>(core->hrtf.get()), core->audio_listener, core->binaural && core->channels == 2 ? IPL_TRUE : IPL_FALSE};
-				if (decode_effect->apply(&decode, &ambisonics_buffer.b, &decoded_buffer.b) == IPL_AUDIOEFFECTSTATE_TAILREMAINING) state = IPL_AUDIOEFFECTSTATE_TAILREMAINING;
-				ctx->interleaveAudioBuffer(&decoded_buffer.b, send + offset * core->channels);
-			}
-			tail_remaining = state == IPL_AUDIOEFFECTSTATE_TAILREMAINING;
+			previous_level = level;
 		}
 	}
-	bool prepare(unsigned int frames) { // Creates or recreates the audio thread's effects when the environment's configuration changed.
+	bool prepare() { // Creates or recreates the audio thread's effects when the environment's configuration changed.
 		audio_config c = audio_config::unpack(core->published_config);
 		if (c.generation == config.generation && direct_effect) return true;
 		config.generation = 0; // Invalid until everything is created.
-		tail_remaining = false;
 		api::IContext* ctx = core->context;
 		IPLAudioSettings settings = core->audio_settings;
-		int order = c.order, ambisonics = c.channels();
 		IPLDirectEffectSettings direct_settings{core->channels};
-		IPLReflectionEffectSettings reflection_settings{(IPLReflectionEffectType)c.type, c.ir_size, ambisonics};
-		IPLAmbisonicsDecodeEffectSettings decode_settings{speaker_layout_for_channels(core->channels), reinterpret_cast<IPLHRTF>(core->hrtf.get()), order};
 		if (!direct_effect && ctx->createDirectEffect(&settings, &direct_settings, direct_effect.put()) != IPL_STATUS_SUCCESS) return false;
-		if (ctx->createReflectionEffect(&settings, &reflection_settings, reflection_effect.put()) != IPL_STATUS_SUCCESS) return false;
-		if (ctx->createAmbisonicsDecodeEffect(&settings, &decode_settings, decode_effect.put()) != IPL_STATUS_SUCCESS) return false;
-		if (!in_buffer.allocate(ctx, core->channels, settings.frameSize) || !out_buffer.allocate(ctx, core->channels, settings.frameSize) || !mono_buffer.allocate(ctx, 1, settings.frameSize) || !ambisonics_buffer.allocate(ctx, ambisonics, settings.frameSize) || !decoded_buffer.allocate(ctx, core->channels, settings.frameSize)) return false;
+		if (!in_buffer.allocate(ctx, core->channels, settings.frameSize) || !out_buffer.allocate(ctx, core->channels, settings.frameSize) || !mono_buffer.allocate(ctx, 1, settings.frameSize)) return false;
 		config = c;
 		return true;
 	}
@@ -420,9 +424,9 @@ public:
 		z = params.sound_z;
 		has_position = true;
 	}
-	IPLSimulationInputs inputs(IPLSimulationFlags flags) const {
+	IPLSimulationInputs direct_inputs() const {
 		IPLSimulationInputs in{};
-		in.flags = flags;
+		in.flags = IPL_SIMULATIONFLAGS_DIRECT;
 		in.directFlags = (IPLDirectSimulationFlags)(IPL_DIRECTSIMULATIONFLAGS_OCCLUSION | IPL_DIRECTSIMULATIONFLAGS_TRANSMISSION);
 		in.source = {{1, 0, 0}, {0, 0, 1}, {0, 1, 0}, {x, y, z}};
 		in.distanceAttenuationModel.type = IPL_DISTANCEATTENUATIONTYPE_DEFAULT;
@@ -431,9 +435,6 @@ public:
 		in.occlusionRadius = occlusion_radius;
 		in.numOcclusionSamples = min<int>(occlusion_samples, core->max_occlusion_samples);
 		in.numTransmissionRays = transmission_rays;
-		in.reverbScale[0] = in.reverbScale[1] = in.reverbScale[2] = 1.0f;
-		in.hybridReverbTransitionTime = core->hybrid_transition_time;
-		in.hybridReverbOverlapPercent = core->hybrid_overlap;
 		return in;
 	}
 	void read_results() { // Script thread, after a direct simulation.
@@ -444,8 +445,9 @@ public:
 			for (int i = 0; i < 3; i++) transmission[i] = out.direct.transmission[i];
 			simulated = true;
 		}
-		if (reflection_source.script) {
-			reflection_source.script->getOutputs(IPL_SIMULATIONFLAGS_REFLECTIONS, &out);
+		reflection_group* g = assigned ? assigned : &core->listener_group;
+		if (g->source.script && g->ready(core->reflection_runs)) {
+			g->source.script->getOutputs(IPL_SIMULATIONFLAGS_REFLECTIONS, &out);
 			for (int i = 0; i < 3; i++) reverb_times[i] = out.reflections.reverbTimes[i];
 		}
 	}
@@ -467,49 +469,45 @@ public:
 	int get_transmission_rays() const { return transmission_rays; }
 	void set_transmission_rays(int v) { transmission_rays = clamp(v, 1, 64); }
 	bool get_simulated() const { return simulated; }
-	bool get_reflections_simulated() const { return own_reflections_ready(); }
+	bool get_reflections_simulated() const { return assigned && assigned->ready(core->reflection_runs); }
+	int get_reflection_group() const {
+		for (int i = 0; i < core->group_count; i++) if (core->groups[i] == assigned) return i;
+		return -1;
+	}
 	float get_occlusion() const { return occlusion; }
 	float get_transmission(int band) const { return band >= 0 && band < 3 ? transmission[band].load() : 0.0f; }
 	float get_reverb_time(int band) const { return band >= 0 && band < 3 ? reverb_times[band].load() : 0.0f; }
 };
 
-void environment_core::release_retired(bool all) { // Script thread. Releases retired sources whose reverb tails have finished, or all of them.
-	vector<environment_source*> done;
-	{
-		lock_guard<mutex> l(sources_mutex);
-		auto now = chrono::steady_clock::now();
-		for (auto it = retired.begin(); it != retired.end();) {
-			environment_source* s = *it;
-			if (all || !s->tail_remaining || chrono::duration<float>(now - s->retired_at).count() > duration + 1.0f) { // The time limit is a safety net should the audio thread stop processing the source.
-				done.push_back(s);
-				it = retired.erase(it);
-			} else ++it;
-		}
-	}
-	for (environment_source* s : done) s->release(); // Retired sources are deleted on their final release.
-}
 static ipl_ref<api::ISimulator>& create_simulator(api::IContext* context, IPLSimulationSettings& settings, ipl_ref<api::ISimulator>& out) {
 	if (context->createSimulator(&settings, out.put()) != IPL_STATUS_SUCCESS) out.reset();
 	return out;
+}
+static api::ISource* create_reflection_source(api::ISimulator* simulator) {
+	IPLSourceSettings source_settings{IPL_SIMULATIONFLAGS_REFLECTIONS};
+	api::ISource* created = nullptr;
+	if (simulator->createSource(&source_settings, &created) != IPL_STATUS_SUCCESS) return nullptr;
+	created->add(simulator);
+	return created;
 }
 bool environment_core::rebuild() { // Script thread, only while the worker is idle.
 	vector<environment_source*> current;
 	{
 		lock_guard<mutex> l(sources_mutex);
 		current = sources;
-		for (api::ISource* s : removed_sources) s->release(); // The old simulators are going away with them.
-		for (api::ISource* s : removed_direct_sources) s->release();
-		removed_sources.clear();
+		for (api::ISource* s : removed_direct_sources) s->release(); // The old direct simulator is going away with them.
 		removed_direct_sources.clear();
 		for (environment_source* s : current) {
-			s->reflection_source.publish(nullptr);
 			s->direct_source.publish(nullptr);
 			s->direct_ready = false;
-			s->ready_at = 0;
 		}
 	}
-	listener_source.publish(nullptr);
-	listener_ready_at = 0;
+	listener_group.source.publish(nullptr);
+	listener_group.ready_at = 0;
+	for (int i = 0; i < group_count; i++) {
+		groups[i]->source.publish(nullptr);
+		groups[i]->ready_at = 0;
+	}
 	if (scene_needed || !scene) {
 		IPLSceneSettings scene_settings{};
 		scene_settings.type = IPL_SCENETYPE_CUSTOM;
@@ -534,7 +532,7 @@ bool environment_core::rebuild() { // Script thread, only while the worker is id
 	settings.numDiffuseSamples = diffuse_samples;
 	settings.maxDuration = duration;
 	settings.maxOrder = order;
-	settings.maxNumSources = max_sources + 1; // Including the listener reverb.
+	settings.maxNumSources = max_sources + 1; // Including the listener's group.
 	settings.numThreads = threads;
 	settings.rayBatchSize = 64; // Rays reach the raycast provider in batches of this many. Larger batches spread the provider's per call costs, such as Jolt's broadphase lock, over more rays, while 2048 rays still make 32 jobs to share among the simulation threads.
 	settings.samplingRate = audio_settings.samplingRate;
@@ -545,6 +543,25 @@ bool environment_core::rebuild() { // Script thread, only while the worker is id
 	if (!create_simulator(context, settings, direct_simulator)) return false;
 	simulator->setScene(scene.get());
 	direct_simulator->setScene(scene.get());
+	// The pool of groups, each with a reflections source that is simulated while the group has members.
+	const int pool = max_sources;
+	while (group_count < pool) {
+		reflection_group* g = new reflection_group();
+		g->send.allocate(context, 1, audio_settings.frameSize);
+		g->send.clear();
+		groups[group_count] = g;
+		group_count++;
+	}
+	if (api::ISource* s = create_reflection_source(simulator.get())) {
+		listener_group.source.publish(s);
+		s->release();
+	}
+	for (int i = 0; i < pool; i++) {
+		if (api::ISource* s = create_reflection_source(simulator.get())) {
+			groups[i]->source.publish(s);
+			s->release();
+		}
+	}
 	simulator->commit();
 	direct_simulator->commit();
 	audio_config c = audio_config::unpack(published_config);
@@ -559,79 +576,141 @@ bool environment_core::rebuild() { // Script thread, only while the worker is id
 	rebuild_needed = false;
 	return true;
 }
-void environment_core::attach_new_sources(bool idle) { // Script thread. Direct sources can always be attached, reflection sources only while the worker is idle.
-	bool direct_changed = false, reflections_changed = false;
-	vector<api::ISource*> removed, removed_direct;
+void environment_core::attach_new_sources() { // Script thread. Direct sources can be added to the direct simulator at any time, as only the script thread uses it.
+	bool changed = false;
+	vector<api::ISource*> removed;
 	{
 		lock_guard<mutex> l(sources_mutex);
-		removed_direct.swap(removed_direct_sources);
-		if (idle) removed.swap(removed_sources);
+		removed.swap(removed_direct_sources);
 		for (environment_source* s : sources) {
-			if (!s->direct_source.script) {
-				IPLSourceSettings source_settings{IPL_SIMULATIONFLAGS_DIRECT};
-				api::ISource* created = nullptr;
-				if (direct_simulator->createSource(&source_settings, &created) == IPL_STATUS_SUCCESS) {
-					created->add(direct_simulator.get());
-					s->direct_ready = false;
-					s->direct_source.publish(created);
-					created->release();
-					direct_changed = true;
-				}
-			}
-			if (idle && !s->reflection_source.script) {
-				IPLSourceSettings source_settings{IPL_SIMULATIONFLAGS_REFLECTIONS};
-				api::ISource* created = nullptr;
-				if (simulator->createSource(&source_settings, &created) == IPL_STATUS_SUCCESS) {
-					created->add(simulator.get());
-					s->reflection_source.publish(created);
-					created->release();
-					reflections_changed = true;
-				}
-			}
-		}
-	}
-	if (idle && !listener_source.script) {
-		IPLSourceSettings source_settings{IPL_SIMULATIONFLAGS_REFLECTIONS};
-		api::ISource* created = nullptr;
-		if (simulator->createSource(&source_settings, &created) == IPL_STATUS_SUCCESS) {
-			created->add(simulator.get());
-			listener_source.publish(created);
+			if (s->direct_source.script) continue;
+			IPLSourceSettings source_settings{IPL_SIMULATIONFLAGS_DIRECT};
+			api::ISource* created = nullptr;
+			if (direct_simulator->createSource(&source_settings, &created) != IPL_STATUS_SUCCESS) continue;
+			created->add(direct_simulator.get());
+			s->direct_ready = false;
+			s->direct_source.publish(created);
 			created->release();
-			reflections_changed = true;
+			changed = true;
 		}
-	}
-	for (api::ISource* s : removed_direct) {
-		s->remove(direct_simulator.get());
-		s->release();
-		direct_changed = true;
 	}
 	for (api::ISource* s : removed) {
-		s->remove(simulator.get());
+		s->remove(direct_simulator.get());
 		s->release();
-		reflections_changed = true;
+		changed = true;
 	}
-	if (direct_changed) direct_simulator->commit();
-	if (reflections_changed) simulator->commit();
+	if (changed) direct_simulator->commit();
+}
+void environment_core::assign_groups(const vector<environment_source*>& current, float lx, float ly, float lz) { // Script thread. Assigns every source with reflections to a reflection group, see reflection_group.
+	struct candidate {
+		environment_source* s;
+		float x, y, z, distance, radius;
+	};
+	vector<candidate> candidates;
+	candidates.reserve(current.size());
+	const float grouping = reflection_grouping;
+	for (environment_source* s : current) {
+		if (!s->has_position || !s->apply_reflections) {
+			s->assigned = nullptr;
+			s->group = nullptr;
+			continue;
+		}
+		float x = s->x, y = s->y, z = s->z;
+		float distance = sqrt((x - lx) * (x - lx) + (y - ly) * (y - ly) + (z - lz) * (z - lz));
+		candidates.push_back({s, x, y, z, distance, max(0.25f, distance * grouping)});
+	}
+	sort(candidates.begin(), candidates.end(), [](const candidate& a, const candidate& b) { return a.distance < b.distance; }); // Nearer sounds have the first claim on groups.
+	const int pool = min<int>(max_sources, group_count);
+	for (int i = 0; i < pool; i++) {
+		reflection_group* g = groups[i];
+		g->members = 0;
+		g->sum_x = g->sum_y = g->sum_z = 0.0f;
+	}
+	auto join = [](candidate& c, reflection_group* g) {
+		if (!g->members) g->nearest = c.distance;
+		g->members++;
+		g->sum_x += c.x;
+		g->sum_y += c.y;
+		g->sum_z += c.z;
+		c.s->assigned = g;
+	};
+	auto distance_to = [](const candidate& c, const reflection_group* g) { return sqrt((c.x - g->x) * (c.x - g->x) + (c.y - g->y) * (c.y - g->y) + (c.z - g->z) * (c.z - g->z)); };
+	// Sources stay in their group while they remain near it and in view of it, so that groups don't change from one update to the next.
+	vector<candidate*> unassigned;
+	for (candidate& c : candidates) {
+		reflection_group* g = c.s->assigned;
+		bool keep = false;
+		for (int i = 0; i < pool && !keep; i++) keep = groups[i] == g;
+		if (keep && distance_to(c, g) <= c.radius * 1.5f && visible(c.x, c.y, c.z, g->x, g->y, g->z)) join(c, g);
+		else {
+			c.s->assigned = nullptr;
+			unassigned.push_back(&c);
+		}
+	}
+	for (candidate* c : unassigned) {
+		// Join the nearest group in reach, or take a free group, or when every group is taken, take over the group whose nearest member is much farther away than this sound, or join a group a little farther out than usual. Failing all of those, the sound uses the listener's group.
+		reflection_group* best = nullptr;
+		float best_distance = 0.0f;
+		for (int i = 0; i < pool; i++) {
+			reflection_group* g = groups[i];
+			if (!g->members) continue;
+			float d = distance_to(*c, g);
+			if (d <= c->radius && (!best || d < best_distance) && visible(c->x, c->y, c->z, g->x, g->y, g->z)) {
+				best = g;
+				best_distance = d;
+			}
+		}
+		if (best) {
+			join(*c, best);
+			continue;
+		}
+		reflection_group* free_group = nullptr;
+		for (int i = 0; i < pool && !free_group; i++) if (!groups[i]->members) free_group = groups[i];
+		if (!free_group) {
+			reflection_group* farthest = nullptr;
+			for (int i = 0; i < pool; i++) if (!farthest || groups[i]->nearest > farthest->nearest) farthest = groups[i];
+			if (farthest && farthest->nearest > c->distance * 2.0f) {
+				for (candidate& other : candidates) if (other.s->assigned == farthest) other.s->assigned = nullptr; // They look for another group at the next update.
+				free_group = farthest;
+				free_group->members = 0;
+				free_group->sum_x = free_group->sum_y = free_group->sum_z = 0.0f;
+			}
+		}
+		if (free_group) {
+			free_group->place(c->x, c->y, c->z);
+			join(*c, free_group);
+			continue;
+		}
+		for (int i = 0; i < pool; i++) {
+			reflection_group* g = groups[i];
+			float d = distance_to(*c, g);
+			if (d <= c->radius * 3.0f && (!best || d < best_distance) && visible(c->x, c->y, c->z, g->x, g->y, g->z)) {
+				best = g;
+				best_distance = d;
+			}
+		}
+		if (best) join(*c, best);
+	}
+	int active = 0;
+	for (int i = 0; i < pool; i++) {
+		reflection_group* g = groups[i];
+		if (!g->members) continue;
+		active++;
+		g->x = g->sum_x / g->members;
+		g->y = g->sum_y / g->members;
+		g->z = g->sum_z / g->members;
+	}
+	active_groups = active;
+	for (candidate& c : candidates) c.s->group = c.s->assigned;
 }
 void environment_core::update() { // Script thread.
 	if (shut_down) return;
-	release_retired(false);
-	{
-		lock_guard<mutex> l(sources_mutex);
-		const int needed = (int)(sources.size() + retired.size()); // Retired sources stay in the simulator until their tails end.
-		if (needed > max_sources && max_sources < 1024) { // Steam Audio silently leaves sources beyond the simulator's capacity without reflections, so the capacity grows with the number of sources instead.
-			int capacity = max_sources;
-			while (capacity < needed) capacity *= 2;
-			max_sources = min(capacity, 1024);
-			rebuild_needed = true;
-		}
-	}
 	bool idle = !worker_busy;
 	if (idle && (rebuild_needed || scene_needed || !simulator)) {
 		if (!rebuild()) return;
 	}
 	if (!simulator || !direct_simulator) return;
-	attach_new_sources(idle);
+	attach_new_sources();
 	// The listener, taken from the audio engine's first listener. Steam Audio's coordinate system is right handed, so right is the cross product of ahead and up.
 	vector3 pos = engine->get_listener_position(0), ahead = engine->get_listener_direction(0), up = engine->get_listener_world_up(0);
 	if (ahead.IsNearZero()) ahead = vector3(0, 1, 0);
@@ -664,7 +743,7 @@ void environment_core::update() { // Script thread.
 	direct_simulator->setSharedInputs(IPL_SIMULATIONFLAGS_DIRECT, &shared);
 	for (environment_source* s : current) {
 		if (!s->direct_source.script || !s->has_position) continue;
-		IPLSimulationInputs in = s->inputs(IPL_SIMULATIONFLAGS_DIRECT);
+		IPLSimulationInputs in = s->direct_inputs();
 		s->direct_source.script->setInputs(IPL_SIMULATIONFLAGS_DIRECT, &in);
 	}
 	direct_simulator->runDirect();
@@ -674,54 +753,50 @@ void environment_core::update() { // Script thread.
 		if (s->direct_source.script) s->direct_ready = true;
 	}
 	direct_time = chrono::duration<float, milli>(chrono::steady_clock::now() - direct_start).count();
-	// Reflections on the worker thread at the configured interval, inputs can only be changed while it is idle.
+	assign_groups(current, pos.GetX(), pos.GetY(), pos.GetZ());
+	// Reflections on the worker thread at the configured interval, inputs can only be changed while it is idle. Groups without members aren't simulated.
 	auto now = chrono::steady_clock::now();
 	if (idle && chrono::duration<float>(now - last_reflections).count() >= interval) {
 		last_reflections = now;
 		const unsigned int run = reflection_runs + 1;
 		simulator->setSharedInputs(IPL_SIMULATIONFLAGS_REFLECTIONS, &shared);
-		bool any = false;
-		for (environment_source* s : current) {
-			if (!s->reflection_source.script || !s->has_position) continue;
-			IPLSimulationInputs in = s->inputs(s->apply_reflections ? IPL_SIMULATIONFLAGS_REFLECTIONS : (IPLSimulationFlags)0);
-			s->reflection_source.script->setInputs(IPL_SIMULATIONFLAGS_REFLECTIONS, &in);
-			if (!s->ready_at && s->apply_reflections) s->ready_at = run;
-			any = true;
-		}
-		if (listener_source.script && use_listener_reverb) {
+		auto set_inputs = [&](reflection_group* g, bool active, const IPLCoordinateSpace3& space) {
+			if (!g->source.script) return;
 			IPLSimulationInputs in{};
-			in.flags = IPL_SIMULATIONFLAGS_REFLECTIONS;
-			in.source = listener_space;
+			in.flags = active ? IPL_SIMULATIONFLAGS_REFLECTIONS : (IPLSimulationFlags)0;
+			in.source = space;
 			in.distanceAttenuationModel.type = IPL_DISTANCEATTENUATIONTYPE_DEFAULT;
 			in.airAbsorptionModel.type = IPL_AIRABSORPTIONTYPE_DEFAULT;
 			in.reverbScale[0] = in.reverbScale[1] = in.reverbScale[2] = 1.0f;
 			in.hybridReverbTransitionTime = hybrid_transition_time;
 			in.hybridReverbOverlapPercent = hybrid_overlap;
-			listener_source.script->setInputs(IPL_SIMULATIONFLAGS_REFLECTIONS, &in);
-			if (!listener_ready_at) listener_ready_at = run;
-			any = true;
+			g->source.script->setInputs(IPL_SIMULATIONFLAGS_REFLECTIONS, &in);
+			if (active && !g->ready_at) g->ready_at = run;
+		};
+		set_inputs(&listener_group, use_listener_reverb, listener_space);
+		const int pool = min<int>(max_sources, group_count);
+		for (int i = 0; i < pool; i++) {
+			reflection_group* g = groups[i];
+			set_inputs(g, g->members > 0, IPLCoordinateSpace3{{1, 0, 0}, {0, 0, 1}, {0, 1, 0}, {g->x, g->y, g->z}});
 		}
-		if (any) {
-			if (!worker.joinable()) worker = thread(&environment_core::worker_loop, this);
-			worker_busy = true;
-			{
-				lock_guard<mutex> l(worker_mutex);
-				worker_run = true;
-			}
-			worker_cv.notify_one();
+		if (!worker.joinable()) worker = thread(&environment_core::worker_loop, this);
+		worker_busy = true;
+		{
+			lock_guard<mutex> l(worker_mutex);
+			worker_run = true;
 		}
+		worker_cv.notify_one();
 	}
 	for (environment_source* s : current) s->release();
 }
 
-// The reverb node of the environment's reverb3d. It applies the listener reverb to the sources sent to it, then the reflection mixer, and decodes the ambisonic result for all sources at once while passing the sends of its input through.
+// The reverb node of the environment's reverb3d. It applies every reflection group's reflection effect to the signal its members added this pass, into the reflection mixer when it's in use, and decodes the ambisonic result once for all of them.
 class environment_return : public effect_node_impl {
 	environment_core* core;
 	audio_config config;
-	bool mixer_wanted = false, listener_tail = false;
+	bool mixer_wanted = false;
 	ipl_ref<api::IReflectionMixer> mixer;
-	ipl_ref<api::IReflectionEffect> listener_effect;
-	ipl_ref<api::IAmbisonicsDecodeEffect> decode_effect, listener_decode_effect;
+	ipl_ref<api::IAmbisonicsDecodeEffect> decode_effect;
 	ipl_buffer ambisonics_buffer, decoded_buffer;
 	ma_hpf highpass;
 	bool highpass_ready = false;
@@ -732,36 +807,39 @@ public:
 		destroy_node();
 		if (highpass_ready) ma_hpf_uninit(&highpass, nullptr);
 		core->audio_mixer = nullptr;
-		core->audio_mixer_generation = 0;
-		core->listener_reverb_generation = 0;
 		mixer.reset();
 		core->release();
 	}
 	bool prepare() {
 		audio_config c = audio_config::unpack(core->published_config);
-		bool want_mixer = core->use_reflection_mixer && c.type == reflections_convolution; // Steam Audio's reflection mixer only implements convolution, parametric and hybrid reflections applied to it are silently dropped, so those are always decoded per source.
+		bool want_mixer = core->use_reflection_mixer && c.type == reflections_convolution; // Steam Audio's reflection mixer only implements convolution, parametric and hybrid reflections applied to it are silently dropped, so those are decoded per group.
 		if (c.generation == config.generation && want_mixer == mixer_wanted && (!want_mixer || mixer)) return c.generation != 0;
 		core->audio_mixer = nullptr;
-		core->audio_mixer_generation = 0;
-		core->listener_reverb_generation = 0;
 		mixer.reset();
-		listener_tail = false;
 		mixer_wanted = want_mixer;
 		config = c;
 		if (!c.generation) return false;
 		api::IContext* ctx = core->context;
-		int order = c.order, ambisonics = c.channels();
-		IPLReflectionEffectSettings effect_settings{(IPLReflectionEffectType)c.type, c.ir_size, ambisonics};
-		IPLAmbisonicsDecodeEffectSettings decode_settings{speaker_layout_for_channels(core->channels), reinterpret_cast<IPLHRTF>(core->hrtf.get()), order};
-		if (ctx->createReflectionEffect(&core->audio_settings, &effect_settings, listener_effect.put()) != IPL_STATUS_SUCCESS) return false;
+		IPLReflectionEffectSettings effect_settings{(IPLReflectionEffectType)c.type, c.ir_size, c.channels()};
+		IPLAmbisonicsDecodeEffectSettings decode_settings{speaker_layout_for_channels(core->channels), reinterpret_cast<IPLHRTF>(core->hrtf.get()), c.order};
 		if (ctx->createAmbisonicsDecodeEffect(&core->audio_settings, &decode_settings, decode_effect.put()) != IPL_STATUS_SUCCESS) return false;
-		if (ctx->createAmbisonicsDecodeEffect(&core->audio_settings, &decode_settings, listener_decode_effect.put()) != IPL_STATUS_SUCCESS) return false;
-		if (!ambisonics_buffer.allocate(ctx, ambisonics, core->audio_settings.frameSize) || !decoded_buffer.allocate(ctx, core->channels, core->audio_settings.frameSize)) return false;
+		if (!ambisonics_buffer.allocate(ctx, c.channels(), core->audio_settings.frameSize) || !decoded_buffer.allocate(ctx, core->channels, core->audio_settings.frameSize)) return false;
 		if (want_mixer) {
 			if (ctx->createReflectionMixer(&core->audio_settings, &effect_settings, mixer.put()) != IPL_STATUS_SUCCESS) return false;
 			core->audio_mixer = mixer.get();
-			core->audio_mixer_generation = c.generation;
 		}
+		return true;
+	}
+	bool prepare_group(reflection_group* g) { // Creates or recreates a group's effects when the environment's configuration changed.
+		if (g->config.generation == config.generation && g->effect) return true;
+		g->config.generation = 0;
+		g->tail = false;
+		api::IContext* ctx = core->context;
+		IPLReflectionEffectSettings effect_settings{(IPLReflectionEffectType)config.type, config.ir_size, config.channels()};
+		IPLAmbisonicsDecodeEffectSettings decode_settings{speaker_layout_for_channels(core->channels), reinterpret_cast<IPLHRTF>(core->hrtf.get()), config.order};
+		if (ctx->createReflectionEffect(&core->audio_settings, &effect_settings, g->effect.put()) != IPL_STATUS_SUCCESS) return false;
+		if (ctx->createAmbisonicsDecodeEffect(&core->audio_settings, &decode_settings, g->decode.put()) != IPL_STATUS_SUCCESS) return false;
+		g->config = config;
 		return true;
 	}
 	void add_decoded(float* out, unsigned int frames) {
@@ -791,9 +869,29 @@ public:
 			out[i * 2 + 1] = mid - side;
 		}
 	}
+	void render_group(reflection_group* g, float* out, unsigned int frames, IPLAmbisonicsDecodeEffectParams& decode) {
+		const bool send_active = g->send_active;
+		g->send_active = false;
+		api::ISource* src = g->source.take();
+		if ((send_active || g->tail) && src && prepare_group(g)) {
+			IPLSimulationOutputs outputs{};
+			src->getOutputs(IPL_SIMULATIONFLAGS_REFLECTIONS, &outputs);
+			IPLReflectionEffectParams params = outputs.reflections;
+			params.type = (IPLReflectionEffectType)config.type;
+			params.numChannels = config.channels();
+			params.irSize = config.ir_size;
+			IPLAudioEffectState state = send_active ? g->effect->apply(&params, &g->send.b, &ambisonics_buffer.b, mixer.get()) : g->effect->getTail(&ambisonics_buffer.b, mixer.get()); // apply would keep reporting a tail for as long as it's called, so silence counts the tail down through getTail.
+			if (!mixer) {
+				if (g->decode->apply(&decode, &ambisonics_buffer.b, &decoded_buffer.b) == IPL_AUDIOEFFECTSTATE_TAILREMAINING) state = IPL_AUDIOEFFECTSTATE_TAILREMAINING;
+				add_decoded(out, frames);
+			}
+			g->tail = state == IPL_AUDIOEFFECTSTATE_TAILREMAINING;
+		}
+		if (send_active) g->send.clear();
+	}
 	void render(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) {
 		const unsigned int frames = *frame_count_out;
-		const unsigned int available = frames_in && frames_in[0] ? min(*frame_count_in, frames) : 0; // With MA_NODE_FLAG_ALLOW_NULL_INPUT the input array itself is null once nothing is attached, as for a retired source finishing its reverb tail.
+		const unsigned int available = frames_in && frames_in[0] ? min(*frame_count_in, frames) : 0; // With MA_NODE_FLAG_ALLOW_NULL_INPUT the input array itself is null once nothing is attached.
 		float* out = frames_out[0];
 		if (available) memcpy(out, frames_in[0], available * core->channels * sizeof(float));
 		if (available < frames) memset(out + available * core->channels, 0, (frames - available) * core->channels * sizeof(float));
@@ -801,33 +899,19 @@ public:
 			unique_lock<mutex> l(core->listener_mutex, try_to_lock); // Never block the audio thread, the previous orientation is fine if update holds the lock.
 			if (l.owns_lock()) core->audio_listener = core->listener;
 		}
-		api::ISource* listener = core->listener_source.take();
-		bool send_active = core->listener_send_active;
-		core->listener_send_active = false;
+		const int group_count = core->group_count;
 		if (!prepare() || frames != (unsigned int)core->audio_settings.frameSize) {
-			core->listener_send.clear();
+			core->listener_group.send.clear();
+			core->listener_group.send_active = false;
+			for (int i = 0; i < group_count; i++) {
+				core->groups[i]->send.clear();
+				core->groups[i]->send_active = false;
+			}
 			return;
 		}
 		IPLAmbisonicsDecodeEffectParams decode{config.order, reinterpret_cast<IPLHRTF>(core->hrtf.get()), core->audio_listener, core->binaural && core->channels == 2 ? IPL_TRUE : IPL_FALSE};
-		// The listener reverb for sources whose own reflections aren't simulated yet, applied into the reflection mixer when it's in use.
-		unsigned int ready_at = core->listener_ready_at;
-		bool listener_ready = listener && ready_at && core->reflection_runs >= ready_at;
-		core->listener_reverb_generation = listener_ready && core->use_listener_reverb ? config.generation : 0;
-		if (listener_ready && (send_active || listener_tail)) {
-			IPLSimulationOutputs outputs{};
-			listener->getOutputs(IPL_SIMULATIONFLAGS_REFLECTIONS, &outputs);
-			IPLReflectionEffectParams params = outputs.reflections;
-			params.type = (IPLReflectionEffectType)config.type;
-			params.numChannels = config.channels();
-			params.irSize = config.ir_size;
-			IPLAudioEffectState state = send_active ? listener_effect->apply(&params, &core->listener_send.b, &ambisonics_buffer.b, mixer.get()) : listener_effect->getTail(&ambisonics_buffer.b, mixer.get()); // apply would keep reporting a tail for as long as it's called.
-			if (!mixer) {
-				if (listener_decode_effect->apply(&decode, &ambisonics_buffer.b, &decoded_buffer.b) == IPL_AUDIOEFFECTSTATE_TAILREMAINING) state = IPL_AUDIOEFFECTSTATE_TAILREMAINING;
-				add_decoded(out, frames);
-			}
-			listener_tail = state == IPL_AUDIOEFFECTSTATE_TAILREMAINING;
-		}
-		core->listener_send.clear();
+		render_group(&core->listener_group, out, frames, decode);
+		for (int i = 0; i < group_count; i++) render_group(core->groups[i], out, frames, decode);
 		if (!mixer) return;
 		IPLReflectionEffectParams params{};
 		params.type = (IPLReflectionEffectType)config.type;
@@ -865,7 +949,6 @@ public:
 	}
 	~sound_environment() {
 		core->shutdown(); // Join the simulation thread here rather than wherever the last source happens to release the core.
-		core->release_retired(true); // They hold references to the core, and without the environment nothing would release them.
 		verb->release();
 		core->release();
 	}
@@ -939,7 +1022,7 @@ public:
 	int get_reflection_bounces() const { return core->bounces; }
 	void set_reflection_bounces(int v) { core->bounces = clamp(v, 1, 64); }
 	int get_max_sources() const { return core->max_sources; }
-	void set_max_sources(int v) { v = clamp(v, 1, 1024); if (v != core->max_sources) { core->max_sources = v; core->rebuild_needed = true; } }
+	void set_max_sources(int v) { v = clamp(v, 1, MAX_REFLECTION_GROUPS); if (v != core->max_sources) { core->max_sources = v; core->rebuild_needed = true; } }
 	int get_simulation_threads() const { return core->threads; }
 	void set_simulation_threads(int v) { v = clamp(v, 1, 64); if (v != core->threads) { core->threads = v; core->rebuild_needed = true; } }
 	int get_diffuse_samples() const { return core->diffuse_samples; }
@@ -954,10 +1037,9 @@ public:
 	void set_hybrid_overlap(float v) { core->hybrid_overlap = clamp(v, 0.0f, 1.0f); }
 	bool get_use_listener_reverb() const { return core->use_listener_reverb; }
 	void set_use_listener_reverb(bool v) { core->use_listener_reverb = v; }
-	unsigned int get_retired_source_count() const {
-		lock_guard<mutex> l(core->sources_mutex);
-		return (unsigned int)core->retired.size();
-	}
+	unsigned int get_active_reflection_groups() const { return core->active_groups; }
+	float get_reflection_grouping() const { return core->reflection_grouping; }
+	void set_reflection_grouping(float v) { core->reflection_grouping = clamp(v, 0.0f, 10.0f); }
 	bool get_use_reflection_mixer() const { return core->use_reflection_mixer; }
 	void set_use_reflection_mixer(bool v) { core->use_reflection_mixer = v; }
 	bool get_binaural() const { return core->binaural; }
@@ -1010,6 +1092,7 @@ void RegisterSoundEnvironment(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("sound_environment_source", "void set_transmission_rays(int rays) property", asFUNCTION((source_call<&environment_source::set_transmission_rays, void, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound_environment_source", "bool get_simulated() const property", asFUNCTION((source_call<&environment_source::get_simulated, bool>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound_environment_source", "bool get_reflections_simulated() const property", asFUNCTION((source_call<&environment_source::get_reflections_simulated, bool>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("sound_environment_source", "int get_reflection_group() const property", asFUNCTION((source_call<&environment_source::get_reflection_group, int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound_environment_source", "float get_occlusion() const property", asFUNCTION((source_call<&environment_source::get_occlusion, float>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound_environment_source", "float get_transmission_low() const property", asFUNCTION((band_getter<environment_source, &environment_source::get_transmission, 0>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound_environment_source", "float get_transmission_mid() const property", asFUNCTION((band_getter<environment_source, &environment_source::get_transmission, 1>)), asCALL_CDECL_OBJFIRST);
@@ -1041,7 +1124,7 @@ void RegisterSoundEnvironment(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("sound_environment", "float get_reflection_simulation_time() const property", asMETHOD(sound_environment, get_reflection_simulation_time), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "float get_direct_simulation_time() const property", asMETHOD(sound_environment, get_direct_simulation_time), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "uint get_source_count() const property", asMETHOD(sound_environment, get_source_count), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound_environment", "uint get_retired_source_count() const property", asMETHOD(sound_environment, get_retired_source_count), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "uint get_active_reflection_groups() const property", asMETHOD(sound_environment, get_active_reflection_groups), asCALL_THISCALL);
 	#define ENV_PROPERTY(type, name) \
 		engine->RegisterObjectMethod("sound_environment", #type " get_" #name "() const property", asMETHOD(sound_environment, get_##name), asCALL_THISCALL); \
 		engine->RegisterObjectMethod("sound_environment", "void set_" #name "(" #type " value) property", asMETHOD(sound_environment, set_##name), asCALL_THISCALL);
@@ -1051,6 +1134,7 @@ void RegisterSoundEnvironment(asIScriptEngine* engine) {
 	ENV_PROPERTY(int, reflection_order)
 	ENV_PROPERTY(int, reflection_bounces)
 	ENV_PROPERTY(int, max_sources)
+	ENV_PROPERTY(float, reflection_grouping)
 	ENV_PROPERTY(int, simulation_threads)
 	ENV_PROPERTY(int, diffuse_samples)
 	ENV_PROPERTY(float, irradiance_min_distance)
