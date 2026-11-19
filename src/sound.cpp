@@ -24,7 +24,6 @@
 #include <scripthandle.h>
 #include "filesystem.h" // FileExists, FileDelete
 #include "jolt.h" // vector3
-#include "sound_environment.h"
 #include "misc_functions.h" // script_memory_buffer
 #include "nvgt.h" // g_ScriptEngine
 #include "nvgt_angelscript.h" // get_array_type
@@ -2457,11 +2456,6 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 	engine->RegisterObjectMethod("audio_node_chain", "audio_node@+ opIndex(uint index) const", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::operator[], audio_node*, unsigned int>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_node_chain", "int find(audio_node@+ node) const", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::index_of, int, audio_node*>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("audio_node_chain", "uint get_node_count() const property", asFUNCTION((virtual_call < audio_node_chain, &audio_node_chain::get_node_count, unsigned int >)), asCALL_CDECL_OBJFIRST);
-	RegisterSoundsystemAudioNode < phonon_binaural_node > (engine, "phonon_binaural_node");
-	engine->RegisterObjectBehaviour("phonon_binaural_node", asBEHAVE_FACTORY, "phonon_binaural_node@ n(audio_engine@+ engine, int channels, int sample_rate, int frame_size = 0)", asFUNCTION(phonon_binaural_node::create), asCALL_CDECL);
-	engine->RegisterObjectMethod("phonon_binaural_node", "void set_direction(float x, float y, float z, float distance)", asFUNCTION((virtual_call < phonon_binaural_node, &phonon_binaural_node::set_direction, void, float, float, float, float >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("phonon_binaural_node", "void set_direction(const vector&in direction, float distance)", asFUNCTION((virtual_call < phonon_binaural_node, &phonon_binaural_node::set_direction_vector, void, const vector3 &, float >)), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("phonon_binaural_node", "void set_spatial_blend_max_distance(float max_distance)", asFUNCTION((virtual_call < phonon_binaural_node, &phonon_binaural_node::set_spatial_blend_max_distance, void, float >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterGlobalFunction("bool set_sound_global_hrtf(bool enabled)", asFUNCTION(set_global_hrtf), asCALL_CDECL);
 	engine->RegisterGlobalFunction("bool get_sound_global_hrtf() property", asFUNCTION(get_global_hrtf), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("audio_splitter_node", asBEHAVE_FACTORY, "audio_splitter_node@ n(audio_engine@+ engine, int channels)", asFUNCTION(splitter_node::create), asCALL_CDECL);
@@ -2702,11 +2696,9 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterEnum("audio_panner");
 	engine->RegisterEnumValue("audio_panner", "audio_panner_basic", g_audio_basic_panner);
 	engine->RegisterEnumValue("audio_panner", "audio_panner_hrtf", g_audio_hrtf_panner);
-	engine->RegisterEnumValue("audio_panner", "audio_panner_phonon_hrtf", g_audio_phonon_hrtf_panner);
 	engine->RegisterEnum("audio_attenuator");
 	engine->RegisterEnumValue("audio_attenuator", "audio_attenuator_basic", g_audio_basic_attenuator);
 	engine->RegisterEnumValue("audio_attenuator", "audio_attenuator_hrtf", g_audio_hrtf_attenuator);
-	engine->RegisterEnumValue("audio_attenuator", "audio_attenuator_phonon", g_audio_phonon_attenuator);
 	engine->RegisterEnum("reverb3d_placement");
 	engine->RegisterEnumValue("reverb3d_placement", "reverb3d_prepan", prepan);
 	engine->RegisterEnumValue("reverb3d_placement", "reverb3d_postpan", postpan);
@@ -2726,7 +2718,6 @@ void RegisterSoundsystem(asIScriptEngine *engine) {
 	RegisterSoundsystemNodes(engine);
 	RegisterSoundsystemEncoders(engine);
 	RegisterSoundsystemShapes(engine);
-	RegisterSoundEnvironment(engine);
 	engine->RegisterObjectBehaviour("sound", asBEHAVE_FACTORY, "sound@ s()", asFUNCTION(new_global_sound), asCALL_CDECL);
 	engine->RegisterObjectMethod("sound", "bool load(const string&in filename, const pack_interface@+ pack = sound_default_pack)", asFUNCTION((virtual_call < sound, &sound::load, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("sound", "bool stream(const string&in filename, const pack_interface@+ pack = sound_default_pack)", asFUNCTION((virtual_call < sound, &sound::stream, bool, const string &, pack_interface * >)), asCALL_CDECL_OBJFIRST);

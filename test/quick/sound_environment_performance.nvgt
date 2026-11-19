@@ -3,6 +3,7 @@
 // Reflections are simulated for at most max_sources reflection groups, which nearby sounds share, so the cost levels off once there are more sounds than groups. For each scenario this prints how long a reflection simulation takes (reflections follow changes by at least this long), how many reflection simulations completed per second (at most 10 with the default simulation_interval of 0.1 seconds), the audio thread's load as a percentage of real time (the average and the worst block, over 100% being an audible glitch with a device), and how long sound_environment.update takes on the script thread.
 // Run with nvgt sound_environment_performance.nvgt -- followed by the groups to run: sources (the number of sources with a still and a moving listener, the default), settings (64 sources with different reflection settings), audio (what the audio thread's cost depends on), threads (how the reflection simulation scales with threads), bursts (two guns firing short sounds every 50ms, each sound its own source or played through one mixer per gun), spikes (whether the audio thread's worst blocks come from reflection updates), pathing (with the map's probes baked and pathing enabled), or all.
 #pragma console
+#pragma plugin nvgt_phonon
 
 const int SAMPLE_RATE = 48000, CHANNELS = 2, BLOCK_FRAMES = 512; // NVGT's audio period.
 const float WARMUP_SECONDS = 1.5, MEASURE_SECONDS = 5;

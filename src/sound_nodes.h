@@ -12,7 +12,6 @@
 
 #include <exception>
 #include <angelscript.h> // asAtomic
-#include <phonon.h>
 #include <unordered_map>
 #include <vector>
 #include "sound.h"
@@ -122,19 +121,6 @@ public:
 
 bool set_global_hrtf(bool enabled);
 bool get_global_hrtf();
-bool phonon_init(); // Creates the Steam Audio context and default HRTF on first use for the default audio engine's sample rate.
-namespace api { class IContext; class IHRTF; } // From Steam Audio's phonon_interfaces.h.
-api::IContext* phonon_get_context();
-api::IHRTF* phonon_get_hrtf();
-const IPLAudioSettings& phonon_get_audio_settings();
-
-class phonon_binaural_node : public virtual audio_node {
-	public:
-	static phonon_binaural_node* create(audio_engine* engine, int channels, int sample_rate, int frame_size = 0);
-	virtual void set_direction(float x, float y, float z, float distance) = 0;
-	virtual void set_direction_vector(const vector3& direction, float distance) = 0;
-	virtual void set_spatial_blend_max_distance(float max_distance) = 0;
-};
 class splitter_node : public virtual audio_node {
 	public:
 	static splitter_node* create(audio_engine* engine, int channels);
@@ -358,11 +344,6 @@ public:
 	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
 };
 
-class phonon_hrtf_panner : public virtual spatializer_component_node {
-public:
-	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
-};
-
 class basic_attenuator : public virtual spatializer_component_node {
 public:
 	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
@@ -378,11 +359,6 @@ class hrtf_attenuator : public virtual spatializer_component_node {
 public:
 	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
 	static float attenuation(const audio_spatialization_parameters& params, float distance);
-};
-
-class phonon_attenuator : public virtual spatializer_component_node {
-public:
-	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
 };
 
 typedef spatializer_component_node* (*spatializer_component_node_factory)(audio_spatializer*, audio_engine*);
@@ -418,8 +394,6 @@ bool sound_set_spatialization(int panner, int attenuator, bool disable_previous 
 
 
 extern int g_audio_basic_panner;
-extern int g_audio_phonon_hrtf_panner;
 extern int g_audio_basic_attenuator;
 extern int g_audio_hrtf_panner;
 extern int g_audio_hrtf_attenuator;
-extern int g_audio_phonon_attenuator;

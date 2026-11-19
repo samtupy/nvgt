@@ -1,4 +1,5 @@
 // Tests for sound_environment, Steam Audio's occlusion, transmission and reflection simulation of a physics_world. Audio is rendered by an engine without a device so nothing is played.
+#pragma plugin nvgt_phonon
 physics_world@ sound_environment_test_room(bool divided) {
 	physics_world world;
 	world.gravity = vector(0, 0, -9.81);

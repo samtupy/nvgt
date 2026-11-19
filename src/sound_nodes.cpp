@@ -20,8 +20,6 @@
 #include "misc_functions.h" // range_convert
 #include "sound_nodes.h"
 #include "microsynthiser.hpp"
-#define STEAMAUDIO_SKIP_API_FUNCTIONS
-#include <phonon_interfaces.h>
 
 using namespace std;
 
@@ -169,93 +167,12 @@ public:
 };
 audio_node_chain* audio_node_chain::create(audio_node* source, audio_node* endpoint, audio_engine* engine) { return new audio_node_chain_impl(source, endpoint, engine); }
 
-// Steam Audio is used through the object interfaces of phonon_interfaces.h, the same way a plugin given the context would use it. Only creating the context needs the library's C API.
-static IPLAudioSettings g_phonon_audio_settings {44100, SOUNDSYSTEM_FRAMESIZE}; // We will update samplerate later in phonon_init.
-static api::IContext* g_phonon_context = nullptr;
-static api::IHRTF* g_phonon_hrtf = nullptr;
-
-bool phonon_init() {
-	if (g_phonon_context) return true;
-	if (!init_sound()) return false;
-	g_phonon_audio_settings = {g_audio_engine->get_sample_rate(), SOUNDSYSTEM_FRAMESIZE};
-	IPLContextSettings phonon_context_settings{};
-	phonon_context_settings.version = STEAMAUDIO_VERSION;
-	IPLContext context = nullptr;
-	if (iplContextCreate(&phonon_context_settings, &context) != IPL_STATUS_SUCCESS) return false;
-	g_phonon_context = reinterpret_cast<api::IContext*>(context);
-	IPLHRTFSettings phonon_hrtf_settings{};
-	phonon_hrtf_settings.type = IPL_HRTFTYPE_DEFAULT;
-	phonon_hrtf_settings.volume = 1.0;
-	if (g_phonon_context->createHRTF(&g_phonon_audio_settings, &phonon_hrtf_settings, &g_phonon_hrtf) != IPL_STATUS_SUCCESS) {
-		g_phonon_context->release();
-		g_phonon_context = nullptr;
-		return false;
-	}
-	return true;
-}
-
-api::IContext* phonon_get_context() { return g_phonon_context; }
-api::IHRTF* phonon_get_hrtf() { return g_phonon_hrtf; }
-const IPLAudioSettings& phonon_get_audio_settings() { return g_phonon_audio_settings; }
-static bool phonon_allocate_buffer(int channels, int samples, IPLAudioBuffer& buffer) { return g_phonon_context->allocateAudioBuffer(channels, samples, &buffer) == IPL_STATUS_SUCCESS; }
-static void phonon_free_buffer(IPLAudioBuffer& buffer) { if (buffer.data) g_phonon_context->freeAudioBuffer(&buffer); }
-
 bool set_global_hrtf(bool enabled) {
 	if (enabled == get_global_hrtf()) return true;
 	return sound_set_spatialization(enabled ? g_audio_hrtf_panner : g_audio_basic_panner, enabled ? g_audio_hrtf_attenuator : g_audio_basic_attenuator);
 }
 bool get_global_hrtf() { return sound_get_default_3d_panner() == g_audio_hrtf_panner && sound_get_default_3d_attenuator() == g_audio_hrtf_attenuator; }
 
-class phonon_binaural_node_impl : public effect_node_impl, public virtual phonon_binaural_node {
-	api::IBinauralEffect* effect = nullptr;
-	IPLAudioSettings audio_settings;
-	IPLAudioBuffer input_buffer{}, output_buffer{};
-	atomic<float> direction_x = 0.0f, direction_y = 0.0f, direction_z = 0.0f, spatial_blend = 0.0f, spatial_blend_max_distance = 4.0f;
-	public:
-		phonon_binaural_node_impl(audio_engine* e, int channels, int sample_rate, int frame_size = 0) : effect_node_impl(e ? e : g_audio_engine, channels, 2, 1, 1, 0) {
-			if (!e) throw std::invalid_argument("no engine provided");
-			if (channels < 1 || channels > 2) throw std::invalid_argument("phonon_binaural_node only supports mono and stereo input");
-			if (!phonon_init()) throw std::runtime_error("Steam Audio was not initialized");
-			audio_settings = {sample_rate, frame_size ? frame_size : SOUNDSYSTEM_FRAMESIZE};
-			IPLBinauralEffectSettings settings{reinterpret_cast<IPLHRTF>(g_phonon_hrtf)};
-			if (g_phonon_context->createBinauralEffect(&audio_settings, &settings, &effect) != IPL_STATUS_SUCCESS) throw std::runtime_error("phonon_binaural_node was not created");
-			if (!phonon_allocate_buffer(channels, audio_settings.frameSize, input_buffer) || !phonon_allocate_buffer(2, audio_settings.frameSize, output_buffer)) {
-				phonon_free_buffer(input_buffer);
-				effect->release();
-				throw std::runtime_error("phonon_binaural_node was not created");
-			}
-		}
-		~phonon_binaural_node_impl() {
-			destroy_node(); // Stop processing before tearing down the effect.
-			effect->release();
-			phonon_free_buffer(input_buffer);
-			phonon_free_buffer(output_buffer);
-		}
-		void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
-			IPLBinauralEffectParams params{};
-			params.direction = {direction_x, direction_y, direction_z};
-			params.interpolation = IPL_HRTFINTERPOLATION_NEAREST;
-			params.spatialBlend = spatial_blend;
-			params.hrtf = reinterpret_cast<IPLHRTF>(g_phonon_hrtf);
-			const unsigned int frames = min(*frame_count_in, *frame_count_out);
-			for (unsigned int offset = 0; offset < frames; offset += audio_settings.frameSize) {
-				const unsigned int n = min<unsigned int>(audio_settings.frameSize, frames - offset);
-				input_buffer.numSamples = output_buffer.numSamples = n;
-				g_phonon_context->deinterleaveAudioBuffer(const_cast<float*>(frames_in[0]) + offset * input_buffer.numChannels, &input_buffer);
-				effect->apply(&params, &input_buffer, &output_buffer);
-				g_phonon_context->interleaveAudioBuffer(&output_buffer, frames_out[0] + offset * 2);
-			}
-		}
-		void set_direction(float x, float y, float z, float distance) override {
-			direction_x = x;
-			direction_y = y;
-			direction_z = z;
-			spatial_blend = spatial_blend_max_distance > 0 ? min(distance / spatial_blend_max_distance, 1.0f) : 1.0f;
-		}
-		void set_direction_vector(const vector3& direction, float distance) override { set_direction(direction.GetX(), direction.GetY(), direction.GetZ(), distance); }
-		void set_spatial_blend_max_distance(float max_distance) override { spatial_blend_max_distance = max_distance; }
-};
-phonon_binaural_node* phonon_binaural_node::create(audio_engine* e, int channels, int sample_rate, int frame_size) { return new phonon_binaural_node_impl(e, channels, sample_rate, frame_size); }
 
 class splitter_node_impl : public audio_node_impl, public virtual splitter_node {
 	unique_ptr<ma_splitter_node> sn;
@@ -770,11 +687,9 @@ int sound_get_default_3d_attenuator() {
 
 // Global  spatializer component registrations
 int g_audio_basic_panner = g_default_3d_panner = register_audio_panner(basic_panner::create, true);
-int g_audio_phonon_hrtf_panner = register_audio_panner(phonon_hrtf_panner::create, false);
 int g_audio_basic_attenuator = g_default_3d_attenuator = register_audio_attenuator(basic_attenuator::create, true, basic_attenuator::attenuation);
 int g_audio_hrtf_panner = register_audio_panner(hrtf_panner::create, true); // Always available, the global HRTF setting chooses whether sounds use them by default.
 int g_audio_hrtf_attenuator = register_audio_attenuator(hrtf_attenuator::create, true, hrtf_attenuator::attenuation);
-int g_audio_phonon_attenuator = register_audio_attenuator(phonon_attenuator::create, false);
 
 bool sound_set_spatialization(int panner, int attenuator, bool disable_previous, bool set_default) {
 	bool panner_success = false, attenuator_success = false;
@@ -1090,61 +1005,6 @@ public:
 };
 spatializer_component_node* hrtf_panner::create(audio_spatializer* spatializer, audio_engine* engine) { return new hrtf_panner_impl(spatializer, engine); }
 
-class phonon_hrtf_panner_impl : public spatializer_component_node_impl, public virtual phonon_hrtf_panner {
-	api::IBinauralEffect* iplEffect;
-	IPLBinauralEffectParams iplEffectParams;
-	IPLAudioBuffer inputBuffer{};
-	IPLAudioBuffer outputBuffer{};
-public:
-	phonon_hrtf_panner_impl(audio_spatializer* spatializer, audio_engine* e) : spatializer_component_node_impl(spatializer, e, 0, 2), iplEffect(nullptr) {
-		if (!phonon_init()) throw std::runtime_error("Steam Audio initialization failed");
-		IPLBinauralEffectSettings effectSettings{};
-		effectSettings.hrtf = reinterpret_cast<IPLHRTF>(g_phonon_hrtf);
-		iplEffectParams = {};
-		iplEffectParams.interpolation = IPL_HRTFINTERPOLATION_NEAREST;
-		iplEffectParams.spatialBlend = 1.0;
-		iplEffectParams.hrtf = effectSettings.hrtf;
-		if (g_phonon_context->createBinauralEffect(&g_phonon_audio_settings, &effectSettings, &iplEffect) != IPL_STATUS_SUCCESS) throw std::runtime_error("Failed to create binaural effect");
-		if (!phonon_allocate_buffer(e->get_channels(), g_phonon_audio_settings.frameSize, inputBuffer) || !phonon_allocate_buffer(2, g_phonon_audio_settings.frameSize, outputBuffer)) {
-			phonon_free_buffer(inputBuffer);
-			iplEffect->release();
-			throw std::runtime_error("Failed to allocate audio buffers");
-		}
-	}
-	~phonon_hrtf_panner_impl() {
-		destroy_node();
-		if (iplEffect) iplEffect->release();
-		phonon_free_buffer(inputBuffer);
-		phonon_free_buffer(outputBuffer);
-	}
-	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
-		ma_uint32 totalFramesToProcess = *frame_count_out;
-		ma_uint32 totalFramesProcessed = 0;
-		float fully_spatialized_distance = 5; // Make this configurable once spatializer components have a property system.
-		if (fully_spatialized_distance < 0.1) fully_spatialized_distance = 0.1;
-		if (!spatializer || !iplEffect) goto fail;
-		audio_spatialization_parameters params;
-		if (!spatializer->get_parameters(params)) goto fail;
-		iplEffectParams.direction.x = params.listener_direction_x * params.directional_attenuation_factor;
-		iplEffectParams.direction.y = params.listener_direction_y * params.directional_attenuation_factor;
-		iplEffectParams.direction.z = params.listener_direction_z * params.directional_attenuation_factor;
-		iplEffectParams.spatialBlend = clamp(params.listener_distance * (params.directional_attenuation_factor / fully_spatialized_distance), 0.0f, 1.0f);
-		while (totalFramesProcessed < totalFramesToProcess) {
-			ma_uint32 framesToProcessThisIteration = totalFramesToProcess - totalFramesProcessed;
-			if (framesToProcessThisIteration > (ma_uint32)g_phonon_audio_settings.frameSize) framesToProcessThisIteration = (ma_uint32)g_phonon_audio_settings.frameSize;
-			inputBuffer.numSamples = framesToProcessThisIteration;
-			outputBuffer.numSamples = framesToProcessThisIteration;
-			g_phonon_context->deinterleaveAudioBuffer((float*)ma_offset_pcm_frames_const_ptr_f32(frames_in[0], totalFramesProcessed, inputBuffer.numChannels), &inputBuffer);
-			iplEffect->apply(&iplEffectParams, &inputBuffer, &outputBuffer);
-			g_phonon_context->interleaveAudioBuffer(&outputBuffer, ma_offset_pcm_frames_ptr_f32(frames_out[0], totalFramesProcessed, 2));
-			totalFramesProcessed += framesToProcessThisIteration;
-		}
-		return;
-		fail:
-			ma_copy_pcm_frames(frames_out[0], frames_in[0], *frame_count_in, ma_format_f32, get_engine()->get_channels());
-	}
-};
-spatializer_component_node* phonon_hrtf_panner::create(audio_spatializer* spatializer, audio_engine* engine) { return new phonon_hrtf_panner_impl(spatializer, engine); }
 
 // An attenuator applying a distance curve, which is also registered so that others can attenuate a sound over other distances the same way.
 template <class base, spatializer_attenuation_function curve> class curve_attenuator_impl : public spatializer_component_node_impl, public virtual base {
@@ -1185,66 +1045,4 @@ float hrtf_attenuator::attenuation(const audio_spatialization_parameters& params
 }
 spatializer_component_node* hrtf_attenuator::create(audio_spatializer* spatializer, audio_engine* engine) { return new curve_attenuator_impl<hrtf_attenuator, hrtf_attenuator::attenuation>(spatializer, engine); }
 
-class phonon_attenuator_impl : public spatializer_component_node_impl, public virtual phonon_attenuator {
-	api::IDirectEffect* iplEffect;
-	IPLDirectEffectParams iplEffectParams;
-	IPLAudioBuffer inputBuffer{};
-	IPLAudioBuffer outputBuffer{};
-	IPLDistanceAttenuationModel distanceModel;
-	IPLAirAbsorptionModel airAbsorptionModel;
-public:
-	phonon_attenuator_impl(audio_spatializer* spatializer, audio_engine* e) : spatializer_component_node_impl(spatializer, e), iplEffect(nullptr) {
-		if (!phonon_init()) throw std::runtime_error("Steam Audio initialization failed");
-		distanceModel = {};
-		distanceModel.type = IPL_DISTANCEATTENUATIONTYPE_INVERSEDISTANCE;
-		distanceModel.minDistance = 1.0f;
-		airAbsorptionModel = {};
-		airAbsorptionModel.type = IPL_AIRABSORPTIONTYPE_DEFAULT;
-		IPLDirectEffectSettings effectSettings{};
-		effectSettings.numChannels = e->get_channels();
-		iplEffectParams = {};
-		iplEffectParams.flags = static_cast<IPLDirectEffectFlags>(IPL_DIRECTEFFECTFLAGS_APPLYDISTANCEATTENUATION | IPL_DIRECTEFFECTFLAGS_APPLYAIRABSORPTION);
-		iplEffectParams.directivity = 1.0f;
-		if (g_phonon_context->createDirectEffect(&g_phonon_audio_settings, &effectSettings, &iplEffect) != IPL_STATUS_SUCCESS) throw std::runtime_error("Failed to create direct effect");
-		if (!phonon_allocate_buffer(e->get_channels(), g_phonon_audio_settings.frameSize, inputBuffer) || !phonon_allocate_buffer(e->get_channels(), g_phonon_audio_settings.frameSize, outputBuffer)) {
-			phonon_free_buffer(inputBuffer);
-			iplEffect->release();
-			throw std::runtime_error("Failed to allocate audio buffers");
-		}
-	}
-	~phonon_attenuator_impl() {
-		destroy_node();
-		if (iplEffect) iplEffect->release();
-		phonon_free_buffer(inputBuffer);
-		phonon_free_buffer(outputBuffer);
-	}
-	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
-		IPLVector3 sourcePos, listenerPos;
-		ma_uint32 totalFramesToProcess = *frame_count_out;
-		ma_uint32 totalFramesProcessed = 0;
-		if (!spatializer || !iplEffect) goto fail;
-		audio_spatialization_parameters params;
-		if (!spatializer->get_parameters(params)) goto fail;
-		distanceModel.minDistance = params.min_distance;
-		distanceModel.type = IPL_DISTANCEATTENUATIONTYPE_INVERSEDISTANCE;
-		params.rolloff *= 0.7; // Attenuators apply internal factors sometimes to try making it so that rolloff at a constant value will cause a similar volume reduction regardless of the attenuator in use.
-		sourcePos = {params.sound_x * params.rolloff, params.sound_y * params.rolloff, params.sound_z * params.rolloff};
-		listenerPos = {params.listener_x * params.rolloff, params.listener_y * params.rolloff, params.listener_z * params.rolloff};
-		iplEffectParams.distanceAttenuation = params.listener_distance <= params.max_distance? clamp(g_phonon_context->calculateDistanceAttenuation(sourcePos, listenerPos, &distanceModel), params.min_volume, params.max_volume) : params.min_volume;
-		g_phonon_context->calculateAirAbsorption(sourcePos, listenerPos, &airAbsorptionModel, iplEffectParams.airAbsorption);
-		while (totalFramesProcessed < totalFramesToProcess) {
-			ma_uint32 framesToProcessThisIteration = totalFramesToProcess - totalFramesProcessed;
-			if (framesToProcessThisIteration > (ma_uint32)g_phonon_audio_settings.frameSize) framesToProcessThisIteration = (ma_uint32)g_phonon_audio_settings.frameSize;
-			inputBuffer.numSamples = framesToProcessThisIteration;
-			outputBuffer.numSamples = framesToProcessThisIteration;
-			g_phonon_context->deinterleaveAudioBuffer((float*)ma_offset_pcm_frames_const_ptr_f32(frames_in[0], totalFramesProcessed, inputBuffer.numChannels), &inputBuffer);
-			iplEffect->apply(&iplEffectParams, &inputBuffer, &outputBuffer);
-			g_phonon_context->interleaveAudioBuffer(&outputBuffer, ma_offset_pcm_frames_ptr_f32(frames_out[0], totalFramesProcessed, outputBuffer.numChannels));
-			totalFramesProcessed += framesToProcessThisIteration;
-		}
-		return;
-		fail:
-			ma_copy_pcm_frames(frames_out[0], frames_in[0], *frame_count_in, ma_format_f32, get_engine()->get_channels());
-	}
-};
-spatializer_component_node* phonon_attenuator::create(audio_spatializer* spatializer, audio_engine* engine) { return new phonon_attenuator_impl(spatializer, engine); }
+

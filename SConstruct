@@ -98,7 +98,14 @@ if  ARGUMENTS.get("no_plugins", "0") == "0":
 		# Build the plugin.
 		# A list of static libraries NVGT should link with is returned if the plugin generates any.
 		plug = SConscript(s, variant_dir = f"build/obj_plugin/{plugname}", duplicate = 0, exports = {"env": plugin_env, "nvgt_env": env})
-		if plug and plugname in static_plugins: env.Append(LIBS = plug)
+		if not plug: continue
+		# A plugin registers itself under the name of its static library, which can differ from its directory (plugin/phonon builds nvgt_phonon), so it is linked statically when either is listed.
+		static_name = next((os.path.splitext(n.name)[0] for n in Flatten([plug]) if not isinstance(n, str)), plugname)
+		if env["NVGT_TARGET"] != "windows" and static_name.startswith("lib"): static_name = static_name[3:]
+		if plugname in static_plugins or static_name in static_plugins:
+			env.Append(LIBS = plug)
+			static_plugins = [static_name if p in (plugname, static_name) else p for p in static_plugins]
+			static_plugins = list(dict.fromkeys(static_plugins))
 	# Finally generate nvgt_plugins.cpp
 	static_plugins_path = os.path.join(tempfile.gettempdir(), "nvgt_plugins")
 	if len(static_plugins) > 0:
@@ -108,7 +115,7 @@ if  ARGUMENTS.get("no_plugins", "0") == "0":
 			static_plugins_object = env.Object(static_plugins_path, static_plugins_path + ".cpp", CPPPATH = env["CPPPATH"] + ["#src"])
 
 # Project libraries
-env.Append(LIBS = ["deps"] + common_libs + ["zs" if env["NVGT_TARGET"] == "windows" else "z", "SDL3", "phonon", "pffft", "mysofa", "ASAddon"])
+env.Append(LIBS = ["deps"] + common_libs + ["zs" if env["NVGT_TARGET"] == "windows" else "z", "SDL3", "ASAddon"])
 if env["NVGT_TARGET"] in ("windows", "macos", "linux"): env.Append(LIBS = ["prism", "fmt", "simdutf", "hwy_contrib", "hwy"])
 if env["NVGT_TARGET"] == "windows": env.Append(LIBS = ["runtimeobject", "uiautomationcore", "rpcrt4", "powrprof", "xaudio2"])
 elif env["NVGT_TARGET"] == "linux": env.Append(LIBS = ["dbus-1"])

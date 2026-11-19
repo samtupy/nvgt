@@ -8,6 +8,7 @@
 // Backspace toggles a microphone loopback: what you say into the default microphone plays from a point in the world through the environment, which shift with the arrows moves a meter north, south, west or east. Use headphones, or the speakers will feed back into the microphone.
 // Left and right brackets select a setting of the environment, of the sonar's source or of how you move, and minus and equals lower or raise it. max sources is the number of reflection groups, and reflection grouping how far apart, as a fraction of their distance from you, sounds can be and still share one. Toggles flip and choices cycle with either key. Changing the rays, duration, order, threads, diffuse samples, max sources or reflection type rebuilds the simulator, so reflections drop out briefly. The movement settings are last, so left bracket reaches them quickly: walk speed, and step size, which when above 0 makes each press of an arrow walk that far.
 #pragma console
+#pragma plugin nvgt_phonon
 
 physics_world world;
 sound_environment env;
