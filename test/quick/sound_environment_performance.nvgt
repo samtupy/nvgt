@@ -1,0 +1,200 @@
+// Measures how much sound_environment costs as the number of sources and the reflection settings grow, to find how much a game can use without the audio glitching or reflections lagging behind.
+// Audio is rendered by an engine without a device, paced to real time so that the reflection worker runs at the rate it would in a game, and nothing is played. Every source plays looping noise, as silent sources skip their convolution.
+// For each scenario this prints how long a reflection simulation takes (reflections follow changes by at least this long), how many reflection simulations completed per second (at most 10 with the default simulation_interval of 0.1 seconds), the audio thread's load as a percentage of real time (the average and the worst block, over 100% being an audible glitch with a device), and how long sound_environment.update takes on the script thread.
+// Run with nvgt sound_environment_performance.nvgt -- followed by the groups to run: sources (the number of sources with a still and a moving listener, the default), settings (64 sources with different reflection settings), or all.
+#pragma console
+
+const int SAMPLE_RATE = 48000, CHANNELS = 2, BLOCK_FRAMES = 480; // 10ms blocks, like a typical device period.
+const float WARMUP_SECONDS = 1.5, MEASURE_SECONDS = 5;
+physics_world world;
+
+class scenario {
+	string name;
+	int sources = 32, rays = 2048, bounces = 32, order = 1, threads = 0;
+	float duration = 1;
+	bool moving = false;
+	sound_environment_reflection_type type = SOUND_ENVIRONMENT_REFLECTIONS_CONVOLUTION;
+	scenario(const string&in name, int sources, bool moving) { this.name = name; this.sources = sources; this.moving = moving; }
+}
+void add_box(float minx, float maxx, float miny, float maxy, float minz, float maxz, const string&in material) {
+	vector half((maxx - minx) / 2, (maxy - miny) / 2, (maxz - minz) / 2);
+	world.create_and_add_body(physics_box_shape_create(half, 0.05, physics_material_get(material)), vector(minx + half.x, miny + half.y, minz + half.z), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+}
+void build_map() { // The interactive sound_environment test's map: a concrete hall and a carpeted lounge joined by a doorway, with a doorway out of the hall to a street.
+	const float t = 0.4, h = 4;
+	add_box(-t, 12, -t, 10 + t, -t, 0, "concrete");
+	add_box(-t, 12, -t, 10 + t, h, h + t, "concrete");
+	add_box(-t, 0, 0, 10, 0, h, "concrete");
+	add_box(0, 2, -t, 0, 0, h, "concrete");
+	add_box(4, 12, -t, 0, 0, h, "concrete");
+	add_box(2, 4, -t, 0, 2.2, h, "concrete");
+	add_box(0, 12, 10, 10 + t, 0, h, "brick");
+	add_box(4, 6, 6, 7, 0, 0.8, "wood");
+	add_box(10.8, 11.8, 0.2, 0.8, 0, 2, "metal");
+	add_box(12, 12 + t, 0, 4, 0, h, "drywall");
+	add_box(12, 12 + t, 6, 10, 0, h, "drywall");
+	add_box(12, 12 + t, 0, 10, 2.2, h, "drywall");
+	add_box(12, 22 + t, -t, 10 + t, -t, 0, "carpet");
+	add_box(12, 22 + t, -t, 10 + t, h, h + t, "plaster");
+	add_box(22, 22 + t, 0, 10, 0, h, "drywall");
+	add_box(12 + t, 22, -t, 0, 0, h, "drywall");
+	add_box(12 + t, 22, 10, 10 + t, 0, h, "drywall");
+	add_box(17, 17.05, 0, 4, 0, 2, "cardboard");
+	add_box(18.5, 20.5, 8.6, 9.5, 0, 0.9, "fabric");
+	add_box(13.5, 14.5, 8, 9, 0, 1.5, "glass");
+	add_box(-20, 40, -10, -t, -t, 0, "asphalt");
+	add_box(-20, 40, -14, -10, -t, 0, "grass");
+	add_box(-5, 25, -20, -14, -t, 6, "brick");
+	add_box(-15, -14.9, -14, -t, 0, 1.5, "wood");
+	world.optimize_broadphase();
+}
+uint random_state = 12345;
+float next_random() { // A fixed sequence, so that every scenario places its sources in the same spots.
+	random_state = random_state * 1103515245 + 12345;
+	return ((random_state >> 8) & 0xffff) / 65535.0;
+}
+vector source_position(int i) { // Mostly indoors, spread over both rooms, with every fourth source outside.
+	if (i % 4 == 3) return vector(-10 + next_random() * 30, -9 + next_random() * 8, 0.3 + next_random() * 2);
+	if (i % 2 == 0) return vector(0.5 + next_random() * 11, 0.5 + next_random() * 9, 0.3 + next_random() * 2);
+	return vector(12.5 + next_random() * 9, 0.5 + next_random() * 9, 0.3 + next_random() * 2);
+}
+vector listener_position(float t, bool moving) { // Walks at 1.4 meters per second from the hall through the lounge doorway and back, out the hall's south doorway onto the street and back.
+	if (!moving) return vector(6, 5, 1.6);
+	const vector[] path = {vector(3, 3, 1.6), vector(10, 5, 1.6), vector(16, 5, 1.6), vector(20, 2, 1.6), vector(16, 5, 1.6), vector(10, 5, 1.6), vector(3, 1, 1.6), vector(3, -4, 1.6), vector(10, -6, 1.6), vector(3, -4, 1.6), vector(3, 1, 1.6)};
+	float d = t * 1.4;
+	for (uint loop = 0; loop < 100; loop++) {
+		for (uint i = 0; i + 1 < path.length(); i++) {
+			float len = (path[i + 1] - path[i]).length();
+			if (d <= len) return path[i] + (path[i + 1] - path[i]) * (d / len);
+			d -= len;
+		}
+	}
+	return path[0];
+}
+float[]@ make_noise() {
+	float[] noise(SAMPLE_RATE * CHANNELS);
+	for (uint i = 0; i < noise.length(); i++) noise[i] = (next_random() * 2 - 1) * 0.1;
+	return noise;
+}
+string pad(const string&in text, uint width) {
+	string r = text;
+	while (r.length() < width) r += " ";
+	return r;
+}
+void run(scenario@ sc, const float[]@ noise) {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, SAMPLE_RATE, CHANNELS);
+	sound_environment env(e);
+	env.max_sources = sc.sources < 1 ? 1 : sc.sources;
+	env.reflection_rays = sc.rays;
+	env.reflection_bounces = sc.bounces;
+	env.reflection_order = sc.order;
+	env.reflection_duration = sc.duration;
+	env.reflection_type = sc.type;
+	if (sc.threads > 0) env.simulation_threads = sc.threads;
+	env.set_raycaster(world);
+	random_state = 12345;
+	mixer@[] mixers;
+	sound@[] sounds;
+	for (int i = 0; i < sc.sources; i++) {
+		mixer@ m = env.new_mixer();
+		vector p = source_position(i);
+		m.set_position_3d(p.x, p.y, p.z);
+		sound@ s = e.sound();
+		s.load_pcm(noise, SAMPLE_RATE, CHANNELS);
+		s.set_mixer(m);
+		mixers.insert_last(m);
+		sounds.insert_last(s);
+	}
+	for (uint i = 0; i < sounds.length(); i++) {
+		while (!sounds[i].load_complete) wait(1);
+		sounds[i].play_looped();
+	}
+	const double block_ms = BLOCK_FRAMES * 1000.0 / SAMPLE_RATE;
+	double audio_ms = 0, audio_worst = 0, update_ms = 0, update_worst = 0, reflection_ms = 0, reflection_worst = 0;
+	int blocks = 0, overruns = 0, reflection_count = 0;
+	uint last_runs = env.reflection_simulations;
+	timer wall(0, MICROSECONDS), measure;
+	bool measuring = false;
+	float audio_time = 0;
+	while (true) {
+		float t = audio_time;
+		if (!measuring and t >= WARMUP_SECONDS) {
+			measuring = true;
+			measure.restart();
+			last_runs = env.reflection_simulations;
+		}
+		if (measuring and t >= WARMUP_SECONDS + MEASURE_SECONDS) break;
+		vector lp = listener_position(t, sc.moving), ahead = listener_position(t + 0.5, sc.moving) - lp;
+		e.set_listener_position(0, lp);
+		if (ahead.length() > 0.01) e.set_listener_direction(0, ahead.normalized());
+		timer block(0, MICROSECONDS);
+		e.read(BLOCK_FRAMES);
+		double read_ms = block.elapsed / 1000.0;
+		block.restart();
+		env.update();
+		double up_ms = block.elapsed / 1000.0;
+		audio_time += BLOCK_FRAMES / float(SAMPLE_RATE);
+		if (measuring) {
+			blocks++;
+			audio_ms += read_ms;
+			if (read_ms > audio_worst) audio_worst = read_ms;
+			if (read_ms > block_ms) overruns++;
+			update_ms += up_ms;
+			if (up_ms > update_worst) update_worst = up_ms;
+			if (env.reflection_simulations != last_runs) {
+				last_runs = env.reflection_simulations;
+				reflection_count++;
+				reflection_ms += env.reflection_simulation_time;
+				if (env.reflection_simulation_time > reflection_worst) reflection_worst = env.reflection_simulation_time;
+			}
+		}
+		while (wall.elapsed / 1000000.0 < audio_time) wait(1); // Keep to real time, as a device would.
+	}
+	float seconds = measure.elapsed / 1000.0;
+	string reflections = reflection_count > 0 ? round(reflection_ms / reflection_count, 1) + " ms (worst " + round(reflection_worst, 1) + ")" : "none finished";
+	println(pad(sc.name, 34) + pad(reflections, 28) + pad(round(reflection_count / seconds, 1) + "/s", 9) + pad(round(audio_ms / blocks / block_ms * 100, 1) + "% (worst " + round(audio_worst / block_ms * 100, 0) + "%, " + overruns + " over)", 30) + round(update_ms / blocks, 2) + " ms (worst " + round(update_worst, 1) + ")");
+	for (uint i = 0; i < sounds.length(); i++) sounds[i].close();
+}
+void main() {
+	build_map();
+	float[]@ noise = make_noise();
+	string[] groups;
+	for (uint i = 1; i < ARGS.length(); i++) groups.insert_last(ARGS[i]);
+	if (groups.length() < 1) groups.insert_last("sources");
+	bool all = groups.find("all") > -1;
+	scenario@[] scenarios;
+	if (all or groups.find("sources") > -1) {
+		int[] counts = {1, 8, 16, 32, 64, 128};
+		for (uint i = 0; i < counts.length(); i++) {
+			scenarios.insert_last(scenario(counts[i] + " sources, still", counts[i], false));
+			scenarios.insert_last(scenario(counts[i] + " sources, moving", counts[i], true));
+		}
+	}
+	if (all or groups.find("settings") > -1) {
+		int[] rays = {1024, 4096};
+		for (uint i = 0; i < rays.length(); i++) { scenario sc("64, moving, " + rays[i] + " rays", 64, true); sc.rays = rays[i]; scenarios.insert_last(sc); }
+		int[] bounces = {8, 16, 64};
+		for (uint i = 0; i < bounces.length(); i++) { scenario sc("64, moving, " + bounces[i] + " bounces", 64, true); sc.bounces = bounces[i]; scenarios.insert_last(sc); }
+		float[] durations = {0.5, 2};
+		for (uint i = 0; i < durations.length(); i++) { scenario sc("64, moving, " + durations[i] + "s duration", 64, true); sc.duration = durations[i]; scenarios.insert_last(sc); }
+		int[] threads = {1, 2, 4};
+		for (uint i = 0; i < threads.length(); i++) { scenario sc("64, moving, " + threads[i] + " threads", 64, true); sc.threads = threads[i]; scenarios.insert_last(sc); }
+		{ scenario sc("64, moving, order 2", 64, true); sc.order = 2; scenarios.insert_last(sc); }
+		{ scenario sc("64, moving, hybrid", 64, true); sc.type = SOUND_ENVIRONMENT_REFLECTIONS_HYBRID; scenarios.insert_last(sc); }
+		{ scenario sc("64, moving, parametric", 64, true); sc.type = SOUND_ENVIRONMENT_REFLECTIONS_PARAMETRIC; scenarios.insert_last(sc); }
+	}
+	if (all or groups.find("audio") > -1) { // What the audio thread's convolution cost depends on, with 16 moving sources.
+		scenarios.insert_last(scenario("16, moving", 16, true));
+		float[] durations = {0.25, 0.5, 2};
+		for (uint i = 0; i < durations.length(); i++) { scenario sc("16, moving, " + durations[i] + "s duration", 16, true); sc.duration = durations[i]; scenarios.insert_last(sc); }
+		{ scenario sc("16, moving, order 0", 16, true); sc.order = 0; scenarios.insert_last(sc); }
+		{ scenario sc("16, moving, hybrid", 16, true); sc.type = SOUND_ENVIRONMENT_REFLECTIONS_HYBRID; scenarios.insert_last(sc); }
+		{ scenario sc("16, moving, parametric", 16, true); sc.type = SOUND_ENVIRONMENT_REFLECTIONS_PARAMETRIC; scenarios.insert_last(sc); }
+	}
+	if (all or groups.find("threads") > -1) { // How the reflection simulation scales with threads, with 16 moving sources.
+		int[] threads = {1, 2, 4, 8, 12, 16};
+		for (uint i = 0; i < threads.length(); i++) { scenario sc("16, moving, " + threads[i] + " threads", 16, true); sc.threads = threads[i]; scenarios.insert_last(sc); }
+	}
+	println(pad("scenario", 34) + pad("reflection simulation", 28) + pad("rate", 9) + pad("audio thread load", 30) + "update");
+	for (uint i = 0; i < scenarios.length(); i++) run(scenarios[i], noise);
+}

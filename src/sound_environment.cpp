@@ -186,6 +186,7 @@ public:
 	bool worker_run = false, worker_stop = false;
 	atomic<bool> worker_busy = false;
 	atomic<unsigned int> reflection_runs = 0; // Completed reflection simulations, the run scheduled next is number reflection_runs + 1.
+	atomic<float> reflection_time = 0, direct_time = 0; // Milliseconds the most recent reflection and direct simulations took.
 	chrono::steady_clock::time_point last_reflections;
 	bool shut_down = false;
 
@@ -237,7 +238,9 @@ public:
 			if (worker_stop) break;
 			worker_run = false;
 			l.unlock();
+			auto start = chrono::steady_clock::now();
 			simulator->runReflections();
+			reflection_time = chrono::duration<float, milli>(chrono::steady_clock::now() - start).count();
 			reflection_runs++;
 			worker_busy = false;
 			l.lock();
@@ -657,6 +660,7 @@ void environment_core::update() { // Script thread.
 		for (environment_source* s : current) s->duplicate(); // Keep them alive while we use them without the lock.
 	}
 	// Direct simulation every update, on its own simulator so that it never waits for reflections.
+	auto direct_start = chrono::steady_clock::now();
 	direct_simulator->setSharedInputs(IPL_SIMULATIONFLAGS_DIRECT, &shared);
 	for (environment_source* s : current) {
 		if (!s->direct_source.script || !s->has_position) continue;
@@ -669,6 +673,7 @@ void environment_core::update() { // Script thread.
 		s->read_results();
 		if (s->direct_source.script) s->direct_ready = true;
 	}
+	direct_time = chrono::duration<float, milli>(chrono::steady_clock::now() - direct_start).count();
 	// Reflections on the worker thread at the configured interval, inputs can only be changed while it is idle.
 	auto now = chrono::steady_clock::now();
 	if (idle && chrono::duration<float>(now - last_reflections).count() >= interval) {
@@ -916,6 +921,8 @@ public:
 	void set_output_mixer(mixer* m) { verb->set_mixer(m); }
 	unsigned int get_reflection_simulations() const { return core->reflection_runs; }
 	bool get_simulating_reflections() const { return core->worker_busy; }
+	float get_reflection_simulation_time() const { return core->reflection_time; }
+	float get_direct_simulation_time() const { return core->direct_time; }
 	unsigned int get_source_count() const {
 		lock_guard<mutex> l(core->sources_mutex);
 		return (unsigned int)core->sources.size();
@@ -1031,6 +1038,8 @@ void RegisterSoundEnvironment(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("sound_environment", "void set_output_mixer(mixer@+ mix) property", asMETHOD(sound_environment, set_output_mixer), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "uint get_reflection_simulations() const property", asMETHOD(sound_environment, get_reflection_simulations), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "bool get_simulating_reflections() const property", asMETHOD(sound_environment, get_simulating_reflections), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "float get_reflection_simulation_time() const property", asMETHOD(sound_environment, get_reflection_simulation_time), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "float get_direct_simulation_time() const property", asMETHOD(sound_environment, get_direct_simulation_time), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "uint get_source_count() const property", asMETHOD(sound_environment, get_source_count), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "uint get_retired_source_count() const property", asMETHOD(sound_environment, get_retired_source_count), asCALL_THISCALL);
 	#define ENV_PROPERTY(type, name) \
