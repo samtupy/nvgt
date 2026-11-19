@@ -65,11 +65,11 @@ string direction_name() {
 	return names[int(round(facing / 45, 0)) % 8];
 }
 string material_ahead() { // The material of a wall or object within reach in front of the player, if any.
-	vector origin = player.position;
+	vector origin = player.position + facing_vector() * 0.35; // Start just outside the player's capsule (radius 0.3), as a ray starting inside it would hit the player.
 	origin.z += 1;
 	physics_body_id hit;
 	float fraction;
-	if (!world.cast_ray(origin, facing_vector() * 0.7, hit, fraction)) return "";
+	if (!world.cast_ray(origin, facing_vector() * 0.35, hit, fraction)) return "";
 	for (uint i = 0; i < wall_bodies.length(); i++) if (wall_bodies[i] == hit) return wall_materials[i];
 	return "";
 }
