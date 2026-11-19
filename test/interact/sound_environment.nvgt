@@ -1,9 +1,11 @@
 // Walk around a small physics world with Steam Audio occlusion, transmission and reflections.
 // A concrete hall with a brick north wall, a wooden table and a metal cabinet opens through a doorway onto a carpeted lounge with drywall, a cardboard partition, a fabric couch and a glass display case. A sonar pings in the lounge. A doorway in the hall's south wall, just behind where you start, leads outside onto a street with a brick building across it.
+// Doorways in the north walls lead to four rooms made of one material each, from west to east: wood and metal off the hall, then glass with a marble floor and a foam studio with a carpeted floor off the lounge.
 // This shows the recommended shape: each object (here the player and the sonar) gets one mixer from the environment, positioned with the object, and every sound the object makes plays through its mixer, so the object is simulated once rather than every sound being a new source.
-// Up and down arrows walk forward and back, left and right arrows sidestep, Q and E turn by 45 degrees. C speaks your position, S speaks simulation details for the sonar, R toggles reflections, P pauses the sonar, escape exits.
+// Up and down arrows walk forward and back, left and right arrows sidestep, Q and E turn by 45 degrees. C speaks your position and the area you're in, S speaks simulation details for the sonar, R toggles reflections, P pauses the sonar, escape exits.
+// Enter, near the doorway between the hall and the lounge, closes it with a drywall wall or opens it again, so the lounge can be heard without the hall.
 // Backspace toggles a microphone loopback: what you say into the default microphone plays from a point in the world through the environment, which shift with the arrows moves a meter north, south, west or east. Use headphones, or the speakers will feed back into the microphone.
-// Left and right brackets select a setting of the environment or of the sonar's source, and minus and equals lower or raise it. Toggles flip and choices cycle with either key. Changing the rays, duration, order, threads, diffuse samples, max sources or reflection type rebuilds the simulator, so reflections drop out briefly.
+// Left and right brackets select a setting of the environment, of the sonar's source or of how you move, and minus and equals lower or raise it. Toggles flip and choices cycle with either key. Changing the rays, duration, order, threads, diffuse samples, max sources or reflection type rebuilds the simulator, so reflections drop out briefly. The movement settings are last, so left bracket reaches them quickly: walk speed, and step size, which when above 0 makes each press of an arrow walk that far.
 #pragma console
 
 physics_world world;
@@ -18,10 +20,13 @@ sound@[] playing;
 physics_body_id[] wall_bodies;
 string[] wall_materials;
 float facing = 90; // Degrees counterclockwise from east, so 90 faces north.
-const float walk_speed = 1.4, step_length = 0.7, eye_height = 1.6;
+const float step_length = 0.7, eye_height = 1.6;
+float walk_speed = 1.4, step_size = 0; // Meters per second, and how far each press of an arrow walks (0 to walk for as long as it's held).
+physics_body_id doorway_wall;
+bool doorway_closed = false;
 float reflections_on_level; // The level R restores when turning reflections back on.
 sound_environment_source@ sonar_source;
-const string[] setting_names = {"reflections level", "reflections width", "reflections highpass", "reflection type", "reflection rays", "reflection bounces", "reflection duration", "reflection order", "diffuse samples", "irradiance min distance", "simulation interval", "simulation threads", "max sources", "hybrid transition time", "hybrid overlap", "reflection mixer", "listener reverb", "binaural reflections", "HRTF", "sonar occlusion", "sonar transmission", "sonar reflections", "sonar reflections level", "sonar occlusion type", "sonar occlusion radius", "sonar transmission rays"};
+const string[] setting_names = {"reflections level", "reflections width", "reflections highpass", "reflection type", "reflection rays", "reflection bounces", "reflection duration", "reflection order", "diffuse samples", "irradiance min distance", "simulation interval", "simulation threads", "max sources", "hybrid transition time", "hybrid overlap", "reflection mixer", "listener reverb", "binaural reflections", "HRTF", "sonar occlusion", "sonar transmission", "sonar reflections", "sonar reflections level", "sonar occlusion type", "sonar occlusion radius", "sonar transmission rays", "walk speed", "step size"};
 const sound_environment_reflection_type[] reflection_types = {SOUND_ENVIRONMENT_REFLECTIONS_CONVOLUTION, SOUND_ENVIRONMENT_REFLECTIONS_HYBRID, SOUND_ENVIRONMENT_REFLECTIONS_PARAMETRIC};
 const string[] reflection_type_names = {"convolution", "hybrid", "parametric"};
 int setting = 0;
@@ -54,6 +59,8 @@ string setting_value(int i) {
 		case 23: return sonar_source.occlusion_type == SOUND_ENVIRONMENT_OCCLUSION_RAYCAST ? "raycast" : "volumetric";
 		case 24: return round(sonar_source.occlusion_radius, 2) + " meters";
 		case 25: return "" + sonar_source.transmission_rays;
+		case 26: return round(walk_speed, 1) + " meters per second";
+		case 27: return step_size > 0 ? round(step_size, 2) + " meters" : "off, hold to walk";
 	}
 	return "";
 }
@@ -85,6 +92,8 @@ void change_setting(int i, int dir) { // dir is 1 to raise and -1 to lower. The 
 		case 23: sonar_source.occlusion_type = sonar_source.occlusion_type == SOUND_ENVIRONMENT_OCCLUSION_RAYCAST ? SOUND_ENVIRONMENT_OCCLUSION_VOLUMETRIC : SOUND_ENVIRONMENT_OCCLUSION_RAYCAST; break;
 		case 24: sonar_source.occlusion_radius = sonar_source.occlusion_radius + 0.25 * dir; break;
 		case 25: sonar_source.transmission_rays = sonar_source.transmission_rays + dir; break;
+		case 26: walk_speed = fmax(0.2, walk_speed + 0.2 * dir); break;
+		case 27: step_size = fmax(0, step_size + 0.25 * dir); break;
 	}
 }
 
@@ -93,6 +102,46 @@ void add_box(float minx, float maxx, float miny, float maxy, float minz, float m
 	physics_body_id id = world.create_and_add_body(physics_box_shape_create(half, 0.05, physics_material_get(material)), vector(minx + half.x, miny + half.y, minz + half.z), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
 	wall_bodies.insert_last(id);
 	wall_materials.insert_last(material);
+}
+void add_wall_with_door(float minx, float maxx, float miny, float maxy, float door_min, float door_max, const string&in material) { // A wall running along x from the floor to the 4 meter ceiling, with a doorway 2.2 meters high.
+	add_box(minx, door_min, miny, maxy, 0, 4, material);
+	add_box(door_max, maxx, miny, maxy, 0, 4, material);
+	add_box(door_min, door_max, miny, maxy, 2.2, 4, material);
+}
+void add_room(float minx, float maxx, const string&in floor, const string&in walls, const string&in ceiling) { // The floor, ceiling and north wall of one of the rooms north of the hall and the lounge, which span y 10.4 to 17.6.
+	add_box(minx - 0.2, maxx + 0.2, 10.4, 18, -0.4, 0, floor);
+	add_box(minx - 0.2, maxx + 0.2, 10.4, 18, 4, 4.4, ceiling);
+	add_box(minx, maxx, 17.6, 18, 0, 4, walls);
+}
+string area_name(const vector&in p) {
+	if (p.y < 0) return p.y > -0.4 ? "the doorway outside" : "outside";
+	if (p.y < 10) return p.x < 12 ? "the concrete hall" : p.x < 12.4 ? "the doorway between the hall and the lounge" : "the carpeted lounge";
+	if (p.y < 10.4) return "a doorway";
+	return p.x < 5.9 ? "the wood room" : p.x < 12.1 ? "the metal room" : p.x < 17.2 ? "the glass room" : "the foam studio";
+}
+void toggle_doorway(const vector&in pos) { // Closes the doorway between the hall and the lounge with a wall, or opens it again.
+	float dx = pos.x - 12.2, dy = pos.y - 5;
+	if (dx * dx + dy * dy > 4) {
+		screen_reader_speak("Stand near the doorway between the hall and the lounge to close or open it.");
+		return;
+	}
+	if (!doorway_closed and abs(dx) < 0.6 and abs(dy) < 1.3) {
+		screen_reader_speak("Step out of the doorway first.");
+		return;
+	}
+	if (doorway_closed) {
+		int i = wall_bodies.find(doorway_wall);
+		if (i > -1) {
+			wall_bodies.remove_at(i);
+			wall_materials.remove_at(i);
+		}
+		world.remove_and_destroy_body(doorway_wall);
+	} else {
+		add_box(12, 12.4, 4, 6, 0, 2.2, "drywall");
+		doorway_wall = wall_bodies[wall_bodies.length() - 1];
+	}
+	doorway_closed = !doorway_closed;
+	screen_reader_speak(doorway_closed ? "doorway closed" : "doorway open");
 }
 void build_map() {
 	world.gravity = vector(0, 0, -9.81);
@@ -105,7 +154,11 @@ void build_map() {
 	add_box(0, 2, -t, 0, 0, h, "concrete");
 	add_box(4, 12, -t, 0, 0, h, "concrete");
 	add_box(2, 4, -t, 0, 2.2, h, "concrete");
-	add_box(0, 12, 10, 10 + t, 0, h, "brick");
+	// The north wall, brick on the hall's side and faced with the material of the room behind it, with doorways to the wood room from x 2 to 4 and to the metal room from x 8 to 10.
+	add_wall_with_door(0, 6, 10, 10.2, 2, 4, "brick");
+	add_wall_with_door(6, 12, 10, 10.2, 8, 10, "brick");
+	add_wall_with_door(0, 6, 10.2, 10 + t, 2, 4, "wood");
+	add_wall_with_door(6, 12, 10.2, 10 + t, 8, 10, "metal");
 	add_box(4, 6, 6, 7, 0, 0.8, "wood"); // Table.
 	add_box(10.8, 11.8, 0.2, 0.8, 0, 2, "metal"); // Cabinet.
 	// The wall between the rooms with a doorway from y 4 to 6.
@@ -117,10 +170,28 @@ void build_map() {
 	add_box(12, 22 + t, -t, 10 + t, h, h + t, "plaster");
 	add_box(22, 22 + t, 0, 10, 0, h, "drywall");
 	add_box(12 + t, 22, -t, 0, 0, h, "drywall");
-	add_box(12 + t, 22, 10, 10 + t, 0, h, "drywall");
+	// The north wall, drywall on the lounge's side, with doorways to the glass room from x 14 to 16 and to the foam studio from x 19 to 21.
+	add_box(12, 12 + t, 10, 10 + t, 0, h, "drywall"); // The corner where the wall between the hall and the lounge meets it.
+	add_wall_with_door(12 + t, 17, 10, 10.2, 14, 16, "drywall");
+	add_wall_with_door(17, 22, 10, 10.2, 19, 21, "drywall");
+	add_wall_with_door(12 + t, 17, 10.2, 10 + t, 14, 16, "glass");
+	add_wall_with_door(17, 22, 10.2, 10 + t, 19, 21, "foam");
 	add_box(17, 17.05, 0, 4, 0, 2, "cardboard"); // Partition.
-	add_box(18.5, 20.5, 8.6, 9.5, 0, 0.9, "fabric"); // Couch.
+	add_box(21.1, 22, 5.5, 7.5, 0, 0.9, "fabric"); // Couch, against the east wall.
 	add_box(13.5, 14.5, 8, 9, 0, 1.5, "glass"); // Display case.
+	// Four rooms of one material each north of the hall and the lounge, y 10.4 to 17.6. Each dividing wall is two halves, each faced with the material of its room.
+	add_room(0, 5.8, "wood", "wood", "wood"); // Floor, walls and ceiling.
+	add_room(6.2, 12, "metal", "metal", "metal");
+	add_room(12 + t, 17, "marble", "glass", "marble");
+	add_room(17.4, 22, "carpet", "foam", "foam");
+	add_box(-t, 0, 10 + t, 18, 0, h, "wood"); // West wall of the wood room.
+	add_box(5.8, 6, 10 + t, 18, 0, h, "wood");
+	add_box(6, 6.2, 10 + t, 18, 0, h, "metal");
+	add_box(12, 12.2, 10 + t, 18, 0, h, "metal");
+	add_box(12.2, 12 + t, 10 + t, 18, 0, h, "glass");
+	add_box(17, 17.2, 10 + t, 18, 0, h, "glass");
+	add_box(17.2, 17.4, 10 + t, 18, 0, h, "foam");
+	add_box(22, 22 + t, 10 + t, 18, 0, h, "foam"); // East wall of the foam studio.
 	// Outside, south of the building: an asphalt street with grass along it, a brick building across the street and a wooden fence, with open sky above.
 	add_box(-20, 40, -10, -t, -t, 0, "asphalt");
 	add_box(-20, 40, -14, -10, -t, 0, "grass");
@@ -172,7 +243,8 @@ void main() {
 	reflections_on_level = env.reflections_level;
 	screen_reader_speak("Sound environment test. You are in a concrete hall facing north. Arrows to move and turn.");
 	timer frame_time, bump_time;
-	float physics_accumulator = 0, step_distance = 0, blocked_time = 0;
+	float physics_accumulator = 0, step_distance = 0, blocked_time = 0, step_remaining = 0;
+	vector step_direction;
 	bool walking = false;
 	string surface = "concrete";
 	while (!key_pressed(KEY_ESCAPE)) {
@@ -182,18 +254,33 @@ void main() {
 		if (key_pressed(KEY_Q)) { facing = (facing + 45) % 360; screen_reader_speak(direction_name()); }
 		if (key_pressed(KEY_E)) { facing = (facing + 315) % 360; screen_reader_speak(direction_name()); }
 		vector forward = facing_vector(), left(-forward.y, forward.x, 0);
-		vector move(0, 0, 0);
+		vector input(0, 0, 0);
 		bool shift = key_down(KEY_LSHIFT) or key_down(KEY_RSHIFT); // Shift with the arrows moves the microphone instead of the player.
 		if (!shift) {
-			if (key_down(KEY_UP)) move += forward;
-			if (key_down(KEY_DOWN)) move -= forward;
-			if (key_down(KEY_LEFT)) move += left;
-			if (key_down(KEY_RIGHT)) move -= left;
+			if (key_down(KEY_UP)) input += forward;
+			if (key_down(KEY_DOWN)) input -= forward;
+			if (key_down(KEY_LEFT)) input += left;
+			if (key_down(KEY_RIGHT)) input -= left;
+		}
+		vector move(0, 0, 0);
+		float speed = walk_speed;
+		if (step_size <= 0) {
+			move = input;
+			step_remaining = 0;
+		} else { // Each press of an arrow walks step_size meters, and holding one keeps stepping.
+			if (step_remaining <= 0 and input.length() > 0.01) {
+				step_direction = input.normalized();
+				step_remaining = step_size;
+			}
+			if (step_remaining > 0) {
+				move = step_direction;
+				speed = fmin(walk_speed, step_remaining * 60); // Slow down for the last physics step rather than overshooting.
+			}
 		}
 		bool moving = move.length() > 0.01;
 		if (moving) move = move.normalized();
 		vector v = player.linear_velocity;
-		player.linear_velocity = vector(move.x * walk_speed, move.y * walk_speed, v.z);
+		player.linear_velocity = vector(move.x * speed, move.y * speed, v.z);
 		vector before = player.position;
 		float simulated = 0;
 		physics_accumulator += dt;
@@ -213,16 +300,20 @@ void main() {
 			// Footsteps by distance walked, and a bump when walking but blocked by something, judged by how far the player actually moved.
 			float moved = sqrt((pos.x - before.x) * (pos.x - before.x) + (pos.y - before.y) * (pos.y - before.y));
 			step_distance += moved;
+			step_remaining -= moved;
 			if (!walking or step_distance >= step_length) {
 				play(surface + "_step" + random(1, 5), player_mixer);
 				step_distance = 0;
 			}
 			walking = true;
-			if (simulated > 0) blocked_time = moved < walk_speed * simulated * 0.3 ? blocked_time + simulated : 0;
-			if (blocked_time >= 0.1 and bump_time.elapsed > 500) {
-				string wall = material_toward(move);
-				play(wall == "cardboard" ? "wall_cardboard" : "wall_brick", player_mixer);
-				bump_time.restart();
+			if (simulated > 0) blocked_time = moved < speed * simulated * 0.3 ? blocked_time + simulated : 0;
+			if (blocked_time >= 0.1) {
+				step_remaining = 0; // A step into a wall ends there.
+				if (bump_time.elapsed > 500) {
+					string wall = material_toward(move);
+					play(wall == "cardboard" ? "wall_cardboard" : "wall_brick", player_mixer);
+					bump_time.restart();
+				}
 			}
 		} else {
 			walking = false;
@@ -233,11 +324,12 @@ void main() {
 		for (int i = playing.length() - 1; i >= 0; i--) if (!playing[i].playing) playing.remove_at(i);
 		if (key_pressed(KEY_C)) {
 			physics_material@ ground = player.ground_material;
-			screen_reader_speak(round(pos.x, 1) + ", " + round(pos.y, 1) + ", facing " + direction_name() + ", on " + (ground is null ? "nothing" : ground.name));
+			screen_reader_speak(round(pos.x, 1) + ", " + round(pos.y, 1) + " in " + area_name(pos) + ", facing " + direction_name() + ", on " + (ground is null ? "nothing" : ground.name));
 		}
 		if (key_pressed(KEY_S)) {
 			screen_reader_speak("sonar occlusion " + round(sonar_source.occlusion, 2) + ", transmission " + round(sonar_source.transmission_low, 2) + " " + round(sonar_source.transmission_mid, 2) + " " + round(sonar_source.transmission_high, 2) + ", " + env.reflection_simulations + " reflection simulations");
 		}
+		if (key_pressed(KEY_RETURN)) toggle_doorway(pos);
 		if (key_pressed(KEY_R)) { env.reflections_level = env.reflections_level > 0 ? 0 : reflections_on_level; screen_reader_speak(env.reflections_level > 0 ? "reflections on" : "reflections off"); }
 		if (key_pressed(KEY_P)) {
 			if (sonar.playing) sonar.pause();
