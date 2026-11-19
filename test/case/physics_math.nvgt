@@ -8,8 +8,7 @@ void test_vector_compound_property_assignment() {
 	v.y *= 3;
 	v.z -= 1;
 	assert(v == vector(6, 6, 2), "compound assignment gave " + v);
-	vector[] arr;
-	arr.insert_last(vector(1, 1, 1));
+	vector[] arr = {vector(1, 1, 1)};
 	arr[0].x += 1;
 	assert(arr[0] == vector(2, 1, 1), "compound assignment through array gave " + arr[0]);
 	v += vector(1, 1, 1);
@@ -35,9 +34,7 @@ void test_quaternion() {
 	quaternion copy(q);
 	copy.w += 1;
 	assert(copy.w == q.w + 1 and copy != q, "compound assignment on quaternion property");
-	quaternion[] arr;
-	arr.insert_last(q);
-	arr.insert_last(id);
+	quaternion[] arr = {q, id};
 	assert(arr[0] == q and arr[1] == id, "quaternion array storage");
 }
 void test_aabb_scoped() {
@@ -47,4 +44,20 @@ void test_aabb_scoped() {
 	assert(b.max == vector(3, 1, 1), "encapsulate gave max " + b.max);
 	aabb c = b;
 	assert(c == b);
+}
+void test_scoped_type_init_lists() {
+	vector v(1, 2, 3);
+	{
+		vector[] a = {v, vector(4, 5, 6), v * 2};
+		assert(a.length() == 3 and a[0] == v and a[1] == vector(4, 5, 6) and a[2] == vector(2, 4, 6), "vector init list gave " + a[0] + ", " + a[1] + ", " + a[2]);
+		a[0].x = 100;
+	}
+	assert(v == vector(1, 2, 3), "a vector placed in an init list must be copied rather than shared, got " + v);
+	vector[][] nested = {{vector(1, 0, 0)}, {v}};
+	assert(nested[0][0] == vector(1, 0, 0) and nested[1][0] == v);
+	aabb[] boxes = {aabb(vector(0, 0, 0), 1.0f), aabb()};
+	assert(boxes[0].contains(vector(0.5, 0, 0)) and !boxes[1].is_valid);
+	dictionary d = {{"pos", vector(7, 8, 9)}};
+	vector got;
+	assert(d.get("pos", got) and got == vector(7, 8, 9), "dictionary init list gave " + got);
 }

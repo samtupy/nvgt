@@ -1,8 +1,8 @@
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO samtupy/angelscript
-    REF dc86e47cbc3e4fa7ad98c1e9612f381bd215aa87
-    SHA512 e5568dafb1ffa88f32df6b7b345ebfb52b0a0055b6ea87322ea2c29576c3dbfad06b0042cd090ab908d42fd3b8716ace5949ee56bb6616f233e807882b912111
+    REF a9f7669f9a20f602a751cf5af83597ffcde090ae
+    SHA512 819e91b256ddaa097328b6e2da985109929550dda71662a77906532f3d27c7c436ecd5aa537db01edbc699d7dd6923dd6a328a14c02318f15ee783b626b3c1c7
     HEAD_REF master
     PATCHES
         mark-threads-private.patch
