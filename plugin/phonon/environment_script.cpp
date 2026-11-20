@@ -295,8 +295,8 @@ public:
 	bool get_use_listener_reverb() const { return core->use_listener_reverb; }
 	void set_use_listener_reverb(bool v) { core->use_listener_reverb = v; }
 	unsigned int get_active_reflection_groups() const { return core->active_groups; }
-	float get_reflection_grouping() const { return core->reflection_grouping; }
-	void set_reflection_grouping(float v) { core->reflection_grouping = clamp(v, 0.0f, 10.0f); }
+	float get_reflection_group_size() const { return core->reflection_group_size; }
+	void set_reflection_group_size(float v) { core->reflection_group_size = clamp(v, 0.0f, 1000.0f); }
 	bool get_use_reflection_mixer() const { return core->use_reflection_mixer; }
 	void set_use_reflection_mixer(bool v) { core->use_reflection_mixer = v; }
 	bool get_binaural() const { return core->binaural; }
@@ -404,7 +404,7 @@ void RegisterSoundEnvironment(asIScriptEngine* engine) {
 	ENV_PROPERTY(int, reflection_order)
 	ENV_PROPERTY(int, reflection_bounces)
 	ENV_PROPERTY(int, max_sources)
-	ENV_PROPERTY(float, reflection_grouping)
+	ENV_PROPERTY(float, reflection_group_size)
 	ENV_PROPERTY(int, simulation_threads)
 	ENV_PROPERTY(int, diffuse_samples)
 	ENV_PROPERTY(float, irradiance_min_distance)

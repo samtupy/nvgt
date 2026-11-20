@@ -81,7 +81,7 @@ struct source_slot {
 	}
 };
 
-// A simulated reflection source shared by every sound near its position. Sounds don't convolve their own reflections: each adds its mono signal to the input of the group it belongs to, and the return node applies one reflection effect per group, so the cost of reflections depends on the number of groups rather than the number of sounds, and a sound that ends simply stops adding to its group while the group's reverb tail rings on. The environment keeps a pool of max_sources groups and assigns sounds to them every update, nearest sounds first. Sounds farther from the listener share groups over larger distances, and when every group is taken, sounds join the nearest group they can or the listener's group, whose reflections are simulated at the listener's position.
+// A simulated reflection source shared by every sound near its position. Sounds don't convolve their own reflections: each adds its mono signal to the input of the group it belongs to, and the return node applies one reflection effect per group, so the cost of reflections depends on the number of groups rather than the number of sounds, and a sound that ends simply stops adding to its group while the group's reverb tail rings on. The environment keeps a pool of max_sources groups and assigns sounds to them every update, nearest sounds first. A sound joins a group within reflection_group_size meters of it that nothing blocks the view of, and otherwise gets a group of its own. When every group is taken, sounds join the nearest group they can or the listener's group, whose reflections are simulated at the listener's position.
 struct reflection_group {
 	// Script thread state.
 	source_slot source; // A Steam Audio reflections source, simulated at the group's position while it has members.
@@ -97,7 +97,7 @@ struct reflection_group {
 	ipl_ref<api::IReflectionEffect> effect;
 	ipl_ref<api::IAmbisonicsDecodeEffect> decode;
 	ipl_buffer send; // Mono sum of the members' signals this audio pass.
-	bool send_active = false, tail = false;
+	bool send_active = false, tail = false, effect_tail = false; // tail includes the decoder's, effect_tail is the reflection effect's alone.
 	bool ready(unsigned int runs) const {
 		unsigned int at = ready_at;
 		return at && runs >= at;
@@ -125,7 +125,7 @@ public:
 	atomic<int> reflection_type = reflections_convolution;
 	atomic<int> rays = 2048, bounces = 32, order = 1, max_sources = 16, threads, diffuse_samples = 32, max_occlusion_samples = 16;
 	atomic<float> duration = 1.0f, irradiance_min_distance = 0.25f, interval = 0.1f, hybrid_transition_time = 1.0f, hybrid_overlap = 0.25f;
-	atomic<float> reflection_grouping = 0.25f; // Sounds within this fraction of their distance from the listener of each other can share a reflection group.
+	atomic<float> reflection_group_size = 3.0f; // Sounds within this many meters of a reflection group, and in view of it, can share it.
 	atomic<bool> use_reflection_mixer = true, binaural = true, use_listener_reverb = true;
 	atomic<float> reflections_level = 0.5f, reflections_width = 4.0f, reflections_highpass = 160.0f; // Toned down from physically accurate levels and widened from Steam Audio's binaural decoding, which tends to sound overpowering and narrow in games.
 	atomic<unsigned long long> published_config = audio_config().pack(); // Audio effects are recreated when its generation changes.
@@ -273,6 +273,7 @@ class environment_source : public audio_plugin_node_interface {
 	ipl_ref<api::IDirectEffect> direct_effect;
 	ipl_buffer in_buffer, out_buffer, mono_buffer;
 	float previous_level = 0.0f;
+	bool previous_silent = true; // Whether the last frame had no input, in which case the next frame needs no ramp or crossfade from it.
 	reflection_group* sending = nullptr; // The group this source's signal is added to, which changes with a crossfade over one frame.
 	unsigned int sending_placement = 0; // The placement of sending when this source started sending to it, to know whether it has moved since.
 	ipl_ref<api::IPathEffect> path_effect; // Created once pathing is first used.
@@ -372,15 +373,19 @@ public:
 				silent = false;
 				break;
 			}
-			if (silent) continue;
+			const float level = reflections_level * core->reflections_level * gain;
+			if (silent) { // The level follows along while there is nothing to ramp, so that the start of the next sound, such as a footstep's onset, isn't faded in from whatever level the source was last heard at, or from silence the first time it is heard.
+				previous_level = level;
+				previous_silent = true;
+				continue;
+			}
 			ctx->downmixAudioBuffer(&in_buffer.b, &mono_buffer.b);
-			float level = reflections_level * core->reflections_level * gain;
 			const float* mono = mono_buffer.b.data[0];
-			if (previous == target) { // Ramp level changes to avoid clicks.
+			if (target && (previous == target || previous_silent)) { // Ramp level changes to avoid clicks. After silence there is nothing to crossfade from another group.
 				float* send = target->send.b.data[0];
 				for (int i = 0; i < n; i++) send[i] += mono[i] * (previous_level + (level - previous_level) * (i / (float)n));
 				target->send_active = true;
-			} else { // Crossfade from the previous group to the new one.
+			} else if (!previous_silent) { // Crossfade from the previous group to the new one.
 				if (previous) {
 					float* send = previous->send.b.data[0];
 					for (int i = 0; i < n; i++) send[i] += mono[i] * previous_level * (1.0f - i / (float)n);
@@ -393,12 +398,13 @@ public:
 				}
 			}
 			previous_level = level;
+			previous_silent = false;
 		}
 	}
 	void apply_path(api::ISource* path, float occlusion, float* out) { // Sound reaching the listener around obstacles. Steam Audio's paths include the direct path whenever the source is in view, which the dry signal already carries, so pathing is heard in proportion to how much the direct sound is occluded.
 		api::IContext* ctx = core->context;
 		const int n = core->audio_settings.frameSize;
-		float weight = core->pathing && apply_pathing && apply_occlusion && direct_ready ? (1.0f - occlusion) * core->pathing_level * 3.5449f : 0.0f; // Steam Audio's path coefficients are normalized spherical harmonics, whose omnidirectional term of 1 / sqrt(4 pi) leaves the path effect 11dB quieter than the dry sound of a source at the same distance.
+		float weight = core->pathing && apply_pathing && apply_occlusion && direct_ready ? (1.0f - occlusion) * core->pathing_level : 0.0f; // Steam Audio's path coefficients are normalized spherical harmonics, whose omnidirectional term of 1 / sqrt(4 pi) leaves pathed sound about 11dB quieter than an unoccluded sound at the length of the path. That is left as it is, as sound bending around a doorway or a corner loses about that much, and making up for it made a sound heard around a corner as loud as with nothing in the way.
 		if (weight <= 0.0f && previous_path_weight <= 0.0f && !path_tail) return;
 		if (!path_effect) {
 			IPLPathEffectSettings settings{1, IPL_TRUE, speaker_layout_for_channels(core->channels), reinterpret_cast<IPLHRTF>(core->hrtf.get())};

@@ -197,7 +197,7 @@ void environment_core::assign_groups(const vector<environment_source*>& current,
 	};
 	vector<candidate> candidates;
 	candidates.reserve(current.size());
-	const float grouping = reflection_grouping;
+	const float radius = reflection_group_size;
 	for (environment_source* s : current) {
 		if (!s->has_position || !s->apply_reflections) {
 			s->assigned = nullptr;
@@ -206,7 +206,7 @@ void environment_core::assign_groups(const vector<environment_source*>& current,
 		}
 		float x = s->x, y = s->y, z = s->z;
 		float distance = sqrt((x - lx) * (x - lx) + (y - ly) * (y - ly) + (z - lz) * (z - lz));
-		candidates.push_back({s, x, y, z, distance, max(0.25f, distance * grouping)});
+		candidates.push_back({s, x, y, z, distance, radius});
 	}
 	sort(candidates.begin(), candidates.end(), [](const candidate& a, const candidate& b) { return a.distance < b.distance; }); // Nearer sounds have the first claim on groups.
 	const int pool = min<int>(max_sources, group_count);
@@ -498,7 +498,7 @@ public:
 	bool prepare_group(reflection_group* g) { // Creates or recreates a group's effects when the environment's configuration changed.
 		if (g->config.generation == config.generation && g->effect) return true;
 		g->config.generation = 0;
-		g->tail = false;
+		g->tail = g->effect_tail = false;
 		api::IContext* ctx = core->context;
 		IPLReflectionEffectSettings effect_settings{(IPLReflectionEffectType)config.type, config.ir_size, config.channels()};
 		IPLAmbisonicsDecodeEffectSettings decode_settings{speaker_layout_for_channels(core->channels), reinterpret_cast<IPLHRTF>(core->hrtf.get()), config.order};
@@ -541,7 +541,7 @@ public:
 		if (placement != g->audio_placement) { // A group moved elsewhere while ringing would play the rest of its old tail through its new place's reflections, so the tail is cut instead.
 			g->audio_placement = placement;
 			if (g->effect) g->effect->reset();
-			g->tail = false;
+			g->tail = g->effect_tail = false;
 		}
 		api::ISource* src = g->source.take();
 		if ((send_active || g->tail) && src && prepare_group(g)) {
@@ -552,12 +552,15 @@ public:
 			params.numChannels = config.channels();
 			params.irSize = config.ir_size;
 			IPLAudioEffectState state = send_active ? g->effect->apply(&params, &g->send.b, &ambisonics_buffer.b, mixer.get()) : g->effect->getTail(&ambisonics_buffer.b, mixer.get()); // apply would keep reporting a tail for as long as it's called, so silence counts the tail down through getTail.
+			const bool effect_tail = state == IPL_AUDIOEFFECTSTATE_TAILREMAINING;
+			bool decode_tail = false;
 			if (!mixer) {
-				if (g->decode->apply(&decode, &ambisonics_buffer.b, &decoded_buffer.b) == IPL_AUDIOEFFECTSTATE_TAILREMAINING) state = IPL_AUDIOEFFECTSTATE_TAILREMAINING;
+				decode_tail = g->decode->apply(&decode, &ambisonics_buffer.b, &decoded_buffer.b) == IPL_AUDIOEFFECTSTATE_TAILREMAINING;
 				add_decoded(out, frames);
 			}
-			g->tail = state == IPL_AUDIOEFFECTSTATE_TAILREMAINING;
-			if (!send_active && !g->tail) g->effect->reset(); // Steam Audio's convolution keeps the input it was given after its tail has ended, and would play that again with the group's next input.
+			if (!send_active && !effect_tail && g->effect_tail) g->effect->reset(); // Steam Audio's convolution keeps the input it was given after its tail has ended, and would play that again with the group's next input. Only the reflection effect's own tail counts, as the decoder's can outlast it.
+			g->effect_tail = send_active || effect_tail;
+			g->tail = effect_tail || decode_tail;
 		}
 		g->ringing = send_active || g->tail;
 		if (send_active) g->send.clear();

@@ -312,15 +312,17 @@ int[] sound_environment_test_groups(bool divided, const vector[]@ positions, con
 	for (uint i = 0; i < mixers.length(); i++) groups.insert_last(env.get_source(mixers[i]).reflection_group);
 	return groups;
 }
-void test_sound_environment_reflection_grouping() { // Sounds near each other share a reflection group over a distance that grows with their distance from the listener, unless something stands between them.
+void test_sound_environment_reflection_grouping() { // Sounds within reflection_group_size meters of each other share a reflection group, wherever the listener is, unless something stands between them.
 	vector listener(-4, -4, 1.6);
-	int[]@ far = sound_environment_test_groups(false, {vector(3, 3, 1.5), vector(3.8, 3, 1.5)}, listener);
-	assert(far[0] >= 0 and far[0] == far[1], "two sounds 0.8 meters apart and 10 meters away should share a group, got " + far[0] + " and " + far[1]);
-	int[]@ near = sound_environment_test_groups(false, {vector(-3, -3, 1.5), vector(-3, -2.2, 1.5)}, listener);
-	assert(near[0] >= 0 and near[1] >= 0 and near[0] != near[1], "two sounds 0.8 meters apart right by the listener should have groups of their own, got " + near[0] + " and " + near[1]);
+	int[]@ far = sound_environment_test_groups(false, {vector(3, 3, 1.5), vector(3, 0.6, 1.5)}, listener);
+	assert(far[0] >= 0 and far[0] == far[1], "two sounds 2.4 meters apart and 10 meters away should share a group, got " + far[0] + " and " + far[1]);
+	int[]@ near = sound_environment_test_groups(false, {vector(-3, -3, 1.5), vector(-3, -0.6, 1.5)}, listener);
+	assert(near[0] >= 0 and near[0] == near[1], "two sounds 2.4 meters apart right by the listener should share a group too, got " + near[0] + " and " + near[1]);
+	int[]@ apart = sound_environment_test_groups(false, {vector(-3, -3, 1.5), vector(1, -3, 1.5)}, listener);
+	assert(apart[0] >= 0 and apart[1] >= 0 and apart[0] != apart[1], "two sounds 4 meters apart should have groups of their own, got " + apart[0] + " and " + apart[1]);
 	vector[] across = {vector(-0.6, 3, 1.5), vector(0.6, 3, 1.5)};
 	int[]@ open = sound_environment_test_groups(false, across, listener);
-	assert(open[0] >= 0 and open[0] == open[1], "two sounds 1.2 meters apart and 8 meters away should share a group, got " + open[0] + " and " + open[1]);
+	assert(open[0] >= 0 and open[0] == open[1], "two sounds 1.2 meters apart should share a group, got " + open[0] + " and " + open[1]);
 	int[]@ walled = sound_environment_test_groups(true, across, listener);
 	assert(walled[0] >= 0 and walled[1] >= 0 and walled[0] != walled[1], "two sounds on either side of a wall should not share a group, got " + walled[0] + " and " + walled[1]);
 }
@@ -514,4 +516,47 @@ void test_sound_environment_moving_between_areas() { // A distant sound moving b
 	}
 	double loudest = sound_environment_test_loudest_window(energies, 8);
 	assert(loudest < steady * 1.6, "moving between areas should not get much louder than the sound is on either side, loudest " + loudest + " against " + steady);
+}
+double[]@ sound_environment_test_click_tails(bool use_reflection_mixer, int clicks) { // The reflections of short clicks through a mixer that hasn't played before, each long after the last one's tail.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.use_listener_reverb = false;
+	env.use_reflection_mixer = use_reflection_mixer;
+	env.set_raycaster(world);
+	e.set_listener_position(0, 0, 0, 1.6);
+	mixer@ m = env.new_mixer();
+	m.set_position_3d(0, 0, 0.9);
+	sound_environment_source@ src = env.get_source(m);
+	timer t;
+	while (!src.reflections_simulated and t.elapsed < 10000) sound_environment_test_block_energies(e, env, 1);
+	assert(src.reflections_simulated);
+	sound_environment_test_block_energies(e, env, 40);
+	float[] click(441 * 2);
+	random_xorshift rng(uint(5));
+	for (uint i = 0; i < click.length(); i++) click[i] = rng.nextf() - 0.5;
+	double[] tails;
+	for (int i = 0; i < clicks; i++) {
+		sound@ s = e.sound();
+		assert(s.load_pcm(click, 44100, 2));
+		sound_environment_test_wait_for_decoding(s);
+		s.set_mixer(m);
+		s.play();
+		sound_environment_test_block_energies(e, env, 3); // The click itself.
+		double[]@ tail = sound_environment_test_block_energies(e, env, 40);
+		double sum = 0;
+		for (uint j = 0; j < tail.length(); j++) sum += tail[j];
+		tails.insert_last(sum);
+		sound_environment_test_block_energies(e, env, 250); // Longer than the reflections last.
+	}
+	return tails;
+}
+void test_sound_environment_first_sound() { // The first sound through a source, such as a first footstep, must reverberate like the ones after it. Its onset was faded in from silence, which took most of a short sound's reflections.
+	for (int use_mixer = 0; use_mixer < 2; use_mixer++) {
+		double[]@ tails = sound_environment_test_click_tails(use_mixer == 1, 3);
+		string name = use_mixer == 1 ? "with the reflection mixer" : "without the reflection mixer";
+		assert(tails[1] > 0.01, "a click should reverberate " + name + ", tail energy " + tails[1]);
+		assert(tails[0] > tails[1] * 0.7 and tails[0] < tails[1] * 1.4, "the first click should reverberate like the second " + name + ", tail energy " + tails[0] + " then " + tails[1]);
+		assert(tails[2] < tails[1] * 1.4, "later clicks shouldn't build up " + name + ", tail energy " + tails[1] + " then " + tails[2]);
+	}
 }
