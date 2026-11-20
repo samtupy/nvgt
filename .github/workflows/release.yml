@@ -52,21 +52,52 @@ jobs:
         [ -z "$PASS" ] && PASS="nvgt_fork_build_passphrase"
         openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:"$PASS" -in nvgt_config.h.enc -out user/nvgt_config.h
     - id: cache_macos
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: macosdev
         key: macosdev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
     - id: cache_ios
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: iosdev
         key: iosdev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
+    - id: vcpkg_archives
+      if: ${{ steps.cache_macos.outputs.cache-hit != 'true' || steps.cache_ios.outputs.cache-hit != 'true' }}
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg_archives
+        key: vcpkg-archives-mac-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: vcpkg-archives-mac-
     - name: build macos dependencies
+      id: deps_macos
       if: ${{ steps.cache_macos.outputs.cache-hit != 'true' }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        VCPKG_DEFAULT_BINARY_CACHE: ${{ runner.temp }}/vcpkg_archives
       run: python3 vcpkg/build_dependencies.py --archive
+    - uses: actions/cache/save@v4
+      if: ${{ steps.cache_macos.outputs.cache-hit != 'true' }}
+      with:
+        path: macosdev
+        key: ${{ steps.cache_macos.outputs.cache-primary-key }}
     - name: build ios dependencies
+      id: deps_ios
       if: ${{ steps.cache_ios.outputs.cache-hit != 'true' }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        VCPKG_DEFAULT_BINARY_CACHE: ${{ runner.temp }}/vcpkg_archives
       run: python3 vcpkg/build_dependencies.py arm64-ios --archive
+    - uses: actions/cache/save@v4
+      if: ${{ steps.cache_ios.outputs.cache-hit != 'true' }}
+      with:
+        path: iosdev
+        key: ${{ steps.cache_ios.outputs.cache-primary-key }}
+    - name: save partial vcpkg packages
+      if: ${{ failure() && (steps.deps_macos.outcome == 'failure' || steps.deps_ios.outcome == 'failure') }}
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg_archives
+        key: vcpkg-archives-mac-${{ github.run_id }}-${{ github.run_attempt }}
     - name: publish macos dependencies
       if: ${{ steps.cache_macos.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
       run: |
@@ -104,18 +135,40 @@ jobs:
         PASS="${{ secrets.NVGT_CONFIG_TRANSFER_KEY }}"
         [ -z "$PASS" ] && PASS="nvgt_fork_build_passphrase"
         openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:"$PASS" -in nvgt_config.h.enc -out user/nvgt_config.h
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       with:
         path: lindev
         key: lindev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
       id: cache
-    - name: build dependencies
+    - id: vcpkg_archives
       if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg_archives
+        key: vcpkg-archives-linux-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: vcpkg-archives-linux-
+    - name: build dependencies
+      id: deps
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        VCPKG_DEFAULT_BINARY_CACHE: ${{ runner.temp }}/vcpkg_archives
       run: |
         sudo apt update
         sudo apt full-upgrade -y
         sudo apt install -y build-essential libtool mesa-common-dev libxext-dev libxcursor-dev ladspa-sdk libxcomposite-dev libsystemd-dev autoconf libxxf86vm-dev libgl1-mesa-dev libxinerama-dev libx11-dev libltdl-dev libgtk-4-dev libglib2.0-dev libspeechd-dev libudev-dev linux-libc-dev libxrandr-dev libxrender-dev libwayland-dev pkg-config xorg-dev libglu1-mesa-dev libxft-dev libgsasl-dev clang g++-12 python3-jinja2 zip gcc-aarch64-linux-gnu g++-aarch64-linux-gnu autoconf autoconf-archive automake libtool
         python3 vcpkg/build_dependencies.py --archive
+    - uses: actions/cache/save@v4
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      with:
+        path: lindev
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+    - name: save partial vcpkg packages
+      if: ${{ failure() && steps.deps.outcome == 'failure' }}
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg_archives
+        key: vcpkg-archives-linux-${{ github.run_id }}-${{ github.run_attempt }}
     - name: publish dependencies
       if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
       run: |
@@ -161,14 +214,36 @@ jobs:
         add-to-path: true
     - name: set ndk environ
       run: echo "ANDROID_NDK_HOME=${{steps.setup-ndk.outputs.ndk-path}}" >> $GITHUB_ENV
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       with:
         path: droidev
         key: droidev-${{ hashFiles('.github/workflows/release.yml', 'vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
       id: cache
-    - name: build dependencies
+    - id: vcpkg_archives
       if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg_archives
+        key: vcpkg-archives-android-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: vcpkg-archives-android-
+    - name: build dependencies
+      id: deps
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        VCPKG_DEFAULT_BINARY_CACHE: ${{ runner.temp }}/vcpkg_archives
       run: python3 vcpkg/build_dependencies.py --archive arm64-android
+    - uses: actions/cache/save@v4
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      with:
+        path: droidev
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+    - name: save partial vcpkg packages
+      if: ${{ failure() && steps.deps.outcome == 'failure' }}
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg_archives
+        key: vcpkg-archives-android-${{ github.run_id }}-${{ github.run_attempt }}
     - name: publish dependencies
       if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
       run: |
@@ -222,14 +297,36 @@ jobs:
     - uses: jwlawson/actions-setup-cmake@v2
       with:
         cmake-version: '4.0.1'
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       with:
         path: windev
         key: windev-${{ hashFiles('vcpkg/ports/**', 'vcpkg/triplets/**', 'vcpkg/*.json', '.git/modules/vcpkg/bin/HEAD') }}
       id: cache
-    - name: build dependencies
+    - id: vcpkg_archives
       if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg_archives
+        key: vcpkg-archives-windows-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: vcpkg-archives-windows-
+    - name: build dependencies
+      id: deps
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        VCPKG_DEFAULT_BINARY_CACHE: ${{ runner.temp }}/vcpkg_archives
       run: python3 vcpkg/build_dependencies.py --archive
+    - uses: actions/cache/save@v4
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      with:
+        path: windev
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+    - name: save partial vcpkg packages
+      if: ${{ failure() && steps.deps.outcome == 'failure' }}
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg_archives
+        key: vcpkg-archives-windows-${{ github.run_id }}-${{ github.run_attempt }}
     - name: publish dependencies
       if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
       run: |

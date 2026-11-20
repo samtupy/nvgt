@@ -5,14 +5,30 @@
 # license: zlib
 import os
 import hashlib
+import json
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import urllib.request
 
 vcpkg_path = Path(__file__, "..", "bin", "vcpkg" if sys.platform != "win32" else "vcpkg.exe").resolve()
 vcpkg_installed_path = Path(__file__, "..", "vcpkg_installed").resolve()
 repo_path = Path(__file__).parents[1]
+
+def prefetch_github_api_downloads():
+	"""Some ports query api.github.com, which only allows 60 unauthenticated requests per hour per IP and so fails constantly on shared CI runners. If a GITHUB_TOKEN is available, fetch those files into vcpkg's downloads directory with it first; the curl user agent makes GitHub pretty print the JSON exactly as it does for vcpkg's own curl download, so the port's pinned SHA512 still matches and vcpkg skips its own download."""
+	token = os.environ.get("GITHUB_TOKEN")
+	if not token: return
+	downloads = Path(os.environ.get("VCPKG_DOWNLOADS", vcpkg_path.parent / "downloads"))
+	downloads.mkdir(parents=True, exist_ok=True)
+	pcre2_version = json.loads((vcpkg_path.parent / "ports" / "pcre2" / "vcpkg.json").read_text())["version"]
+	files = [(f"https://api.github.com/repos/PCRE2Project/pcre2/contents/deps/sljit?ref=pcre2-{pcre2_version}", f"pcre2-pcre2-{pcre2_version}-sljit-gitlink.json")]
+	for url, filename in files:
+		if (downloads / filename).exists(): continue
+		try:
+			with urllib.request.urlopen(urllib.request.Request(url, headers = {"Authorization": f"Bearer {token}", "User-Agent": "curl"})) as r: (downloads / filename).write_bytes(r.read())
+		except Exception as e: print(f"warning: could not prefetch {url}: {e}")
 
 def bootstrap_vcpkg():
 	if vcpkg_path.exists() and vcpkg_path.is_file():
@@ -33,6 +49,8 @@ def build(triplet = "", do_archive = False, out_dir = ""):
                         triplet = "arm64-linux"
 		else: sys.exit("unable to determine platform, please pass a triplet explicitly.")
 	bootstrap_vcpkg()
+	if os.environ.get("VCPKG_DEFAULT_BINARY_CACHE"): Path(os.environ["VCPKG_DEFAULT_BINARY_CACHE"]).mkdir(parents=True, exist_ok=True) # vcpkg refuses to run if this directory doesn't exist, and CI points it somewhere that is only populated on a cache hit.
+	prefetch_github_api_downloads()
 	try: subprocess.run([vcpkg_path, "install", "--triplet", triplet, "--x-manifest-root", vcpkg_path.parents[1]], check=True)
 	except subprocess.CalledProcessError as cpe: sys.exit(f"Building packages for {triplet} failed with error code {cpe.returncode}.")
 	dev_basename = ""
