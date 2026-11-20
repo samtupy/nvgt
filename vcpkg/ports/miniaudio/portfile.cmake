@@ -8,6 +8,7 @@ vcpkg_from_github(
   HEAD_REF master
   PATCHES
     fix-async-decoded-available-frames.patch # Asynchronously decoded sounds played before decoding finished read the undecoded part of their buffer, skipping their start. Not yet fixed upstream as of 0.11.26.
+    pass-decoder-tell-callback.patch # ma_decoder_init takes and passes on a tell callback as it does in miniaudio 0.12, without which decoding backends such as Vorbis and Opus can't open custom streams. Not in 0.11.26.
 )
 
 file(INSTALL "${SOURCE_PATH}/miniaudio.h" DESTINATION "${CURRENT_PACKAGES_DIR}/include")

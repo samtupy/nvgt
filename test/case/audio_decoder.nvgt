@@ -1,0 +1,11 @@
+// Decoding audio from datastreams, which needs miniaudio to be given NVGT's tell callback for formats such as Vorbis (issue #387). Nothing is played.
+void test_audio_decoder_datastream() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	audio_decoder d(e);
+	assert(d.open(file("data/audio/points.ogg", "rb")), "an ogg file should open from a datastream, error " + SOUNDSYSTEM_LAST_ERROR);
+	assert(d.sample_rate > 0 and d.channels > 0, "the decoder should report the stream's format");
+	assert(d.length_frames > 0, "the decoder should know the stream's length");
+	float[]@ frames = d.read(4096);
+	assert(frames.length() == 4096 * d.channels, "the decoder should read frames, got " + frames.length() + " samples");
+	assert(d.seek_frames(0) and d.cursor_frames == 0, "the decoder should seek back to the start");
+}
