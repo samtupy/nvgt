@@ -10,4 +10,4 @@ Move the sound to a position.
 bool: true if the sound was moved, false if nothing is loaded or the sound has no known length, such as a live stream.
 
 ## Remarks:
-The sound carries on playing from the new position if it was playing.
+The sound carries on playing from the new position if it was playing. The move is made by the audio thread before it next reads the sound, which makes this safe to call while the sound plays, unlike seeking the sound's `datasource` directly.
