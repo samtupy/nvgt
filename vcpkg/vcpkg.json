@@ -20,7 +20,12 @@
     "libvorbis",
     "angelscript",
     "angelscript-nc",
-    "joltphysics",
+    {
+      "name": "joltphysics",
+      "features": [
+        "rtti"
+      ]
+    },
     "steam-audio",
     {
       "name": "openssl",
