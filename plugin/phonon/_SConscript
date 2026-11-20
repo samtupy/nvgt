@@ -3,6 +3,7 @@ Import("env")
 # nvgt_phonon: Steam Audio's HRTF, phonon_binaural_node and sound_environment. Steam Audio is linked into the plugin rather than into NVGT.
 sources = ["nvgt_phonon.cpp", "nodes.cpp", "environment.cpp", "environment_script.cpp"]
 libs = ["phonon", "pffft", "mysofa", "zs" if env["NVGT_TARGET"] == "windows" else "z"]
+if env["NVGT_TARGET"] == "android": libs.append("log") # Steam Audio's logger writes to logcat.
 if ARGUMENTS.get("no_shared_plugins", "0") == "0":
 	scripthandle = env.SharedObject("scripthandle", "#ASAddon/plugin/scripthandle.cpp")
 	env.SharedLibrary(env["PLUGIN_DEST_DIR"] + "/nvgt_phonon", sources + [scripthandle], LIBS = libs)
