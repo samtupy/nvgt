@@ -1,20 +1,21 @@
 /**
 	A filter that boosts or cuts all frequencies below a frequency, like a bass control.
-	audio_low_shelf_filter(double gain_db, double q, double frequency, audio_engine@ engine = sound_default_engine);
+	audio_low_shelf_filter(double frequency, double gain_db, double q = 0.707, audio_engine@ engine = sound_default_engine);
 	## Arguments:
-		* double gain_db: how much to boost, or cut if negative, in decibels.
-		* double q: how sharp the transition is, see `q`.
 		* double frequency: the frequency in hertz below which audio is affected.
+		* double gain_db: how much to boost, or cut if negative, in decibels.
+		* double q = 0.707: how sharp the transition is, see `q`. The default gives a smooth, natural response.
 		* audio_engine@ engine = sound_default_engine: the engine to create the node in.
 	## Remarks:
 		This is an audio_node with one input and one output bus, and has all of the methods and properties of audio_node as well as the ones listed here. Its settings can be changed while audio is playing.
+		To create the filter in another engine while keeping the default q, name the engine argument, as in `audio_low_shelf_filter filter(200, 6, engine: my_engine);`.
 */
 
 // Example:
 void main() {
 	sound s;
 	s.load("C:/Windows/media/ding.wav");
-	audio_low_shelf_filter effect(9, 0.707, 250);
+	audio_low_shelf_filter effect(250, 9);
 	s.effects_chain.add_node(effect);
 	s.play_wait();
 }

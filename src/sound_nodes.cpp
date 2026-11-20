@@ -186,7 +186,10 @@ class splitter_node_impl : public audio_node_impl, public virtual splitter_node 
 		if (sn) ma_splitter_node_uninit(&*sn, nullptr);
 	}
 };
-splitter_node* splitter_node::create(audio_engine* e, int channels) { return new splitter_node_impl(e, channels); }
+splitter_node* splitter_node::create(audio_engine* e, int channels) { // A channel count of 0 or less means the engine's.
+	if (!e) e = g_audio_engine;
+	return new splitter_node_impl(e, channels > 0 ? channels : e->get_channels());
+}
 
 class low_pass_filter_node_impl : public audio_node_impl, public virtual low_pass_filter_node {
 	unique_ptr<ma_lpf_node> fn;
@@ -286,7 +289,7 @@ class notch_filter_node_impl : public audio_node_impl, public virtual notch_filt
 	}
 	double get_frequency() const override { return cfg.notch.frequency; }
 };
-notch_filter_node* notch_filter_node::create(double q, double frequency, audio_engine* engine) { return new notch_filter_node_impl(q, frequency, engine); }
+notch_filter_node* notch_filter_node::create(double frequency, double q, audio_engine* engine) { return new notch_filter_node_impl(q, frequency, engine); }
 
 class peak_filter_node_impl : public audio_node_impl, public virtual peak_filter_node {
 	unique_ptr<ma_peak_node> fn;
@@ -316,7 +319,7 @@ class peak_filter_node_impl : public audio_node_impl, public virtual peak_filter
 	}
 	double get_frequency() const override { return cfg.peak.frequency; }
 };
-peak_filter_node* peak_filter_node::create(double gain_db, double q, double frequency, audio_engine* engine) { return new peak_filter_node_impl(gain_db, q, frequency, engine); }
+peak_filter_node* peak_filter_node::create(double frequency, double gain_db, double q, audio_engine* engine) { return new peak_filter_node_impl(gain_db, q, frequency, engine); }
 
 class low_shelf_filter_node_impl : public audio_node_impl, public virtual low_shelf_filter_node {
 	unique_ptr<ma_loshelf_node> fn;
@@ -346,7 +349,7 @@ class low_shelf_filter_node_impl : public audio_node_impl, public virtual low_sh
 	}
 	double get_frequency() const override { return cfg.loshelf.frequency; }
 };
-low_shelf_filter_node* low_shelf_filter_node::create(double gain_db, double q, double frequency, audio_engine* engine) { return new low_shelf_filter_node_impl(gain_db, q, frequency, engine); }
+low_shelf_filter_node* low_shelf_filter_node::create(double frequency, double gain_db, double q, audio_engine* engine) { return new low_shelf_filter_node_impl(gain_db, q, frequency, engine); }
 
 class high_shelf_filter_node_impl : public audio_node_impl, public virtual high_shelf_filter_node {
 	unique_ptr<ma_hishelf_node> fn;
@@ -376,7 +379,7 @@ class high_shelf_filter_node_impl : public audio_node_impl, public virtual high_
 	}
 	double get_frequency() const override { return cfg.hishelf.frequency; }
 };
-high_shelf_filter_node* high_shelf_filter_node::create(double gain_db, double q, double frequency, audio_engine* engine) { return new high_shelf_filter_node_impl(gain_db, q, frequency, engine); }
+high_shelf_filter_node* high_shelf_filter_node::create(double frequency, double gain_db, double q, audio_engine* engine) { return new high_shelf_filter_node_impl(gain_db, q, frequency, engine); }
 
 class delay_node_impl : public audio_node_impl, public virtual delay_node {
 	unique_ptr<ma_delay_node> dn;
