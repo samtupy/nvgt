@@ -195,11 +195,20 @@ elif env["NVGT_TARGET"] == "android":
 	android_stub_env = env.Clone()
 	android_stub_env.Append(CPPDEFINES = ["NVGT_STUB"])
 	VariantDir("build/obj_stub", "src", duplicate = 0)
-	libgame = env.SharedLibrary(os.path.join(stub_dest, "libgame"), android_stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + extra_objects)
-	# Copy dependencies to both directories.
-	libcxx_path = os.path.join(env["NDK_HOME"], "toolchains", "llvm", "prebuilt", env["NDK_HOST_TAG"], "sysroot", "usr", "lib", "aarch64-linux-android", "libc++_shared.so")
+	android_stub_objects = android_stub_env.Object([os.path.join("build/obj_stub", s) for s in sources]) + extra_objects
+	libgame = env.SharedLibrary(os.path.join(stub_dest, "libgame"), android_stub_objects)
 	android_deps = [runner_lib, libgame]
-	for d in [runner_dest, stub_dest]:
+	lib_dests = [runner_dest, stub_dest]
+	# The compiler-less stub (nvgt_android_nc.bin, selected with #pragma stub nc) links the same objects against angelscript_nc.
+	# On Android common_libs ends up in LIBS twice, so replace every occurrence.
+	stublibs = ["angelscript_nc" if l == "angelscript" else l for l in env["LIBS"]]
+	if "angelscript_nc" in stublibs:
+		stub_nc_dest = "jni/libs/stub_nc/arm64-v8a"
+		android_deps.append(env.SharedLibrary(os.path.join(stub_nc_dest, "libgame"), android_stub_objects, LIBS = stublibs))
+		lib_dests.append(stub_nc_dest)
+	# Copy dependencies to all library directories.
+	libcxx_path = os.path.join(env["NDK_HOME"], "toolchains", "llvm", "prebuilt", env["NDK_HOST_TAG"], "sysroot", "usr", "lib", "aarch64-linux-android", "libc++_shared.so")
+	for d in lib_dests:
 		android_deps.extend(env.Install(d, libcxx_path))
 		android_deps.extend(env.Install(d, os.path.join(env["NVGT_OSDEV_PATH"], "lib/libSDL3.so")))
 	# Finally, trigger Gradle to package the .bin and the APK
@@ -208,7 +217,7 @@ elif env["NVGT_TARGET"] == "android":
 		original_dir = os.getcwd()
 		os.chdir("jni")
 		try:
-			subprocess.check_call(env["GRADLE_CMD"] + ["assembleStubRelease", "assembleRunnerRelease"])
+			subprocess.check_call(env["GRADLE_CMD"] + ["assembleStubRelease", "assembleStubncRelease", "assembleRunnerRelease"])
 		finally:
 			os.chdir(original_dir)
 	apk_alias = env.Alias("android_apk", android_deps)

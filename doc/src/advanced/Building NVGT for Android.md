@@ -10,7 +10,7 @@ On some systems, the Android SDK requires a bit of setup to use it extensively e
 4. If at any point you need to run sdkmanager to accept licenses on Windows, run it... yep, as admin. Otherwise you will be informed that the licenses have been successfully accepted, but when you try using the tools, you'll be told to accept them again.
 5. It should be noted that both Visual Studio and Android Studio install a functioning Java runtime environment for you, so you don't have to go hunting for one. On Visual Studio, this may be at "C:\Program Files (x86)\Android\openjdk\jdk-17.0.8.101-hotspot", and for Android Studio it may be at "C:\Android\Android Studio\jre". Sadly these paths might change a bit over time (especially the JDK version in the Visual Studio path), so you may need to look up the latest paths if you are having trouble.
 
-Once the Android SDK is set up, cd to the jni directory and run `gradlew assembleRunnerDebug assembleStubRelease`
+Once the Android SDK is set up, cd to the jni directory and run `gradlew assembleRunnerDebug assembleStubRelease assembleStubncRelease` (the last one produces the compiler-less nvgt_android_nc.bin used by `#pragma stub nc`)
 
 On platforms other than Windows you may need to run `./gradlew` instead of `gradlew`.
 
