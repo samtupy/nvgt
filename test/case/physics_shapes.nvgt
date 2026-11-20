@@ -145,3 +145,24 @@ void test_shape_common_members() {
 	physics_world world;
 	assert(!world.create_and_add_body(big, vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC).is_invalid, "a body from a scaled shape");
 }
+bool near_vector(const vector&in a, const vector&in b) { return (a - b).length() < 0.01; }
+void test_shape_closest_point() {
+	physics_box_shape@ box = physics_box_shape_create(vector(1, 2, 3), 0);
+	assert(near_vector(box.closest_point(vector(5, 0, 0)), vector(1, 0, 0)), "closest point on a box gave " + box.closest_point(vector(5, 0, 0)));
+	assert(near_vector(box.closest_point(vector(5, 5, 5)), vector(1, 2, 3)), "a corner of the box");
+	assert(box.closest_point(vector(0.5, 0.5, 0.5)) == vector(0.5, 0.5, 0.5), "a point inside is returned unchanged");
+	physics_tapered_cylinder_shape@ cone = physics_tapered_cylinder_shape_create(1, 0.1, 1, 0);
+	assert(near_vector(cone.closest_point(vector(0, -5, 0)), vector(0, -1, 0)), "points are relative to the shape's origin rather than its center of mass, gave " + cone.closest_point(vector(0, -5, 0)));
+	physics_shape@ big = physics_sphere_shape_create(1).scaled(vector(3, 3, 3));
+	assert(near_vector(big.closest_point(vector(0, 10, 0)), vector(0, 3, 0)), "a scaled sphere gave " + big.closest_point(vector(0, 10, 0)));
+	physics_plane_shape@ floor = physics_plane_shape_create(plane(), 100);
+	assert(near_vector(floor.closest_point(vector(4, 5, 6)), vector(4, 5, 0)), "a plane gave " + floor.closest_point(vector(4, 5, 6)));
+}
+void test_world_get_closest_point() {
+	physics_world world;
+	physics_body_id body = world.create_and_add_body(physics_box_shape_create(vector(2, 1, 1), 0), vector(10, 0, 0), quaternion_from_axis_angle(vector(0, 0, 1), 1.5707964), PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	assert(near_vector(world.get_closest_point(body, vector(10, 10, 0)), vector(10, 2, 0)), "the body is rotated so its long side runs along y, gave " + world.get_closest_point(body, vector(10, 10, 0)));
+	assert(near_vector(world.get_closest_point(body, vector(20, 0, 0)), vector(11, 0, 0)), "its short side along x, gave " + world.get_closest_point(body, vector(20, 0, 0)));
+	assert(world.get_closest_point(body, vector(10.5, 1, 0)) == vector(10.5, 1, 0), "a point inside the body is returned unchanged");
+	assert(world.get_closest_point(physics_body_id(), vector(1, 2, 3)) == vector(1, 2, 3), "an invalid body returns the point");
+}

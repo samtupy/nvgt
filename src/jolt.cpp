@@ -323,6 +323,43 @@ static bool jolt_shape_cast_ray(const jolt_shape_ref& s, const Vec3& origin, con
 	out_fraction = result.mFraction;
 	return true;
 }
+// Finds the point of a shape closest to a point outside it, both relative to the shape's center of mass. Convex shapes, including scaled ones, are solved exactly with GJK and planes by projection, which covers every shape the script can make other than the compounds that scaled() makes from scales that convex shapes can't take, for which false is returned.
+static bool jolt_closest_point_on_surface(const Shape* shape, Vec3Arg scale, Vec3Arg point, Vec3& out_closest) {
+	if (shape->GetType() == EShapeType::Convex) {
+		ConvexShape::SupportBuffer buffer;
+		const ConvexShape::Support* support = static_cast<const ConvexShape*>(shape)->GetSupportFunction(ConvexShape::ESupportMode::IncludeConvexRadius, buffer, scale);
+		GJKClosestPoint gjk;
+		Vec3 v = Vec3::sAxisX(), on_shape, on_point;
+		gjk.GetClosestPoints(*support, PointConvexSupport {point}, 1.0e-4f, FLT_MAX, v, on_shape, on_point);
+		out_closest = on_shape;
+		return true;
+	}
+	if (shape->GetSubType() == EShapeSubType::Scaled) {
+		const ScaledShape* scaled = static_cast<const ScaledShape*>(shape);
+		return jolt_closest_point_on_surface(scaled->GetInnerShape(), scale * scaled->GetScale(), point, out_closest);
+	}
+	if (shape->GetSubType() == EShapeSubType::Plane) {
+		out_closest = static_cast<const PlaneShape*>(shape)->GetPlane().Scaled(scale).ProjectPointOnPlane(point);
+		return true;
+	}
+	return false;
+}
+// The point of a shape closest to a point relative to its center of mass, which is the point itself when it is inside the shape.
+static Vec3 jolt_closest_point(const Shape* shape, Vec3Arg point) {
+	AnyHitCollisionCollector<CollidePointCollector> inside;
+	shape->CollidePoint(point, SubShapeIDCreator(), inside);
+	if (inside.HadHit()) return point;
+	Vec3 closest;
+	if (jolt_closest_point_on_surface(shape, Vec3::sOne(), point, closest)) return closest;
+	// Other shapes are approximated by colliding a tiny sphere at the point with a separation distance that reaches the shape, for which Jolt reports points that are nearly the closest.
+	static const RefConst<Shape> probe = new SphereShape(0.001f);
+	CollideShapeSettings settings;
+	settings.mMaxSeparationDistance = point.Length() + shape->GetLocalBounds().GetExtent().Length();
+	ClosestHitCollisionCollector<CollideShapeCollector> hit;
+	CollisionDispatch::sCollideShapeVsShape(probe, shape, Vec3::sOne(), Vec3::sOne(), Mat44::sTranslation(point), Mat44::sIdentity(), SubShapeIDCreator(), SubShapeIDCreator(), settings, hit);
+	return hit.HadHit() ? hit.mHit.mContactPointOn2 : point;
+}
+static Vec3* jolt_shape_closest_point(const jolt_shape_ref& s, const Vec3& point) { Vec3 center_of_mass = s.shape->GetCenterOfMass(); return new_vec3(jolt_closest_point(s.shape, point - center_of_mass) + center_of_mass); }
 static bool jolt_shape_is_valid_scale(const jolt_shape_ref& s, const Vec3& scale) { return s.shape->IsValidScale(scale); }
 static Vec3* jolt_shape_make_scale_valid(const jolt_shape_ref& s, const Vec3& scale) { return new_vec3(s.shape->MakeScaleValid(scale)); }
 static jolt_shape_ref* jolt_shape_scaled(const jolt_shape_ref& s, const Vec3& scale) {
@@ -781,6 +818,14 @@ static bool jolt_body_get_acoustically_transparent(jolt_physics_world* w, const 
 static void jolt_world_set_gravity_factor(jolt_physics_world* w, const BodyID& id, float v) { w->system.GetBodyInterface().SetGravityFactor(id, v); }
 
 // -- Body interface: spatial queries --
+// The point of a body closest to a point in the world, which is the point itself when it is inside the body or the body doesn't exist.
+static Vec3* jolt_world_get_closest_point(jolt_physics_world* w, const BodyID& id, const Vec3& point) {
+	BodyLockRead lock(w->system.GetBodyLockInterface(), id);
+	if (!lock.Succeeded()) return new_vec3(point);
+	const Body& body = lock.GetBody();
+	Mat44 transform = body.GetCenterOfMassTransform();
+	return new_vec3(transform * jolt_closest_point(body.GetShape(), transform.InversedRotationTranslation() * point));
+}
 static AABox* jolt_world_get_world_space_bounds(jolt_physics_world* w, const BodyID& id) {
 	BodyLockRead lock(w->system.GetBodyLockInterface(), id);
 	if (!lock.Succeeded()) return ::new (scoped_alloc<AABox>()) AABox();
@@ -1326,6 +1371,7 @@ static void jolt_register_shape_base(asIScriptEngine* engine, const char* type) 
 	engine->RegisterObjectMethod(type, "vector@ get_center_of_mass() const property", asFUNCTION(jolt_shape_get_center_of_mass), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type, "float get_inner_radius() const property", asFUNCTION(jolt_shape_get_inner_radius), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type, "bool contains_point(const vector&in point) const", asFUNCTION(jolt_shape_contains_point), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "vector@ closest_point(const vector&in point) const", asFUNCTION(jolt_shape_closest_point), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type, "bool cast_ray(const vector&in origin, const vector&in direction, float&out hit_fraction) const", asFUNCTION(jolt_shape_cast_ray), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type, "bool is_valid_scale(const vector&in scale) const", asFUNCTION(jolt_shape_is_valid_scale), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod(type, "vector@ make_scale_valid(const vector&in scale) const", asFUNCTION(jolt_shape_make_scale_valid), asCALL_CDECL_OBJFIRST);
@@ -1415,48 +1461,14 @@ static void RegisterJoltShape(asIScriptEngine* engine) {
 }
 
 // A physics_shape given to mixer::set_shape, which the mixer then fills, being heard from the point of the shape closest to the listener. The shape is placed at the mixer's position, unrotated, with points relative to its origin as in physics_shape::contains_point.
-// Finds the point of a shape closest to a point outside it, both relative to the shape's center of mass. Convex shapes, including scaled ones, are solved exactly with GJK and planes by projection, which covers every shape the script can make other than the compounds that scaled() makes from scales that convex shapes can't take, for which false is returned.
-static bool jolt_closest_point_on_shape(const Shape* shape, Vec3Arg scale, Vec3Arg point, Vec3& out_closest) {
-	if (shape->GetType() == EShapeType::Convex) {
-		ConvexShape::SupportBuffer buffer;
-		const ConvexShape::Support* support = static_cast<const ConvexShape*>(shape)->GetSupportFunction(ConvexShape::ESupportMode::IncludeConvexRadius, buffer, scale);
-		GJKClosestPoint gjk;
-		Vec3 v = Vec3::sAxisX(), on_shape, on_point;
-		gjk.GetClosestPoints(*support, PointConvexSupport {point}, 1.0e-4f, FLT_MAX, v, on_shape, on_point);
-		out_closest = on_shape;
-		return true;
-	}
-	if (shape->GetSubType() == EShapeSubType::Scaled) {
-		const ScaledShape* scaled = static_cast<const ScaledShape*>(shape);
-		return jolt_closest_point_on_shape(scaled->GetInnerShape(), scale * scaled->GetScale(), point, out_closest);
-	}
-	if (shape->GetSubType() == EShapeSubType::Plane) {
-		out_closest = static_cast<const PlaneShape*>(shape)->GetPlane().Scaled(scale).ProjectPointOnPlane(point);
-		return true;
-	}
-	return false;
-}
-// A physics_shape given to mixer::set_shape, which the mixer then fills, being heard from the point of the shape closest to the listener. The shape is placed at the mixer's position, unrotated, with points relative to its origin as in physics_shape::contains_point.
 class jolt_sound_shape : public sound_shape {
 	RefConst<Shape> shape;
 public:
 	explicit jolt_sound_shape(const Shape* shape) : shape(shape) {}
 	bool contains(const vector3& listener_position, vector3& sound_position) override {
-		Vec3 center_of_mass = sound_position + shape->GetCenterOfMass(), listener = listener_position - center_of_mass, closest;
-		AnyHitCollisionCollector<CollidePointCollector> inside;
-		shape->CollidePoint(listener, SubShapeIDCreator(), inside);
-		if (inside.HadHit()) return true;
-		if (jolt_closest_point_on_shape(shape, Vec3::sOne(), listener, closest)) {
-			sound_position = center_of_mass + closest;
-			return false;
-		}
-		// Other shapes are approximated by colliding a tiny sphere at the listener with a separation distance that reaches the shape, for which Jolt reports the points that are nearly closest.
-		static const RefConst<Shape> probe = new SphereShape(0.001f);
-		CollideShapeSettings settings;
-		settings.mMaxSeparationDistance = listener.Length() + shape->GetLocalBounds().GetExtent().Length();
-		ClosestHitCollisionCollector<CollideShapeCollector> hit;
-		CollisionDispatch::sCollideShapeVsShape(probe, shape, Vec3::sOne(), Vec3::sOne(), Mat44::sTranslation(listener_position), Mat44::sTranslation(center_of_mass), SubShapeIDCreator(), SubShapeIDCreator(), settings, hit);
-		if (hit.HadHit()) sound_position = hit.mHit.mContactPointOn2;
+		Vec3 center_of_mass = sound_position + shape->GetCenterOfMass(), listener = listener_position - center_of_mass, closest = jolt_closest_point(shape, listener);
+		if (closest == listener) return true;
+		sound_position = center_of_mass + closest;
 		return false;
 	}
 };
@@ -1571,6 +1583,7 @@ static void RegisterJoltWorld(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_world", "void set_gravity_factor(const physics_body_id&in id, float v)", asFUNCTION(jolt_world_set_gravity_factor), asCALL_CDECL_OBJFIRST);
 
 	// Spatial queries
+	engine->RegisterObjectMethod("physics_world", "vector@ get_closest_point(const physics_body_id&in id, const vector&in point) const", asFUNCTION(jolt_world_get_closest_point), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "aabb@ get_world_space_bounds(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_world_space_bounds), asCALL_CDECL_OBJFIRST);
 
 	// Velocity limits

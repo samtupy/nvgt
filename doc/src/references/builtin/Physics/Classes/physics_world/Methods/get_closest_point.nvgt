@@ -1,0 +1,23 @@
+/**
+	Find the point of a body closest to a point in the world.
+	vector@ physics_world::get_closest_point(const physics_body_id&in id, const vector&in point) const;
+	## Arguments:
+		* const physics_body_id&in id: the body to measure to.
+		* const vector&in point: the point to measure from, such as the player's position.
+	## Returns:
+		vector@: the point on the surface of the body closest to the given point, or the given point itself if it is inside the body or the body doesn't exist.
+	## Remarks:
+		This takes the body's position, rotation and shape into account, so it answers questions such as how far the player is from a wall, rather than from its center, or where the nearest edge of an object they are tracking is. The distance to the body is the length of the difference between the two points, which is 0 when the point is inside it.
+		A sound played at the returned point is heard from the nearest part of the body, which gives the player a sense of how large it is and where its edges are. To have a sound fill a shape all the time, see `mixer::set_shape()`.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	physics_body_id wall = world.create_and_add_body(physics_box_shape_create(vector(10, 0.5, 3)), vector(0, 10, 3), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	vector player(4, 0, 1);
+	vector nearest = world.get_closest_point(wall, player);
+	alert("Wall", "The nearest part of the wall is at " + nearest + ", " + round((nearest - player).length(), 1) + " meters away.");
+	sound_play("C:/Windows/media/ding.wav", nearest); // A ping from the nearest part of the wall.
+	wait(1000);
+}
