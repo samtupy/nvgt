@@ -473,7 +473,7 @@ public:
 		in.airAbsorptionModel.type = IPL_AIRABSORPTIONTYPE_DEFAULT;
 		in.occlusionType = (IPLOcclusionType)occlusion_type.load();
 		in.occlusionRadius = occlusion_radius;
-		in.numOcclusionSamples = min<int>(occlusion_samples, core->max_occlusion_samples);
+		in.numOcclusionSamples = occlusion_samples;
 		in.numTransmissionRays = transmission_rays;
 		return in;
 	}
@@ -507,7 +507,7 @@ public:
 	float get_occlusion_radius() const { return occlusion_radius; }
 	void set_occlusion_radius(float v) { occlusion_radius = max(0.0f, v); }
 	int get_occlusion_samples() const { return occlusion_samples; }
-	void set_occlusion_samples(int v) { occlusion_samples = clamp(v, 1, 1024); }
+	void set_occlusion_samples(int v) { occlusion_samples = clamp(v, 1, core->max_occlusion_samples.load()); }
 	int get_transmission_rays() const { return transmission_rays; }
 	void set_transmission_rays(int v) { transmission_rays = clamp(v, 1, 64); }
 	bool get_simulated() const { return simulated; }
