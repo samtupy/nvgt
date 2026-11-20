@@ -78,3 +78,91 @@ void test_physics_material_registry() {
 	physics_material@ goo = physics_material_get("test_goo");
 	assert(goo !is null and abs(goo.acoustic_scattering - 0.4) < 0.0001 and abs(goo.acoustic_transmission_high - 0.7) < 0.0001, "define_acoustics should create a registered material");
 }
+void test_body_uses_shape_material() {
+	physics_world world;
+	physics_material@ rubber = physics_material_get("rubber");
+	physics_body_id bouncy = world.create_and_add_body(physics_sphere_shape_create(0.5, rubber), vector(0, 0, 5), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	assert(abs(world.get_friction(bouncy) - rubber.friction) < 0.0001 and abs(world.get_restitution(bouncy) - rubber.restitution) < 0.0001, "a body should take the friction and restitution of its shape's material, but has " + world.get_friction(bouncy) + " and " + world.get_restitution(bouncy));
+	physics_body_id plain = world.create_and_add_body(physics_sphere_shape_create(0.5), vector(0, 0, 5), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	assert(abs(world.get_friction(plain) - 0.2) < 0.0001 and world.get_restitution(plain) == 0, "a body whose shape has no material should have Jolt's defaults, but has " + world.get_friction(plain) + " and " + world.get_restitution(plain));
+}
+void test_world_methods_with_default_activation() {
+	physics_world world;
+	physics_body_id body = world.create_and_add_body(physics_sphere_shape_create(0.5), vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	world.set_position(body, vector(1, 2, 3));
+	world.set_rotation(body, IDENTITY_QUATERNION);
+	world.set_position_and_rotation(body, vector(4, 5, 6), IDENTITY_QUATERNION);
+	world.set_motion_type(body, PHYSICS_BODY_KINEMATIC);
+	world.set_shape(body, physics_sphere_shape_create(1.0));
+	vector pos = world.get_position(body);
+	assert(abs(pos.x - 4) < 0.0001 and abs(pos.y - 5) < 0.0001 and abs(pos.z - 6) < 0.0001, "the activation arguments of these world methods should have defaults, position was " + pos);
+}
+void test_plane_shape() {
+	physics_material@ grass = physics_material_get("grass");
+	physics_plane_shape@ ground = physics_plane_shape_create(plane(), 100, grass);
+	assert(ground !is null and ground.half_extent == 100 and ground.material is grass, "plane shape creation");
+	assert(ground.type == PHYSICS_SHAPE_PLANE and ground.sub_type == PHYSICS_SHAPE_PLANE_SUBTYPE and ground.must_be_static, "plane shape type");
+	assert(ground.plane == plane() and ground.volume == 0 and ground.mass == 0, "plane shape accessors");
+	assert(ground.contains_point(vector(3, 4, -0.1)) and !ground.contains_point(vector(3, 4, 0.1)), "the space below a plane is solid");
+	physics_shape@ s = ground;
+	assert(cast<physics_plane_shape>(s) !is null and cast<physics_convex_shape>(s) is null, "plane shape casts");
+	assert(cast<physics_plane_shape>(cast<physics_shape>(physics_sphere_shape_create(1))) is null, "a sphere must not cast to a plane");
+	assert(physics_plane_shape_create(plane(vector(0, 0, 0), 1)) is null, "a zero normal should fail");
+	assert(physics_plane_shape_create(plane(), 0) is null, "a zero half extent should fail");
+	physics_world world;
+	assert(world.create_and_add_body(ground, vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC).is_invalid, "a plane can't be a dynamic body");
+	physics_body_id floor = world.create_and_add_body(ground, vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	assert(!floor.is_invalid and abs(world.get_friction(floor) - grass.friction) < 0.0001, "a plane body takes its material's friction");
+	physics_body_id ball = world.create_and_add_body(physics_sphere_shape_create(0.5), vector(10, -20, 5), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	for (int i = 0; i < 240; i++) world.update(1.0 / 60);
+	vector pos = world.get_position(ball);
+	assert(abs(pos.z - 0.5) < 0.05, "a ball should rest on the plane at z 0.5, but is at " + pos);
+	float fraction;
+	assert(world.cast_ray(vector(50, 50, 10), vector(0, 0, -20), floor, fraction) and abs(fraction - 0.5) < 0.001, "a ray should hit the plane far from any other body");
+	physics_body_id slope = world.create_and_add_body(physics_plane_shape_create(plane(vector(0, 0, 0), vector(1, 0, 1))), vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	assert(!slope.is_invalid, "a sloped plane body");
+}
+void test_shape_common_members() {
+	physics_box_shape@ box = physics_box_shape_create(vector(1, 2, 3));
+	assert(!box.must_be_static and box.center_of_mass == vector(0, 0, 0), "box static and center of mass");
+	assert(abs(box.inner_radius - 1) < 0.0001, "box inner radius was " + box.inner_radius);
+	assert(abs(box.mass - box.volume * box.density) < 0.01, "box mass was " + box.mass + " with volume " + box.volume + " and density " + box.density);
+	assert(box.contains_point(vector(0.9, -1.9, 2.9)) and !box.contains_point(vector(1.1, 0, 0)), "box contains point");
+	float fraction;
+	assert(box.cast_ray(vector(-5, 0, 0), vector(10, 0, 0), fraction) and abs(fraction - 0.4) < 0.001, "ray against box gave " + fraction);
+	assert(!box.cast_ray(vector(-5, 5, 0), vector(10, 0, 0), fraction), "a ray passing a box should miss");
+	physics_tapered_cylinder_shape@ cone = physics_tapered_cylinder_shape_create(1, 0.1, 1);
+	assert(cone.center_of_mass.y < 0 and cone.contains_point(vector(0, -0.9, 0.8)) and !cone.contains_point(vector(0, 0.9, 0.8)), "tapered cylinder points should be in the space it was created in, center of mass " + cone.center_of_mass);
+	physics_sphere_shape@ ball = physics_sphere_shape_create(1);
+	assert(ball.is_valid_scale(vector(2, 2, 2)) and !ball.is_valid_scale(vector(1, 2, 1)), "sphere only scales uniformly");
+	vector valid = ball.make_scale_valid(vector(1, 2, 3));
+	assert(ball.is_valid_scale(valid), "make_scale_valid gave " + valid);
+	physics_shape@ big = ball.scaled(vector(2, 2, 2));
+	assert(big !is null and big.sub_type == PHYSICS_SHAPE_SCALED and big.type == PHYSICS_SHAPE_DECORATED, "scaled sphere type");
+	assert(abs(big.local_bounds.max.x - 2) < 0.0001 and big.contains_point(vector(1.9, 0, 0)), "scaled sphere bounds");
+	assert(ball.scaled(vector(1, 1, 1)) !is null and ball.scaled(vector(0, 0, 0)) is null, "unit and zero scale");
+	assert(cast<physics_convex_shape>(big) is null, "a scaled shape is not convex in the script's hierarchy");
+	physics_world world;
+	assert(!world.create_and_add_body(big, vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC).is_invalid, "a body from a scaled shape");
+}
+bool near_vector(const vector&in a, const vector&in b) { return (a - b).length() < 0.01; }
+void test_shape_closest_point() {
+	physics_box_shape@ box = physics_box_shape_create(vector(1, 2, 3), 0);
+	assert(near_vector(box.closest_point(vector(5, 0, 0)), vector(1, 0, 0)), "closest point on a box gave " + box.closest_point(vector(5, 0, 0)));
+	assert(near_vector(box.closest_point(vector(5, 5, 5)), vector(1, 2, 3)), "a corner of the box");
+	assert(box.closest_point(vector(0.5, 0.5, 0.5)) == vector(0.5, 0.5, 0.5), "a point inside is returned unchanged");
+	physics_tapered_cylinder_shape@ cone = physics_tapered_cylinder_shape_create(1, 0.1, 1, 0);
+	assert(near_vector(cone.closest_point(vector(0, -5, 0)), vector(0, -1, 0)), "points are relative to the shape's origin rather than its center of mass, gave " + cone.closest_point(vector(0, -5, 0)));
+	physics_shape@ big = physics_sphere_shape_create(1).scaled(vector(3, 3, 3));
+	assert(near_vector(big.closest_point(vector(0, 10, 0)), vector(0, 3, 0)), "a scaled sphere gave " + big.closest_point(vector(0, 10, 0)));
+	physics_plane_shape@ floor = physics_plane_shape_create(plane(), 100);
+	assert(near_vector(floor.closest_point(vector(4, 5, 6)), vector(4, 5, 0)), "a plane gave " + floor.closest_point(vector(4, 5, 6)));
+}
+void test_world_get_closest_point() {
+	physics_world world;
+	physics_body_id body = world.create_and_add_body(physics_box_shape_create(vector(2, 1, 1), 0), vector(10, 0, 0), quaternion_from_axis_angle(vector(0, 0, 1), 1.5707964), PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	assert(near_vector(world.get_closest_point(body, vector(10, 10, 0)), vector(10, 2, 0)), "the body is rotated so its long side runs along y, gave " + world.get_closest_point(body, vector(10, 10, 0)));
+	assert(near_vector(world.get_closest_point(body, vector(20, 0, 0)), vector(11, 0, 0)), "its short side along x, gave " + world.get_closest_point(body, vector(20, 0, 0)));
+	assert(world.get_closest_point(body, vector(10.5, 1, 0)) == vector(10.5, 1, 0), "a point inside the body is returned unchanged");
+	assert(world.get_closest_point(physics_body_id(), vector(1, 2, 3)) == vector(1, 2, 3), "an invalid body returns the point");
+}

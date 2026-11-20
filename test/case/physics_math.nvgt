@@ -1,4 +1,4 @@
-// Tests for the SIMD backed math types (vector, quaternion, aabb) which are registered as scoped reference types.
+// AI generated tests for the SIMD backed math types (vector, quaternion, aabb) which are registered as scoped reference types.
 const float HALF_PI = 1.5707963267949;
 bool near(float a, float b) { return abs(a - b) < 0.0001; }
 bool near(const vector&in a, const vector&in b) { return near(a.x, b.x) and near(a.y, b.y) and near(a.z, b.z); }
@@ -75,4 +75,30 @@ void test_scoped_type_conditional_operator() { // The conditional operator once 
 	assert((!a ? vector(1, 2, 3) : vector(0, 0, 0)).length() > 3.7, "a conditional temporary used directly");
 	quaternion q = a ? quaternion(1, 0, 0, 0) : IDENTITY_QUATERNION;
 	assert(q == IDENTITY_QUATERNION, "quaternion condition gave " + q);
+}
+void test_plane() {
+	plane floor;
+	assert(floor.normal == vector(0, 0, 1) and floor.constant == 0, "default plane should be the z up floor through the origin, got " + floor);
+	plane p(vector(0, 0, 2), 3); // A longer normal is normalized along with the constant, so this is z = -1.5.
+	assert(near(p.normal, vector(0, 0, 1)) and near(p.constant, 1.5), "normal and constant plane gave " + p);
+	assert(near(p.signed_distance(vector(4, 5, 0)), 1.5) and near(p.signed_distance(vector(0, 0, -3)), -1.5), "signed distance");
+	plane through(vector(1, 2, 3), vector(0, 5, 0));
+	assert(near(through.normal, vector(0, 1, 0)) and near(through.signed_distance(vector(7, 2, -4)), 0), "point and normal plane gave " + through);
+	plane tri(vector(0, 0, 1), vector(1, 0, 1), vector(0, 1, 1));
+	assert(near(tri.normal, vector(0, 0, 1)) and near(tri.signed_distance(vector(0, 0, 3)), 2), "counter clockwise points plane gave " + tri);
+	assert(plane(vector(0, 0, 0), vector(1, 0, 0), vector(2, 0, 0)).normal == vector(0, 0, 0), "points in a line should give a zero normal rather than NaN");
+	assert(near(p.project_point(vector(3, 4, 5)), vector(3, 4, -1.5)), "project point gave " + p.project_point(vector(3, 4, 5)));
+	plane raised = floor.offset(2);
+	assert(near(raised.signed_distance(vector(0, 0, 2)), 0) and floor.constant == 0, "offset should return a moved copy, got " + raised);
+	plane wall = floor.transformed(vector(5, 0, 0), quaternion_from_axis_angle(vector(0, 1, 0), HALF_PI));
+	assert(near(wall.normal, vector(1, 0, 0)) and near(wall.signed_distance(vector(5, 3, 3)), 0), "transformed plane gave " + wall);
+	plane stretched = plane(vector(0, 0, 1), -1).scaled(vector(1, 1, 2));
+	assert(near(stretched.signed_distance(vector(0, 0, 2)), 0) and near(stretched.normal, vector(0, 0, 1)), "scaled plane gave " + stretched);
+	plane copy = p;
+	assert(copy == p and copy != floor, "plane copy and comparison");
+	copy.normal = vector(3, 0, 0);
+	copy.constant = -1;
+	assert(copy.normal == vector(1, 0, 0) and copy.constant == -1 and p.constant == 1.5, "setting normal should normalize it, got " + copy);
+	plane[] planes = {floor, p};
+	assert(planes[1] == p, "plane array storage");
 }

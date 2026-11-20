@@ -1,4 +1,4 @@
-// Tests for physics_character, Jolt's rigid body character controller.
+// AI generated tests for physics_character, Jolt's rigid body character controller.
 void test_physics_character() {
 	physics_world world;
 	world.gravity = vector(0, 0, -9.81); // A Z up world, which the character should adopt as its up direction.

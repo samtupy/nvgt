@@ -21,6 +21,7 @@
 #include <angelscript.h>
 #include <scriptany.h>
 #include <scriptarray.h>
+#include <scripthandle.h>
 
 #include "jolt.h"
 #include <Jolt/RegisterTypes.h>
@@ -29,6 +30,7 @@
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Geometry/AABox.h>
+#include <Jolt/Geometry/Plane.h>
 #include <Jolt/Math/Vec3.h>
 #include <Jolt/Math/Quat.h>
 #include <Jolt/Math/Mat44.h>
@@ -50,6 +52,13 @@
 #include <Jolt/Physics/Collision/Shape/TaperedCapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/TaperedCylinderShape.h>
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
+#include <Jolt/Physics/Collision/Shape/PlaneShape.h>
+#include <Jolt/Physics/Collision/CollidePointResult.h>
+#include <Jolt/Physics/Collision/CollideShape.h>
+#include <Jolt/Physics/Collision/CollisionDispatch.h>
+#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
+#include <Jolt/Geometry/GJKClosestPoint.h>
+#include <Jolt/Geometry/ConvexSupport.h>
 #include <Jolt/Physics/Character/Character.h>
 #include <Jolt/Physics/Collision/NarrowPhaseQuery.h>
 #include <Jolt/Physics/Collision/PhysicsMaterial.h>
@@ -60,6 +69,7 @@
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
 
 #include "nvgt.h"
+#include "sound.h"
 #include "nvgt_plugin.h"
 #include "nvgt_angelscript.h"
 #include "UI.h" // temp alert
@@ -69,7 +79,7 @@ using namespace std;
 
 // -- physics_material: ref-counted (via Jolt's RefTarget) override of PhysicsMaterial --
 // Note: this Jolt version's PhysicsMaterial only provides debug info; friction/restitution are per-body via BodyInterface.
-// We store friction/restitution here for game-logic use (e.g. reading back when adding a body to the world).
+// We store friction/restitution here and copy them to bodies created with a shape that has this material.
 class nvgt_physics_material final : public PhysicsMaterial {
 public:
 	float friction;
@@ -281,10 +291,82 @@ static jolt_shape_ref* jolt_tapered_cylinder_shape_create(float half_height, flo
 	if (result.HasError() || result.Get()->GetSubType() != EShapeSubType::TaperedCylinder) return nullptr;
 	return new jolt_shape_ref(result.Get());
 }
+static jolt_shape_ref* jolt_plane_shape_create(const Plane& plane, float half_extent, nvgt_physics_material* mat) {
+	if (!(half_extent > 0.0f)) return nullptr;
+	PlaneShapeSettings settings(plane, mat, half_extent);
+	auto result = settings.Create();
+	if (result.HasError()) return nullptr;
+	return new jolt_shape_ref(result.Get());
+}
 static uint8 jolt_shape_get_type(const jolt_shape_ref& s) { return (uint8)s.shape->GetType(); }
 static uint8 jolt_shape_get_sub_type(const jolt_shape_ref& s) { return (uint8)s.shape->GetSubType(); }
 static AABox* jolt_shape_get_local_bounds(const jolt_shape_ref& s) { return ::new (scoped_alloc<AABox>()) AABox(s.shape->GetLocalBounds()); }
 static float jolt_shape_get_volume(const jolt_shape_ref& s) { return s.shape->GetVolume(); }
+static bool jolt_shape_get_must_be_static(const jolt_shape_ref& s) { return s.shape->MustBeStatic(); }
+static Vec3* jolt_shape_get_center_of_mass(const jolt_shape_ref& s) { return new_vec3(s.shape->GetCenterOfMass()); }
+static float jolt_shape_get_inner_radius(const jolt_shape_ref& s) { return s.shape->GetInnerRadius(); }
+static float jolt_shape_get_mass(const jolt_shape_ref& s) { return s.shape->GetMassProperties().mMass; }
+static nvgt_physics_material* jolt_shape_get_material(const jolt_shape_ref& s) { // Only valid for shapes with a single material such as convex and plane shapes, which is why it's only registered on those.
+	auto* mat = const_cast<nvgt_physics_material*>(dynamic_cast<const nvgt_physics_material*>(s.shape->GetMaterial(SubShapeID())));
+	if (mat) mat->AddRef();
+	return mat;
+}
+// Jolt's shape queries take points relative to the center of mass, whereas scripts think of a shape in the space it was created in, so the center of mass is subtracted first.
+static bool jolt_shape_contains_point(const jolt_shape_ref& s, const Vec3& point) {
+	AnyHitCollisionCollector<CollidePointCollector> collector;
+	s.shape->CollidePoint(point - s.shape->GetCenterOfMass(), SubShapeIDCreator(), collector);
+	return collector.HadHit();
+}
+static bool jolt_shape_cast_ray(const jolt_shape_ref& s, const Vec3& origin, const Vec3& direction, float& out_fraction) {
+	RayCastResult result;
+	if (!s.shape->CastRay(RayCast(origin - s.shape->GetCenterOfMass(), direction), SubShapeIDCreator(), result)) return false;
+	out_fraction = result.mFraction;
+	return true;
+}
+// Finds the point of a shape closest to a point outside it, both relative to the shape's center of mass. Convex shapes, including scaled ones, are solved exactly with GJK and planes by projection, which covers every shape the script can make other than the compounds that scaled() makes from scales that convex shapes can't take, for which false is returned.
+static bool jolt_closest_point_on_surface(const Shape* shape, Vec3Arg scale, Vec3Arg point, Vec3& out_closest) {
+	if (shape->GetType() == EShapeType::Convex) {
+		ConvexShape::SupportBuffer buffer;
+		const ConvexShape::Support* support = static_cast<const ConvexShape*>(shape)->GetSupportFunction(ConvexShape::ESupportMode::IncludeConvexRadius, buffer, scale);
+		GJKClosestPoint gjk;
+		Vec3 v = Vec3::sAxisX(), on_shape, on_point;
+		gjk.GetClosestPoints(*support, PointConvexSupport {point}, 1.0e-4f, FLT_MAX, v, on_shape, on_point);
+		out_closest = on_shape;
+		return true;
+	}
+	if (shape->GetSubType() == EShapeSubType::Scaled) {
+		const ScaledShape* scaled = static_cast<const ScaledShape*>(shape);
+		return jolt_closest_point_on_surface(scaled->GetInnerShape(), scale * scaled->GetScale(), point, out_closest);
+	}
+	if (shape->GetSubType() == EShapeSubType::Plane) {
+		out_closest = static_cast<const PlaneShape*>(shape)->GetPlane().Scaled(scale).ProjectPointOnPlane(point);
+		return true;
+	}
+	return false;
+}
+// The point of a shape closest to a point relative to its center of mass, which is the point itself when it is inside the shape.
+static Vec3 jolt_closest_point(const Shape* shape, Vec3Arg point) {
+	AnyHitCollisionCollector<CollidePointCollector> inside;
+	shape->CollidePoint(point, SubShapeIDCreator(), inside);
+	if (inside.HadHit()) return point;
+	Vec3 closest;
+	if (jolt_closest_point_on_surface(shape, Vec3::sOne(), point, closest)) return closest;
+	// Other shapes are approximated by colliding a tiny sphere at the point with a separation distance that reaches the shape, for which Jolt reports points that are nearly the closest.
+	static const RefConst<Shape> probe = new SphereShape(0.001f);
+	CollideShapeSettings settings;
+	settings.mMaxSeparationDistance = point.Length() + shape->GetLocalBounds().GetExtent().Length();
+	ClosestHitCollisionCollector<CollideShapeCollector> hit;
+	CollisionDispatch::sCollideShapeVsShape(probe, shape, Vec3::sOne(), Vec3::sOne(), Mat44::sTranslation(point), Mat44::sIdentity(), SubShapeIDCreator(), SubShapeIDCreator(), settings, hit);
+	return hit.HadHit() ? hit.mHit.mContactPointOn2 : point;
+}
+static Vec3* jolt_shape_closest_point(const jolt_shape_ref& s, const Vec3& point) { Vec3 center_of_mass = s.shape->GetCenterOfMass(); return new_vec3(jolt_closest_point(s.shape, point - center_of_mass) + center_of_mass); }
+static bool jolt_shape_is_valid_scale(const jolt_shape_ref& s, const Vec3& scale) { return s.shape->IsValidScale(scale); }
+static Vec3* jolt_shape_make_scale_valid(const jolt_shape_ref& s, const Vec3& scale) { return new_vec3(s.shape->MakeScaleValid(scale)); }
+static jolt_shape_ref* jolt_shape_scaled(const jolt_shape_ref& s, const Vec3& scale) {
+	auto result = s.shape->ScaleShape(scale);
+	if (result.HasError()) return nullptr;
+	return new jolt_shape_ref(result.Get());
+}
 
 // -- Shape hierarchy cast helpers (all backed by jolt_shape_ref*; AS sees different types) --
 // Explicit downcasts (may return null)
@@ -316,18 +398,16 @@ static jolt_shape_ref* jolt_convex_to_tapered_cylinder(jolt_shape_ref* s) {
 	if (!s || s->shape->GetSubType() != EShapeSubType::TaperedCylinder) return nullptr;
 	s->AddRef(); return s;
 }
+static jolt_shape_ref* jolt_shape_to_plane(jolt_shape_ref* s) {
+	if (!s || s->shape->GetSubType() != EShapeSubType::Plane) return nullptr;
+	s->AddRef(); return s;
+}
 // Implicit upcasts (always succeed)
 static jolt_shape_ref* jolt_shape_ref_upcast(jolt_shape_ref* s) { if (s) s->AddRef(); return s; }
 
 // -- ConvexShape accessors --
 static float jolt_convex_shape_get_density(const jolt_shape_ref* s) { return static_cast<const ConvexShape*>(s->shape.GetPtr())->GetDensity(); }
 static void jolt_convex_shape_set_density(jolt_shape_ref* s, float density) { const_cast<ConvexShape*>(static_cast<const ConvexShape*>(s->shape.GetPtr()))->SetDensity(density); }
-static nvgt_physics_material* jolt_convex_shape_get_material(const jolt_shape_ref* s) {
-	const ConvexShape* cs = static_cast<const ConvexShape*>(s->shape.GetPtr());
-	auto* mat = const_cast<nvgt_physics_material*>(dynamic_cast<const nvgt_physics_material*>(cs->GetMaterial()));
-	if (mat) mat->AddRef();
-	return mat;
-}
 
 // -- SphereShape specific --
 static float jolt_sphere_shape_get_radius(const jolt_shape_ref* s) { return static_cast<const SphereShape*>(s->shape.GetPtr())->GetRadius(); }
@@ -355,6 +435,11 @@ static float jolt_tapered_cylinder_shape_get_half_height(const jolt_shape_ref* s
 static float jolt_tapered_cylinder_shape_get_top_radius(const jolt_shape_ref* s) { return static_cast<const TaperedCylinderShape*>(s->shape.GetPtr())->GetTopRadius(); }
 static float jolt_tapered_cylinder_shape_get_bottom_radius(const jolt_shape_ref* s) { return static_cast<const TaperedCylinderShape*>(s->shape.GetPtr())->GetBottomRadius(); }
 static float jolt_tapered_cylinder_shape_get_convex_radius(const jolt_shape_ref* s) { return static_cast<const TaperedCylinderShape*>(s->shape.GetPtr())->GetConvexRadius(); }
+
+// -- PlaneShape specific --
+static Plane* new_plane(const Plane& p) { return ::new (scoped_alloc<Plane>()) Plane(p); }
+static Plane* jolt_plane_shape_get_plane(const jolt_shape_ref* s) { return new_plane(static_cast<const PlaneShape*>(s->shape.GetPtr())->GetPlane()); }
+static float jolt_plane_shape_get_half_extent(const jolt_shape_ref* s) { return static_cast<const PlaneShape*>(s->shape.GetPtr())->GetHalfExtent(); }
 
 // -- Vec3 (vector) factory/release/assign for scoped reference type --
 static Vec3* vec3_factory_default() { return new_vec3(0.0f, 0.0f, 0.0f); }
@@ -423,6 +508,25 @@ static void aabb_set_min(AABox& b, const Vec3& v) { b.mMin = v; }
 static void aabb_set_max(AABox& b, const Vec3& v) { b.mMax = v; }
 static bool aabb_contains_point(const AABox& b, const Vec3& p) { return b.Contains(p); }
 static void aabb_encapsulate_point(AABox& b, const Vec3& p) { b.Encapsulate(p); }
+
+// -- Plane factory/release/assign for scoped reference type; the normal is always kept at unit length, as Jolt's plane shape and distance functions require, so a constant passed with a longer normal is scaled with it to describe the same plane. A zero normal is left as is rather than becoming NaN, and makes physics_plane_shape_create fail --
+static Plane normalized_plane(Vec3Arg normal, float constant) { float len = normal.Length(); return len > 0.0f ? Plane(normal / len, constant / len) : Plane(normal, constant); }
+static Plane* plane_factory_default() { return new_plane(Plane(Vec3::sAxisZ(), 0.0f)); }
+static Plane* plane_factory_normal_constant(const Vec3& normal, float constant) { return new_plane(normalized_plane(normal, constant)); }
+static Plane* plane_factory_point_normal(const Vec3& point, const Vec3& normal) { return new_plane(Plane::sFromPointAndNormal(point, normal.NormalizedOr(Vec3::sZero()))); }
+static Plane* plane_factory_points(const Vec3& v1, const Vec3& v2, const Vec3& v3) { return new_plane(Plane::sFromPointAndNormal(v1, (v2 - v1).Cross(v3 - v1).NormalizedOr(Vec3::sZero()))); } // Plane::sFromPointsCCW would give a NaN normal for points in a line.
+static Plane* plane_factory_copy(const Plane& o) { return new_plane(o); }
+static void plane_release(Plane* p) { p->~Plane(); JPH::AlignedFree(p); }
+static Plane& plane_opAssign(Plane& self, const Plane& other) { self = other; return self; }
+static bool plane_equals(const Plane& a, const Plane& b) { return a.GetNormal() == b.GetNormal() && a.GetConstant() == b.GetConstant(); }
+static Vec3* plane_get_normal(const Plane& p) { return new_vec3(p.GetNormal()); }
+static void plane_set_normal(Plane& p, const Vec3& normal) { p.SetNormal(normal.NormalizedOr(Vec3::sZero())); }
+static float plane_signed_distance(const Plane& p, const Vec3& point) { return p.SignedDistance(point); }
+static Vec3* plane_project_point(const Plane& p, const Vec3& point) { return new_vec3(p.ProjectPointOnPlane(point)); }
+static Plane* plane_offset(const Plane& p, float distance) { return new_plane(p.Offset(distance)); }
+static Plane* plane_scaled(const Plane& p, const Vec3& scale) { return new_plane(p.Scaled(scale)); }
+static Plane* plane_transformed(const Plane& p, const Vec3& position, const Quat& rotation) { return new_plane(p.GetTransformed(Mat44::sRotationTranslation(rotation, position))); }
+static string plane_to_string(const Plane& p) { Vec3 n = p.GetNormal(); return "plane(" + to_string(n.GetX()) + ", " + to_string(n.GetY()) + ", " + to_string(n.GetZ()) + ", " + to_string(p.GetConstant()) + ")"; }
 
 // -- BodyID as a value type --
 static void body_id_default_construct(void* mem) { new (mem) BodyID(); }
@@ -560,7 +664,13 @@ static void jolt_world_set_contact_listener(jolt_physics_world* w, asIScriptFunc
 
 static BodyID jolt_world_create_and_add_body(jolt_physics_world* w, jolt_shape_ref* shape, const Vec3& pos, const Quat& rot, int motion_type, uint16 layer, int activation) {
 	if (!shape || !shape->shape) return BodyID();
+	if (motion_type == (int)EMotionType::Dynamic && shape->shape->MustBeStatic()) return BodyID(); // Jolt only asserts on this in debug builds, otherwise creating a massless dynamic body.
 	BodyCreationSettings settings(shape->shape.GetPtr(), pos, rot, (EMotionType)motion_type, (ObjectLayer)layer);
+	const PhysicsMaterial* material = shape->shape->GetMaterial(SubShapeID());
+	if (material && material != PhysicsMaterial::sDefault.GetPtr()) { // Jolt only gives bodies friction and restitution, so those of the shape's material are copied to the body, which can still change them afterwards.
+		settings.mFriction = static_cast<const nvgt_physics_material*>(material)->friction;
+		settings.mRestitution = static_cast<const nvgt_physics_material*>(material)->restitution;
+	}
 	return w->system.GetBodyInterface().CreateAndAddBody(settings, (EActivation)activation);
 }
 
@@ -708,6 +818,14 @@ static bool jolt_body_get_acoustically_transparent(jolt_physics_world* w, const 
 static void jolt_world_set_gravity_factor(jolt_physics_world* w, const BodyID& id, float v) { w->system.GetBodyInterface().SetGravityFactor(id, v); }
 
 // -- Body interface: spatial queries --
+// The point of a body closest to a point in the world, which is the point itself when it is inside the body or the body doesn't exist.
+static Vec3* jolt_world_get_closest_point(jolt_physics_world* w, const BodyID& id, const Vec3& point) {
+	BodyLockRead lock(w->system.GetBodyLockInterface(), id);
+	if (!lock.Succeeded()) return new_vec3(point);
+	const Body& body = lock.GetBody();
+	Mat44 transform = body.GetCenterOfMassTransform();
+	return new_vec3(transform * jolt_closest_point(body.GetShape(), transform.InversedRotationTranslation() * point));
+}
 static AABox* jolt_world_get_world_space_bounds(jolt_physics_world* w, const BodyID& id) {
 	BodyLockRead lock(w->system.GetBodyLockInterface(), id);
 	if (!lock.Succeeded()) return ::new (scoped_alloc<AABox>()) AABox();
@@ -1139,6 +1257,27 @@ static void RegisterJoltMathTypes(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("aabb", "aabb@ intersect(const aabb&in other) const", asFUNCTION((scoped_ret<AABox, AABox, &AABox::Intersect, const AABox&>)), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("aabb", "aabb& opAssign(const aabb&in)", asFUNCTION(aabb_opAssign), asCALL_CDECL_OBJFIRST);
 
+	// plane (JPH::Plane) - scoped reference type, as it stores its normal and constant in a SIMD Vec4
+	engine->RegisterObjectType("plane", 0, asOBJ_REF | asOBJ_SCOPED);
+	engine->RegisterObjectBehaviour("plane", asBEHAVE_FACTORY, "plane@ f()", asFUNCTION(plane_factory_default), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("plane", asBEHAVE_FACTORY, "plane@ f(const vector&in normal, float constant)", asFUNCTION(plane_factory_normal_constant), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("plane", asBEHAVE_FACTORY, "plane@ f(const vector&in point, const vector&in normal)", asFUNCTION(plane_factory_point_normal), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("plane", asBEHAVE_FACTORY, "plane@ f(const vector&in point1, const vector&in point2, const vector&in point3)", asFUNCTION(plane_factory_points), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("plane", asBEHAVE_FACTORY, "plane@ f(const plane&in)", asFUNCTION(plane_factory_copy), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("plane", asBEHAVE_RELEASE, "void f()", asFUNCTION(plane_release), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("plane", "plane& opAssign(const plane&in)", asFUNCTION(plane_opAssign), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("plane", "bool opEquals(const plane&in) const", asFUNCTION(plane_equals), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("plane", "vector@ get_normal() const property", asFUNCTION(plane_get_normal), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("plane", "void set_normal(const vector&in) property", asFUNCTION(plane_set_normal), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("plane", "float get_constant() const property", asMETHOD(Plane, GetConstant), asCALL_THISCALL);
+	engine->RegisterObjectMethod("plane", "void set_constant(float) property", asMETHOD(Plane, SetConstant), asCALL_THISCALL);
+	engine->RegisterObjectMethod("plane", "float signed_distance(const vector&in point) const", asFUNCTION(plane_signed_distance), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("plane", "vector@ project_point(const vector&in point) const", asFUNCTION(plane_project_point), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("plane", "plane@ offset(float distance) const", asFUNCTION(plane_offset), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("plane", "plane@ scaled(const vector&in scale) const", asFUNCTION(plane_scaled), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("plane", "plane@ transformed(const vector&in position, const quaternion&in rotation) const", asFUNCTION(plane_transformed), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("plane", "string opImplConv() const", asFUNCTION(plane_to_string), asCALL_CDECL_OBJFIRST);
+
 	// physics_transform
 	engine->RegisterObjectType("physics_transform", sizeof(physics_transform), asOBJ_VALUE | asGetTypeTraits<physics_transform>());
 	engine->RegisterObjectBehaviour("physics_transform", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(physics_transform_construct), asCALL_CDECL_OBJFIRST);
@@ -1183,6 +1322,8 @@ static void RegisterJoltEnums(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("physics_shape_type", "PHYSICS_SHAPE_COMPOUND", (int)EShapeType::Compound);
 	engine->RegisterEnumValue("physics_shape_type", "PHYSICS_SHAPE_MESH", (int)EShapeType::Mesh);
 	engine->RegisterEnumValue("physics_shape_type", "PHYSICS_SHAPE_HEIGHT_FIELD", (int)EShapeType::HeightField);
+	engine->RegisterEnumValue("physics_shape_type", "PHYSICS_SHAPE_DECORATED", (int)EShapeType::Decorated);
+	engine->RegisterEnumValue("physics_shape_type", "PHYSICS_SHAPE_PLANE", (int)EShapeType::Plane);
 
 	engine->RegisterEnum("physics_shape_sub_type");
 	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_SPHERE", (int)EShapeSubType::Sphere);
@@ -1197,6 +1338,10 @@ static void RegisterJoltEnums(asIScriptEngine* engine) {
 	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_MUTABLE_COMPOUND", (int)EShapeSubType::MutableCompound);
 	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_MESH_SUBTYPE", (int)EShapeSubType::Mesh);
 	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_HEIGHT_FIELD_SUBTYPE", (int)EShapeSubType::HeightField);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_ROTATED_TRANSLATED", (int)EShapeSubType::RotatedTranslated);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_SCALED", (int)EShapeSubType::Scaled);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_OFFSET_CENTER_OF_MASS", (int)EShapeSubType::OffsetCenterOfMass);
+	engine->RegisterEnumValue("physics_shape_sub_type", "PHYSICS_SHAPE_PLANE_SUBTYPE", (int)EShapeSubType::Plane);
 }
 
 static void RegisterJoltBodyID(asIScriptEngine* engine) {
@@ -1213,9 +1358,36 @@ static void RegisterJoltBodyID(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_body_id", "string opImplConv() const", asFUNCTION(body_id_to_string), asCALL_CDECL_OBJFIRST);
 }
 
+// Every shape class is backed by jolt_shape_ref*, so the members of the classes a script shape derives from are registered on it directly rather than through inheritance, which registered application types don't have.
+static void jolt_register_shape_base(asIScriptEngine* engine, const char* type) {
+	engine->RegisterObjectBehaviour(type, asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
+	engine->RegisterObjectBehaviour(type, asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type, "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "aabb@ get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "float get_mass() const property", asFUNCTION(jolt_shape_get_mass), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "bool get_must_be_static() const property", asFUNCTION(jolt_shape_get_must_be_static), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "vector@ get_center_of_mass() const property", asFUNCTION(jolt_shape_get_center_of_mass), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "float get_inner_radius() const property", asFUNCTION(jolt_shape_get_inner_radius), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "bool contains_point(const vector&in point) const", asFUNCTION(jolt_shape_contains_point), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "vector@ closest_point(const vector&in point) const", asFUNCTION(jolt_shape_closest_point), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "bool cast_ray(const vector&in origin, const vector&in direction, float&out hit_fraction) const", asFUNCTION(jolt_shape_cast_ray), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "bool is_valid_scale(const vector&in scale) const", asFUNCTION(jolt_shape_is_valid_scale), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "vector@ make_scale_valid(const vector&in scale) const", asFUNCTION(jolt_shape_make_scale_valid), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "physics_shape@ scaled(const vector&in scale) const", asFUNCTION(jolt_shape_scaled), asCALL_CDECL_OBJFIRST);
+	if (string(type) != "physics_shape") engine->RegisterObjectMethod(type, "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+}
+static void jolt_register_convex_shape_base(asIScriptEngine* engine, const char* type) {
+	jolt_register_shape_base(engine, type);
+	engine->RegisterObjectMethod(type, "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod(type, "physics_material@ get_material() const property", asFUNCTION(jolt_shape_get_material), asCALL_CDECL_OBJFIRST);
+	if (string(type) != "physics_convex_shape") engine->RegisterObjectMethod(type, "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+}
 static void RegisterJoltShape(asIScriptEngine* engine) {
-	// All shape types are backed by jolt_shape_ref* — AddRef/Release are shared
 	// Forward declare shape types
+	engine->RegisterObjectType("physics_shape", 0, asOBJ_REF);
 	engine->RegisterObjectType("physics_convex_shape", 0, asOBJ_REF);
 	engine->RegisterObjectType("physics_sphere_shape", 0, asOBJ_REF);
 	engine->RegisterObjectType("physics_box_shape", 0, asOBJ_REF);
@@ -1223,27 +1395,15 @@ static void RegisterJoltShape(asIScriptEngine* engine) {
 	engine->RegisterObjectType("physics_cylinder_shape", 0, asOBJ_REF);
 	engine->RegisterObjectType("physics_tapered_capsule_shape", 0, asOBJ_REF);
 	engine->RegisterObjectType("physics_tapered_cylinder_shape", 0, asOBJ_REF);
-	// physics_shape (base)
-	engine->RegisterObjectType("physics_shape", 0, asOBJ_REF);
-	engine->RegisterObjectBehaviour("physics_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("physics_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_shape", "aabb@ get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_shape", "physics_convex_shape@ opCast()", asFUNCTION(jolt_shape_to_convex), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectType("physics_plane_shape", 0, asOBJ_REF);
 
-	// jolt_convex_shape
-	engine->RegisterObjectBehaviour("physics_convex_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("physics_convex_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_convex_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_convex_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_convex_shape", "aabb@ get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_convex_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_convex_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_convex_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_convex_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_convex_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+	// physics_shape (base)
+	jolt_register_shape_base(engine, "physics_shape");
+	engine->RegisterObjectMethod("physics_shape", "physics_convex_shape@ opCast()", asFUNCTION(jolt_shape_to_convex), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_shape", "physics_plane_shape@ opCast()", asFUNCTION(jolt_shape_to_plane), asCALL_CDECL_OBJFIRST);
+
+	// physics_convex_shape
+	jolt_register_convex_shape_base(engine, "physics_convex_shape");
 	engine->RegisterObjectMethod("physics_convex_shape", "physics_sphere_shape@ opCast()", asFUNCTION(jolt_convex_to_sphere), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_convex_shape", "physics_box_shape@ opCast()", asFUNCTION(jolt_convex_to_box), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_convex_shape", "physics_capsule_shape@ opCast()", asFUNCTION(jolt_convex_to_capsule), asCALL_CDECL_OBJFIRST);
@@ -1251,98 +1411,44 @@ static void RegisterJoltShape(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_convex_shape", "physics_tapered_capsule_shape@ opCast()", asFUNCTION(jolt_convex_to_tapered_capsule), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_convex_shape", "physics_tapered_cylinder_shape@ opCast()", asFUNCTION(jolt_convex_to_tapered_cylinder), asCALL_CDECL_OBJFIRST);
 
-	// jolt_sphere_shape
-	engine->RegisterObjectBehaviour("physics_sphere_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("physics_sphere_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_sphere_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_sphere_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_sphere_shape", "aabb@ get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_sphere_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_sphere_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_sphere_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_sphere_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
+	// physics_sphere_shape
+	jolt_register_convex_shape_base(engine, "physics_sphere_shape");
 	engine->RegisterObjectMethod("physics_sphere_shape", "float get_radius() const property", asFUNCTION(jolt_sphere_shape_get_radius), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_sphere_shape", "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_sphere_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
 
-	// jolt_box_shape
-	engine->RegisterObjectBehaviour("physics_box_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("physics_box_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_box_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_box_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_box_shape", "aabb@ get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_box_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_box_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_box_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_box_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
+	// physics_box_shape
+	jolt_register_convex_shape_base(engine, "physics_box_shape");
 	engine->RegisterObjectMethod("physics_box_shape", "vector@ get_half_extent() const property", asFUNCTION(jolt_box_shape_get_half_extent), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_box_shape", "float get_convex_radius() const property", asFUNCTION(jolt_box_shape_get_convex_radius), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_box_shape", "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_box_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
 
-	// jolt_capsule_shape
-	engine->RegisterObjectBehaviour("physics_capsule_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("physics_capsule_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_capsule_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_capsule_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_capsule_shape", "aabb@ get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_capsule_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_capsule_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_capsule_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_capsule_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
+	// physics_capsule_shape
+	jolt_register_convex_shape_base(engine, "physics_capsule_shape");
 	engine->RegisterObjectMethod("physics_capsule_shape", "float get_half_height() const property", asFUNCTION(jolt_capsule_shape_get_half_height), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_capsule_shape", "float get_radius() const property", asFUNCTION(jolt_capsule_shape_get_radius), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_capsule_shape", "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_capsule_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
 
-	// jolt_cylinder_shape
-	engine->RegisterObjectBehaviour("physics_cylinder_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("physics_cylinder_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_cylinder_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_cylinder_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_cylinder_shape", "aabb@ get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_cylinder_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_cylinder_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_cylinder_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_cylinder_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
+	// physics_cylinder_shape
+	jolt_register_convex_shape_base(engine, "physics_cylinder_shape");
 	engine->RegisterObjectMethod("physics_cylinder_shape", "float get_half_height() const property", asFUNCTION(jolt_cylinder_shape_get_half_height), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_cylinder_shape", "float get_radius() const property", asFUNCTION(jolt_cylinder_shape_get_radius), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_cylinder_shape", "float get_convex_radius() const property", asFUNCTION(jolt_cylinder_shape_get_convex_radius), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_cylinder_shape", "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_cylinder_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
 
-	// jolt_tapered_capsule_shape
-	engine->RegisterObjectBehaviour("physics_tapered_capsule_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("physics_tapered_capsule_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "aabb@ get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
+	// physics_tapered_capsule_shape
+	jolt_register_convex_shape_base(engine, "physics_tapered_capsule_shape");
 	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "float get_half_height() const property", asFUNCTION(jolt_tapered_capsule_shape_get_half_height), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "float get_top_radius() const property", asFUNCTION(jolt_tapered_capsule_shape_get_top_radius), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "float get_bottom_radius() const property", asFUNCTION(jolt_tapered_capsule_shape_get_bottom_radius), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_capsule_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
 
-	// jolt_tapered_cylinder_shape
-	engine->RegisterObjectBehaviour("physics_tapered_cylinder_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(jolt_shape_ref, AddRef), asCALL_THISCALL);
-	engine->RegisterObjectBehaviour("physics_tapered_cylinder_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(jolt_shape_ref, Release), asCALL_THISCALL);
-	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "uint8 get_type() const property", asFUNCTION(jolt_shape_get_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "uint8 get_sub_type() const property", asFUNCTION(jolt_shape_get_sub_type), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "aabb@ get_local_bounds() const property", asFUNCTION(jolt_shape_get_local_bounds), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "float get_volume() const property", asFUNCTION(jolt_shape_get_volume), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "float get_density() const property", asFUNCTION(jolt_convex_shape_get_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "void set_density(float) property", asFUNCTION(jolt_convex_shape_set_density), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_convex_shape_get_material), asCALL_CDECL_OBJFIRST);
+	// physics_tapered_cylinder_shape
+	jolt_register_convex_shape_base(engine, "physics_tapered_cylinder_shape");
 	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "float get_half_height() const property", asFUNCTION(jolt_tapered_cylinder_shape_get_half_height), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "float get_top_radius() const property", asFUNCTION(jolt_tapered_cylinder_shape_get_top_radius), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "float get_bottom_radius() const property", asFUNCTION(jolt_tapered_cylinder_shape_get_bottom_radius), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "float get_convex_radius() const property", asFUNCTION(jolt_tapered_cylinder_shape_get_convex_radius), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "physics_convex_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_tapered_cylinder_shape", "physics_shape@ opImplCast()", asFUNCTION(jolt_shape_ref_upcast), asCALL_CDECL_OBJFIRST);
+
+	// physics_plane_shape
+	jolt_register_shape_base(engine, "physics_plane_shape");
+	engine->RegisterObjectMethod("physics_plane_shape", "plane@ get_plane() const property", asFUNCTION(jolt_plane_shape_get_plane), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_plane_shape", "float get_half_extent() const property", asFUNCTION(jolt_plane_shape_get_half_extent), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_plane_shape", "physics_material@ get_material() const property", asFUNCTION(jolt_shape_get_material), asCALL_CDECL_OBJFIRST);
 
 	// Factory functions return specific typed shapes
 	engine->RegisterGlobalFunction("physics_sphere_shape@ physics_sphere_shape_create(float radius, physics_material@ mat = null)", asFUNCTION(jolt_sphere_shape_create), asCALL_CDECL);
@@ -1351,6 +1457,24 @@ static void RegisterJoltShape(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("physics_cylinder_shape@ physics_cylinder_shape_create(float half_height, float radius, float convex_radius = 0.05f, physics_material@ mat = null)", asFUNCTION(jolt_cylinder_shape_create), asCALL_CDECL);
 	engine->RegisterGlobalFunction("physics_tapered_capsule_shape@ physics_tapered_capsule_shape_create(float half_height, float top_radius, float bottom_radius, physics_material@ mat = null)", asFUNCTION(jolt_tapered_capsule_shape_create), asCALL_CDECL);
 	engine->RegisterGlobalFunction("physics_tapered_cylinder_shape@ physics_tapered_cylinder_shape_create(float half_height, float top_radius, float bottom_radius, float convex_radius = 0.05f, physics_material@ mat = null)", asFUNCTION(jolt_tapered_cylinder_shape_create), asCALL_CDECL);
+	engine->RegisterGlobalFunction("physics_plane_shape@ physics_plane_shape_create(const plane&in plane, float half_extent = 1000.0f, physics_material@ mat = null)", asFUNCTION(jolt_plane_shape_create), asCALL_CDECL);
+}
+
+// A physics_shape given to mixer::set_shape, which the mixer then fills, being heard from the point of the shape closest to the listener. The shape is placed at the mixer's position, unrotated, with points relative to its origin as in physics_shape::contains_point.
+class jolt_sound_shape : public sound_shape {
+	RefConst<Shape> shape;
+public:
+	explicit jolt_sound_shape(const Shape* shape) : shape(shape) {}
+	bool contains(const vector3& listener_position, vector3& sound_position) override {
+		Vec3 center_of_mass = sound_position + shape->GetCenterOfMass(), listener = listener_position - center_of_mass, closest = jolt_closest_point(shape, listener);
+		if (closest == listener) return true;
+		sound_position = center_of_mass + closest;
+		return false;
+	}
+};
+static sound_shape* jolt_sound_shape_setup(mixer* connected_sound, CScriptHandle* shape_reference) {
+	jolt_shape_ref* s = static_cast<jolt_shape_ref*>(shape_reference->GetRef());
+	return s && s->shape ? new jolt_sound_shape(s->shape.GetPtr()) : nullptr;
 }
 
 static void RegisterJoltCharacter(asIScriptEngine* engine) {
@@ -1415,10 +1539,10 @@ static void RegisterJoltWorld(asIScriptEngine* engine) {
 
 	// Transform
 	engine->RegisterObjectMethod("physics_world", "vector@ get_position(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_position), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_world", "void set_position(const physics_body_id&in id, const vector&in pos, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_position), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_position(const physics_body_id&in id, const vector&in pos, physics_activation activation = PHYSICS_ACTIVATE)", asFUNCTION(jolt_world_set_position), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "quaternion@ get_rotation(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_rotation), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_world", "void set_rotation(const physics_body_id&in id, const quaternion&in rot, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_rotation), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_world", "void set_position_and_rotation(const physics_body_id&in id, const vector&in pos, const quaternion&in rot, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_position_and_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_rotation(const physics_body_id&in id, const quaternion&in rot, physics_activation activation = PHYSICS_ACTIVATE)", asFUNCTION(jolt_world_set_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_position_and_rotation(const physics_body_id&in id, const vector&in pos, const quaternion&in rot, physics_activation activation = PHYSICS_ACTIVATE)", asFUNCTION(jolt_world_set_position_and_rotation), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "vector@ get_center_of_mass_position(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_center_of_mass_position), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "physics_transform get_transform(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_transform), asCALL_CDECL_OBJFIRST);
 
@@ -1444,11 +1568,11 @@ static void RegisterJoltWorld(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_world", "bool is_added(const physics_body_id&in id) const", asFUNCTION(jolt_world_is_added), asCALL_CDECL_OBJFIRST);
 
 	// Motion type
-	engine->RegisterObjectMethod("physics_world", "void set_motion_type(const physics_body_id&in id, physics_body_type type, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_motion_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_motion_type(const physics_body_id&in id, physics_body_type type, physics_activation activation = PHYSICS_ACTIVATE)", asFUNCTION(jolt_world_set_motion_type), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "physics_body_type get_motion_type(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_motion_type), asCALL_CDECL_OBJFIRST);
 
 	// Shape
-	engine->RegisterObjectMethod("physics_world", "void set_shape(const physics_body_id&in id, physics_shape@ shape, bool update_mass = true, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_shape), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_shape(const physics_body_id&in id, physics_shape@ shape, bool update_mass = true, physics_activation activation = PHYSICS_ACTIVATE)", asFUNCTION(jolt_world_set_shape), asCALL_CDECL_OBJFIRST);
 
 	// Material properties
 	engine->RegisterObjectMethod("physics_world", "float get_friction(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_friction), asCALL_CDECL_OBJFIRST);
@@ -1459,6 +1583,7 @@ static void RegisterJoltWorld(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_world", "void set_gravity_factor(const physics_body_id&in id, float v)", asFUNCTION(jolt_world_set_gravity_factor), asCALL_CDECL_OBJFIRST);
 
 	// Spatial queries
+	engine->RegisterObjectMethod("physics_world", "vector@ get_closest_point(const physics_body_id&in id, const vector&in point) const", asFUNCTION(jolt_world_get_closest_point), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "aabb@ get_world_space_bounds(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_world_space_bounds), asCALL_CDECL_OBJFIRST);
 
 	// Velocity limits
@@ -1494,6 +1619,7 @@ void RegisterJolt(asIScriptEngine* engine) {
 	RegisterJoltEnums(engine);
 	RegisterJoltBodyID(engine);
 	RegisterJoltShape(engine);
+	for (const char* type : {"physics_shape", "physics_convex_shape", "physics_sphere_shape", "physics_box_shape", "physics_capsule_shape", "physics_cylinder_shape", "physics_tapered_capsule_shape", "physics_tapered_cylinder_shape", "physics_plane_shape"}) register_sound_shape_type(engine->GetTypeIdByDecl(type), jolt_sound_shape_setup);
 	RegisterJoltWorld(engine);
 	RegisterJoltCharacter(engine);
 	nvgt_register_raycast_provider_type(engine->GetTypeIdByDecl("physics_world"), jolt_world_get_raycast_provider);
