@@ -7,6 +7,7 @@
 		bool: true if the stream could be opened, false otherwise.
 	## Remarks:
 		The audio is downloaded and decoded a little at a time as it plays. Live streams such as radio stations have no known length, so their `length` is 0 and they can't be seeked.
+		Note that the script will block at this time until a connection to the URL succeeds.
 		This method should currently be considered beta.
 */
 
