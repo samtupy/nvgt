@@ -209,10 +209,9 @@ ma_result wav_write_proc(ma_encoder *pEncoder, const void *pBufferIn, size_t byt
 	return MA_SUCCESS;
 }
 ma_result wav_seek_proc(ma_encoder *pEncoder, ma_int64 offset, ma_seek_origin origin) {
-	if (origin != ma_seek_origin_start)
-		return MA_NOT_IMPLEMENTED;
 	std::ostream *stream = static_cast<std::ostream *>(pEncoder->pUserData);
-	stream->seekp(offset);
+	// dr_wav updates the sizes in the header after every write and then seeks back to the end, so every origin must be supported or each write lands on top of the last.
+	stream->seekp(offset, origin == ma_seek_origin_end ? std::ios::end : origin == ma_seek_origin_current ? std::ios::cur : std::ios::beg);
 	if (!stream->good())
 		return MA_ERROR;
 	return MA_SUCCESS;
@@ -937,6 +936,7 @@ protected:
 		return true;
 	}
 	ma_data_converter* get_dc() const { return &*dc; }
+	unsigned int get_input_channels() const { return dc ? dc->channelsIn : channels; } // Frames are written in the engine's channel count and converted to the encoder's, which may differ.
 public:
 	audio_encoder_impl(audio_engine* e, bool streamable_pulling = true) : effect_node_impl(e, 0, 0, 1, 1, MA_NODE_FLAG_PASSTHROUGH), output_stream(nullptr), pull_stream(nullptr), streamable_pulling(streamable_pulling), sample_rate(0), channels(0), frames_written(0) {}
 	~audio_encoder_impl() {
@@ -998,7 +998,7 @@ public:
 		ma_uint64 total_processed = 0, total_written = 0;
 		while (frame_count) {
 			ma_uint64 frame_count_in = frame_count, frame_count_out = dc_bufsize;
-			if (ma_data_converter_process_pcm_frames(&*dc, ma_offset_pcm_frames_ptr_f32((float*)frames_in, total_processed, get_channels()), &frame_count_in, &dc_buffer[0], &frame_count_out) != MA_SUCCESS) return 0;
+			if (ma_data_converter_process_pcm_frames(&*dc, ma_offset_pcm_frames_ptr_f32((float*)frames_in, total_processed, dc->channelsIn), &frame_count_in, &dc_buffer[0], &frame_count_out) != MA_SUCCESS) return 0;
 			total_processed += frame_count_in;
 			frames_written += frame_count_in;
 			frame_count -= frame_count_in;
@@ -1008,11 +1008,11 @@ public:
 	}
 	unsigned int write_script_array(CScriptArray *frames) override {
 		if (!frames || !get_channels()) return 0;
-		return write((float*)frames->GetBuffer(), frames->GetSize() / get_channels());
+		return write((float*)frames->GetBuffer(), frames->GetSize() / get_input_channels());
 	}
 	unsigned int write_script_memory_buffer(script_memory_buffer* frames) override {
 		if (!frames || !get_channels()) return false;
-		return write((float*)frames->ptr, frames->size / get_channels());
+		return write((float*)frames->ptr, frames->size / get_input_channels());
 	}
 	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override { write(*frames_in, *frame_count_in); }
 	string read() override {
