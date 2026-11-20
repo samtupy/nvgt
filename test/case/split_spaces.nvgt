@@ -1,3 +1,4 @@
+const int test_split_spaces_large_string_level = 3; // Slow, run with -l3.
 void test_split_spaces_large_string() {
 	// First test with a simple case to understand the behavior
 	string simple = "/ aaaaa";

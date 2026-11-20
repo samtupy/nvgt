@@ -103,6 +103,7 @@ double sound_environment_test_tail_energy(bool use_environment, bool use_reflect
 	}
 	return tail;
 }
+const int test_sound_environment_reflections_level = 3; // Slow, run with -l3.
 void test_sound_environment_reflections() {
 	double dry = sound_environment_test_tail_energy(false, true);
 	assert(dry < 0.0001, "a sound outside of the environment should be silent after it ends, tail energy " + dry);
@@ -112,6 +113,7 @@ void test_sound_environment_reflections() {
 	assert(per_source > 0.01, "reflections decoded per source should leave a reverb tail, tail energy " + per_source);
 	assert(per_source > mixed * 0.5 and per_source < mixed * 2, "both reflection paths should produce similar tails, mixer " + mixed + " per source " + per_source);
 }
+const int test_sound_environment_settings_changes_level = 3; // Slow, run with -l3.
 void test_sound_environment_settings_changes() { // Changing settings that rebuild the simulator and the audio effects while sounds are playing must not interrupt or break processing.
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	physics_world@ world = sound_environment_test_room(true);
@@ -162,6 +164,7 @@ double sound_environment_test_energy(audio_engine@ e, sound_environment@ env, in
 	}
 	return energy;
 }
+const int test_sound_environment_new_sources_level = 3; // Slow, run with -l3.
 void test_sound_environment_new_sources() { // New sounds are heard with the listener reverb until their own reflections are simulated, and are occluded straight away even while reflections are being simulated.
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	physics_world@ world = sound_environment_test_room(true);
@@ -312,6 +315,7 @@ int[] sound_environment_test_groups(bool divided, const vector[]@ positions, con
 	for (uint i = 0; i < mixers.length(); i++) groups.insert_last(env.get_source(mixers[i]).reflection_group);
 	return groups;
 }
+const int test_sound_environment_reflection_grouping_level = 3; // Slow, run with -l3.
 void test_sound_environment_reflection_grouping() { // Sounds within reflection_group_size meters of each other share a reflection group, wherever the listener is, unless something stands between them.
 	vector listener(-4, -4, 1.6);
 	int[]@ far = sound_environment_test_groups(false, {vector(3, 3, 1.5), vector(3, 0.6, 1.5)}, listener);
@@ -326,6 +330,7 @@ void test_sound_environment_reflection_grouping() { // Sounds within reflection_
 	int[]@ walled = sound_environment_test_groups(true, across, listener);
 	assert(walled[0] >= 0 and walled[1] >= 0 and walled[0] != walled[1], "two sounds on either side of a wall should not share a group, got " + walled[0] + " and " + walled[1]);
 }
+const int test_sound_environment_reflection_budget_level = 3; // Slow, run with -l3.
 void test_sound_environment_reflection_budget() { // With more sounds than reflection groups, sounds share groups rather than going without reflections.
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	physics_world@ world = sound_environment_test_room(false);
@@ -358,6 +363,7 @@ void test_sound_environment_reflection_budget() { // With more sounds than refle
 	double tail = sound_environment_test_energy(e, env, 40);
 	assert(tail > 10, "a sound sharing a group should reverberate, tail energy " + tail);
 }
+const int test_sound_environment_probes_and_baking_level = 3; // Slow, run with -l3.
 void test_sound_environment_probes_and_baking() {
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	physics_world@ world = sound_environment_test_room(false);
@@ -399,6 +405,7 @@ double sound_environment_test_baked_tail(bool use_baked_reverb) {
 	sound_environment_test_energy(e, env, 20);
 	return sound_environment_test_energy(e, env, 40);
 }
+const int test_sound_environment_baked_reverb_level = 3; // Slow, run with -l3.
 void test_sound_environment_baked_reverb() { // The listener's reverb can be looked up from baked probes rather than simulated.
 	double baked = sound_environment_test_baked_tail(true), unbaked = sound_environment_test_baked_tail(false);
 	assert(baked > 10 and unbaked < baked / 100, "the baked reverb should be heard where real time simulation hears nothing, tail energy " + baked + " baked and " + unbaked + " simulated");
@@ -426,12 +433,14 @@ double sound_environment_test_pathing_energy(bool pathing, bool baked) { // A so
 	sound_environment_test_energy(e, env, 10);
 	return sound_environment_test_energy(e, env, 40);
 }
+const int test_sound_environment_pathing_level = 3; // Slow, run with -l3.
 void test_sound_environment_pathing() { // Pathing lets a sound be heard around the wall between it and the listener, through the gap at the wall's end.
 	double without = sound_environment_test_pathing_energy(false, true), with_pathing = sound_environment_test_pathing_energy(true, true), unbaked = sound_environment_test_pathing_energy(true, false);
 	assert(without < 0.001, "with the direct path blocked and nothing else enabled, the sound should be silent, energy " + without);
 	assert(with_pathing > 1, "with pathing, the sound should be heard around the wall, energy " + with_pathing);
 	assert(unbaked < 0.001, "pathing needs baked paths, energy " + unbaked);
 }
+const int test_sound_environment_tail_history_level = 3; // Slow, run with -l3.
 void test_sound_environment_tail_history() { // Once a reflection group's tail has ended, the sound it was given before must not play again when it gets input again.
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	physics_world@ world = sound_environment_test_room(false);
@@ -480,6 +489,7 @@ double sound_environment_test_loudest_window(const double[]@ energies, uint wind
 	}
 	return loudest;
 }
+const int test_sound_environment_moving_between_areas_level = 3; // Slow, run with -l3.
 void test_sound_environment_moving_between_areas() { // A distant sound moving back and forth across the wall between two areas must glide between them, rather than bursting into reflections simulated as if it were at the listener while its new place is first simulated.
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	physics_world@ world = sound_environment_test_room(true);
@@ -552,6 +562,7 @@ double[]@ sound_environment_test_click_tails(bool use_reflection_mixer, int clic
 	}
 	return tails;
 }
+const int test_sound_environment_first_sound_level = 3; // Slow, run with -l3.
 void test_sound_environment_first_sound() { // The first sound through a source, such as a first footstep, must reverberate like the ones after it. Its onset was faded in from silence, which took most of a short sound's reflections.
 	for (int use_mixer = 0; use_mixer < 2; use_mixer++) {
 		double[]@ tails = sound_environment_test_click_tails(use_mixer == 1, 3);
@@ -561,6 +572,7 @@ void test_sound_environment_first_sound() { // The first sound through a source,
 		assert(tails[2] < tails[1] * 1.4, "later clicks shouldn't build up " + name + ", tail energy " + tails[1] + " then " + tails[2]);
 	}
 }
+const int test_sound_environment_mixed_hybrid_level = 3; // Slow, run with -l3.
 void test_sound_environment_mixed_hybrid() { // Steam Audio's reflection mixer only implements convolution, so hybrid and parametric reflections are added up and decoded once instead, and must sound the same as when each group is decoded on its own.
 	for (int t = 0; t < 2; t++) {
 		sound_environment_reflection_type type = t == 0 ? SOUND_ENVIRONMENT_REFLECTIONS_HYBRID : SOUND_ENVIRONMENT_REFLECTIONS_PARAMETRIC;
