@@ -1747,6 +1747,7 @@ public:
 			void* buffer_ptr = nullptr;
 			unsigned int frames_requested = size_in_frames;
 			if ((g_soundsystem_last_error = ma_pcm_rb_acquire_write(&*pcm_stream, &frames_requested, &buffer_ptr)) != MA_SUCCESS || !buffer_ptr) return false;
+			if (!frames_requested) return false; // The buffer is full, and waiting for it to drain would hang forever if the sound isn't playing, so what doesn't fit is dropped.
 			memcpy(buffer_ptr, input + (frames_written * frame_size), frames_requested * frame_size);
 			if ((g_soundsystem_last_error = ma_pcm_rb_commit_write(&*pcm_stream, frames_requested)) != MA_SUCCESS) return false;
 			frames_written += frames_requested;

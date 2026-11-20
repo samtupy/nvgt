@@ -9,3 +9,12 @@ void test_audio_decoder_datastream() {
 	assert(frames.length() == 4096 * d.channels, "the decoder should read frames, got " + frames.length() + " samples");
 	assert(d.seek_frames(0) and d.cursor_frames == 0, "the decoder should seek back to the start");
 }
+void test_sound_stream_pcm_full_buffer() { // Writing more than fits in a stream_pcm buffer once hung forever.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	sound@ s = e.sound();
+	float[] chunk(1000 * 2);
+	assert(s.stream_pcm(chunk, 44100, 2, 1500), "the first chunk fits");
+	assert(!s.stream_pcm(chunk), "a chunk that doesn't fit is refused rather than waited for");
+	e.read(1500);
+	assert(s.stream_pcm(chunk), "once the sound has played some of its buffer there is room again");
+}
