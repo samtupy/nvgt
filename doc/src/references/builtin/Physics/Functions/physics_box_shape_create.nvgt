@@ -1,0 +1,20 @@
+/**
+	Create a box shape.
+	physics_box_shape@ physics_box_shape_create(const vector&in half_extents, float convex_radius = 0.05f, physics_material@ mat = null);
+	## Arguments:
+		* const vector&in half_extents: half of the size of the box along each axis, so `vector(1, 2, 3)` makes a box 2 meters wide, 4 deep and 6 tall.
+		* float convex_radius = 0.05f: how much the edges of the box are rounded, which makes collisions faster and more stable. The default is nearly always right, but must be smaller than the smallest half extent.
+		* physics_material@ mat = null: the material of the shape, which gives bodies made from the shape their friction and restitution, and determines how it absorbs, scatters and lets through sound in acoustic simulations such as sound_environment, see `physics_material_get()`. If null, the default material is used.
+	## Returns:
+		physics_box_shape@: the new shape, or null if it could not be created, such as when a size is not positive.
+	## Remarks:
+		Boxes are what you use for floors, walls, ceilings and crates. A shape isn't a body, so it must be given to `physics_world::create_and_add_body()` before it does anything, and one shape can be used by any number of bodies.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	physics_box_shape@ wall = physics_box_shape_create(vector(0.1, 5, 2), 0.05, physics_material_get("brick"));
+	world.create_and_add_body(wall, vector(0, 0, 2), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	alert("Bodies", "The world has " + world.num_bodies + " body.");
+}

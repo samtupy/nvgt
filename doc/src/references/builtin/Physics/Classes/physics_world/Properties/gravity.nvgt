@@ -1,0 +1,14 @@
+/**
+	The acceleration applied to every dynamic body each second, as a vector in meters per second squared.
+	vector physics_world::gravity;
+	## Remarks:
+		The default is `(0, 0, -9.81)`, which is earth's gravity pulling down along the z axis. Setting it to `(0, 0, 0)` gives a world without gravity, such as space. Individual bodies can be made to feel more or less of it with `set_gravity_factor()`.
+		Characters take their up direction from the direction opposite gravity, so set the gravity before creating any.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	world.gravity = vector(0, 0, -1.62); // The moon.
+	alert("Gravity", "Gravity pulls with " + world.gravity.z + " meters per second squared.");
+}

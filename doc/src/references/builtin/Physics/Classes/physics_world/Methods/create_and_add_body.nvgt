@@ -1,0 +1,25 @@
+/**
+	Create a body and add it to the world.
+	physics_body_id physics_world::create_and_add_body(physics_shape@ shape, const vector&in position, const quaternion&in rotation, physics_body_type motion_type, uint16 layer = PHYSICS_LAYER_MOVING, physics_activation activation = PHYSICS_ACTIVATE);
+	## Arguments:
+		* physics_shape@ shape: the shape of the body, made with one of the `physics_*_shape_create()` functions. The same shape can be given to any number of bodies.
+		* const vector&in position: where to put the body, in the world.
+		* const quaternion&in rotation: how to turn the body, or `IDENTITY_QUATERNION` for none.
+		* physics_body_type motion_type: whether the body is static, kinematic or dynamic, see the `physics_body_type` enum.
+		* uint16 layer = PHYSICS_LAYER_MOVING: the layer to put the body in, `PHYSICS_LAYER_NON_MOVING` for static bodies and `PHYSICS_LAYER_MOVING` for the others, see the `physics_object_layer` enum.
+		* physics_activation activation = PHYSICS_ACTIVATE: whether the body starts awake, see the `physics_activation` enum.
+	## Returns:
+		physics_body_id: the id of the new body, which is invalid (its `is_invalid` property is true) if the body could not be created, such as when the shape is null or the world already has its maximum number of bodies.
+	## Remarks:
+		The position is the origin of the shape, which for the built in shapes is its center. A box created with a half extent of `vector(50, 50, 0.5)` is 100 meters wide and long and 1 meter thick, so its center must be 0.5 below the surface that things should rest on.
+		A body takes its friction and restitution from the physics_material its shape was made with, or has a friction of 0.2 and a restitution of 0 if the shape has none, and these can be changed afterwards with `set_friction()` and `set_restitution()`. A dynamic body gets its mass from the volume of its shape.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	physics_body_id floor = world.create_and_add_body(physics_box_shape_create(vector(20, 20, 0.5)), vector(0, 0, -0.5), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	physics_body_id crate = world.create_and_add_body(physics_box_shape_create(vector(0.5, 0.5, 0.5)), vector(0, 0, 3), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	if (crate.is_invalid) alert("Error", "The crate could not be created.");
+	else alert("Bodies", "The world now has " + world.num_bodies + " bodies.");
+}

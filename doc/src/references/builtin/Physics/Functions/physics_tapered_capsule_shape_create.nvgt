@@ -1,0 +1,20 @@
+/**
+	Create a capsule shape whose two ends have different radii.
+	physics_tapered_capsule_shape@ physics_tapered_capsule_shape_create(float half_height, float top_radius, float bottom_radius, physics_material@ mat = null);
+	## Arguments:
+		* float half_height: half of the height of the tapered part between the centers of the two rounded ends. The whole shape is taller by both radii.
+		* float top_radius: the radius of the end at the top (the positive y axis of the shape).
+		* float bottom_radius: the radius of the end at the bottom (the negative y axis).
+		* physics_material@ mat = null: the material of the shape, see `physics_material_get()`. If null, the default material is used.
+	## Returns:
+		physics_tapered_capsule_shape@: the new shape, or null if it could not be created, such as when a size is not positive.
+	## Remarks:
+		The shape stands along the y axis of the shape, like a capsule, so rotate its body to stand it up in a z up world, see `physics_capsule_shape_create()`. A tapered capsule is shaped like a leg or a bowling pin, which is useful for characters that have a wide body and narrower head. The radii must be positive and the shape must be tall enough for the two ends not to swallow each other.
+*/
+
+// Example:
+void main() {
+	physics_tapered_capsule_shape@ pin = physics_tapered_capsule_shape_create(0.5, 0.1, 0.25);
+	if (pin is null) return;
+	alert("Pin", "The shape has a volume of " + pin.volume + " cubic meters.");
+}

@@ -1,0 +1,23 @@
+/**
+	Advance the simulation by an amount of time.
+	void physics_world::update(float delta_time, int collision_steps = 1);
+	## Arguments:
+		* float delta_time: the number of seconds to advance by, normally the time since the last call.
+		* int collision_steps = 1: how many steps the update is divided into for collision detection. Use more when delta_time is large, about one for each 1/60th of a second, otherwise fast objects can pass through thin ones.
+	## Remarks:
+		Call this every frame of your game loop. Contact listener callbacks are dispatched before it returns, and characters are updated afterwards. For the most predictable results, call it with the same small value each time rather than with a variable frame time.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	physics_body_id ball = world.create_and_add_body(physics_sphere_shape_create(0.5), vector(0, 0, 10), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	timer t;
+	int last = 0;
+	while (t.elapsed < 1000) {
+		wait(5);
+		world.update((t.elapsed - last) / 1000.0);
+		last = t.elapsed;
+	}
+	alert("Ball", "After about a second of falling the ball is at " + world.get_position(ball).z);
+}
