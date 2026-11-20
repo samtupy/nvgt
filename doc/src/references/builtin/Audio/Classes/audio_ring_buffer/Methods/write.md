@@ -1,9 +1,8 @@
 # write
 Add frames to the buffer.
 
-`uint audio_ring_buffer::write(const float[]@ frames);`
-
-`uint audio_ring_buffer::write(const memory_buffer<float>& frames);`
+1. `uint audio_ring_buffer::write(const float[]@ frames);`
+2. `uint audio_ring_buffer::write(const memory_buffer<float>& frames);`
 
 ## Arguments:
 * frames: the samples to add, interleaved when there is more than one channel.

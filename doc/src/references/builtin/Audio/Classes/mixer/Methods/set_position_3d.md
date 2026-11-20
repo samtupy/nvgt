@@ -1,9 +1,8 @@
 # set_position_3d
 Place the mixer at a point in 3d space, so that it is heard from that point relative to the listener.
 
-`void mixer::set_position_3d(float x, float y, float z);`
-
-`void mixer::set_position_3d(const vector&in position);`
+1. `void mixer::set_position_3d(float x, float y, float z);`
+2. `void mixer::set_position_3d(const vector&in position);`
 
 ## Arguments:
 * float x, float y, float z (1): the coordinates of the position.

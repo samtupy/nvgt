@@ -1,9 +1,8 @@
 # set_velocity
 Set how fast and in which direction the mixer is moving, for the doppler effect.
 
-`void mixer::set_velocity(float x, float y, float z);`
-
-`void mixer::set_velocity(const vector&in velocity);`
+1. `void mixer::set_velocity(float x, float y, float z);`
+2. `void mixer::set_velocity(const vector&in velocity);`
 
 ## Arguments:
 * float x, float y, float z (1): the velocity in units per second along each axis.

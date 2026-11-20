@@ -1,8 +1,8 @@
 # sort_ascending
 Sorts an array in ascending order.
 
-`void array::sort_ascending();`
-`void array::sort_ascending(uint startAt, uint count);`
+1. `void array::sort_ascending();`
+2. `void array::sort_ascending(uint startAt, uint count);`
 
 ## Arguments (2):
 * uint startAt: The index to start sorting from.

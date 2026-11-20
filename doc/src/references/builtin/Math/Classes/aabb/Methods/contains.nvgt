@@ -1,7 +1,7 @@
 /**
 	Check whether a point or another box is inside this box.
-	bool aabb::contains(const vector&in point) const;
-	bool aabb::contains(const aabb&in box) const;
+	1. bool aabb::contains(const vector&in point) const;
+	2. bool aabb::contains(const aabb&in box) const;
 	## Arguments:
 		* const vector&in point (1): the point to check.
 		* const aabb&in box (2): the box to check, which must be entirely inside.

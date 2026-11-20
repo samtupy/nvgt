@@ -1,9 +1,8 @@
 # stream_pcm
 Play raw samples that arrive a piece at a time, such as voice chat received over a network.
 
-`bool sound::stream_pcm(const float[]@ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0);`
-
-`bool sound::stream_pcm(const memory_buffer<float>&in data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0);`
+1. `bool sound::stream_pcm(const float[]@ data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0);`
+2. `bool sound::stream_pcm(const memory_buffer<float>&in data, uint sample_rate = 0, uint channels = 0, uint buffer_size = 0);`
 
 ## Arguments:
 * data: the next samples to play, as `float[]`, `int[]`, `int16[]` or `uint8[]`, or a `memory_buffer` of one of those types, interleaved when there is more than one channel.

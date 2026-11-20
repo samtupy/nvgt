@@ -1,9 +1,8 @@
 # open
 Open a sound file or stream for decoding.
 
-`bool audio_decoder::open(const string&in filename, const pack_interface@ pack_file = sound_default_pack, uint sample_rate = 0, uint channels = 0);`
-
-`bool audio_decoder::open(datastream@ stream, uint sample_rate = 0, uint channels = 0);`
+1. `bool audio_decoder::open(const string&in filename, const pack_interface@ pack_file = sound_default_pack, uint sample_rate = 0, uint channels = 0);`
+2. `bool audio_decoder::open(datastream@ stream, uint sample_rate = 0, uint channels = 0);`
 
 ## Arguments:
 * const string&in filename (1): the file to open.

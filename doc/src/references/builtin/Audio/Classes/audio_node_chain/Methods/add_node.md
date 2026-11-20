@@ -1,9 +1,8 @@
 # add_node
 Insert a node into the chain.
 
-`bool audio_node_chain::add_node(audio_node@ node, audio_node@ after = null, uint input_bus_index = 0);`
-
-`bool audio_node_chain::add_node(audio_node@ node, int after, uint input_bus_index = 0);`
+1. `bool audio_node_chain::add_node(audio_node@ node, audio_node@ after = null, uint input_bus_index = 0);`
+2. `bool audio_node_chain::add_node(audio_node@ node, int after, uint input_bus_index = 0);`
 
 ## Arguments:
 * audio_node@ node: the node to insert.

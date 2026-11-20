@@ -1,7 +1,7 @@
 /**
 	Move a listener.
-	void audio_engine::set_listener_position(int index, float x, float y, float z);
-	void audio_engine::set_listener_position(int index, const vector&in position);
+	1. void audio_engine::set_listener_position(int index, float x, float y, float z);
+	2. void audio_engine::set_listener_position(int index, const vector&in position);
 	## Arguments:
 		* int index: the number of the listener, starting at 0. Engines have one listener by default.
 		* float x: the new x coordinate (1).

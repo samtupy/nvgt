@@ -1,9 +1,8 @@
 # set_direction
 Set the direction that the mixer faces, which its cone is pointed in.
 
-`void mixer::set_direction(float x, float y, float z);`
-
-`void mixer::set_direction(const vector&in direction);`
+1. `void mixer::set_direction(float x, float y, float z);`
+2. `void mixer::set_direction(const vector&in direction);`
 
 ## Arguments:
 * float x, float y, float z (1): the direction.

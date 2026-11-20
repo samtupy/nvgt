@@ -1,21 +1,14 @@
 # load_pcm
 Load a sound from raw samples.
 
-`bool sound::load_pcm(const float[]@ data, int samplerate, int channels);`
-
-`bool sound::load_pcm(const int[]@ data, int samplerate, int channels);`
-
-`bool sound::load_pcm(const int16[]@ data, int samplerate, int channels);`
-
-`bool sound::load_pcm(const uint8[]@ data, int samplerate, int channels);`
-
-`bool sound::load_pcm(const memory_buffer<float>&in data, int samplerate, int channels);`
-
-`bool sound::load_pcm(const memory_buffer<int>&in data, int samplerate, int channels);`
-
-`bool sound::load_pcm(const memory_buffer<int16>&in data, int samplerate, int channels);`
-
-`bool sound::load_pcm(const memory_buffer<uint8>&in data, int samplerate, int channels);`
+1. `bool sound::load_pcm(const float[]@ data, int samplerate, int channels);`
+2. `bool sound::load_pcm(const int[]@ data, int samplerate, int channels);`
+3. `bool sound::load_pcm(const int16[]@ data, int samplerate, int channels);`
+4. `bool sound::load_pcm(const uint8[]@ data, int samplerate, int channels);`
+5. `bool sound::load_pcm(const memory_buffer<float>&in data, int samplerate, int channels);`
+6. `bool sound::load_pcm(const memory_buffer<int>&in data, int samplerate, int channels);`
+7. `bool sound::load_pcm(const memory_buffer<int16>&in data, int samplerate, int channels);`
+8. `bool sound::load_pcm(const memory_buffer<uint8>&in data, int samplerate, int channels);`
 
 ## Arguments:
 * data: the samples, as `float[]`, `int[]`, `int16[]` or `uint8[]`, or a `memory_buffer` of one of those types. When there is more than one channel the samples are interleaved, so a stereo sound's samples go left, right, left, right. Floats go from -1 to 1, and the integer types use their full range, with uint8 centered on 128.

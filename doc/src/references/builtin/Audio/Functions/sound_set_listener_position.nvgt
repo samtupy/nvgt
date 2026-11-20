@@ -1,7 +1,7 @@
 /**
 	Move a listener of the default engine, the point that 3d sounds are heard from.
-	bool sound_set_listener_position(float x, float y, float z, uint listener_index = 0);
-	bool sound_set_listener_position(const vector&in position, uint listener_index = 0);
+	1. bool sound_set_listener_position(float x, float y, float z, uint listener_index = 0);
+	2. bool sound_set_listener_position(const vector&in position, uint listener_index = 0);
 	## Arguments:
 		* float x, float y, float z (1): the new position.
 		* const vector&in position (2): the new position.

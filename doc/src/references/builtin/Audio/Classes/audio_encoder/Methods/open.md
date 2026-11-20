@@ -1,11 +1,9 @@
 # open
 Start encoding to memory, to a file or to a stream.
 
-`bool audio_encoder::open(uint sample_rate, uint channels, uint flags = AUDIO_ENCODER_DEFAULTS);`
-
-`bool audio_encoder::open(const string&in filename, uint sample_rate, uint channels, uint flags = AUDIO_ENCODER_DEFAULTS);`
-
-`bool audio_encoder::open(datastream@ stream, uint sample_rate, uint channels, uint flags = AUDIO_ENCODER_DEFAULTS);`
+1. `bool audio_encoder::open(uint sample_rate, uint channels, uint flags = AUDIO_ENCODER_DEFAULTS);`
+2. `bool audio_encoder::open(const string&in filename, uint sample_rate, uint channels, uint flags = AUDIO_ENCODER_DEFAULTS);`
+3. `bool audio_encoder::open(datastream@ stream, uint sample_rate, uint channels, uint flags = AUDIO_ENCODER_DEFAULTS);`
 
 ## Arguments:
 * const string&in filename (2): the file to write to.

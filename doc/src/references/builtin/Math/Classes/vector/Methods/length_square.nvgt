@@ -1,7 +1,7 @@
 /**
 	Calculate the square of the vector's length.
-	float vector::length_square() const;
-	float vector::length_sq() const;
+	1. float vector::length_square() const;
+	2. float vector::length_sq() const;
 	## Returns:
 		float: the squared length.
 	## Remarks:

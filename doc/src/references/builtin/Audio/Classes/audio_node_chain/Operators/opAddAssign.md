@@ -1,9 +1,8 @@
 # opAddAssign
 Overloads the += operator, adding a node, or a list of nodes in order, to the end of the chain.
 
-`audio_node_chain@ audio_node_chain::opAddAssign(audio_node@ node);`
-
-`audio_node_chain@ audio_node_chain::opAddAssign(const audio_node@[]@ nodes);`
+1. `audio_node_chain@ audio_node_chain::opAddAssign(audio_node@ node);`
+2. `audio_node_chain@ audio_node_chain::opAddAssign(const audio_node@[]@ nodes);`
 
 ## Arguments:
 * audio_node@ node (1): the node to add.

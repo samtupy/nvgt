@@ -1,9 +1,8 @@
 # remove_node
 Take a node out of the chain, connecting the nodes on either side of it to each other.
 
-`bool audio_node_chain::remove_node(audio_node@ node);`
-
-`bool audio_node_chain::remove_node(uint index);`
+1. `bool audio_node_chain::remove_node(audio_node@ node);`
+2. `bool audio_node_chain::remove_node(uint index);`
 
 ## Arguments:
 * audio_node@ node (1): the node to remove.

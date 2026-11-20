@@ -1,7 +1,7 @@
 /**
 	Grow the box so that it contains a point or another box.
-	void aabb::encapsulate(const vector&in point);
-	void aabb::encapsulate(const aabb&in box);
+	1. void aabb::encapsulate(const vector&in point);
+	2. void aabb::encapsulate(const aabb&in box);
 	## Arguments:
 		* const vector&in point (1): the point to include.
 		* const aabb&in box (2): the box to include.

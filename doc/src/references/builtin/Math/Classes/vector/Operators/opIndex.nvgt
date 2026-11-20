@@ -1,7 +1,7 @@
 /**
 	Overloads the [] operator, accessing a coordinate by number.
-	float vector::opIndex(uint index) const;
-	void vector::opIndex(uint index, float value);
+	1. float vector::opIndex(uint index) const;
+	2. void vector::opIndex(uint index, float value);
 	## Arguments:
 		* uint index: 0 for x, 1 for y and 2 for z.
 		* float value (2): the value to set.

@@ -1,7 +1,7 @@
 /**
 	Overloads the * operator, multiplying a vector by a number or by another vector.
-	vector@ vector::opMul(const vector&in other) const;
-	vector@ vector::opMul(float scalar) const;
+	1. vector@ vector::opMul(const vector&in other) const;
+	2. vector@ vector::opMul(float scalar) const;
 	## Arguments:
 		* const vector&in other (1): the vector to multiply by.
 		* float scalar (2): the number to multiply every coordinate by.
