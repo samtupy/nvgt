@@ -438,3 +438,61 @@ void test_sound_environment_tail_history() { // Once a reflection group's tail h
 	}
 	assert(tails[0] > 1 and tails[1] < tails[0] * 1.3, "the second burst should reverberate like the first, rather than with the first burst's reverb again, tail energy " + tails[0] + " then " + tails[1]);
 }
+double[]@ sound_environment_test_block_energies(audio_engine@ e, sound_environment@ env, int blocks) { // Paced at about the rate the blocks would play, so that reflections are simulated as often as they would be.
+	double[] energies;
+	for (int b = 0; b < blocks; b++) {
+		wait(5);
+		float[]@ frames = e.read(256);
+		env.update();
+		double energy = 0;
+		for (uint i = 0; i < frames.length(); i++) energy += frames[i] * frames[i];
+		energies.insert_last(energy);
+	}
+	return energies;
+}
+double sound_environment_test_loudest_window(const double[]@ energies, uint window) { // The most energy in any run of window blocks.
+	double loudest = 0;
+	for (uint i = 0; i + window <= energies.length(); i++) {
+		double sum = 0;
+		for (uint j = i; j < i + window; j++) sum += energies[j];
+		if (sum > loudest) loudest = sum;
+	}
+	return loudest;
+}
+void test_sound_environment_moving_between_areas() { // A distant sound moving back and forth across the wall between two areas must glide between them, rather than bursting into reflections simulated as if it were at the listener while its new place is first simulated.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(true);
+	sound_environment env(e);
+	env.set_raycaster(world);
+	e.set_listener_position(0, -4, -4, 1.6);
+	sound@ s = env.new_sound();
+	float[] noise(44100 * 2);
+	random_xorshift rng(uint(7));
+	for (uint i = 0; i < noise.length(); i++) noise[i] = (rng.nextf() * 2 - 1) / 4;
+	assert(s.load_pcm(noise, 44100, 2));
+	sound_environment_test_wait_for_decoding(s);
+	sound_environment_source@ src = env.get_source(s);
+	s.rolloff = 10; // Only the reflections are heard, as the direct sound fades out well before the sound's distance.
+	s.play_looped();
+	double steady = 0; // The loudest the sound settles at on either side.
+	for (int side = 0; side < 2; side++) {
+		s.set_position_3d(side == 0 ? -0.6 : 0.6, 3, 1.5);
+		timer t;
+		while (!src.reflections_simulated and t.elapsed < 10000) {
+			sound_environment_test_pump(e, env, 1);
+			wait(1);
+		}
+		assert(src.reflections_simulated, "the sound's reflections should be simulated on side " + side);
+		sound_environment_test_block_energies(e, env, 250); // Let the reverb settle, longer than the reflections last.
+		double settled = sound_environment_test_loudest_window(sound_environment_test_block_energies(e, env, 60), 8);
+		if (settled > steady) steady = settled;
+	}
+	double[] energies;
+	for (int crossing = 0; crossing < 16; crossing++) {
+		s.set_position_3d(crossing % 2 == 0 ? -0.6 : 0.6, 3, 1.5);
+		double[]@ part = sound_environment_test_block_energies(e, env, 10 + crossing % 3 * 12); // Crossing at varying times relative to the reflection simulations.
+		for (uint i = 0; i < part.length(); i++) energies.insert_last(part[i]);
+	}
+	double loudest = sound_environment_test_loudest_window(energies, 8);
+	assert(loudest < steady * 1.6, "moving between areas should not get much louder than the sound is on either side, loudest " + loudest + " against " + steady);
+}

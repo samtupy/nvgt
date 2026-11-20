@@ -274,6 +274,7 @@ class environment_source : public audio_plugin_node_interface {
 	ipl_buffer in_buffer, out_buffer, mono_buffer;
 	float previous_level = 0.0f;
 	reflection_group* sending = nullptr; // The group this source's signal is added to, which changes with a crossfade over one frame.
+	unsigned int sending_placement = 0; // The placement of sending when this source started sending to it, to know whether it has moved since.
 	ipl_ref<api::IPathEffect> path_effect; // Created once pathing is first used.
 	float previous_path_weight = 0.0f;
 	bool path_tail = false;
@@ -335,7 +336,15 @@ public:
 		const int frame_size = core->audio_settings.frameSize;
 		const unsigned int runs = core->reflection_runs;
 		reflection_group* target = group.load();
-		if (!target || !target->ready(runs)) target = core->use_listener_reverb && core->listener_group.ready(runs) ? &core->listener_group : nullptr; // Until a group's reflections have been simulated where it is, its members are heard with the listener's.
+		if (target && !target->ready(runs)) target = nullptr;
+		if (!target && sending && sending != &core->listener_group && sending->placement == sending_placement && sending->ready(runs)) target = sending; // Until a sound's new group has been simulated where it is, the sound stays with its old group if that hasn't moved, so that a sound moving from one place to another crossfades between two simulated places and the old place's tail rings out.
+		float gain = 1.0f;
+		if (!target && core->use_listener_reverb && core->listener_group.ready(runs)) { // Otherwise it is heard with the listener's reflections, which are simulated as if the sound were at the listener, so they are attenuated by the sound's distance as Steam Audio's default distance attenuation would, rather than a distant sound reverberating as loudly as one right by the listener.
+			target = &core->listener_group;
+			const IPLVector3 l = core->audio_listener.origin;
+			const float dx = x - l.x, dy = y - l.y, dz = z - l.z;
+			gain = 1.0f / max(1.0f, sqrt(dx * dx + dy * dy + dz * dz));
+		}
 		if (!apply_reflections) target = nullptr;
 		for (unsigned int offset = 0; offset < frames; offset += frame_size) {
 			const int n = (int)min<unsigned int>(frame_size, frames - offset);
@@ -356,6 +365,7 @@ public:
 			// Reflections, applied by each group to exactly one frame per audio graph pass.
 			reflection_group* previous = sending;
 			sending = target;
+			if (target != previous && target) sending_placement = target->placement;
 			if (!target && !previous) continue;
 			bool silent = true; // Skipping silence saves the downmix, the groups ring on by themselves.
 			for (int c = 0; c < in_buffer.b.numChannels && silent; c++) for (int i = 0; i < n; i++) if (in_buffer.b.data[c][i] != 0.0f) {
@@ -364,7 +374,7 @@ public:
 			}
 			if (silent) continue;
 			ctx->downmixAudioBuffer(&in_buffer.b, &mono_buffer.b);
-			float level = reflections_level * core->reflections_level;
+			float level = reflections_level * core->reflections_level * gain;
 			const float* mono = mono_buffer.b.data[0];
 			if (previous == target) { // Ramp level changes to avoid clicks.
 				float* send = target->send.b.data[0];

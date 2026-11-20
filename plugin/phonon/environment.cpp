@@ -253,6 +253,19 @@ void environment_core::assign_groups(const vector<environment_source*>& current,
 			join(*c, best);
 			continue;
 		}
+		for (int i = 0; i < pool; i++) { // A group left empty near the sound, for example one it just left, keeps its simulation and its tail, so rejoining it beats moving another group here.
+			reflection_group* g = groups[i];
+			if (g->members || !g->ready_at) continue;
+			float d = distance_to(*c, g);
+			if (d <= c->radius && (!best || d < best_distance) && visible(c->x, c->y, c->z, g->x, g->y, g->z)) {
+				best = g;
+				best_distance = d;
+			}
+		}
+		if (best) {
+			join(*c, best);
+			continue;
+		}
 		reflection_group* free_group = nullptr; // Groups still ringing are left to finish their tails where they are, and are only taken when nothing else is free.
 		for (int i = 0; i < pool && !free_group; i++) if (!groups[i]->members && !groups[i]->ringing) free_group = groups[i];
 		if (!free_group) {
