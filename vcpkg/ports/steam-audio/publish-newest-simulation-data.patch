@@ -1,0 +1,48 @@
+diff --git a/core/src/core/triple_buffer.h b/core/src/core/triple_buffer.h
+--- a/core/src/core/triple_buffer.h
++++ b/core/src/core/triple_buffer.h
+@@ -44,31 +44,31 @@
+         readBuffer  = ipl::make_unique<T>(std::forward<Args>(args)...);
+     }
+ 
++    // Always publishes the newest data. Skipping the commit while the reader hadn't taken the previous data kept a reader that hadn't read for a while, such as a reflection effect with no input yet, on the first data ever written.
+     void commitWriteBuffer()
+     {
+-        if (!mNewDataWritten)
+-        {
+-            shareBuffer.swap(writeBuffer);
+-            mNewDataWritten = true;
+-        }
++        while (mSwapLock.test_and_set(std::memory_order_acquire)) {}
++        shareBuffer.swap(writeBuffer);
++        mNewDataWritten = true;
++        mSwapLock.clear(std::memory_order_release);
+     }
+ 
+     bool updateReadBuffer()
+     {
+-        auto newDataRead = false;
++        if (!mNewDataWritten)
++            return false;
+ 
+-        if (mNewDataWritten)
+-        {
+-            readBuffer.swap(shareBuffer);
+-            newDataRead = true;
+-            mNewDataWritten = false;
+-        }
++        while (mSwapLock.test_and_set(std::memory_order_acquire)) {}
++        readBuffer.swap(shareBuffer);
++        mNewDataWritten = false;
++        mSwapLock.clear(std::memory_order_release);
+ 
+-        return newDataRead;
++        return true;
+     }
+ 
+ private:
+     std::atomic<bool>   mNewDataWritten;
++    std::atomic_flag    mSwapLock = ATOMIC_FLAG_INIT;
+ };
+ 
+ }

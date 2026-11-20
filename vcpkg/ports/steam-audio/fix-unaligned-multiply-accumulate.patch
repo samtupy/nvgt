@@ -1,0 +1,13 @@
+diff --git a/core/src/core/array_math.cpp b/core/src/core/array_math.cpp
+index 58a2352..1b8453e 100644
+--- a/core/src/core/array_math.cpp
++++ b/core/src/core/array_math.cpp
+@@ -257,7 +257,7 @@ void ArrayMath::multiplyAccumulate(int size,
+ 
+             auto y = float4::add(float4::mul(b1, x2), float4::mul(b0, float4::mul(b3, b4)));
+ 
+-            y = float4::add(y, float4::load(&outData[i]));
++            y = float4::add(y, float4::loadu(&outData[i]));
+ 
+             float4::storeu(&outData[i], y);
+         }

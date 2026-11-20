@@ -1,0 +1,134 @@
+diff --git a/core/src/core/reflection_simulator.cpp b/core/src/core/reflection_simulator.cpp
+--- a/core/src/core/reflection_simulator.cpp
++++ b/core/src/core/reflection_simulator.cpp
+@@ -913,10 +913,12 @@
+                                        int end,
+                                        int threadId)
+ {
++    // Rays that escaped on an earlier bounce are no longer advanced, so tracing them again would only find the same
++    // hit and the same result. A negative maximum distance lets the scene skip them.
+     for (auto i = start; i < end; ++i)
+     {
+         mThreadState[threadId].minDistances[i - start] = 0.0f;
+-        mThreadState[threadId].maxDistances[i - start] = std::numeric_limits<float>::infinity();
++        mThreadState[threadId].maxDistances[i - start] = mThreadState[threadId].escaped[i - start] ? -1.0f : std::numeric_limits<float>::infinity();
+     }
+ 
+     auto numRays = end - start;
+diff --git a/core/src/core/simulation_manager.cpp b/core/src/core/simulation_manager.cpp
+--- a/core/src/core/simulation_manager.cpp
++++ b/core/src/core/simulation_manager.cpp
+@@ -110,6 +110,15 @@
+         }
+ 
+         mThreadPool = make_unique<ThreadPool>(numThreads);
++
++        if (indirectType == IndirectEffectType::Convolution && sceneType != SceneType::RadeonRays)
++        {
++            for (auto i = 0; i < numThreads; ++i)
++            {
++                mThreadReconstructors.push_back(ReconstructorFactory::create(sceneType, indirectType, maxDuration, maxOrder, samplingRate, radeonRays));
++                mThreadPartitioners.push_back(make_unique<OverlapSavePartitioner>(frameSize));
++            }
++        }
+     }
+ 
+     mSharedData = make_unique<SharedSimulationData>();
+@@ -212,10 +221,13 @@
+         copyEnergyFieldsFromDeviceToHost();
+     }
+ 
++    auto parallel = false;
+     if (mIndirectType != IndirectEffectType::Parametric)
+     {
+         generateDistanceCorrectionCurves(numSamples);
+-        reconstructImpulseResponses();
++        parallel = reconstructAndPartitionInParallel(numChannels, numSamples);
++        if (!parallel)
++            reconstructImpulseResponses();
+     }
+ 
+     if (mIndirectType == IndirectEffectType::Parametric || mIndirectType == IndirectEffectType::Hybrid)
+@@ -233,7 +245,8 @@
+         copyImpulseResponsesFromHostToDevice();
+     }
+ 
+-    partitionImpulseResponses(numChannels, numSamples);
++    if (!parallel)
++        partitionImpulseResponses(numChannels, numSamples);
+ 
+     for (auto& source : mSourceData[0])
+     {
+@@ -490,6 +503,50 @@
+     }
+ }
+ 
++bool SimulationManager::reconstructAndPartitionInParallel(int numChannels, int numSamples)
++{
++    PROFILE_FUNCTION();
++
++    if (mThreadReconstructors.empty() || mIndirectType != IndirectEffectType::Convolution || mSceneType == SceneType::RadeonRays)
++        return false;
++
++    // Each source's impulse response is independent of the others, so reconstructing and partitioning them, which
++    // otherwise takes most of a reflection simulation once there are many sources, is shared across the thread pool.
++    // generateDistanceCorrectionCurves() has collected one correction curve per enabled source, in the same order.
++    mJobGraph.reset();
++
++    auto curveIndex = 0;
++    for (auto& source : mSourceData[0])
++    {
++        if (!source->reflectionInputs.enabled)
++            continue;
++
++        auto data = source.get();
++        auto curve = mDistanceAttenuationCorrectionCurves[curveIndex++];
++        mJobGraph.addJob([this, data, curve, numChannels, numSamples](int threadId, std::atomic<bool>& cancel)
++        {
++            const EnergyField* energyField = data->reflectionState.accumEnergyField.get();
++            ImpulseResponse* impulseResponse = data->reflectionState.impulseResponse.get();
++            mThreadReconstructors[threadId]->reconstruct(1, &energyField, &curve, &data->reflectionInputs.airAbsorptionModel,
++                                                         &impulseResponse, mSharedData->reflection.reconstructionType,
++                                                         mSharedData->reflection.duration, mSharedData->reflection.order);
++
++            if (!data->reflectionState.validSimulationData)
++                return;
++
++            mThreadPartitioners[threadId]->partition(*impulseResponse, numChannels, numSamples, *data->reflectionOutputs.overlapSaveFIR.writeBuffer);
++            data->reflectionOutputs.overlapSaveFIR.commitWriteBuffer();
++            data->reflectionOutputs.numChannels = numChannels;
++            data->reflectionOutputs.numSamples = numSamples;
++        });
++    }
++
++    if (curveIndex > 0)
++        mThreadPool->process(mJobGraph);
++
++    return true;
++}
++
+ void SimulationManager::estimateReverb()
+ {
+     PROFILE_FUNCTION();
+diff --git a/core/src/core/simulation_manager.h b/core/src/core/simulation_manager.h
+--- a/core/src/core/simulation_manager.h
++++ b/core/src/core/simulation_manager.h
+@@ -212,6 +212,8 @@
+     unique_ptr<IReconstructor> mCPUReconstructor;
+     unique_ptr<HybridReverbEstimator> mHybridReverbEstimator;
+     unique_ptr<OverlapSavePartitioner> mPartitioner;
++    vector<unique_ptr<IReconstructor>> mThreadReconstructors; // One per thread, as reconstructors and partitioners keep scratch buffers.
++    vector<unique_ptr<OverlapSavePartitioner>> mThreadPartitioners;
+     shared_ptr<OpenCLDevice> mOpenCL;
+     shared_ptr<TANDevice> mTAN;
+     map<const ProbeBatch*, shared_ptr<PathSimulator>> mPathSimulators[2];
+@@ -254,6 +256,9 @@
+     void estimateHybridReverb();
+     void copyImpulseResponsesFromHostToDevice();
+     void partitionImpulseResponses(int numChannels, int numSamples);
++
++    // Reconstructs and partitions the impulse responses of all sources in parallel on the thread pool, returning false if that isn't supported for the current settings.
++    bool reconstructAndPartitionInParallel(int numChannels, int numSamples);
+ };
+ 
+ }

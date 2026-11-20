@@ -6,7 +6,7 @@ if(PORT MATCHES "libgit" OR PORT MATCHES "libplist" OR PORT MATCHES "libarchive"
 else()
 	set(VCPKG_LIBRARY_LINKAGE static)
 endif()
-if(PORT MATCHES "bass" OR PORT MATCHES "steam-audio-official")
+if(PORT MATCHES "bass")
 	set(VCPKG_FIXUP_MACHO_RPATH OFF)
 endif()
 if(PORT MATCHES "openssl" OR PORT MATCHES "libffi" OR PORT MATCHES "steam-audio" OR PORT MATCHES "angelscript" OR PORT MATCHES "angelscript-nc")
