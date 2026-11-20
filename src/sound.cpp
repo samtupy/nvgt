@@ -1587,6 +1587,7 @@ class sound_impl final : public mixer_impl, public virtual sound {
 	mutable std::atomic_flag load_completed;
 	unique_ptr<ma_pcm_rb> pcm_stream;
 	bool paused;
+	bool fade_paused; // pause_fade leaves a stop time and a faded out volume behind, which must be undone before the sound can be heard again.
 	bool should_autoclose; // If this is true, the release method defers sound destruction until playback has complete.
 	mutable audio_data_source* datasource; // Avoid the need to keep looking up the pointer to the c++ ma_data_source wrapper associated with this sound.
 	inline void postload(const string& filename, bool async_load = false) {
@@ -1605,7 +1606,7 @@ public:
 		async_notification_callbacks *anc = (async_notification_callbacks *)pNotification;
 		anc->pAtomicFlag->test_and_set();
 	}
-	sound_impl(audio_engine *e) : paused(false), should_autoclose(false), datasource(nullptr), pcm_stream(nullptr), mixer_impl(dynamic_cast <audio_engine_impl*> (e), false), pcm_buffer() {
+	sound_impl(audio_engine *e) : paused(false), fade_paused(false), should_autoclose(false), datasource(nullptr), pcm_stream(nullptr), mixer_impl(dynamic_cast <audio_engine_impl*> (e), false), pcm_buffer() {
 		init_sound();
 		snd = nullptr;
 		ma_fence_init(&fence);
@@ -1819,7 +1820,7 @@ public:
 		pcm_buffer.resize(0);
 		loaded_filename.clear();
 		load_completed.clear();
-		paused = should_autoclose = false;
+		paused = fade_paused = should_autoclose = false;
 		return true;
 	}
 	void set_autoclose(bool enabled) override { should_autoclose = enabled; }
@@ -1835,14 +1836,22 @@ public:
 	bool get_paused() override {
 		return snd ? !ma_sound_is_playing(&*snd) && paused : false;
 	}
+	void undo_fade_pause() {
+		if (!fade_paused || !snd) return;
+		ma_sound_set_stop_time_in_pcm_frames(&*snd, ~ma_uint64(0));
+		ma_sound_set_fade_in_pcm_frames(&*snd, 1, 1, 0);
+		fade_paused = false;
+	}
 	bool play(bool reset_loop_state = true) override {
 		paused = false;
+		undo_fade_pause();
 		if (pcm_stream) ma_pcm_rb_reset(&*pcm_stream);
 		return mixer_impl::play(reset_loop_state);
 	}
 	bool play_looped() override {
 		if (pcm_stream) return false;
 		paused = false;
+		undo_fade_pause();
 		return mixer_impl::play_looped();
 	}
 	bool play_wait() override {
@@ -1854,6 +1863,7 @@ public:
 	}
 	bool stop() override {
 		paused = false;
+		undo_fade_pause();
 		return mixer_impl::stop() && seek(0);
 	}
 	bool pause() override {
@@ -1871,6 +1881,7 @@ public:
 	bool pause_fade_in_frames(unsigned long long frames) override {
 		if (snd) {
 			g_soundsystem_last_error = ma_sound_stop_with_fade_in_pcm_frames(&*snd, frames);
+			if (g_soundsystem_last_error == MA_SUCCESS) paused = fade_paused = true;
 			return g_soundsystem_last_error == MA_SUCCESS;
 		}
 		return false;
@@ -1878,6 +1889,7 @@ public:
 	bool pause_fade_in_milliseconds(unsigned long long frames) override {
 		if (snd) {
 			g_soundsystem_last_error = ma_sound_stop_with_fade_in_milliseconds(&*snd, frames);
+			if (g_soundsystem_last_error == MA_SUCCESS) paused = fade_paused = true;
 			return g_soundsystem_last_error == MA_SUCCESS;
 		}
 		return false;
