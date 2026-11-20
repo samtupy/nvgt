@@ -99,6 +99,7 @@ def windows_lib_rename(out_dir):
 		("pocoMongoDBmt", "pocoMongoDB"),
 		("pocoNetmt", "pocoNet"),
 		("pocoNetSSLmt", "pocoNetSSL"),
+		("pocoNetSSLWinmt", "pocoNetSSLWin"),
 		("pocoPrometheusmt", "pocoPrometheus"),
 		("pocoRedismt", "pocoRedis"),
 		("pocoSevenZipmt", "pocoSevenZip"),

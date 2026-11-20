@@ -11,3 +11,7 @@ else()
 		list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS_RELEASE -DCMAKE_BUILD_TYPE=MinSizeRel)
 	endif()
 endif()
+# Poco uses Windows' own TLS (Schannel) rather than OpenSSL for HTTPS, keeping OpenSSL out of NVGT on Windows, where it was the largest part of the executable.
+if(PORT STREQUAL "poco")
+	set(POCO_ENABLE_NETSSL_WIN ON)
+endif()
