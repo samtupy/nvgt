@@ -1,0 +1,20 @@
+/**
+	Move a listener.
+	void audio_engine::set_listener_position(int index, float x, float y, float z);
+	void audio_engine::set_listener_position(int index, const vector&in position);
+	## Arguments:
+		* int index: the number of the listener, starting at 0. Engines have one listener by default.
+		* float x: the new x coordinate (1).
+		* float y: the new y coordinate (1).
+		* float z: the new z coordinate (1).
+		* const vector&in position: the new position (2).
+	## Remarks:
+		Call this whenever the player moves so that 3D sounds are heard from where they are. The position of a listener is measured in the same units as the positions of sounds.
+*/
+
+// Example:
+void main() {
+	audio_engine engine(0);
+	engine.set_listener_position(0, 10, 20, 0);
+	alert("Listener", "The listener is at " + engine.get_listener_position(0).x + ", " + engine.get_listener_position(0).y);
+}
