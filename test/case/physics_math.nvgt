@@ -1,0 +1,63 @@
+// Tests for the SIMD backed math types (vector, quaternion, aabb) which are registered as scoped reference types.
+const float HALF_PI = 1.5707963267949;
+bool near(float a, float b) { return abs(a - b) < 0.0001; }
+bool near(const vector&in a, const vector&in b) { return near(a.x, b.x) and near(a.y, b.y) and near(a.z, b.z); }
+void test_vector_compound_property_assignment() {
+	vector v(1, 2, 3);
+	v.x += 5;
+	v.y *= 3;
+	v.z -= 1;
+	assert(v == vector(6, 6, 2), "compound assignment gave " + v);
+	vector[] arr = {vector(1, 1, 1)};
+	arr[0].x += 1;
+	assert(arr[0] == vector(2, 1, 1), "compound assignment through array gave " + arr[0]);
+	v += vector(1, 1, 1);
+	assert(v == vector(7, 7, 3), "opAddAssign gave " + v);
+	assert(vector(3, 0, 0).normalized().is_normalized() and !vector(3, 0, 0).is_normalized(), "is_normalized with default tolerance");
+	assert(vector(0, 0, 0).is_near_zero() and !vector(0.1, 0, 0).is_near_zero(), "is_near_zero with default distance");
+	assert(vector(0.1, 0, 0).is_near_zero(0.1), "is_near_zero with explicit distance");
+}
+void test_quaternion() {
+	quaternion id;
+	assert(id == IDENTITY_QUATERNION and id.w == 1, "default quaternion should be identity, got " + id);
+	quaternion q = quaternion_from_axis_angle(vector(0, 0, 1), HALF_PI);
+	assert(q.is_normalized(), "axis angle quaternion should be normalized");
+	assert(near(q * vector(1, 0, 0), vector(0, 1, 0)), "rotating x by 90 degrees around z gave " + (q * vector(1, 0, 0)));
+	quaternion q2 = q * q;
+	assert(near(q2 * vector(1, 0, 0), vector(-1, 0, 0)), "two 90 degree rotations gave " + (q2 * vector(1, 0, 0)));
+	assert(near(q.inversed() * (q * vector(1, 2, 3)), vector(1, 2, 3)), "inverse rotation should restore the vector");
+	assert(near(q.get_rotation_angle(vector(0, 0, 1)), HALF_PI), "rotation angle gave " + q.get_rotation_angle(vector(0, 0, 1)));
+	assert(near(q.dot(q), 1), "dot with itself gave " + q.dot(q));
+	quaternion half = id.slerp(q, 0.5);
+	assert(near(half * vector(1, 0, 0), vector(cos(HALF_PI / 2), sin(HALF_PI / 2), 0)), "slerp halfway gave " + (half * vector(1, 0, 0)));
+	assert(near(id.lerp(q, 0.5).normalized().dot(half), 1), "normalized lerp halfway should match slerp for this rotation");
+	quaternion copy(q);
+	copy.w += 1;
+	assert(copy.w == q.w + 1 and copy != q, "compound assignment on quaternion property");
+	quaternion[] arr = {q, id};
+	assert(arr[0] == q and arr[1] == id, "quaternion array storage");
+}
+void test_aabb_scoped() {
+	aabb b(vector(-1, -1, -1), vector(1, 1, 1));
+	assert(b.is_valid and b.contains(vector(0, 0, 0)) and !b.contains(vector(2, 0, 0)));
+	b.encapsulate(vector(3, 0, 0));
+	assert(b.max == vector(3, 1, 1), "encapsulate gave max " + b.max);
+	aabb c = b;
+	assert(c == b);
+}
+void test_scoped_type_init_lists() {
+	vector v(1, 2, 3);
+	{
+		vector[] a = {v, vector(4, 5, 6), v * 2};
+		assert(a.length() == 3 and a[0] == v and a[1] == vector(4, 5, 6) and a[2] == vector(2, 4, 6), "vector init list gave " + a[0] + ", " + a[1] + ", " + a[2]);
+		a[0].x = 100;
+	}
+	assert(v == vector(1, 2, 3), "a vector placed in an init list must be copied rather than shared, got " + v);
+	vector[][] nested = {{vector(1, 0, 0)}, {v}};
+	assert(nested[0][0] == vector(1, 0, 0) and nested[1][0] == v);
+	aabb[] boxes = {aabb(vector(0, 0, 0), 1.0f), aabb()};
+	assert(boxes[0].contains(vector(0.5, 0, 0)) and !boxes[1].is_valid);
+	dictionary d = {{"pos", vector(7, 8, 9)}};
+	vector got;
+	assert(d.get("pos", got) and got == vector(7, 8, 9), "dictionary init list gave " + got);
+}

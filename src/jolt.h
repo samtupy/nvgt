@@ -1,4 +1,4 @@
-/* reactphysics.h - reactphysics3d wrapper header
+/* jolt.h - JoltPhysics wrapper header
  *
  * NVGT - NonVisual Gaming Toolkit
  * Copyright (c) 2022-2025 Sam Tupy
@@ -10,6 +10,21 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
-class asIScriptEngine;
+#pragma once
 
-void RegisterReactphysics(asIScriptEngine* engine);
+// These must match the definitions Jolt was compiled with or JPH::RegisterTypes aborts. Jolt's CMake only enables floating point exceptions for MSVC debug builds, so only define it when we link against that library.
+#define JPH_OBJECT_STREAM
+#if defined(_MSC_VER) && !defined(NDEBUG)
+	#define JPH_FLOATING_POINT_EXCEPTIONS_ENABLED
+#endif
+#include <Jolt/Jolt.h>
+#include <Jolt/Math/Vec3.h>
+
+// JPH::Vec3 is used as the AngelScript "vector" type throughout NVGT.
+// Internal C++ code can use Vec3 by value; only values crossing the AngelScript boundary need new_vec3().
+using vector3 = JPH::Vec3;
+JPH::Vec3* new_vec3(float x = 0.0f, float y = 0.0f, float z = 0.0f);
+inline JPH::Vec3* new_vec3(JPH::Vec3Arg v) { return new_vec3(v.GetX(), v.GetY(), v.GetZ()); }
+
+class asIScriptEngine;
+void RegisterJolt(asIScriptEngine* engine);

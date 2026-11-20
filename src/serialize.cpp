@@ -28,6 +28,7 @@
 #include <Poco/Net/NameValueCollection.h>
 #include <scriptarray.h>
 #include <scriptdictionary.h>
+#include "jolt.h"
 #include "nvgt.h"
 #include "pocostuff.h"
 #include "serialize.h"
@@ -224,6 +225,11 @@ static bool write_value(Poco::BinaryWriter& w, const void* ref, int type_id) {
 		return true;
 	}
 	if (type_id & asTYPEID_SCRIPTOBJECT) return write_script_object(w, obj, ti, is_null);
+	if (!is_handle && !strcmp(name, "vector")) { // vector is a scoped reference type with no registered size, but is written in the same 3 float pod layout it had as a value type so that previously serialized data remains compatible.
+		const vector3* v = (const vector3*)obj;
+		w << (unsigned char)value_tag::pod << std::string("vector") << (Poco::UInt32)(sizeof(float) * 3) << v->GetX() << v->GetY() << v->GetZ();
+		return true;
+	}
 	if ((ti->GetFlags() & asOBJ_POD) && !is_handle) {
 		asUINT size = ti->GetSize();
 		w << (unsigned char)value_tag::pod;
@@ -266,6 +272,13 @@ static void read_value(Poco::BinaryReader& r, asIScriptModule* mod, const value_
 			std::string bytes;
 			r.readRaw(size, bytes);
 			asITypeInfo* ti = mod ? mod->GetTypeInfoByDecl(decl.c_str()) : nullptr;
+			if (ti && decl == "vector" && size == sizeof(float) * 3) {
+				float xyz[3];
+				memcpy(xyz, bytes.data(), sizeof(xyz));
+				vector3 v(xyz[0], xyz[1], xyz[2]);
+				set(&v, ti->GetTypeId());
+				return;
+			}
 			if (ti && !(ti->GetFlags() & asOBJ_ENUM) && (ti->GetFlags() & (asOBJ_VALUE | asOBJ_POD)) != (asOBJ_VALUE | asOBJ_POD)) ti = nullptr;
 			if (ti && (asUINT)ti->GetSize() == size) set((void*)bytes.data(), ti->GetTypeId());
 			return;

@@ -47,7 +47,7 @@ if ARGUMENTS.get("debug", "0") == "1":
 	Alias('cdb', cdb)
 
 # Platform setup and system libraries
-common_libs = ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoCrypto", "PocoFoundation", "expat", "angelscript", "SDL3_ttf", "freetype", "bz2", "enet", "reactphysics3d", "ssl", "crypto", "utf8proc", "pcre2-8", "vorbisfile", "vorbisenc", "vorbis", "ogg", "opusfile", "opusenc", "opus", "tinyexpr", "tiny-aes-c", "ffi"]
+common_libs = ["PocoJSON", "PocoNet", "PocoNetSSL", "PocoUtil", "PocoXML", "PocoCrypto", "PocoFoundation", "expat", "angelscript", "SDL3_ttf", "freetype", "bz2", "enet", "Jolt", "ssl", "crypto", "utf8proc", "pcre2-8", "vorbisfile", "vorbisenc", "vorbis", "ogg", "opusfile", "opusenc", "opus", "tinyexpr", "tiny-aes-c", "ffi"]
 if env["NVGT_TARGET"] == "windows":
 	common_libs = [l for l in common_libs if l not in ("PocoNetSSL", "PocoCrypto", "ssl", "crypto")] + ["PocoNetSSLWin"] # HTTPS uses Windows' own TLS rather than OpenSSL, see vcpkg/triplets/x64-windows.cmake.
 	deb_rel_flags = ["/MTd", "/Od", "/Z7"] if ARGUMENTS.get("debug", "0") == "1" else ["/MT", "/O2"]

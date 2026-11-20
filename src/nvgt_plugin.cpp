@@ -44,6 +44,17 @@ void nvgt_register_shutdown_notification(nvgt_plugin_shutdown_callback* callback
 	if (!callback || std::find(plugin_shutdown_callbacks.begin(), plugin_shutdown_callbacks.end(), callback) != plugin_shutdown_callbacks.end()) return;
 	plugin_shutdown_callbacks.push_back(callback);
 }
+static std::unordered_map<int, nvgt_raycast_provider_getter*> raycast_provider_types; // Keyed by script type id without handle flags.
+void nvgt_register_raycast_provider_type(int type_id, nvgt_raycast_provider_getter* getter) {
+	type_id &= ~(asTYPEID_OBJHANDLE | asTYPEID_HANDLETOCONST);
+	if (getter) raycast_provider_types[type_id] = getter;
+	else raycast_provider_types.erase(type_id);
+}
+nvgt_raycast_provider* nvgt_get_raycast_provider(void* object, int type_id) { // object is the object itself, as returned by CScriptHandle::GetRef, any handle flags in type_id are ignored.
+	if (!object) return nullptr;
+	auto it = raycast_provider_types.find(type_id & ~(asTYPEID_OBJHANDLE | asTYPEID_HANDLETOCONST));
+	return it == raycast_provider_types.end() ? nullptr : it->second(object);
+}
 void notify_nvgt_plugins_shutdown() {
 	while (!plugin_shutdown_callbacks.empty()) {
 		nvgt_plugin_shutdown_callback* callback = plugin_shutdown_callbacks.back();
@@ -109,20 +120,15 @@ void list_loaded_nvgt_plugins(std::vector<std::string>& output) {
 	for (auto kv : loaded_plugins) output.push_back(kv.first);
 }
 
-bool load_serialized_nvgt_plugins(Poco::BinaryReader& br) {
+bool read_serialized_nvgt_plugins(Poco::BinaryReader& br, std::vector<std::string>& names) {
 	unsigned short count;
 	br >> count;
-	if (!count) return true;
 	for (int i = 0; i < count; i++) {
 		std::string name;
 		br >> name;
-		std::string errmsg = Poco::format("Unable to load %s, exiting.", name);
-		if (!load_nvgt_plugin(name, &errmsg)) {
-			message(errmsg, "error");
-			return false;
-		}
+		names.push_back(name);
 	}
-	return true;
+	return br.good();
 }
 
 void serialize_nvgt_plugins(Poco::BinaryWriter& bw) {

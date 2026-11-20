@@ -1,0 +1,34 @@
+// Tests for physics_character, Jolt's rigid body character controller.
+void test_physics_character() {
+	physics_world world;
+	world.gravity = vector(0, 0, -9.81); // A Z up world, which the character should adopt as its up direction.
+	physics_body_id floor = world.create_and_add_body(physics_box_shape_create(vector(20, 20, 0.5), 0.05, physics_material_get("concrete")), vector(0, 0, -0.5), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	physics_character@ c = physics_character(world, 1.8, 0.3, vector(0, 0, 2));
+	assert(c !is null, "character creation failed");
+	vector up = c.up;
+	assert(abs(up.z - 1) < 0.0001, "the character's up direction should oppose gravity, but is " + up);
+	assert(c.world is world);
+	for (int i = 0; i < 120; i++) world.update(1.0 / 60);
+	vector pos = c.position;
+	assert(abs(pos.z) < 0.05, "the character should be standing on the floor at z 0, but is at " + pos);
+	assert(c.supported and c.ground_state == PHYSICS_GROUND_STATE_ON_GROUND, "the character should be on the ground, ground state is " + c.ground_state);
+	assert(c.ground_body == floor, "the character should be standing on the floor body");
+	physics_material@ ground = c.ground_material;
+	assert(ground !is null and ground.name == "concrete", "the character should be standing on concrete");
+	vector normal = c.ground_normal;
+	assert(normal.z > 0.99, "the ground normal should point up, but is " + normal);
+	assert(!c.is_slope_too_steep(vector(0, 0, 1)) and c.is_slope_too_steep(vector(1, 0, 0)), "slope steepness checks");
+	for (int i = 0; i < 60; i++) {
+		vector v = c.linear_velocity;
+		c.linear_velocity = vector(2, 0, v.z);
+		world.update(1.0 / 60);
+	}
+	pos = c.position;
+	assert(abs(pos.x - 2) < 0.15 and abs(pos.z) < 0.05, "walking at 2 units per second for a second should move the character 2 units, but it is at " + pos);
+	c.position = vector(5, 5, 3);
+	for (int i = 0; i < 6; i++) world.update(1.0 / 60);
+	assert(!c.supported and c.ground_state == PHYSICS_GROUND_STATE_IN_AIR, "a character placed above the floor should be in the air");
+	physics_character@ boxy = physics_character(world, physics_box_shape_create(vector(0.5, 0.5, 0.5)), vector(-5, -5, 3));
+	assert(boxy !is null and boxy.shape !is null and boxy.body != c.body, "a character with a custom shape");
+	assert(physics_character(world, 0.2, 0.3, vector(0, 0, 0)) is null, "a capsule shorter than its diameter is invalid");
+}
