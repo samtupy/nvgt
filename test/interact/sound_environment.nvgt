@@ -242,7 +242,7 @@ void main() {
 	set_sound_global_hrtf(true);
 	build_map();
 	env.set_raycaster(world);
-	// Probes 1.5 meters above every floor of the map, at which the listener's reverb and the paths sound takes are baked. Baking takes about a second here, a game would bake once and save the result with save_baked_data.
+	// Probes 1.5 meters above every floor of the map, at which the listener's reverb and the paths sound takes are baked. Baking traces many more rays and bounces than the simulation does at run time, which takes several seconds here, so a game would bake once and save the result with save_baked_data.
 	screen_reader_speak("Baking.");
 	timer bake_time;
 	env.generate_probes(vector(-20, -20, -0.5), vector(40, 18, 4.2), 2, 1.5);

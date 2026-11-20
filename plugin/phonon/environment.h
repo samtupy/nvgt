@@ -122,7 +122,7 @@ public:
 	ipl_ref<api::IHRTF> hrtf;
 	int channels;
 	// Settings, set from the script thread. Changing those that the simulators or the audio effects are created with causes them to be rebuilt. The defaults are Unity's, except that fewer rays with many more bounces are traced for a similar cost, as the length of the reverb tail depends on the number of bounces while Steam Audio averages out the noise of fewer rays across simulations.
-	atomic<int> reflection_type = reflections_convolution;
+	atomic<int> reflection_type = reflections_hybrid;
 	atomic<int> rays = 2048, bounces = 32, order = 1, max_sources = 16, threads, diffuse_samples = 32, max_occlusion_samples = 16;
 	atomic<float> duration = 1.0f, irradiance_min_distance = 0.25f, interval = 0.1f, hybrid_transition_time = 1.0f, hybrid_overlap = 0.25f;
 	atomic<float> reflection_group_size = 3.0f; // Sounds within this many meters of a reflection group, and in view of it, can share it.

@@ -152,7 +152,7 @@ public:
 		if (nested) ctx->PopState();
 		else p->callback->GetEngine()->ReturnContext(ctx);
 	}
-	bool bake(asIScriptFunction* callback) { // Bakes the reverb at every probe and the paths between them with the environment's reflection settings, reporting progress from 0 to 1 to the callback if given. This blocks until baking is done.
+	bool bake(asIScriptFunction* callback, int rays, int bounces) { // Bakes the reverb at every probe and the paths between them, reporting progress from 0 to 1 to the callback if given. This blocks until baking is done. Baking is done once, so it traces the given numbers of rays and bounces, many more than real time simulation can afford, and otherwise uses the environment's reflection settings, which baked data must match.
 		bake_progress progress{callback, 0.0f, 0.75f, -1.0f};
 		bool ok = core->provider && !core->probe_spheres.empty();
 		if (ok) {
@@ -167,9 +167,9 @@ public:
 			reflections.sceneType = IPL_SCENETYPE_CUSTOM;
 			reflections.identifier = {IPL_BAKEDDATATYPE_REFLECTIONS, IPL_BAKEDDATAVARIATION_REVERB, {}};
 			reflections.bakeFlags = (IPLReflectionsBakeFlags)(IPL_REFLECTIONSBAKEFLAGS_BAKECONVOLUTION | IPL_REFLECTIONSBAKEFLAGS_BAKEPARAMETRIC);
-			reflections.numRays = core->rays * 2; // Baking is done once, so it can afford more rays than real time simulation.
+			reflections.numRays = clamp(rays, 1, 1 << 20);
 			reflections.numDiffuseSamples = core->diffuse_samples;
-			reflections.numBounces = core->bounces;
+			reflections.numBounces = clamp(bounces, 1, 1024);
 			reflections.simulatedDuration = reflections.savedDuration = core->duration;
 			reflections.order = core->order;
 			reflections.numThreads = threads;
@@ -379,7 +379,7 @@ void RegisterSoundEnvironment(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("sound_environment", "void add_probe(const vector&in position, float radius = 2)", asMETHOD(sound_environment, add_probe), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "void clear_probes()", asMETHOD(sound_environment, clear_probes), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "uint get_probe_count() const property", asMETHOD(sound_environment, get_probe_count), asCALL_THISCALL);
-	engine->RegisterObjectMethod("sound_environment", "bool bake(sound_environment_bake_callback@ progress = null)", asMETHOD(sound_environment, bake), asCALL_THISCALL);
+	engine->RegisterObjectMethod("sound_environment", "bool bake(sound_environment_bake_callback@ progress = null, int rays = 16384, int bounces = 64)", asMETHOD(sound_environment, bake), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "bool get_has_baked_reverb() const property", asMETHOD(sound_environment, get_has_baked_reverb), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "bool get_has_baked_paths() const property", asMETHOD(sound_environment, get_has_baked_paths), asCALL_THISCALL);
 	engine->RegisterObjectMethod("sound_environment", "string save_baked_data() const", asMETHOD(sound_environment, save_baked_data), asCALL_THISCALL);

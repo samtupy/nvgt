@@ -458,10 +458,10 @@ struct highpass_filter {
 class environment_return : public audio_plugin_node_interface {
 	environment_core* core;
 	audio_config config;
-	bool mixer_wanted = false;
+	bool mixer_setting = false, summing = false; // summing is whether groups' ambisonics are added up and decoded once, the reflection mixer's job for reflection types Steam Audio's mixer doesn't implement.
 	ipl_ref<api::IReflectionMixer> mixer;
 	ipl_ref<api::IAmbisonicsDecodeEffect> decode_effect;
-	ipl_buffer ambisonics_buffer, decoded_buffer;
+	ipl_buffer ambisonics_buffer, decoded_buffer, summed_buffer;
 	highpass_filter highpass;
 public:
 	plugin_node* node; // Owns this.
@@ -477,18 +477,19 @@ public:
 	void on_node_destroyed(plugin_node* destroyed) override { delete this; }
 	bool prepare() {
 		audio_config c = audio_config::unpack(core->published_config);
-		bool want_mixer = core->use_reflection_mixer && c.type == reflections_convolution; // Steam Audio's reflection mixer only implements convolution, parametric and hybrid reflections applied to it are silently dropped, so those are decoded per group.
-		if (c.generation == config.generation && want_mixer == mixer_wanted && (!want_mixer || mixer)) return c.generation != 0;
+		const bool use_mixer = core->use_reflection_mixer, want_mixer = use_mixer && c.type == reflections_convolution; // Steam Audio's reflection mixer only implements convolution, parametric and hybrid reflections applied to it are silently dropped, so for those the groups' ambisonics are added up here instead, which comes to the same as decoding is linear and every group is decoded for the same listener.
+		if (c.generation == config.generation && use_mixer == mixer_setting && (!want_mixer || mixer)) return c.generation != 0;
 		core->audio_mixer = nullptr;
 		mixer.reset();
-		mixer_wanted = want_mixer;
+		mixer_setting = use_mixer;
+		summing = use_mixer && !want_mixer;
 		config = c;
 		if (!c.generation) return false;
 		api::IContext* ctx = core->context;
 		IPLReflectionEffectSettings effect_settings{(IPLReflectionEffectType)c.type, c.ir_size, c.channels()};
 		IPLAmbisonicsDecodeEffectSettings decode_settings{speaker_layout_for_channels(core->channels), reinterpret_cast<IPLHRTF>(core->hrtf.get()), c.order};
 		if (ctx->createAmbisonicsDecodeEffect(&core->audio_settings, &decode_settings, decode_effect.put()) != IPL_STATUS_SUCCESS) return false;
-		if (!ambisonics_buffer.allocate(ctx, c.channels(), core->audio_settings.frameSize) || !decoded_buffer.allocate(ctx, core->channels, core->audio_settings.frameSize)) return false;
+		if (!ambisonics_buffer.allocate(ctx, c.channels(), core->audio_settings.frameSize) || !decoded_buffer.allocate(ctx, core->channels, core->audio_settings.frameSize) || !summed_buffer.allocate(ctx, c.channels(), core->audio_settings.frameSize)) return false;
 		if (want_mixer) {
 			if (ctx->createReflectionMixer(&core->audio_settings, &effect_settings, mixer.put()) != IPL_STATUS_SUCCESS) return false;
 			core->audio_mixer = mixer.get();
@@ -554,7 +555,9 @@ public:
 			IPLAudioEffectState state = send_active ? g->effect->apply(&params, &g->send.b, &ambisonics_buffer.b, mixer.get()) : g->effect->getTail(&ambisonics_buffer.b, mixer.get()); // apply would keep reporting a tail for as long as it's called, so silence counts the tail down through getTail.
 			const bool effect_tail = state == IPL_AUDIOEFFECTSTATE_TAILREMAINING;
 			bool decode_tail = false;
-			if (!mixer) {
+			if (summing) {
+				for (int c = 0; c < ambisonics_buffer.b.numChannels; c++) for (int i = 0; i < ambisonics_buffer.b.numSamples; i++) summed_buffer.b.data[c][i] += ambisonics_buffer.b.data[c][i];
+			} else if (!mixer) {
 				decode_tail = g->decode->apply(&decode, &ambisonics_buffer.b, &decoded_buffer.b) == IPL_AUDIOEFFECTSTATE_TAILREMAINING;
 				add_decoded(out, frames);
 			}
@@ -582,15 +585,18 @@ public:
 			return;
 		}
 		IPLAmbisonicsDecodeEffectParams decode{config.order, reinterpret_cast<IPLHRTF>(core->hrtf.get()), core->audio_listener, core->binaural && core->channels == 2 ? IPL_TRUE : IPL_FALSE};
+		if (summing) summed_buffer.clear();
 		render_group(&core->listener_group, out, frames, decode);
 		for (int i = 0; i < group_count; i++) render_group(core->groups[i], out, frames, decode);
-		if (!mixer) return;
-		IPLReflectionEffectParams params{};
-		params.type = (IPLReflectionEffectType)config.type;
-		params.numChannels = config.channels();
-		params.irSize = config.ir_size;
-		mixer->apply(&params, &ambisonics_buffer.b);
-		decode_effect->apply(&decode, &ambisonics_buffer.b, &decoded_buffer.b);
+		if (mixer) {
+			IPLReflectionEffectParams params{};
+			params.type = (IPLReflectionEffectType)config.type;
+			params.numChannels = config.channels();
+			params.irSize = config.ir_size;
+			mixer->apply(&params, &ambisonics_buffer.b);
+			decode_effect->apply(&decode, &ambisonics_buffer.b, &decoded_buffer.b);
+		} else if (summing) decode_effect->apply(&decode, &summed_buffer.b, &decoded_buffer.b);
+		else return;
 		add_decoded(out, frames);
 	}
 };
