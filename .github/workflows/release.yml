@@ -360,6 +360,8 @@ jobs:
     steps:
     - uses: actions/checkout@v5
     - uses: actions/download-artifact@v8
+      with:
+        pattern: '*_release'
     - name: set_version
       run: |
         python3 build/ci_set_version.py
@@ -410,6 +412,8 @@ jobs:
     steps:
     - uses: actions/checkout@v5
     - uses: actions/download-artifact@v8
+      with:
+        pattern: '*_release'
     - name: set_version
       run: |
         python3 build/ci_set_version.py
@@ -466,6 +470,8 @@ jobs:
     steps:
     - uses: actions/checkout@v5
     - uses: actions/download-artifact@v8
+      with:
+        pattern: '*_release'
     - name: set_version
       run: |
         python3 build/ci_set_version.py
