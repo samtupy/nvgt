@@ -9,3 +9,18 @@ void test_mixer_set_mixer_rejects_loops() {
 	assert(s.set_mixer(c) and s.get_mixer() is c, "a sound in the innermost mixer");
 	assert(c.set_mixer(null) and a.set_mixer(c), "once separated, the outer mixer can go into the former inner one");
 }
+void test_mixer_shape_follows_listener() { // The closest point of a shape was once only found again when the mixer moved, not when the listener did.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	mixer@ m = e.mixer();
+	e.set_listener_position(0, 20, 0, 0);
+	m.set_position_3d(0, 0, 0);
+	assert(m.set_shape(sound_aabb_shape(0, 10, 0, 0, 0, 0)), "setting a shape");
+	assert(abs(m.get_distance_to_listener() - 10) < 0.01, "the closest point of the shape should be 10 away, got " + m.get_distance_to_listener());
+	e.set_listener_position(0, 5, 0, 0);
+	assert(m.get_distance_to_listener() < 0.01, "a listener inside the shape should be at it, got " + m.get_distance_to_listener());
+	e.set_listener_position(0, -10, 0, 0);
+	assert(abs(m.get_distance_to_listener() - 10) < 0.01, "a listener on the other side should be 10 from its near edge, got " + m.get_distance_to_listener());
+	assert(m.set_shape(sound_aabb_shape(0, 2, 0, 0, 0, 0)), "replacing the shape");
+	e.set_listener_position(0, 20, 0, 0);
+	assert(abs(m.get_distance_to_listener() - 18) < 0.01, "the replacement shape should be used, got " + m.get_distance_to_listener());
+}

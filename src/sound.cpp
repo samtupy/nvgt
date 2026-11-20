@@ -1266,15 +1266,21 @@ public:
 		sound_shape* old_shape = shape;
 		shape = nullptr;
 		shape_handle = CScriptHandle();
-		if (old_shape) old_shape->release();
+		if (old_shape) {
+			if (old_shape->connected_sound == this) unregister_blocking_sound_shape(old_shape);
+			old_shape->release();
+		}
 		int ot = new_shape.GetTypeId();
 		ot ^= asTYPEID_OBJHANDLE;
 		if (!g_sound_shape_setup_callbacks.contains(ot)) return false;
 		sound_shape* new_shape_obj = g_sound_shape_setup_callbacks[ot](this, &new_shape);
 		if (!new_shape_obj) return false;
-		new_shape_obj->set_position(get_position_3d());
+		vector3 position = get_position_3d();
+		new_shape_obj->set_position(position);
 		shape = new_shape_obj;
 		shape_handle = new_shape;
+		register_blocking_sound_shape(shape, this); // So that the closest point of the shape is found again whenever the listener moves, not only when the mixer does.
+		if (get_spatialization_enabled()) set_position_3d_vector(position);
 		return true;
 	}
 	CScriptHandle get_shape() const override {
