@@ -494,6 +494,7 @@ struct jolt_physics_world : public nvgt_raycast_provider {
 		system.Init(max_bodies, 0, max_body_pairs, max_contact_constraints, bp_layer_iface, obj_vs_bp_filter, obj_layer_pair_filter);
 		contact_listener.world = this;
 		system.SetContactListener(&contact_listener);
+		system.SetGravity(Vec3(0.0f, 0.0f, -9.81f)); // NVGT's coordinate system has z up, whereas Jolt's default gravity points down the y axis.
 	}
 	~jolt_physics_world() {
 		if (cb_contact_added) { cb_contact_added->Release(); cb_contact_added = nullptr; }
