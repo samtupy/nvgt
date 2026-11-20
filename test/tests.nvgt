@@ -1,6 +1,7 @@
 /* tests.nvgt - main test runner application
  * In our case, it's actually better to write our tests directly in Angelscript, as any specific parts of the c++ code will be tested by loading and executing this Angelscript code which can test engine features in the same way as end-users will be employing them.
  * To add a test, create a .nvgt script in the case folder with function(s) that return void, takes no arguments and is prepended with the word "test_", for example void test_foo(), test_bar(). The function names need not match the basename of the file. A test should throw an exception if it fails, if the function returns successfully the test is considered to have passed.
+ * Each test has a level from 1 to 3, set by declaring a global such as "const int test_foo_level = 3;" next to it, and is level 2 if it declares none. Level 1 is for quick tests that take under 100ms, suited to automated sanity checks, 2 for the usual tests and 3 for slow or rarely needed ones such as long audio simulations. The runner runs tests up to level 2 unless given another level with -l, though tests named with -t run whatever their level.
  * If a test case relies on any static files, those should go in the data folder.
  * If a test case produces any temporary data to work with, it should go in the tmp folder so as to be ignored by git.
  *
@@ -19,8 +20,9 @@
 
 dictionary disabled_tests, enabled_tests;
 bool verbose = false, nonfatal = false, console_available = is_console_available();
+int max_level = 2;
 script_module@ nvgt_game = script_get_module("nvgt_game");
-int tests_total, tests_skipped, tests_failed, tests_passed;
+int tests_total, tests_skipped, tests_skipped_by_level, tests_failed, tests_passed;
 string ui_buffer;
 
 void help() {
@@ -28,7 +30,8 @@ void help() {
 	outln("-v (verbose), print status information.");
 	outln("-n (nonfatal), Warn on failed test and continue rather than exiting.");
 	outln("-d (disable), do not run a given test (-dbase64).");
-	outln("-t (test), only run the specified tests (-tbase64 -tasync).");
+	outln("-t (test), only run the specified tests (-tbase64 -tasync), whatever their level.");
+	outln("-l (level), run tests up to this level, from -l1 for only quick tests to -l3 to include slow ones (default -l2).");
 	outln("-h (help), Print this message and exit.");
 	abort();
 }
@@ -48,6 +51,7 @@ void main() {
 		else if (ARGS[i] == "-n") nonfatal = true;
 		else if (ARGS[i].starts_with("-d")) disabled_tests.set(ARGS[i].substr(2), true);
 		else if (ARGS[i].starts_with("-t")) enabled_tests.set(ARGS[i].substr(2), true);
+		else if (ARGS[i] == "-l1" or ARGS[i] == "-l2" or ARGS[i] == "-l3") max_level = parse_int(ARGS[i].substr(2));
 		else {
 			outln("unknown command line option " + ARGS[i]);
 			abort(64);
@@ -80,6 +84,7 @@ void main() {
 		if (tests_passed > 0)outln("%0 of %1 tests passed successfully in %2ms!".format(tests_passed, tests_total, timetracker.elapsed), "success");
 	} else outln("%0 of %1 tests have passed successfully, with %2 failures. Total time %3ms.".format(tests_passed, tests_total, tests_failed, timetracker.elapsed), "partial success");
 	if (tests_skipped > 0) outln("%0 tests skipped.".format(tests_skipped));
+	if (tests_skipped_by_level > 0) outln("%0 tests above level %1 were not run, pass -l%2 to include them.".format(tests_skipped_by_level, max_level, max_level + 1));
 	display_ui_buffer();
 }
 
@@ -96,6 +101,13 @@ void run_test(script_function@ func, const string&in filename) {
 	// Or if only specific tests are enabled and this one isn't among them, skip it silently.
 	if (!enabled_tests.empty() && !(enabled_tests.exists(func_name) || enabled_tests.exists(test_name) || enabled_tests.exists(filename))) {
 		tests_skipped++;
+		return;
+	}
+	// Tests above the requested level only run when they are asked for with -t.
+	int level = get_test_level(func_name);
+	if (enabled_tests.empty() and level > max_level) {
+		if (verbose) outln("Skipping %0::%1 (level %2)".format(filename, func_name, level));
+		tests_skipped_by_level++;
 		return;
 	}
 
@@ -142,6 +154,14 @@ void run_test(script_function@ func, const string&in filename) {
 }
 
 // utility functions:
+int get_test_level(const string&in func_name) { // The value of a global int named after the test, such as test_foo_level, or 2 if it declares none.
+	int index = nvgt_game.get_global_index_by_decl("const int %0_level".format(func_name));
+	if (index < 0) index = nvgt_game.get_global_index_by_decl("int %0_level".format(func_name));
+	any@ v_level = nvgt_game.get_global(index);
+	int64 level = 2;
+	if (@v_level != null) v_level.retrieve(level);
+	return level < 1 ? 1 : level > 3 ? 3 : level;
+}
 void outln(const string&in msg, const string&in popup_title = "") {
 	if (console_available) println(msg);
 	else if(!popup_title.empty()) alert(popup_title, msg);

@@ -879,8 +879,7 @@ public:
 		ma_decoder_config cfg = decoder_config_init(sample_rate, channels);
 		cursor = make_unique<stream_cursor>();
 		cursor->ds = ds;
-		// Note: We used to pass on_tell_datastream here until miniaudio update Jan 8 2026, if something breaks with raw decoders and end checking, look here.
-		if ((g_soundsystem_last_error = ma_decoder_init(on_read_datastream, on_seek_datastream, &*cursor, &cfg, &*decoder)) != MA_SUCCESS) {
+		if ((g_soundsystem_last_error = ma_decoder_init(on_read_datastream, on_seek_datastream, on_tell_datastream, &*cursor, &cfg, &*decoder)) != MA_SUCCESS) { // The tell callback needs NVGT's miniaudio patch until miniaudio 0.12, see vcpkg/ports/miniaudio.
 			decoder.reset();
 			cursor.reset();
 			ds->release();

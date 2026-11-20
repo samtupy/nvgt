@@ -1,0 +1,12 @@
+// AI generated test for reading numeric globals through script_module::get_global, which once returned an any that integers and floats couldn't be retrieved from.
+const int script_module_get_global_int = -7;
+uint8 script_module_get_global_byte = 200;
+float script_module_get_global_float = 1.5;
+void test_script_module_get_global_numbers() {
+	script_module@ m = script_get_module("nvgt_game");
+	int64 i = 0;
+	assert(m.get_global(m.get_global_index_by_decl("const int script_module_get_global_int")).retrieve(i) and i == -7, "int global gave " + i);
+	assert(m.get_global(m.get_global_index_by_decl("uint8 script_module_get_global_byte")).retrieve(i) and i == 200, "uint8 global gave " + i);
+	double d = 0;
+	assert(m.get_global(m.get_global_index_by_decl("float script_module_get_global_float")).retrieve(d) and d == 1.5, "float global gave " + d);
+}
