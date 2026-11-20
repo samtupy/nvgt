@@ -1,0 +1,570 @@
+// Tests for sound_environment, Steam Audio's occlusion, transmission and reflection simulation of a physics_world. Audio is rendered by an engine without a device so nothing is played.
+#pragma plugin nvgt_phonon
+physics_world@ sound_environment_test_room(bool divided) {
+	physics_world world;
+	world.gravity = vector(0, 0, -9.81);
+	physics_material@ concrete = physics_material_get("concrete");
+	// A closed 10 by 10 by 4 room centered on the origin in x and y, with walls half a unit thick.
+	world.create_and_add_body(physics_box_shape_create(vector(5.5, 5.5, 0.25), 0.05, concrete), vector(0, 0, -0.25), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	world.create_and_add_body(physics_box_shape_create(vector(5.5, 5.5, 0.25), 0.05, concrete), vector(0, 0, 4.25), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	world.create_and_add_body(physics_box_shape_create(vector(0.25, 5.5, 2), 0.05, concrete), vector(-5.25, 0, 2), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	world.create_and_add_body(physics_box_shape_create(vector(0.25, 5.5, 2), 0.05, concrete), vector(5.25, 0, 2), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	world.create_and_add_body(physics_box_shape_create(vector(5.5, 0.25, 2), 0.05, concrete), vector(0, -5.25, 2), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	world.create_and_add_body(physics_box_shape_create(vector(5.5, 0.25, 2), 0.05, concrete), vector(0, 5.25, 2), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	if (divided) world.create_and_add_body(physics_box_shape_create(vector(0.1, 5, 2), 0.05, physics_material_get("brick")), vector(0, 0, 2), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	return world;
+}
+void sound_environment_test_pump(audio_engine@ e, sound_environment@ env, int blocks) {
+	for (int i = 0; i < blocks; i++) {
+		e.read(256);
+		env.update();
+	}
+}
+bool sound_environment_test_wait_for_reflections(audio_engine@ e, sound_environment@ env, uint count) { // Waits for the worker thread to complete the given number of reflection simulations.
+	timer t;
+	while (env.reflection_simulations < count and t.elapsed < 20000) {
+		sound_environment_test_pump(e, env, 1);
+		wait(1);
+	}
+	return env.reflection_simulations >= count;
+}
+void test_sound_environment_direct() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(true);
+	sound_environment env(e);
+	assert(env.set_raycaster(world), "a physics_world should be accepted as a raycaster");
+	assert(!env.set_raycaster(e), "an audio_engine is not a raycaster");
+	assert(env.raycaster !is null, "a failed set_raycaster call must not clear the previous raycaster");
+	e.set_listener_position(0, -2.5, 0, 1.5);
+	mixer@ m = env.new_mixer();
+	sound_environment_source@ src = env.get_source(m);
+	assert(src !is null and env.source_count == 1, "a new mixer should be attached to the environment");
+	m.set_position_3d(2.5, 0, 1.5); // Behind the brick wall dividing the room.
+	sound_environment_test_pump(e, env, 20);
+	assert(src.simulated, "the source should have been simulated");
+	assert(src.occlusion < 0.01, "a source behind a wall should be occluded, occlusion " + src.occlusion);
+	assert(abs(src.transmission_low - 0.015) < 0.001 and abs(src.transmission_mid - 0.015) < 0.001 and abs(src.transmission_high - 0.015) < 0.001, "the source should be heard through one brick wall, which transmits 0.015 in every band, got " + src.transmission_low + ", " + src.transmission_mid + ", " + src.transmission_high);
+	m.set_position_3d(-1, 2, 1.5); // In the same half of the room as the listener.
+	sound_environment_test_pump(e, env, 20);
+	assert(src.occlusion > 0.99, "a source in plain view should not be occluded, occlusion " + src.occlusion);
+	env.set_raycaster(null);
+	m.set_position_3d(2.5, 0, 1.5);
+	timer t; // The scene is replaced once the reflection simulation in progress, if any, has finished.
+	while (src.occlusion < 0.99 and t.elapsed < 5000) {
+		sound_environment_test_pump(e, env, 1);
+		wait(1);
+	}
+	assert(src.occlusion > 0.99, "without a raycaster there is nothing to occlude the source, occlusion " + src.occlusion);
+	env.detach(m);
+	assert(env.get_source(m) is null, "a detached mixer has no environment source");
+	@src = null;
+	@m = null;
+	sound_environment_test_pump(e, env, 2);
+	assert(env.source_count == 0, "released sources should leave the environment, " + env.source_count + " remain");
+}
+void test_sound_environment_reverb_times() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.reflection_type = SOUND_ENVIRONMENT_REFLECTIONS_PARAMETRIC;
+	env.set_raycaster(world);
+	e.set_listener_position(0, -2, 0, 1.5);
+	mixer@ m = env.new_mixer();
+	m.set_position_3d(2, 2, 1.5);
+	sound_environment_test_pump(e, env, 2);
+	assert(sound_environment_test_wait_for_reflections(e, env, 2), "reflection simulations should complete");
+	sound_environment_test_pump(e, env, 2);
+	sound_environment_source@ src = env.get_source(m);
+	assert(src.reverb_time_mid > 0.2, "a closed concrete room should reverberate, reverb times " + src.reverb_time_low + ", " + src.reverb_time_mid + ", " + src.reverb_time_high);
+}
+// Plays a short noise burst through a sound in a closed room and returns the energy remaining a while after it ended, which only reflections can produce.
+double sound_environment_test_tail_energy(bool use_environment, bool use_reflection_mixer) {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.use_reflection_mixer = use_reflection_mixer;
+	env.set_raycaster(world);
+	e.set_listener_position(0, -2, 0, 1.5);
+	sound@ s = use_environment ? env.new_sound() : e.sound();
+	float[] burst(4410 * 2);
+	random_xorshift rng(uint(1));
+	for (uint i = 0; i < burst.length(); i++) burst[i] = rng.nextf() * 2 - 1;
+	assert(s.load_pcm(burst, 44100, 2), "loading the burst");
+	s.set_position_3d(2, 2, 1.5);
+	sound_environment_test_pump(e, env, 2);
+	if (use_environment) assert(sound_environment_test_wait_for_reflections(e, env, 2), "reflection simulations should complete");
+	s.play();
+	double tail = 0;
+	for (int block = 0; block < 120; block++) { // About 0.7 seconds, the burst is 0.1 seconds long.
+		float[]@ frames = e.read(256);
+		env.update();
+		if (block < 40) continue; // Skip the burst itself and the first moments after it.
+		for (uint i = 0; i < frames.length(); i++) tail += frames[i] * frames[i];
+	}
+	return tail;
+}
+void test_sound_environment_reflections() {
+	double dry = sound_environment_test_tail_energy(false, true);
+	assert(dry < 0.0001, "a sound outside of the environment should be silent after it ends, tail energy " + dry);
+	double mixed = sound_environment_test_tail_energy(true, true);
+	assert(mixed > 0.01, "reflections through the reflection mixer should leave a reverb tail, tail energy " + mixed);
+	double per_source = sound_environment_test_tail_energy(true, false);
+	assert(per_source > 0.01, "reflections decoded per source should leave a reverb tail, tail energy " + per_source);
+	assert(per_source > mixed * 0.5 and per_source < mixed * 2, "both reflection paths should produce similar tails, mixer " + mixed + " per source " + per_source);
+}
+void test_sound_environment_settings_changes() { // Changing settings that rebuild the simulator and the audio effects while sounds are playing must not interrupt or break processing.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(true);
+	sound_environment env(e);
+	env.set_raycaster(world);
+	e.set_listener_position(0, -2, 0, 1.5);
+	float[] noise(44100 * 2);
+	random_xorshift rng(uint(2));
+	for (uint i = 0; i < noise.length(); i++) noise[i] = (rng.nextf() * 2 - 1) * 0.5;
+	sound@[] sounds;
+	for (int i = 0; i < 3; i++) {
+		sound@ s = env.new_sound();
+		assert(s.load_pcm(noise, 44100, 2));
+		s.set_position_3d(-3 + i * 3, 2, 1.5);
+		s.play_looped();
+		sounds.insert_last(s);
+	}
+	sound_environment_reflection_type[] types = {SOUND_ENVIRONMENT_REFLECTIONS_HYBRID, SOUND_ENVIRONMENT_REFLECTIONS_PARAMETRIC, SOUND_ENVIRONMENT_REFLECTIONS_CONVOLUTION};
+	for (uint step = 0; step < 6; step++) {
+		env.reflection_type = types[step % 3];
+		env.reflection_order = step % 3;
+		env.use_reflection_mixer = step % 2 == 0;
+		env.reflection_duration = 0.5 + step * 0.25;
+		timer t;
+		while (t.elapsed < 150) {
+			float[]@ frames = e.read(256);
+			env.update();
+			for (uint i = 0; i < frames.length(); i++) assert(frames[i] == frames[i] and abs(frames[i]) < 100, "audio output should stay finite after changing settings in step " + step + ", got " + frames[i] + " at sample " + i + " after " + t.elapsed + "ms");
+			wait(1);
+		}
+	}
+	assert(env.reflection_order == 2 and env.reflection_type == SOUND_ENVIRONMENT_REFLECTIONS_CONVOLUTION and env.reflection_duration == 1.75 and !env.use_reflection_mixer, "settings should read back as set");
+	uint simulations = env.reflection_simulations;
+	assert(sound_environment_test_wait_for_reflections(e, env, simulations + 2), "reflections should still be simulated after the changes");
+}
+float[]@ sound_environment_test_burst() {
+	float[] burst(4410 * 2);
+	random_xorshift rng(uint(3));
+	for (uint i = 0; i < burst.length(); i++) burst[i] = rng.nextf() * 2 - 1;
+	return burst;
+}
+double sound_environment_test_energy(audio_engine@ e, sound_environment@ env, int blocks) {
+	double energy = 0;
+	for (int b = 0; b < blocks; b++) {
+		float[]@ frames = e.read(256);
+		env.update();
+		for (uint i = 0; i < frames.length(); i++) energy += frames[i] * frames[i];
+	}
+	return energy;
+}
+void test_sound_environment_new_sources() { // New sounds are heard with the listener reverb until their own reflections are simulated, and are occluded straight away even while reflections are being simulated.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(true);
+	sound_environment env(e);
+	env.set_raycaster(world);
+	e.set_listener_position(0, -2.5, -2, 1.5);
+	sound_environment_test_pump(e, env, 2);
+	assert(sound_environment_test_wait_for_reflections(e, env, 3), "reflection simulations should complete");
+	sound@ s = env.new_sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	s.set_position_3d(-2, 2, 1.5);
+	s.play();
+	sound_environment_source@ src = env.get_source(s);
+	sound_environment_test_energy(e, env, 20); // The 0.1 second burst, 17 blocks.
+	assert(!src.reflections_simulated, "a source's own reflections can't have been simulated this soon");
+	double with_listener_reverb = sound_environment_test_energy(e, env, 32);
+	env.use_listener_reverb = false;
+	sound_environment_test_energy(e, env, 250); // Let the first sound's reverb die away.
+	@s = env.new_sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	s.set_position_3d(-2, 2, 1.5);
+	s.play();
+	sound_environment_test_energy(e, env, 20);
+	double without = sound_environment_test_energy(e, env, 32);
+	assert(with_listener_reverb > 10 and without < with_listener_reverb / 100, "a new sound should reverberate straight away with the listener reverb, energy after the burst " + with_listener_reverb + " with it and " + without + " without it");
+	env.simulation_interval = 0; // Keep the worker as busy as possible.
+	mixer@ m = env.new_mixer();
+	m.set_position_3d(2.5, 0, 1.5); // Behind the wall.
+	@src = env.get_source(m);
+	sound_environment_test_pump(e, env, 2);
+	assert(src.simulated and src.occlusion < 0.01, "a new source behind a wall should be occluded after a couple of updates, simulated " + src.simulated + ", occlusion " + src.occlusion);
+}
+void test_sound_environment_tail_after_release() { // A sound released while its reflections are still ringing leaves the environment straight away, while its reflection group rings on.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.use_listener_reverb = false; // So that only the released sound's own reflections can be heard.
+	env.set_raycaster(world);
+	e.set_listener_position(0, -2, 0, 1.5);
+	sound@ s = env.new_sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	s.set_position_3d(2, 2, 1.5);
+	sound_environment_source@ src = env.get_source(s);
+	timer t;
+	while (!src.reflections_simulated and t.elapsed < 10000) {
+		sound_environment_test_pump(e, env, 1);
+		wait(1);
+	}
+	assert(src.reflections_simulated, "the sound's own reflections should be simulated before it plays");
+	s.play();
+	sound_environment_test_energy(e, env, 12); // The burst and a little more.
+	@src = null;
+	@s = null;
+	assert(env.source_count == 0, "the released sound should leave the environment, " + env.source_count + " sources remain");
+	double tail = sound_environment_test_energy(e, env, 40);
+	assert(tail > 1, "the released sound's reverb tail should continue, energy " + tail);
+	assert(env.active_reflection_groups == 0, "the group should have no members left, " + env.active_reflection_groups + " are active");
+}
+void sound_environment_test_wait_for_decoding(sound@ s) {
+	timer t;
+	while (!s.load_complete and t.elapsed < 5000) wait(1);
+	assert(s.load_complete, "the test sound should finish decoding");
+}
+void test_sound_environment_attack() { // A sound played and updated before the audio thread first processes it must not be simulated at a stale position, which muted and faded in its start.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.reflections_level = 0;
+	env.set_raycaster(world);
+	e.set_listener_position(0, 0, 0, 1.6);
+	sound_environment_test_pump(e, env, 2);
+	sound@ plain = e.sound();
+	assert(plain.load_pcm(sound_environment_test_burst(), 44100, 2));
+	sound_environment_test_wait_for_decoding(plain); // A sound played before its asynchronous decoding has produced anything starts a block late, with or without the environment.
+	plain.set_position_3d(0, 1, 0.05);
+	plain.play();
+	double expected = sound_environment_test_energy(e, env, 2);
+	sound_environment_test_energy(e, env, 20);
+	sound@ s = env.new_sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	sound_environment_test_wait_for_decoding(s);
+	s.set_position_3d(0, 1, 0.05);
+	s.play();
+	env.update();
+	double got = sound_environment_test_energy(e, env, 2);
+	assert(got > expected * 0.8, "the start of a new environment sound should be as loud as without the environment, " + got + " against " + expected);
+}
+void test_sound_environment_character_transparent() { // A sound inside a character's capsule, such as its footsteps, must still have reflections.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	physics_character@ c = physics_character(world, 1.8, 0.3, vector(0, 0, 0.01));
+	assert(c.acoustically_transparent, "characters should be acoustically transparent by default");
+	sound_environment env(e);
+	env.use_listener_reverb = false;
+	env.set_raycaster(world);
+	e.set_listener_position(0, 0, 0, 1.6);
+	mixer@ m = env.new_mixer();
+	m.set_position_3d(0, 0, 0.9);
+	sound@ s = e.sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	s.set_mixer(m);
+	sound_environment_source@ src = env.get_source(m);
+	timer t;
+	while (!src.reflections_simulated and t.elapsed < 10000) {
+		sound_environment_test_pump(e, env, 1);
+		wait(1);
+	}
+	s.play();
+	sound_environment_test_energy(e, env, 20);
+	double tail = sound_environment_test_energy(e, env, 40);
+	assert(tail > 10, "a sound inside an acoustically transparent character should reverberate, tail energy " + tail);
+	c.acoustically_transparent = false;
+	assert(!c.acoustically_transparent);
+}
+void test_sound_environment_transparent_material() { // Surfaces of an acoustically transparent material don't block sound.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	physics_material@ curtain = physics_material_create(0.5, 0.1, "brick");
+	curtain.acoustically_transparent = true;
+	assert(physics_material_create(0.5, 0.1, "brick").acoustically_transparent == false, "materials shouldn't be transparent unless made so");
+	world.create_and_add_body(physics_box_shape_create(vector(0.1, 5, 2), 0.05, curtain), vector(0, 0, 2), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	sound_environment env(e);
+	env.set_raycaster(world);
+	e.set_listener_position(0, -2.5, -2, 1.5);
+	mixer@ m = env.new_mixer();
+	m.set_position_3d(2.5, 0, 1.5);
+	sound_environment_source@ src = env.get_source(m);
+	sound_environment_test_pump(e, env, 3);
+	assert(src.simulated and src.occlusion > 0.99, "a wall of a transparent material shouldn't occlude, occlusion " + src.occlusion);
+	curtain.acoustically_transparent = false;
+	sound_environment_test_pump(e, env, 3);
+	assert(src.occlusion < 0.01, "the wall should occlude once its material isn't transparent, occlusion " + src.occlusion);
+}
+int[] sound_environment_test_groups(bool divided, const vector[]@ positions, const vector&in listener) { // The reflection group each of the given positions is assigned to.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(divided);
+	sound_environment env(e);
+	env.set_raycaster(world);
+	e.set_listener_position(0, listener);
+	mixer@[] mixers;
+	for (uint i = 0; i < positions.length(); i++) {
+		mixer@ m = env.new_mixer();
+		m.set_position_3d(positions[i].x, positions[i].y, positions[i].z);
+		mixers.insert_last(m);
+	}
+	sound_environment_test_pump(e, env, 4);
+	int[] groups;
+	for (uint i = 0; i < mixers.length(); i++) groups.insert_last(env.get_source(mixers[i]).reflection_group);
+	return groups;
+}
+void test_sound_environment_reflection_grouping() { // Sounds within reflection_group_size meters of each other share a reflection group, wherever the listener is, unless something stands between them.
+	vector listener(-4, -4, 1.6);
+	int[]@ far = sound_environment_test_groups(false, {vector(3, 3, 1.5), vector(3, 0.6, 1.5)}, listener);
+	assert(far[0] >= 0 and far[0] == far[1], "two sounds 2.4 meters apart and 10 meters away should share a group, got " + far[0] + " and " + far[1]);
+	int[]@ near = sound_environment_test_groups(false, {vector(-3, -3, 1.5), vector(-3, -0.6, 1.5)}, listener);
+	assert(near[0] >= 0 and near[0] == near[1], "two sounds 2.4 meters apart right by the listener should share a group too, got " + near[0] + " and " + near[1]);
+	int[]@ apart = sound_environment_test_groups(false, {vector(-3, -3, 1.5), vector(1, -3, 1.5)}, listener);
+	assert(apart[0] >= 0 and apart[1] >= 0 and apart[0] != apart[1], "two sounds 4 meters apart should have groups of their own, got " + apart[0] + " and " + apart[1]);
+	vector[] across = {vector(-0.6, 3, 1.5), vector(0.6, 3, 1.5)};
+	int[]@ open = sound_environment_test_groups(false, across, listener);
+	assert(open[0] >= 0 and open[0] == open[1], "two sounds 1.2 meters apart should share a group, got " + open[0] + " and " + open[1]);
+	int[]@ walled = sound_environment_test_groups(true, across, listener);
+	assert(walled[0] >= 0 and walled[1] >= 0 and walled[0] != walled[1], "two sounds on either side of a wall should not share a group, got " + walled[0] + " and " + walled[1]);
+}
+void test_sound_environment_reflection_budget() { // With more sounds than reflection groups, sounds share groups rather than going without reflections.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.use_listener_reverb = false; // So that only the groups' reflections can be heard.
+	env.max_sources = 4;
+	env.set_raycaster(world);
+	e.set_listener_position(0, 0, 0, 1.6);
+	mixer@[] mixers;
+	for (int i = 0; i < 10; i++) {
+		mixer@ m = env.new_mixer();
+		m.set_position_3d(-4 + i * 0.8, 2, 1.5);
+		mixers.insert_last(m);
+	}
+	sound@ s = e.sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	sound_environment_test_wait_for_decoding(s);
+	s.set_mixer(mixers[9]);
+	sound_environment_source@ src = env.get_source(mixers[9]);
+	timer t;
+	while (!src.reflections_simulated and t.elapsed < 10000) {
+		sound_environment_test_pump(e, env, 1);
+		wait(1);
+	}
+	assert(src.reflections_simulated, "the farthest of 10 sounds should have its reflections simulated in a shared group");
+	assert(env.max_sources == 4 and env.active_reflection_groups <= 4, "no more than 4 groups should be in use, " + env.active_reflection_groups + " are");
+	for (uint i = 0; i < mixers.length(); i++) assert(env.get_source(mixers[i]).reflection_group >= 0, "sound " + i + " should belong to a group");
+	s.play();
+	sound_environment_test_energy(e, env, 20);
+	double tail = sound_environment_test_energy(e, env, 40);
+	assert(tail > 10, "a sound sharing a group should reverberate, tail energy " + tail);
+}
+void test_sound_environment_probes_and_baking() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	assert(env.generate_probes(vector(-5, -5, 0), vector(5, 5, 4), 2, 1.5) == 0, "probes can't be generated without a raycaster");
+	env.set_raycaster(world);
+	assert(env.generate_probes(vector(-5, -5, 0), vector(5, 5, 4), 2, 1.5) == 36, "a 10 meter square room should get a 6 by 6 grid of probes 2 meters apart, got " + env.probe_count);
+	assert(!env.has_baked_reverb and !env.has_baked_paths, "nothing is baked yet");
+	string unbaked = env.save_baked_data();
+	assert(env.bake() and env.has_baked_reverb and env.has_baked_paths, "baking should bake reverb and paths");
+	string data = env.save_baked_data();
+	assert(data.length() > unbaked.length() + 36 * 1000, "baked data should hold reverb for every probe, " + data.length() + " bytes against " + unbaked.length() + " unbaked");
+	sound_environment loaded(e);
+	assert(loaded.load_baked_data(data) and loaded.probe_count == 36 and loaded.has_baked_reverb and loaded.has_baked_paths, "baked data should load with its probes");
+	assert(loaded.save_baked_data() == data, "loaded baked data should save the same");
+	assert(!loaded.load_baked_data(data.substr(0, data.length() - 1)) and !loaded.load_baked_data("not baked data") and loaded.probe_count == 36, "invalid data should be refused and leave the probes as they were");
+	loaded.add_probe(vector(0, 0, 3));
+	assert(loaded.probe_count == 37 and !loaded.has_baked_reverb, "changing the probes discards the baked data");
+	loaded.clear_probes();
+	assert(loaded.probe_count == 0, "clear_probes should remove every probe");
+}
+double sound_environment_test_baked_tail(bool use_baked_reverb) {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.max_sources = 0; // Only the listener's reverb.
+	env.set_raycaster(world);
+	env.generate_probes(vector(-5, -5, 0), vector(5, 5, 4), 2, 1.5);
+	assert(env.bake());
+	env.set_raycaster(null); // Simulated in real time, the listener's reverb would now be silent.
+	env.use_baked_reverb = use_baked_reverb;
+	e.set_listener_position(0, -1, -1, 1.5);
+	sound@ s = env.new_sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	sound_environment_test_wait_for_decoding(s);
+	s.set_position_3d(1, 1, 1.5);
+	assert(sound_environment_test_wait_for_reflections(e, env, env.reflection_simulations + 3));
+	s.play();
+	sound_environment_test_energy(e, env, 20);
+	return sound_environment_test_energy(e, env, 40);
+}
+void test_sound_environment_baked_reverb() { // The listener's reverb can be looked up from baked probes rather than simulated.
+	double baked = sound_environment_test_baked_tail(true), unbaked = sound_environment_test_baked_tail(false);
+	assert(baked > 10 and unbaked < baked / 100, "the baked reverb should be heard where real time simulation hears nothing, tail energy " + baked + " baked and " + unbaked + " simulated");
+}
+double sound_environment_test_pathing_energy(bool pathing, bool baked) { // A sound on the other side of a wall with a gap at one end, heard without transmission or reflections.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	world.create_and_add_body(physics_box_shape_create(vector(0.1, 3.5, 2), 0.05, physics_material_get("brick")), vector(0, -1.5, 2), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING); // The wall at x 0, open from y 2 to 5.
+	sound_environment env(e);
+	env.set_raycaster(world);
+	env.reflections_level = 0;
+	env.generate_probes(vector(-5, -5, 0), vector(5, 5, 4), 1.5, 1.5);
+	if (baked) assert(env.bake());
+	env.pathing = pathing;
+	e.set_listener_position(0, -3, -3, 1.5);
+	mixer@ m = env.new_mixer();
+	m.set_position_3d(3, -3, 1.5);
+	env.get_source(m).apply_transmission = false;
+	sound@ s = e.sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	sound_environment_test_wait_for_decoding(s);
+	s.set_mixer(m);
+	sound_environment_test_pump(e, env, 20);
+	s.play_looped();
+	sound_environment_test_energy(e, env, 10);
+	return sound_environment_test_energy(e, env, 40);
+}
+void test_sound_environment_pathing() { // Pathing lets a sound be heard around the wall between it and the listener, through the gap at the wall's end.
+	double without = sound_environment_test_pathing_energy(false, true), with_pathing = sound_environment_test_pathing_energy(true, true), unbaked = sound_environment_test_pathing_energy(true, false);
+	assert(without < 0.001, "with the direct path blocked and nothing else enabled, the sound should be silent, energy " + without);
+	assert(with_pathing > 1, "with pathing, the sound should be heard around the wall, energy " + with_pathing);
+	assert(unbaked < 0.001, "pathing needs baked paths, energy " + unbaked);
+}
+void test_sound_environment_tail_history() { // Once a reflection group's tail has ended, the sound it was given before must not play again when it gets input again.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.use_listener_reverb = false;
+	env.set_raycaster(world);
+	e.set_listener_position(0, -2, 0, 1.5);
+	sound@ s = env.new_sound();
+	assert(s.load_pcm(sound_environment_test_burst(), 44100, 2));
+	sound_environment_test_wait_for_decoding(s);
+	s.set_position_3d(2, 2, 1.5);
+	sound_environment_source@ src = env.get_source(s);
+	timer t;
+	while (!src.reflections_simulated and t.elapsed < 10000) {
+		sound_environment_test_pump(e, env, 1);
+		wait(1);
+	}
+	assert(src.reflections_simulated);
+	double[] tails;
+	for (int i = 0; i < 2; i++) {
+		s.play();
+		sound_environment_test_energy(e, env, 12);
+		tails.insert_last(sound_environment_test_energy(e, env, 40));
+		sound_environment_test_energy(e, env, 200); // Longer than the reflection duration, so the tail ends.
+	}
+	assert(tails[0] > 1 and tails[1] < tails[0] * 1.3, "the second burst should reverberate like the first, rather than with the first burst's reverb again, tail energy " + tails[0] + " then " + tails[1]);
+}
+double[]@ sound_environment_test_block_energies(audio_engine@ e, sound_environment@ env, int blocks) { // Paced at about the rate the blocks would play, so that reflections are simulated as often as they would be.
+	double[] energies;
+	for (int b = 0; b < blocks; b++) {
+		wait(5);
+		float[]@ frames = e.read(256);
+		env.update();
+		double energy = 0;
+		for (uint i = 0; i < frames.length(); i++) energy += frames[i] * frames[i];
+		energies.insert_last(energy);
+	}
+	return energies;
+}
+double sound_environment_test_loudest_window(const double[]@ energies, uint window) { // The most energy in any run of window blocks.
+	double loudest = 0;
+	for (uint i = 0; i + window <= energies.length(); i++) {
+		double sum = 0;
+		for (uint j = i; j < i + window; j++) sum += energies[j];
+		if (sum > loudest) loudest = sum;
+	}
+	return loudest;
+}
+void test_sound_environment_moving_between_areas() { // A distant sound moving back and forth across the wall between two areas must glide between them, rather than bursting into reflections simulated as if it were at the listener while its new place is first simulated.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(true);
+	sound_environment env(e);
+	env.set_raycaster(world);
+	e.set_listener_position(0, -4, -4, 1.6);
+	sound@ s = env.new_sound();
+	float[] noise(44100 * 2);
+	random_xorshift rng(uint(7));
+	for (uint i = 0; i < noise.length(); i++) noise[i] = (rng.nextf() * 2 - 1) / 4;
+	assert(s.load_pcm(noise, 44100, 2));
+	sound_environment_test_wait_for_decoding(s);
+	sound_environment_source@ src = env.get_source(s);
+	s.rolloff = 10; // Only the reflections are heard, as the direct sound fades out well before the sound's distance.
+	s.play_looped();
+	double steady = 0; // The loudest the sound settles at on either side.
+	for (int side = 0; side < 2; side++) {
+		s.set_position_3d(side == 0 ? -0.6 : 0.6, 3, 1.5);
+		timer t;
+		while (!src.reflections_simulated and t.elapsed < 10000) {
+			sound_environment_test_pump(e, env, 1);
+			wait(1);
+		}
+		assert(src.reflections_simulated, "the sound's reflections should be simulated on side " + side);
+		sound_environment_test_block_energies(e, env, 250); // Let the reverb settle, longer than the reflections last.
+		double settled = sound_environment_test_loudest_window(sound_environment_test_block_energies(e, env, 60), 8);
+		if (settled > steady) steady = settled;
+	}
+	double[] energies;
+	for (int crossing = 0; crossing < 16; crossing++) {
+		s.set_position_3d(crossing % 2 == 0 ? -0.6 : 0.6, 3, 1.5);
+		double[]@ part = sound_environment_test_block_energies(e, env, 10 + crossing % 3 * 12); // Crossing at varying times relative to the reflection simulations.
+		for (uint i = 0; i < part.length(); i++) energies.insert_last(part[i]);
+	}
+	double loudest = sound_environment_test_loudest_window(energies, 8);
+	assert(loudest < steady * 1.6, "moving between areas should not get much louder than the sound is on either side, loudest " + loudest + " against " + steady);
+}
+double[]@ sound_environment_test_click_tails(bool use_reflection_mixer, int clicks, sound_environment_reflection_type type = SOUND_ENVIRONMENT_REFLECTIONS_CONVOLUTION) { // The reflections of short clicks through a mixer that hasn't played before, each long after the last one's tail.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	sound_environment env(e);
+	env.use_listener_reverb = false;
+	env.use_reflection_mixer = use_reflection_mixer;
+	env.reflection_type = type; // Convolution by default, as its tail ends with the reflection duration, where hybrid reflections ring on long enough in this concrete room that each click would add to the last.
+	env.set_raycaster(world);
+	e.set_listener_position(0, 0, 0, 1.6);
+	mixer@ m = env.new_mixer();
+	m.set_position_3d(0, 0, 0.9);
+	sound_environment_source@ src = env.get_source(m);
+	timer t;
+	while (!src.reflections_simulated and t.elapsed < 10000) sound_environment_test_block_energies(e, env, 1);
+	assert(src.reflections_simulated);
+	sound_environment_test_block_energies(e, env, 40);
+	float[] click(441 * 2);
+	random_xorshift rng(uint(5));
+	for (uint i = 0; i < click.length(); i++) click[i] = rng.nextf() - 0.5;
+	double[] tails;
+	for (int i = 0; i < clicks; i++) {
+		sound@ s = e.sound();
+		assert(s.load_pcm(click, 44100, 2));
+		sound_environment_test_wait_for_decoding(s);
+		s.set_mixer(m);
+		s.play();
+		sound_environment_test_block_energies(e, env, 3); // The click itself.
+		double[]@ tail = sound_environment_test_block_energies(e, env, 40);
+		double sum = 0;
+		for (uint j = 0; j < tail.length(); j++) sum += tail[j];
+		tails.insert_last(sum);
+		sound_environment_test_block_energies(e, env, 250); // Longer than the reflections last.
+	}
+	return tails;
+}
+void test_sound_environment_first_sound() { // The first sound through a source, such as a first footstep, must reverberate like the ones after it. Its onset was faded in from silence, which took most of a short sound's reflections.
+	for (int use_mixer = 0; use_mixer < 2; use_mixer++) {
+		double[]@ tails = sound_environment_test_click_tails(use_mixer == 1, 3);
+		string name = use_mixer == 1 ? "with the reflection mixer" : "without the reflection mixer";
+		assert(tails[1] > 0.01, "a click should reverberate " + name + ", tail energy " + tails[1]);
+		assert(tails[0] > tails[1] * 0.7 and tails[0] < tails[1] * 1.4, "the first click should reverberate like the second " + name + ", tail energy " + tails[0] + " then " + tails[1]);
+		assert(tails[2] < tails[1] * 1.4, "later clicks shouldn't build up " + name + ", tail energy " + tails[1] + " then " + tails[2]);
+	}
+}
+void test_sound_environment_mixed_hybrid() { // Steam Audio's reflection mixer only implements convolution, so hybrid and parametric reflections are added up and decoded once instead, and must sound the same as when each group is decoded on its own.
+	for (int t = 0; t < 2; t++) {
+		sound_environment_reflection_type type = t == 0 ? SOUND_ENVIRONMENT_REFLECTIONS_HYBRID : SOUND_ENVIRONMENT_REFLECTIONS_PARAMETRIC;
+		double mixed = sound_environment_test_click_tails(true, 1, type)[0], separate = sound_environment_test_click_tails(false, 1, type)[0];
+		assert(separate > 0.01 and mixed > separate * 0.75 and mixed < separate * 1.33, "reflections of type " + type + " should sound the same with the reflection mixer, tail energy " + mixed + " with it and " + separate + " without");
+	}
+}

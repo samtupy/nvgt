@@ -13,6 +13,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -75,6 +76,7 @@ public:
 	float restitution;
 	string debug_name;
 	nvgt_acoustic_material acoustic;
+	bool acoustically_transparent = false; // Surfaces of this material are ignored by the raycast provider, so sound passes through them untouched.
 	nvgt_physics_material(float friction = 0.2f, float restitution = 0.0f, const string& name = "") : friction(friction), restitution(restitution), debug_name(name), acoustic{{0.10f,0.20f,0.30f}, 0.05f, {0.100f,0.050f,0.030f}} {}
 	const char* GetDebugName() const override { return debug_name.c_str(); }
 	void as_addref() { AddRef(); }
@@ -492,6 +494,7 @@ struct jolt_physics_world : public nvgt_raycast_provider {
 		system.Init(max_bodies, 0, max_body_pairs, max_contact_constraints, bp_layer_iface, obj_vs_bp_filter, obj_layer_pair_filter);
 		contact_listener.world = this;
 		system.SetContactListener(&contact_listener);
+		system.SetGravity(Vec3(0.0f, 0.0f, -9.81f)); // NVGT's coordinate system has z up, whereas Jolt's default gravity points down the y axis.
 	}
 	~jolt_physics_world() {
 		if (cb_contact_added) { cb_contact_added->Release(); cb_contact_added = nullptr; }
@@ -664,7 +667,10 @@ static nvgt_physics_material* physics_material_create(float friction, float rest
 	auto* m = new nvgt_physics_material(friction, restitution, name);
 	m->AddRef();
 	auto it = g_physics_materials->find(name);
-	if (it != g_physics_materials->end()) m->acoustic = it->second->acoustic;
+	if (it != g_physics_materials->end()) {
+		m->acoustic = it->second->acoustic;
+		m->acoustically_transparent = it->second->acoustically_transparent;
+	}
 	return m;
 }
 static nvgt_physics_material* physics_material_get(const string& name) {
@@ -691,6 +697,14 @@ static void jolt_world_set_friction(jolt_physics_world* w, const BodyID& id, flo
 static float jolt_world_get_restitution(jolt_physics_world* w, const BodyID& id) { return w->system.GetBodyInterface().GetRestitution(id); }
 static void jolt_world_set_restitution(jolt_physics_world* w, const BodyID& id, float v) { w->system.GetBodyInterface().SetRestitution(id, v); }
 static float jolt_world_get_gravity_factor(jolt_physics_world* w, const BodyID& id) { return w->system.GetBodyInterface().GetGravityFactor(id); }
+// NVGT uses Jolt's per body user data for flags. The raycast provider ignores the bodies of acoustically transparent characters, which contain the listener or the sounds they make and would otherwise block every path sound could take to or from them. Anything else is made acoustically transparent through its physics_material.
+static constexpr uint64 BODY_ACOUSTICALLY_TRANSPARENT = 1;
+static void jolt_body_set_acoustically_transparent(jolt_physics_world* w, const BodyID& id, bool transparent) {
+	BodyInterface& bi = w->system.GetBodyInterface();
+	uint64 data = bi.GetUserData(id);
+	bi.SetUserData(id, transparent ? data | BODY_ACOUSTICALLY_TRANSPARENT : data & ~BODY_ACOUSTICALLY_TRANSPARENT);
+}
+static bool jolt_body_get_acoustically_transparent(jolt_physics_world* w, const BodyID& id) { return (w->system.GetBodyInterface().GetUserData(id) & BODY_ACOUSTICALLY_TRANSPARENT) != 0; }
 static void jolt_world_set_gravity_factor(jolt_physics_world* w, const BodyID& id, float v) { w->system.GetBodyInterface().SetGravityFactor(id, v); }
 
 // -- Body interface: spatial queries --
@@ -745,59 +759,131 @@ static RayCastSettings make_jolt_ray_settings() {
 	settings.mTreatConvexAsSolid = false;
 	return settings;
 }
+// Rays are traced in batches through BroadPhaseQuery::CastRays, added by NVGT's Jolt patch, which takes the broadphase's query lock once per batch rather than once per ray. Acoustic simulation traces millions of rays a second from many threads, and that lock alone made each ray cost four times as much with eight threads as with one. Each candidate body's shape is cast against directly while the body is locked, rather than through NarrowPhaseQuery, so the material and normal of a hit are read under the same lock.
+template <class base> class acoustic_shape_collector : public base { // Skips hits on acoustically transparent materials.
+public:
+	const Shape* shape = nullptr;
+	void AddHit(const RayCastResult& result) override {
+		const PhysicsMaterial* m = shape->GetMaterial(result.mSubShapeID2);
+		if (m && m != PhysicsMaterial::sDefault.GetPtr() && static_cast<const nvgt_physics_material*>(m)->acoustically_transparent) return;
+		base::AddHit(result);
+	}
+};
+using acoustic_closest_shape_hit = acoustic_shape_collector<ClosestHitCollisionCollector<CastRayCollector>>;
+using acoustic_any_shape_hit = acoustic_shape_collector<AnyHitCollisionCollector<CastRayCollector>>;
+template <class shape_collector> class acoustic_ray_collector : public RayCastBodyCollector {
+public:
+	const BodyLockInterface& locks;
+	RayCast ray;
+	const RayCastSettings& settings;
+	acoustic_ray_collector(const BodyLockInterface& locks, const RayCast& ray, const RayCastSettings& settings) : locks(locks), ray(ray), settings(settings) {}
+	virtual bool hit_body(const Body& body, shape_collector& collector) = 0; // Called with the body locked when its shape was hit, returns false to stop the query.
+	void AddHit(const BroadPhaseCastResult& result) override {
+		BodyLockRead lock(locks, result.mBodyID);
+		if (!lock.SucceededAndIsInBroadPhase()) return; // The body could have been removed since the broadphase found it.
+		const Body& body = lock.GetBody();
+		if (body.GetUserData() & BODY_ACOUSTICALLY_TRANSPARENT) return;
+		shape_collector collector;
+		collector.shape = body.GetShape();
+		collector.UpdateEarlyOutFraction(GetEarlyOutFraction());
+		body.GetShape()->CastRay(ray.Transformed(body.GetInverseCenterOfMassTransform()), settings, SubShapeIDCreator(), collector, {});
+		if (collector.HadHit() && !hit_body(body, collector)) ForceEarlyOut();
+	}
+};
+class acoustic_closest_hit : public acoustic_ray_collector<acoustic_closest_shape_hit> {
+public:
+	float fraction = 1.0f;
+	Vec3 normal;
+	nvgt_acoustic_material material;
+	int object_index = -1;
+	bool had_hit = false;
+	using acoustic_ray_collector::acoustic_ray_collector;
+	bool hit_body(const Body& body, acoustic_closest_shape_hit& collector) override {
+		const RayCastResult& result = collector.mHit;
+		had_hit = true;
+		fraction = result.mFraction;
+		normal = body.GetWorldSpaceSurfaceNormal(result.mSubShapeID2, ray.GetPointOnRay(result.mFraction));
+		const PhysicsMaterial* m = body.GetShape()->GetMaterial(result.mSubShapeID2);
+		material = m && m != PhysicsMaterial::sDefault.GetPtr() ? static_cast<const nvgt_physics_material*>(m)->acoustic : g_default_acoustic_material; // NVGT only ever creates nvgt_physics_material, Jolt substitutes sDefault for shapes without one.
+		object_index = (int)body.GetID().GetIndex();
+		UpdateEarlyOutFraction(fraction); // Farther bodies can be skipped.
+		return true;
+	}
+};
+class acoustic_any_hit : public acoustic_ray_collector<acoustic_any_shape_hit> {
+public:
+	bool had_hit = false;
+	using acoustic_ray_collector::acoustic_ray_collector;
+	bool hit_body(const Body& body, acoustic_any_shape_hit& collector) override {
+		had_hit = true;
+		return false;
+	}
+};
+static constexpr int ACOUSTIC_RAY_BATCH = 64; // Rays are passed to the broadphase in batches of up to this many.
 void jolt_physics_world::closest_hits(int count, const nvgt_ray* rays, const float* min_distances, const float* max_distances, nvgt_ray_hit* hits) {
 	if (count < 1) return;
 	if (g_raycast_hit_materials.size() < (size_t)count) g_raycast_hit_materials.resize(count);
-	const NarrowPhaseQuery& query = system.GetNarrowPhaseQuery();
+	const BroadPhaseQuery& query = system.GetBroadPhaseQuery();
 	const BodyLockInterface& locks = system.GetBodyLockInterface();
 	const RayCastSettings settings = make_jolt_ray_settings();
 	const AABox bounds = system.GetBounds();
-	for (int i = 0; i < count; i++) {
-		nvgt_ray_hit& hit = hits[i];
-		hit = {INFINITY, -1, -1, -1, {0.0f, 0.0f, 0.0f}, nullptr};
-		if (max_distances[i] <= min_distances[i] || !bounds.IsValid()) continue;
-		float length;
-		RRayCast ray = make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, length);
-		ClosestHitCollisionCollector<CastRayCollector> collector;
-		query.CastRay(ray, settings, collector);
-		if (!collector.HadHit()) continue;
-		const RayCastResult& result = collector.mHit;
-		nvgt_acoustic_material& material = g_raycast_hit_materials[i];
-		material = g_default_acoustic_material;
-		Vec3 normal = -ray.mDirection.Normalized();
-		BodyLockRead lock(locks, result.mBodyID);
-		if (lock.Succeeded()) {
-			const Body& body = lock.GetBody();
-			normal = body.GetWorldSpaceSurfaceNormal(result.mSubShapeID2, ray.GetPointOnRay(result.mFraction));
-			const PhysicsMaterial* m = body.GetShape()->GetMaterial(result.mSubShapeID2);
-			if (m && m != PhysicsMaterial::sDefault.GetPtr()) material = static_cast<const nvgt_physics_material*>(m)->acoustic; // NVGT only ever creates nvgt_physics_material, Jolt substitutes sDefault for shapes without one.
-			hit.object_index = (int)body.GetID().GetIndex();
+	optional<acoustic_closest_hit> collectors[ACOUSTIC_RAY_BATCH];
+	RayCast batch_rays[ACOUSTIC_RAY_BATCH];
+	RayCastBodyCollector* batch_collectors[ACOUSTIC_RAY_BATCH];
+	int indices[ACOUSTIC_RAY_BATCH];
+	float lengths[ACOUSTIC_RAY_BATCH];
+	for (int start = 0; start < count; start += ACOUSTIC_RAY_BATCH) {
+		int n = 0;
+		for (int i = start; i < count && i < start + ACOUSTIC_RAY_BATCH; i++) {
+			hits[i] = {INFINITY, -1, -1, -1, {0.0f, 0.0f, 0.0f}, nullptr};
+			if (max_distances[i] <= min_distances[i] || !bounds.IsValid()) continue;
+			batch_rays[n] = RayCast(make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, lengths[n]));
+			batch_collectors[n] = &collectors[n].emplace(locks, batch_rays[n], settings);
+			indices[n++] = i;
 		}
-		hit.distance = min_distances[i] + result.mFraction * length;
-		hit.normal[0] = normal.GetX();
-		hit.normal[1] = normal.GetY();
-		hit.normal[2] = normal.GetZ();
-		hit.material_index = 0;
-		hit.material = &material;
+		if (n) query.CastRays(n, batch_rays, batch_collectors);
+		for (int j = 0; j < n; j++) {
+			const acoustic_closest_hit& c = *collectors[j];
+			if (c.had_hit) {
+				const int i = indices[j];
+				nvgt_ray_hit& hit = hits[i];
+				g_raycast_hit_materials[i] = c.material;
+				hit.distance = min_distances[i] + c.fraction * lengths[j];
+				hit.normal[0] = c.normal.GetX();
+				hit.normal[1] = c.normal.GetY();
+				hit.normal[2] = c.normal.GetZ();
+				hit.object_index = c.object_index;
+				hit.material_index = 0;
+				hit.material = &g_raycast_hit_materials[i];
+			}
+			collectors[j].reset();
+		}
 	}
 }
 void jolt_physics_world::any_hits(int count, const nvgt_ray* rays, const float* min_distances, const float* max_distances, unsigned char* occluded) {
-	const NarrowPhaseQuery& query = system.GetNarrowPhaseQuery();
+	const BroadPhaseQuery& query = system.GetBroadPhaseQuery();
+	const BodyLockInterface& locks = system.GetBodyLockInterface();
 	const RayCastSettings settings = make_jolt_ray_settings();
 	const AABox bounds = system.GetBounds();
-	for (int i = 0; i < count; i++) {
-		if (max_distances[i] <= min_distances[i]) {
-			occluded[i] = 1;
-			continue;
+	optional<acoustic_any_hit> collectors[ACOUSTIC_RAY_BATCH];
+	RayCast batch_rays[ACOUSTIC_RAY_BATCH];
+	RayCastBodyCollector* batch_collectors[ACOUSTIC_RAY_BATCH];
+	int indices[ACOUSTIC_RAY_BATCH];
+	for (int start = 0; start < count; start += ACOUSTIC_RAY_BATCH) {
+		int n = 0;
+		for (int i = start; i < count && i < start + ACOUSTIC_RAY_BATCH; i++) {
+			occluded[i] = max_distances[i] <= min_distances[i] ? 1 : 0; // Rays of no length, such as those Steam Audio passes for paths it has already ruled out, count as occluded.
+			if (occluded[i] || !bounds.IsValid()) continue;
+			float length;
+			batch_rays[n] = RayCast(make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, length));
+			batch_collectors[n] = &collectors[n].emplace(locks, batch_rays[n], settings);
+			indices[n++] = i;
 		}
-		if (!bounds.IsValid()) {
-			occluded[i] = 0;
-			continue;
+		if (n) query.CastRays(n, batch_rays, batch_collectors);
+		for (int j = 0; j < n; j++) {
+			if (collectors[j]->had_hit) occluded[indices[j]] = 1;
+			collectors[j].reset();
 		}
-		float length;
-		AnyHitCollisionCollector<CastRayCollector> collector;
-		query.CastRay(make_jolt_ray(rays[i], min_distances[i], max_distances[i], bounds, length), settings, collector);
-		occluded[i] = collector.HadHit() ? 1 : 0;
 	}
 }
 static nvgt_raycast_provider* jolt_world_get_raycast_provider(void* world) {
@@ -824,6 +910,7 @@ struct jolt_character {
 		settings.mLayer = layer;
 		character = new Character(&settings, position, rotation, 0, &world->system);
 		character->AddToPhysicsSystem(EActivation::Activate);
+		jolt_body_set_acoustically_transparent(world, character->GetBodyID(), true); // The listener and the character's own sounds are usually inside its shape.
 		world->characters.push_back(this);
 	}
 	~jolt_character() {
@@ -904,6 +991,8 @@ static void jolt_character_set_linear_velocity(jolt_character* c, const Vec3& v)
 static void jolt_character_add_linear_velocity(jolt_character* c, const Vec3& v) { c->character->AddLinearVelocity(v); }
 static void jolt_character_add_impulse(jolt_character* c, const Vec3& v) { c->character->AddImpulse(v); }
 static void jolt_character_activate(jolt_character* c) { c->character->Activate(); }
+static bool jolt_character_get_acoustically_transparent(const jolt_character* c) { return jolt_body_get_acoustically_transparent(c->world, c->character->GetBodyID()); }
+static void jolt_character_set_acoustically_transparent(jolt_character* c, bool transparent) { jolt_body_set_acoustically_transparent(c->world, c->character->GetBodyID(), transparent); }
 static uint16 jolt_character_get_layer(const jolt_character* c) { return c->character->GetLayer(); }
 static void jolt_character_set_layer(jolt_character* c, uint16 layer) { c->character->SetLayer(layer); }
 static bool jolt_character_set_shape(jolt_character* c, jolt_shape_ref* shape, float max_penetration_depth) { return shape && c->character->SetShape(shape->shape.GetPtr(), max_penetration_depth); }
@@ -931,6 +1020,7 @@ static void RegisterJoltMaterial(asIScriptEngine* engine) {
 	engine->RegisterObjectProperty("physics_material", "float acoustic_transmission_low", ab + 4 * (int)sizeof(float));
 	engine->RegisterObjectProperty("physics_material", "float acoustic_transmission_mid", ab + 5 * (int)sizeof(float));
 	engine->RegisterObjectProperty("physics_material", "float acoustic_transmission_high",ab + 6 * (int)sizeof(float));
+	engine->RegisterObjectProperty("physics_material", "bool acoustically_transparent", asOFFSET(nvgt_physics_material, acoustically_transparent)); // Ignored by acoustic raycasts, so sound passes through untouched.
 	engine->RegisterGlobalFunction("physics_material@ physics_material_create(float friction = 0.2f, float restitution = 0.0f, const string&in name = \"\")", asFUNCTION(physics_material_create), asCALL_CDECL);
 	engine->RegisterGlobalFunction("void physics_material_define_acoustics(const string&in name, float abs_low, float abs_mid, float abs_high, float scattering, float trans_low, float trans_mid, float trans_high)", asFUNCTION(physics_material_define_acoustics), asCALL_CDECL);
 	engine->RegisterGlobalFunction("physics_material@ physics_material_get(const string&in name)", asFUNCTION(physics_material_get), asCALL_CDECL);
@@ -1287,6 +1377,8 @@ static void RegisterJoltCharacter(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_character", "void add_linear_velocity(const vector&in velocity)", asFUNCTION(jolt_character_add_linear_velocity), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_character", "void add_impulse(const vector&in impulse)", asFUNCTION(jolt_character_add_impulse), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_character", "void activate()", asFUNCTION(jolt_character_activate), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "bool get_acoustically_transparent() const property", asFUNCTION(jolt_character_get_acoustically_transparent), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_character", "void set_acoustically_transparent(bool transparent) property", asFUNCTION(jolt_character_set_acoustically_transparent), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_character", "uint16 get_layer() const property", asFUNCTION(jolt_character_get_layer), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_character", "void set_layer(uint16 layer) property", asFUNCTION(jolt_character_set_layer), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_character", "bool set_shape(physics_shape@ shape, float max_penetration_depth = FLOAT_MAX)", asFUNCTION(jolt_character_set_shape), asCALL_CDECL_OBJFIRST);

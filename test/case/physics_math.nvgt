@@ -61,3 +61,18 @@ void test_scoped_type_init_lists() {
 	vector got;
 	assert(d.get("pos", got) and got == vector(7, 8, 9), "dictionary init list gave " + got);
 }
+bool physics_math_no() { return false; }
+void test_scoped_type_conditional_operator() { // The conditional operator once kept a dangling handle to a scoped temporary, or dereferenced it once too often when mixed with a variable.
+	bool a = false;
+	vector v1 = a ? vector(1, 0, 0) : vector(0, 2, 0);
+	assert(v1 == vector(0, 2, 0), "two temporaries gave " + v1);
+	vector v2 = physics_math_no() ? vector(1, 0, 0) : physics_math_no() ? vector(2, 0, 0) : vector(3, 0, 0);
+	assert(v2 == vector(3, 0, 0), "nested conditions gave " + v2);
+	vector v3 = !a ? vector(4, 5, 6) : v1;
+	assert(v3 == vector(4, 5, 6), "a temporary mixed with a variable gave " + v3);
+	v1 = a ? vector(7, 0, 0) : v3;
+	assert(v1 == vector(4, 5, 6) and v3 == vector(4, 5, 6), "assigning a variable through a condition gave " + v1);
+	assert((!a ? vector(1, 2, 3) : vector(0, 0, 0)).length() > 3.7, "a conditional temporary used directly");
+	quaternion q = a ? quaternion(1, 0, 0, 0) : IDENTITY_QUATERNION;
+	assert(q == IDENTITY_QUATERNION, "quaternion condition gave " + q);
+}

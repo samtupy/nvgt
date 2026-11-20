@@ -1,4 +1,4 @@
-// Tests for the physics shape wrappers, including simulating bodies built from them.
+// AI generated tests for the physics shape wrappers, including simulating bodies built from them.
 void test_cylinder_shape() {
 	physics_cylinder_shape@ cyl = physics_cylinder_shape_create(1.0, 0.5);
 	assert(cyl !is null, "cylinder creation failed");
@@ -13,6 +13,7 @@ void test_cylinder_shape() {
 	assert(c !is null and cast<physics_cylinder_shape>(c) !is null, "cylinder should downcast from physics_shape");
 	assert(cast<physics_box_shape>(c) is null and cast<physics_capsule_shape>(c) is null, "cylinder must not cast to other shapes");
 	physics_world world;
+	world.gravity = vector(0, -9.81, 0); // The shapes are tested standing along the y axis, whereas NVGT worlds default to z up.
 	world.create_and_add_body(physics_box_shape_create(vector(10, 0.5, 10)), vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
 	physics_body_id body = world.create_and_add_body(cyl, vector(0, 5, 0), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
 	for (int i = 0; i < 240; i++) world.update(1.0 / 60);
@@ -31,6 +32,7 @@ void test_tapered_capsule_shape() {
 	assert(physics_tapered_capsule_shape_create(0.1, 1.0, 0.1) is null, "an embedded sphere should not produce a tapered capsule");
 	assert(physics_tapered_capsule_shape_create(-1.0, 0.25, 0.5) is null, "a negative height should fail");
 	physics_world world;
+	world.gravity = vector(0, -9.81, 0); // The shapes are tested standing along the y axis, whereas NVGT worlds default to z up.
 	world.create_and_add_body(physics_box_shape_create(vector(10, 0.5, 10)), vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
 	physics_body_id body = world.create_and_add_body(cap, vector(0, 5, 0), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
 	for (int i = 0; i < 600; i++) world.update(1.0 / 60);
@@ -50,6 +52,7 @@ void test_tapered_cylinder_shape() {
 	// Equal radii make Jolt create a plain cylinder instead, which must not be handed out as a tapered cylinder.
 	assert(physics_tapered_cylinder_shape_create(1.0, 0.5, 0.5) is null, "equal radii should not produce a tapered cylinder");
 	physics_world world;
+	world.gravity = vector(0, -9.81, 0); // The shapes are tested standing along the y axis, whereas NVGT worlds default to z up.
 	world.create_and_add_body(physics_box_shape_create(vector(10, 0.5, 10)), vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
 	physics_body_id body = world.create_and_add_body(cyl, vector(0, 5, 0), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
 	for (int i = 0; i < 240; i++) world.update(1.0 / 60);
