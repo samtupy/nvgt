@@ -700,7 +700,21 @@ public:
 			return NULL;
 		void* ref = get_mod()->GetAddressOfGlobalVar(index);
 		if (!ref) return NULL;
-		return new CScriptAny(ref, type_id, g_ScriptEngine);
+		// An any can only hold the bool, int64 and double primitives, so other numbers are widened to those or they couldn't be retrieved.
+		asINT64 int_value;
+		double float_value;
+		switch (type_id) {
+			case asTYPEID_INT8: int_value = *(asINT8*)ref; break;
+			case asTYPEID_INT16: int_value = *(asINT16*)ref; break;
+			case asTYPEID_INT32: int_value = *(asINT32*)ref; break;
+			case asTYPEID_UINT8: int_value = *(asBYTE*)ref; break;
+			case asTYPEID_UINT16: int_value = *(asWORD*)ref; break;
+			case asTYPEID_UINT32: int_value = *(asDWORD*)ref; break;
+			case asTYPEID_UINT64: int_value = asINT64(*(asQWORD*)ref); break;
+			case asTYPEID_FLOAT: float_value = *(float*)ref; return new CScriptAny(&float_value, asTYPEID_DOUBLE, g_ScriptEngine);
+			default: return new CScriptAny(ref, type_id, g_ScriptEngine);
+		}
+		return new CScriptAny(&int_value, asTYPEID_INT64, g_ScriptEngine);
 	}
 	const std::string get_global_decl(asDWORD index) {
 		if (!get_mod())
