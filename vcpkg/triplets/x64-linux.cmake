@@ -8,6 +8,9 @@ else()
 endif()
 
 set(VCPKG_CMAKE_SYSTEM_NAME Linux)
+# Each function and variable gets its own section so that NVGT's --gc-sections link can drop the parts of the dependencies it doesn't use.
+set(VCPKG_C_FLAGS "-ffunction-sections -fdata-sections")
+set(VCPKG_CXX_FLAGS "-ffunction-sections -fdata-sections")
 if(NOT PORT MATCHES "^(openssl|flatbuffers)$")
 	set(VCPKG_CMAKE_CONFIGURE_OPTIONS_RELEASE -DCMAKE_BUILD_TYPE=MinSizeRel)
 endif()
