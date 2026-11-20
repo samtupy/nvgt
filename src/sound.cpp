@@ -1234,6 +1234,7 @@ public:
 	bool set_mixer(mixer *mix) override {
 		if (mix == parent_mixer)
 			return false;
+		for (mixer* m = mix; m; m = m->get_mixer()) if (m == this) return false; // Putting a mixer into itself or into one of the mixers inside it would make a loop in the node graph.
 		parent_mixer = mix; // Non-owning cache; node_chain's endpoint tracking is the sole owner of this reference.
 		audio_node *target = mix? mix : get_engine()->get_endpoint();
 		node_chain->set_endpoint(target);

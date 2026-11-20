@@ -1,0 +1,11 @@
+// AI generated tests for mixers, using an engine without a device so that nothing is played.
+void test_mixer_set_mixer_rejects_loops() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	mixer@ a = e.mixer(), b = e.mixer(), c = e.mixer();
+	assert(!a.set_mixer(a) and a.get_mixer() is null, "a mixer can't be put into itself");
+	assert(b.set_mixer(a) and c.set_mixer(b), "nesting mixers");
+	assert(!a.set_mixer(b) and !a.set_mixer(c) and a.get_mixer() is null, "a mixer can't be put into a mixer inside it");
+	sound@ s = e.sound();
+	assert(s.set_mixer(c) and s.get_mixer() is c, "a sound in the innermost mixer");
+	assert(c.set_mixer(null) and a.set_mixer(c), "once separated, the outer mixer can go into the former inner one");
+}
