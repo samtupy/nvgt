@@ -1,4 +1,4 @@
-// Decoding audio from datastreams, which needs miniaudio to be given NVGT's tell callback for formats such as Vorbis (issue #387). Nothing is played.
+// AI generated test of decoding audio from datastreams, which needs miniaudio to be given NVGT's tell callback for formats such as Vorbis (issue #387). Nothing is played.
 void test_audio_decoder_datastream() {
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	audio_decoder d(e);

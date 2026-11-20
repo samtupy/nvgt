@@ -1,4 +1,4 @@
-// Tests for the SIMD backed math types (vector, quaternion, aabb) which are registered as scoped reference types.
+// AI generated tests for the SIMD backed math types (vector, quaternion, aabb) which are registered as scoped reference types.
 const float HALF_PI = 1.5707963267949;
 bool near(float a, float b) { return abs(a - b) < 0.0001; }
 bool near(const vector&in a, const vector&in b) { return near(a.x, b.x) and near(a.y, b.y) and near(a.z, b.z); }
