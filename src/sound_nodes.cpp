@@ -766,7 +766,7 @@ private:
 public:
 	audio_spatializer_impl(mixer* mixer, audio_engine* engine) : audio_node_chain_impl(nullptr, nullptr, engine), panner(nullptr), attenuator(nullptr), reverb(nullptr), reverb_attachment(nullptr), reverb_placement(postpan), attached_mixer(mixer), spatialization_params{}, parameters_valid(false), preferred_panner_id(-1), preferred_attenuator_id(-1), current_panner_id(-1), current_attenuator_id(-1) {
 		if (!mixer) throw std::invalid_argument("mixer cannot be null");
-		spatialization_params.rolloff = 0.3f; // See basic_attenuator::attenuation.
+		spatialization_params.rolloff = 0.375f; // See basic_attenuator::attenuation.
 		spatialization_params.directional_attenuation_factor = 1.0f;
 		g_tracked_spatializers.insert(this);
 	}
@@ -1029,7 +1029,7 @@ public:
 		ma_gainer_process_pcm_frames(&gainer, frames_out[0], frames_in[0], frameCount);
 	}
 };
-// NVGT's distance curve, shared by its attenuators so that a sound sounds about as loud at a distance whichever is in use: 1.75 decibels per unit of distance beyond the minimum distance for a rolloff of 1, faded smoothly to silence at the maximum distance. Audio games rarely treat a unit of distance as a meter, as a step is often a whole unit, so the default rolloff of 0.3 and maximum distance of 50 keep a sound at about half volume 10 units away and a quarter 20 units away, almost inaudible beyond 40.
+// NVGT's distance curve, shared by its attenuators so that a sound sounds about as loud at a distance whichever is in use: 1.75 decibels per unit of distance beyond the minimum distance for a rolloff of 1, faded smoothly to silence at the maximum distance. Audio games rarely treat a unit of distance as a meter, as a step is often a whole unit, so the default rolloff of 0.375 and maximum distance of 50 keep a sound at just under half volume 10 units away and a fifth 20 units away, almost inaudible beyond 40.
 float basic_attenuator::attenuation(const audio_spatialization_parameters& params, float distance) {
 	if (distance >= params.max_distance) return params.min_volume;
 	const float beyond = distance > params.min_distance ? distance - params.min_distance : 0.0f, fade = params.max_distance > 0 ? distance / params.max_distance : 0.0f;
