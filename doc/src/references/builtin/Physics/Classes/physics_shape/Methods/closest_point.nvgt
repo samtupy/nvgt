@@ -1,0 +1,16 @@
+/**
+	Find the point of the shape closest to another point.
+	vector@ physics_shape::closest_point(const vector&in point) const;
+	## Arguments:
+		* const vector&in point: the point to measure from, relative to the shape's origin.
+	## Returns:
+		vector@: the point on the surface of the shape that is closest to the given point, or the given point itself if it is inside the shape.
+	## Remarks:
+		The shape here isn't in the world, so the point is relative to the shape's own origin and the result is too. To find the closest point of a body in the world, use `physics_world::get_closest_point()`, which takes the body's position and rotation into account.
+*/
+
+// Example:
+void main() {
+	physics_box_shape@ crate = physics_box_shape_create(vector(1, 1, 1));
+	alert("Closest point", "The closest point of the crate to a point 5 meters east of it is " + crate.closest_point(vector(5, 0, 0)));
+}

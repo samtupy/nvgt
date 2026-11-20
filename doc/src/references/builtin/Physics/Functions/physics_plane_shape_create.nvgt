@@ -1,0 +1,23 @@
+/**
+	Create a plane shape, a flat surface that is solid behind it and goes on as far as its half extent in every direction.
+	physics_plane_shape@ physics_plane_shape_create(const plane&in plane, float half_extent = 1000.0f, physics_material@ mat = null);
+	## Arguments:
+		* const plane&in plane: the surface of the shape, relative to the position of the body it is given to. Everything behind the plane, the side its normal points away from, is solid.
+		* float half_extent = 1000.0f: how far the plane goes in every direction from the point on it that is closest to the shape's origin, so the default makes a plane 2 kilometers across, which is solid for 1 kilometer behind it. Keep this no bigger than the map needs, as a smaller plane is faster for the world to sort.
+		* physics_material@ mat = null: the material of the shape, which gives bodies made from the shape their friction and restitution, and determines how it absorbs, scatters and lets through sound in acoustic simulations such as sound_environment, see `physics_material_get()`. If null, the default material is used.
+	## Returns:
+		physics_plane_shape@: the new shape, or null if it could not be created, such as when the plane's normal is zero or the half extent is not positive.
+	## Remarks:
+		A plane is the simplest way to give a map a floor that nothing can fall through, no matter how fast it is going, as everything below the floor is solid rather than just a thin layer. It can also make the outer walls of a map, or a slope with a plane that is tilted.
+		Plane shapes can only be used for static and kinematic bodies, `physics_world::create_and_add_body()` fails if one is given with PHYSICS_BODY_DYNAMIC. Things that leave the area covered by the half extent no longer collide with the plane, and collisions right at its edge are unreliable, so make it a bit larger than the area that is walked on, and use a box for a floor of a particular size such as a platform.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	physics_plane_shape@ ground = physics_plane_shape_create(plane(), 500, physics_material_get("grass"));
+	world.create_and_add_body(ground, vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	physics_body_id ball = world.create_and_add_body(physics_sphere_shape_create(0.5), vector(0, 0, 10), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	for (int i = 0; i < 180; i++) world.update(1.0 / 60);
+	alert("Ball", "The ball has come to rest at " + world.get_position(ball));
+}

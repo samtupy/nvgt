@@ -1,0 +1,29 @@
+/**
+	Set the functions that are called when bodies start, keep and stop touching.
+	void physics_world::set_contact_listener(physics_contact_added_callback@ on_added, physics_contact_persisted_callback@ on_persisted, physics_contact_removed_callback@ on_removed);
+	## Arguments:
+		* physics_contact_added_callback@ on_added: called when two bodies begin to touch, or null.
+		* physics_contact_persisted_callback@ on_persisted: called each update that two bodies remain in contact, or null.
+		* physics_contact_removed_callback@ on_removed: called when two bodies stop touching, or null.
+	## Remarks:
+		The signatures of the callbacks are:
+		> void physics_contact_added_callback(const physics_body_id&in body1, const physics_body_id&in body2, const vector&in world_normal, float penetration_depth);
+> void physics_contact_persisted_callback(const physics_body_id&in body1, const physics_body_id&in body2, const vector&in world_normal, float penetration_depth);
+> void physics_contact_removed_callback(const physics_body_id&in body1, const physics_body_id&in body2);
+		The simulation may run on several threads, so contacts are queued while `update()` runs and the callbacks are called one after the other from `update()` once the simulation step is complete. This means they can safely do anything a script can do, but also that by then bodies have moved on a little from where they hit. The normal points from the first body to the second, and the penetration depth is how far they overlap.
+*/
+
+// Example:
+void hit(const physics_body_id&in a, const physics_body_id&in b, const vector&in normal, float depth) {
+	screen_reader_speak("Bump!", true);
+}
+void main() {
+	physics_world world;
+	world.create_and_add_body(physics_box_shape_create(vector(20, 20, 0.5)), vector(0, 0, -0.5), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	world.create_and_add_body(physics_sphere_shape_create(0.5), vector(0, 0, 3), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	world.set_contact_listener(hit, null, null);
+	for (int i = 0; i < 120; i++) {
+		world.update(1.0 / 60);
+		wait(16);
+	}
+}

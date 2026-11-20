@@ -1,0 +1,18 @@
+/**
+	Get a copy of the plane turned and then moved.
+	plane@ plane::transformed(const vector&in position, const quaternion&in rotation) const;
+	## Arguments:
+		* const vector&in position: how far to move the plane after rotating it.
+		* const quaternion&in rotation: how to turn the plane around the origin.
+	## Returns:
+		plane@: the transformed plane. The plane this is called on is not changed.
+	## Remarks:
+		This is useful for describing a plane relative to something, such as the floor of a room, and then placing it in the world at that thing's position and rotation.
+*/
+
+// Example:
+void main() {
+	plane floor;
+	plane wall = floor.transformed(vector(5, 0, 0), quaternion_from_axis_angle(vector(0, 1, 0), 1.5707964)); // Tipped over to face along x, then moved 5 meters along x.
+	alert("Wall", "The wall is " + wall + ", and the point (5, 3, 2) is " + wall.signed_distance(vector(5, 3, 2)) + " meters from it.");
+}

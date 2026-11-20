@@ -1,0 +1,22 @@
+/**
+	A filter that boosts or cuts a band of frequencies around a center frequency, like one band of an equalizer.
+	audio_peak_filter(double frequency, double gain_db, double q = 0.707, audio_engine@ engine = sound_default_engine);
+	## Arguments:
+		* double frequency: the frequency in hertz at the center of the band.
+		* double gain_db: how much to boost, or cut if negative, in decibels.
+		* double q = 0.707: how narrow the affected band is, see `q`. The default gives a smooth, natural response.
+		* audio_engine@ engine = sound_default_engine: the engine to create the node in.
+	## Remarks:
+		This is an audio_node with one input and one output bus, and has all of the methods and properties of audio_node as well as the ones listed here. Its settings can be changed while audio is playing.
+		Several peak filters in a chain make a graphic equalizer.
+		To create the filter in another engine while keeping the default q, name the engine argument, as in `audio_peak_filter filter(1000, 6, engine: my_engine);`.
+*/
+
+// Example:
+void main() {
+	sound s;
+	s.load("C:/Windows/media/ding.wav");
+	audio_peak_filter effect(2000, 9, 1);
+	s.effects_chain.add_node(effect);
+	s.play_wait();
+}

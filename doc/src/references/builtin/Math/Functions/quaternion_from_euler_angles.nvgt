@@ -1,0 +1,16 @@
+/**
+	Create a rotation from angles around each axis.
+	quaternion@ quaternion_from_euler_angles(const vector&in angles);
+	## Arguments:
+		* const vector&in angles: the angle in radians to rotate around the x, y and z axes, in the x, y and z components.
+	## Returns:
+		quaternion@: the combined rotation.
+	## Remarks:
+		When more than one angle is given the order the rotations are combined in matters. If you only need to turn around one axis, `quaternion_from_axis_angle()` is simpler.
+*/
+
+// Example:
+void main() {
+	quaternion tilt = quaternion_from_euler_angles(vector(0.5, 0, 0)); // About 29 degrees around the x axis.
+	alert("Rotation", "" + tilt);
+}

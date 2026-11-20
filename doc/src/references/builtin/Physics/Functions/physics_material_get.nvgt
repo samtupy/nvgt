@@ -1,0 +1,18 @@
+/**
+	Look up a material by name.
+	physics_material@ physics_material_get(const string&in name);
+	## Arguments:
+		* const string&in name: the name of the material.
+	## Returns:
+		physics_material@: the material, or null if no material has that name.
+	## Remarks:
+		A physics_material describes a kind of surface. Bodies created from a shape that has a material start with the material's friction and restitution, and its acoustic properties control how sound is absorbed, scattered and let through it in acoustic simulations such as the nvgt_phonon plugin's sound_environment. Give one to a shape when you create it.
+		These materials are built in: generic, brick, concrete, ceramic, gravel, carpet, glass, plaster, wood, metal, rock, sand, snow, soil, foliage, water, drywall, marble, asphalt, grass, fabric, cardboard, plastic, rubber, foam and ice. `physics_material_list()` returns the names of every material that exists, including those you register yourself.
+*/
+
+// Example:
+void main() {
+	physics_material@ wood = physics_material_get("wood");
+	if (wood is null) return;
+	alert("Wood", "Wood has a friction of " + wood.friction + " and a restitution of " + wood.restitution + ".");
+}

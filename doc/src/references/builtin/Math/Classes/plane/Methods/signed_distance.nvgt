@@ -1,0 +1,15 @@
+/**
+	Get the distance from the plane to a point.
+	float plane::signed_distance(const vector&in point) const;
+	## Arguments:
+		* const vector&in point: the point to measure to.
+	## Returns:
+		float: the distance, which is positive when the point is in front of the plane, the side its normal points to, negative when it is behind the plane and 0 when it is on it.
+*/
+
+// Example:
+void main() {
+	plane water_surface(vector(0, 0, 0), vector(0, 0, 1));
+	vector diver(10, 5, -3);
+	if (water_surface.signed_distance(diver) < 0) alert("Underwater", "The diver is " + -water_surface.signed_distance(diver) + " meters deep.");
+}

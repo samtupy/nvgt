@@ -3,7 +3,7 @@
 	mixer@ sound_default_mixer;
 	## Remarks:
 		This is null by default, which means new sounds play directly through the audio engine. If you assign a mixer, every sound created afterwards is attached to it, so you can control the volume or effects of all your sounds in one place. Sounds that already exist are not moved.
-		A sound can still be moved to a different mixer at any time with `sound::set_mixer()`.
+		A sound can still be moved to a different mixer at any time with `mixer::set_mixer()`, which sounds have because they are derived from mixer.
 */
 
 // Example:

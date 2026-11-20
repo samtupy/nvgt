@@ -1,4 +1,4 @@
 # paused
-Determine if the sound is paused.
+Whether the sound was paused with `pause()` or `pause_fade()` and hasn't been played since.
 
-`bool sound::paused;`
+`const bool sound::paused;`

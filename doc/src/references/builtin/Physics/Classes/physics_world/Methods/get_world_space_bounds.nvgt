@@ -1,0 +1,18 @@
+/**
+	Get the smallest axis aligned box that contains a body.
+	aabb@ physics_world::get_world_space_bounds(const physics_body_id&in id) const;
+	## Arguments:
+		* const physics_body_id&in id: the body to operate on, as returned by `create_and_add_body()`.
+	## Returns:
+		aabb@: the box in world coordinates.
+	## Remarks:
+		The box is recalculated from the body's shape and rotation, so for a rotated body it is larger than the body itself.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	physics_body_id crate = world.create_and_add_body(physics_box_shape_create(vector(1, 2, 3)), vector(10, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	aabb bounds = world.get_world_space_bounds(crate);
+	alert("Bounds", "From " + bounds.min + " to " + bounds.max);
+}

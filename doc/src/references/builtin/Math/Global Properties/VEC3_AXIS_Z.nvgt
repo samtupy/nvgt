@@ -1,0 +1,12 @@
+/**
+	A vector of length 1 that points along the z axis (up), `vector(0, 0, 1)`.
+	const vector VEC3_AXIS_Z;
+	## Remarks:
+		A new vector is returned every time this property is read, so modifying the result does not change the property.
+*/
+
+// Example:
+void main() {
+	vector v = VEC3_AXIS_Z;
+	alert("Z axis", "" + v.z);
+}

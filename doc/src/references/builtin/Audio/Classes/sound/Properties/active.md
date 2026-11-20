@@ -1,4 +1,7 @@
 # active
-Determine if the sound has successfully been loaded or not.
+Whether the sound has something loaded.
 
-`bool sound::active;`
+`const bool sound::active;`
+
+## Remarks:
+This becomes true when one of the loading methods succeeds, and false again after `close()`.

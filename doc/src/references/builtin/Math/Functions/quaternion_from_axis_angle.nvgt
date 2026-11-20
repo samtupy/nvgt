@@ -1,0 +1,17 @@
+/**
+	Create a rotation around an axis.
+	quaternion@ quaternion_from_axis_angle(const vector&in axis, float angle);
+	## Arguments:
+		* const vector&in axis: the axis to rotate around, which should have a length of 1. For turning left and right in NVGT's coordinate system this is `vector(0, 0, 1)`, up.
+		* float angle: the angle to rotate by in radians. Positive angles are counterclockwise when looking at the axis from its tip towards the origin, so a positive turn around the z axis turns from the x axis towards the y axis.
+	## Returns:
+		quaternion@: the rotation.
+	## Remarks:
+		Angles are in radians. To convert degrees to radians multiply by `3.14159265 / 180`.
+*/
+
+// Example:
+void main() {
+	quaternion turn = quaternion_from_axis_angle(vector(0, 0, 1), 90 * (3.14159265 / 180)); // 90 degrees around the up axis.
+	alert("Rotation", "" + turn);
+}

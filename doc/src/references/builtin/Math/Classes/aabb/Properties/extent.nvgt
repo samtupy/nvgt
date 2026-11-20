@@ -1,13 +1,10 @@
 /**
-	A read-only property representing the extent of the box, calculated based on min and max.
-	Note that "extent" calculates from min, not from center. Therefore in this case, extent is synonymous with size.
-	vector aabb::extent const;
+	Half of the size of the box along each axis, the distance from the center to the faces.
+	const vector aabb::extent;
 */
 
 // Example:
 void main() {
-	aabb b;
-	b.min = vector(1, 3, 5);
-	b.max = vector(5, 3, 7);
-	alert("The extent of the box is located at", round(b.extent.x, 0)+", "+round(b.extent.y, 0)+", "+round(b.extent.z, 0)); // 4,0,2.
+	aabb box(vector(0, 0, 0), vector(10, 4, 2));
+	alert("Extent", "" + box.extent); // 5, 2, 1
 }

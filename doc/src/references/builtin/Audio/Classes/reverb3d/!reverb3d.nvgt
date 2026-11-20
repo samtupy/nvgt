@@ -1,0 +1,28 @@
+/**
+	A reverb3d gives 3d sounds a shared reverb whose volume depends on how far each sound is from the listener, so that distant sounds are heard more through the reverb of the space they are in and less directly.
+	reverb3d(audio_node@ reverb, mixer@ destination = mixer(), audio_engine@ engine = sound_default_engine);
+	## Arguments:
+		* audio_node@ reverb: the reverb effect that the sounds are sent through, usually an audio_freeverb_node or an audio_fdn_reverb_node.
+		* mixer@ destination = mixer(): the mixer that the output of the reverb goes to, a new one by default. If null, the reverb goes straight to the engine's endpoint.
+		* audio_engine@ engine = sound_default_engine: the engine to create the reverb3d in.
+	## Remarks:
+		A reverb3d is an audio_node, and has all of its methods and properties. It is a single reverb that any number of sounds can be sent to at once, which is far cheaper than giving each sound its own reverb. A sound or mixer is sent to it by setting its `reverb3d` property, or by calling `set_reverb3d_at()` to choose where the send is taken from, see the reverb3d_placement enum. The sound is still heard directly as before, and a copy of it is sent to the reverb at a volume that `get_volume_at()` calculates from the sound's distance to the listener, which is kept up to date as either of them moves.
+		How loud the reverb is at each distance is controlled by `min_volume`, `max_volume`, `max_volume_distance`, `max_audible_distance` and `volume_curve`. The send gets louder from `min_volume` for a sound at the listener's position to `max_volume` at `max_volume_distance`, as distant sounds have more of their energy in reverb than close ones, and then fades out by `max_audible_distance`, with `volume_curve` shaping that fade.
+		The reverb itself decides how the space sounds. The reverb node should pass none of its input through unchanged, as the direct sound is already heard without it. An audio_freeverb_node does this by default, while an audio_fdn_reverb_node's `dry` property must be set to 0.
+		For acoustics that are simulated from the shape and materials of a map, see sound_environment in the nvgt_phonon plugin, which manages a reverb3d of its own.
+*/
+
+// Example:
+void main() {
+	audio_freeverb_node freeverb;
+	freeverb.room_size = 0.8;
+	reverb3d verb(freeverb);
+	sound s;
+	s.load("C:/Windows/media/ding.wav");
+	@s.reverb3d = verb;
+	for (int distance = 2; distance <= 30; distance += 7) {
+		s.set_position_3d(0, distance, 0);
+		s.play_wait();
+		wait(1500); // Let the reverb ring out.
+	}
+}

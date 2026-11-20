@@ -1,15 +1,13 @@
 /**
-	Overloads the *= operator, allowing you to multiply one vector by a scalar.
+	Overloads the *= operator, multiplying this vector by a number.
 	vector& vector::opMulAssign(float scalar);
 	## Arguments:
-		* float scalar: The scalar to multiply by.
-	## Remarks
-		Multiplying by a scalar will multiply all axes by that scalar.
+		* float scalar: the number to multiply every coordinate by.
 */
 
 // Example:
 void main() {
-	vector v1(1, 4, 8);
-	v1*=3;
-	alert("The first vector =", "(" + v1.x + ", " + v1.y + ", " + v1.z + ")");
+	vector v(1, 2, 3);
+	v *= 2;
+	alert("Vector", v.x + ", " + v.y + ", " + v.z);
 }

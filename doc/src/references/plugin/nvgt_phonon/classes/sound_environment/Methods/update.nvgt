@@ -1,0 +1,20 @@
+/**
+	Run the environment's simulations and publish their results to the audio thread.
+	void sound_environment::update();
+	## Remarks:
+		Call this once per frame from your main loop, after positioning the listener and the environment's sounds. The listener's position and orientation are read from the first listener of the environment's engine.
+		Each call runs the direct simulation (occlusion and transmission) of every source on the calling thread. The much more expensive reflection simulation is handed to a worker thread at most once per `simulation_interval`, and its results are picked up by later calls. Changes to settings that rebuild the simulator are also applied here, once the worker thread is idle.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	// ... create level ...
+	sound_environment env;
+	env.set_raycaster(world);
+	while (!key_pressed(KEY_ESCAPE)) {
+		wait(5);
+		sound_default_engine.set_listener_position(0, 0, 0, 1.6);
+		env.update();
+	}
+}

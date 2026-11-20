@@ -1,0 +1,16 @@
+/**
+	Get the angle that the quaternion rotates by around an axis.
+	float quaternion::get_rotation_angle(const vector&in axis) const;
+	## Arguments:
+		* const vector&in axis: the axis to measure around.
+	## Returns:
+		float: the angle in radians.
+	## Remarks:
+		This is meant for rotations that are around the given axis, such as turning around the z axis, to find out how far that was.
+*/
+
+// Example:
+void main() {
+	quaternion q = quaternion_from_axis_angle(vector(0, 0, 1), 0.5);
+	alert("Angle", "The rotation around the z axis is " + q.get_rotation_angle(vector(0, 0, 1)) + " radians.");
+}

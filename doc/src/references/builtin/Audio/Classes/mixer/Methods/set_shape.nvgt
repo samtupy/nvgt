@@ -1,0 +1,25 @@
+/**
+	Give the mixer a shape, so that it is heard from the closest point of the shape to the listener rather than from a single point.
+	bool mixer::set_shape(ref@ shape);
+	## Arguments:
+		* ref@ shape: the shape, which can be a sound_aabb_shape or any physics_shape, or null to make the mixer a point again.
+	## Returns:
+		bool: true if the shape was set, false if it is null or of a type that can't be used as a sound shape.
+	## Remarks:
+		Shapes suit sounds that fill an area, such as a river, a crowd or the hum of a room, where the sound should come from the nearest part of the area and surround the listener when they are inside it. The closest point is found again whenever the mixer or the listener moves.
+		The shape is placed with its origin at the position given to `set_position_3d()`, which moves the shape, and `get_position_3d()` still returns that position rather than the closest point.
+		Any physics_shape can be used, such as a sphere for a fountain, a capsule for a waterfall, a box for a room or a plane for the sea or wind across open ground. A physics shape is placed without rotation, its axes lined up with the world's, and points are measured from its origin as with `physics_shape::contains_point()`. The same shape object can be given to a physics body and to a mixer, so the area a sound fills matches the object it belongs to. A sound_aabb_shape is the cheaper choice for a simple box.
+*/
+
+// Example:
+void main() {
+	sound fountain;
+	fountain.load("C:/Windows/media/Ring10.wav");
+	fountain.set_shape(physics_sphere_shape_create(3)); // A pool 3 meters across, heard from its edge.
+	fountain.set_position_3d(0, 10, 0);
+	fountain.play_looped();
+	for (int y = 0; y <= 10; y += 2) {
+		sound_set_listener_position(0, y, 0); // Walking towards the pool, the sound surrounds the listener once they step into it.
+		wait(700);
+	}
+}

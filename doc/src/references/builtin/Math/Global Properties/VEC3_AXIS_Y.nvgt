@@ -1,0 +1,12 @@
+/**
+	A vector of length 1 that points along the y axis (forward), `vector(0, 1, 0)`.
+	const vector VEC3_AXIS_Y;
+	## Remarks:
+		A new vector is returned every time this property is read, so modifying the result does not change the property.
+*/
+
+// Example:
+void main() {
+	vector v = VEC3_AXIS_Y;
+	alert("Y axis", "" + v.y);
+}

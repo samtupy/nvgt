@@ -1,0 +1,23 @@
+/**
+	Load and play a sound in one go, in a way that cleans it up automatically when it has finished.
+	sound@ audio_engine::play(const string&in path, const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX), float volume = FLOAT_MAX, float pan = FLOAT_MAX, float pitch = FLOAT_MAX, mixer@ mix = null, const pack_interface@ pack_file = sound_default_pack, bool autoplay = true);
+	## Arguments:
+		* const string&in path: the file to load the sound from.
+		* const vector&in position = vector(FLOAT_MAX, FLOAT_MAX, FLOAT_MAX): where to play the sound in 3D space. The default of FLOAT_MAX for every axis means the sound is not positioned.
+		* float volume = FLOAT_MAX: the volume of the sound, in the units that sounds of this engine use. The default of FLOAT_MAX leaves the sound at its normal volume.
+		* float pan = FLOAT_MAX: the pan of the sound. The default of FLOAT_MAX leaves it centered.
+		* float pitch = FLOAT_MAX: the pitch of the sound. The default of FLOAT_MAX leaves it at its normal pitch.
+		* mixer@ mix = null: the mixer to play the sound through, if any.
+		* const pack_interface@ pack_file = sound_default_pack: the pack to load the sound from.
+		* bool autoplay = true: whether to start playing the sound immediately.
+	## Returns:
+		sound@: the sound, or null if it could not be loaded.
+	## Remarks:
+		The sound is closed automatically once it has finished playing, so this is the easiest way to play a sound effect that you don't need to control again. If you do need to stop, move or otherwise control the sound, keep the handle returned.
+*/
+
+// Example:
+void main() {
+	sound_default_engine.play("explosion.ogg", vector(5, 0, 0));
+	wait(2000);
+}

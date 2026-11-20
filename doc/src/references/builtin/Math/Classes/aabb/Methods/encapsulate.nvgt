@@ -1,0 +1,18 @@
+/**
+	Grow the box so that it contains a point or another box.
+	1. void aabb::encapsulate(const vector&in point);
+	2. void aabb::encapsulate(const aabb&in box);
+	## Arguments:
+		* const vector&in point (1): the point to include.
+		* const aabb&in box (2): the box to include.
+	## Remarks:
+		`inflate_with_point()` does the same as the first form.
+*/
+
+// Example:
+void main() {
+	aabb bounds;
+	bounds.encapsulate(vector(1, 5, 0));
+	bounds.encapsulate(vector(-3, 2, 4));
+	alert("Bounds", "The box is " + bounds.size.x + " by " + bounds.size.y + " by " + bounds.size.z);
+}

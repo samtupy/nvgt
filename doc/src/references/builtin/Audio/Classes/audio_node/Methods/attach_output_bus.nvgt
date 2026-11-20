@@ -1,0 +1,25 @@
+/**
+	Connect one of the node's outputs to the input of another node.
+	bool audio_node::attach_output_bus(uint output_bus, audio_node@ destination, uint destination_input_bus);
+	## Arguments:
+		* uint output_bus: the output bus of this node to connect.
+		* audio_node@ destination: the node to send the audio to.
+		* uint destination_input_bus: the input bus of the destination to connect to.
+	## Returns:
+		bool: true if the connection was made, false if either bus doesn't exist or the connection would be invalid, such as two nodes whose channel counts can't be matched.
+	## Remarks:
+		If the output bus was already attached somewhere, it is detached from there first. Several output buses can be attached to the same input bus, and their audio is added together.
+		The node keeps a reference to the destination for as long as it is attached.
+*/
+
+// Example:
+void main() {
+	sound s;
+	s.load("music.ogg");
+	audio_freeverb_node reverb;
+	s.set_mixer(null);
+	s.attach_output_bus(0, reverb, 0);
+	reverb.attach_output_bus(0, sound_default_engine.endpoint, 0);
+	s.play_looped();
+	wait(5000);
+}

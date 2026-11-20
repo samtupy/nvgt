@@ -1,0 +1,16 @@
+/**
+	Get the box where this box and another overlap.
+	aabb@ aabb::intersect(const aabb&in other) const;
+	## Arguments:
+		* const aabb&in other: the other box.
+	## Returns:
+		aabb@: the shared part of the boxes, which is not valid if they don't overlap.
+*/
+
+// Example:
+void main() {
+	aabb a(vector(0, 0, 0), vector(2, 2, 2));
+	aabb b(vector(1, 1, 1), vector(3, 3, 3));
+	aabb shared = a.intersect(b);
+	alert("Shared", "The overlap is " + shared.size.x + " wide.");
+}

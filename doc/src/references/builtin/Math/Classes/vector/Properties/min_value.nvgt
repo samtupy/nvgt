@@ -1,10 +1,10 @@
 /**
-	Returns the minimum value of the vector.
-	float vector::min_value const;
+	The smallest of the vector's three coordinates.
+	const float vector::min_value;
 */
 
 // Example:
 void main() {
-	vector v(5, 7, 4);
-	alert("Minimum value", v.min_value);
+	vector v(4, -2, 9);
+	alert("Smallest", "" + v.min_value); // -2
 }

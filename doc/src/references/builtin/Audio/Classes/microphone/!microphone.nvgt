@@ -1,0 +1,26 @@
+/**
+	A microphone records audio from an input device such as a microphone or a line input.
+	microphone(int device = -1, audio_engine@ engine = sound_default_engine);
+	## Arguments:
+		* int device = -1: the index of the device in `sound_input_devices` to record from, or -1 for the system's default.
+		* audio_engine@ engine = sound_default_engine: the engine to create the microphone in, whose sample rate and number of channels the recording uses.
+	## Remarks:
+		A microphone is an audio_ring_buffer, and has all of its methods and properties, and those of audio_data_source and audio_node, as well as the ones listed here. Recording starts as soon as it is created, and an exception is thrown if the device can't be opened.
+		The recorded audio is kept in the buffer until it is read with `read()`, so read regularly or older audio is lost once the buffer is full. Alternatively attach the microphone's output to a node, for example an audio_encoder to save the recording to a file, or give it to `sound::open()` to hear it. Stopping the microphone with `set_state(AUDIO_NODE_STATE_STOPPED)` stops recording, and starting it again empties the buffer first.
+		Recording may need permission from the user on some platforms.
+*/
+
+// Example:
+void main() {
+	microphone mic;
+	audio_wav_encoder recording;
+	recording.open("recording.wav", sound_default_engine.sample_rate, sound_default_engine.channels);
+	wait(100);
+	timer t;
+	while (t.elapsed < 5000) { // Record for five seconds.
+		recording.write(mic.read());
+		wait(20);
+	}
+	recording.close();
+	alert("Done", "Five seconds were recorded to recording.wav.");
+}

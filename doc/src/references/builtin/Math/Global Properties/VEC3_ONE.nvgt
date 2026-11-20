@@ -1,0 +1,12 @@
+/**
+	A vector of all ones, `vector(1, 1, 1)`.
+	const vector VEC3_ONE;
+	## Remarks:
+		A new vector is returned every time this property is read, so modifying the result does not change the property.
+*/
+
+// Example:
+void main() {
+	vector v = VEC3_ONE;
+	alert("One", "" + v.length());
+}

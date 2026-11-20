@@ -1,0 +1,19 @@
+/**
+	A value for the audio_panner enum's place that selects Steam Audio's HRTF panner, which makes sounds seem to come from a direction around the listener and works best with headphones.
+	const int audio_panner_phonon_hrtf;
+	## Remarks:
+		This is an integer rather than a member of the `audio_panner` enum because plugins cannot add values to builtin enums. It can be used anywhere an audio_panner is accepted, such as `set_sound_default_3d_panner()` and `sound::set_3d_panner()`.
+		Within 5 units of the listener, sounds are increasingly unpositioned, so that sounds situated at the same position as the listener are not snapped to one direction. NVGT also has its own built in HRTF, `audio_panner_hrtf`, which is derived from the Synthizer library and is used by `set_sound_global_hrtf()`. The two sound slightly different, so this one exists for choosing Steam Audio's if you prefer it.
+*/
+
+// Example:
+#pragma plugin nvgt_phonon
+void main() {
+	set_sound_default_3d_panner(audio_panner_phonon_hrtf);
+	set_sound_default_3d_attenuator(audio_attenuator_phonon);
+	sound s;
+	s.load("music.ogg");
+	s.set_position_3d(5, 0, 0);
+	s.play_looped();
+	alert("HRTF", "A sound should be playing to your right.");
+}

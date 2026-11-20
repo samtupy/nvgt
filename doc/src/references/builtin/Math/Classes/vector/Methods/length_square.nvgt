@@ -1,14 +1,16 @@
 /**
-	Retrieves the square length of the vector.
-	float vector::length_square();
-	## Arguments:
-		None.
-	## Remarks
-		This is similar to length except it does not perform the square root calculation.
+	Calculate the square of the vector's length.
+	1. float vector::length_square() const;
+	2. float vector::length_sq() const;
+	## Returns:
+		float: the squared length.
+	## Remarks:
+		This avoids the square root that `length()` has to calculate, so is better for comparing distances: instead of `v.length() < 5` write `v.length_square() < 25`. `length_sq()` is a shorter name for the same method.
 */
 
 // Example:
 void main() {
-	vector v1(3, 4, 0);
-	alert("Length", v1.length_square());
+	vector a(1, 2, 3), b(4, 6, 3);
+	vector difference = b - a;
+	alert("Distance", "The squared distance between the points is " + difference.length_square());
 }

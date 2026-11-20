@@ -1,0 +1,14 @@
+/**
+	Replace the environment's probes and baked data with data saved by `save_baked_data()`.
+	bool sound_environment::load_baked_data(const string&in data);
+	## Arguments:
+		* const string&in data: the data to load.
+	## Returns:
+		bool: true if the data was valid and has been loaded, false otherwise, in which case nothing changes.
+*/
+
+// Example:
+void main() {
+	sound_environment env;
+	if (!env.load_baked_data(file_get_contents("level1.baked"))) alert("Error", "The baked data could not be loaded.");
+}

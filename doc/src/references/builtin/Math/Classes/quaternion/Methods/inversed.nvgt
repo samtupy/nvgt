@@ -1,0 +1,15 @@
+/**
+	Get the inverse of the quaternion.
+	quaternion@ quaternion::inversed() const;
+	## Returns:
+		quaternion@: the quaternion that undoes this rotation.
+	## Remarks:
+		Multiplying a quaternion by its inverse gives no rotation.
+*/
+
+// Example:
+void main() {
+	quaternion q = quaternion_from_axis_angle(vector(0, 0, 1), 1.0);
+	quaternion undone = q.inversed() * q;
+	alert("Undone", "Rotating and then undoing it leaves w at " + undone.w); // 1
+}

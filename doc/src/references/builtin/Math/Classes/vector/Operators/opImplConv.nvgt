@@ -1,12 +1,14 @@
 /**
-	Allows the vector to be turned into a string.
+	Converts the vector to a string.
 	string vector::opImplConv() const;
-	## Remarks
-		Note this currently does not trim redundant decimal places from the output.
+	## Returns:
+		string: the vector in the form `vector(x, y, z)`.
+	## Remarks:
+		This conversion happens automatically when a vector is added to a string, so `"position: " + v` works.
 */
 
 // Example:
 void main() {
-	vector v(2, 3, 5);
-	alert("Vector", v);
+	vector v(1, 2, 3);
+	alert("Vector", "The vector is " + v);
 }

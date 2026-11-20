@@ -1,0 +1,19 @@
+/**
+	Set the object this environment traces rays through to determine occlusion, transmission and reflections.
+	bool sound_environment::set_raycaster(ref@ raycaster);
+	## Arguments:
+		* ref@ raycaster: the object to trace rays through, currently a physics_world, or null to remove the current one.
+	## Returns:
+		bool: true if the raycaster was accepted, false if the object cannot be used as a raycaster.
+	## Remarks:
+		With no raycaster, nothing blocks sound, so sounds are never occluded and no reflections are produced. A failed call leaves the previous raycaster in place.
+		The acoustic properties of what a ray hits come from the physics_material of the body that was hit, and bodies and materials marked as acoustically transparent are ignored. The new scene is used from the first `update()` call after any reflection simulation in progress has finished.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	// ... create the bodies of your level here ...
+	sound_environment env;
+	if (!env.set_raycaster(world)) alert("Error", "The physics world can't be used as a raycaster.");
+}

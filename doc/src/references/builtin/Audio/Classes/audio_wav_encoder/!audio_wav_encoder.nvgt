@@ -1,0 +1,21 @@
+/**
+	An encoder that writes uncompressed WAV files.
+	audio_wav_encoder(audio_engine@ engine = sound_default_engine);
+	## Arguments:
+		* audio_engine@ engine = sound_default_engine: the engine to create the encoder in.
+	## Remarks:
+		An audio_wav_encoder is an audio_encoder, and has all of its methods and properties as well as the ones listed here. Choose the sample format of the file by passing one of the audio_wav_encoder_flags to `open()`, by default 16 bit.
+		When encoding to memory, the file is only returned by `read()` once the encoder has been closed, as its header can only be completed then.
+*/
+
+// Example:
+void main() {
+	float[] tone(44100); // One second of a 440 hertz tone in mono.
+	for (uint i = 0; i < tone.length(); i++) tone[i] = sin(i * 2 * 3.14159265 * 440 / 44100) * 0.5;
+	audio_engine engine(AUDIO_ENGINE_NO_DEVICE, 44100, 1);
+	audio_wav_encoder wav(engine);
+	wav.open("tone.wav", 44100, 1);
+	wav.write(tone);
+	wav.close();
+	alert("Done", "A tone was written to tone.wav.");
+}

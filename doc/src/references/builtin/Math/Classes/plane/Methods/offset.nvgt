@@ -1,0 +1,15 @@
+/**
+	Get a copy of the plane moved along its normal.
+	plane@ plane::offset(float distance) const;
+	## Arguments:
+		* float distance: how far to move the plane, in the direction it faces when positive and the other way when negative.
+	## Returns:
+		plane@: the moved plane. The plane this is called on is not changed.
+*/
+
+// Example:
+void main() {
+	plane ground_floor;
+	plane second_floor = ground_floor.offset(3);
+	alert("Second floor", "The second floor is " + second_floor); // plane(0, 0, 1, -3)
+}

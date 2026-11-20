@@ -1,14 +1,16 @@
 /**
-	Overloads the == operator, checking if two vectors are equal.
-	bool vector::opEquals(const vector&in other);
+	Overloads the == operator, comparing two vectors.
+	bool vector::opEquals(const vector&in other) const;
 	## Arguments:
-		* const vector&in other: the vector to compare.
+		* const vector&in other: the vector to compare with.
+	## Returns:
+		bool: true if all three coordinates are equal.
+	## Remarks:
+		Because coordinates are floating point numbers, vectors that were calculated by different means may differ by a tiny amount even when they ought to be the same.
 */
 
 // Example:
 void main() {
-	vector v1(2, 3, 5);
-	vector v2(5, 4, 2);
-	if(v1 != v2)
-	alert("Compared", "Vectors are not equal.");
+	vector a(1, 2, 3), b(1, 2, 3);
+	alert("Equal", a == b ? "yes" : "no");
 }

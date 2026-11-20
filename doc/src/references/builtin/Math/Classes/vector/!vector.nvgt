@@ -1,14 +1,17 @@
 /**
-	A class containing x, y and z coordinates, usually used to represent a 3d point in space.
+	A vector holds three numbers, x, y and z, that usually represent a point or a direction in 3D space.
 	1. vector();
-	2. vector(const vector&in vec);
-	3. vector(float x, float y = 0.0, float z = 0.0);
+	2. vector(float x, float y, float z = 0.0);
+	3. vector(const vector&in other);
+	## Arguments (2):
+		* float x: the x coordinate, which is to the right in NVGT's coordinate system.
+		* float y: the y coordinate, which is forward.
+		* float z = 0.0: the z coordinate, which is up. It defaults to 0 for 2D uses.
 	## Arguments (3):
-		* float x: The initial x point or coordinate this vector represents.
-		* float y = 0.0: The initial y point or coordinate this vector represents.
-		* float z = 0.0: The initial z point or coordinate this vector represents, defaulted to 0 because it may not be needed in some 2d applications.
+		* const vector&in other: the vector to copy.
 	## Remarks:
-		An advantage with vectors is that they contain basic addition and scaling operators.
+		A default constructed vector is all zeros. Vectors are used throughout NVGT's 3D features, such as the positions of sounds and the physics_world. Positions and directions use the same type: a position is where something is, and a direction is where to move or how far from the origin something is, and can be multiplied by a distance to move that far.
+		Vectors support the usual operators, adding, subtracting and comparing them, and multiplying and dividing by a number. They are copied when assigned, so changing a copy does not change the original.
 */
 
 // Example:
@@ -16,5 +19,5 @@ void main() {
 	vector v1(5, 5, 5);
 	vector v2(10, 10, 0);
 	vector v3 = v1 + v2;
-	alert("example", "the new vector is "+v3.x + ", " + v3.y + ", " + v3.z); // will show that the vector is 15, 15, 5.
+	alert("example", "the new vector is " + v3.x + ", " + v3.y + ", " + v3.z); // will show that the vector is 15, 15, 5.
 }

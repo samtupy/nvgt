@@ -1,0 +1,16 @@
+/**
+	Restrict a number to a range.
+	1. int clamp(int value, int min, int max);
+	2. float clamp(float value, float min, float max);
+	## Arguments:
+		* int/float value: the number to restrict.
+		* int/float min: the smallest allowed result.
+		* int/float max: the largest allowed result.
+	## Returns:
+		int/float: value if it is within the range, otherwise the nearest end of it.
+*/
+
+// Example:
+void main() {
+	alert("Volume", "" + clamp(150, 0, 100)); // 100
+}

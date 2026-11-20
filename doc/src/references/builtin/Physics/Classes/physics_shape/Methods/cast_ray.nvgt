@@ -1,0 +1,19 @@
+/**
+	Cast a ray against the shape alone, finding where it first hits.
+	bool physics_shape::cast_ray(const vector&in origin, const vector&in direction, float&out hit_fraction) const;
+	## Arguments:
+		* const vector&in origin: where the ray starts, relative to the shape's origin.
+		* const vector&in direction: the direction and length of the ray, so the ray ends at `origin + direction`.
+		* float&out hit_fraction: set to how far along the ray the hit is, from 0 at its origin to 1 at its end, if there is one.
+	## Returns:
+		bool: true if the ray hit the shape.
+	## Remarks:
+		The shape is treated as solid, so a ray starting inside it hits at a fraction of 0. To cast rays against the bodies in a world, use `physics_world::cast_ray()`.
+*/
+
+// Example:
+void main() {
+	physics_sphere_shape@ target = physics_sphere_shape_create(1);
+	float fraction;
+	if (target.cast_ray(vector(-10, 0, 0), vector(20, 0, 0), fraction)) alert("Hit", "The ray hit the sphere " + fraction * 20 + " meters from where it started."); // 9 meters.
+}

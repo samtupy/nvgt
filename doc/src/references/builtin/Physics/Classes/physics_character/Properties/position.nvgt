@@ -1,0 +1,14 @@
+/**
+	The position of the character.
+	vector physics_character::position;
+	## Remarks:
+		For a character made with a height and a radius this is the point on the floor underneath the character, otherwise it is the origin of the character's shape. Setting it moves the character there instantly.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	physics_character c(world, 1.8, 0.3, vector(0, 0, 0));
+	c.position = vector(10, 5, 0);
+	alert("Position", "The character is at " + c.position.x + ", " + c.position.y + ", " + c.position.z);
+}

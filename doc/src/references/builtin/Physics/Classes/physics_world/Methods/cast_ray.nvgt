@@ -1,0 +1,24 @@
+/**
+	Find the first body hit by a ray.
+	bool physics_world::cast_ray(const vector&in origin, const vector&in direction, physics_body_id&out hit_body, float&out hit_fraction) const;
+	## Arguments:
+		* const vector&in origin: where the ray starts.
+		* const vector&in direction: the direction the ray travels, whose length is also the length of the ray.
+		* physics_body_id&out hit_body: receives the first body the ray hit.
+		* float&out hit_fraction: receives how far along the ray the hit was, from 0 at the origin to 1 at the end of the direction vector.
+	## Returns:
+		bool: true if a body was hit, false if the ray reached its end without touching anything.
+	## Remarks:
+		The point that was hit is `origin + direction * hit_fraction`. Casting a ray from a point towards another and checking whether anything is in the way is a simple line of sight check.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	world.create_and_add_body(physics_box_shape_create(vector(0.5, 5, 5)), vector(10, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING); // A wall 10 meters to the right.
+	physics_body_id hit;
+	float fraction;
+	vector start(0, 0, 0), direction(20, 0, 0); // A ray 20 meters long.
+	if (world.cast_ray(start, direction, hit, fraction)) alert("Ray", "Hit a wall " + fraction * 20 + " meters away.");
+	else alert("Ray", "Nothing was hit.");
+}

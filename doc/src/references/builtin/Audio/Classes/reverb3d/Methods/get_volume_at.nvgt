@@ -1,0 +1,19 @@
+/**
+	Calculate the volume at which a sound at a given distance from the listener is sent to the reverb.
+	float reverb3d::get_volume_at(float distance) const;
+	## Arguments:
+		* float distance: the distance between the sound and the listener.
+	## Returns:
+		float: the send volume as a linear gain, where 1 is full volume and 0 is silence, rather than in decibels.
+	## Remarks:
+		This is what a reverb3d uses to set the volume of every sound sent to it, so you only need to call it to see the effect of the volume properties, or to set the volume of an attachment made with `create_attachment()` yourself.
+*/
+
+// Example:
+void main() {
+	audio_freeverb_node freeverb;
+	reverb3d verb(freeverb);
+	string result;
+	for (int distance = 0; distance <= 60; distance += 10) result += distance + " meters: " + round(verb.get_volume_at(distance), 3) + "\r\n";
+	alert("Reverb volumes", result);
+}

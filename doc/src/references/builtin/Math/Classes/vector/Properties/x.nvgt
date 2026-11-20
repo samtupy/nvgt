@@ -1,10 +1,13 @@
 /**
-	Represents the x coordinate of the vector.
-	float vector::x const;
+	The x coordinate of the vector.
+	float vector::x;
+	## Remarks:
+		Each of the three can also be read and written by index, `v[0]`, `v[1]` and `v[2]`.
 */
 
 // Example:
 void main() {
-	vector v(2.9);
-	alert("The x value of the vector is", round(v.x, 2));
+	vector v(1, 2, 3);
+	v.x = 10;
+	alert("Vector", "The x coordinate is now " + v.x);
 }

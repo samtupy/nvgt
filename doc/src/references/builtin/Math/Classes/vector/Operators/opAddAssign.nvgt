@@ -1,5 +1,5 @@
 /**
-	Overloads the += operator, allowing you to add a vector to another, already existing one.
+	Overloads the += operator, adding a vector to this one.
 	vector& vector::opAddAssign(const vector&in other);
 	## Arguments:
 		* const vector&in other: the vector to add.
@@ -7,8 +7,7 @@
 
 // Example:
 void main() {
-	vector v1(2, 3, 5);
-	vector v2(5, 4, 2);
-	v1 += v2;
-	alert("The first vector =", "(" + v1.x + ", " + v1.y + ", " + v1.z + ")");
+	vector position(0, 0, 0);
+	position += vector(1, 2, 3);
+	alert("Position", position.x + ", " + position.y + ", " + position.z);
 }

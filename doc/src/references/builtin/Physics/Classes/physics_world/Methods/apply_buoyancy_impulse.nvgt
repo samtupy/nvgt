@@ -1,0 +1,30 @@
+/**
+	Push and slow a body the way water would, if it is under the surface of a fluid.
+	bool physics_world::apply_buoyancy_impulse(const physics_body_id&in id, const vector&in surface_pos, const vector&in surface_normal, float buoyancy, float linear_drag, float angular_drag, const vector&in fluid_velocity, const vector&in gravity, float delta_time);
+	## Arguments:
+		* const physics_body_id&in id: the body to operate on, as returned by `create_and_add_body()`.
+		* const vector&in surface_pos: any point on the surface of the fluid.
+		* const vector&in surface_normal: the direction the surface faces, which is up for a lake.
+		* float buoyancy: how much the fluid pushes the body up. 1 makes the body float at neutral buoyancy, neither sinking nor rising, 0 gives no push and higher values make it rise.
+		* float linear_drag: how much the fluid slows the body's movement, from 0 for none to 1 for one that would stop it within a second.
+		* float angular_drag: how much the fluid slows the body's spinning, on the same scale.
+		* const vector&in fluid_velocity: the speed and direction the fluid itself is moving, for a river for example. Use `vector(0, 0, 0)` for still water.
+		* const vector&in gravity: the gravity to push against, normally the world's.
+		* float delta_time: the time of the step, normally what you pass to `update()`.
+	## Returns:
+		bool: true if the body was in the fluid and an impulse was applied, false if it was above the surface.
+	## Remarks:
+		There are no fluids in a physics_world, so to simulate water you call this every frame for each body that could be in it, before `update()`, with the surface of the water.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	physics_body_id ball = world.create_and_add_body(physics_sphere_shape_create(0.5), vector(0, 0, -1), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	for (int i = 0; i < 120; i++) {
+		// Water with its surface at z 0, where the ball floats upwards.
+		world.apply_buoyancy_impulse(ball, vector(0, 0, 0), vector(0, 0, 1), 1.5, 0.5, 0.5, vector(0, 0, 0), world.gravity, 1.0 / 60);
+		world.update(1.0 / 60);
+	}
+	alert("Ball", "The ball is at a height of " + world.get_position(ball).z);
+}

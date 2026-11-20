@@ -1,8 +1,8 @@
 # sort_descending
 Sorts an array in descending order.
 
-`void array::sort_descending();`
-`void array::sort_descending(uint startAt, uint count);`
+1. `void array::sort_descending();`
+2. `void array::sort_descending(uint startAt, uint count);`
 
 ## Arguments (2):
 * uint startAt: The index to start sorting from.

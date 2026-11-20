@@ -1,10 +1,13 @@
 # seek
-Seeks to a particular point in the sound.
+Move the sound to a position.
 
-`bool sound::seek(float ms);`
+`bool sound::seek(const uint64 position);`
 
 ## Arguments:
-* float ms: the time (in MS) to seek to.
+* const uint64 position: the position to move to from the start of the sound, in milliseconds unless the engine was created with AUDIO_ENGINE_DURATIONS_IN_FRAMES, in which case it is in PCM frames.
 
 ## Returns:
-bool: true if the seeking was successful, false otherwise.
+bool: true if the sound was moved, false if nothing is loaded or the sound has no known length, such as a live stream.
+
+## Remarks:
+The sound carries on playing from the new position if it was playing. The move is made by the audio thread before it next reads the sound, which makes this safe to call while the sound plays, unlike seeking the sound's `datasource` directly.

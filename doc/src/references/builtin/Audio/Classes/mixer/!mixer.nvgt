@@ -1,0 +1,41 @@
+/**
+	A mixer combines the audio of any number of sounds and other mixers into one stream, which can then be given a volume, pitch, effects and a position in 3d space as a whole.
+	mixer();
+	## Remarks:
+		A mixer is an audio_node, and has all of the methods and properties of audio_node as well as the ones listed here. The sound class is derived from mixer, so everything documented here, such as `volume`, `set_position_3d()` and `effects_chain`, works on a sound in exactly the same way and isn't documented again for sound. A sound is a mixer that has audio of its own to play.
+		A mixer created with `mixer()` belongs to the default audio engine, use `audio_engine::mixer()` to create one in another engine. A new mixer is already playing and goes straight to the engine's output. Sounds and other mixers are put into it with their `set_mixer()` method, and a mixer can itself be put into another mixer, so mixers can be nested as deeply as you like. Changing a mixer affects everything in it: lowering its volume lowers the volume of all of its sounds, and stopping it silences them all, though each sound carries on playing silently and is heard again when the mixer is played.
+		### Mixers as groups
+		The simplest use of a mixer is as a volume control for a category of sounds, such as one mixer for music, one for speech and one for sound effects, each with its own volume setting in the game's options menu. `sound_default_mixer` can be set to a mixer that every new sound is put into automatically.
+		### A mixer for each object
+		Mixers can be positioned in 3d space just like sounds, with `set_position_3d()`, and the sounds in a positioned mixer are heard from the mixer's position, panned and quieter with distance, without being positioned themselves. This makes the best way to give sound to an object in a game, such as an enemy, a vehicle or a door, to create one mixer for the object, move that mixer whenever the object moves, and play every sound the object makes, its footsteps, its voice and its weapon, through that mixer.
+		Spatializing a mixer once is much cheaper than spatializing each of its sounds. An enemy making five sounds at once with each sound positioned at the enemy is panned, attenuated and, with HRTF, filtered five separate times, whereas five sounds in the enemy's mixer are mixed together first and then spatialized only once. The more sounds an object plays, and the more expensive the spatialization, such as with HRTF or with the reflections of a sound_environment, the greater the saving. It also means that moving the object only takes one call to move all of its sounds, and that a sound which starts playing while the object is moving is placed correctly straight away.
+		Sounds in a positioned mixer should usually not be positioned themselves, as a positioned sound inside a positioned mixer is spatialized twice. The exception is when the sounds of one object are far enough apart to need positions of their own, such as the engine and horn of a long truck, in which case they can be left out of a positioned mixer.
+		### Units
+		The mixers and sounds of the default engine use the units of older versions of NVGT: `volume` is in decibels, where 0 is full volume and -100 is silent, `pan` goes from -100 for fully left to 100 for fully right, and `pitch` is a percentage where 100 is normal. Mixers and sounds of an engine you create use linear values instead, where a volume of 1 is full volume, pan goes from -1 to 1 and a pitch of 1 is normal, unless the engine was created with AUDIO_ENGINE_PERCENTAGE_ATTRIBUTES. Distances are in the same units as the positions of the listener and of your game's objects.
+*/
+
+// Example:
+class enemy {
+	vector position;
+	mixer voice; // Every sound the enemy makes is played through this mixer, which is the only thing that is positioned.
+	enemy(const vector&in position) {
+		this.position = position;
+		voice.set_position_3d(position);
+	}
+	void move(const vector&in new_position) {
+		position = new_position;
+		voice.set_position_3d(position); // Moves every sound the enemy is playing at once.
+	}
+	void play_sound(const string&in filename) {
+		sound s;
+		if (!s.load(filename)) return;
+		s.set_mixer(voice);
+		s.play_wait();
+	}
+}
+void main() {
+	enemy guard(vector(5, 3, 0));
+	guard.play_sound("C:/Windows/media/ding.wav");
+	guard.move(vector(-5, 3, 0));
+	guard.play_sound("C:/Windows/media/ding.wav");
+}
