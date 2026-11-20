@@ -1,3 +1,4 @@
+// AI generated interactive test. Its behavior was refined by human feedback from walking around in it, though the code itself was not written or reviewed by a human.
 // Walk around a small physics world with Steam Audio occlusion, transmission and reflections.
 // A concrete hall with a brick north wall, a wooden table and a metal cabinet opens through a doorway onto a carpeted lounge with drywall, a cardboard partition, a fabric couch and a glass display case. A sonar pings in the lounge. A doorway in the hall's south wall, just behind where you start, leads outside onto a street with a brick building across it.
 // Doorways in the north walls lead to four rooms made of one material each, from west to east: wood and metal off the hall, then glass with a marble floor and a foam studio with a carpeted floor off the lounge.

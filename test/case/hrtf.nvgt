@@ -1,4 +1,4 @@
-// Tests for NVGT's built in HRTF panner and attenuator and the FDN reverb node, from microsynthiser. Audio is rendered by an engine without a device so nothing is played.
+// AI generated Tests for NVGT's built in HRTF panner and attenuator and the FDN reverb node, from microsynthiser. Audio is rendered by an engine without a device so nothing is played.
 float[]@ hrtf_test_noise(int channels) {
 	float[] noise(44100 / 2 * channels);
 	for (uint i = 0; i < noise.length(); i++) noise[i] = random(-1000, 1000) / 4000.0;

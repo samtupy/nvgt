@@ -1,0 +1,22 @@
+// AI generated tests for the audio encoders, using an engine without a device so that nothing is played.
+void test_wav_encoder_to_memory_keeps_every_write() { // Seeks from anything but the start were once refused, so each write after the first overwrote the one before it when encoding to memory or a datastream.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	float[] frames(441 * 2);
+	for (uint i = 0; i < frames.length(); i++) frames[i] = 0.25;
+	audio_wav_encoder wav(e);
+	assert(wav.open(44100, 2, AUDIO_ENCODER_WAV_S16), "opening a wav encoder to memory");
+	for (int i = 0; i < 10; i++) assert(wav.write(frames) == 441, "write " + i);
+	assert(wav.read().empty(), "a wav can only be read once it is closed");
+	assert(wav.close(), "closing");
+	string data = wav.read();
+	assert(data.length() == 44 + 4410 * 4, "the wav should hold all 4410 frames, but is " + data.length() + " bytes");
+}
+void test_audio_encoder_channel_conversion() { // Frames are given in the engine's channel count, which was once confused with the encoder's.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	float[] frames(441 * 2);
+	audio_wav_encoder wav(e);
+	assert(wav.open(44100, 1, AUDIO_ENCODER_WAV_F32), "opening a mono encoder");
+	assert(wav.write(frames) == 441, "441 stereo frames should be written as 441 mono frames");
+	wav.close();
+	assert(wav.read().length() == 44 + 441 * 4, "a mono float wav of 441 frames");
+}

@@ -1,4 +1,4 @@
-// Decoding audio from datastreams, which needs miniaudio to be given NVGT's tell callback for formats such as Vorbis (issue #387). Nothing is played.
+// AI generated test of decoding audio from datastreams, which needs miniaudio to be given NVGT's tell callback for formats such as Vorbis (issue #387). Nothing is played.
 void test_audio_decoder_datastream() {
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	audio_decoder d(e);
@@ -8,4 +8,38 @@ void test_audio_decoder_datastream() {
 	float[]@ frames = d.read(4096);
 	assert(frames.length() == 4096 * d.channels, "the decoder should read frames, got " + frames.length() + " samples");
 	assert(d.seek_frames(0) and d.cursor_frames == 0, "the decoder should seek back to the start");
+}
+void test_sound_stream_pcm_full_buffer() { // Writing more than fits in a stream_pcm buffer once hung forever.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	sound@ s = e.sound();
+	float[] chunk(1000 * 2);
+	assert(s.stream_pcm(chunk, 44100, 2, 1500), "the first chunk fits");
+	assert(!s.stream_pcm(chunk), "a chunk that doesn't fit is refused rather than waited for");
+	e.read(1500);
+	assert(s.stream_pcm(chunk), "once the sound has played some of its buffer there is room again");
+}
+double sound_test_energy(audio_engine@ e, int blocks) {
+	double total = 0;
+	for (int b = 0; b < blocks; b++) {
+		float[]@ frames = e.read(1024);
+		for (uint i = 0; i < frames.length(); i++) total += frames[i] * frames[i];
+	}
+	return total;
+}
+void test_sound_play_after_pause_fade() { // A sound paused with pause_fade was once silent when played again, as the fade's stop time and volume were left behind.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	float[] data(44100 * 4 * 2);
+	for (uint i = 0; i < data.length(); i++) data[i] = 0.5;
+	sound@ s = e.sound();
+	assert(s.load_pcm(data, 44100, 2));
+	while (!s.load_complete) wait(1);
+	s.play();
+	double before = sound_test_energy(e, 10);
+	assert(s.pause_fade(50), "pause_fade");
+	sound_test_energy(e, 10);
+	assert(!s.playing and s.paused, "the sound should be paused once the fade ends");
+	uint64 position = s.position;
+	s.play();
+	double after = sound_test_energy(e, 10);
+	assert(after > before * 0.9 and s.position > position, "playing again should continue at full volume, energy " + after + " against " + before + " before");
 }

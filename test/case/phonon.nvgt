@@ -1,4 +1,4 @@
-// Tests for the Steam Audio based audio nodes, the HRTF panner and attenuator and phonon_binaural_node. Audio is rendered by an engine without a device so nothing is played.
+// AI generated tests for the Steam Audio based audio nodes, the HRTF panner and attenuator and phonon_binaural_node. Audio is rendered by an engine without a device so nothing is played.
 #pragma plugin nvgt_phonon
 float[]@ phonon_test_noise(int channels) {
 	float[] noise(44100 / 2 * channels);

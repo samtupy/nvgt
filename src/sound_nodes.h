@@ -155,7 +155,7 @@ public:
 	virtual double get_q() const = 0;
 	virtual void set_frequency(double freq) = 0;
 	virtual double get_frequency() const = 0;
-	static notch_filter_node* create(double q, double frequency, audio_engine* engine);
+	static notch_filter_node* create(double frequency, double q, audio_engine* engine);
 };
 class peak_filter_node : public virtual audio_node {
 public:
@@ -165,7 +165,7 @@ public:
 	virtual double get_q() const = 0;
 	virtual void set_frequency(double freq) = 0;
 	virtual double get_frequency() const = 0;
-	static peak_filter_node* create(double gain_db, double q, double frequency, audio_engine* engine);
+	static peak_filter_node* create(double frequency, double gain_db, double q, audio_engine* engine);
 };
 class low_shelf_filter_node : public virtual audio_node {
 public:
@@ -175,7 +175,7 @@ public:
 	virtual double get_q() const = 0;
 	virtual void set_frequency(double freq) = 0;
 	virtual double get_frequency() const = 0;
-	static low_shelf_filter_node* create(double gain_db, double q, double frequency, audio_engine* engine);
+	static low_shelf_filter_node* create(double frequency, double gain_db, double q, audio_engine* engine);
 };
 class high_shelf_filter_node : public virtual audio_node {
 public:
@@ -185,7 +185,7 @@ public:
 	virtual double get_q() const = 0;
 	virtual void set_frequency(double freq) = 0;
 	virtual double get_frequency() const = 0;
-	static high_shelf_filter_node* create(double gain_db, double q, double frequency, audio_engine* engine);
+	static high_shelf_filter_node* create(double frequency, double gain_db, double q, audio_engine* engine);
 };
 class delay_node : public virtual audio_node {
 public:
