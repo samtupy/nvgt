@@ -52,6 +52,7 @@ struct panner_state;
 struct fdn_reverb_state;
 struct echo_state;
 struct biquad_filter_state;
+struct air_absorption_state;
 }
 
 // Base class of the mono to stereo panners. Input is mono, output is interleaved stereo; input and output must not overlap.
@@ -61,8 +62,13 @@ public:
 	panner_effect(panner_effect &&other) noexcept;
 	panner_effect &operator=(panner_effect &&other) noexcept;
 	void process(const float *input, float *output, unsigned int frames, bool accumulate = false);
+	// Like process, but the input is interleaved stereo. A fully spatialized sound is downmixed to mono; with less spatial blend each ear increasingly hears its own channel, so that a stereo sound near the listener keeps its stereo image.
+	void process_stereo(const float *input, float *output, unsigned int frames, bool accumulate = false);
 	void reset();
 	unsigned int get_sample_rate() const;
+	// How much the sound is positioned, from 0 (unchanged and the same in both ears) to 1 (fully positioned, the default). Like Steam Audio's spatial blend, values in between narrow the difference between the ears in decibels rather than mixing in the unpositioned sound, so that a sound close to the listener still has a clear direction.
+	void set_spatial_blend(double blend);
+	double get_spatial_blend() const;
 	void set_angles(double azimuth, double elevation);
 	void set_azimuth(double azimuth);
 	double get_azimuth() const;
@@ -94,6 +100,30 @@ public:
 class stereo_panner_effect : public panner_effect {
 public:
 	explicit stereo_panner_effect(unsigned int sample_rate = 44100);
+};
+
+/* Steam Audio's air absorption, which makes distant sounds duller as air absorbs high frequencies faster than low ones. The bands below 800hz, from 800hz to 8khz and above 8khz are each attenuated by exp(-coefficient * distance) through a low shelf, a peaking filter and a high shelf. As in Steam Audio the loudest band passes unchanged with its gain applied to the whole signal, no band is cut by more than 24db relative to it, and changes crossfade.
+ * distance (meters): how far the sound travels through the air.
+ * coefficients (per meter): Steam Audio's defaults are 0.0002, 0.0017 and 0.0182. */
+class air_absorption_effect {
+public:
+	explicit air_absorption_effect(unsigned int sample_rate = 44100, unsigned int channels = 1);
+	~air_absorption_effect();
+	air_absorption_effect(air_absorption_effect &&other) noexcept;
+	air_absorption_effect &operator=(air_absorption_effect &&other) noexcept;
+	void process(const float *input, float *output, unsigned int frames, bool accumulate = false);
+	void reset();
+	unsigned int get_sample_rate() const;
+	unsigned int get_channels() const;
+	void set_distance(double distance);
+	double get_distance() const;
+	void set_coefficients(double low, double mid, double high);
+	void get_coefficients(double &low, double &mid, double &high) const;
+	// The gains of the three bands at the current distance, before normalization.
+	void get_band_gains(double &low, double &mid, double &high) const;
+
+private:
+	std::unique_ptr<detail::air_absorption_state> state;
 };
 
 /* A feedback delay network reverb with 8 modulated lines, an input diffuser and a 3 band decay equalizer.
@@ -222,6 +252,7 @@ private:
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <complex>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -532,6 +563,20 @@ extern const float hrtf_impulses[HRTF_IMPULSE_COUNT][HRTF_IMPULSE_LENGTH];
 struct hrtf_dataset {
 	unsigned int sr = 0, length = 0;
 	std::vector<float> impulses;
+	std::vector<float> resampler; // length rows of HRTF_IMPULSE_LENGTH weights taking an impulse at 44100hz to this rate, empty at 44100hz.
+	void resample(const float *in, float *out) const {
+		if (resampler.empty()) {
+			std::copy(in, in + HRTF_IMPULSE_LENGTH, out);
+			std::fill(out + HRTF_IMPULSE_LENGTH, out + length, 0.0f);
+			return;
+		}
+		for (unsigned int n = 0; n < length; n++) {
+			const float *w = &resampler[n * HRTF_IMPULSE_LENGTH];
+			float sum = 0.0f;
+			for (unsigned int k = 0; k < HRTF_IMPULSE_LENGTH; k++) sum += in[k] * w[k];
+			out[n] = sum;
+		}
+	}
 };
 
 /* The dataset is recorded at 44100hz. Other rates get a band limited (Blackman windowed sinc) resampling of every impulse. Scaling by the rate ratio keeps the frequency response, rather than the sum of the taps, the same. Results are cached and shared between all instances. */
@@ -547,24 +592,21 @@ inline std::shared_ptr<const hrtf_dataset> get_hrtf_dataset(unsigned int sr) {
 	const double ratio = REFERENCE_SR / sr, cutoff = std::min(1.0, 1.0 / ratio), radius = 6.0 / cutoff;
 	data->length = (unsigned int)std::ceil((HRTF_IMPULSE_LENGTH + 2.0 * radius) / ratio);
 	data->length = (data->length + 3) & ~3u;
-	data->impulses.assign(HRTF_IMPULSE_COUNT * data->length, 0.0f);
-	for (unsigned int i = 0; i < HRTF_IMPULSE_COUNT; i++) {
-		float *out = &data->impulses[i * data->length];
-		if (sr == (unsigned int)REFERENCE_SR) {
-			std::copy(hrtf_impulses[i], hrtf_impulses[i] + HRTF_IMPULSE_LENGTH, out);
-			continue;
-		}
+	if (sr == (unsigned int)REFERENCE_SR) data->length = HRTF_IMPULSE_LENGTH;
+	else {
+		data->resampler.assign(data->length * HRTF_IMPULSE_LENGTH, 0.0f);
 		for (unsigned int n = 0; n < data->length; n++) {
-			double t = n * ratio - radius, sum = 0.0;
+			const double t = n * ratio - radius;
 			for (unsigned int k = 0; k < HRTF_IMPULSE_LENGTH; k++) {
 				double x = t - k;
 				if (std::fabs(x) >= radius) continue;
 				double sinc = x == 0.0 ? 1.0 : std::sin(PI * cutoff * x) / (PI * cutoff * x), u = x / radius;
-				sum += hrtf_impulses[i][k] * cutoff * sinc * (0.42 + 0.5 * std::cos(PI * u) + 0.08 * std::cos(2.0 * PI * u));
+				data->resampler[n * HRTF_IMPULSE_LENGTH + k] = float(cutoff * sinc * (0.42 + 0.5 * std::cos(PI * u) + 0.08 * std::cos(2.0 * PI * u)) * ratio);
 			}
-			out[n] = float(sum * ratio);
 		}
 	}
+	data->impulses.assign(HRTF_IMPULSE_COUNT * data->length, 0.0f);
+	for (unsigned int i = 0; i < HRTF_IMPULSE_COUNT; i++) data->resample(hrtf_impulses[i], &data->impulses[i * data->length]);
 	cache.push_back(data);
 	return data;
 }
@@ -620,13 +662,48 @@ inline std::pair<double, double> compute_itd(double azimuth, double elevation, u
 	return (unsigned int)(az / PI) % 2 ? std::make_pair(0.0, itd) : std::make_pair(itd, 0.0);
 }
 
-inline void convolve_stereo(const float *x, const float *hl, const float *hr, unsigned int length, float &l, float &r) {
+// In place radix 2 FFT of a power of 2 length; the inverse isn't scaled.
+inline void fft(std::complex<double> *x, unsigned int n, bool inverse) {
+	for (unsigned int i = 1, j = 0; i < n; i++) {
+		unsigned int bit = n >> 1;
+		for (; j & bit; bit >>= 1) j ^= bit;
+		j ^= bit;
+		if (i < j) std::swap(x[i], x[j]);
+	}
+	for (unsigned int len = 2; len <= n; len <<= 1) {
+		const std::complex<double> w = std::polar(1.0, (inverse ? 2.0 : -2.0) * PI / len);
+		for (unsigned int i = 0; i < n; i += len) {
+			std::complex<double> wk = 1.0;
+			for (unsigned int k = 0; k < len / 2; k++, wk *= w) {
+				const std::complex<double> a = x[i + k], b = x[i + k + len / 2] * wk;
+				x[i + k] = a + b, x[i + k + len / 2] = a - b;
+			}
+		}
+	}
+}
+
+const unsigned int HRTF_BLEND_FFT = 256; // Long enough that the cepstrum of a 32 tap impulse barely aliases.
+
+/* Steam Audio's spatial blend, which scales the log magnitude and the phase of the HRTF by the blend so that it moves towards the flat response of an unpositioned sound. Scaled log magnitudes keep a clear difference between the ears at any blend, where mixing with the unpositioned sound would quickly drown it out. The impulse is minimum phase, so this is exactly scaling its complex cepstrum, found here from the log magnitude by folding the real cepstrum. The impulse is at 44100hz and buf holds HRTF_BLEND_FFT values. */
+inline void blend_impulse(double blend, float *impulse, std::complex<double> *buf) {
+	const unsigned int n = HRTF_BLEND_FFT;
+	for (unsigned int k = 0; k < n; k++) buf[k] = k < HRTF_IMPULSE_LENGTH ? impulse[k] : 0.0f;
+	fft(buf, n, false);
+	for (unsigned int k = 0; k < n; k++) buf[k] = std::log(std::max(std::abs(buf[k]), 1e-9));
+	fft(buf, n, true);
+	for (unsigned int k = 0; k < n; k++) buf[k] = k == 0 || k == n / 2 ? buf[k].real() * blend / n : k < n / 2 ? 2.0 * buf[k].real() * blend / n : 0.0;
+	fft(buf, n, false);
+	for (unsigned int k = 0; k < n; k++) buf[k] = std::exp(buf[k]);
+	fft(buf, n, true);
+	for (unsigned int k = 0; k < HRTF_IMPULSE_LENGTH; k++) impulse[k] = float(buf[k].real() / n);
+}
+
+inline void convolve_stereo(const float *xl, const float *xr, const float *hl, const float *hr, unsigned int length, float &l, float &r) {
 #ifdef MICROSYNTHISER_SSE
 	__m128 al = _mm_setzero_ps(), ar = _mm_setzero_ps();
 	for (unsigned int i = 0; i < length; i += 4) {
-		__m128 s = _mm_loadu_ps(x + i);
-		al = _mm_add_ps(al, _mm_mul_ps(s, _mm_loadu_ps(hl + i)));
-		ar = _mm_add_ps(ar, _mm_mul_ps(s, _mm_loadu_ps(hr + i)));
+		al = _mm_add_ps(al, _mm_mul_ps(_mm_loadu_ps(xl + i), _mm_loadu_ps(hl + i)));
+		ar = _mm_add_ps(ar, _mm_mul_ps(_mm_loadu_ps(xr + i), _mm_loadu_ps(hr + i)));
 	}
 	auto hsum = [](__m128 v) {
 		v = _mm_add_ps(v, _mm_shuffle_ps(v, v, _MM_SHUFFLE(1, 0, 3, 2)));
@@ -637,8 +714,8 @@ inline void convolve_stereo(const float *x, const float *hl, const float *hr, un
 #else
 	float l0 = 0.0f, l1 = 0.0f, l2 = 0.0f, l3 = 0.0f, r0 = 0.0f, r1 = 0.0f, r2 = 0.0f, r3 = 0.0f;
 	for (unsigned int i = 0; i < length; i += 4) {
-		l0 += x[i] * hl[i], l1 += x[i + 1] * hl[i + 1], l2 += x[i + 2] * hl[i + 2], l3 += x[i + 3] * hl[i + 3];
-		r0 += x[i] * hr[i], r1 += x[i + 1] * hr[i + 1], r2 += x[i + 2] * hr[i + 2], r3 += x[i + 3] * hr[i + 3];
+		l0 += xl[i] * hl[i], l1 += xl[i + 1] * hl[i + 1], l2 += xl[i + 2] * hl[i + 2], l3 += xl[i + 3] * hl[i + 3];
+		r0 += xr[i] * hr[i], r1 += xr[i + 1] * hr[i + 1], r2 += xr[i + 2] * hr[i + 2], r3 += xr[i + 3] * hr[i + 3];
 	}
 	l = (l0 + l1) + (l2 + l3);
 	r = (r0 + r1) + (r2 + r3);
@@ -649,7 +726,7 @@ inline void convolve_stereo(const float *x, const float *hl, const float *hr, un
 
 struct panner_state {
 	struct params {
-		double azimuth = 0.0, elevation = 0.0, distance = 0.0, gain = 1.0;
+		double azimuth = 0.0, elevation = 0.0, distance = 0.0, gain = 1.0, spatial_blend = 1.0;
 		distance_params distance_settings;
 	};
 	unsigned int sr;
@@ -657,14 +734,23 @@ struct panner_state {
 	params p;
 	bool first = true;
 	std::atomic<bool> reset_pending{false};
+	ramp crossfeed; // How much of the other channel of a stereo input each ear hears, half of the spatial blend as in Steam Audio.
 
 	explicit panner_state(unsigned int sample_rate) : sr(std::max(1u, sample_rate)) {}
 	virtual ~panner_state() {}
 	double total_gain() const { return p.gain * distance_gain(p.distance_settings, p.distance); }
 	virtual void update(bool snap) = 0;
-	virtual void run(const float *input, float *output, unsigned int frames, bool accumulate) = 0;
+	virtual void run(const float *input, unsigned int channels, float *output, unsigned int frames, bool accumulate) = 0;
 	virtual void clear() = 0;
-	void process(const float *input, float *output, unsigned int frames, bool accumulate) {
+	void ears(const float *frame, unsigned int channels, float &l, float &r) {
+		if (channels < 2) {
+			l = r = frame[0];
+			return;
+		}
+		const float w = crossfeed.next();
+		l = frame[0] + (frame[1] - frame[0]) * w, r = frame[1] + (frame[0] - frame[1]) * w;
+	}
+	void process(const float *input, unsigned int channels, float *output, unsigned int frames, bool accumulate) {
 		if (!input || !output) return;
 		denormal_guard guard;
 		if (reset_pending.exchange(false)) clear();
@@ -673,34 +759,39 @@ struct panner_state {
 			params np;
 			if (box.poll(np)) {
 				p = np;
+				if (first) crossfeed.snap(float(0.5 * p.spatial_blend));
+				else crossfeed.set(float(0.5 * p.spatial_blend), scale_samples(sr, 256));
 				update(first);
 			}
 			first = false;
-			run(input, output, n, accumulate);
-			input += n, output += n * 2, frames -= n;
+			run(input, channels, output, n, accumulate);
+			input += n * channels, output += n * 2, frames -= n;
 		}
 	}
 };
 
 /* Synthizer's HrtfPanner. Each output sample is a convolution with the current HRIRs followed by a fractional ITD delay per ear. When the position changes the HRIRs and ITD crossfade over 64 samples (at 44100hz); a position change during a crossfade is picked up once it finishes. */
 struct hrtf_state : panner_state {
-	std::shared_ptr<const hrtf_dataset> data;
+	std::shared_ptr<const hrtf_dataset> data, reference; // The dataset at this rate and at 44100hz, which spatial blending works on.
+	std::vector<std::complex<double>> blend_buf;
 	unsigned int length, xfade_len, xfade_pos, fade_len, itd_mask, itd_pos = 0, cur = 0;
-	// Input history followed by the current chunk, so that convolution always reads contiguous memory.
-	std::vector<float> history;
+	// Each ear's input history followed by the current chunk, so that convolution always reads contiguous memory.
+	std::vector<float> history[2];
 	// [set][ear], stored reversed so that convolution walks the history and the impulse in the same direction.
 	std::vector<float> impulses[2][2];
 	std::vector<float> itd_lines[2];
-	double cur_azimuth = 0.0, cur_elevation = 0.0;
+	double cur_azimuth = 0.0, cur_elevation = 0.0, cur_blend = 1.0;
 	float itd_prev[2] = {0.0f, 0.0f}, itd_cur[2] = {0.0f, 0.0f};
 	ramp gain;
 
 	explicit hrtf_state(unsigned int sample_rate) : panner_state(sample_rate) {
 		data = get_hrtf_dataset(sr);
+		reference = get_hrtf_dataset((unsigned int)REFERENCE_SR);
+		blend_buf.resize(HRTF_BLEND_FFT);
 		length = data->length;
 		xfade_len = xfade_pos = scale_samples(sr, 64);
 		fade_len = scale_samples(sr, 256);
-		history.assign(length - 1 + CHUNK, 0.0f);
+		for (auto &h : history) h.assign(length - 1 + CHUNK, 0.0f);
 		for (auto &set : impulses)
 			for (auto &ear : set) ear.assign(length, 0.0f);
 		itd_mask = next_pow2((unsigned int)std::ceil(HRTF_MAX_ITD * sr / REFERENCE_SR) + 4) - 1;
@@ -708,11 +799,18 @@ struct hrtf_state : panner_state {
 		update(true);
 	}
 	void load(unsigned int set) {
-		cur_azimuth = p.azimuth, cur_elevation = p.elevation;
-		compute_hrtf_impulses(*data, cur_azimuth, cur_elevation, impulses[set][0].data(), impulses[set][1].data());
+		cur_azimuth = p.azimuth, cur_elevation = p.elevation, cur_blend = p.spatial_blend;
+		if (cur_blend < 1.0) {
+			float ears[2][HRTF_IMPULSE_LENGTH];
+			compute_hrtf_impulses(*reference, cur_azimuth, cur_elevation, ears[0], ears[1]);
+			for (unsigned int e = 0; e < 2; e++) {
+				blend_impulse(cur_blend, ears[e], blend_buf.data());
+				data->resample(ears[e], impulses[set][e].data());
+			}
+		} else compute_hrtf_impulses(*data, cur_azimuth, cur_elevation, impulses[set][0].data(), impulses[set][1].data());
 		for (auto &ear : impulses[set]) std::reverse(ear.begin(), ear.end());
 		auto itd = compute_itd(cur_azimuth, cur_elevation, sr);
-		itd_cur[0] = float(itd.first), itd_cur[1] = float(itd.second);
+		itd_cur[0] = float(itd.first * cur_blend), itd_cur[1] = float(itd.second * cur_blend);
 	}
 	void update(bool snap) override {
 		if (snap) {
@@ -723,7 +821,7 @@ struct hrtf_state : panner_state {
 		} else gain.set(float(total_gain()), fade_len);
 	}
 	void clear() override {
-		std::fill(history.begin(), history.end(), 0.0f);
+		for (auto &h : history) std::fill(h.begin(), h.end(), 0.0f);
 		for (auto &line : itd_lines) std::fill(line.begin(), line.end(), 0.0f);
 	}
 	float read_itd(unsigned int ear, float delay) const {
@@ -731,22 +829,22 @@ struct hrtf_state : panner_state {
 		float f = delay - i, a = itd_lines[ear][(itd_pos - i) & itd_mask], b = itd_lines[ear][(itd_pos - i - 1) & itd_mask];
 		return a + (b - a) * f;
 	}
-	void run(const float *input, float *output, unsigned int frames, bool accumulate) override {
-		if (xfade_pos >= xfade_len && (p.azimuth != cur_azimuth || p.elevation != cur_elevation)) {
+	void run(const float *input, unsigned int channels, float *output, unsigned int frames, bool accumulate) override {
+		if (xfade_pos >= xfade_len && (p.azimuth != cur_azimuth || p.elevation != cur_elevation || p.spatial_blend != cur_blend)) {
 			itd_prev[0] = itd_cur[0], itd_prev[1] = itd_cur[1];
 			cur ^= 1;
 			load(cur);
 			xfade_pos = 0;
 		}
-		float *h = history.data();
-		std::copy(input, input + frames, h + length - 1);
+		float *hl = history[0].data(), *hr = history[1].data();
+		for (unsigned int i = 0; i < frames; i++) ears(input + i * channels, channels, hl[length - 1 + i], hr[length - 1 + i]);
 		const float *cl = impulses[cur][0].data(), *cr = impulses[cur][1].data(), *pl = impulses[cur ^ 1][0].data(), *pr = impulses[cur ^ 1][1].data();
 		for (unsigned int i = 0; i < frames; i++) {
 			float l, r, itd_l = itd_cur[0], itd_r = itd_cur[1];
-			convolve_stereo(h + i, cl, cr, length, l, r);
+			convolve_stereo(hl + i, hr + i, cl, cr, length, l, r);
 			if (xfade_pos < xfade_len) {
 				float ol, orr, w = float(xfade_pos++) / xfade_len;
-				convolve_stereo(h + i, pl, pr, length, ol, orr);
+				convolve_stereo(hl + i, hr + i, pl, pr, length, ol, orr);
 				l = ol + (l - ol) * w, r = orr + (r - orr) * w;
 				itd_l = itd_prev[0] + (itd_l - itd_prev[0]) * w, itd_r = itd_prev[1] + (itd_r - itd_prev[1]) * w;
 			}
@@ -757,7 +855,8 @@ struct hrtf_state : panner_state {
 			o[0] = accumulate ? o[0] + ol : ol;
 			o[1] = accumulate ? o[1] + orr : orr;
 		}
-		std::memmove(h, h + frames, (length - 1) * sizeof(float));
+		std::memmove(hl, hl + frames, (length - 1) * sizeof(float));
+		std::memmove(hr, hr + frames, (length - 1) * sizeof(float));
 	}
 };
 
@@ -771,15 +870,18 @@ struct stereo_state : panner_state {
 		// Azimuth is clockwise from forward; the scalar wants clockwise from left, folding the back half onto the front.
 		double angle = std::fmod(90.0 + p.azimuth, 360.0), g = total_gain();
 		double scalar = angle <= 180.0 ? -1.0 + 2.0 * angle / 180.0 : 1.0 - 2.0 * (angle - 180.0) / 180.0;
-		double pan = (1.0 + scalar) / 2.0 * PI / 2.0;
-		float l = float(std::cos(pan) * g), r = float(std::sin(pan) * g);
+		double pan = (1.0 + scalar) / 2.0 * PI / 2.0, b = p.spatial_blend;
+		// The spatial blend moves each side's gain towards unity in decibels.
+		float l = float(std::pow(std::max(std::cos(pan), 1e-5), b) * g), r = float(std::pow(std::max(std::sin(pan), 1e-5), b) * g);
 		if (snap) gain_l.snap(l), gain_r.snap(r);
 		else gain_l.set(l, fade_len), gain_r.set(r, fade_len);
 	}
 	void clear() override {}
-	void run(const float *input, float *output, unsigned int frames, bool accumulate) override {
+	void run(const float *input, unsigned int channels, float *output, unsigned int frames, bool accumulate) override {
 		for (unsigned int i = 0; i < frames; i++) {
-			float *o = output + i * 2, l = input[i] * gain_l.next(), r = input[i] * gain_r.next();
+			float *o = output + i * 2, l, r;
+			ears(input + i * channels, channels, l, r);
+			l *= gain_l.next(), r *= gain_r.next();
 			o[0] = accumulate ? o[0] + l : l;
 			o[1] = accumulate ? o[1] + r : r;
 		}
@@ -1132,6 +1234,77 @@ struct biquad_filter_state {
 	}
 };
 
+/* Steam Audio's air absorption (see air_absorption_effect), with its EQ: a low shelf at 800hz, a peaking filter between 800hz and 8khz and a high shelf at 8khz, crossfading to new settings over 256 samples (at 44100hz) like biquad_filter_state. */
+struct air_absorption_state {
+	static const unsigned int BANDS = 3;
+	struct params {
+		double distance = 0.0, coefficients[BANDS] = {0.0002, 0.0017, 0.0182};
+	};
+
+	unsigned int sr, channels, active = 0, xfade_len, xfade_pos;
+	param_box<params> box;
+	bool first = true;
+	std::atomic<bool> reset_pending{false};
+	biquad_coefs coefs[2][BANDS];
+	float gains[2] = {1.0f, 1.0f};
+	std::vector<biquad_state> states[2]; // BANDS per channel.
+
+	air_absorption_state(unsigned int sample_rate, unsigned int channel_count) : sr(std::max(1u, sample_rate)), channels(std::max(1u, channel_count)) {
+		xfade_len = xfade_pos = scale_samples(sr, 256);
+		for (auto &s : states) s.assign(channels * BANDS, biquad_state());
+	}
+	static void band_gains(const params &p, double *g) {
+		for (unsigned int b = 0; b < BANDS; b++) g[b] = std::exp(-p.coefficients[b] * p.distance);
+	}
+	void design(const params &p, unsigned int set) {
+		double g[BANDS], loudest = 0.0;
+		band_gains(p, g);
+		for (double v : g) loudest = std::max(loudest, v);
+		for (double &v : g) v = loudest > 0.0 ? std::max(v / loudest, 0.0625) : 1.0;
+		const double center = std::sqrt(800.0 * 8000.0);
+		coefs[set][0] = design_biquad(biquad_type::lowshelf, 800.0, 0.7071067811865476, 20.0 * std::log10(g[0]), sr);
+		coefs[set][1] = design_biquad(biquad_type::peaking, center, center / (8000.0 - 800.0), 20.0 * std::log10(g[1]), sr);
+		coefs[set][2] = design_biquad(biquad_type::highshelf, 8000.0, 0.7071067811865476, 20.0 * std::log10(g[2]), sr);
+		gains[set] = float(loudest);
+	}
+	float tick(unsigned int set, unsigned int channel, float x) {
+		double y = x;
+		biquad_state *s = &states[set][channel * BANDS];
+		for (unsigned int b = 0; b < BANDS; b++) y = s[b].tick(coefs[set][b], y);
+		return float(y) * gains[set];
+	}
+	void process(const float *input, float *output, unsigned int frames, bool accumulate) {
+		if (!input || !output) return;
+		denormal_guard guard;
+		if (reset_pending.exchange(false))
+			for (auto &s : states) std::fill(s.begin(), s.end(), biquad_state());
+		while (frames) {
+			unsigned int n = std::min(frames, CHUNK);
+			params np;
+			if ((first || xfade_pos >= xfade_len) && box.poll(np)) {
+				if (first) design(np, active);
+				else {
+					design(np, active ^ 1);
+					std::copy(states[active].begin(), states[active].end(), states[active ^ 1].begin());
+					xfade_pos = 0;
+				}
+			}
+			first = false;
+			for (unsigned int i = 0; i < n; i++, input += channels, output += channels) {
+				const bool fading = xfade_pos < xfade_len;
+				const float w = fading ? float(xfade_pos++) / xfade_len : 0.0f;
+				for (unsigned int c = 0; c < channels; c++) {
+					float x = input[c], y = tick(active, c, x);
+					if (fading) y += (tick(active ^ 1, c, x) - y) * w;
+					output[c] = accumulate ? output[c] + y : y;
+				}
+				if (fading && xfade_pos == xfade_len) active ^= 1;
+			}
+			frames -= n;
+		}
+	}
+};
+
 } // namespace detail
 
 double distance_gain(const distance_params &params, double distance) {
@@ -1178,9 +1351,14 @@ panner_effect::panner_effect(detail::panner_state *s) : state(s) {}
 panner_effect::~panner_effect() = default;
 panner_effect::panner_effect(panner_effect &&other) noexcept = default;
 panner_effect &panner_effect::operator=(panner_effect &&other) noexcept = default;
-void panner_effect::process(const float *input, float *output, unsigned int frames, bool accumulate) { state->process(input, output, frames, accumulate); }
+void panner_effect::process(const float *input, float *output, unsigned int frames, bool accumulate) { state->process(input, 1, output, frames, accumulate); }
+void panner_effect::process_stereo(const float *input, float *output, unsigned int frames, bool accumulate) { state->process(input, 2, output, frames, accumulate); }
 void panner_effect::reset() { state->reset_pending = true; }
 unsigned int panner_effect::get_sample_rate() const { return state->sr; }
+void panner_effect::set_spatial_blend(double blend) {
+	state->box.write([&](detail::panner_state::params &p) { p.spatial_blend = detail::sanitize(blend, 0.0, 1.0); });
+}
+double panner_effect::get_spatial_blend() const { return state->box.read().spatial_blend; }
 void panner_effect::set_angles(double azimuth, double elevation) {
 	state->box.write([&](detail::panner_state::params &p) {
 		p.azimuth = detail::wrap_azimuth(azimuth);
@@ -1297,6 +1475,35 @@ biquad_type biquad_filter_effect::get_type() const { return state->box.read().ty
 double biquad_filter_effect::get_frequency() const { return state->box.read().frequency; }
 double biquad_filter_effect::get_q() const { return state->box.read().q; }
 double biquad_filter_effect::get_gain_db() const { return state->box.read().gain_db; }
+
+air_absorption_effect::air_absorption_effect(unsigned int sample_rate, unsigned int channels) : state(new detail::air_absorption_state(sample_rate, channels)) {}
+air_absorption_effect::~air_absorption_effect() = default;
+air_absorption_effect::air_absorption_effect(air_absorption_effect &&other) noexcept = default;
+air_absorption_effect &air_absorption_effect::operator=(air_absorption_effect &&other) noexcept = default;
+void air_absorption_effect::process(const float *input, float *output, unsigned int frames, bool accumulate) { state->process(input, output, frames, accumulate); }
+void air_absorption_effect::reset() { state->reset_pending = true; }
+unsigned int air_absorption_effect::get_sample_rate() const { return state->sr; }
+unsigned int air_absorption_effect::get_channels() const { return state->channels; }
+void air_absorption_effect::set_distance(double distance) {
+	state->box.write([&](detail::air_absorption_state::params &p) { p.distance = detail::sanitize(distance, 0.0, 1e9); });
+}
+double air_absorption_effect::get_distance() const { return state->box.read().distance; }
+void air_absorption_effect::set_coefficients(double low, double mid, double high) {
+	state->box.write([&](detail::air_absorption_state::params &p) {
+		p.coefficients[0] = detail::sanitize(low, 0.0, 1e3);
+		p.coefficients[1] = detail::sanitize(mid, 0.0, 1e3);
+		p.coefficients[2] = detail::sanitize(high, 0.0, 1e3);
+	});
+}
+void air_absorption_effect::get_coefficients(double &low, double &mid, double &high) const {
+	auto p = state->box.read();
+	low = p.coefficients[0], mid = p.coefficients[1], high = p.coefficients[2];
+}
+void air_absorption_effect::get_band_gains(double &low, double &mid, double &high) const {
+	double g[detail::air_absorption_state::BANDS];
+	detail::air_absorption_state::band_gains(state->box.read(), g);
+	low = g[0], mid = g[1], high = g[2];
+}
 
 namespace detail {
 // Synthizer's processed MIT KEMAR dataset: per elevation {angle, first impulse, azimuth count}, then 32 tap minimum phase left ear impulses at 44100hz with azimuths equally spaced clockwise from forward.

@@ -4,6 +4,22 @@ float[]@ hrtf_test_noise(int channels) {
 	for (uint i = 0; i < noise.length(); i++) noise[i] = random(-1000, 1000) / 4000.0;
 	return noise;
 }
+float[]@ hrtf_test_tone(int channels) { // 500hz, which air absorption barely touches.
+	float[] tone(44100 / 2 * channels);
+	for (uint i = 0; i < tone.length(); i++) tone[i] = sin(2 * 3.14159265 * 500 * (i / channels) / 44100.0) / 4;
+	return tone;
+}
+double hrtf_test_brightness(audio_engine@ e, int blocks) { // The energy of the change between samples relative to the energy of the samples, which falls as highs are lost.
+	double energy = 0, change = 0;
+	for (int b = 0; b < blocks; b++) {
+		float[]@ frames = e.read(512);
+		for (uint i = 2; i + 1 < frames.length(); i += 2) {
+			energy += frames[i] * frames[i];
+			change += pow(frames[i] - frames[i - 2], 2);
+		}
+	}
+	return energy > 0 ? change / energy : 0;
+}
 double[]@ hrtf_test_render(audio_engine@ e, int blocks) { // The energy of the left and right channels.
 	double[] energy = {0, 0};
 	for (int b = 0; b < blocks; b++) {
@@ -41,7 +57,7 @@ void test_hrtf_spatialization() {
 double[]@ hrtf_test_distance_energies(bool hrtf, const float[]@ distances) {
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	sound@ s = e.sound();
-	assert(s.load_pcm(hrtf_test_noise(2), 44100, 2));
+	assert(s.load_pcm(hrtf_test_tone(2), 44100, 2)); // A tone so that the HRTF attenuator's air absorption doesn't change the level.
 	hrtf_test_wait(s);
 	s.hrtf = hrtf;
 	s.set_3d_panner(audio_panner_basic); // The HRTF panner blends to unspatialized sound close to the listener, which would change the level as well.
@@ -66,6 +82,52 @@ void test_hrtf_attenuation_curve() { // Every attenuator uses NVGT's distance cu
 			assert(abs(gain - expected[i]) < expected[i] * 0.15, (hrtf == 1 ? "hrtf" : "basic") + " attenuator gain at " + distances[i] + " units should be about " + expected[i] + ", got " + gain);
 		}
 	}
+}
+void test_hrtf_spatial_blend() { // Close to the listener the HRTF panner narrows the difference between the ears rather than mixing in the unpositioned sound, which made nearby sounds seem centered.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	sound@ s = e.sound();
+	assert(s.load_pcm(hrtf_test_noise(1), 44100, 1));
+	hrtf_test_wait(s);
+	s.hrtf = true;
+	e.set_listener_position(0, 0, 0, 0);
+	s.set_position_3d(2, 0, 0);
+	s.play_looped();
+	hrtf_test_render(e, 4);
+	double[]@ near = hrtf_test_render(e, 20);
+	assert(near[1] > near[0] * 2.5, "a sound 2 units to the right should still be clearly louder in the right ear, got " + near[0] + ", " + near[1]);
+	sound@ st = e.sound(); // A stereo sound right in front of the listener keeps its stereo image.
+	float[]@ left_only = hrtf_test_noise(2);
+	for (uint i = 1; i < left_only.length(); i += 2) left_only[i] = 0;
+	assert(st.load_pcm(left_only, 44100, 2));
+	hrtf_test_wait(st);
+	s.stop();
+	st.hrtf = true;
+	st.set_position_3d(0, 0.25, 0);
+	st.play_looped();
+	hrtf_test_render(e, 4);
+	double[]@ image = hrtf_test_render(e, 20);
+	assert(image[0] > image[1] * 10, "a stereo sound at the listener should keep its stereo image, got " + image[0] + ", " + image[1]);
+}
+void test_hrtf_air_absorption() { // The HRTF attenuator dulls distant sounds, the basic one doesn't.
+	double[] brightness;
+	for (int hrtf = 0; hrtf < 2; hrtf++) {
+		for (int far = 0; far < 2; far++) {
+			audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+			sound@ s = e.sound();
+			assert(s.load_pcm(hrtf_test_noise(2), 44100, 2));
+			hrtf_test_wait(s);
+			s.hrtf = hrtf == 1;
+			s.set_3d_panner(audio_panner_basic);
+			e.set_listener_position(0, 0, 0, 0);
+			s.set_position_3d(0, far == 1 ? 40 : 1, 0);
+			s.play_looped();
+			hrtf_test_render(e, 4);
+			brightness.insert_last(hrtf_test_brightness(e, 20));
+		}
+	}
+	assert(abs(brightness[1] / brightness[0] - 1) < 0.05, "the basic attenuator shouldn't change the sound's tone with distance, brightness " + brightness[0] + " near and " + brightness[1] + " far");
+	assert(abs(brightness[2] / brightness[0] - 1) < 0.05, "the HRTF attenuator shouldn't change the tone of a nearby sound, brightness " + brightness[2] + " vs " + brightness[0]);
+	assert(brightness[3] < brightness[2] * 0.95, "the HRTF attenuator should dull a distant sound, brightness " + brightness[2] + " near and " + brightness[3] + " far");
 }
 void test_fdn_reverb_node() {
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);

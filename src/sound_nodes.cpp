@@ -964,8 +964,7 @@ spatializer_component_node* basic_panner::create(audio_spatializer* spatializer,
 
 class hrtf_panner_impl : public spatializer_component_node_impl, public virtual hrtf_panner {
 	microsynthiser::hrtf_effect hrtf;
-	vector<float> mono, binaural;
-	float spatial_blend = -1.0f; // How much of the output is spatialized, the rest being the input unchanged, so that sounds at the listener's position aren't snapped to one direction.
+	vector<float> mono;
 public:
 	hrtf_panner_impl(audio_spatializer* spatializer, audio_engine* e) : spatializer_component_node_impl(spatializer, e, 0, 2), hrtf(e->get_sample_rate()) {
 		microsynthiser::distance_params no_attenuation; // The attenuator attenuates.
@@ -982,25 +981,20 @@ public:
 		}
 		// The direction is listener relative with x right, y up and z behind, microsynthiser's has y ahead and z up.
 		hrtf.set_position({params.listener_direction_x, -params.listener_direction_z, params.listener_direction_y});
-		const float fully_spatialized_distance = 5.0f;
-		float blend = clamp(params.listener_distance * params.directional_attenuation_factor / fully_spatialized_distance, 0.0f, 1.0f);
-		if (spatial_blend < 0.0f) spatial_blend = blend;
+		const float fully_spatialized_distance = 5.0f; // Within this distance a sound is increasingly unpositioned, so that sounds at the listener's position aren't snapped to one direction. Like Steam Audio this narrows the difference between the ears rather than mixing in the unpositioned sound, which would make nearby sounds seem centered.
+		hrtf.set_spatial_blend(clamp(params.listener_distance * params.directional_attenuation_factor / fully_spatialized_distance, 0.0f, 1.0f));
+		if (channels == 2) {
+			hrtf.process_stereo(frames_in[0], frames_out[0], frames);
+			return;
+		}
 		if (mono.size() < frames) mono.resize(frames);
-		if (binaural.size() < frames * 2) binaural.resize(frames * 2);
 		const float* in = frames_in[0];
 		for (unsigned int i = 0; i < frames; i++) {
 			float sum = 0.0f;
 			for (unsigned int c = 0; c < channels; c++) sum += in[i * channels + c];
 			mono[i] = sum / channels;
 		}
-		hrtf.process(mono.data(), binaural.data(), frames);
-		float* out = frames_out[0];
-		for (unsigned int i = 0; i < frames; i++) {
-			const float b = spatial_blend + (blend - spatial_blend) * (i / (float)frames), left = channels > 1 ? in[i * channels] : in[i], right = channels > 1 ? in[i * channels + 1] : in[i];
-			out[i * 2] = binaural[i * 2] * b + left * (1.0f - b);
-			out[i * 2 + 1] = binaural[i * 2 + 1] * b + right * (1.0f - b);
-		}
-		spatial_blend = blend;
+		hrtf.process(mono.data(), frames_out[0], frames);
 	}
 };
 spatializer_component_node* hrtf_panner::create(audio_spatializer* spatializer, audio_engine* engine) { return new hrtf_panner_impl(spatializer, engine); }
@@ -1037,6 +1031,21 @@ float basic_attenuator::attenuation(const audio_spatialization_parameters& param
 }
 spatializer_component_node* basic_attenuator::create(audio_spatializer* spatializer, audio_engine* engine) { return new curve_attenuator_impl<basic_attenuator, basic_attenuator::attenuation>(spatializer, engine); }
 float hrtf_attenuator::attenuation(const audio_spatialization_parameters& params, float distance) { return basic_attenuator::attenuation(params, distance); } // NVGT's distance curve, as physical models such as Synthizer's inverse distance fall off far too quickly for audio games.
-spatializer_component_node* hrtf_attenuator::create(audio_spatializer* spatializer, audio_engine* engine) { return new curve_attenuator_impl<hrtf_attenuator, hrtf_attenuator::attenuation>(spatializer, engine); }
+// NVGT's distance curve followed by Steam Audio's air absorption, which dulls distant sounds so that they sound far away rather than only quiet. As with the nvgt_phonon plugin's attenuator, a unit of distance is taken to be about 0.3 meters for air absorption, as audio games rarely treat a unit as a meter.
+class hrtf_attenuator_impl : public curve_attenuator_impl<hrtf_attenuator, hrtf_attenuator::attenuation> {
+	microsynthiser::air_absorption_effect air;
+	static constexpr float meters_per_unit = 0.3f;
+public:
+	hrtf_attenuator_impl(audio_spatializer* spatializer, audio_engine* e) : curve_attenuator_impl(spatializer, e), air(e->get_sample_rate(), e->get_channels()) {}
+	~hrtf_attenuator_impl() { destroy_node(); } // Before air is destroyed, so the audio thread can't be using it.
+	void process(const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) override {
+		curve_attenuator_impl::process(frames_in, frame_count_in, frames_out, frame_count_out);
+		audio_spatialization_parameters params;
+		if (!spatializer || !spatializer->get_parameters(params)) return;
+		air.set_distance(params.listener_distance * meters_per_unit);
+		air.process(frames_out[0], frames_out[0], min(*frame_count_in, *frame_count_out));
+	}
+};
+spatializer_component_node* hrtf_attenuator::create(audio_spatializer* spatializer, audio_engine* engine) { return new hrtf_attenuator_impl(spatializer, engine); }
 
 
