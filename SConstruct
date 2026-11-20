@@ -109,7 +109,7 @@ if  ARGUMENTS.get("no_plugins", "0") == "0":
 			static_plugins_object = env.Object(static_plugins_path, static_plugins_path + ".cpp", CPPPATH = env["CPPPATH"] + ["#src"])
 
 # Project libraries
-env.Append(LIBS = ["deps"] + common_libs + ["zs" if env["NVGT_TARGET"] == "windows" else "z", "SDL3", "phonon", "pffft", "mysofa", "ASAddon"])
+env.Append(LIBS = ["deps"] + common_libs + ["zs" if env["NVGT_TARGET"] == "windows" else "z", "SDL3", "ASAddon"])
 if env["NVGT_TARGET"] in ("windows", "macos", "linux"): env.Append(LIBS = ["prism", "fmt", "simdutf", "hwy_contrib", "hwy"])
 if env["NVGT_TARGET"] == "windows": env.Append(LIBS = ["runtimeobject", "uiautomationcore", "rpcrt4", "powrprof", "xaudio2"])
 elif env["NVGT_TARGET"] == "linux": env.Append(LIBS = ["dbus-1"])

@@ -17,7 +17,7 @@
 #include "jolt.h"
 #include "sound_service.h"
 
-#define SOUNDSYSTEM_FRAMESIZE 256 // We can make this be configureable if enough people want it.
+#define SOUNDSYSTEM_FRAMESIZE 512 // Steam Audio processes and partitions its convolution in blocks of this many frames, so larger blocks make reflections much cheaper. We can make this be configureable if enough people want it.
 
 class CScriptArray;
 class CScriptHandle;
@@ -267,7 +267,7 @@ public:
 	virtual void set_reverb3d(reverb3d* verb) = 0;
 	virtual void set_reverb3d_at(reverb3d* verb, audio_spatializer_reverb3d_placement placement) = 0;
 	virtual reverb3d* get_reverb3d() const = 0;
-	virtual splitter_node* get_reverb3d_attachment() const = 0;
+	virtual audio_node* get_reverb3d_attachment() const = 0;
 	virtual audio_spatializer_reverb3d_placement get_reverb3d_placement() const = 0;
 	virtual audio_node_chain* get_effects_chain() = 0;
 	virtual audio_node_chain* get_internal_node_chain() = 0;

@@ -10,7 +10,7 @@ timer rotationtimer;
 
 void main() {
 	dummy.load("dummy");
-	sound_global_hrtf = true;
+	set_sound_global_hrtf(true);
 
 	show_window("NVGT 3d sound demo");
 	p.hrtf = true;
@@ -22,7 +22,6 @@ void main() {
 	}
 
 	mixer mix;
-	mix.set_fx("$room:freeverb:1.0:0.8:0.50:1.0:1.0:0.8");
 	p.items[mus].handle.set_mixer(@mix);
 	int x = 0;
 	int y = 0;
@@ -33,7 +32,6 @@ void main() {
 		wait(5);
 		if (key_pressed(KEY_C)) {
 			screen_reader_speak("FX cleared", false);
-			mix.set_fx("$room");
 		}
 		if (key_pressed(KEY_ESCAPE))
 			exit();

@@ -12,8 +12,6 @@
 
 #include <exception>
 #include <angelscript.h> // asAtomic
-#include <miniaudio_phonon.h>
-#include <phonon.h>
 #include <unordered_map>
 #include <vector>
 #include "sound.h"
@@ -123,14 +121,6 @@ public:
 
 bool set_global_hrtf(bool enabled);
 bool get_global_hrtf();
-
-class phonon_binaural_node : public virtual audio_node {
-	public:
-	static phonon_binaural_node* create(audio_engine* engine, int channels, int sample_rate, int frame_size = 0);
-	virtual void set_direction(float x, float y, float z, float distance) = 0;
-	virtual void set_direction_vector(const vector3& direction, float distance) = 0;
-	virtual void set_spatial_blend_max_distance(float max_distance) = 0;
-};
 class splitter_node : public virtual audio_node {
 	public:
 	static splitter_node* create(audio_engine* engine, int channels);
@@ -207,6 +197,31 @@ public:
 	virtual float get_decay() const = 0;
 	static delay_node* create(unsigned int delay_in_frames, float decay, audio_engine* engine);
 };
+// A feedback delay network reverb from microsynthiser (Synthizer's reverb), with a smooth tail and a 3 band decay.
+class fdn_reverb_node : public virtual audio_node {
+	public:
+	static fdn_reverb_node* create(audio_engine* engine);
+	virtual void reset() = 0;
+	virtual float get_tail_length() const = 0;
+	#define FDN_REVERB_PROPERTY(type, name) virtual void set_##name(type value) = 0; virtual type get_##name() const = 0;
+	FDN_REVERB_PROPERTY(float, wet)
+	FDN_REVERB_PROPERTY(float, dry)
+	FDN_REVERB_PROPERTY(float, width)
+	FDN_REVERB_PROPERTY(bool, frozen)
+	FDN_REVERB_PROPERTY(float, input_lowpass)
+	FDN_REVERB_PROPERTY(float, input_highpass)
+	FDN_REVERB_PROPERTY(float, mean_free_path)
+	FDN_REVERB_PROPERTY(float, t60)
+	FDN_REVERB_PROPERTY(float, lf_rolloff)
+	FDN_REVERB_PROPERTY(float, lf_reference)
+	FDN_REVERB_PROPERTY(float, hf_rolloff)
+	FDN_REVERB_PROPERTY(float, hf_reference)
+	FDN_REVERB_PROPERTY(float, diffusion)
+	FDN_REVERB_PROPERTY(float, modulation_depth)
+	FDN_REVERB_PROPERTY(float, modulation_frequency)
+	FDN_REVERB_PROPERTY(float, late_reflections_delay)
+	#undef FDN_REVERB_PROPERTY
+};
 class freeverb_node : public virtual audio_node {
 	public:
 	virtual void set_room_size(float size) = 0;
@@ -224,6 +239,15 @@ class freeverb_node : public virtual audio_node {
 	virtual void set_frozen(bool frozen) = 0;
 	virtual bool get_frozen() const = 0;
 	static freeverb_node* create(audio_engine* engine);
+};
+struct audio_spatialization_parameters;
+class reverb3d;
+// Lets a subsystem such as sound_environment supply the node through which each source is sent to a reverb3d, for reverbs that need to process every source individually. The handler is owned by the reverb3d it is created with.
+class reverb3d_attachment_handler {
+public:
+	virtual ~reverb3d_attachment_handler() = default;
+	virtual audio_node* create_attachment(reverb3d* verb, mixer* source) = 0; // Must return a node with one input and two output buses, bus 0 continuing the source's dry signal and bus 1 being the send that will be connected to verb, such as a plugin_node.
+	virtual void update_attachment(reverb3d* verb, audio_node* attachment, const audio_spatialization_parameters& params) = 0; // Called from the audio thread with the source's current spatialization parameters, in place of reverb3d's distance based send volume.
 };
 class reverb3d : public virtual passthrough_node {
 public:
@@ -243,7 +267,10 @@ public:
 	virtual float get_volume_curve() const = 0;
 	virtual float get_volume_at(float distance) const = 0;
 	virtual splitter_node* create_attachment(audio_node* dry_input = nullptr, audio_node* dry_output = nullptr) = 0;
+	virtual audio_node* create_source_attachment(mixer* source) = 0; // Used by audio_spatializer, creating the attachment through the handler if there is one.
+	virtual void update_attachment(audio_node* attachment, const audio_spatialization_parameters& params) = 0;
 	static reverb3d* create(audio_node* reverb, mixer* destination = nullptr, audio_engine* e = g_audio_engine);
+	static reverb3d* create_with_handler(reverb3d_attachment_handler* handler, audio_node* reverb, mixer* destination = nullptr, audio_engine* e = g_audio_engine);
 };
 class plugin_node : public virtual audio_node {
 public:
@@ -275,6 +302,7 @@ struct audio_spatialization_parameters {
 	float rolloff;
 	float directional_attenuation_factor;
 	audio_spatializer_distance_model distance_model;
+	int attenuator; // The id of the attenuator in use, -1 if none.
 };
 
 class spatializer_component_node;
@@ -297,7 +325,7 @@ public:
 	virtual float get_directional_attenuation_factor() const = 0;
 	virtual void set_reverb3d(reverb3d* new_reverb, audio_spatializer_reverb3d_placement placement = postpan) = 0;
 	virtual reverb3d* get_reverb3d() const = 0;
-	virtual splitter_node* get_reverb3d_attachment() const = 0;
+	virtual audio_node* get_reverb3d_attachment() const = 0;
 	virtual audio_spatializer_reverb3d_placement get_reverb3d_placement() const = 0;
 	virtual mixer* get_mixer() const = 0;
 	virtual bool get_parameters(audio_spatialization_parameters& params) = 0;
@@ -316,30 +344,42 @@ public:
 	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
 };
 
-class phonon_hrtf_panner : public virtual spatializer_component_node {
-public:
-	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
-};
-
 class basic_attenuator : public virtual spatializer_component_node {
 public:
 	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
+	static float attenuation(const audio_spatialization_parameters& params, float distance);
 };
 
-class phonon_attenuator : public virtual spatializer_component_node {
+// Synthizer's HRTF panner and inverse distance attenuation from microsynthiser, NVGT's built in HRTF.
+class hrtf_panner : public virtual spatializer_component_node {
 public:
 	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
 };
+class hrtf_attenuator : public virtual spatializer_component_node {
+public:
+	static spatializer_component_node* create(audio_spatializer* spatializer, audio_engine* engine);
+	static float attenuation(const audio_spatialization_parameters& params, float distance);
+};
 
 typedef spatializer_component_node* (*spatializer_component_node_factory)(audio_spatializer*, audio_engine*);
+typedef float (*spatializer_attenuation_function)(const audio_spatialization_parameters& params, float distance); // The gain an attenuator applies to a sound with the given parameters at a distance, for subsystems such as sound_environment's pathing that need to attenuate a sound over a distance other than the listener's.
 
 struct spatializer_component {
 	spatializer_component_node_factory factory;
 	bool enabled;
+	spatializer_attenuation_function attenuation;
 };
 
+// Implemented by plugins to provide a 3d panner or attenuator through create_plugin_spatializer_component (nvgt_audio_spatializer_component_create). NVGT calls process on the audio thread with the sound's current spatialization parameters, passing the audio through unchanged while there are none, and deletes the implementation with its node.
+class audio_plugin_spatializer_component_interface {
+public:
+	virtual ~audio_plugin_spatializer_component_interface() = default;
+	virtual void process(const audio_spatialization_parameters& params, const float** frames_in, unsigned int* frame_count_in, float** frames_out, unsigned int* frame_count_out) = 0;
+};
+spatializer_component_node* create_plugin_spatializer_component(audio_plugin_spatializer_component_interface* impl, audio_spatializer* spatializer, audio_engine* engine, unsigned int input_channels, unsigned int output_channels);
 int register_audio_panner(spatializer_component_node_factory factory, bool default_enabled = true);
-int register_audio_attenuator(spatializer_component_node_factory factory, bool default_enabled = true);
+int register_audio_attenuator(spatializer_component_node_factory factory, bool default_enabled = true, spatializer_attenuation_function attenuation = nullptr);
+float get_audio_attenuation(int attenuator_id, const audio_spatialization_parameters& params, float distance); // Uses the basic attenuator's curve for attenuators without one.
 spatializer_component_node* create_audio_panner(int id, audio_spatializer* spatializer, audio_engine* engine);
 spatializer_component_node* create_audio_attenuator(int id, audio_spatializer* spatializer, audio_engine* engine);
 void sound_set_default_3d_panner(int panner_id);
@@ -354,6 +394,6 @@ bool sound_set_spatialization(int panner, int attenuator, bool disable_previous 
 
 
 extern int g_audio_basic_panner;
-extern int g_audio_phonon_hrtf_panner;
 extern int g_audio_basic_attenuator;
-extern int g_audio_phonon_attenuator;
+extern int g_audio_hrtf_panner;
+extern int g_audio_hrtf_attenuator;

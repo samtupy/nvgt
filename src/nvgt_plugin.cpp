@@ -22,6 +22,7 @@
 #include "datastreams.h"
 #include "nvgt.h"
 #include "nvgt_plugin.h"
+#include "sound_nodes.h"
 #include "UI.h"
 #include "xplatform.h"
 
@@ -55,6 +56,12 @@ nvgt_raycast_provider* nvgt_get_raycast_provider(void* object, int type_id) { //
 	auto it = raycast_provider_types.find(type_id & ~(asTYPEID_OBJHANDLE | asTYPEID_HANDLETOCONST));
 	return it == raycast_provider_types.end() ? nullptr : it->second(object);
 }
+int nvgt_register_audio_panner(nvgt_spatializer_component_factory* factory, bool default_enabled) { return factory ? register_audio_panner(factory, default_enabled) : -1; }
+int nvgt_register_audio_attenuator(nvgt_spatializer_component_factory* factory, bool default_enabled, nvgt_audio_attenuation_function* attenuation) { return factory ? register_audio_attenuator(factory, default_enabled, attenuation) : -1; }
+float nvgt_get_audio_attenuation(int attenuator_id, const audio_spatialization_parameters* params, float distance) { return params ? get_audio_attenuation(attenuator_id, *params, distance) : 1.0f; }
+spatializer_component_node* nvgt_audio_spatializer_component_create(audio_plugin_spatializer_component_interface* impl, audio_spatializer* spatializer, audio_engine* engine, unsigned int input_channels, unsigned int output_channels) { return create_plugin_spatializer_component(impl, spatializer, engine, input_channels, output_channels); }
+audio_engine* nvgt_get_default_audio_engine() { return init_sound() ? g_audio_engine : nullptr; }
+reverb3d* nvgt_reverb3d_create_with_handler(reverb3d_attachment_handler* handler, audio_node* reverb, mixer* destination, audio_engine* engine) { return reverb3d::create_with_handler(handler, reverb, destination, engine ? engine : nvgt_get_default_audio_engine()); }
 void notify_nvgt_plugins_shutdown() {
 	while (!plugin_shutdown_callbacks.empty()) {
 		nvgt_plugin_shutdown_callback* callback = plugin_shutdown_callbacks.back();
