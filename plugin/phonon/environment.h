@@ -124,7 +124,7 @@ public:
 	// Settings, set from the script thread. Changing those that the simulators or the audio effects are created with causes them to be rebuilt. The defaults are Unity's, except that fewer rays with many more bounces are traced for a similar cost, as the length of the reverb tail depends on the number of bounces while Steam Audio averages out the noise of fewer rays across simulations.
 	atomic<int> reflection_type = reflections_convolution;
 	atomic<int> rays = 2048, bounces = 32, order = 1, max_sources = 16, threads, diffuse_samples = 32, max_occlusion_samples = 16;
-	atomic<float> duration = 1.0f, irradiance_min_distance = 1.0f, interval = 0.1f, hybrid_transition_time = 1.0f, hybrid_overlap = 0.25f;
+	atomic<float> duration = 1.0f, irradiance_min_distance = 0.25f, interval = 0.1f, hybrid_transition_time = 1.0f, hybrid_overlap = 0.25f;
 	atomic<float> reflection_grouping = 0.25f; // Sounds within this fraction of their distance from the listener of each other can share a reflection group.
 	atomic<bool> use_reflection_mixer = true, binaural = true, use_listener_reverb = true;
 	atomic<float> reflections_level = 0.5f, reflections_width = 4.0f, reflections_highpass = 160.0f; // Toned down from physically accurate levels and widened from Steam Audio's binaural decoding, which tends to sound overpowering and narrow in games.

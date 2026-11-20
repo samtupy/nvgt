@@ -253,7 +253,7 @@ void test_sound_environment_character_transparent() { // A sound inside a charac
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
 	physics_world@ world = sound_environment_test_room(false);
 	physics_character@ c = physics_character(world, 1.8, 0.3, vector(0, 0, 0.01));
-	assert(c.acoustically_transparent and world.get_acoustically_transparent(c.body), "characters should be acoustically transparent by default");
+	assert(c.acoustically_transparent, "characters should be acoustically transparent by default");
 	sound_environment env(e);
 	env.use_listener_reverb = false;
 	env.set_raycaster(world);
@@ -274,7 +274,26 @@ void test_sound_environment_character_transparent() { // A sound inside a charac
 	double tail = sound_environment_test_energy(e, env, 40);
 	assert(tail > 10, "a sound inside an acoustically transparent character should reverberate, tail energy " + tail);
 	c.acoustically_transparent = false;
-	assert(!world.get_acoustically_transparent(c.body));
+	assert(!c.acoustically_transparent);
+}
+void test_sound_environment_transparent_material() { // Surfaces of an acoustically transparent material don't block sound.
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	physics_world@ world = sound_environment_test_room(false);
+	physics_material@ curtain = physics_material_create(0.5, 0.1, "brick");
+	curtain.acoustically_transparent = true;
+	assert(physics_material_create(0.5, 0.1, "brick").acoustically_transparent == false, "materials shouldn't be transparent unless made so");
+	world.create_and_add_body(physics_box_shape_create(vector(0.1, 5, 2), 0.05, curtain), vector(0, 0, 2), IDENTITY_QUATERNION, PHYSICS_BODY_STATIC, PHYSICS_LAYER_NON_MOVING);
+	sound_environment env(e);
+	env.set_raycaster(world);
+	e.set_listener_position(0, -2.5, -2, 1.5);
+	mixer@ m = env.new_mixer();
+	m.set_position_3d(2.5, 0, 1.5);
+	sound_environment_source@ src = env.get_source(m);
+	sound_environment_test_pump(e, env, 3);
+	assert(src.simulated and src.occlusion > 0.99, "a wall of a transparent material shouldn't occlude, occlusion " + src.occlusion);
+	curtain.acoustically_transparent = false;
+	sound_environment_test_pump(e, env, 3);
+	assert(src.occlusion < 0.01, "the wall should occlude once its material isn't transparent, occlusion " + src.occlusion);
 }
 int[] sound_environment_test_groups(bool divided, const vector[]@ positions, const vector&in listener) { // The reflection group each of the given positions is assigned to.
 	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
