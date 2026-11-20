@@ -6,10 +6,10 @@ void test_audio_node_chain_ordering() {
 	audio_high_pass_filter b(100, 2, e);
 	audio_notch_filter n(1, 500, e);
 	audio_peak_filter p(3, 1, 1000, e);
-	assert(c.add_node(a) and c.add_node(b) and c[0] is b and c[1] is a, "add_node without a node to insert after inserts at the front");
+	assert(c.add_node(a) and c.add_node(b) and c[0] is a and c[1] is b, "add_node without a node to insert after appends");
 	assert(c.add_node(p, c.node_count - 1) and c.last is p, "inserting after the last index appends");
 	assert(c.add_node(n, -1) and c.first is n and c.node_count == 4, "inserting after index -1 puts the node first");
 	assert(!c.add_node(audio_notch_filter(1, 500, e), 4) and !c.add_node(audio_notch_filter(1, 500, e), -2), "out of range indexes are refused");
-	assert(c.find(a) == 2 and c.remove_node(a) and c.find(a) == -1 and c.remove_node(0) and c.node_count == 2, "removing nodes");
+	assert(c.find(a) == 1 and c.remove_node(a) and c.find(a) == -1 and c.remove_node(0) and c.node_count == 2, "removing nodes");
 	assert(c.clear() and c.node_count == 0 and c.endpoint is e.endpoint, "clearing keeps the endpoint");
 }
