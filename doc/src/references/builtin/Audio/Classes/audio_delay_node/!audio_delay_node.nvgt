@@ -1,0 +1,21 @@
+/**
+	An echo effect, which repeats the audio after a delay, each repetition quieter than the last.
+	audio_delay_node(uint delay_in_frames, float decay, audio_engine@ engine = sound_default_engine);
+	## Arguments:
+		* uint delay_in_frames: the time between echoes in PCM frames, so the engine's sample rate is one second.
+		* float decay: how much of each echo is fed into the next, from 0 for a single echo to nearly 1 for echoes that take a long time to fade.
+		* audio_engine@ engine = sound_default_engine: the engine to create the node in.
+	## Remarks:
+		This is an audio_node with one input and one output bus, and has all of the methods and properties of audio_node as well as the ones listed here.
+		The delay can't be changed once the node is created, create a new node for a different delay. The echoes carry on after the audio going into the node stops, until they have faded away.
+*/
+
+// Example:
+void main() {
+	sound s;
+	s.load("C:/Windows/media/ding.wav");
+	audio_delay_node echo(sound_default_engine.sample_rate / 4, 0.5); // A quarter of a second between echoes.
+	s.effects_chain.add_node(echo);
+	s.play_wait();
+	wait(2000); // Let the echoes fade.
+}

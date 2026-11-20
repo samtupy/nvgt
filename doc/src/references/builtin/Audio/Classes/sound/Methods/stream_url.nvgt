@@ -1,12 +1,13 @@
 /**
-	Load the specified URL.
-	bool sound::load_url(string url);
+	Stream a sound from a URL, such as an internet radio station or a sound file on a web server.
+	bool sound::stream_url(const string&in url);
 	## Arguments:
-		* string url: the URL to load (should be the direct link to a sound or stream).
+		* const string&in url: the address of the audio, which should lead directly to the audio data rather than to a web page about it.
 	## Returns:
-		Bool: True if the URL was successfully loaded; false otherwise.
+		bool: true if the stream could be opened, false otherwise.
 	## Remarks:
-		This function should currently be considered beta.
+		The audio is downloaded and decoded a little at a time as it plays. Live streams such as radio stations have no known length, so their `length` is 0 and they can't be seeked.
+		This method should currently be considered beta.
 */
 
 // Example:

@@ -1,0 +1,20 @@
+/**
+	A filter that removes high frequencies above its cutoff, making audio sound muffled, distant or as though it is behind a wall.
+	audio_low_pass_filter(double cutoff_frequency, uint order, audio_engine@ engine = sound_default_engine);
+	## Arguments:
+		* double cutoff_frequency: the frequency in hertz above which audio is removed.
+		* uint order: how steeply frequencies above the cutoff are cut, from 1 to 8, see `order`.
+		* audio_engine@ engine = sound_default_engine: the engine to create the node in.
+	## Remarks:
+		This is an audio_node with one input and one output bus, and has all of the methods and properties of audio_node as well as the ones listed here. Its settings can be changed while audio is playing.
+		A cutoff of around 1000 hertz makes a convincing sound through a wall, and around 500 one under water.
+*/
+
+// Example:
+void main() {
+	sound s;
+	s.load("C:/Windows/media/ding.wav");
+	audio_low_pass_filter effect(800, 4);
+	s.effects_chain.add_node(effect);
+	s.play_wait();
+}

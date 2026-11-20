@@ -1,34 +1,18 @@
 # load
-Loads a sound file with the specified settings.
+Load a sound from a file, decoding all of it into memory.
 
-1. `bool sound::load(string filename, pack@ soundpack = null, bool allow_preloads = true);`
-2. `bool sound::load(sound_close_callback@ close_cb, sound_length_callback@ length_cb, sound_read_callback@ read_cb, sound_seek_callback@ seek_cb, string data, string preload_filename = "");`
+`bool sound::load(const string&in filename, const pack_interface@ pack = sound_default_pack);`
 
-## Arguments (1):
-* string filename: the name/path to the file that is to be loaded.
-* pack@ soundpack = null: a handle to the pack object to load this sound from, if any.
-* bool allow_preloads = true: whether or not the sound system should preload sounds into memory on game load.
-
-## Arguments (2):
-* sound_close_callback@ close_cb: the close callback to use with the sound (see remarks).
-* sound_length_callback@ length_cb: the length callback to use with the sound (see remarks).
-* sound_read_callback@ read_cb: the read callback to use with the sound (see remarks).
-* sound_seek_callback@ seek_cb: the seek callback to use with the sound (see remarks).
-* string data: the audio data of the sound.
-* string preload_filename = "": the name of the file to be preloaded (if any).
+## Arguments:
+* const string&in filename: the file to load.
+* const pack_interface@ pack = sound_default_pack: the pack to load the file from, or null to load it from disk. By default `sound_default_pack` is used, which is null unless you have set it.
 
 ## Returns:
-bool: true if the sound was successfully loaded, false otherwise.
+bool: true if the file was found and could be opened, false otherwise.
 
 ## Remarks:
-The syntax for the sound_close_callback is:
-> void sound_close_callback(string user_data);
+Any sound that was loaded before is closed first. Loading happens in the background, so this returns quickly even for a long file, and the sound can be played straight away, starting as soon as enough of it is decoded. `load_complete` says when the whole file has been decoded.
 
-The syntax for the sound_length_callback is:
-> uint sound_length_callback(string user_data);
+The whole sound is kept in memory, decoded, which makes it quick to play again and to seek, and is best for sound effects. Sounds loaded from the same file share their decoded audio, so loading one sound many times costs little extra memory. For long sounds such as music, which would take a lot of memory, use `stream()` instead.
 
-The syntax for the sound_read_callback is:
-> int sound_read_callback(string&out buffer, uint length, string user_data);
-
-The syntax for the sound_seek_callback is:
-> bool sound_seek_callback(uint offset, string user_data);
+WAV, OGG Vorbis, Opus, MP3 and FLAC files are supported, as are formats provided by plugins. Files encrypted with the key in `sound_default_decryption_key` are decrypted.

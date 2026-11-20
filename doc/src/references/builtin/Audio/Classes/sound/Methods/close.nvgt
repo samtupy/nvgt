@@ -1,8 +1,10 @@
 /**
-	Closes an opened sound, making the sound object available to be reloaded with a new one.
+	Close whatever is loaded into the sound, freeing it so that the sound object can be loaded with something else.
 	bool sound::close();
 	## Returns:
-		bool: true if the sound could be closed, false otherwise for example if there is no sound opened.
+		bool: true if the sound could be closed, false if nothing was loaded.
+	## Remarks:
+		Loading something new into a sound closes what was loaded before automatically, so this is only needed to free memory early. A sound is also closed when it is destroyed.
 */
 
 // Example:

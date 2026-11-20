@@ -1,0 +1,25 @@
+/**
+	An audio_decoder decodes a sound file or stream into samples, for playing with a sound or for reading yourself.
+	audio_decoder(audio_engine@ engine = sound_default_engine);
+	## Arguments:
+		* audio_engine@ engine = sound_default_engine: the engine to create the decoder in.
+	## Remarks:
+		An audio_decoder is an audio_data_source, and has all of its methods and properties as well as the ones listed here. Open something to decode with `open()`.
+		Most of the time `sound::load()` or `sound::stream()` is all you need. A decoder is useful when you want the samples themselves, such as to analyse a sound, to mix it into something else or to convert it to another format, or to decode audio arriving over a datastream.
+*/
+
+// Example:
+void main() {
+	audio_decoder decoder;
+	if (!decoder.open("C:/Windows/media/ding.wav")) {
+		alert("Error", "The file could not be opened.");
+		return;
+	}
+	float loudest = 0;
+	while (true) {
+		float[]@ samples = decoder.read();
+		if (samples.length() == 0) break;
+		for (uint i = 0; i < samples.length(); i++) if (abs(samples[i]) > loudest) loudest = abs(samples[i]);
+	}
+	alert("Peak", "The loudest sample is " + round(loudest * 100, 1) + "% of full scale.");
+}

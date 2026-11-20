@@ -1,0 +1,25 @@
+/**
+	An audio_node_chain connects a list of nodes one after another, so that audio entering the chain passes through each of them in order before going to its endpoint.
+	audio_node_chain(audio_node@ source = null, audio_node@ endpoint = null, audio_engine@ engine = sound_default_engine);
+	## Arguments:
+		* audio_node@ source = null: a node whose output is attached to the start of the chain, or null to attach something later.
+		* audio_node@ endpoint = null: the node that the end of the chain is attached to, or null to set it later with `set_endpoint()`.
+		* audio_engine@ engine = sound_default_engine: the engine to create the chain in.
+	## Remarks:
+		An audio_node_chain is an audio_node with one input and one output, and has all of the methods and properties of audio_node as well as the ones listed here. Attaching something to its input sends it through the chain, and attaching its output changes its endpoint.
+		Connecting nodes one after another with `attach_output_bus()` works, but taking a node out of the middle of such a line means reconnecting its neighbours by hand. A chain does that for you, so effects can be inserted, removed and reordered while audio is playing.
+		Every mixer and sound has a chain of its own, its `effects_chain`, which is the easiest way to give it effects. A chain of your own is useful for a set of effects that several things should share, such as one that sounds from a radio go through.
+		Calling `add_node()` without saying where inserts the node at the start of the chain. To build a chain in order, insert each node after the `last` one as the example does.
+*/
+
+// Example:
+void main() {
+	sound s;
+	s.load("C:/Windows/media/ding.wav");
+	audio_node_chain@ effects = s.effects_chain; // Every sound has a chain of its own.
+	effects.add_node(audio_high_pass_filter(500, 2), effects.last);
+	effects.add_node(audio_low_pass_filter(3000, 2), effects.last); // Together, a tinny telephone sound.
+	s.play_wait();
+	effects.clear();
+	s.play_wait(); // And the same sound without any effects.
+}
