@@ -78,3 +78,22 @@ void test_physics_material_registry() {
 	physics_material@ goo = physics_material_get("test_goo");
 	assert(goo !is null and abs(goo.acoustic_scattering - 0.4) < 0.0001 and abs(goo.acoustic_transmission_high - 0.7) < 0.0001, "define_acoustics should create a registered material");
 }
+void test_body_uses_shape_material() {
+	physics_world world;
+	physics_material@ rubber = physics_material_get("rubber");
+	physics_body_id bouncy = world.create_and_add_body(physics_sphere_shape_create(0.5, rubber), vector(0, 0, 5), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	assert(abs(world.get_friction(bouncy) - rubber.friction) < 0.0001 and abs(world.get_restitution(bouncy) - rubber.restitution) < 0.0001, "a body should take the friction and restitution of its shape's material, but has " + world.get_friction(bouncy) + " and " + world.get_restitution(bouncy));
+	physics_body_id plain = world.create_and_add_body(physics_sphere_shape_create(0.5), vector(0, 0, 5), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	assert(abs(world.get_friction(plain) - 0.2) < 0.0001 and world.get_restitution(plain) == 0, "a body whose shape has no material should have Jolt's defaults, but has " + world.get_friction(plain) + " and " + world.get_restitution(plain));
+}
+void test_world_methods_with_default_activation() {
+	physics_world world;
+	physics_body_id body = world.create_and_add_body(physics_sphere_shape_create(0.5), vector(0, 0, 0), IDENTITY_QUATERNION, PHYSICS_BODY_DYNAMIC);
+	world.set_position(body, vector(1, 2, 3));
+	world.set_rotation(body, IDENTITY_QUATERNION);
+	world.set_position_and_rotation(body, vector(4, 5, 6), IDENTITY_QUATERNION);
+	world.set_motion_type(body, PHYSICS_BODY_KINEMATIC);
+	world.set_shape(body, physics_sphere_shape_create(1.0));
+	vector pos = world.get_position(body);
+	assert(abs(pos.x - 4) < 0.0001 and abs(pos.y - 5) < 0.0001 and abs(pos.z - 6) < 0.0001, "the activation arguments of these world methods should have defaults, position was " + pos);
+}

@@ -69,7 +69,7 @@ using namespace std;
 
 // -- physics_material: ref-counted (via Jolt's RefTarget) override of PhysicsMaterial --
 // Note: this Jolt version's PhysicsMaterial only provides debug info; friction/restitution are per-body via BodyInterface.
-// We store friction/restitution here for game-logic use (e.g. reading back when adding a body to the world).
+// We store friction/restitution here and copy them to bodies created with a shape that has this material.
 class nvgt_physics_material final : public PhysicsMaterial {
 public:
 	float friction;
@@ -561,6 +561,11 @@ static void jolt_world_set_contact_listener(jolt_physics_world* w, asIScriptFunc
 static BodyID jolt_world_create_and_add_body(jolt_physics_world* w, jolt_shape_ref* shape, const Vec3& pos, const Quat& rot, int motion_type, uint16 layer, int activation) {
 	if (!shape || !shape->shape) return BodyID();
 	BodyCreationSettings settings(shape->shape.GetPtr(), pos, rot, (EMotionType)motion_type, (ObjectLayer)layer);
+	const PhysicsMaterial* material = shape->shape->GetMaterial(SubShapeID());
+	if (material && material != PhysicsMaterial::sDefault.GetPtr()) { // Jolt only gives bodies friction and restitution, so those of the shape's material are copied to the body, which can still change them afterwards.
+		settings.mFriction = static_cast<const nvgt_physics_material*>(material)->friction;
+		settings.mRestitution = static_cast<const nvgt_physics_material*>(material)->restitution;
+	}
 	return w->system.GetBodyInterface().CreateAndAddBody(settings, (EActivation)activation);
 }
 
@@ -1415,10 +1420,10 @@ static void RegisterJoltWorld(asIScriptEngine* engine) {
 
 	// Transform
 	engine->RegisterObjectMethod("physics_world", "vector@ get_position(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_position), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_world", "void set_position(const physics_body_id&in id, const vector&in pos, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_position), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_position(const physics_body_id&in id, const vector&in pos, physics_activation activation = PHYSICS_ACTIVATE)", asFUNCTION(jolt_world_set_position), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "quaternion@ get_rotation(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_rotation), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_world", "void set_rotation(const physics_body_id&in id, const quaternion&in rot, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_rotation), asCALL_CDECL_OBJFIRST);
-	engine->RegisterObjectMethod("physics_world", "void set_position_and_rotation(const physics_body_id&in id, const vector&in pos, const quaternion&in rot, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_position_and_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_rotation(const physics_body_id&in id, const quaternion&in rot, physics_activation activation = PHYSICS_ACTIVATE)", asFUNCTION(jolt_world_set_rotation), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_position_and_rotation(const physics_body_id&in id, const vector&in pos, const quaternion&in rot, physics_activation activation = PHYSICS_ACTIVATE)", asFUNCTION(jolt_world_set_position_and_rotation), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "vector@ get_center_of_mass_position(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_center_of_mass_position), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "physics_transform get_transform(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_transform), asCALL_CDECL_OBJFIRST);
 
@@ -1444,11 +1449,11 @@ static void RegisterJoltWorld(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("physics_world", "bool is_added(const physics_body_id&in id) const", asFUNCTION(jolt_world_is_added), asCALL_CDECL_OBJFIRST);
 
 	// Motion type
-	engine->RegisterObjectMethod("physics_world", "void set_motion_type(const physics_body_id&in id, physics_body_type type, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_motion_type), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_motion_type(const physics_body_id&in id, physics_body_type type, physics_activation activation = PHYSICS_ACTIVATE)", asFUNCTION(jolt_world_set_motion_type), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("physics_world", "physics_body_type get_motion_type(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_motion_type), asCALL_CDECL_OBJFIRST);
 
 	// Shape
-	engine->RegisterObjectMethod("physics_world", "void set_shape(const physics_body_id&in id, physics_shape@ shape, bool update_mass = true, physics_activation activation = JOLT_ACTIVATE)", asFUNCTION(jolt_world_set_shape), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("physics_world", "void set_shape(const physics_body_id&in id, physics_shape@ shape, bool update_mass = true, physics_activation activation = PHYSICS_ACTIVATE)", asFUNCTION(jolt_world_set_shape), asCALL_CDECL_OBJFIRST);
 
 	// Material properties
 	engine->RegisterObjectMethod("physics_world", "float get_friction(const physics_body_id&in id) const", asFUNCTION(jolt_world_get_friction), asCALL_CDECL_OBJFIRST);
