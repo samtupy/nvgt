@@ -66,8 +66,8 @@ elif env["NVGT_TARGET"] == "ios":
 	env.Append(CCFLAGS = ["-arch", "arm64", "-xobjective-c++"], LINKFLAGS = ["-arch", "arm64"])
 	env["FRAMEWORKPREFIX"] = "-weak_framework"
 elif env["NVGT_TARGET"] == "linux":
-	# enable the gold linker, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
-	env.Append(CPPPATH = ["lindev/include", "/usr/local/include"], LIBPATH = ["lindev/lib", "/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], LINKFLAGS = ["-fuse-ld=gold", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
+	# enable the gold linker, drop unused functions and data, strip the resulting binaries, and add /usr/local/lib to the libpath because it seems we aren't finding libraries unless we do manually.
+	env.Append(CPPPATH = ["lindev/include", "/usr/local/include"], LIBPATH = ["lindev/lib", "/usr/local/lib", "/usr/lib/x86_64-linux-gnu"], CCFLAGS = ["-ffunction-sections", "-fdata-sections"], LINKFLAGS = ["-fuse-ld=gold", "-Wl,--gc-sections", "-g" if ARGUMENTS.get("debug", 0) == "1" else "-s"])
 elif env["NVGT_TARGET"] == "android":
 	SConscript("build/android_sconscript.py", exports = ["env"])
 	env.Append(LIBS = common_libs + ["z", "GLESv1_CM", "GLESv2", "OpenSLES", "log", "android"])
@@ -141,7 +141,7 @@ elif env["NVGT_TARGET"] in ("macos", "ios"):
 	env.Append(FRAMEWORKS = ["AudioToolbox", "AVFoundation", "CoreAudio", "CoreFoundation", "CoreHaptics", "CoreMedia", "CoreVideo", "GameController", "IOKit", "Metal", "QuartzCore", "Security"])
 	if env["NVGT_TARGET"] == "macos":
 		env.Append(FRAMEWORKS = ["AppKit", "Carbon", "Cocoa", "CoreServices", "ForceFeedback", "UniformTypeIdentifiers"])
-		env.Append(LINKFLAGS = ["-Wl,-rpath,'@loader_path',-rpath,'@loader_path/lib',-rpath,'@loader_path/../Frameworks',-dead_strip_dylibs", "-mmacosx-version-min=14.0", "-fexperimental-library"])
+		env.Append(LINKFLAGS = ["-Wl,-rpath,'@loader_path',-rpath,'@loader_path/lib',-rpath,'@loader_path/../Frameworks',-dead_strip_dylibs,-dead_strip", "-mmacosx-version-min=14.0", "-fexperimental-library"])
 	else:
 		env.Append(FRAMEWORKS = ["CoreBluetooth", "CoreGraphics", "CoreMotion", "Foundation", "OpenGLES", "UIKit"])
 		env.Append(CCFLAGS = ["-miphoneos-version-min=16.0"], LINKFLAGS = ["-miphoneos-version-min=16.0"])
