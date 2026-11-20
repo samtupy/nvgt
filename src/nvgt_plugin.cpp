@@ -33,6 +33,11 @@ std::ios* nvgt_datastream_get_ios(void* stream) { return reinterpret_cast<datast
 // We need a no-op wrapper for nvgt_bundle_shared_library which is only needed on script compilation and thus is not included in stubs or mobile platforms.
 void nvgt_bundle_shared_library(const std::string& libname) {}
 #endif
+#if defined(_WIN32) && defined(_DEBUG)
+// Every module linked with the static debug CRT keeps its own list of heap blocks, so memory such as a std::string's buffer that a plugin allocates and NVGT frees, or the reverse, trips a debug heap assertion. Debug plugins find these with GetProcAddress and route their operator new and delete through NVGT's, see nvgt_plugin.h. Release builds don't need this, as the static CRT allocates from the process heap that every module shares.
+extern "C" __declspec(dllexport) void* nvgt_debug_operator_new(size_t size, size_t alignment) { return alignment ? ::operator new(size, std::align_val_t(alignment)) : ::operator new(size); }
+extern "C" __declspec(dllexport) void nvgt_debug_operator_delete(void* ptr, size_t alignment) { if (alignment) ::operator delete(ptr, std::align_val_t(alignment)); else ::operator delete(ptr); }
+#endif
 typedef struct {
 	nvgt_plugin_entry* e;
 	nvgt_plugin_version_func* v;

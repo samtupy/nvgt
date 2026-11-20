@@ -205,6 +205,51 @@ typedef int nvgt_plugin_version_func();
 		plugin_version() { return NVGT_PLUGIN_API_VERSION; }
 	#endif
 #endif
+#if defined(_WIN32) && defined(_DEBUG) && !defined(NVGT_PLUGIN_STATIC) && !defined(NVGT_PLUGIN_INCLUDE)
+	// A debug plugin's static CRT has a debug heap of its own that can't free NVGT's memory or the reverse, which strings and other objects passed between them need, so its operator new and delete use NVGT's, see nvgt_debug_operator_new in nvgt_plugin.cpp. They are looked up from the executable on first use rather than in prepare_plugin so that memory allocated by static initializers goes the same way, and the plugin falls back to its own heap if the executable doesn't export them. The declarations match windows.h's, which isn't included here to keep its macros out of plugins.
+	#include <cstdint>
+	#include <cstdlib>
+	#include <new>
+	struct HINSTANCE__;
+	extern "C" __declspec(dllimport) HINSTANCE__* __stdcall GetModuleHandleW(const wchar_t* module_name);
+	extern "C" __declspec(dllimport) intptr_t(__stdcall* __stdcall GetProcAddress(HINSTANCE__* module, const char* proc_name))();
+	typedef void* nvgt_debug_operator_new_func(size_t size, size_t alignment);
+	typedef void nvgt_debug_operator_delete_func(void* ptr, size_t alignment);
+	static nvgt_debug_operator_new_func* nvgt_debug_host_new() { static nvgt_debug_operator_new_func* f = (nvgt_debug_operator_new_func*)GetProcAddress(GetModuleHandleW(nullptr), "nvgt_debug_operator_new"); return f; }
+	static nvgt_debug_operator_delete_func* nvgt_debug_host_delete() { static nvgt_debug_operator_delete_func* f = (nvgt_debug_operator_delete_func*)GetProcAddress(GetModuleHandleW(nullptr), "nvgt_debug_operator_delete"); return f; }
+	static void* nvgt_debug_new(size_t size, size_t alignment) {
+		if (nvgt_debug_host_new() && nvgt_debug_host_delete()) return nvgt_debug_host_new()(size ? size : 1, alignment);
+		void* ptr = alignment ? _aligned_malloc(size ? size : 1, alignment) : malloc(size ? size : 1);
+		if (!ptr) throw std::bad_alloc();
+		return ptr;
+	}
+	static void nvgt_debug_delete(void* ptr, size_t alignment) {
+		if (!ptr) return;
+		if (nvgt_debug_host_new() && nvgt_debug_host_delete()) nvgt_debug_host_delete()(ptr, alignment);
+		else if (alignment) _aligned_free(ptr);
+		else free(ptr);
+	}
+	void* operator new(size_t size) { return nvgt_debug_new(size, 0); }
+	void* operator new[](size_t size) { return nvgt_debug_new(size, 0); }
+	void* operator new(size_t size, std::align_val_t alignment) { return nvgt_debug_new(size, size_t(alignment)); }
+	void* operator new[](size_t size, std::align_val_t alignment) { return nvgt_debug_new(size, size_t(alignment)); }
+	void* operator new(size_t size, const std::nothrow_t&) noexcept { try { return nvgt_debug_new(size, 0); } catch (...) { return nullptr; } }
+	void* operator new[](size_t size, const std::nothrow_t&) noexcept { try { return nvgt_debug_new(size, 0); } catch (...) { return nullptr; } }
+	void* operator new(size_t size, std::align_val_t alignment, const std::nothrow_t&) noexcept { try { return nvgt_debug_new(size, size_t(alignment)); } catch (...) { return nullptr; } }
+	void* operator new[](size_t size, std::align_val_t alignment, const std::nothrow_t&) noexcept { try { return nvgt_debug_new(size, size_t(alignment)); } catch (...) { return nullptr; } }
+	void operator delete(void* ptr) noexcept { nvgt_debug_delete(ptr, 0); }
+	void operator delete[](void* ptr) noexcept { nvgt_debug_delete(ptr, 0); }
+	void operator delete(void* ptr, size_t) noexcept { nvgt_debug_delete(ptr, 0); }
+	void operator delete[](void* ptr, size_t) noexcept { nvgt_debug_delete(ptr, 0); }
+	void operator delete(void* ptr, std::align_val_t alignment) noexcept { nvgt_debug_delete(ptr, size_t(alignment)); }
+	void operator delete[](void* ptr, std::align_val_t alignment) noexcept { nvgt_debug_delete(ptr, size_t(alignment)); }
+	void operator delete(void* ptr, size_t, std::align_val_t alignment) noexcept { nvgt_debug_delete(ptr, size_t(alignment)); }
+	void operator delete[](void* ptr, size_t, std::align_val_t alignment) noexcept { nvgt_debug_delete(ptr, size_t(alignment)); }
+	void operator delete(void* ptr, const std::nothrow_t&) noexcept { nvgt_debug_delete(ptr, 0); }
+	void operator delete[](void* ptr, const std::nothrow_t&) noexcept { nvgt_debug_delete(ptr, 0); }
+	void operator delete(void* ptr, std::align_val_t alignment, const std::nothrow_t&) noexcept { nvgt_debug_delete(ptr, size_t(alignment)); }
+	void operator delete[](void* ptr, std::align_val_t alignment, const std::nothrow_t&) noexcept { nvgt_debug_delete(ptr, size_t(alignment)); }
+#endif
 // Pass a pointer to an nvgt_plugin_shared structure to this function, making Angelscript available for use in any file that includes nvgt_plugin.h after calling this function.
 inline bool prepare_plugin(nvgt_plugin_shared* shared) {
 	if (shared->version != NVGT_PLUGIN_API_VERSION) return false;
