@@ -233,8 +233,8 @@ void garbage_collect_inline_sounds() {
 }
 
 // Sound shapes let mixer/sound::set_position_3d position the sound as though it was more than one tile wide in each direction.
-typedef sound_shape* sound_shape_setup_callback(mixer* connected_sound, CScriptHandle* shape_reference);
 std::unordered_map<int, sound_shape_setup_callback*> g_sound_shape_setup_callbacks;
+void register_sound_shape_type(int type_id, sound_shape_setup_callback* setup) { if (type_id > 0) g_sound_shape_setup_callbacks[type_id] = setup; }
 std::unordered_set<sound_shape*> g_blocking_sound_shapes; // Most built-in shapes are threadsafe, thus when the listener moves we can safely update the sound position from audio processing threads. Sometimes however such as in the case of script callbacks, we wish to insilate the scripter from being threadsafe, and we store all such non-threadsafe shapes here.
 bool register_blocking_sound_shape(sound_shape* shape, mixer* connected_sound) {
 	if (!shape || !connected_sound) return false;
@@ -1262,7 +1262,7 @@ public:
 	}
 	bool get_hrtf() const override { return get_spatializer()->get_preferred_panner_id() == g_audio_hrtf_panner && get_spatializer()->get_preferred_attenuator_id() == g_audio_hrtf_attenuator; }
 	bool set_shape(CScriptHandle new_shape) override {
-		// release old shape.
+		vector3 position = get_position_3d(); // Taken before the old shape is released, as the position a shape moves the mixer to is the shape's closest point rather than the mixer's own position.
 		sound_shape* old_shape = shape;
 		shape = nullptr;
 		shape_handle = CScriptHandle();
@@ -1270,18 +1270,17 @@ public:
 			if (old_shape->connected_sound == this) unregister_blocking_sound_shape(old_shape);
 			old_shape->release();
 		}
-		int ot = new_shape.GetTypeId();
-		ot ^= asTYPEID_OBJHANDLE;
-		if (!g_sound_shape_setup_callbacks.contains(ot)) return false;
-		sound_shape* new_shape_obj = g_sound_shape_setup_callbacks[ot](this, &new_shape);
-		if (!new_shape_obj) return false;
-		vector3 position = get_position_3d();
-		new_shape_obj->set_position(position);
-		shape = new_shape_obj;
-		shape_handle = new_shape;
-		register_blocking_sound_shape(shape, this); // So that the closest point of the shape is found again whenever the listener moves, not only when the mixer does.
-		if (get_spatialization_enabled()) set_position_3d_vector(position);
-		return true;
+		sound_shape* new_shape_obj = nullptr;
+		int ot = new_shape.GetTypeId() & ~asTYPEID_OBJHANDLE;
+		if (g_sound_shape_setup_callbacks.contains(ot)) new_shape_obj = g_sound_shape_setup_callbacks[ot](this, &new_shape);
+		if (new_shape_obj) {
+			new_shape_obj->set_position(position);
+			shape = new_shape_obj;
+			shape_handle = new_shape;
+			register_blocking_sound_shape(shape, this); // So that the closest point of the shape is found again whenever the listener moves, not only when the mixer does.
+		}
+		if (get_spatialization_enabled()) set_position_3d_vector(position); // Puts the mixer back at its own position if the shape was removed.
+		return new_shape_obj != nullptr;
 	}
 	CScriptHandle get_shape() const override {
 		if (!shape) return CScriptHandle();

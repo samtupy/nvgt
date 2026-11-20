@@ -21,6 +21,7 @@
 #include <angelscript.h>
 #include <scriptany.h>
 #include <scriptarray.h>
+#include <scripthandle.h>
 
 #include "jolt.h"
 #include <Jolt/RegisterTypes.h>
@@ -53,6 +54,11 @@
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 #include <Jolt/Physics/Collision/Shape/PlaneShape.h>
 #include <Jolt/Physics/Collision/CollidePointResult.h>
+#include <Jolt/Physics/Collision/CollideShape.h>
+#include <Jolt/Physics/Collision/CollisionDispatch.h>
+#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
+#include <Jolt/Geometry/GJKClosestPoint.h>
+#include <Jolt/Geometry/ConvexSupport.h>
 #include <Jolt/Physics/Character/Character.h>
 #include <Jolt/Physics/Collision/NarrowPhaseQuery.h>
 #include <Jolt/Physics/Collision/PhysicsMaterial.h>
@@ -63,6 +69,7 @@
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
 
 #include "nvgt.h"
+#include "sound.h"
 #include "nvgt_plugin.h"
 #include "nvgt_angelscript.h"
 #include "UI.h" // temp alert
@@ -1407,6 +1414,57 @@ static void RegisterJoltShape(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("physics_plane_shape@ physics_plane_shape_create(const plane&in plane, float half_extent = 1000.0f, physics_material@ mat = null)", asFUNCTION(jolt_plane_shape_create), asCALL_CDECL);
 }
 
+// A physics_shape given to mixer::set_shape, which the mixer then fills, being heard from the point of the shape closest to the listener. The shape is placed at the mixer's position, unrotated, with points relative to its origin as in physics_shape::contains_point.
+// Finds the point of a shape closest to a point outside it, both relative to the shape's center of mass. Convex shapes, including scaled ones, are solved exactly with GJK and planes by projection, which covers every shape the script can make other than the compounds that scaled() makes from scales that convex shapes can't take, for which false is returned.
+static bool jolt_closest_point_on_shape(const Shape* shape, Vec3Arg scale, Vec3Arg point, Vec3& out_closest) {
+	if (shape->GetType() == EShapeType::Convex) {
+		ConvexShape::SupportBuffer buffer;
+		const ConvexShape::Support* support = static_cast<const ConvexShape*>(shape)->GetSupportFunction(ConvexShape::ESupportMode::IncludeConvexRadius, buffer, scale);
+		GJKClosestPoint gjk;
+		Vec3 v = Vec3::sAxisX(), on_shape, on_point;
+		gjk.GetClosestPoints(*support, PointConvexSupport {point}, 1.0e-4f, FLT_MAX, v, on_shape, on_point);
+		out_closest = on_shape;
+		return true;
+	}
+	if (shape->GetSubType() == EShapeSubType::Scaled) {
+		const ScaledShape* scaled = static_cast<const ScaledShape*>(shape);
+		return jolt_closest_point_on_shape(scaled->GetInnerShape(), scale * scaled->GetScale(), point, out_closest);
+	}
+	if (shape->GetSubType() == EShapeSubType::Plane) {
+		out_closest = static_cast<const PlaneShape*>(shape)->GetPlane().Scaled(scale).ProjectPointOnPlane(point);
+		return true;
+	}
+	return false;
+}
+// A physics_shape given to mixer::set_shape, which the mixer then fills, being heard from the point of the shape closest to the listener. The shape is placed at the mixer's position, unrotated, with points relative to its origin as in physics_shape::contains_point.
+class jolt_sound_shape : public sound_shape {
+	RefConst<Shape> shape;
+public:
+	explicit jolt_sound_shape(const Shape* shape) : shape(shape) {}
+	bool contains(const vector3& listener_position, vector3& sound_position) override {
+		Vec3 center_of_mass = sound_position + shape->GetCenterOfMass(), listener = listener_position - center_of_mass, closest;
+		AnyHitCollisionCollector<CollidePointCollector> inside;
+		shape->CollidePoint(listener, SubShapeIDCreator(), inside);
+		if (inside.HadHit()) return true;
+		if (jolt_closest_point_on_shape(shape, Vec3::sOne(), listener, closest)) {
+			sound_position = center_of_mass + closest;
+			return false;
+		}
+		// Other shapes are approximated by colliding a tiny sphere at the listener with a separation distance that reaches the shape, for which Jolt reports the points that are nearly closest.
+		static const RefConst<Shape> probe = new SphereShape(0.001f);
+		CollideShapeSettings settings;
+		settings.mMaxSeparationDistance = listener.Length() + shape->GetLocalBounds().GetExtent().Length();
+		ClosestHitCollisionCollector<CollideShapeCollector> hit;
+		CollisionDispatch::sCollideShapeVsShape(probe, shape, Vec3::sOne(), Vec3::sOne(), Mat44::sTranslation(listener_position), Mat44::sTranslation(center_of_mass), SubShapeIDCreator(), SubShapeIDCreator(), settings, hit);
+		if (hit.HadHit()) sound_position = hit.mHit.mContactPointOn2;
+		return false;
+	}
+};
+static sound_shape* jolt_sound_shape_setup(mixer* connected_sound, CScriptHandle* shape_reference) {
+	jolt_shape_ref* s = static_cast<jolt_shape_ref*>(shape_reference->GetRef());
+	return s && s->shape ? new jolt_sound_shape(s->shape.GetPtr()) : nullptr;
+}
+
 static void RegisterJoltCharacter(asIScriptEngine* engine) {
 	engine->RegisterEnum("physics_ground_state");
 	engine->RegisterEnumValue("physics_ground_state", "PHYSICS_GROUND_STATE_ON_GROUND", (int)CharacterBase::EGroundState::OnGround);
@@ -1548,6 +1606,7 @@ void RegisterJolt(asIScriptEngine* engine) {
 	RegisterJoltEnums(engine);
 	RegisterJoltBodyID(engine);
 	RegisterJoltShape(engine);
+	for (const char* type : {"physics_shape", "physics_convex_shape", "physics_sphere_shape", "physics_box_shape", "physics_capsule_shape", "physics_cylinder_shape", "physics_tapered_capsule_shape", "physics_tapered_cylinder_shape", "physics_plane_shape"}) register_sound_shape_type(engine->GetTypeIdByDecl(type), jolt_sound_shape_setup);
 	RegisterJoltWorld(engine);
 	RegisterJoltCharacter(engine);
 	nvgt_register_raycast_provider_type(engine->GetTypeIdByDecl("physics_world"), jolt_world_get_raycast_provider);

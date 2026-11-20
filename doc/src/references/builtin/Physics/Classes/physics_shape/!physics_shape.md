@@ -12,6 +12,6 @@ The kinds of shape are:
 * physics_tapered_cylinder_shape: a cylinder whose ends have a `top_radius` and a `bottom_radius`.
 * physics_plane_shape: a flat surface with a `plane`, that is solid behind it, which is good for floors.
 
-All of these but the plane are convex, meaning that they have no dents, and are derived from physics_convex_shape. A plane shape can only be used for static and kinematic bodies. Any shape can also be stretched into a new physics_shape with `scaled()`. Shapes are measured in meters. Shapes whose size is described along an axis, the capsule and cylinders, are aligned with the y axis of the shape, and a body that is to stand up in the world, where z is up, needs a rotation to do so, such as `quaternion_from_axis_angle(vector(1, 0, 0), 1.5707964)`.
+All of these but the plane are convex, meaning that they have no dents, and are derived from physics_convex_shape. A plane shape can only be used for static and kinematic bodies. Any shape can also be stretched into a new physics_shape with `scaled()`, and given to `mixer::set_shape()` so that a sound fills it. Shapes are measured in meters. Shapes whose size is described along an axis, the capsule and cylinders, are aligned with the y axis of the shape, and a body that is to stand up in the world, where z is up, needs a rotation to do so, such as `quaternion_from_axis_angle(vector(1, 0, 0), 1.5707964)`.
 
 The properties that are specific to each kind of shape are listed in the documentation of the creation function of that kind.

@@ -238,6 +238,7 @@ class sound_shape {
 public:
 	mixer* connected_sound; // If set, this object is not threadsafe.
 	sound_shape() : refcount(1), connected_sound(nullptr) {}
+	virtual ~sound_shape() = default;
 	void duplicate() const { asAtomicInc(refcount); }
 	void release() const { if (asAtomicDec(refcount) < 1) delete this; }
 	void set_position(const vector3& new_position) { position = new_position; }
@@ -245,6 +246,8 @@ public:
 	bool is_in_shape(const vector3& listener_position, vector3& sound_position) { position = sound_position; return contains(listener_position, sound_position); }
 	virtual bool contains(const vector3&  listener_position, vector3& sound_position) { return sound_position == listener_position; }
 };
+typedef sound_shape* sound_shape_setup_callback(mixer* connected_sound, CScriptHandle* shape_reference);
+void register_sound_shape_type(int type_id, sound_shape_setup_callback* setup); // Lets objects of a script type, such as a physics_shape, be given to mixer::set_shape. The callback creates the sound_shape that positions the mixer.
 class mixer : public virtual audio_node {
 public:
 	virtual void duplicate() = 0; // reference counting

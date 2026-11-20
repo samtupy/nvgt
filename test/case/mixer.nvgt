@@ -24,3 +24,28 @@ void test_mixer_shape_follows_listener() { // The closest point of a shape was o
 	e.set_listener_position(0, 20, 0, 0);
 	assert(abs(m.get_distance_to_listener() - 18) < 0.01, "the replacement shape should be used, got " + m.get_distance_to_listener());
 }
+void test_mixer_physics_shape() {
+	audio_engine e(AUDIO_ENGINE_NO_DEVICE, 44100, 2);
+	mixer@ m = e.mixer();
+	e.set_listener_position(0, 20, 0, 0);
+	m.set_position_3d(0, 0, 0);
+	assert(m.set_shape(physics_box_shape_create(vector(5, 1, 1), 0)), "a box can be a sound shape");
+	assert(abs(m.get_distance_to_listener() - 15) < 0.05, "the box's near face should be 15 away, got " + m.get_distance_to_listener());
+	e.set_listener_position(0, 2, 0.5, 0);
+	assert(m.get_distance_to_listener() < 0.01, "a listener inside the box should be at the sound, got " + m.get_distance_to_listener());
+	e.set_listener_position(0, 0, 10, 0);
+	assert(abs(m.get_distance_to_listener() - 9) < 0.05, "the box's side should be 9 away, got " + m.get_distance_to_listener());
+	physics_shape@ ball = physics_sphere_shape_create(1).scaled(vector(3, 3, 3));
+	assert(m.set_shape(ball), "a scaled shape can be a sound shape");
+	assert(abs(m.get_distance_to_listener() - 7) < 0.05, "a sphere of radius 3 should be 7 away, got " + m.get_distance_to_listener());
+	assert(m.get_position_3d() == vector(0, 0, 0), "the mixer's own position is kept");
+	assert(m.set_shape(physics_plane_shape_create(plane(), 100)), "a plane can be a sound shape");
+	e.set_listener_position(0, 3, 4, 5);
+	assert(abs(m.get_distance_to_listener() - 5) < 0.05, "a floor plane should be heard from directly below, got " + m.get_distance_to_listener());
+	e.set_listener_position(0, 3, 4, -2);
+	assert(m.get_distance_to_listener() < 0.01, "below the floor is inside it, got " + m.get_distance_to_listener());
+	assert(m.set_shape(sound_aabb_shape(0, 1, 0, 1, 0, 1)), "switching back to an aabb shape");
+	e.set_listener_position(0, 0, 0, 10);
+	assert(!m.set_shape(null) and m.get_shape() is null, "removing the shape");
+	assert(m.get_position_3d() == vector(0, 0, 0) and abs(m.get_distance_to_listener() - 10) < 0.01, "without a shape the mixer is back at its own position, " + m.get_position_3d());
+}
