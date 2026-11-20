@@ -24,13 +24,14 @@
     "steam-audio",
     {
       "name": "openssl",
-      "default-features": false
+      "default-features": false,
+      "platform": "!windows"
     },
     {
       "name": "curl",
       "default-features": false,
       "features": [
-        "openssl"
+        "ssl"
       ]
     },
     {
@@ -98,17 +99,23 @@
       "default-features": false,
       "features": [
         "net",
-        "netssl",
         "json",
         "util",
         "xml",
         "encodings",
         "mongodb",
         "redis",
-        "jwt",
         "prometheus",
         "sevenzip"
       ]
+    },
+    {
+      "name": "poco",
+      "default-features": false,
+      "features": [
+        "netssl"
+      ],
+      "platform": "!windows"
     },
     {
       "name": "libgit2",

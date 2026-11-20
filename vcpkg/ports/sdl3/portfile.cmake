@@ -71,6 +71,10 @@ vcpkg_cmake_configure(
         -DSDL_SHARED=${SDL_SHARED}
         -DSDL_FORCE_STATIC_VCRT=${FORCE_STATIC_VCRT}
         -DSDL_LIBC=ON
+        # NVGT does its own audio with miniaudio and uses neither the camera nor the GPU API, so these subsystems only add size.
+        -DSDL_AUDIO=OFF
+        -DSDL_CAMERA=OFF
+        -DSDL_GPU=OFF
         # Prevent host-installed Unix libraries from silently changing SDL's capabilities.
         -DSDL_FRIBIDI=OFF
         -DSDL_JACK=OFF
