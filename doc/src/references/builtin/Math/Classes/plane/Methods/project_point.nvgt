@@ -1,0 +1,15 @@
+/**
+	Get the point on the plane that is closest to another point.
+	vector@ plane::project_point(const vector&in point) const;
+	## Arguments:
+		* const vector&in point: the point to project.
+	## Returns:
+		vector@: the point on the plane directly in front of or behind the given point.
+*/
+
+// Example:
+void main() {
+	plane slope(vector(0, 0, 0), vector(0, -1, 1)); // A ramp rising as y increases.
+	vector bird(0, 10, 20);
+	alert("Below", "The point on the slope below the bird is " + slope.project_point(bird));
+}

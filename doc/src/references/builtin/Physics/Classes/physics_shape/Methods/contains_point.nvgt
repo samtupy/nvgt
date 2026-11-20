@@ -1,0 +1,17 @@
+/**
+	Check whether a point is inside the shape.
+	bool physics_shape::contains_point(const vector&in point) const;
+	## Arguments:
+		* const vector&in point: the point to check, relative to the shape's origin.
+	## Returns:
+		bool: true if the point is inside the shape.
+	## Remarks:
+		Shapes are treated as solid, and for a plane shape everything behind the plane is inside it. The shape is not in the world, so to check a point in the world against a body, subtract the body's position first and undo its rotation.
+*/
+
+// Example:
+void main() {
+	physics_box_shape@ room = physics_box_shape_create(vector(5, 4, 1.5));
+	vector player(3, 2, 0);
+	alert("Room", room.contains_point(player) ? "The player is in the room." : "The player is outside.");
+}

@@ -9,7 +9,7 @@
 		* uint16 layer = PHYSICS_LAYER_MOVING: the layer to put the body in, `PHYSICS_LAYER_NON_MOVING` for static bodies and `PHYSICS_LAYER_MOVING` for the others, see the `physics_object_layer` enum.
 		* physics_activation activation = PHYSICS_ACTIVATE: whether the body starts awake, see the `physics_activation` enum.
 	## Returns:
-		physics_body_id: the id of the new body, which is invalid (its `is_invalid` property is true) if the body could not be created, such as when the shape is null or the world already has its maximum number of bodies.
+		physics_body_id: the id of the new body, which is invalid (its `is_invalid` property is true) if the body could not be created, such as when the shape is null, the shape must be static (see `physics_shape::must_be_static`) and the motion type is PHYSICS_BODY_DYNAMIC, or the world already has its maximum number of bodies.
 	## Remarks:
 		The position is the origin of the shape, which for the built in shapes is its center. A box created with a half extent of `vector(50, 50, 0.5)` is 100 meters wide and long and 1 meter thick, so its center must be 0.5 below the surface that things should rest on.
 		A body takes its friction and restitution from the physics_material its shape was made with, or has a friction of 0.2 and a restitution of 0 if the shape has none, and these can be changed afterwards with `set_friction()` and `set_restitution()`. A dynamic body gets its mass from the volume of its shape.

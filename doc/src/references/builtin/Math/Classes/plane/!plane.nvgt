@@ -1,0 +1,31 @@
+/**
+	A plane is a flat surface that goes on forever in every direction, described by the direction it faces, its normal, and how far it is from the origin, its constant.
+	1. plane();
+	2. plane(const vector&in normal, float constant);
+	3. plane(const vector&in point, const vector&in normal);
+	4. plane(const vector&in point1, const vector&in point2, const vector&in point3);
+	5. plane(const plane&in other);
+	## Arguments (2):
+		* const vector&in normal: the direction the plane faces.
+		* float constant: the negative of the plane's distance from the origin along its normal, so `plane(vector(0, 0, 1), -2)` is the horizontal plane at a height of 2.
+	## Arguments (3):
+		* const vector&in point: any point on the plane.
+		* const vector&in normal: the direction the plane faces.
+	## Arguments (4):
+		* const vector&in point1: the first of three points on the plane.
+		* const vector&in point2: the second point.
+		* const vector&in point3: the third point. The plane faces the side from which the three points go around counter clockwise.
+	## Arguments (5):
+		* const plane&in other: the plane to copy.
+	## Remarks:
+		A default constructed plane is the ground of NVGT's coordinate system, facing up along the z axis through the origin.
+		The points on a plane are those for which `point.dot(normal) + constant` is 0, which is what `signed_distance()` calculates. The side the normal points to is in front of the plane, and the other side is behind it. A plane given to `physics_plane_shape_create()` is solid behind it, which makes planes a simple way to make the floor of a map.
+		The normal is always kept at a length of 1. A longer or shorter normal given to the second constructor is shortened or lengthened along with the constant, so that the plane is still in the same place, `plane(vector(0, 0, 2), -4)` being the same as `plane(vector(0, 0, 1), -2)`. A normal of zero, or three points that are in a line, make a plane whose normal is zero, which is not a valid plane.
+*/
+
+// Example:
+void main() {
+	plane floor(vector(0, 0, 0), vector(0, 0, 1)); // A point on the plane, then the direction it faces.
+	vector player(3, 4, 1.5);
+	alert("Height", "The player is " + floor.signed_distance(player) + " meters above the floor.");
+}

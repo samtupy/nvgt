@@ -13,5 +13,9 @@ This is a list of the specific kinds of shapes, the value of `physics_shape::sub
 * PHYSICS_SHAPE_MUTABLE_COMPOUND: a shape made of several others that can change.
 * PHYSICS_SHAPE_MESH_SUBTYPE: a shape made of triangles.
 * PHYSICS_SHAPE_HEIGHT_FIELD_SUBTYPE: a shape made of a grid of heights.
+* PHYSICS_SHAPE_ROTATED_TRANSLATED: another shape turned and moved.
+* PHYSICS_SHAPE_SCALED: another shape stretched, as made by `physics_shape::scaled()`.
+* PHYSICS_SHAPE_OFFSET_CENTER_OF_MASS: another shape whose center of mass is moved.
+* PHYSICS_SHAPE_PLANE_SUBTYPE: a flat surface that is solid behind it.
 
-Currently the shape creation functions make the sphere, box, capsule, cylinder, tapered capsule and tapered cylinder shapes.
+Currently the shape creation functions make the sphere, box, capsule, cylinder, tapered capsule, tapered cylinder and plane shapes, and `physics_shape::scaled()` makes scaled shapes.

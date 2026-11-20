@@ -1,0 +1,18 @@
+/**
+	Make a new shape that is this one stretched along each axis.
+	physics_shape@ physics_shape::scaled(const vector&in scale) const;
+	## Arguments:
+		* const vector&in scale: how much to stretch along the x, y and z axes, where 1 is no change and 2 is twice the size. A negative value mirrors the shape along that axis.
+	## Returns:
+		physics_shape@: the scaled shape, or null if it could not be made, such as when the scale is zero.
+	## Remarks:
+		The shape this is called on is not changed. Unless the scale is 1, the result is usually a shape of type PHYSICS_SHAPE_DECORATED and sub type PHYSICS_SHAPE_SCALED that wraps the original, so it can't be cast to the kind of shape it was made from. A scale that `is_valid_scale()` says the shape can't take is approximated, see `make_scale_valid()`.
+		This makes it easy to use one shape at several sizes, but if a shape of a particular size is all that's needed, creating it at that size is faster to simulate.
+*/
+
+// Example:
+void main() {
+	physics_sphere_shape@ pebble = physics_sphere_shape_create(0.1);
+	physics_shape@ boulder = pebble.scaled(vector(20, 20, 20));
+	alert("Boulder", "The boulder is " + boulder.local_bounds.size.x + " meters across."); // 4 meters.
+}

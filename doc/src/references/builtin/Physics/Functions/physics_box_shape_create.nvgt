@@ -8,7 +8,7 @@
 	## Returns:
 		physics_box_shape@: the new shape, or null if it could not be created, such as when a size is not positive.
 	## Remarks:
-		Boxes are what you use for floors, walls, ceilings and crates. A shape isn't a body, so it must be given to `physics_world::create_and_add_body()` before it does anything, and one shape can be used by any number of bodies.
+		Boxes are what you use for floors, walls, ceilings and crates, though `physics_plane_shape_create()` is simpler for a floor that goes on and on. A shape isn't a body, so it must be given to `physics_world::create_and_add_body()` before it does anything, and one shape can be used by any number of bodies.
 */
 
 // Example:
