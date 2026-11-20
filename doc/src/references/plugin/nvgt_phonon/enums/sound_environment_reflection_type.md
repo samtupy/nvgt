@@ -1,0 +1,6 @@
+# sound_environment_reflection_type
+This is a list of the kinds of reflection effects a sound_environment can use, set with `sound_environment::reflection_type`.
+
+* SOUND_ENVIRONMENT_REFLECTIONS_CONVOLUTION: the most accurate type, which convolves each reflection group's sound with the full simulated impulse response of the room, including the direction each reflection comes from. This is the most expensive on the audio thread, and the only type that can use the environment's reflection mixer.
+* SOUND_ENVIRONMENT_REFLECTIONS_PARAMETRIC: the cheapest type, which instead of convolving the room's response applies a simple reverb whose decay times in each frequency band come from the simulation. It captures the character of a room but not the individual echoes or their directions, and tends to sound rather mono - best used in limited resource sanarios if wanted.
+* SOUND_ENVIRONMENT_REFLECTIONS_HYBRID: convolves the early part of the response, which has the most perceptible detail, and replaces the long tail with a parametric reverb. This is the default, and approaches the quality of convolution at a much lower cost for long reverbs. See `sound_environment::hybrid_transition_time` and `sound_environment::hybrid_overlap`.

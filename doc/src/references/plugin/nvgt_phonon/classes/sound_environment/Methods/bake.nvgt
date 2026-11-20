@@ -1,0 +1,26 @@
+/**
+	Simulate reverb at every probe and the paths between them ahead of time.
+	bool sound_environment::bake(sound_environment_bake_callback@ progress = null, int rays = 16384, int bounces = 64);
+	## Arguments:
+		* sound_environment_bake_callback@ progress = null: an optional function with the signature `void callback(float progress)` that is called with a number from 0 to 1 as baking proceeds.
+		* int rays = 16384: the number of rays traced per probe, clamped between 1 and 1048576.
+		* int bounces = 64: the number of bounces per ray, clamped between 1 and 1024.
+	## Returns:
+		bool: true if baking completed, false if there is no raycaster or no probes.
+	## Remarks:
+		This blocks until baking is finished, so it should be done while loading or in a separate tool, and the result stored with `save_baked_data()`. Baking traces many more rays and bounces than real time simulation can afford.
+		Baked reverb is used for the listener's reverb when `use_baked_reverb` is enabled and the listener is within a probe, and baked paths are used when `pathing` is enabled. Baked data is created with the environment's current `reflection_duration`, `reflection_order`, `diffuse_samples` and `irradiance_min_distance`, and should be used with the same values.
+*/
+
+// Example:
+void progress(float amount) {
+	screen_reader_speak(round(amount * 100, 0) + " percent", true);
+}
+void main() {
+	physics_world world;
+	// ... create level ...
+	sound_environment env;
+	env.set_raycaster(world);
+	env.generate_probes(vector(0, 0, 0), vector(50, 50, 5));
+	if (env.bake(progress)) alert("Baked", "Baked " + env.probe_count + " probes.");
+}

@@ -1,0 +1,19 @@
+/**
+	Serialize the environment's probes and baked data.
+	string sound_environment::save_baked_data() const;
+	## Returns:
+		string: the data, which can be written to a file and given to `load_baked_data()` later.
+	## Remarks:
+		The data contains the probes and everything baked at them, which is about 5 kilobytes per probe at the default reflection settings. It does not contain the scene, so it is only meaningful for the same level.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	// ... create level ...
+	sound_environment env;
+	env.set_raycaster(world);
+	env.generate_probes(vector(0, 0, 0), vector(50, 50, 5));
+	env.bake();
+	file_put_contents("level1.baked", env.save_baked_data());
+}

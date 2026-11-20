@@ -1,0 +1,19 @@
+/**
+	Create a new mixer that is already attached to this environment.
+	mixer@ sound_environment::new_mixer();
+	## Returns:
+		mixer@: the new mixer, or null if it could not be created.
+	## Remarks:
+		The recommended way to use an environment is to create one mixer per object that makes sound, such as the player, an enemy or a machine, position that mixer with `set_position_3d()` wherever the object is, and play all of the object's sounds through the mixer. The object is then simulated once however many sounds it is making.
+*/
+
+// Example:
+void main() {
+	sound_environment env;
+	mixer@ player = env.new_mixer();
+	player.set_position_3d(10, 5, 1);
+	sound@ footstep = sound();
+	footstep.load("footstep.ogg");
+	footstep.set_mixer(player); // The sound is heard at the mixer's position, with the environment's occlusion and reflections.
+	footstep.play();
+}

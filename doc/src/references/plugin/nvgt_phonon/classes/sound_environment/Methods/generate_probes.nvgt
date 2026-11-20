@@ -1,0 +1,25 @@
+/**
+	Automatically place probes above every floor within a box.
+	uint sound_environment::generate_probes(const vector&in minimum, const vector&in maximum, float spacing = 2, float height = 1.5);
+	## Arguments:
+		* const vector&in minimum: the lowest corner of the box to place probes in.
+		* const vector&in maximum: the highest corner of the box.
+		* float spacing = 2: the distance in meters between probes.
+		* float height = 1.5: how many meters above the floor the probes are placed, which should be about the height of the listener's ears.
+	## Returns:
+		uint: the number of probes placed, or 0 if there is no raycaster or spacing is not positive.
+	## Remarks:
+		Probes mark the places the listener can be. Once baked with `bake()`, reverb at every probe and the paths that sound takes between them are looked up rather than simulated. Floors are found by tracing rays down through the box from the raycaster, so a raycaster must be set first.
+		The probes are added to any that already exist, and any baked data is discarded.
+		The reasoning for this is that replaying precalculated reflections from probes is exceedingly less CPU intensive than generating them in realtime. They can be downloaded over the network or extracted from a pack, so a map builder in a game could generate these once while building their map then distribute the probes to players who will then have a much less CPU intensive experience hearing good reflections.
+*/
+
+// Example:
+void main() {
+	physics_world world;
+	// ... create level ...
+	sound_environment env;
+	env.set_raycaster(world);
+	uint count = env.generate_probes(vector(0, 0, 0), vector(50, 50, 5));
+	alert("Probes", "Placed " + count + " probes.");
+}
