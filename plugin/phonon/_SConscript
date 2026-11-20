@@ -6,7 +6,8 @@ libs = ["phonon", "pffft", "mysofa", "zs" if env["NVGT_TARGET"] == "windows" els
 if env["NVGT_TARGET"] == "android": libs.append("log") # Steam Audio's logger writes to logcat.
 if ARGUMENTS.get("no_shared_plugins", "0") == "0":
 	scripthandle = env.SharedObject("scripthandle", "#ASAddon/plugin/scripthandle.cpp")
-	env.SharedLibrary(env["PLUGIN_DEST_DIR"] + "/nvgt_phonon", sources + [scripthandle], LIBS = libs)
+	# NVGT's headers pull in Jolt's inline math, whose assertions in debug builds call JPH::AssertFailed from Jolt's library. Other platforms resolve it from the NVGT executable when the plugin loads, but a Windows DLL must link it, which only adds Jolt's small issue reporting object.
+	env.SharedLibrary(env["PLUGIN_DEST_DIR"] + "/nvgt_phonon", sources + [scripthandle], LIBS = libs + (["Jolt"] if env["NVGT_TARGET"] == "windows" else []))
 static = [env.Object(s.replace(".cpp", "_static"), s, CPPDEFINES = list(env["CPPDEFINES"]) + [("NVGT_PLUGIN_STATIC", "nvgt_phonon")]) for s in sources]
 static = [env.StaticLibrary("#build/lib/nvgt_phonon", static)] + libs
 Return("static")
