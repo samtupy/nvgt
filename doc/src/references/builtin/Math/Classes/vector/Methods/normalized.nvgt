@@ -1,0 +1,16 @@
+/**
+	Get a copy of the vector with a length of 1 that points in the same direction.
+	vector@ vector::normalized() const;
+	## Returns:
+		vector@: the normalized vector.
+	## Remarks:
+		Normalizing is useful when you need the direction something is pointing rather than how far it goes, such as when you want to move at a particular speed in a direction: `position += direction.normalized() * speed`. The original vector is not changed.
+		Normalizing a vector of length 0 gives a vector of invalid numbers, so check `is_near_zero()` first if that is possible.
+*/
+
+// Example:
+void main() {
+	vector v(3, 4, 0);
+	vector n = v.normalized();
+	alert("Vector", "(" + n.x + ", " + n.y + ", " + n.z + ")");
+}

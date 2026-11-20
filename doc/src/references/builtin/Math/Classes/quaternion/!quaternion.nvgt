@@ -1,0 +1,25 @@
+/**
+	A quaternion holds a rotation in 3D space, which turns something about an axis by an angle.
+	1. quaternion();
+	2. quaternion(float x, float y, float z, float w);
+	3. quaternion(const quaternion&in other);
+	## Arguments (2):
+		* float x: the x component.
+		* float y: the y component.
+		* float z: the z component.
+		* float w: the w component.
+	## Arguments (3):
+		* const quaternion&in other: the quaternion to copy.
+	## Remarks:
+		The four numbers of a quaternion are not angles, and are not meant to be set by hand. A default constructed quaternion is the identity, meaning no rotation, which is also available as `IDENTITY_QUATERNION`. Make other rotations with `quaternion_from_axis_angle()` or `quaternion_from_euler_angles()`. Rotations are measured in radians.
+		Quaternions are used to rotate bodies in a physics_world. Multiplying two quaternions with `*` combines their rotations, the one on the right being applied first, and multiplying a quaternion by a vector rotates that vector. Unlike angles, quaternions don't suffer from awkward cases such as the order of rotations mattering or rotations that line up and lose a direction, and they interpolate smoothly with `slerp()`.
+*/
+
+// Example:
+void main() {
+	// A quarter turn counter clockwise as seen from above, around the z axis (up).
+	quaternion turn = quaternion_from_axis_angle(vector(0, 0, 1), 3.14159265 / 2);
+	vector forward(0, 1, 0);
+	vector rotated = turn * forward;
+	alert("Rotated", "Facing forward and turning a quarter now points to " + rotated.x + ", " + rotated.y + ", " + rotated.z); // Approximately -1, 0, 0.
+}

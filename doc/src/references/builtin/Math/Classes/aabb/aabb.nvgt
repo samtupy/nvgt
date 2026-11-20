@@ -1,17 +1,24 @@
 /**
-	A class representing an axis-aligned bounding box (AABB).
-	aabb();
+	An aabb is an axis aligned bounding box, a box whose sides are straight along the x, y and z axes, defined by the two opposite corners with the smallest and largest coordinates.
+	1. aabb();
+	2. aabb(const vector&in min, const vector&in max);
+	3. aabb(const vector&in center, float radius);
+	4. aabb(const aabb&in other);
+	## Arguments (2):
+		* const vector&in min: the corner with the smallest x, y and z.
+		* const vector&in max: the corner with the largest x, y and z.
+	## Arguments (3):
+		* const vector&in center: the center of the box.
+		* float radius: half the size of the box in every direction, so the box is a cube.
+	## Arguments (4):
+		* const aabb&in other: the box to copy.
 	## Remarks:
-		AABBs are numbers representing the corners of a fixed, non-rotating, rectangular box. This is useful for such functions as collision detection, defining world regions and so on.
+		A default constructed aabb is empty and invalid, which is useful as the starting point for a box that grows to contain a set of points with `encapsulate()`. Boxes are used to describe regions of the world, such as the bounds of a body, and to check cheaply whether things could be touching.
 */
 
 // Example:
 void main() {
-	aabb box1;
-	aabb box2;
-	box1.min = vector(1, 1, 1);
-	box1.max = vector(5, 5, 5);
-	box2.min = vector(2, 2, 2);
-	box2.max = vector(4, 4, 4);
-if (box1.contains(box2)) alert("Boxed in a box!", "Box1 contains box2.");
+	aabb box1(vector(1, 1, 1), vector(5, 5, 5));
+	aabb box2(vector(2, 2, 2), vector(4, 4, 4));
+	if (box1.contains(box2)) alert("Boxed in a box!", "Box1 contains box2.");
 }

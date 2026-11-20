@@ -1,14 +1,15 @@
 /**
-	Overloads the [] operator, allowing you to access the axes via their indexes.
-	bool vector::opIndex(int index);
+	Overloads the [] operator, accessing a coordinate by number.
+	float vector::opIndex(uint index) const;
+	void vector::opIndex(uint index, float value);
 	## Arguments:
-		* int index: the index of the axis to query.
-	## Remarks
-		The axis index is represent by a number: x = 0, y = 1, z = 2.
+		* uint index: 0 for x, 1 for y and 2 for z.
+		* float value (2): the value to set.
 */
 
 // Example:
 void main() {
-	vector v(2, 3, 5);
-	alert("Vector", v[0]+", "+v[1]+", "+v[2]);
+	vector v(1, 2, 3);
+	v[2] = 30;
+	alert("Vector", "z is " + v[2]);
 }

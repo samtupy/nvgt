@@ -1,14 +1,17 @@
 /**
-	Overloads the + operator, allowing you to add a vector to another.
-	vector& vector::opAdd(const vector&in other);
+	Overloads the + operator, adding two vectors together.
+	vector@ vector::opAdd(const vector&in other) const;
 	## Arguments:
 		* const vector&in other: the vector to add.
+	## Returns:
+		vector@: the sum.
+	## Remarks:
+		Each coordinate is added to the same coordinate of the other vector.
 */
 
 // Example:
 void main() {
-	vector v1(2, 3, 5);
-	vector v2(5, 4, 2);
+	vector v1(1, 2, 3), v2(10, 20, 30);
 	vector v3 = v1 + v2;
-	alert("The third vector =", "(" + v3.x + ", " + v3.y + ", " + v3.z + ")");
+	alert("Sum", v3.x + ", " + v3.y + ", " + v3.z);
 }

@@ -1,18 +1,19 @@
 /**
-	Overloads the * operator, allowing you to multiply two vectors, or multiply one vector by a scalar.
-	vector& vector::opMul(const vector&in other);
-	vector& vector::opMul(float scalar);
-	## Arguments (1):
-		* const vector&in other: the vector to multiply.
-	## Arguments (2):
-		* float scalar: The scalar to multiply by.
-	## Remarks
-		Multiplying two vectors will, as you might imagine, multiply each axis independently. On the other hand, multiplying by a scalar will multiply all axes by that scalar.
+	Overloads the * operator, multiplying a vector by a number or by another vector.
+	vector@ vector::opMul(const vector&in other) const;
+	vector@ vector::opMul(float scalar) const;
+	## Arguments:
+		* const vector&in other (1): the vector to multiply by.
+		* float scalar (2): the number to multiply every coordinate by.
+	## Returns:
+		vector@: the product.
+	## Remarks:
+		Multiplying by a number scales the vector, so multiplying a direction by a distance gives the offset. Multiplying two vectors multiplies each coordinate by the same coordinate of the other, which is not the dot or cross product.
 */
 
 // Example:
 void main() {
 	vector v1(1, 4, 8);
-	vector v2=v1*3;
+	vector v2 = v1 * 3;
 	alert("The second vector =", "(" + v2.x + ", " + v2.y + ", " + v2.z + ")");
 }

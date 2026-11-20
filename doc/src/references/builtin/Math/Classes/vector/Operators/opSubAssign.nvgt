@@ -1,5 +1,5 @@
 /**
-	Overloads the -= operator, allowing you to subtract a vector from another.
+	Overloads the -= operator, subtracting a vector from this one.
 	vector& vector::opSubAssign(const vector&in other);
 	## Arguments:
 		* const vector&in other: the vector to subtract.
@@ -7,8 +7,7 @@
 
 // Example:
 void main() {
-	vector v1(12, 10, 8);
-	vector v2(5, 3, 1);
-	v1 -= v2;
-	alert("The first vector =", "(" + v1.x + ", " + v1.y + ", " + v1.z + ")");
+	vector position(10, 10, 10);
+	position -= vector(1, 2, 3);
+	alert("Position", position.x + ", " + position.y + ", " + position.z);
 }

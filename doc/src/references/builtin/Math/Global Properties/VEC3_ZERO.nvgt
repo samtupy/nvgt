@@ -1,0 +1,12 @@
+/**
+	A vector of all zeros, `vector(0, 0, 0)`.
+	const vector VEC3_ZERO;
+	## Remarks:
+		A new vector is returned every time this property is read, so modifying the result does not change the property.
+*/
+
+// Example:
+void main() {
+	vector v = VEC3_ZERO;
+	alert("Zero", "" + v.length());
+}

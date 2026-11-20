@@ -1,0 +1,19 @@
+/**
+	Interpolate between this rotation and another at a constant speed.
+	quaternion@ quaternion::slerp(const quaternion&in dest, float t) const;
+	## Arguments:
+		* const quaternion&in dest: the rotation to move towards.
+		* float t: how far to move, from 0 for this rotation to 1 for dest.
+	## Returns:
+		quaternion@: the rotation in between.
+	## Remarks:
+		The rotation takes the shortest path and the speed is constant, which is what you want for smoothly turning something. `lerp()` is cheaper but the speed varies.
+*/
+
+// Example:
+void main() {
+	quaternion start; // No rotation.
+	quaternion end = quaternion_from_axis_angle(vector(0, 0, 1), 1.0);
+	quaternion half = start.slerp(end, 0.5);
+	alert("Halfway", "The angle halfway is " + half.get_rotation_angle(vector(0, 0, 1))); // 0.5
+}

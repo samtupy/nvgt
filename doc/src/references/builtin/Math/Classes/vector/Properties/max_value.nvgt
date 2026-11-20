@@ -1,10 +1,10 @@
 /**
-	Returns the maximum value of the vector.
-	float vector::max_value const;
+	The largest of the vector's three coordinates.
+	const float vector::max_value;
 */
 
 // Example:
 void main() {
-	vector v(5, 7, 4);
-	alert("maximum value", v.max_value);
+	vector v(4, -2, 9);
+	alert("Largest", "" + v.max_value); // 9
 }

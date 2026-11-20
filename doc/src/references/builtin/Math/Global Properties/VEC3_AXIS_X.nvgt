@@ -1,0 +1,12 @@
+/**
+	A vector of length 1 that points along the x axis (right), `vector(1, 0, 0)`.
+	const vector VEC3_AXIS_X;
+	## Remarks:
+		A new vector is returned every time this property is read, so modifying the result does not change the property.
+*/
+
+// Example:
+void main() {
+	vector v = VEC3_AXIS_X;
+	alert("X axis", "" + v.x);
+}
