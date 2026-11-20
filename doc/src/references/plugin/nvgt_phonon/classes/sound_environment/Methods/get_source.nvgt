@@ -1,8 +1,8 @@
 /**
 	Retrieve the sound_environment_source of a sound or mixer attached to this environment, which holds its settings and simulation results.
-	sound_environment_source@ sound_environment::get_source(mixer@+ sound_or_mixer) const;
+	sound_environment_source@ sound_environment::get_source(mixer@ sound_or_mixer) const;
 	## Arguments:
-		* mixer@+ sound_or_mixer: the sound or mixer to look up.
+		* mixer@ sound_or_mixer: the sound or mixer to look up.
 	## Returns:
 		sound_environment_source@: the source, or null if the object isn't attached to this environment.
 */

@@ -3,10 +3,10 @@ A sound_environment simulates how sound travels through a physical world, using 
 
 The world the sound travels through is provided by a raycaster, currently a physics_world, and the acoustic properties of its surfaces come from the physics_material of the bodies in it. This class is part of the nvgt_phonon plugin, so your script needs the line `#pragma plugin nvgt_phonon`.
 
-`sound_environment@ sound_environment(audio_engine@+ engine = sound_default_engine);`
+`sound_environment@ sound_environment(audio_engine@ engine = sound_default_engine);`
 
 ## Arguments:
-* audio_engine@+ engine = sound_default_engine: the audio engine whose sounds the environment will process.
+* audio_engine@ engine = sound_default_engine: the audio engine whose sounds the environment will process.
 
 ## Remarks:
 An exception is thrown if Steam Audio could not be initialized.

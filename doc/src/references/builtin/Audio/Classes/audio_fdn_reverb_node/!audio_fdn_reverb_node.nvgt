@@ -1,8 +1,8 @@
 /**
 	A feedback delay network reverb, derived from the reverb of Synthizer, with a smooth tail and separate decay times for low, middle and high frequencies.
-	audio_fdn_reverb_node(audio_engine@+ engine = sound_default_engine);
+	audio_fdn_reverb_node(audio_engine@ engine = sound_default_engine);
 	## Arguments:
-		* audio_engine@+ engine = sound_default_engine: the engine to create the node in.
+		* audio_engine@ engine = sound_default_engine: the engine to create the node in.
 	## Remarks:
 		This is an audio_node with one input and one output bus, and has all of the methods and properties of audio_node as well as the ones listed here. Audio attached to its input comes out of its output with reverb added. The input is mixed to mono before it is reverberated, and the reverb is stereo.
 		Compared to audio_freeverb_node it sounds smoother and less metallic, and its properties describe a room in physical terms: `mean_free_path` for its size, `t60` for how long it rings, and `lf_rolloff` and `hf_rolloff` for how its walls treat low and high frequencies. It is still being tested, so its defaults and the way some of its properties sound may change in future versions.

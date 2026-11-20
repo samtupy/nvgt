@@ -1,8 +1,8 @@
 /**
 	A reverb effect based on the classic Freeverb algorithm, which makes audio sound as though it is in a room.
-	audio_freeverb_node(audio_engine@+ engine = sound_default_engine);
+	audio_freeverb_node(audio_engine@ engine = sound_default_engine);
 	## Arguments:
-		* audio_engine@+ engine = sound_default_engine: the engine to create the node in.
+		* audio_engine@ engine = sound_default_engine: the engine to create the node in.
 	## Remarks:
 		This is an audio_node with one input and one output bus, and has all of the methods and properties of audio_node as well as the ones listed here. Audio attached to its input comes out of its output with reverb added.
 		Freeverb is cheap and simple to set up, needing little more than a `room_size` and `damping`, but it can sound somewhat metallic, especially on short sharp sounds. audio_fdn_reverb_node is a smoother sounding alternative with more control.

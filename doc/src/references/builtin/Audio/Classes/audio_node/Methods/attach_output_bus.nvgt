@@ -1,9 +1,9 @@
 /**
 	Connect one of the node's outputs to the input of another node.
-	bool audio_node::attach_output_bus(uint output_bus, audio_node@+ destination, uint destination_input_bus);
+	bool audio_node::attach_output_bus(uint output_bus, audio_node@ destination, uint destination_input_bus);
 	## Arguments:
 		* uint output_bus: the output bus of this node to connect.
-		* audio_node@+ destination: the node to send the audio to.
+		* audio_node@ destination: the node to send the audio to.
 		* uint destination_input_bus: the input bus of the destination to connect to.
 	## Returns:
 		bool: true if the connection was made, false if either bus doesn't exist or the connection would be invalid, such as two nodes whose channel counts can't be matched.
