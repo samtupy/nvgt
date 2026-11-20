@@ -13,3 +13,5 @@ Turn a listener to face a direction.
 
 ## Remarks:
 This is a direction to face, not a position to look at. The default is `(0, 1, 0)`, facing forward along the y axis. A sound that is to the right of this direction is heard on the right, which changes as you turn the listener with the player. The direction does not need to be normalized.
+
+A common desire is to rotate a game player by an angle given in degrees, letting them turn in a circle. You can convert the desired direction in degrees to radians `(degrees * pi / 180)` and call `set_listener_direction(index, sin(radians), cos(radians), 0)` to position sounds in the environment according to the direction in degrees that the character is facing.

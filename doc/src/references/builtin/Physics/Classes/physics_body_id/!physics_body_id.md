@@ -15,3 +15,5 @@ A physics_body_id identifies a body in a physics_world. It is a small value that
 A default constructed id is invalid. Ids are compared with `==`, and convert to a string so that they can be printed.
 
 The index of an id identifies the slot a body occupies in the world, while its sequence number changes every time the slot is reused, so an id of a destroyed body does not accidentally refer to a new one.
+
+You usually don't need to worry too much about the guts of this object, it is enough to know that it's what you use to identify bodies in a physics world.

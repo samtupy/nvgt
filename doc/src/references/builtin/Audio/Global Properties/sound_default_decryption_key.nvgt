@@ -6,6 +6,7 @@
 		While a key is set, sounds loaded with `sound::load()` or `sound::stream()` are decrypted with it, whether they are loaded from disk or from a pack. Files that aren't encrypted still load normally while a key is set.
 		Set the key before you load an encrypted file for the first time. If `sound::load()` fails on an encrypted file because the right key wasn't set yet, later loads of the same filename keep failing even after the key is set. Streaming the file with `sound::stream()` is not affected.
 		When encrypting a file with `asset_encryptor`, close both the encryptor and the underlying file before loading the result, otherwise the end of the data may not have been written to disk yet.
+		Note that NVGT's built in `pack_file` object supports encryption out of the box, so setting the `sound_default_pack` property to an instance of an encrypted pack might be an easier way to gain encrypted assets in your game.
 */
 
 // Example:
