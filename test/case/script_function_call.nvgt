@@ -35,3 +35,18 @@ void test_script_module_compile_global() {
 	assert(errors.length() > 0 and errors[0].find("line: 11") > -1, "errors: " + join(errors, " "));
 	m.discard();
 }
+void test_script_module_max_statement_count() {
+	script_module@ m = script_get_module("script_function_call_limit_test", 2);
+	m.add_section("test", "void spin() { while (true) {} }\nint one() { return 1; }");
+	assert(m.build() >= 0);
+	assert(m.max_statement_count == 0);
+	m.max_statement_count = 1000;
+	assert(script_get_module("script_function_call_limit_test", 0).max_statement_count == 1000, "the limit is stored with the module rather than the script_module object");
+	string[] errors;
+	assert(m.get_function_by_name("spin").call(null, errors) is null and errors.length() > 0 and errors[0].find("1000") > -1, "the default limit was not used: " + join(errors, " "));
+	errors.resize(0);
+	assert(m.get_function_by_name("spin").call(null, errors, 50) is null and errors[0].find("50") > -1, "an explicit limit did not override the default: " + join(errors, " "));
+	int64 i = 0;
+	assert(m.get_function_by_name("one").call(null, null, -1).get("0", i) and i == 1); // A negative limit means no limit at all.
+	m.discard();
+}

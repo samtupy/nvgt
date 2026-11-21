@@ -19,6 +19,7 @@
 #include <Poco/Net/NetException.h>
 #include <Poco/Net/SMTPClientSession.h>
 #include <Poco/Net/SecureSMTPClientSession.h>
+#include <Poco/Net/SecureStreamSocket.h>
 #include <Poco/Net/StringPartSource.h>
 #include <Poco/Path.h>
 #include <Poco/RegularExpression.h>
@@ -415,11 +416,14 @@ public:
 	bool connect() {
 		try {
 			close();  // Close any existing connection
-			if (m_use_ssl)
-				m_session = new SecureSMTPClientSession(m_host, m_port);
-			else
-				m_session = new SMTPClientSession(m_host, m_port);
+			if (m_use_ssl && m_port == 465) m_session = new SecureSMTPClientSession(SecureStreamSocket(SocketAddress(m_host, m_port), m_host)); // Implicit TLS, the connection is encrypted from the very first byte.
+			else if (m_use_ssl) m_session = new SecureSMTPClientSession(m_host, m_port);
+			else m_session = new SMTPClientSession(m_host, m_port);
 			m_session->login(m_host);
+			if (m_use_ssl && m_port != 465) {
+				if (!static_cast<SecureSMTPClientSession*>(m_session)->startTLS()) throw Poco::Exception("The server does not support STARTTLS");
+				m_session->login(m_host); // The server forgets the greeting once the connection is upgraded, so it must be repeated.
+			}
 			m_session->setTimeout(Poco::Timespan(m_timeout * 1000));  // Convert ms to microseconds
 			m_last_error.clear();
 			return true;
@@ -436,12 +440,6 @@ public:
 			return false;
 		}
 		try {
-			// For SSL connections, we might need to start TLS
-			if (m_use_ssl && m_port == 587) {
-				SecureSMTPClientSession* secure = dynamic_cast<SecureSMTPClientSession*>(m_session);
-				if (secure)
-					secure->startTLS();
-			}
 			m_session->login(static_cast<SMTPClientSession::LoginMethod>(auth_method), username, password);
 			m_is_authenticated = true;
 			m_last_error.clear();
@@ -459,12 +457,6 @@ public:
 			return false;
 		}
 		try {
-			// For SSL connections, we might need to start TLS
-			if (m_use_ssl && m_port == 587) {
-				SecureSMTPClientSession* secure = dynamic_cast<SecureSMTPClientSession*>(m_session);
-				if (secure)
-					secure->startTLS();
-			}
 			// OAuth2 uses XOAUTH2 method
 			m_session->login(SMTPClientSession::AUTH_XOAUTH2, username, access_token);
 			m_is_authenticated = true;

@@ -1,0 +1,11 @@
+// AI generated test for the timespan class, whose total_milliseconds and total_microseconds were registered as int and overflowed for anything longer than a few minutes or days.
+void test_timespan_totals() {
+	timespan t(30 * DAYS);
+	assert(t.total_microseconds == 2592000000000, "total_microseconds: " + t.total_microseconds);
+	assert(t.total_milliseconds == 2592000000, "total_milliseconds: " + t.total_milliseconds);
+	assert(t.total_seconds == 2592000 and t.days == 30);
+	timespan u(1, 2, 3, 4, 5678);
+	assert(u.hours == 2 and u.minutes == 3 and u.seconds == 4 and u.milliseconds == 5 and u.microseconds == 678 and u.useconds == 5678);
+	assert(u.format() == "1d 02:03:04.005", "format gave " + u.format());
+	assert(timespan(5, 3000000) == 8 * SECONDS);
+}

@@ -26,3 +26,14 @@ void test_http_settings_survive_requests() {
 	assert(h.max_retries == 10 and h.retry_delay == 0 and h.connect_timeout == 30000);
 	assert(h.keepalive_timeout == 10000, "reset(true) set keepalive_timeout to " + h.keepalive_timeout + " rather than the default");
 }
+const int test_http_retries_after_network_error_level = 3; // Windows takes about two seconds to report a refused connection, making this slow there.
+void test_http_retries_after_network_error() {
+	http h;
+	h.max_retries = 2;
+	h.retry_delay = 100;
+	uint64 start = ticks();
+	h.get("http://127.0.0.1:1/");
+	h.wait();
+	assert(ticks() - start >= 190, "a refused connection was only tried once, finished after " + (ticks() - start) + " ms"); // Each of the two tries waits for the retry delay first, a network error used to end the request without trying again.
+	assert(h.status_code == 0);
+}

@@ -693,10 +693,12 @@ public:
 					_bytes_downloaded += count;
 				}
 				break;
-			} catch(Exception& e) {
+			} catch(Exception& e) { // A network error uses up one of the tries and the request is sent again after the retry delay, throwing away whatever part of the body arrived so it isn't duplicated.
 				if (_session) delete _session;
 				_session = nullptr;
-				return;
+				ScopedLock lock(*this);
+				_response_body.clear();
+				_bytes_downloaded = 0;
 			}
 		}
 		if (_session) {
