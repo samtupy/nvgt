@@ -18,7 +18,7 @@
 		* %c - centiseconds (00 .. 99).
 		* %F - the fraction of a second in microseconds (000000 .. 999999).
 		* %% - a percent sign.
-		The letters don't all mean the same as in `datetime::format()`, for example %h is the total number of hours here, but the hour on a 12 hour clock there. Every part of a negative timespan is negative, so formatting one gives results such as `0d 00:-1:-30.000`. It is better to format the absolute value and add the sign yourself.
+		The letters don't all mean the same as in `datetime::format()`, for example %h is the total number of hours here, but the hour on a 12 hour clock there. Every part of a negative timespan is negative, so formatting one gives results such as `0d 00:-1:-30.000`. It is better to format the absolute value of such a negative timespan and re-add the sign yourself.
 */
 
 // Example:

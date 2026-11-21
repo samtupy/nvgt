@@ -11,3 +11,5 @@ bool: true if elapsed is greater than or equal to time_units.
 
 ## Remarks:
 This doesn't change the timer, so it keeps counting. Use tick() to also start the timer over.
+
+This is simply a convenience method so that statements like `if (my_timer.elapsed >= 200)` can be written with more clarity, such as `if (my_timer.has_elapsed(200))` etc.

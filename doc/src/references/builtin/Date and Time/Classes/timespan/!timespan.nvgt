@@ -26,9 +26,9 @@
 
 // Example:
 void main() {
-	timespan t(1, 2, 30, 15, 500000);
+	timespan t(1, 2, 30, 15, 500000); // 1 day 2 hours 30 minutes 15.5 seconds.
 	alert("Constructed from parts", t.format() + "\nIn total, that is " + t.total_minutes + " minutes.");
-	timespan from_units(90 * SECONDS);
+	timespan from_units(90 * SECONDS); // 1 minute and 30 seconds
 	alert("Constructed from a number of microseconds", from_units.format("%m minutes and %S seconds"));
 	datetime start(2024, 1, 1);
 	datetime finish(2024, 3, 15, 12);
