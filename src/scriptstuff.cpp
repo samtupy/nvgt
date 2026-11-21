@@ -406,8 +406,20 @@ CScriptDictionary* script_function_call(asIScriptFunction* func, CScriptDictiona
 		void* ret = ctx->GetAddressOfReturnValue();
 		if (ret && !args)
 			args = CScriptDictionary::Create(g_ScriptEngine);
-		if (args && ret)
-			args->Set("0", ret, ret_type_id);
+		if (args && ret) {
+			// A dictionary only gives back the int64 and double primitives, so narrower numbers are widened to those or the return value couldn't be retrieved.
+			switch (ret_type_id) {
+				case asTYPEID_INT8: args->Set("0", asINT64(*(asINT8*)ret)); break;
+				case asTYPEID_INT16: args->Set("0", asINT64(*(asINT16*)ret)); break;
+				case asTYPEID_INT32: args->Set("0", asINT64(*(asINT32*)ret)); break;
+				case asTYPEID_UINT8: args->Set("0", asINT64(*(asBYTE*)ret)); break;
+				case asTYPEID_UINT16: args->Set("0", asINT64(*(asWORD*)ret)); break;
+				case asTYPEID_UINT32: args->Set("0", asINT64(*(asDWORD*)ret)); break;
+				case asTYPEID_UINT64: args->Set("0", asINT64(*(asQWORD*)ret)); break;
+				case asTYPEID_FLOAT: args->Set("0", double(*(float*)ret)); break;
+				default: args->Set("0", ret, ret_type_id);
+			}
+		}
 	}
 	if (new_context) g_ScriptEngine->ReturnContext(ctx);
 	else ctx->PopState();
@@ -795,7 +807,7 @@ void RegisterScripting(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("script_module"), _O("int reset_globals(string[]@ errors=null)"), asMETHOD(script_module, reset_globals), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("int bind_all_imported_functions()"), asMETHOD(script_module, bind_all_imported_functions), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("int bind_imported_function(uint index, script_function@+ func)"), asMETHOD(script_module, bind_imported_function), asCALL_THISCALL);
-	engine->RegisterObjectMethod(_O("script_module"), _O("int compile_global(const string&in section_name, const string&in code, uint line_offset=0)"), asMETHOD(script_module, compile_global), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("script_module"), _O("int compile_global(const string&in section_name, const string&in code, string[]@ errors=null, uint line_offset=0)"), asMETHOD(script_module, compile_global), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@ compile_function(const string&in section_name, const string&in code, string[]@ errors=null, bool add_to_module=false, uint line_offset=0)"), asMETHOD(script_module, compile_function), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("void discard()"), asMETHOD(script_module, discard), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("script_module"), _O("script_function@+ get_function_by_decl(const string&in decl)"), asMETHOD(script_module, get_function_by_decl), asCALL_THISCALL);

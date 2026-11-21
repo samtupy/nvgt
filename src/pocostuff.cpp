@@ -985,7 +985,7 @@ void RegisterPocostuff(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("uri", _O("void resolve(const uri&in relative_uri)"), asMETHODPR(URI, resolve, (const URI&), void), asCALL_THISCALL);
 	engine->RegisterObjectMethod("uri", _O("bool get_is_relative() const property"), asMETHOD(URI, isRelative), asCALL_THISCALL);
 	engine->RegisterObjectMethod("uri", _O("bool get_is_empty() const property"), asMETHOD(URI, empty), asCALL_THISCALL);
-	engine->RegisterObjectMethod("uri", _O("bool normalize()"), asMETHOD(URI, normalize), asCALL_THISCALL);
+	engine->RegisterObjectMethod("uri", _O("void normalize()"), asMETHOD(URI, normalize), asCALL_THISCALL);
 	engine->RegisterObjectMethod("uri", "string[][]@ get_query_parameters(bool plus_as_space = true) const", asFUNCTION(uri_get_query_parameters), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("uri", "string[]@ get_path_segments() const", asFUNCTION(uri_get_path_segments), asCALL_CDECL_OBJFIRST);
 	engine->SetDefaultNamespace("");

@@ -1,0 +1,37 @@
+// AI generated tests for calling functions of a script module, whose narrow number return values once couldn't be retrieved from the result dictionary, and for script_module::compile_global, which was registered without the errors parameter the C++ function took.
+script_module@ script_function_call_module() {
+	script_module@ m = script_get_module("script_function_call_test", 2);
+	m.add_section("test", "int add(int a, int b) { return a + b; }\nuint8 byte() { return 200; }\nfloat half() { return 0.5; }\nstring greet(const string&in name) { return \"hi \" + name; }\nint counter = 5;\nint get_counter() { return counter; }");
+	assert(m.build() >= 0);
+	return m;
+}
+void test_script_function_call_returns() {
+	script_module@ m = script_function_call_module();
+	int64 i = 0;
+	assert(m.get_function_by_name("add").call({{"1", 2}, {"2", 3}}).get("0", i) and i == 5, "int return gave " + i);
+	assert(m.get_function_by_name("byte").call(null).get("0", i) and i == 200, "uint8 return gave " + i);
+	double d = 0;
+	assert(m.get_function_by_name("half").call(null).get("0", d) and d == 0.5, "float return gave " + d);
+	string s;
+	assert(m.get_function_by_name("greet").call({{"1", "Sam"}}).get("0", s) and s == "hi Sam");
+	m.discard();
+}
+void test_script_module_globals_need_reset() {
+	script_module@ m = script_function_call_module();
+	int64 i = -1;
+	m.get_function_by_name("get_counter").call(null).get("0", i);
+	assert(i == 0, "globals were initialized by build, the documentation says otherwise");
+	assert(m.reset_globals() >= 0);
+	m.get_function_by_name("get_counter").call(null).get("0", i);
+	assert(i == 5);
+	m.discard();
+}
+void test_script_module_compile_global() {
+	script_module@ m = script_function_call_module();
+	assert(m.compile_global("extra", "int extra = 7;") >= 0);
+	assert(m.get_global_index_by_name("extra") >= 0);
+	string[] errors;
+	assert(m.compile_global("bad", "int bad = ;", errors, 10) < 0);
+	assert(errors.length() > 0 and errors[0].find("line: 11") > -1, "errors: " + join(errors, " "));
+	m.discard();
+}

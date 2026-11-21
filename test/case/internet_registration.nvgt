@@ -1,0 +1,28 @@
+// AI generated tests for internet classes whose registrations once disagreed with the C++ functions behind them, found while documenting them. Nothing leaves the computer, the http test only connects to a closed local port.
+void test_name_value_collection_get() {
+	name_value_collection c = {{"Name", "value"}};
+	assert(c.get("name") == "value", "get returned [" + c.get("name") + "]"); // get returned a string by value while registered as returning a reference, giving garbage or hanging.
+	assert(c.get("missing", "fallback") == "fallback");
+	http_request req(HTTP_GET, "/");
+	req["Accept"] = "text/plain";
+	assert(req.get("accept") == "text/plain");
+}
+void test_uri_normalize() {
+	spec::uri u("http://example.com/a/./b/../c");
+	u.normalize(); // Was registered as returning bool though it returns nothing.
+	assert(u.path == "/a/c", "normalized to " + u.path);
+}
+void test_http_settings_survive_requests() {
+	http h;
+	h.max_retries = 3;
+	h.retry_delay = 1;
+	h.connect_timeout = 500;
+	h.get("http://127.0.0.1:1/"); // Every request resets the last one, which used to restore max_retries and retry_delay to their defaults.
+	h.wait();
+	assert(h.status_code == 0);
+	assert(h.max_retries == 3, "max_retries became " + h.max_retries);
+	assert(h.retry_delay == 1, "retry_delay became " + h.retry_delay);
+	h.reset(true);
+	assert(h.max_retries == 10 and h.retry_delay == 0 and h.connect_timeout == 30000);
+	assert(h.keepalive_timeout == 10000, "reset(true) set keepalive_timeout to " + h.keepalive_timeout + " rather than the default");
+}

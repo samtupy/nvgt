@@ -193,7 +193,7 @@ template <class T> void RegisterNameValueCollection(asIScriptEngine* engine, con
 	engine->RegisterObjectMethod(type.c_str(), "void set_opIndex(const string&in name, const string&in value) property", asMETHOD(T, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void set(const string&in name, const string&in value)", asMETHOD(T, set), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "void add(const string&in name, const string&in value)", asMETHOD(T, add), asCALL_THISCALL);
-	engine->RegisterObjectMethod(type.c_str(), "const string& get(const string&in name, const string&in default_value = \"\") const", asMETHODPR(T, get, (const string&, const string&) const, string), asCALL_THISCALL);
+	engine->RegisterObjectMethod(type.c_str(), "string get(const string&in name, const string&in default_value = \"\") const", asMETHODPR(T, get, (const string&, const string&) const, string), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool exists(const string&in name) const", asMETHOD(T, has), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "bool empty() const", asMETHOD(T, empty), asCALL_THISCALL);
 	engine->RegisterObjectMethod(type.c_str(), "uint64 size() const", asMETHOD(T, size), asCALL_THISCALL);
@@ -622,13 +622,14 @@ public:
 		_request.setContentLength(0);
 		_request.set("User-Agent", _user_agent);
 		_response.clear();
-		_max_retries = 10;
-		_bytes_downloaded = _retry_delay = 0;
-		if (configuration) {
+		_bytes_downloaded = 0;
+		if (configuration) { // Every request resets the previous one, so the settings a script chose must only be reset when asked.
+			_max_retries = 10;
+			_retry_delay = 0;
 			_keepalive = false;
 			_connect_timeout = 30000;
 			_send_timeout = _receive_timeout = 60000;
-			_keepalive_timeout = 30000;
+			_keepalive_timeout = 10000;
 		}
 		tryWait(0); // Try making sure the event is not signaled.
 	}
@@ -670,7 +671,7 @@ public:
 				{
 					ScopedLock lock(*this);
 					_response = tmp_response;
-					bool moved = (_response.getStatus() == HTTPResponse::HTTP_MOVED_PERMANENTLY || _response.getStatus() == HTTPResponse::HTTP_FOUND || _response.getStatus() == HTTPResponse::HTTP_SEE_OTHER || _response.getStatus() == HTTPResponse::HTTP_TEMPORARY_REDIRECT);
+					bool moved = (_response.getStatus() == HTTPResponse::HTTP_MOVED_PERMANENTLY || _response.getStatus() == HTTPResponse::HTTP_FOUND || _response.getStatus() == HTTPResponse::HTTP_SEE_OTHER || _response.getStatus() == HTTPResponse::HTTP_TEMPORARY_REDIRECT || _response.getStatus() == HTTPResponse::HTTP_PERMANENT_REDIRECT);
 					if (moved) {
 						_url.resolve(_response.get("Location"));
 						authorize = false;
