@@ -1,5 +1,5 @@
 # retry_delay
-How many milliseconds to wait before sending each request, including the first.
+How many milliseconds to wait before sending each request, including the first and every retry after a network error.
 
 `uint http::retry_delay;`
 

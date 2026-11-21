@@ -4,7 +4,7 @@
 	## Arguments:
 		* dictionary@ args: the arguments, keyed by their position as strings starting at "1", such as `{{"1", 20}, {"2", "hello"}}`, or null for a function without parameters.
 		* array<string>@ errors = null: if given, receives three elements if the call fails: the reason, such as the exception that was thrown, the call stack where it happened, and the call stack of the caller.
-		* int max_statement_count = 0: the most statements the function may run before it is stopped, which protects against code that never returns, or 0 for no limit.
+		* int max_statement_count = 0: the most statements the function may run before it is stopped, which protects against code that never returns, or 0 to use the max_statement_count of the function's module, which is no limit unless you set one. A negative value means no limit even if the module has a default.
 	## Returns:
 		dictionary@: the args dictionary, cleared and then holding the return value under the key "0" if the function returns something, or a new dictionary if args was null. null if the call failed.
 	## Remarks:

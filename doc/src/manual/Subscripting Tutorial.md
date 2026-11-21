@@ -84,8 +84,8 @@ string code = """void test() {
 }
 
 // This function needs arguments.
-int64 add(int n1, int n2) {
-	return n1 + n2; // normal int can be passed as argument but not yet for return values, consider it a beta bug.
+int add(int n1, int n2) {
+	return n1 + n2;
 }
 
 // This function will be used to demonstrate how to catch script exceptions.
@@ -98,6 +98,8 @@ void throw_exception() {
 ### Calling the subscript
 ```
 #include "nvgt_subsystems.nvgt" // To limit the subscript's access to certain nvgt core functions.
+
+funcdef int add_function(int, int); // Used to retrieve the add function below.
 
 void main() {
 	// Create a new module.
@@ -125,24 +127,31 @@ void main() {
 		exit();
 	}
 	// This looks a bit bulky, but it won't in actual usage when you don't need to show UI upon this error. Lets call the function!
-	func({}); // Usually a dictionary of arguments is passed, this function takes none. Soon I think we'll be able to use funcdefs to call functions from shared code completely naturally, but we're not there yet and so now we use a dictionary, properly demonstrated in the next call.
+	func({}); // Usually a dictionary of arguments is passed, this function takes none. You can also retrieve a function into a funcdef handle and call it like any other function, which is shown a bit further down, but a dictionary is the most flexible way.
 	// Now lets demonstrate how to pass function arguments and how to fetch the return value. We'll skip the error check here we know the add function exists.
 	@func = mod.get_function_by_name("add"); // Notice the lack of signature verification here.
-	dictionary@ r = func.call({{1, people[0].age}, {2, people[1].age}}); // Notice how we can access those person objects created from the subscript.
-	// The return value will be stored in a key called 0, and the other values will maintain the indexes that you passed to them encase the function has modified a value using an &out reference.
-	int64 result = 1;
-	r.get(0, result);
-	alert("add test", result);
-	// Usually it's good to check for errors when calling functions, unfortunately. In time this may be compressed so that a default error handler may exist or something of the sort, for now, this is possible.
+	dictionary@ r = func.call({{"1", people[0].age}, {"2", people[1].age}}); // Notice how we can access those person objects created from the subscript. The keys are the positions of the arguments as strings, starting at "1".
+	// The dictionary you pass is cleared when the function finishes, and then the return value is stored in it under the key "0". The other arguments are not kept, so a function can't give values back through &out parameters, return something instead, for example an array or a dictionary. If the function fails, null is returned. If you pass null instead of a dictionary, a new one is created for the return value.
+	int64 result = 1; // Integers are always stored as int64 and floating point numbers as double, even if the function returns an int or a float.
+	r.get("0", result);
+	alert("add test", "" + result);
+	// Usually it's good to check for errors when calling functions. If the call fails, the errors array receives three strings, the reason (such as the exception that was thrown), the call stack of the subscript where it happened and the call stack of the code that called it.
 	err.resize(0);
 	@func = mod.get_function_by_name("throw_exception");
 	func({}, err);
 	if (err.size() > 0) alert("test", join(err, "\r\n"));
+	// If you will call a function often, retrieve it into a funcdef handle instead. This needs no dictionaries and is as fast as any normal function call, though the signature of the funcdef must match the function exactly and there is no way to pass an errors array, so exceptions are raised in the code that called it.
+	add_function@ add;
+	mod.get_function_by_name("add").retrieve(@add);
+	alert("add test 2", "" + add(2, 3));
 }
 ```
 
+### Limiting how long a subscript runs
+Code that you didn't write may never return, for example because of a loop that doesn't end. Set `script_module.max_statement_count` to the most statements any function of that module may run when it is called with `call()` before it is stopped, which causes the call to fail with an error such as "maximum statement count of 100000 exceeded" in the errors array. You can also pass a max_statement_count to a single `call()` which overrides the default of the module, where a negative number means no limit. The default is 0, meaning no limit. The limit applies to calls made with `call()` or by calling the function directly like `func(args)`, but not to functions called through a retrieved funcdef handle.
+
 ### Useful wrapper functions
-Finally, I'll leave you with some useful functions that show how it's very easy to wrap the calling of common functions. As I said above later I plan to make it possible to call functions with funcdefs if I am able, but we're not yet there. For now, you can use a version of these. They will not run out of the box as they are copied from stw, but they should be all the example needed.
+Finally, I'll leave you with some useful functions that show how it's very easy to wrap the calling of common functions. You can use a version of these, or retrieve functions into funcdef handles if you don't need the flexibility of a dictionary. They will not run out of the box as they are copied from stw, but they should be all the example needed.
 
 ```
 dictionary shared_function_cache; // It's useful to cache function lookups in a dictionary for performance, else Angelscript needs to keep looping through all shared functions to find the matching signature.

@@ -1,0 +1,35 @@
+/**
+	A stopwatch that measures how much time has passed since it was created or restarted, which is the usual way to make cooldowns, delays and repeating events in a game.
+	1. timer();
+	2. timer(bool speedhack_protection);
+	3. timer(int64 initial_elapsed, bool speedhack_protection = speedhack_protection);
+	4. timer(int64 initial_elapsed, uint64 accuracy, bool speedhack_protection = speedhack_protection);
+	## Arguments (2):
+		* bool speedhack_protection: whether the timer measures time with a clock that is protected against speed hacking tools, see the `secure` property.
+	## Arguments (3):
+		* int64 initial_elapsed: how much time the timer starts out with already elapsed, in the default accuracy. This can be negative.
+		* bool speedhack_protection = speedhack_protection: whether the timer is protected, which defaults to the value of the `speedhack_protection` global property.
+	## Arguments (4):
+		* int64 initial_elapsed: how much time the timer starts out with already elapsed, in units of the accuracy given.
+		* uint64 accuracy: the number of microseconds in one unit of this timer's elapsed time, usually one of the constants in `Time Units` such as SECONDS.
+		* bool speedhack_protection = speedhack_protection: whether the timer is protected.
+	## Remarks:
+		A timer starts counting as soon as it is created, and elapsed always reports how much time has passed since it was created or last restarted, in units of its accuracy. With the default accuracy of `timer_default_accuracy`, which is MILLISECONDS unless it has been changed, a timer reports milliseconds.
+		The timer class is a reference type, so declaring `timer t;` creates a new timer and `timer@` handles share one object. A timer can be paused with pause() and resumed with resume(), and while it is paused the time that passes isn't counted.
+		The most common ways to use a timer are has_elapsed(), which checks whether an amount of time has passed, and tick(), which does the same but also starts the timer over when it has, making it ideal for repeating events.
+*/
+
+// Example:
+void main() {
+	timer attack_cooldown;
+	int attacks = 0;
+	// Allow an attack every 200 milliseconds until we have made five of them.
+	while (attacks < 5) {
+		if (attack_cooldown.tick(200)) attacks++; // Returns true and starts counting again once 200 milliseconds have passed.
+		wait(1);
+	}
+	alert("Example", "Made " + attacks + " attacks.");
+	timer seconds_timer(0, SECONDS); // This timer counts in seconds rather than milliseconds.
+	wait(1500);
+	alert("Example", "The second timer reports " + seconds_timer.elapsed + " second.");
+}

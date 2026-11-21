@@ -1,7 +1,7 @@
 # use_ssl
-Whether to secure the connection with STARTTLS.
+Whether to encrypt the connection with TLS.
 
 `bool smtp_client::use_ssl;`
 
 ## Remarks:
-This defaults to false. The connection is upgraded to TLS by login() when the port is 587, so messages should only be sent after logging in.
+This defaults to false. On port 465 the connection is encrypted from the very first byte, while on any other port, such as 587, it is upgraded with STARTTLS during connect(), which fails if the server doesn't support it. Set it before calling connect().

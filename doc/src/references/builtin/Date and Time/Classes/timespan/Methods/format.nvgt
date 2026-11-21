@@ -1,0 +1,30 @@
+/**
+	Format the timespan as a string.
+	string timespan::format(const string&in fmt = "%dd %H:%M:%S.%i");
+	## Arguments:
+		* const string&in fmt = "%dd %H:%M:%S.%i": a template for the result, in which the specifiers listed in the remarks are replaced by values and all other characters are copied as they are.
+	## Returns:
+		string: the formatted timespan.
+	## Remarks:
+		These specifiers are replaced:
+		* %d - days.
+		* %H - hours (00 .. 23).
+		* %h - total hours.
+		* %M - minutes (00 .. 59).
+		* %m - total minutes.
+		* %S - seconds (00 .. 59).
+		* %s - total seconds.
+		* %i - milliseconds (000 .. 999).
+		* %c - centiseconds (00 .. 99).
+		* %F - the fraction of a second in microseconds (000000 .. 999999).
+		* %% - a percent sign.
+		The letters don't all mean the same as in `datetime::format()`, for example %h is the total number of hours here, but the hour on a 12 hour clock there. Every part of a negative timespan is negative, so formatting one gives results such as `0d 00:-1:-30.000`. It is better to format the absolute value and add the sign yourself.
+*/
+
+// Example:
+void main() {
+	timespan t(1, 2, 3, 4, 5678);
+	alert("Default format", t.format());
+	alert("Custom format", t.format("%h hours, %M minutes and %S seconds"));
+	alert("Total minutes", t.format("%m minutes"));
+}

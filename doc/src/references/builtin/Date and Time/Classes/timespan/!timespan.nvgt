@@ -1,0 +1,37 @@
+/**
+	A length of time, stored with microsecond accuracy, such as the difference between two points in time.
+	1. timespan();
+	2. timespan(int64 microseconds);
+	3. timespan(int seconds, int microseconds);
+	4. timespan(int days, int hours, int minutes, int seconds, int microseconds);
+	5. timespan(const timespan&in other);
+	## Arguments (2):
+		* int64 microseconds: the length of the timespan, which can be negative. The constants listed in `Time Units` convert from other units, for example `5 * MINUTES`.
+	## Arguments (3):
+		* int seconds: the number of seconds.
+		* int microseconds: the number of microseconds, which is added to the seconds.
+	## Arguments (4):
+		* int days: the number of days.
+		* int hours: the number of hours.
+		* int minutes: the number of minutes.
+		* int seconds: the number of seconds.
+		* int microseconds: the number of microseconds.
+	## Arguments (5):
+		* const timespan&in other: the timespan to copy.
+	## Remarks:
+		A timespan is a plain value like an integer, rather than a handle. The default constructor creates a length of zero.
+		The parts given to a constructor are simply added together, so they may exceed their usual ranges. `timespan(5, 3000000)` is 8 seconds.
+		Subtracting one datetime, calendar or timestamp from another gives a timespan, and a timespan can be added to or subtracted from all three. The properties of a timespan either give one part of the length, such as the minutes from 0 to 59, or the whole length measured in one unit, such as total_minutes. A timespan can also be compared with, added to and subtracted from a number of microseconds.
+*/
+
+// Example:
+void main() {
+	timespan t(1, 2, 30, 15, 500000);
+	alert("Constructed from parts", t.format() + "\nIn total, that is " + t.total_minutes + " minutes.");
+	timespan from_units(90 * SECONDS);
+	alert("Constructed from a number of microseconds", from_units.format("%m minutes and %S seconds"));
+	datetime start(2024, 1, 1);
+	datetime finish(2024, 3, 15, 12);
+	timespan between = finish - start;
+	alert("Difference between two datetimes", between.days + " days and " + between.hours + " hours");
+}

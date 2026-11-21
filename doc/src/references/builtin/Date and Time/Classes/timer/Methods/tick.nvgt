@@ -1,0 +1,23 @@
+/**
+	Check whether a given amount of time has passed, and if it has, start the timer over.
+	bool timer::tick(int64 time_units);
+	## Arguments:
+		* int64 time_units: the amount of time to wait for, in units of the timer's accuracy.
+	## Returns:
+		bool: true if at least time_units had elapsed, in which case the timer has been restarted.
+	## Remarks:
+		When this returns true it calls restart(), so the time is counted from the moment of the call rather than from the moment the interval ended, and a paused timer is resumed. Any time beyond time_units is therefore not carried over.
+*/
+
+// Example:
+void main() {
+	timer t;
+	int ticks = 0;
+	while (ticks < 3) {
+		if (t.tick(100)) { // 100 milliseconds by default.
+			ticks++;
+			alert("Example", "Tick " + ticks);
+		}
+		wait(1);
+	}
+}

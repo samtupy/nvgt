@@ -1,0 +1,35 @@
+/**
+	Connect to an FTP server to browse its directories and to download, upload and manage files.
+	1. ftp_client(uint16 active_data_port = 0);
+	2. ftp_client(const string&in host, uint16 port = 21, const string&in username = "", const string&in password = "", uint16 active_data_port = 0);
+	## Arguments (1):
+		* uint16 active_data_port = 0: the local port that the server connects to for transfers when passive mode is turned off, where 0 lets the system choose a free one.
+	## Arguments (2):
+		* const string&in host: the name or address of the server.
+		* uint16 port = 21: the port of the server.
+		* const string&in username = "": the user to log in as, which should be "anonymous" for servers that allow anyone to download. If it is empty, no login is attempted and login() must be called before most commands.
+		* const string&in password = "": the password to log in with, which for anonymous access is conventionally an email address.
+		* uint16 active_data_port = 0: as above.
+	## Remarks:
+		The first constructor creates a client that isn't connected yet, which is connected with open(). The second one connects immediately and logs in if a username is given.
+		Every method blocks until the server responds and throws an exception if something goes wrong, such as a connection that is refused, a login that is rejected or a file that doesn't exist, and the exception contains the message of the server or the network error. Socket operations time out after 30 seconds, which can't be changed.
+		File transfers use a second connection to the server. By default it is made in passive mode, where the client connects to the server, which works through firewalls and routers. Call set_passive(false) for servers that need active mode, in which the server connects to the client. Transfers are done with the begin_ methods, which return a datastream that is read from or written to, and the matching end_ method must be called afterwards, before another command is sent. Only one transfer can be in progress at a time.
+		The connection is not encrypted, so passwords and files are sent as plain text, and `is_secure` is therefore always false.
+*/
+
+// Example:
+void main() {
+	ftp_client ftp;
+	try {
+		ftp.open("ftp.gnu.org", 21, "anonymous", "guest@example.com");
+		alert("Connected", ftp.welcome_message);
+		ftp.set_working_directory("gnu");
+		datastream@ listing = ftp.begin_list();
+		string names = listing.read();
+		ftp.end_list();
+		alert("Contents of " + ftp.get_working_directory(), names);
+		ftp.close();
+	} catch {
+		alert("Error", get_exception_info());
+	}
+}

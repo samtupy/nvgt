@@ -1,0 +1,29 @@
+/**
+	An image stored in memory, which can be created, loaded from a file, modified, saved and then drawn into a window or used as an icon.
+	graphic@ create_surface(int width, int height, pixel_format pixel_format);
+	## Remarks:
+		The graphic class holds a block of pixels, called a surface. Graphics are reference types, so `graphic@` handles share one image, and use duplicate() to make an independent copy. They are created with create_surface(), which makes a blank image, with the load_ functions, which read image files, or by the render_ methods of text_font, which draw text into a new image. A window draws one with game_window::render_graphic() and uses one as its icon with game_window::set_icon().
+		A graphic can't be created directly with a constructor, and each of the functions above returns null on failure instead of throwing an exception. Methods that return a bool return true on success and false on failure. A graphic stays valid until the last handle to it is released, and its pixels can't currently be read or written from the script.
+		Each pixel is stored in the pixel_format that was given when the image was created or loaded, and the width and height are in pixels. The pitch is the number of bytes in one row of pixels, which can be larger than the width multiplied by the size of a pixel, because rows are padded for speed.
+		The color, alpha and blend modes of a graphic control how it is combined with whatever it is drawn onto.
+*/
+
+// Example:
+void main() {
+	// Create an image of 64 by 32 pixels, with a red, green, blue and alpha channel.
+	graphic@ image = create_surface(64, 32, PIXELFORMAT_ARGB8888);
+	alert("Created", image.width + " by " + image.height + " pixels, with " + image.pitch + " bytes per row.");
+	// Save it, then load it again.
+	string path = "graphic_example.png";
+	if (!image.save_png(path)) {
+		alert("Error", "Failed to save the image.");
+		return;
+	}
+	graphic@ loaded = load_png(path);
+	alert("Loaded", "Loaded back an image of " + loaded.width + " by " + loaded.height + " pixels.");
+	file_delete(path);
+	// A copy can be converted to another pixel format, or have its properties changed without affecting the original.
+	graphic@ opaque = loaded.convert(PIXELFORMAT_RGB24);
+	loaded.set_alpha_mod(128);
+	alert("Converted", "The converted image has " + opaque.pitch + " bytes per row, and the original has an alpha of " + loaded.get_alpha_mod() + ".");
+}
