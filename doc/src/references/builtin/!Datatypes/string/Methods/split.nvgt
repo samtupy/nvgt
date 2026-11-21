@@ -5,13 +5,13 @@
 		* const string&in delimiter: the delimiter to split at.
 		* bool full: Use all or any of the delimiter characters.
 		* bool allow_blanks: Specifies whether to allow empty fields.
-		* int max_elements = 0: the most elements to return, or 0 for no limit. A positive value stops splitting once that many elements exist, the last holding the rest of the string unsplit. A negative value does the same counting from the right, so the first element holds the unsplit rest.
+		* int max_elements = 0: the maximum number of elements to return, or 0 for no limit. A positive value stops splitting once that many elements exist, the last holding the rest of the string unsplit. A negative value does the same counting from the right, so the first element holds the unsplit remainder.
 	## Returns:
 		string[]@: a handle to an array containing each part of the split string.
 	## Remarks:
 		* The full parameter decides how to treat delimiter strings with multiple characters (such as "\r\n"). If enabled, the entire string is treated as a single delimiter ("\r\n"). If disabled, any character in the string counts as a delimiter ("\r" or "\n"). If the delimiter string is a single character this parameter is effectively meaningless.
 		* The allow_blanks parameter decides how to treat consecutive delimiters. See the example for how this works in practice.
-		* max_elements counts elements rather than splits, so "a-b-c-d".split("-", true, false, 2) gives {"a", "b-c-d"} while -2 gives {"a-b-c", "d"}. This makes it easy to partition a string at the first or last delimiter, and is similar to the maxsplit argument of Python's str.split and str.rsplit except that Python's counts one less.
+		* max_elements controls how many elements can be returned with the split aborting part way through once that limit is reached, so "a-b-c-d".split("-", true, false, 2) gives {"a", "b-c-d"} while -2 gives {"a-b-c", "d"}. This makes it easy to partition a string at the first or last delimiter.
 		* If the input string is empty, the output depends on the allow_blanks parameter. If true, an array with the blank string as the only element is returned. If false, an empty array is returned.
 */
 

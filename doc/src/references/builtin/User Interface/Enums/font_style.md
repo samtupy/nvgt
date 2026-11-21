@@ -1,5 +1,5 @@
 # font_style
-Styles of a text_font, which can be combined with |.
+Styles of a text_font, which can be combined with a verticle bar (| bitwise).
 
 * FONT_STYLE_NORMAL: no styling.
 * FONT_STYLE_BOLD: bold text.
