@@ -1,12 +1,12 @@
 /**
-	An icon in the system tray, or notification area, with a tooltip and a menu.
+	An icon in the system tray or notification area depending on what the host operating system offers, with a tooltip and a menu.
 	system_tray(const string&in tooltip, graphic@ icon = null);
 	## Arguments:
 		* const string&in tooltip: the text shown and spoken when the icon is focused or hovered over.
 		* graphic@ icon = null: the image to show as the icon, or null for a default.
 	## Remarks:
 		A tray icon lets a program be reached while its window is hidden, which suits games and tools that keep running in the background, such as a chat client waiting for messages. The icon stays in the tray until the system_tray object is destroyed.
-		The tray's menu, from the menu property, is shown when the user activates the icon. Items are added to it with system_tray_menu's insert methods, and their callbacks are called during wait() or refresh_window(), so the script must keep calling one of them for the menu to work. Tray icons are supported on Windows, macOS and Linux desktops, and valid is false where they aren't.
+		The tray's menu, from the menu property, is shown when the user activates the icon. Items are added to it with system_tray_menu's insert methods. The icon and its menu are serviced by wait() and refresh_window(), which also call the item callbacks, so the script must keep calling one of them from the thread that created the tray. While it isn't, for example during a long computation or a sleep, activating the icon does nothing at all. No window is needed, a script can run from the tray alone as the example below does. Tray icons are supported at least on Windows, macOS and Linux desktops. The `system_tray::valid` property indicates whether the system tray icon could be created usually due to lack of underlying platform support, false if it couldn't.
 */
 
 // Example:

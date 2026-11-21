@@ -1,0 +1,34 @@
+void test_split_max_elements() {
+	string[]@ a = "a-b-c-d".split("-", true, false, 2);
+	assert(a.length() == 2 && a[0] == "a" && a[1] == "b-c-d");
+	@a = "a-b-c-d".split("-", true, false, 10);
+	assert(a.length() == 4 && a[3] == "d");
+	@a = "a-b-c-d".split("-", true, false, 1);
+	assert(a.length() == 1 && a[0] == "a-b-c-d");
+	@a = "a-b-c-d".split("-");
+	assert(a.length() == 4);
+	@a = "a--b-c".split("-", true, true, 2);
+	assert(a.length() == 2 && a[0] == "a" && a[1] == "-b-c");
+	@a = "a--b-c".split("-", true, false, 2);
+	assert(a.length() == 2 && a[0] == "a" && a[1] == "b-c");
+	@a = "a, b;c".split(",; ", false, false, 3);
+	assert(a.length() == 3 && a[0] == "a" && a[1] == "b" && a[2] == "c");
+}
+void test_split_max_elements_from_right() {
+	string[]@ a = "a-b-c-d".split("-", true, false, -2);
+	assert(a.length() == 2 && a[0] == "a-b-c" && a[1] == "d");
+	@a = "a-b-c-d".split("-", true, false, -3);
+	assert(a.length() == 3 && a[0] == "a-b" && a[1] == "c" && a[2] == "d");
+	@a = "a-b-c-d".split("-", true, false, -10);
+	assert(a.length() == 4 && a[0] == "a" && a[3] == "d");
+	@a = "a-b-c-d".split("-", true, false, -1);
+	assert(a.length() == 1 && a[0] == "a-b-c-d");
+	@a = "a-b--c".split("-", true, true, -2);
+	assert(a.length() == 2 && a[0] == "a-b-" && a[1] == "c");
+	@a = "a-b--c".split("-", true, false, -2);
+	assert(a.length() == 2 && a[0] == "a-b" && a[1] == "c");
+	@a = "key::value::more".split("::", true, false, -2);
+	assert(a.length() == 2 && a[0] == "key::value" && a[1] == "more");
+	@a = "a, b;c".split(",; ", false, false, -3);
+	assert(a.length() == 3 && a[0] == "a" && a[1] == "b" && a[2] == "c");
+}

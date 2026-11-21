@@ -248,11 +248,20 @@ bool info_box(const std::string& title, const std::string& text, const std::stri
 	#endif
 }
 
+static text_font* default_window_font() { // Gives a window something to draw text with out of the box, or null when the platform has no font to offer in which case the script can still set one.
+	std::string path = platform_get_font();
+	if (path.empty()) return nullptr;
+	text_font* font = new text_font(path, 20);
+	if (font->is_valid()) return font;
+	font->release();
+	return nullptr;
+}
 game_window::game_window(const std::string& title, unsigned int w, unsigned int h, unsigned int flags) : _window(nullptr), _owns_window(true), _native_window(nullptr), _refcount(1) {
 	if (Poco::Environment::os() == POCO_OS_LINUX) flags |= SDL_WINDOW_FULLSCREEN;
 	_window = SDL_CreateWindow(title.c_str(), (int)w, (int)h, flags);
 	if (!_window) return;
 	_renderer = new graphics_renderer(this);
+	_font = default_window_font();
 	if (!SDL_HasScreenKeyboardSupport()) SDL_StartTextInput(_window);
 	SDL_PropertiesID props = SDL_GetWindowProperties(_window);
 	#ifdef NATIVE_WINDOW_SDL_PROP
@@ -267,6 +276,7 @@ game_window::game_window(const std::string& title, unsigned int w, unsigned int 
 game_window::game_window(SDL_Window* window) : _window(window), _owns_window(false), _native_window(nullptr), _refcount(1) {
 	if (!_window) return;
 	_renderer = new graphics_renderer(this);
+	_font = default_window_font();
 	SDL_PropertiesID props = SDL_GetWindowProperties(_window);
 	#ifdef NATIVE_WINDOW_SDL_PROP
 	_native_window = (native_window_t)SDL_GetPointerProperty(props, NATIVE_WINDOW_SDL_PROP, nullptr);
@@ -368,6 +378,8 @@ void game_window::draw_menu(CScriptArray* items, float x, float y) {
 
 Poco::AutoPtr<game_window> g_window;
 thread_id_t g_WindowThreadId = 0;
+static int g_tray_count = 0; // Live system_tray icons, so that wait() keeps pumping events for their menus even when no window is shown.
+static thread_id_t g_tray_thread_id = 0; // Tray menus are serviced by the event pump of the thread that created them, which on Windows is the thread owning SDL's hidden tray window.
 
 static std::vector<SDL_Event> post_events; // holds events that should be processed after the next wait() call.
 bool set_application_name(const std::string& name) {
@@ -484,7 +496,8 @@ void refresh_window() {
 }
 void wait(int ms) {
 	anticheat_check();
-	if (!g_window || g_WindowThreadId != thread_current_thread_id()) {
+	thread_id_t current_thread = thread_current_thread_id();
+	if (!(g_window && g_WindowThreadId == current_thread) && !(g_tray_count > 0 && g_tray_thread_id == current_thread)) {
 		Poco::Thread::sleep(ms);
 		return;
 	}
@@ -657,11 +670,17 @@ CScriptArray* system_tray_menu::get_entries() {
 
 // system_tray implementation
 system_tray::system_tray(const std::string& tooltip, graphic* icon) : _tray(nullptr), _refcount(1) {
+	InputInit(); // SDL_PumpEvents only services trays once the video subsystem is initialized, which otherwise doesn't happen until show_window is called.
 	_tray = SDL_CreateTray(icon ? icon->get_surface() : nullptr, tooltip.empty() ? nullptr : tooltip.c_str());
+	if (!_tray) return;
+	if (g_tray_count++ == 0) g_tray_thread_id = thread_current_thread_id();
 }
 system_tray::~system_tray() {
 	_menu = nullptr;
-	if (_tray) { SDL_DestroyTray(_tray); _tray = nullptr; }
+	if (!_tray) return;
+	SDL_DestroyTray(_tray);
+	_tray = nullptr;
+	g_tray_count--;
 }
 system_tray_menu* system_tray::get_menu() {
 	if (_menu) return _menu.get();

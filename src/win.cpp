@@ -25,11 +25,18 @@
 #include <ctime>
 #include <iomanip>
 #include <stdexcept>
+#include <Poco/File.h>
 #include <Poco/UnicodeConverter.h>
 #include "win.h"
 
 using namespace std;
 
+std::string platform_get_font() {
+	const char* root = getenv("SystemRoot");
+	std::string dir = std::string(root ? root : "C:/Windows") + "/Fonts/";
+	for (const char* name : {"arial.ttf", "segoeui.ttf", "tahoma.ttf", "verdana.ttf"}) if (Poco::File(dir + name).exists()) return dir + name;
+	return "";
+}
 void register_native_tts() { tts_engine_register("sapi5", []() -> shared_ptr<tts_engine> { return make_shared<sapi5_engine>(); }); }
 
 sapi5_engine::sapi5_engine() : tts_engine_impl("SAPI5") {

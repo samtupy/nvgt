@@ -3,12 +3,13 @@
 	1. http_request();
 	2. http_request(const http_request&in other);
 	3. http_request(const string&in method, const string&in uri, const string&in version = HTTP_1_1);
-	4. $list(int&in) { repeat { string, string } };
+	4. http_request({{string, string}, ...});
 	## Arguments:
 		* const http_request&in other (2): a request to copy.
 		* const string&in method (3): the method of the request, such as HTTP_GET or HTTP_POST.
 		* const string&in uri (3): what to request from the server, usually the path and query of a URL, such as `/docs/?search=sound`.
 		* const string&in version = HTTP_1_1 (3): the HTTP version of the request.
+		* {{string, string}, ...} (4): the names and values of the request's headers, each pair in its own set of braces.
 	## Remarks:
 		For most HTTP requests, the http class is far easier to use, as it runs the request in the background, follows redirects, handles authentication and works with both http and https URLs. This lower level class is for when more control over the request and the connection is needed.
 		An http_request is an internet_message_header holding the request's headers, so headers are set by indexing it, as in `req["Accept"] = "text/html";`, and it has every method of internet_message_header and name_value_collection as well as the ones listed here. It can be created from an initialization list of headers.

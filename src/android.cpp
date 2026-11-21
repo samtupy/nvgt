@@ -16,6 +16,7 @@
 #include <jni.h>
 #include <time.h>
 #include <Poco/Exception.h>
+#include <Poco/File.h>
 #include <Poco/Format.h>
 #include <SDL3/SDL.h>
 #include <stdexcept>
@@ -231,6 +232,11 @@ std::vector<std::string> android_get_tts_engine_packages() {
 	return result;
 }
 
+std::string platform_get_font() {
+	for (const char* dir : {"/system/fonts/", "/system/font/"})
+		for (const char* name : {"Roboto-Regular.ttf", "NotoSans-Regular.ttf", "DroidSans.ttf"}) if (Poco::File(std::string(dir) + name).exists()) return std::string(dir) + name;
+	return "";
+}
 void register_native_tts() {
 	std::vector<std::string> android_engines = android_get_tts_engine_packages();
 	for (const auto& engine_pkg : android_engines) tts_engine_register(engine_pkg, [engine_pkg]() -> std::shared_ptr<tts_engine> { return std::make_shared<android_tts_engine>(engine_pkg); });

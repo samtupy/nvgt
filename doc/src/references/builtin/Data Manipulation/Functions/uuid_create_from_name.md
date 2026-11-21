@@ -1,5 +1,5 @@
 # uuid_create_from_name
-Create a UUID from a name, which is always the same for the same namespace and name, using MD5.
+Create a UUID from a name, which is always the same for the same namespace and name, using SHA1.
 
 `uuid uuid_create_from_name(const uuid&in namespace_id, const string&in name);`
 
@@ -8,7 +8,7 @@ Create a UUID from a name, which is always the same for the same namespace and n
 * const string&in name: the name.
 
 ## Returns:
-uuid: the UUID of the name, which is version 3.
+uuid: the UUID of the name, which is version 5.
 
 ## Remarks:
-uuid_create_from_name_sha1() does the same with SHA1, which is preferred for new uses.
+This gives an item a stable identifier derived from something already unique about it, such as a player's account name. Use uuid_create_from_name_md5() instead only when an identifier must match one created with the older MD5 scheme, which produces version 3 UUIDs.

@@ -15,6 +15,7 @@
 #include "tts.h"
 #include <memory>
 #include <time.h>
+#include <Poco/File.h>
 #include <Poco/SharedLibrary.h>
 #include <stdexcept>
 using namespace std;
@@ -93,6 +94,11 @@ bool speechd_engine::stop() {
 	return true;
 }
 
+std::string platform_get_font() {
+	for (const char* dir : {"/usr/share/fonts/truetype/dejavu/", "/usr/share/fonts/dejavu/", "/usr/share/fonts/TTF/", "/usr/share/fonts/truetype/liberation/", "/usr/share/fonts/liberation/", "/usr/share/fonts/truetype/noto/", "/usr/share/fonts/noto/", "/usr/share/fonts/truetype/freefont/", "/usr/share/fonts/truetype/"})
+		for (const char* name : {"DejaVuSans.ttf", "LiberationSans-Regular.ttf", "NotoSans-Regular.ttf", "FreeSans.ttf"}) if (Poco::File(std::string(dir) + name).exists()) return std::string(dir) + name;
+	return "";
+}
 void register_native_tts() { tts_engine_register("speechd", []() -> shared_ptr<tts_engine> { return make_shared<speechd_engine>(); }); }
 
 unsigned long long system_running_milliseconds() {

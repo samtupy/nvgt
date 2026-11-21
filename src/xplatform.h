@@ -47,6 +47,7 @@ typedef void* native_window_t;
 
 bool running_on_mobile();
 std::string get_font_path(const std::string& name);
+std::string platform_get_font(); // Path to a font the platform is known to ship, so that text can be drawn without the script having to choose one, or blank if none could be found. Defined in win.cpp, apple.mm, android.cpp or linux.cpp, of which only one will be built.
 void register_native_tts(); // Actual function exists in either android.cpp, apple.mm, linux.cpp or win.cpp, of which only one will be built.
 #ifndef NVGT_STUB
 void determine_compile_platform();

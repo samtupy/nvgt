@@ -15,6 +15,6 @@
 void main() {
 	uuid id = uuid_generate_random();
 	uuid same(id.str);
-	uuid named = uuid_create_from_name_sha1(uuid_namespace_dns(), "nvgt.dev");
+	uuid named = uuid_create_from_name(uuid_namespace_dns(), "nvgt.dev");
 	alert("UUIDs", "random: " + id + ", version " + id.version + "\nparsed copy is equal: " + (same == id) + "\nname based: " + named + ", version " + named.version + "\nnull: " + uuid() + (uuid().is_null? " is null" : ""));
 }

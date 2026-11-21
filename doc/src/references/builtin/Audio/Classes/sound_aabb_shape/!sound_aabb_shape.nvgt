@@ -1,13 +1,13 @@
 /**
 	A box shaped area that a mixer or sound fills, so that it is heard from the closest point of the box rather than from a single point.
-	sound_aabb_shape(int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range);
+	sound_aabb_shape(float left_range, float right_range, float backward_range, float forward_range, float lower_range, float upper_range);
 	## Arguments:
-		* int left_range: how far the box extends to the left of the mixer's position, along negative x.
-		* int right_range: how far it extends to the right, along positive x.
-		* int backward_range: how far it extends backwards, along negative y.
-		* int forward_range: how far it extends forwards, along positive y.
-		* int lower_range: how far it extends downwards, along negative z.
-		* int upper_range: how far it extends upwards, along positive z.
+		* float left_range: how far the box extends to the left of the mixer's position, along negative x.
+		* float right_range: how far it extends to the right, along positive x.
+		* float backward_range: how far it extends backwards, along negative y.
+		* float forward_range: how far it extends forwards, along positive y.
+		* float lower_range: how far it extends downwards, along negative z.
+		* float upper_range: how far it extends upwards, along positive z.
 	## Remarks:
 		Give the shape to a mixer or sound with `set_shape()`. The position given to `set_position_3d()` is then the point that the ranges are measured from, and the mixer is heard from the point of the box closest to the listener, which is updated whenever either of them moves. While the listener is inside the box the mixer is heard all around them, as though it was at their position.
 		Shapes suit sounds that come from a whole area rather than a point, such as a river, a busy road, a crowd or the hum of machinery filling a room. Give each mixer a shape of its own rather than sharing one between several. For areas that aren't boxes, any physics_shape can be used instead, such as a sphere or a plane.

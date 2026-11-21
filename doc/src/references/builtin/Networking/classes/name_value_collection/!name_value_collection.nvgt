@@ -2,9 +2,10 @@
 	A list of names and values, such as the headers of an HTTP request or the cookies of a website.
 	1. name_value_collection();
 	2. name_value_collection(const name_value_collection&in other);
-	3. $list(int&in) { repeat { string, string } };
+	3. name_value_collection({{string, string}, ...});
 	## Arguments:
 		* const name_value_collection&in other (2): a collection to copy.
+		* {{string, string}, ...} (3): the names and values to start with, each pair in its own set of braces.
 	## Remarks:
 		Names are case insensitive, so `c["content-type"]` and `c["Content-Type"]` are the same entry, and a name can appear more than once. A collection can be created from an initialization list of name and value pairs, as in `name_value_collection headers = {{"Accept", "text/html"}, {"Accept-Language", "en"}};`.
 		Indexing the collection with a name gets or sets its value, but reading a name that isn't there throws an exception, use get() with a default value to avoid that. Entries keep their order, and name_at() and value_at() access them by position.

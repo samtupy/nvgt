@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <algorithm>
+#include <vector>
 using namespace std;
 
 BEGIN_AS_NAMESPACE
@@ -23,7 +24,28 @@ static asITypeInfo *StringArrayType = NULL;
 //
 // AngelScript signature:
 // array<string>@ string::split(const string &in delim, bool full = true) const
-static CScriptArray *StringSplit(const string &delim, bool full, bool allow_blanks, const string &str)
+static CScriptArray *StringRSplit(const string &delim, bool full, bool allow_blanks, asUINT max_elements, const string &str, CScriptArray *array)
+{
+	// Splits from the right like python's str.rsplit, collecting pieces last to first so that at most max_elements are produced and the first one is the unsplit remainder.
+	vector<string> parts;
+	size_t end = str.size(), dl = full ? delim.size() : 1;
+	while (parts.size() + 1 < max_elements && end >= dl)
+	{
+		size_t pos = full ? str.rfind(delim, end - dl) : str.find_last_of(delim, end - 1);
+		if (pos == string::npos) break;
+		if (allow_blanks || end - pos - dl > 0) parts.push_back(str.substr(pos + dl, end - pos - dl));
+		end = pos;
+	}
+	if (!allow_blanks) // Skip any delimiters left dangling at the end of the remainder.
+		while (end >= dl && (full ? str.compare(end - dl, dl, delim) == 0 : delim.find(str[end - 1]) != string::npos)) end -= dl;
+	if (allow_blanks || end > 0 || parts.empty()) parts.push_back(str.substr(0, end));
+	array->Resize(parts.size());
+	for (size_t i = 0; i < parts.size(); i++) *(string *)array->At(parts.size() - 1 - i) = std::move(parts[i]);
+	return array;
+}
+
+// If max_elements is greater than 0, at most that many elements are returned, the last one being the unsplit remainder of the string. If it is less than 0 the same applies counting from the right, like python's str.rsplit.
+static CScriptArray *StringSplit(const string &delim, bool full, bool allow_blanks, int max_elements, const string &str)
 {
 	// Obtain a pointer to the engine
 	asIScriptContext *ctx = asGetActiveContext();
@@ -44,13 +66,14 @@ static CScriptArray *StringSplit(const string &delim, bool full, bool allow_blan
 		array->InsertLast((void *)&str);
 		return array;
 	}
+	if (max_elements < 0) return StringRSplit(delim, full, allow_blanks, (asUINT)-(long long)max_elements, str, array);
 	asUINT reserved = str.size() * 0.05; // Sam: Not sure how to predict how many elements we should initially reserve as each string could be different. Does it matter?
 	array->Reserve(reserved);
 
 	// Find the existence of the delimiter in the input string
 	size_t pos = 0, prev = 0;
 	asUINT count = 0;
-	while ((pos = (full ? str.find(delim, prev) : str.find_first_of(delim, prev))) != string::npos)
+	while ((max_elements <= 0 || array->GetSize() + 1 < (asUINT)max_elements) && (pos = (full ? str.find(delim, prev) : str.find_first_of(delim, prev))) != string::npos)
 	{
 		if (count > reserved)
 		{
@@ -75,6 +98,8 @@ static CScriptArray *StringSplit(const string &delim, bool full, bool allow_blan
 		}
 	}
 
+	if (!allow_blanks && max_elements > 0) // The loop may have stopped early, so skip delimiters at the start of the unsplit remainder.
+		while (prev < str.size() && (full ? str.compare(prev, delim.size(), delim) == 0 : delim.find(str[prev]) != string::npos)) prev += full ? delim.size() : 1;
 	// Add the remaining part if needed
 	if (array->GetSize() < 1 || str.size() - prev > 0)
 	{
@@ -92,9 +117,10 @@ static void StringSplit_Generic(asIScriptGeneric *gen)
 	string *delim = *(string **)gen->GetAddressOfArg(0);
 	bool full = gen->GetArgByte(1);
 	bool allow_blanks = gen->GetArgByte(2);
+	int max_elements = gen->GetArgDWord(3);
 
 	// Return the array by handle
-	*(CScriptArray **)gen->GetAddressOfReturnLocation() = StringSplit(*delim, full, allow_blanks, *str);
+	*(CScriptArray **)gen->GetAddressOfReturnLocation() = StringSplit(*delim, full, allow_blanks, max_elements, *str);
 }
 
 // This function takes as input an array of string handles as well as a
@@ -449,7 +475,7 @@ void RegisterStdStringUtils(asIScriptEngine *engine)
 
 	if (strstr(asGetLibraryOptions(), "AS_MAX_PORTABILITY"))
 	{
-		r = engine->RegisterObjectMethod("string", "array<string>@ split(const string &in delimiter, bool full = true, bool allow_blanks = false) const", asFUNCTION(StringSplit_Generic), asCALL_GENERIC);
+		r = engine->RegisterObjectMethod("string", "array<string>@ split(const string &in delimiter, bool full = true, bool allow_blanks = false, int max_elements = 0) const", asFUNCTION(StringSplit_Generic), asCALL_GENERIC);
 		assert(r >= 0);
 		r = engine->RegisterGlobalFunction("string join(const array<string> &in arr, const string &in delimiter, int start = 0, int count = -1)", asFUNCTION(StringJoin_Generic), asCALL_GENERIC);
 		assert(r >= 0);
@@ -464,7 +490,7 @@ void RegisterStdStringUtils(asIScriptEngine *engine)
 	}
 	else
 	{
-		r = engine->RegisterObjectMethod("string", "array<string>@ split(const string &in delimiter, bool full = true, bool allow_blanks = false) const", asFUNCTION(StringSplit), asCALL_CDECL_OBJLAST);
+		r = engine->RegisterObjectMethod("string", "array<string>@ split(const string &in delimiter, bool full = true, bool allow_blanks = false, int max_elements = 0) const", asFUNCTION(StringSplit), asCALL_CDECL_OBJLAST);
 		assert(r >= 0);
 		r = engine->RegisterGlobalFunction("string join(const array<string> &in arr, const string &in delimiter, int start = 0, int count = -1)", asFUNCTION(StringJoin), asCALL_CDECL);
 		assert(r >= 0);

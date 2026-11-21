@@ -7,4 +7,4 @@ Copy the window's software surface to the screen.
 bool: true on success, false otherwise.
 
 ## Remarks:
-This is for software drawing to the window's surface rather than its renderer, which NVGT's drawing methods use.
+This is for software drawing to the window's surface rather than its renderer, which NVGT's drawing methods use. Most programs never need it, see destroy_surface() for how the two differ.

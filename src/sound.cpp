@@ -260,8 +260,8 @@ sound_shape* sound_shape_builtin_standard_setup(mixer* snd, CScriptHandle* shape
 }
 class sound_aabb_shape : public sound_shape {
 public:
-	int left_range, right_range, backward_range, forward_range, lower_range, upper_range;
-	sound_aabb_shape(int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range) : sound_shape(), left_range(left_range), right_range(right_range), backward_range(backward_range), forward_range(forward_range), lower_range(lower_range), upper_range(upper_range) {}
+	float left_range, right_range, backward_range, forward_range, lower_range, upper_range;
+	sound_aabb_shape(float left_range, float right_range, float backward_range, float forward_range, float lower_range, float upper_range) : sound_shape(), left_range(left_range), right_range(right_range), backward_range(backward_range), forward_range(forward_range), lower_range(lower_range), upper_range(upper_range) {}
 	bool contains(const vector3& listener_position, vector3& sound_position) override {
 		vector3 bmin(sound_position.GetX() - left_range, sound_position.GetY() - backward_range, sound_position.GetZ() - lower_range);
 		vector3 bmax(sound_position.GetX() + right_range, sound_position.GetY() + forward_range, sound_position.GetZ() + upper_range);
@@ -272,7 +272,7 @@ public:
 		return false;
 	}
 };
-sound_aabb_shape* create_sound_aabb_shape(int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range) { return new sound_aabb_shape(left_range, right_range, backward_range, forward_range, lower_range, upper_range); }
+sound_aabb_shape* create_sound_aabb_shape(float left_range, float right_range, float backward_range, float forward_range, float lower_range, float upper_range) { return new sound_aabb_shape(left_range, right_range, backward_range, forward_range, lower_range, upper_range); }
 
 // Miniaudio objects must be allocated on the heap as nvgt's API introduces the concept of an uninitialized sound, which a stack based system would make more difficult to implement.
 class audio_engine_impl final : public audio_node_impl, public virtual audio_engine {
@@ -2623,15 +2623,15 @@ void RegisterSoundsystemNodes(asIScriptEngine *engine) {
 void RegisterSoundsystemShapes(asIScriptEngine* engine) {
 	int ot = engine->RegisterObjectType("sound_aabb_shape", 0, asOBJ_REF); assert(ot >= 0);
 	g_sound_shape_setup_callbacks[ot] = sound_shape_builtin_standard_setup;
-	engine->RegisterObjectBehaviour("sound_aabb_shape", asBEHAVE_FACTORY, "sound_aabb_shape@ s(int left_range, int right_range, int backward_range, int forward_range, int lower_range, int upper_range)", asFUNCTION(create_sound_aabb_shape), asCALL_CDECL);
+	engine->RegisterObjectBehaviour("sound_aabb_shape", asBEHAVE_FACTORY, "sound_aabb_shape@ s(float left_range, float right_range, float backward_range, float forward_range, float lower_range, float upper_range)", asFUNCTION(create_sound_aabb_shape), asCALL_CDECL);
 	engine->RegisterObjectBehaviour("sound_aabb_shape", asBEHAVE_ADDREF, "void f()", asMETHOD(sound_aabb_shape, duplicate), asCALL_THISCALL);
 	engine->RegisterObjectBehaviour("sound_aabb_shape", asBEHAVE_RELEASE, "void f()", asMETHOD(sound_aabb_shape, release), asCALL_THISCALL);
-	engine->RegisterObjectProperty("sound_aabb_shape", "int left_range", asOFFSET(sound_aabb_shape, left_range));
-	engine->RegisterObjectProperty("sound_aabb_shape", "int right_range", asOFFSET(sound_aabb_shape, right_range));
-	engine->RegisterObjectProperty("sound_aabb_shape", "int backward_range", asOFFSET(sound_aabb_shape, backward_range));
-	engine->RegisterObjectProperty("sound_aabb_shape", "int forward_range", asOFFSET(sound_aabb_shape, forward_range));
-	engine->RegisterObjectProperty("sound_aabb_shape", "int lower_range", asOFFSET(sound_aabb_shape, lower_range));
-	engine->RegisterObjectProperty("sound_aabb_shape", "int upper_range", asOFFSET(sound_aabb_shape, upper_range));
+	engine->RegisterObjectProperty("sound_aabb_shape", "float left_range", asOFFSET(sound_aabb_shape, left_range));
+	engine->RegisterObjectProperty("sound_aabb_shape", "float right_range", asOFFSET(sound_aabb_shape, right_range));
+	engine->RegisterObjectProperty("sound_aabb_shape", "float backward_range", asOFFSET(sound_aabb_shape, backward_range));
+	engine->RegisterObjectProperty("sound_aabb_shape", "float forward_range", asOFFSET(sound_aabb_shape, forward_range));
+	engine->RegisterObjectProperty("sound_aabb_shape", "float lower_range", asOFFSET(sound_aabb_shape, lower_range));
+	engine->RegisterObjectProperty("sound_aabb_shape", "float upper_range", asOFFSET(sound_aabb_shape, upper_range));
 }
 void RegisterSoundsystem(asIScriptEngine *engine) {
 	engine->RegisterEnum("audio_error_state");

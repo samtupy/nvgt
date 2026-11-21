@@ -93,6 +93,7 @@ public:
 	~text_font();
 	void duplicate() { asAtomicInc(_refcount); }
 	void release() { if (asAtomicDec(_refcount) < 1) delete this; }
+	bool is_valid() const { return _font != nullptr; }
 	unsigned int get_generation() const { return TTF_GetFontGeneration(_font); }
 	bool add_fallback_font(text_font* font);
 	bool remove_fallback_font(text_font* font);

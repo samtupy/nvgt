@@ -64,7 +64,7 @@ void uuid_set_bytes(Poco::UUID& uuid, const std::string& bytes) {
 		uuid.copyFrom(bytes.data());
 }
 
-Poco::UUID uuid_create_from_name_sha1(const Poco::UUID& nsid, const std::string& name) {
+Poco::UUID uuid_create_from_name(const Poco::UUID& nsid, const std::string& name) {
 	Poco::SHA1Engine engine;
 	return Poco::UUIDGenerator::defaultGenerator().createFromName(nsid, name, engine, Poco::UUID::UUID_NAME_BASED_SHA1);
 }
@@ -99,8 +99,8 @@ void RegisterUUID(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("uuid uuid_generate_time()", asMETHOD(Poco::UUIDGenerator, create), asCALL_THISCALL_ASGLOBAL, &Poco::UUIDGenerator::defaultGenerator());
 	engine->RegisterGlobalFunction("uuid uuid_generate_time_v6()", asMETHOD(Poco::UUIDGenerator, createV6), asCALL_THISCALL_ASGLOBAL, &Poco::UUIDGenerator::defaultGenerator());
 	engine->RegisterGlobalFunction("uuid uuid_generate_time_v7()", asMETHOD(Poco::UUIDGenerator, createV7), asCALL_THISCALL_ASGLOBAL, &Poco::UUIDGenerator::defaultGenerator());
-	engine->RegisterGlobalFunction("uuid uuid_create_from_name(const uuid&in namespace_id, const string&in name)", asMETHODPR(Poco::UUIDGenerator, createFromName, (const Poco::UUID&, const std::string&), Poco::UUID), asCALL_THISCALL_ASGLOBAL, &Poco::UUIDGenerator::defaultGenerator());
-	engine->RegisterGlobalFunction("uuid uuid_create_from_name_sha1(const uuid&in namespace_id, const string&in name)", asFUNCTION(uuid_create_from_name_sha1), asCALL_CDECL);
+	engine->RegisterGlobalFunction("uuid uuid_create_from_name_md5(const uuid&in namespace_id, const string&in name)", asMETHODPR(Poco::UUIDGenerator, createFromName, (const Poco::UUID&, const std::string&), Poco::UUID), asCALL_THISCALL_ASGLOBAL, &Poco::UUIDGenerator::defaultGenerator());
+	engine->RegisterGlobalFunction("uuid uuid_create_from_name(const uuid&in namespace_id, const string&in name)", asFUNCTION(uuid_create_from_name), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uuid uuid_namespace_dns()", asFUNCTION(uuid_namespace_dns), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uuid uuid_namespace_url()", asFUNCTION(uuid_namespace_url), asCALL_CDECL);
 	engine->RegisterGlobalFunction("uuid uuid_namespace_oid()", asFUNCTION(uuid_namespace_oid), asCALL_CDECL);

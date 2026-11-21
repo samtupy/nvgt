@@ -27,12 +27,17 @@
 #include <scriptarray.h>
 #include <TargetConditionals.h>
 #include <Poco/Event.h>
+#include <Poco/File.h>
 #include <Poco/Mutex.h>
 #include <Poco/Thread.h>
 #include "apple.h"
 #include "UI.h"
 #include "xplatform.h"
 
+std::string platform_get_font() {
+	for (const char* path : {"/System/Library/Fonts/Supplemental/Arial.ttf", "/Library/Fonts/Arial.ttf", "/System/Library/Fonts/Supplemental/Verdana.ttf", "/System/Library/Fonts/Helvetica.ttc"}) if (Poco::File(path).exists()) return path;
+	return "";
+}
 void register_native_tts() { tts_engine_register("avspeech", []() -> std::shared_ptr<tts_engine> { return std::make_shared<AVTTSVoice>(); }); }
 
 // AVTTSVoice::impl class created by Gruia Chiscop on 6/6/24.
