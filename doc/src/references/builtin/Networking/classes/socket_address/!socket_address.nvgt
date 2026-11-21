@@ -1,0 +1,31 @@
+/**
+	An IP address and a port, which identify one end of a connection.
+	1. socket_address();
+	2. socket_address(spec::ip_address_family family);
+	3. socket_address(uint16 port);
+	4. socket_address(const spec::ip_address&in addr, uint16 port);
+	5. socket_address(const string&in host_and_port);
+	6. socket_address(const string&in host, uint16 port);
+	7. socket_address(spec::ip_address_family family, uint16 port);
+	8. socket_address(spec::ip_address_family family, const string&in addr);
+	9. socket_address(spec::ip_address_family family, const string&in host, uint16 port);
+	10. socket_address(spec::ip_address_family family, const string&in host, const string&in port);
+	11. socket_address(const socket_address&in other);
+	## Arguments:
+		* spec::ip_address_family family (2, 7, 8, 9, 10): the family of the address, a value of the spec::ip_address_family enum.
+		* uint16 port (3, 4, 6, 7, 9, 10): the port. As a string, this can also be the name of a service such as `http`.
+		* const spec::ip_address&in addr (4, 8): the IP address, either an ip_address or a string to parse.
+		* const string&in host_and_port (5): an address and port together, such as `192.168.1.10:8080`, `[::1]:8080` or `localhost:8080`.
+		* const string&in host (6, 9, 10): the host, either an IP address or a host name to resolve.
+		* const socket_address&in other (11): an address to copy.
+	## Remarks:
+		A socket_address is used to bind and connect sockets and is returned by them to say who they are connected to. Without an address it is the wildcard address of its family, and without a port it uses port 0, which lets the operating system pick one when binding.
+		Host names given to the constructors are resolved through DNS, which blocks until the lookup is done and throws an exception if it fails. A socket_address converts to its string form, such as `192.168.1.10:8080`, implicitly, and addresses can be compared and sorted.
+*/
+
+// Example:
+void main() {
+	socket_address server("127.0.0.1", 8080);
+	socket_address any_port(spec::IP_FAMILY_IPV6, 0);
+	alert("Socket addresses", "server: " + server + ", host " + server.host + ", port " + server.port + "\nIPv6 wildcard: " + any_port);
+}

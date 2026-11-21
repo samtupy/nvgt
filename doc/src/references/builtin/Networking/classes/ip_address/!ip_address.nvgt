@@ -1,0 +1,25 @@
+/**
+	An IPv4 or IPv6 address.
+	1. ip_address();
+	2. ip_address(spec::ip_address_family family);
+	3. ip_address(const string&in addr);
+	4. ip_address(const string&in addr, spec::ip_address_family family);
+	5. ip_address(const spec::ip_address&in other);
+	## Arguments:
+		* spec::ip_address_family family (2, 4): the family of the address. Without an address, this creates the wildcard address of the family, `0.0.0.0` or `::`.
+		* const string&in addr (3, 4): the address to parse, such as `192.168.1.10` or `::1`.
+		* const spec::ip_address&in other (5): an address to copy.
+	## Remarks:
+		This class is in the spec namespace, so scripts write it as `spec::ip_address` unless they have a `using namespace spec;` statement.
+		The default constructor creates the IPv4 wildcard address 0.0.0.0. Constructing an ip_address from a string parses it and throws an exception if it isn't a valid address. Host names aren't resolved, use dns_resolve() or dns_resolve_single() for those, or spec::parse_ip_address() to parse without an exception.
+		An ip_address converts to its string form implicitly, though as it has no + operator of its own, it must follow a string when concatenated, as in `"address: " + addr`, or be converted with `string(addr)`. Addresses can be compared and sorted, and the &, |, ^ and ~ operators work on their bits, which is useful with network masks.
+*/
+
+// Example:
+void main() {
+	spec::ip_address local("192.168.1.10");
+	spec::ip_address netmask("255.255.255.0");
+	spec::ip_address subnet = local & netmask;
+	spec::ip_address loopback("::1");
+	alert("IP addresses", "The address " + local + " is in network " + subnet + " with a prefix length of " + netmask.prefix_length + ".\n" + loopback + " is " + (loopback.is_v6? "IPv6" : "IPv4") + (loopback.is_loopback? " loopback." : "."));
+}

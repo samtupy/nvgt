@@ -1,0 +1,27 @@
+/**
+	An HTTP response, with its status, reason, version and headers.
+	1. http_response();
+	2. http_response(const http_response&in other);
+	3. http_response(http_status status);
+	4. http_response(http_status status, const string&in reason);
+	5. http_response(const string&in version, http_status status, const string&in reason);
+	6. http_response(const string&in version, http_status status);
+	7. $list(int&in) { repeat { string, string } };
+	## Arguments:
+		* const http_response&in other (2): a response to copy.
+		* http_status status (3, 4, 5, 6): the status of the response, a value of the http_status enum.
+		* const string&in reason (4, 5): the reason phrase of the response. Without it, the standard phrase for the status is used.
+		* const string&in version (5, 6): the HTTP version of the response.
+	## Remarks:
+		http_response objects are filled in by http_client::receive_response(), returned by http::response_headers, and given to url_get() and its relatives.
+		An http_response is an internet_message_header holding the response's headers, so a header is read by indexing it, as in `resp["Content-Type"]`, and it has every method of internet_message_header and name_value_collection as well as the ones listed here. The response doesn't include its body, which is read from the stream returned by http_client::receive_response().
+*/
+
+// Example:
+void main() {
+	http_response resp;
+	string body = url_get("https://nvgt.dev", resp);
+	string info = resp.version + " " + resp.status + " " + resp.reason + "\ntype: " + resp.content_type + "\nlength: " + body.length();
+	for (uint i = 0; i < resp.size(); i++) info += "\n" + resp.name_at(i) + ": " + resp.value_at(i);
+	alert("Response", info);
+}

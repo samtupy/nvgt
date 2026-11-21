@@ -1,0 +1,33 @@
+/**
+	A module of script code, separate from the game's own, that can be built from source code or bytecode at run time and whose functions and variables can then be used.
+	script_module@ script_get_module(const string&in name, int mode = 1);
+	## Arguments:
+		* const string&in name: the name of the module.
+		* int mode = 1: 0 to only get a module that already exists, 1 to create it if it doesn't, or 2 to always create a new, empty one, discarding any existing module with the name.
+	## Remarks:
+		script_module objects can't be created directly, they are returned by script_get_module(). A module stays in the engine until it is discarded with discard(), so getting a module by name again returns the same code.
+		The usual steps are to add the code with add_section(), choose which of NVGT's functions the code may use with set_access_mask(), build it with build(), initialize its global variables with reset_globals(), bind any functions it imports from the game with bind_all_imported_functions(), and then find its functions with get_function_by_decl() or get_function_by_name() and call them. See the Subscripting Tutorial in the manual for a full walk through, including how to share classes and functions between the game and the module.
+		Every method fails with a negative value or an empty result once the module has been discarded.
+*/
+
+// Example:
+funcdef int calculator(int, int);
+void main() {
+	script_module@ mod = script_get_module("calculator", 2);
+	mod.add_section("calculator", "int add(int a, int b) { return a + b; }\nint multiply(int a, int b) { return a * b; }");
+	mod.set_access_mask(1); // Only NVGT's most basic functions, see set_access_mask.
+	string[] errors;
+	if (mod.build(errors) < 0) {
+		alert("Error", join(errors, "\n"));
+		return;
+	}
+	// Call a function through a dictionary of arguments.
+	dictionary@ result = mod.get_function_by_decl("int add(int, int)").call({{"1", 20}, {"2", 22}});
+	int64 sum;
+	result.get("0", sum);
+	// Or retrieve it into a funcdef handle and call it like any other function.
+	calculator@ multiply;
+	mod.get_function_by_name("multiply").retrieve(@multiply);
+	alert("Calculator", "20 + 22 = " + sum + ", 6 * 7 = " + multiply(6, 7));
+	mod.discard();
+}

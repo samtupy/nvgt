@@ -1,0 +1,37 @@
+/**
+	A path to a file or directory, which can be split into and built from its device, directories, filename and extension, and converted between the styles of different operating systems.
+	1. path();
+	2. path(bool absolute);
+	3. path(const string&in path);
+	4. path(const string&in path, spec::path_style style);
+	5. path(const spec::path&in other);
+	6. path(const spec::path&in parent, const string&in filename);
+	7. path(const spec::path&in parent, const spec::path&in relative);
+	## Arguments:
+		* bool absolute (2): whether the empty path is absolute.
+		* const string&in path (3, 4): the path to parse.
+		* spec::path_style style (4): how to parse the path, a value of the path_style enum.
+		* const spec::path&in other (5): a path to copy.
+		* const spec::path&in parent (6, 7): a directory to start from.
+		* const string&in filename (6): a filename to put in parent.
+		* const spec::path&in relative (7): a relative path to resolve against parent.
+	## Remarks:
+		This class is in the spec namespace, so scripts write it as `spec::path` unless they have a `using namespace spec;` statement.
+		A path is made up of an optional node (for UNC paths on Windows), an optional device (such as a drive letter), a list of directories and an optional filename. A path whose string ends with a separator, such as `sounds/`, is a directory with no filename, while `sounds/door` is a file named door in the sounds directory, however it exists on disk. This class only deals with the text of paths, it never looks at the filesystem, so nothing has to exist.
+		Paths are parsed in the style of the operating system NVGT is running on unless a path_style is given, and to_string() can produce any style. On Windows both forward and back slashes are accepted.
+		A path converts to a string implicitly, and `/` joins two paths, so that `spec::path("sounds") / "door.ogg"` is `sounds/door.ogg` (or `sounds\door.ogg` on Windows). If the right side is absolute it is returned unchanged.
+		`p[i]` returns directory i, counting from 0, and an index equal to depth returns the filename.
+		Many methods return the path itself, so calls can be chained, such as `p.make_directory().push_directory("music")`.
+*/
+
+// Example:
+void main() {
+	spec::path p("C:/Users/Sam/Documents/My Game/sounds/door_open.ogg", spec::PATH_STYLE_WINDOWS);
+	string info = "device: " + p.device + "\ndepth: " + p.depth + "\nfilename: " + p.filename + "\nbasename: " + p.basename + "\nextension: " + p.extension + "\nparent: " + p.parent.to_string(spec::PATH_STYLE_WINDOWS);
+	for (int i = 0; i < p.depth; i++) info += "\ndirectory " + i + ": " + p[i];
+	p.set_extension("wav").pop_directory().push_directory("music");
+	info += "\nchanged: " + p.to_string(spec::PATH_STYLE_UNIX);
+	spec::path joined = spec::path("data") / "levels" / "1.json";
+	info += "\njoined: " + joined;
+	alert("Path", info);
+}

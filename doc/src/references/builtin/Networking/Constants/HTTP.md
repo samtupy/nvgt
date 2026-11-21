@@ -3,7 +3,7 @@ These string constants hold standard values used when building HTTP requests and
 
 ## Protocol versions
 * HTTP_1_0: `HTTP/1.0`.
-* HTTP_1_1: `HTTP/1.1`. This is the default version of a new http_request.
+* HTTP_1_1: `HTTP/1.1`. This is the default version of an http_request created with a method and URI.
 
 ## Request methods
 * HTTP_GET: `GET`.

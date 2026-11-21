@@ -1,0 +1,21 @@
+/**
+	An email message, with its sender, recipients, subject, content and attachments, for sending with smtp_client.
+	mail_message();
+	## Remarks:
+		Methods that can fail don't throw exceptions, instead the reason is stored in last_error.
+		The content can be plain text set with set_content(), or HTML set with set_html_content() along with a plain text version for mail programs that can't show HTML. Files and strings can be attached, and images can be embedded in the HTML with add_inline_attachment_file(), which returns the content ID to refer to them by, as in `<img src="cid:logo.png@nvgt.mail">`.
+*/
+
+// Example:
+void main() {
+	mail_message msg;
+	msg.set_sender("Game Server <server@example.com>");
+	msg.add_recipient("player@example.com");
+	msg.add_recipient("admin@example.com", RECIPIENT_BCC);
+	msg.set_subject("Your weekly stats");
+	msg.set_html_content("<h1>Great week!</h1><p>You played 12 matches.</p>", "Great week! You played 12 matches.");
+	msg.add_attachment_string("stats.csv", "matches,wins\n12,7\n", "text/csv");
+	msg.set_priority(MAIL_PRIORITY_HIGH);
+	mail_recipient@[]@ recipients = msg.get_recipients();
+	alert("Message", msg.subject + " from " + msg.sender + " to " + recipients.length() + " recipients.");
+}

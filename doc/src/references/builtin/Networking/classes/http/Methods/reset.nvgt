@@ -1,9 +1,11 @@
 /**
-	Resets the http object to the state it was in at the time of it's construction, canceling any requests in progress.
-	void reset();
+	Cancel the current request, if any, and clear the response.
+	void http::reset(bool configuration = false);
+	## Arguments:
+		* bool configuration = false: whether to also restore the settings, max_retries, retry_delay, keepalive and the timeouts, to their defaults.
 	## Remarks:
-		This method waits for the current request to cancel successfully, which is usually instant. However from time to time you could see a small delay as the request thread runs to the next point where it can check the cancelation event.
-		This method is implicitly called whenever the http object destructs.
+		This waits for the current request to cancel, which is usually instant, though there can be a short delay while the request's thread reaches a point where it checks for cancellation.
+		Starting a new request resets the previous one automatically, and destroying the http object resets it too, so this is only needed to cancel a request or free the memory of its response.
 */
 
 // Example:

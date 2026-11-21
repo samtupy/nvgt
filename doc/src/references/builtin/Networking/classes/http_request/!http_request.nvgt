@@ -1,0 +1,27 @@
+/**
+	An HTTP request, with its method, URI, version and headers, for sending with http_client.
+	1. http_request();
+	2. http_request(const http_request&in other);
+	3. http_request(const string&in method, const string&in uri, const string&in version = HTTP_1_1);
+	4. $list(int&in) { repeat { string, string } };
+	## Arguments:
+		* const http_request&in other (2): a request to copy.
+		* const string&in method (3): the method of the request, such as HTTP_GET or HTTP_POST.
+		* const string&in uri (3): what to request from the server, usually the path and query of a URL, such as `/docs/?search=sound`.
+		* const string&in version = HTTP_1_1 (3): the HTTP version of the request.
+	## Remarks:
+		For most HTTP requests, the http class is far easier to use, as it runs the request in the background, follows redirects, handles authentication and works with both http and https URLs. This lower level class is for when more control over the request and the connection is needed.
+		An http_request is an internet_message_header holding the request's headers, so headers are set by indexing it, as in `req["Accept"] = "text/html";`, and it has every method of internet_message_header and name_value_collection as well as the ones listed here. It can be created from an initialization list of headers.
+		The request doesn't include its body, which is written to the stream returned by http_client::send_request() after the content_length or chunked_transfer_encoding is set.
+*/
+
+// Example:
+void main() {
+	http_request req(HTTP_GET, "/downloads/latest_version", HTTP_1_1);
+	req.host = "nvgt.dev";
+	req["Accept"] = "text/plain";
+	req.set_credentials("Bearer", "my_token");
+	string info = req.method + " " + req.uri + " " + req.version + "\nhost: " + req.host;
+	for (uint i = 0; i < req.size(); i++) info += "\n" + req.name_at(i) + ": " + req.value_at(i);
+	alert("Request", info);
+}

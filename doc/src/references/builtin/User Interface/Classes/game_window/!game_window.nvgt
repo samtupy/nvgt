@@ -1,0 +1,28 @@
+/**
+	A window on the screen, with the settings of the operating system's windows and simple drawing of text, shapes and graphics.
+	game_window(const string&in title, uint w, uint h, uint flags = 0);
+	## Arguments:
+		* const string&in title: the title of the window, which screen readers speak when it gains focus.
+		* uint w: the width of the window in screen coordinates.
+		* uint h: the height of the window in screen coordinates.
+		* uint flags = 0: a combination of values from the window_flags enum, such as WINDOW_FLAG_RESIZABLE.
+	## Remarks:
+		Most games only need the main window, which show_window() creates and returns and the global window property refers to. NVGT's keyboard and mouse functions, is_window_active() and the other global window functions all work with the main window, which is drawn automatically every time wait() or refresh_window() is called. Creating a game_window directly makes an additional window, which must be drawn with present() and doesn't receive the main window's special handling.
+		Settings methods return true on success and false when the operating system doesn't support or refused the change. Positions and sizes are in screen coordinates, which on high resolution displays can differ from pixels, see pixel_density.
+		Drawing is done with clear(), the draw_ methods and render_graphic(), which draw into the window's renderer and are shown on the screen when the window is next presented. Text can only be drawn after a font has been given to the window, as in `@window.font = get_font("arial", 24);`, as windows have none by default.
+		On Linux, the main window is always created fullscreen at this time.
+*/
+
+// Example:
+void main() {
+	game_window@ w = show_window("Drawing example");
+	@w.font = get_font("arial", 24);
+	w.clear(0, 0, 64);
+	w.draw_text("Hello from NVGT!", 20, 20, 255, 255, 255);
+	w.draw_rect(20, 70, 200, 40, 255, 128, 0, true);
+	w.draw_circle(320, 300, 60, 0, 200, 0, true);
+	w.draw_line(0, 400, 640, 400, 255, 255, 255);
+	uint64 size = w.measure_text("Hello from NVGT!");
+	screen_reader_output("The greeting is " + (size >> 32) + " pixels wide. Press escape to exit.", true);
+	while (!key_pressed(KEY_ESCAPE)) wait(5);
+}

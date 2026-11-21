@@ -1,0 +1,40 @@
+/**
+	A uniform resource identifier such as a web address, which can be built from or split into its scheme, authority, path, query and fragment.
+	1. uri();
+	2. uri(const string&in uri);
+	3. uri(const string&in scheme, const string&in path_etc);
+	4. uri(const string&in scheme, const string&in authority, const string&in path_etc);
+	5. uri(const string&in scheme, const string&in authority, const string&in path, const string&in query);
+	6. uri(const string&in scheme, const string&in authority, const string&in path, const string&in query, const string&in fragment);
+	7. uri(const spec::uri&in base_uri, const string&in relative_uri);
+	8. uri(const spec::path&in path);
+	9. uri(const spec::uri&in other);
+	## Arguments:
+		* const string&in uri (2): a complete URI to parse, such as `https://nvgt.dev/docs/?search=sound#top`.
+		* const string&in scheme (3, 4, 5, 6): the scheme, such as `https` or `ftp`, which is converted to lowercase.
+		* const string&in path_etc (3, 4): the path, query and fragment, such as `/docs/?search=sound#top`.
+		* const string&in authority (4, 5, 6): the user info, host and port, such as `user@example.com:8080`.
+		* const string&in path (5, 6): the path.
+		* const string&in query (5, 6): the query, without the leading question mark.
+		* const string&in fragment (6): the fragment, without the leading hash.
+		* const spec::uri&in base_uri (7): an absolute URI to resolve relative_uri against.
+		* const string&in relative_uri (7): a URI relative to base_uri, such as `../images/logo.png`.
+		* const spec::path&in path (8): a path to create a `file://` URI from, which is made absolute first.
+		* const spec::uri&in other (9): a URI to copy.
+	## Remarks:
+		This class is in the spec namespace, so scripts write it as `spec::uri` unless they have a `using namespace spec;` statement.
+		Constructing or assigning a uri from a string parses it, and an exception is thrown if the string isn't a valid URI. A uri converts to its string form implicitly, so it can be passed anywhere a string is expected, and a string can be passed to a function that takes a uri, such as `http::get()`, without writing spec::uri at all.
+		The scheme is converted to lowercase, and percent encoded characters in every part but the query and fragment are decoded. The query and fragment are stored percent encoded, which is why they have both a decoded property and a raw one.
+		Comparing two uris with == compares their scheme, authority, path, query and fragment, and a uri can also be compared with a string, which is parsed first.
+*/
+
+// Example:
+void main() {
+	spec::uri u("https://user@nvgt.dev:8080/docs/audio/?search=sound+pool&page=2#top");
+	string info = "scheme: " + u.scheme + "\nhost: " + u.host + "\nport: " + u.port + "\nuser info: " + u.user_info + "\npath: " + u.path + "\nquery: " + u.query + "\nfragment: " + u.fragment;
+	string[][]@ params = u.get_query_parameters();
+	for (uint i = 0; i < params.length(); i++) info += "\nparameter " + params[i][0] + " = " + params[i][1];
+	u.resolve("../manual/");
+	info += "\nresolved against ../manual/: " + u;
+	alert("URI", info);
+}

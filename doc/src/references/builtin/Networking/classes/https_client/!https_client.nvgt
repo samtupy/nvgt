@@ -1,0 +1,20 @@
+/**
+	A connection to an HTTPS server, which sends http_request objects and receives http_response objects over TLS.
+	https_client(const string&in host, uint16 port = 443);
+	## Arguments:
+		* const string&in host: the host to connect to, such as `nvgt.dev`.
+		* uint16 port = 443: the port to connect to.
+	## Remarks:
+		For most HTTP requests, the http class is far easier to use, as it runs the request in the background, follows redirects, handles authentication and works with both http and https URLs. This lower level class is for when more control over the request and the connection is needed.
+		https_client has exactly the same methods and properties as http_client, documented there, except that it connects with TLS and its secure property is true. It converts to an http_client implicitly, and an http_client that is really an https_client can be cast back with cast<https_client@>().
+*/
+
+// Example:
+void main() {
+	https_client client("nvgt.dev");
+	http_request req(HTTP_GET, "/");
+	client.send_request(req);
+	http_response resp;
+	datastream@ body = client.receive_response(resp);
+	alert("Status " + resp.status, body.read().length() + " bytes received over " + (client.secure? "a secure" : "an insecure") + " connection.");
+}

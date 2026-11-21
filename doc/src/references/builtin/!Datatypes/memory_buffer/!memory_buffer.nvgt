@@ -1,0 +1,26 @@
+/**
+	A view of a block of memory holding numbers of one type, such as the samples of an audio buffer, that can be read and written like an array without copying it.
+	1. memory_buffer<T>(uint64 ptr, uint64 size);
+	2. memory_buffer<T>(const memory_buffer<T>&in other);
+	## Arguments:
+		* uint64 ptr (1): the address of the memory.
+		* uint64 size (1): the number of elements of type T in the memory.
+		* const memory_buffer<T>&in other (2): a memory_buffer to view the same memory as.
+	## Remarks:
+		T can be any primitive type, such as float, int, int16 or uint8, but not a class or handle. Functions that work with large amounts of data use memory_buffers to avoid copying it into an array, such as `sound::load_pcm()`, `sound::stream_pcm()`, `audio_encoder::write()` and the callback of `audio_engine::set_processing_callback()`, which is given the audio being mixed so that a script can modify it in place.
+		A memory_buffer doesn't own its memory, it only refers to memory that belongs to something else. It must only be used while that memory exists, for example only during the callback that was given it, and creating one from an address directly is only safe for memory known to be valid, such as memory from memory_allocate_units() that hasn't been freed, a string's address, or memory returned by a library function. Reading or writing through a memory_buffer whose memory no longer exists can crash the program.
+		Elements are accessed by index, as in `buf[0] = 1.0;`, which throws an exception when the index is outside the buffer. A memory_buffer converts to an array of its type implicitly, which copies the memory, and assigning an array to it copies the array into the memory, as many elements as fit.
+*/
+
+// Example:
+void main() {
+	// Generate a second of a 440 hz tone into memory allocated for 44100 floats, and give it to a sound.
+	uint64 frames = 44100;
+	uint64 addr = memory_allocate_units(4, frames);
+	memory_buffer<float> buf(addr, frames);
+	for (uint64 i = 0; i < frames; i++) buf[i] = sin(i * 440 * 6.283185307 / 44100) * 0.5;
+	sound s;
+	s.load_pcm(buf, 44100, 1); // The sound copies the samples, so the memory can be freed straight away.
+	memory_free(addr);
+	s.play_wait();
+}

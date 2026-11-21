@@ -1,0 +1,16 @@
+/**
+	Write a description of every function, class, enum and property NVGT registers with AngelScript to a stream.
+	void script_dump_engine_configuration(datastream@ output);
+	## Arguments:
+		* datastream@ output: the stream to write to, such as an open file.
+	## Remarks:
+		The output is in the format of AngelScript's WriteConfigToStream, as read by tools such as AngelScript's offline compiler and editors that complete code. It isn't written by compiled games.
+*/
+
+// Example:
+void main() {
+	file f("engine_config.txt", "wb");
+	script_dump_engine_configuration(f);
+	f.close();
+	alert("Done", "The engine configuration was written to engine_config.txt.");
+}

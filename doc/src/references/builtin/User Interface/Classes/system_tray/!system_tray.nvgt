@@ -1,0 +1,31 @@
+/**
+	An icon in the system tray, or notification area, with a tooltip and a menu.
+	system_tray(const string&in tooltip, graphic@ icon = null);
+	## Arguments:
+		* const string&in tooltip: the text shown and spoken when the icon is focused or hovered over.
+		* graphic@ icon = null: the image to show as the icon, or null for a default.
+	## Remarks:
+		A tray icon lets a program be reached while its window is hidden, which suits games and tools that keep running in the background, such as a chat client waiting for messages. The icon stays in the tray until the system_tray object is destroyed.
+		The tray's menu, from the menu property, is shown when the user activates the icon. Items are added to it with system_tray_menu's insert methods, and their callbacks are called during wait() or refresh_window(), so the script must keep calling one of them for the menu to work. Tray icons are supported on Windows, macOS and Linux desktops, and valid is false where they aren't.
+*/
+
+// Example:
+bool running = true;
+void on_exit(system_tray_menu_item@ item) { running = false; }
+void on_speak(system_tray_menu_item@ item) { screen_reader_output("Hello from the system tray!", true); }
+void on_mute(system_tray_menu_item@ item) { screen_reader_output(item.checked? "Muted" : "Unmuted", true); } // Checkboxes toggle themselves before their callback is called.
+void main() {
+	system_tray tray("NVGT tray example");
+	if (!tray.valid) {
+		alert("Error", "System tray icons aren't supported here.");
+		return;
+	}
+	system_tray_menu@ menu = tray.menu;
+	menu.insert_item("Say hello", on_speak);
+	menu.insert_checkbox("Mute", false, on_mute);
+	system_tray_menu@ more = menu.insert_submenu("More").submenu;
+	more.insert_item("Disabled item", null, true);
+	menu.insert_separator();
+	menu.insert_item("Exit", on_exit);
+	while (running) wait(5);
+}

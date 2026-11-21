@@ -1,7 +1,7 @@
 # wait
-Waits for the current request to complete.
+Wait for the current request to finish.
 
-`void wait();`
+`void http::wait();`
 
 ## Remarks:
-If no request is in progress, this will return emmedietly. Otherwise, it will block code execution on the calling thread until the request has finished.
+This blocks the script until the request completes, which is simple but stops the game from doing anything else meanwhile. To keep the game running, check the complete property in the game loop instead.

@@ -1,0 +1,25 @@
+/**
+	A TrueType or OpenType font, for measuring text and drawing it into images or windows.
+	text_font(const string&in name, float size, uint style = FONT_STYLE_NORMAL);
+	## Arguments:
+		* const string&in name: the font to load, either the name of an installed font such as `arial`, or the path to a .ttf file.
+		* float size: the size of the font in points.
+		* uint style = FONT_STYLE_NORMAL: a combination of values from the font_style enum, such as FONT_STYLE_BOLD.
+	## Remarks:
+		Fonts are found by name in the system's font directory, such as C:/Windows/Fonts on Windows, or the name can be a path to a font file, with or without its .ttf extension. If the font can't be found, every method fails, returning false, 0 or null, and family_name is empty.
+		get_font() is usually a better way to get a font, as it shares one object between everything that asks for the same font, size and style. A font is drawn into a window by giving it to game_window::font, and the render_ methods draw text into a new graphic in one of four ways: solid, which is fastest but has rough edges, blended, which is smooth over any background, shaded, which is smooth over a background color, and lcd, which uses subpixel rendering for LCD screens.
+		Text is UTF-8, and fallback fonts can supply the characters the font lacks, such as emoji or other scripts.
+*/
+
+// Example:
+void main() {
+	text_font@ f = get_font("arial", 32);
+	if (f.family_name.empty()) {
+		alert("Error", "The font couldn't be loaded.");
+		return;
+	}
+	int w, h;
+	f.get_string_size("Hello from NVGT!", w, h);
+	f.style = FONT_STYLE_BOLD | FONT_STYLE_ITALIC;
+	alert("Font", f.family_name + " " + f.style_name + " at " + f.size + " points\nline height: " + f.height + ", ascent " + f.ascent + ", descent " + f.descent + "\nThe greeting measures " + w + " by " + h + " pixels.\nHas the letter A: " + f.has_glyph(65));
+}

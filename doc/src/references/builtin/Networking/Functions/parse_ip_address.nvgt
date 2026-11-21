@@ -1,0 +1,17 @@
+/**
+	Parse an IP address from a string without throwing an exception if it isn't valid.
+	bool spec::parse_ip_address(const string&in addr_in, ip_address&out addr_out);
+	## Arguments:
+		* const string&in addr_in: the address to parse, such as `192.168.1.10` or `::1`.
+		* ip_address&out addr_out: the parsed address, if successful.
+	## Returns:
+		bool: true if the string was a valid IP address, false otherwise.
+*/
+
+// Example:
+void main() {
+	spec::ip_address addr;
+	string input = input_box("IP address", "Enter an IP address");
+	if (spec::parse_ip_address(input, addr)) alert("Valid", "The address " + addr + " is an IPv" + (addr.is_v4? "4" : "6") + " address.");
+	else alert("Invalid", input + " isn't an IP address.");
+}

@@ -1,0 +1,21 @@
+/**
+	A connection to an HTTP server, which sends http_request objects and receives http_response objects.
+	http_client(const string&in host, uint16 port = 80);
+	## Arguments:
+		* const string&in host: the host to connect to, such as `nvgt.dev`.
+		* uint16 port = 80: the port to connect to.
+	## Remarks:
+		For most HTTP requests, the http class is far easier to use, as it runs the request in the background, follows redirects, handles authentication and works with both http and https URLs. This lower level class is for when more control over the request and the connection is needed.
+		The client connects when the first request is sent, and with keep_alive can send further requests over the same connection. Every method blocks until it is done, and an exception is thrown if connecting, sending or receiving fails.
+		http_client only speaks plain HTTP. For HTTPS use https_client, which has the same methods and converts to an http_client implicitly, so code can be written for both.
+*/
+
+// Example:
+void main() {
+	http_client client("httpbin.org");
+	http_request req(HTTP_GET, "/get");
+	client.send_request(req);
+	http_response resp;
+	datastream@ body = client.receive_response(resp);
+	alert("Status " + resp.status, body.read());
+}

@@ -1,0 +1,24 @@
+/**
+	A map of rectangular areas in a 3D grid, which can be looked up quickly by position, such as the rooms, floors, walls and zones of a game's world.
+	coordinate_map();
+	## Remarks:
+		Audio games often describe their worlds as boxes: a room of carpet from 0 to 20 on x and y, a wall at x 21, a pool of water in one corner, a zone where a certain music plays. A coordinate_map stores such boxes as coordinate_map_area objects, each with a priority, optional rotation, flags and data of your choosing, and finds the ones at any position without checking every area, as they are divided into frames of the grid.
+		Coordinates are whole tiles, so an area from minx 0 to maxx 9 covers the 10 tiles 0 through 9, as well as any position from 0.0 up to but not including 10.0. Where areas overlap, the one with the highest priority usually wins, such as a rug placed over a floor, and get_area() returns it.
+		An area stays in the map until it is unframed with coordinate_map_area::unframe() or the map is reset, even if the script no longer holds a handle to it.
+*/
+
+// Example:
+void main() {
+	coordinate_map map;
+	map.add_area(0, 20, 0, 20, 0, 0, 0, null, "carpet", "", "", 0);
+	map.add_area(5, 8, 5, 8, 0, 0, 0, null, "water", "", "", 1); // A pool in the room, with a higher priority so it wins over the carpet.
+	map.add_area(21, 21, 0, 20, 0, 10, 0, null, "wall", "", "", 2, 1); // A wall, with flag 1 marking it as solid.
+	coordinate_map_area@ a = map.get_area(6, 6, 0);
+	string info = "At 6, 6 you are on " + a.data1;
+	@a = map.get_area(2, 3, 0);
+	info += "\nAt 2, 3 you are on " + a.data1;
+	coordinate_map_area@[]@ areas = map.get_areas(6, 6, 0);
+	info += "\n" + areas.length() + " areas overlap 6, 6";
+	info += "\nSolid areas within 2 tiles of 20, 10: " + map.get_areas(20, 10, 0, 2, null, 1).length();
+	alert("Map", info);
+}

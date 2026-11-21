@@ -1,14 +1,14 @@
 /**
-	Initiate a get request.
-	bool get(spec::uri url, name_value_collection@ headers = null, http_credentials@ creds = null);
+	Start an HTTP GET request in the background. This downloads whatever the URL points to, such as a web page, a file or the result of an API call.
+	bool http::get(const spec::uri&in url, const name_value_collection@ headers = null, const http_credentials@ creds = null);
 	## Arguments:
-		* spec::uri url: A valid URI which must have a scheme of either http or https.
-		* name_value_collection@ headers = null: Pairs of extra http headers to pass on to the server.
-		* http_credentials@ creds = null: Optional credentials to authenticate the request with.
+		* const spec::uri&in url: the URL to request, which must have a scheme of http or https. A string can be passed directly.
+		* const name_value_collection@ headers = null: extra headers to send with the request, such as `{{"Accept", "application/json"}}`.
+		* const http_credentials@ creds = null: credentials to authenticate with if the server asks for them.
 	## Returns:
-		bool: True if the request was initiated, or false if there was an error.
+		bool: true if the request was started, false if the URL's scheme isn't http or https or a request is already running.
 	## Remarks:
-		Once this method is called and returns true, you will usually want to wait until either http.complete returns true or http.running returns false before thoroughly handling the request. However http.progress, http.status_code, http.response_headers and http.response_body are accessible throughout the request's lifecycle to stream the data or get more detailed information.
+		Any previous request made with this object is reset first. While the request runs, its status_code, response_headers, progress and response_body can be checked, and complete becomes true when it has finished, whether or not it succeeded.
 */
 
 // Example:
@@ -16,7 +16,7 @@ void main() {
 	// Fetch the latest version of NVGT.
 	http h;
 	if (!h.get("http://nvgt.dev/downloads/latest_version")) {
-		alert("oops", "request failed"); // This class will contain more detailed error management facilities in the near future.
+		alert("oops", "request failed");
 		return;
 	}
 	h.wait(); // You can also use the h.running or h.complete properties in a loop to execute code in the background while the request progresses.

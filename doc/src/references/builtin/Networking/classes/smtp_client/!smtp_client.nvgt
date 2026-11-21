@@ -1,0 +1,27 @@
+/**
+	Send email through an SMTP server.
+	smtp_client();
+	## Remarks:
+		Set the host, and if needed the port and use_ssl, then call connect(), log in if the server needs it with login(), and send mail_message objects with send_message() or send_messages(). Every method blocks until the server responds, and instead of throwing exceptions they return false on failure, with a description of the problem in last_error.
+		use_ssl secures the connection with STARTTLS when logging in, which servers support on port 587. Servers that expect TLS from the very start of the connection, usually on port 465, aren't supported at this time.
+		Many email providers require an app password, or OAuth2 through login_oauth2(), rather than the account's normal password.
+*/
+
+// Example:
+void main() {
+	smtp_client smtp;
+	smtp.host = "smtp.example.com";
+	smtp.port = 587;
+	smtp.use_ssl = true;
+	if (!smtp.connect() or !smtp.login("me@example.com", "app password")) {
+		alert("Error", smtp.last_error);
+		return;
+	}
+	mail_message msg;
+	msg.set_sender("me@example.com");
+	msg.add_recipient("friend@example.com");
+	msg.set_subject("High score");
+	msg.set_content("I just scored 1500 points!");
+	if (!smtp.send_message(msg)) alert("Error", smtp.last_error);
+	smtp.close();
+}

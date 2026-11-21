@@ -1,0 +1,20 @@
+/**
+	A universally unique identifier, a 128 bit value written like `6ba7b810-9dad-11d1-80b4-00c04fd430c8`, which can be generated without coordination and is practically never the same twice.
+	1. uuid();
+	2. uuid(const string&in str);
+	3. uuid(const uuid&in other);
+	## Arguments:
+		* const string&in str (2): a UUID to parse, such as `6ba7b810-9dad-11d1-80b4-00c04fd430c8`. If it isn't a valid UUID, the null UUID is created.
+		* const uuid&in other (3): a UUID to copy.
+	## Remarks:
+		UUIDs are useful as identifiers for players, items, saved games or anything else that needs an ID that won't clash with another, even when created on different computers. A uuid created without arguments is the null UUID, all zeros. New ones are made with functions such as uuid_generate() and uuid_generate_random().
+		A uuid converts to its string form implicitly, and uuids can be compared and sorted.
+*/
+
+// Example:
+void main() {
+	uuid id = uuid_generate_random();
+	uuid same(id.str);
+	uuid named = uuid_create_from_name_sha1(uuid_namespace_dns(), "nvgt.dev");
+	alert("UUIDs", "random: " + id + ", version " + id.version + "\nparsed copy is equal: " + (same == id) + "\nname based: " + named + ", version " + named.version + "\nnull: " + uuid() + (uuid().is_null? " is null" : ""));
+}

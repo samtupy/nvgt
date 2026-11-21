@@ -1,0 +1,31 @@
+/**
+	A WebSocket connection, which exchanges whole messages called frames with a server over HTTP or HTTPS.
+	1. web_socket(const socket&in sock);
+	2. web_socket(const web_socket&in sock);
+	3. web_socket(http_client&inout cs, http_request&inout request, http_response&inout response);
+	4. web_socket(http_client&inout cs, http_request&inout request, http_response&inout response, http_credentials&inout credentials);
+	## Arguments:
+		* const socket&in sock (1, 2): a socket to share the underlying socket of, which must be a web socket.
+		* http_client&inout cs (3, 4): an http_client or https_client connected to the server's host.
+		* http_request&inout request (3, 4): the request starting the connection, whose uri is the path of the WebSocket endpoint, such as `/chat`. The headers WebSocket needs are added to it.
+		* http_response&inout response (3, 4): receives the server's response to the request.
+		* http_credentials&inout credentials (4): credentials to authenticate with if the server asks for them.
+	## Remarks:
+		WebSockets are used by many web services for real time communication, such as chat servers and game lobbies. Unlike a stream_socket, data is sent and received as frames that each arrive whole, and text and binary frames can be told apart.
+		A web_socket is created by giving it an http_client or https_client for the server, an http_request whose uri is the path of the endpoint, and an http_response to fill in. The connection is made straight away, and an exception is thrown if the server refuses it, in which case the response holds the server's answer. After that, the client is no longer needed.
+		A web_socket has every method and property of socket and the shutdown, shutdown_send, shutdown_receive, send_bytes and receive_bytes methods of stream_socket, but frames should be sent with send_frame() and received with receive_frame(). Pings from the server arrive as frames too, and should be answered with a pong containing the same data.
+*/
+
+// Example:
+void main() {
+	https_client client("echo.websocket.org");
+	http_request req(HTTP_GET, "/", HTTP_1_1);
+	http_response resp;
+	web_socket ws(client, req, resp);
+	int flags;
+	string greeting = ws.receive_frame(flags); // This server greets every connection.
+	ws.send_frame("Hello from NVGT!");
+	string echo = ws.receive_frame(flags);
+	ws.shutdown(WS_NORMAL_CLOSE);
+	alert("Web socket", "The server said " + greeting + " and echoed " + echo);
+}

@@ -1,0 +1,31 @@
+/**
+	A TCP connection to a server, through which data can be sent and received in order.
+	1. stream_socket();
+	2. stream_socket(const socket&in sock);
+	3. stream_socket(const stream_socket&in sock);
+	4. stream_socket(const socket_address&in address);
+	5. stream_socket(const spec::ip_address_family family);
+	## Arguments:
+		* const socket&in sock (2, 3): a socket to share the underlying socket of, which must be a stream socket.
+		* const socket_address&in address (4): an address and port to connect to straight away.
+		* const spec::ip_address_family family (5): the address family of a socket created without connecting, so that options can be set before calling connect().
+	## Remarks:
+		For networking between the players of a game, the network class is usually a better fit, as it handles connections, reliable and unreliable messages and channels for you.
+		A stream_socket has every method and property of socket, documented there, as well as the ones listed here. It connects to servers with connect(), or straight away when created with an address. NVGT doesn't provide server sockets that accept connections at this time.
+		Every method blocks until it completes unless the blocking property is set to false, so receiving in the game loop should be done after checking that data is available with poll() or the available property. An exception is thrown when connecting, sending or receiving fails.
+*/
+
+// Example:
+void main() {
+	// Fetch a web page by speaking HTTP over a plain TCP connection.
+	stream_socket sock(socket_address("httpbin.org", 80));
+	sock.send_bytes("GET /get HTTP/1.1\r\nHost: httpbin.org\r\nConnection: close\r\n\r\n");
+	string response;
+	while (true) {
+		string data = sock.receive_bytes(4096, 0); // The flags must be given, as receive_bytes(4096) could also mean the other overload.
+		if (data.empty()) break; // The server closed the connection.
+		response += data;
+	}
+	sock.close();
+	alert("Response", response);
+}

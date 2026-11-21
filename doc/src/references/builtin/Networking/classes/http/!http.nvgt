@@ -1,0 +1,39 @@
+/**
+	Make HTTP and HTTPS requests in the background through a simple interface.
+	http();
+	## Remarks:
+		This is the easiest way to make a web request in NVGT, and the best choice for almost every HTTP operation, from checking for updates to downloading files and talking to web APIs. Create an http object, start a request with a method such as get() or post(), and then either wait() for it or keep running the game while checking properties such as progress, status_code and response_body.
+		Requests run on a thread of their own, so the game never stops while one is in progress. Redirects are followed automatically, and if the server asks for authentication, the credentials given to the request or found in the URL's user info are sent.
+		The response body is collected as it downloads, and reading response_body returns what has arrived since it was last read, so a large download can be written to a file a piece at a time. Destroying the http object or calling reset() cancels the request.
+		For a one line blocking request, see url_get() and url_post(), which use this class. For complete control over the requests and the connection, see http_client, http_request and http_response.
+*/
+
+// Example:
+#include "size.nvgt"
+#include "speech.nvgt"
+void main() {
+	// This script downloads the latest NVGT windows installer and saves it in the current working directory.
+	http h;
+	h.get("https://nvgt.zip/windows");
+	file f;
+	string filename = "";
+	show_window("downloading...");
+	while (!h.complete) {
+		wait(5);
+		if (key_pressed(KEY_ESCAPE)) {
+			f.close();
+			file_delete(filename);
+			return; // Destruction of the http object will cancel any requests in progress.
+		}
+		if (!f.active and h.status_code == 200) { // The file is available.
+			string[]@ path = h.url.get_path_segments();
+			filename = path.length() > 0? path[-1] : "http.txt";
+			f.open(filename, "wb");
+		}
+		if (f.active) f.write(h.response_body);
+		if (key_pressed(KEY_SPACE)) speak(round(h.progress * 100, 2) + "%");
+	}
+	int keep = question(filename, size_to_string(f.size) + " downloaded, keep file?");
+	f.close();
+	if (keep != 1) file_delete(filename);
+}

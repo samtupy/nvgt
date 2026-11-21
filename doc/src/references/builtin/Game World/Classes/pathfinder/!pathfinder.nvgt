@@ -1,0 +1,35 @@
+/**
+	Find the cheapest path between two tiles of a grid, asking a callback how difficult each tile is to cross.
+	pathfinder(int size = 1024, bool cache = true);
+	## Arguments:
+		* int size = 1024: how many tiles the pathfinder allocates room for at a time, from 1 to 16777216. Larger values use more memory but search large maps with fewer allocations.
+		* bool cache = true: whether to remember the paths and tile difficulties found, which makes finding paths again much faster until reset() is called. Callbacks that take the parent tile can't be used with caching.
+	## Remarks:
+		Give the pathfinder a callback with set_callback_function(), which returns how difficult a tile is to cross: 0 for open ground, higher numbers up to 9 for harder terrain such as mud or stairs, and 10 or more for tiles that can't be crossed at all, such as walls. find() then returns the path from one tile to another that costs the least, moving between neighboring tiles in x, y and z.
+		The callback is called many times during a search, so it should be fast, such as looking up a coordinate_map. With caching, a tile's difficulty is only asked for once until reset(), so call reset(), or set automatic_reset, when the map changes.
+		The search uses the A* algorithm from the MicroPather library. Coordinates must be between -524288 and 524287.
+*/
+
+// Example:
+coordinate_map map;
+int tile_difficulty(int x, int y, int z, any@ data) {
+	coordinate_map_area@ a = map.get_area(x, y, z);
+	if (@a == null) return 10; // Outside the map.
+	if (a.data1 == "wall") return 10;
+	if (a.data1 == "mud") return 5;
+	return 0;
+}
+void main() {
+	map.add_area(0, 20, 0, 20, 0, 0, 0, null, "floor", "", "", 0);
+	map.add_area(10, 10, 0, 15, 0, 0, 0, null, "wall", "", "", 1); // A wall with a gap at the top.
+	map.add_area(3, 6, 3, 6, 0, 0, 0, null, "mud", "", "", 1);
+	pathfinder pf;
+	pf.allow_diagonals = true;
+	pf.set_callback_function(tile_difficulty);
+	vector[]@ path = pf.find(2, 2, 0, 18, 2, 0);
+	if (path.length() == 0) {
+		alert("Pathfinder", "There is no way there.");
+		return;
+	}
+	alert("Pathfinder", "The path takes " + path.length() + " steps, costing " + round(pf.total_cost, 2) + ", and passes " + path[path.length() / 2] + " halfway.");
+}

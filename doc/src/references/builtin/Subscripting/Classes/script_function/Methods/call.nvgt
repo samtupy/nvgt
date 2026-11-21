@@ -1,0 +1,26 @@
+/**
+	Call the function, passing its arguments in a dictionary.
+	dictionary@ script_function::call(dictionary@ args, array<string>@ errors = null, int max_statement_count = 0);
+	## Arguments:
+		* dictionary@ args: the arguments, keyed by their position as strings starting at "1", such as `{{"1", 20}, {"2", "hello"}}`, or null for a function without parameters.
+		* array<string>@ errors = null: if given, receives three elements if the call fails: the reason, such as the exception that was thrown, the call stack where it happened, and the call stack of the caller.
+		* int max_statement_count = 0: the most statements the function may run before it is stopped, which protects against code that never returns, or 0 for no limit.
+	## Returns:
+		dictionary@: the args dictionary, cleared and then holding the return value under the key "0" if the function returns something, or a new dictionary if args was null. null if the call failed.
+	## Remarks:
+		Integer return values are stored as int64 and floats as double, so retrieve them into variables of those types. Arguments are converted to the parameter types where possible, and handles and objects must be of the parameter's class or derive from it.
+		Calling a script_function directly, as in `func(args)`, does the same as call().
+*/
+
+// Example:
+void main() {
+	script_module@ mod = script_get_module("example", 2);
+	mod.add_section("example", "string greet(const string&in name, int times) { string r; for (int i = 0; i < times; i++) r += \"Hello \" + name + \"! \"; return r; }\nvoid crash() { int[] a; a[5] = 1; }");
+	mod.build();
+	dictionary@ r = mod.get_function_by_name("greet").call({{"1", "Sam"}, {"2", 2}});
+	string greeting;
+	r.get("0", greeting);
+	string[] errors;
+	mod.get_function_by_name("crash").call(null, errors);
+	alert("Results", greeting + "\n" + errors[0]);
+}

@@ -1,0 +1,20 @@
+/**
+	The result of looking up a host with DNS, its canonical name, aliases and addresses.
+	1. dns_host_entry();
+	2. dns_host_entry(const dns_host_entry&in other);
+	## Arguments:
+		* const dns_host_entry&in other (2): an entry to copy.
+	## Remarks:
+		These are returned by dns_resolve() and system_dns_host_entry().
+*/
+
+// Example:
+void main() {
+	dns_host_entry entry = dns_resolve("nvgt.dev");
+	string info = "name: " + entry.name;
+	spec::ip_address[]@ addresses = entry.get_addresses();
+	for (uint i = 0; i < addresses.length(); i++) info += "\naddress: " + addresses[i];
+	string[]@ aliases = entry.get_aliases();
+	for (uint i = 0; i < aliases.length(); i++) info += "\nalias: " + aliases[i];
+	alert("DNS", info);
+}

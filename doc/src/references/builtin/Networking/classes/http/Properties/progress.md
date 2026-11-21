@@ -1,7 +1,7 @@
 # progress
-Determine the percentage of the request download (from 0.0 to 1.0.
+How much of the response has been downloaded, from 0.0 to 1.0.
 
-`const float progress;`
+`const float http::progress;`
 
 ## Remarks:
-This property will be 0 if a request is not in progress or if it is not yet in a state where the content length of the download can be known, and -1 if the progress cannot be determined such as if the remote endpoint does not provide a Content-Length header.
+This is 0 until the response headers arrive, and -1 if the progress can't be known, such as when the server doesn't send a Content-Length header.

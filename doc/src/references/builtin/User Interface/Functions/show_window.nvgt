@@ -1,13 +1,14 @@
 /**
 	Shows a window with the specified title.
-	bool show_window(const string&in title, uint flags = 0);
+	game_window@ show_window(const string&in title, uint flags = 0);
 	## Arguments:
 		* const string&in title: the title of the window.
 		* uint flags: An optional set of flags to control the window's appearance. This can be a combination of values from the `window_flags` enum.
 	## Returns:
-		bool: true if window creation was successful, false otherwise.
+		game_window@: the main window, or null if it couldn't be created.
 	## Remarks:
-		This window doesn't do any event processing by default. As such, you have to create a loop in order to keep it alive.
+		If the main window already exists, its title is changed and it is shown if it was hidden, rather than a second window being created. The window is also available afterwards through the global window property.
+		This window doesn't do any event processing by default. As such, you have to create a loop in order to keep it alive, calling wait() or refresh_window() regularly.
 */
 
 // Example:
