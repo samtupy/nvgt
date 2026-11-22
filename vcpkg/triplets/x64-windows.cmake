@@ -6,10 +6,15 @@ if(PORT MATCHES "libgit" OR PORT MATCHES "libplist" OR PORT MATCHES "libarchive"
 else()
 	set(VCPKG_LIBRARY_LINKAGE static)
 	set(VCPKG_CMAKE_CONFIGURE_OPTIONS_DEBUG -DCMAKE_POLICY_VERSION_MINIMUM=3.15 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug)
-	set(VCPKG_CMAKE_CONFIGURE_OPTIONS_RELEASE -DCMAKE_POLICY_VERSION_MINIMUM=3.15 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DCMAKE_CXX_FLAGS=/Oi /GS-")
+	set(VCPKG_CMAKE_CONFIGURE_OPTIONS_RELEASE -DCMAKE_POLICY_VERSION_MINIMUM=3.15 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded)
 	if(NOT PORT MATCHES "^(openssl|flatbuffers)$")
-		list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS_RELEASE -DCMAKE_BUILD_TYPE=MinSizeRel)
+		list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS_RELEASE -DCMAKE_BUILD_TYPE=MinSizeRel "-DCMAKE_CXX_FLAGS_MINSIZEREL=/O1 /Ob1 /DNDEBUG /Oi /GS-")
 	endif()
+endif()
+# Prism only converts short strings between UTF-8 and UTF-16 with simdutf, so its scalar implementation is plenty and leaving out the SIMD ones saves around 300 KB.
+if(PORT STREQUAL "simdutf")
+	set(VCPKG_C_FLAGS "")
+	set(VCPKG_CXX_FLAGS "/DSIMDUTF_IMPLEMENTATION_HASWELL=0 /DSIMDUTF_IMPLEMENTATION_WESTMERE=0 /DSIMDUTF_IMPLEMENTATION_ICELAKE=0")
 endif()
 # Poco uses Windows' own TLS (Schannel) rather than OpenSSL for HTTPS, keeping OpenSSL out of NVGT on Windows, where it was the largest part of the executable. This is enabled directly rather than through the POCO_ENABLE_NETSSL_WIN triplet variable, which needs the netssl feature that depends on Poco's OpenSSL based crypto library.
 if(PORT STREQUAL "poco")

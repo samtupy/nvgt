@@ -6,9 +6,9 @@ if(PORT MATCHES "libgit" OR PORT MATCHES "libplist" OR PORT MATCHES "libarchive"
 else()
 	set(VCPKG_LIBRARY_LINKAGE static)
 	set(VCPKG_CMAKE_CONFIGURE_OPTIONS_DEBUG -DCMAKE_POLICY_VERSION_MINIMUM=3.15 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug)
-	set(VCPKG_CMAKE_CONFIGURE_OPTIONS_RELEASE -DCMAKE_POLICY_VERSION_MINIMUM=3.15 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DCMAKE_CXX_FLAGS=/Oi /GS-")
+	set(VCPKG_CMAKE_CONFIGURE_OPTIONS_RELEASE -DCMAKE_POLICY_VERSION_MINIMUM=3.15 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded)
 	if(NOT PORT MATCHES "^(openssl|flatbuffers)$")
-		list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS_RELEASE -DCMAKE_BUILD_TYPE=MinSizeRel)
+		list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS_RELEASE -DCMAKE_BUILD_TYPE=MinSizeRel "-DCMAKE_CXX_FLAGS_MINSIZEREL=/O1 /Ob1 /DNDEBUG /Oi /GS-")
 	endif()
 endif()
 # Poco uses Windows' own TLS (Schannel) rather than OpenSSL for HTTPS, keeping OpenSSL out of NVGT on Windows, where it was the largest part of the executable. This is enabled directly rather than through the POCO_ENABLE_NETSSL_WIN triplet variable, which needs the netssl feature that depends on Poco's OpenSSL based crypto library.
