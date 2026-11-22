@@ -57,6 +57,9 @@
 #include <Jolt/Physics/Collision/CollideShape.h>
 #include <Jolt/Physics/Collision/CollisionDispatch.h>
 #include <Jolt/Physics/Collision/Shape/ScaledShape.h>
+#include <Jolt/Physics/Collision/Shape/OffsetCenterOfMassShape.h>
+#include <Jolt/Physics/Collision/Shape/EmptyShape.h>
+#include <Jolt/Physics/Collision/PhysicsMaterialSimple.h>
 #include <Jolt/Geometry/GJKClosestPoint.h>
 #include <Jolt/Geometry/ConvexSupport.h>
 #include <Jolt/Physics/Character/Character.h>
@@ -857,8 +860,26 @@ static void jolt_ensure_init() {
 	g_jolt_initialized = true;
 	Trace = jolt_trace;
 	RegisterDefaultAllocator();
+	if (!VerifyJoltVersionID()) {
+		Trace("Jolt was built with different settings than NVGT expects");
+		std::abort();
+	}
 	Factory::sInstance = new Factory();
-	RegisterTypes();
+	// Rather than RegisterTypes(), only the shapes NVGT exposes are registered so that the linker can leave out the rest of Jolt (constraints, vehicles, soft bodies, mesh shapes and so on, about 500 KB). A shape type NVGT exposes in future must be registered here, or collisions with it will crash.
+	CollisionDispatch::sInit();
+	ConvexShape::sRegister();
+	PlaneShape::sRegister();
+	SphereShape::sRegister();
+	BoxShape::sRegister();
+	CapsuleShape::sRegister();
+	TaperedCapsuleShape::sRegister();
+	CylinderShape::sRegister();
+	TaperedCylinderShape::sRegister();
+	RotatedTranslatedShape::sRegister();
+	OffsetCenterOfMassShape::sRegister();
+	ScaledShape::sRegister();
+	EmptyShape::sRegister();
+	if (!PhysicsMaterial::sDefault) PhysicsMaterial::sDefault = new PhysicsMaterialSimple("Default", Color::sGrey);
 	physics_material_registry_init();
 }
 
