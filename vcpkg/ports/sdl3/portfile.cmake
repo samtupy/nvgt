@@ -59,6 +59,10 @@ endif()
 
 # option for not need to show windows
 list(APPEND FEATURE_OPTIONS -DSDL_UNIX_CONSOLE_BUILD=ON)
+# NVGT's renderer on Windows only needs Direct3D 11 with the software renderer as a fallback, and leaving out the others saves around 265 KB.
+if (VCPKG_TARGET_IS_WINDOWS)
+    list(APPEND FEATURE_OPTIONS -DSDL_OPENGL=OFF -DSDL_OPENGLES=OFF -DSDL_RENDER_D3D=OFF -DSDL_RENDER_D3D12=OFF)
+endif()
 if (VCPKG_TARGET_IS_LINUX AND NOT "x11" IN_LIST FEATURES AND NOT "wayland" IN_LIST FEATURES)
     message(WARNING "The selected features don't allow sdl3 to create windows, which is usually unintentional. You can get windowing support by installing the x11 and/or wayland features.")
 endif()

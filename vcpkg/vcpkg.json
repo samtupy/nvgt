@@ -48,7 +48,11 @@
       "features": [
         "vulkan"
       ],
-      "platform": "windows|osx|ios|android"
+      "platform": "osx|ios|android"
+    },
+    {
+      "name": "sdl3",
+      "platform": "windows"
     },
     {
       "name": "sdl3",
