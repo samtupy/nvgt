@@ -1366,7 +1366,8 @@ static void RegisterJoltEnums(asIScriptEngine* engine) {
 }
 
 static void RegisterJoltBodyID(asIScriptEngine* engine) {
-	engine->RegisterObjectType("physics_body_id", sizeof(BodyID), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<BodyID>());
+	// BodyID is a single uint32; ALLINTS lets AngelScript return it by value on x64 SysV, where it otherwise refuses.
+	engine->RegisterObjectType("physics_body_id", sizeof(BodyID), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_ALLINTS | asGetTypeTraits<BodyID>());
 	engine->RegisterObjectBehaviour("physics_body_id", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(body_id_default_construct), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("physics_body_id", asBEHAVE_CONSTRUCT, "void f(uint raw_id)", asFUNCTION(body_id_uint_construct), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectBehaviour("physics_body_id", asBEHAVE_CONSTRUCT, "void f(const physics_body_id&in)", asFUNCTION(body_id_copy_construct), asCALL_CDECL_OBJFIRST);
