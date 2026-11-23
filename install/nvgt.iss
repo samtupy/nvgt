@@ -101,7 +101,7 @@
 		source: "release\stub\nvgt_windows*.bin"; DestDir: "{app}\stub"; components: stubs\windows
 	#endif
 	#ifdef have_macos_stubs
-		source: "release\stub\nvgt_mac.bin"; DestDir: "{app}\stub"; components: stubs\macos
+		source: "release\stub\nvgt_mac*.bin"; DestDir: "{app}\stub"; components: stubs\macos
 		source: "release\lib_mac\*"; DestDir: "{app}\lib_mac"; components: stubs\macos
 	#endif
 	#ifdef have_linux_stubs
