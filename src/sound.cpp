@@ -2005,7 +2005,7 @@ public:
 		device_config.pUserData = this;
 		device_config.periodSizeInFrames = SOUNDSYSTEM_FRAMESIZE * 2;
 		device_config.capture.pDeviceID = (device >= 0 && device < g_sound_input_devices.size()) ? &g_sound_input_devices[device_index].id : nullptr;
-		if ((g_soundsystem_last_error = ma_device_init(nullptr, &device_config, &*capture_device)) != MA_SUCCESS) throw std::runtime_error("failed to initialize capture device");
+		if ((g_soundsystem_last_error = ma_device_init(&g_sound_context, &device_config, &*capture_device)) != MA_SUCCESS) throw std::runtime_error("failed to initialize capture device");
 		if ((g_soundsystem_last_error = ma_device_start(&*capture_device)) != MA_SUCCESS) audio_node_impl::set_state(ma_node_state_stopped);
 	}
 	~microphone_impl() {
@@ -2026,7 +2026,7 @@ public:
 		device_config.pUserData = this;
 		device_config.capture.pDeviceID = (device >= 0 && device < int(g_sound_input_devices.size())) ? &g_sound_input_devices[device].id : nullptr;
 		capture_device = make_unique<ma_device>();
-		if ((g_soundsystem_last_error = ma_device_init(nullptr, &device_config, &*capture_device)) != MA_SUCCESS) {
+		if ((g_soundsystem_last_error = ma_device_init(&g_sound_context, &device_config, &*capture_device)) != MA_SUCCESS) {
 			capture_device.reset();
 			return false;
 		}
