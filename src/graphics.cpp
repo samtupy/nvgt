@@ -359,6 +359,26 @@ bool graphics_renderer::render_texture_ex(graphics_texture* tex, float src_x, fl
 	return ok;
 }
 
+bool graphics_renderer::render_texture_rotated(graphics_texture* tex, float dst_x, float dst_y, double angle, int flip) {
+	// Rotates around the center of the drawn texture.
+	if (!tex || !tex->get_texture()) return false;
+	SDL_FRect dst = {dst_x, dst_y, (float)tex->get_width(), (float)tex->get_height()};
+	bool ok = SDL_RenderTextureRotated(_renderer, tex->get_texture(), nullptr, &dst, angle, nullptr, (SDL_FlipMode)flip);
+	if (ok) mark_dirty();
+	return ok;
+}
+
+bool graphics_renderer::render_texture_rotated_ex(graphics_texture* tex, float src_x, float src_y, float src_w, float src_h, float dst_x, float dst_y, float dst_w, float dst_h, double angle, float center_x, float center_y, int flip) {
+	// The rotation center is relative to the top left corner of the destination rectangle.
+	if (!tex || !tex->get_texture()) return false;
+	SDL_FRect src = {src_x, src_y, src_w, src_h};
+	SDL_FRect dst = {dst_x, dst_y, dst_w, dst_h};
+	SDL_FPoint center = {center_x, center_y};
+	bool ok = SDL_RenderTextureRotated(_renderer, tex->get_texture(), &src, &dst, angle, &center, (SDL_FlipMode)flip);
+	if (ok) mark_dirty();
+	return ok;
+}
+
 bool graphics_renderer::set_logical_presentation(int w, int h, unsigned int mode) {
 	return SDL_SetRenderLogicalPresentation(_renderer, w, h, (SDL_RendererLogicalPresentation)mode);
 }
@@ -602,6 +622,8 @@ void RegisterGraphics(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("graphics_renderer", "graphics_texture@ create_texture(graphic@+ gfx)", asMETHOD(graphics_renderer, create_texture), asCALL_THISCALL);
 	engine->RegisterObjectMethod("graphics_renderer", "bool render_texture(graphics_texture@+ tex, float dst_x, float dst_y)", asMETHOD(graphics_renderer, render_texture), asCALL_THISCALL);
 	engine->RegisterObjectMethod("graphics_renderer", "bool render_texture(graphics_texture@+ tex, float src_x, float src_y, float src_w, float src_h, float dst_x, float dst_y, float dst_w, float dst_h)", asMETHOD(graphics_renderer, render_texture_ex), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_renderer", "bool render_texture_rotated(graphics_texture@+ tex, float dst_x, float dst_y, double angle, flip_mode flip = FLIP_NONE)", asMETHOD(graphics_renderer, render_texture_rotated), asCALL_THISCALL);
+	engine->RegisterObjectMethod("graphics_renderer", "bool render_texture_rotated(graphics_texture@+ tex, float src_x, float src_y, float src_w, float src_h, float dst_x, float dst_y, float dst_w, float dst_h, double angle, float center_x, float center_y, flip_mode flip = FLIP_NONE)", asMETHOD(graphics_renderer, render_texture_rotated_ex), asCALL_THISCALL);
 	engine->RegisterObjectMethod("graphics_renderer", "bool set_logical_presentation(int w, int h, renderer_logical_presentation mode)", asMETHOD(graphics_renderer, set_logical_presentation), asCALL_THISCALL);
 	engine->RegisterObjectMethod("graphics_renderer", "bool get_logical_presentation(int&out w, int&out h, renderer_logical_presentation&out mode) const", asMETHOD(graphics_renderer, get_logical_presentation), asCALL_THISCALL);
 	engine->RegisterObjectMethod("graphics_renderer", "bool set_viewport(int x, int y, int w, int h)", asMETHOD(graphics_renderer, set_viewport), asCALL_THISCALL);
