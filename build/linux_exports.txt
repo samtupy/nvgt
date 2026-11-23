@@ -1,0 +1,15 @@
+/* Symbols nvgt and its stubs export on Linux, passed to the linker with --dynamic-list.
+ * Plugins resolve these from the executable when they are loaded, like on macOS, but a Linux executable exports nothing
+ * unless told to. They are what the inline code of sound.h and sound_nodes.h refers to (GCC can emit a plugin's own copy
+ * of audio_node_impl when it speculatively devirtualizes audio_node calls), plus the assertion handler that Jolt's inline
+ * math calls in debug builds. Exporting everything with -rdynamic would keep --gc-sections from dropping unused code.
+ */
+{
+	ma_node_*;
+	g_soundsystem_last_error;
+	g_audio_engine;
+	extern "C++" {
+		"init_sound()";
+		"JPH::AssertFailed";
+	};
+};

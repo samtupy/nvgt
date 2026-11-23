@@ -147,7 +147,7 @@ elif env["NVGT_TARGET"] in ("macos", "ios"):
 		env.Append(CCFLAGS = ["-miphoneos-version-min=16.0"], LINKFLAGS = ["-miphoneos-version-min=16.0"])
 	env.Append(LIBS = ["objc"])
 elif env["NVGT_TARGET"] == "linux":
-	env.Append(LINKFLAGS = ["-Wl,-rpath,'$$ORIGIN/.',-rpath,'$$ORIGIN/lib'"])
+	env.Append(LINKFLAGS = ["-Wl,-rpath,'$$ORIGIN/.',-rpath,'$$ORIGIN/lib'", "-Wl,--dynamic-list=" + File("#build/linux_exports.txt").abspath])
 if ARGUMENTS.get("no_user", "0") == "0":
 	if os.path.isfile("user/nvgt_config.h"):
 		env.Append(CPPDEFINES = ["NVGT_USER_CONFIG"])
