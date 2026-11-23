@@ -131,26 +131,35 @@ int sb_sapi_refresh_voices(sb_sapi* sapi)
 if(!sbz_sapi_is_init(sapi)) return 0;
 return sbz_sapi_refresh_voices(sapi);
 }
+/* Voice lookups use the list cached by the last enumeration and only enumerate when there is none. Enumerating runs every
+ * dynamic token enumerator (TokenEnums) installed on the system, so doing it on every name or language lookup made listing
+ * the voices scale with the square of the voice count, which gets slow on machines with many voices or a slow enumerator. */
+int sbz_sapi_ensure_voices(sb_sapi* sapi)
+{
+if(!sbz_sapi_is_init(sapi)) return 0;
+if(sapi->voices&&sapi->voice_count>0) return 1;
+return sbz_sapi_refresh_voices(sapi);
+}
 int sb_sapi_count_voices(sb_sapi* sapi)
 {
-if(!sb_sapi_refresh_voices(sapi)) return 0;
+if(!sbz_sapi_ensure_voices(sapi)) return 0;
 return sapi->voice_count;
 }
 char* sb_sapi_get_voice_name(sb_sapi* sapi, int id)
 {
-if(!sb_sapi_refresh_voices(sapi)) return NULL;
+if(!sbz_sapi_ensure_voices(sapi)) return NULL;
 if((id<0)||(id>=sapi->voice_count)) return NULL;
 return sapi->voices[id].name;
 }
 char* sb_sapi_get_voice_language(sb_sapi* sapi, int id)
 {
-if(!sb_sapi_refresh_voices(sapi)) return NULL;
+if(!sbz_sapi_ensure_voices(sapi)) return NULL;
 if((id<0)||(id>=sapi->voice_count)) return NULL;
 return sapi->voices[id].language;
 }
 int sb_sapi_set_voice(sb_sapi* sapi, int id)
 {
-if(!sb_sapi_refresh_voices(sapi)) return 0;
+if(!sbz_sapi_ensure_voices(sapi)) return 0;
 if((id<0)||(id>=sapi->voice_count)) return 0;
 HRESULT hr= sapi->voice->lpVtbl->SetVoice(sapi->voice, sapi->voices[id].token);
 if(FAILED(hr)) return 0;
@@ -163,7 +172,7 @@ return 1;
 }
 int sb_sapi_get_voice(sb_sapi* sapi)
 {
-if(!sb_sapi_refresh_voices(sapi)) return -1;
+if(!sbz_sapi_ensure_voices(sapi)) return -1;
 ISpObjectToken* current=NULL;
 if(FAILED(sapi->voice->lpVtbl->GetVoice(sapi->voice, &current))) return -1;
 for(int x=0; x<sapi->voice_count; x++)

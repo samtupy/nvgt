@@ -73,14 +73,18 @@ void sapi5_engine::set_volume(float volume) { sb_sapi_set_volume(inst, volume); 
 bool sapi5_engine::get_rate_range(float& minimum, float& midpoint, float& maximum) { minimum = -10; midpoint = 0; maximum = 10; return true; }
 bool sapi5_engine::get_pitch_range(float& minimum, float& midpoint, float& maximum) { minimum = -10; midpoint = 0; maximum = 10; return true; }
 bool sapi5_engine::get_volume_range(float& minimum, float& midpoint, float& maximum) { minimum = 0; midpoint = 50; maximum = 100; return true; }
-int sapi5_engine::get_voice_count() { return inst->voice_count; }
+// tts_voice::refresh calls this once per refresh, so enumerate again here to pick up voices installed or removed since; the other lookups use that list.
+int sapi5_engine::get_voice_count() {
+	sb_sapi_refresh_voices(inst);
+	return inst->voice_count;
+}
 string sapi5_engine::get_voice_name(int index) {
 	if (index < 0 || index >= inst->voice_count) return "";
 	char *result = sb_sapi_get_voice_name(inst, index);
 	return result? string(result) : "";
 }
 string sapi5_engine::get_voice_language(int index) {
-	if (!inst || index < 0 || index >= get_voice_count()) return "";
+	if (!inst || index < 0 || index >= inst->voice_count) return "";
 	char *lang = sb_sapi_get_voice_language(inst, index);
 	return lang ? string(lang) : "";
 }
