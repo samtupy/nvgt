@@ -83,13 +83,6 @@ autoreconf -vfi
 ./configure
 make
 sudo make install
-
-cd deps
-git clone https://github.com/bulletphysics/bullet3
-cd bullet3
-./build_cmake_pybullet_double.sh
-cd cmake_build
-sudo cmake --install .
 ```
 
 ```bash
