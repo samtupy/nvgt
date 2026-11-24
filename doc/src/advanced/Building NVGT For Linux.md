@@ -96,11 +96,16 @@ cmake --build .
 sudo cmake --install .
 ```
 
-You will need scons, which you can get by running pip3 install scons.
+You will need CMake 3.22 or later and Ninja, which you can get by running `sudo apt install cmake ninja-build`.
 
 ## Finally...
-cd to the root of the nvgt repository and extract https://nvgt.dev/lindev.tar.gz to a lindev folder there.
+cd to the root of the nvgt repository and run:
 
-scons -s
+```bash
+cmake --preset linux
+cmake --build --preset linux
+```
+
+The first command downloads https://nvgt.dev/lindev.zip to a lindev folder there if it isn't already present.
 
 Enjoy!

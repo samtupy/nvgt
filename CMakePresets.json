@@ -1,0 +1,63 @@
+{
+	"version": 3,
+	"cmakeMinimumRequired": {"major": 3, "minor": 22, "patch": 0},
+	"configurePresets": [
+		{
+			"name": "base",
+			"hidden": true,
+			"generator": "Ninja",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {"CMAKE_BUILD_TYPE": "Release"}
+		},
+		{
+			"name": "debug",
+			"hidden": true,
+			"cacheVariables": {"CMAKE_BUILD_TYPE": "Debug"}
+		},
+		{
+			"name": "windows",
+			"displayName": "Windows",
+			"description": "Run from a Visual Studio x64 developer command prompt.",
+			"inherits": "base",
+			"cacheVariables": {"CMAKE_C_COMPILER": "cl", "CMAKE_CXX_COMPILER": "cl"},
+			"condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows"}
+		},
+		{"name": "windows-debug", "displayName": "Windows debug", "inherits": ["debug", "windows"]},
+		{
+			"name": "linux",
+			"displayName": "Linux",
+			"inherits": "base",
+			"condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux"}
+		},
+		{"name": "linux-debug", "displayName": "Linux debug", "inherits": ["debug", "linux"]},
+		{
+			"name": "macos",
+			"displayName": "macOS",
+			"inherits": "base",
+			"condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin"}
+		},
+		{"name": "macos-debug", "displayName": "macOS debug", "inherits": ["debug", "macos"]},
+		{
+			"name": "ios",
+			"displayName": "iOS stubs",
+			"inherits": "base",
+			"cacheVariables": {
+				"CMAKE_SYSTEM_NAME": "iOS",
+				"CMAKE_OSX_SYSROOT": "iphoneos",
+				"CMAKE_OSX_ARCHITECTURES": "arm64",
+				"CMAKE_OSX_DEPLOYMENT_TARGET": "16.0",
+				"NVGT_PLUGINS": "OFF"
+			},
+			"condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin"}
+		}
+	],
+	"buildPresets": [
+		{"name": "windows", "configurePreset": "windows"},
+		{"name": "windows-debug", "configurePreset": "windows-debug"},
+		{"name": "linux", "configurePreset": "linux"},
+		{"name": "linux-debug", "configurePreset": "linux-debug"},
+		{"name": "macos", "configurePreset": "macos"},
+		{"name": "macos-debug", "configurePreset": "macos-debug"},
+		{"name": "ios", "configurePreset": "ios"}
+	]
+}
