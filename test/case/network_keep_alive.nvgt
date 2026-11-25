@@ -1,0 +1,46 @@
+// A client that can't call request() for longer than enet's timeout stays connected, and gets what came meanwhile, in order.
+void test_network_keep_alive() {
+	network server, client;
+	assert(client.keep_alive_time == 1000);
+	client.keep_alive_time = 500;
+	assert(client.keep_alive_time == 500);
+	assert(server.setup_server(34991, 1, 1));
+	assert(client.setup_client(1, 1));
+	assert(client.connect("127.0.0.1", 34991) > 0);
+	uint64 peer = 0;
+	bool client_in = false;
+	timer t;
+	while ((peer == 0 or !client_in) and t.elapsed < 5000) {
+		const network_event@ s = server.request(5);
+		if (s.type == event_connect) peer = s.peer_id;
+		const network_event@ c = client.request(5);
+		if (c.type == event_connect) client_in = true;
+	}
+	assert(peer > 0 and client_in);
+	server.send_reliable(peer, "one", 0);
+	server.send_reliable(peer, "two", 0);
+	// The client is held up past enet's shortest timeout (10 seconds): only the server is serviced.
+	t.restart();
+	while (t.elapsed < 16000) {
+		const network_event@ s = server.request(5);
+		assert(s.type != event_disconnect);
+	}
+	string[] got;
+	t.restart();
+	while (got.length() < 2 and t.elapsed < 2000) {
+		const network_event@ c = client.request(5);
+		assert(c.type != event_disconnect);
+		if (c.type == event_receive) got.insert_last(c.message);
+	}
+	assert(got.length() == 2 and got[0] == "one" and got[1] == "two");
+	client.send_reliable(1, "back", 0);
+	t.restart();
+	string heard;
+	while (heard == "" and t.elapsed < 2000) {
+		const network_event@ s = server.request(5);
+		if (s.type == event_receive) heard = s.message;
+	}
+	assert(heard == "back");
+	client.destroy();
+	server.destroy();
+}

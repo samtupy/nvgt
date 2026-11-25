@@ -10,9 +10,15 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include <chrono>
 #include <obfuscate.h>
 #include "nvgt_angelscript.h" // get_array_type
 #include "network.h"
+
+// Milliseconds on a steady clock, for the keeper thread's idea of how long the script has gone without calling request().
+static uint64_t network_now_ms() {
+	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 bool g_enet_initialized = false;
 network_event g_enet_none_event; // The none event is static and never changes, why reallocate it every time network::request() doesn't come up with an event?
@@ -23,7 +29,7 @@ ENetPeer* network::get_peer(asQWORD peer_id) {
 	return i->second;
 }
 
-network::network() {
+network::network() : keeper_stop(false), keep_alive_ms(1000), last_service(0) {
 	if (!g_enet_initialized) {
 		enet_initialize();
 		g_enet_initialized = true;
@@ -46,7 +52,40 @@ void network::release() {
 	}
 }
 
+void network::start_keeper() {
+	if (keeper.joinable()) return; // still running from before: it finds the new host itself (setup_* holds the lock, so it can't be joined here)
+	last_service = network_now_ms();
+	keeper_stop = false;
+	keeper = std::thread(&network::keeper_loop, this);
+}
+void network::stop_keeper() {
+	if (!keeper.joinable()) return;
+	keeper_stop = true;
+	keeper.join();
+}
+void network::keeper_loop() {
+	while (!keeper_stop) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(20));
+		unsigned int after = keep_alive_ms;
+		uint64_t last = last_service, now = network_now_ms(); // last first: request() may set it later than this now
+		if (!after || now < last || now - last < after) continue;
+		host_lock lock(mutex);
+		if (!host) continue;
+		ENetEvent event;
+		while (enet_host_service(host, &event, 0) > 0) held_events.push_back(take_event(event));
+	}
+}
+void network::clear_held_events() {
+	for (network_pending_event& e : held_events) {
+		if (e.packet) enet_packet_destroy(e.packet);
+	}
+	held_events.clear();
+}
+
 void network::destroy(bool flush) {
+	stop_keeper();
+	host_lock lock(mutex);
+	clear_held_events();
 	if (host) {
 		if (flush) {
 			for (const auto& it : peers) enet_peer_disconnect(it.second, 0);
@@ -63,15 +102,18 @@ void network::destroy(bool flush) {
 }
 
 bool network::setup_client(unsigned char max_channels, unsigned short max_peers) {
+	host_lock lock(mutex);
 	if (host) return false;
 	host = enet_host_create(IPv6enabled? ENET_ADDRESS_TYPE_ANY : ENET_ADDRESS_TYPE_IPV4, NULL, max_peers, max_channels, 0, 0);
 	if (!host) return false;
 	is_client = true;
 	channel_count = max_channels;
+	start_keeper();
 	return true;
 }
 
 bool network::setup_server(unsigned short port, unsigned char max_channels, unsigned short max_peers) {
+	host_lock lock(mutex);
 	if (host) return false;
 	ENetAddress address;
 	enet_address_build_any(&address, IPv6enabled? ENET_ADDRESS_TYPE_IPV6 : ENET_ADDRESS_TYPE_IPV4);
@@ -79,10 +121,12 @@ bool network::setup_server(unsigned short port, unsigned char max_channels, unsi
 	host = enet_host_create(IPv6enabled? ENET_ADDRESS_TYPE_ANY : ENET_ADDRESS_TYPE_IPV4, &address, max_peers, max_channels, 0, 0);
 	if (!host) return false;
 	channel_count = max_channels;
+	start_keeper();
 	return true;
 }
 
 bool network::setup_local_server(unsigned short port, unsigned char max_channels, unsigned short max_peers) {
+	host_lock lock(mutex);
 	if (host) return false;
 	ENetAddress address;
 	enet_address_build_loopback(&address, IPv6enabled? ENET_ADDRESS_TYPE_IPV6 : ENET_ADDRESS_TYPE_IPV4);
@@ -90,10 +134,12 @@ bool network::setup_local_server(unsigned short port, unsigned char max_channels
 	host = enet_host_create(IPv6enabled? ENET_ADDRESS_TYPE_ANY : ENET_ADDRESS_TYPE_IPV4, &address, max_peers, max_channels, 0, 0);
 	if (!host) return false;
 	channel_count = max_channels;
+	start_keeper();
 	return true;
 }
 
 asQWORD network::connect(const std::string& hostname, unsigned short port) {
+	host_lock lock(mutex);
 	if (!host || !is_client) return 0;
 	ENetAddress addr;
 	if (enet_address_set_host(&addr, IPv6enabled? ENET_ADDRESS_TYPE_ANY : ENET_ADDRESS_TYPE_IPV4, hostname.c_str()) < 0) return false;
@@ -106,46 +152,74 @@ asQWORD network::connect(const std::string& hostname, unsigned short port) {
 	return next_peer - 1;
 }
 
-const network_event* network::request(uint32_t timeout) {
-	if (!host) {
-		g_enet_none_event.addRef();
-			return &g_enet_none_event;
-		}
-	ENetEvent event;
-	int r = enet_host_service(host, &event, timeout);
-	if (r < 1) {
-		g_enet_none_event.addRef();
-			return &g_enet_none_event;
-		}
-	update_totals(); // total_sent, total_received...
-	network_event* e = new network_event();
-	e->type = event.type;
-	e->channel = event.channelID;
-	if (!receive_timeout_event && e->type == ENET_EVENT_TYPE_DISCONNECT_TIMEOUT) e->type = ENET_EVENT_TYPE_DISCONNECT;
+// Does what an event from the host means for its peer at once (as the host gives it), whether request() or the keeper thread got it.
+network_pending_event network::take_event(ENetEvent& event) {
+	network_pending_event p;
+	p.type = event.type;
+	p.channel = event.channelID;
+	p.packet = nullptr;
+	p.peer_id = 0;
 	if (event.type == ENET_EVENT_TYPE_CONNECT) {
 		enet_peer_timeout(event.peer, 128, 10000, 35000);
 		if (!is_client) {
 			event.peer->data = reinterpret_cast<void*>(next_peer);
 			peers[next_peer] = event.peer;
-			e->peer_id = next_peer;
+			p.peer_id = next_peer;
 			next_peer++;
 		} else
-			e->peer_id = (asQWORD)event.peer->data;
+			p.peer_id = (asQWORD)event.peer->data;
 	} else if (event.type == ENET_EVENT_TYPE_DISCONNECT || event.type == ENET_EVENT_TYPE_DISCONNECT_TIMEOUT) {
 		asQWORD peer_id = (asQWORD)event.peer->data;
 		event.peer->data = NULL;
 		if (peer_id > 0)
 			peers.erase(peer_id);
-		e->peer_id = peer_id;
+		p.peer_id = peer_id;
 	} else if (event.type == ENET_EVENT_TYPE_RECEIVE) {
-		e->peer_id = (asQWORD)event.peer->data;
-		e->message.append((char*)event.packet->data, event.packet->dataLength);
-		enet_packet_destroy(event.packet);
+		p.peer_id = (asQWORD)event.peer->data;
+		p.packet = event.packet;
+	}
+	return p;
+}
+network_event* network::make_event(network_pending_event& p) {
+	update_totals(); // total_sent, total_received...
+	network_event* e = new network_event();
+	e->type = p.type;
+	e->channel = p.channel;
+	e->peer_id = p.peer_id;
+	if (!receive_timeout_event && e->type == ENET_EVENT_TYPE_DISCONNECT_TIMEOUT) e->type = ENET_EVENT_TYPE_DISCONNECT;
+	if (p.packet) {
+		e->message.append((char*)p.packet->data, p.packet->dataLength);
+		enet_packet_destroy(p.packet);
+		p.packet = nullptr;
 	}
 	return e;
 }
+const network_event* network::request(uint32_t timeout) {
+	host_lock lock(mutex);
+	last_service = network_now_ms();
+	if (!host) {
+		g_enet_none_event.addRef();
+		return &g_enet_none_event;
+	}
+	network_pending_event p;
+	if (!held_events.empty()) {
+		// What came while the script was held up, before anything newer.
+		p = held_events.front();
+		held_events.pop_front();
+	} else {
+		ENetEvent event;
+		int r = enet_host_service(host, &event, timeout);
+		if (r < 1) {
+			g_enet_none_event.addRef();
+			return &g_enet_none_event;
+		}
+		p = take_event(event);
+	}
+	return make_event(p);
+}
 
 std::string network::get_peer_address(asQWORD peer_id) {
+	host_lock lock(mutex);
 	ENetPeer* peer = get_peer(peer_id);
 	if (!peer) return "";
 	std::string tmp(32, '\0');
@@ -154,6 +228,7 @@ std::string network::get_peer_address(asQWORD peer_id) {
 	return tmp;
 }
 unsigned int network::get_peer_average_round_trip_time(asQWORD peer_id) {
+	host_lock lock(mutex);
 	if (!host) return -1;
 	ENetPeer* peer = get_peer(peer_id);
 	if (!peer) return -1;
@@ -161,6 +236,7 @@ unsigned int network::get_peer_average_round_trip_time(asQWORD peer_id) {
 }
 
 bool network::send(asQWORD peer_id, const std::string& message, unsigned char channel, bool reliable) {
+	host_lock lock(mutex);
 	if (!host || channel > channel_count) return false;
 	ENetPeer* peer = get_peer(peer_id);
 	if (peer_id && !peer) return false;
@@ -174,6 +250,7 @@ bool network::send(asQWORD peer_id, const std::string& message, unsigned char ch
 	return r;
 }
 bool network::send_peer(asQWORD peer, const std::string& message, unsigned char channel, bool reliable) {
+	host_lock lock(mutex);
 	if (!host || channel > channel_count) return false;
 	ENetPeer* peer_obj = reinterpret_cast<ENetPeer*>(peer);
 	if (peer < asQWORD(host->peers) || peer >= asQWORD(host->peers + host->peerCount) || (peer - asQWORD(host->peers)) % sizeof(ENetPeer) != 0) return false;
@@ -186,12 +263,14 @@ bool network::send_peer(asQWORD peer, const std::string& message, unsigned char 
 }
 
 bool network::flush() {
+	host_lock lock(mutex);
 	if (!host) return false;
 	enet_host_flush(host);
 	return true;
 }
 
 bool network::disconnect_peer_softly(asQWORD peer_id) {
+	host_lock lock(mutex);
 	if (!host) return false;
 	ENetPeer* peer = get_peer(peer_id);
 	if (!peer) return false;
@@ -200,6 +279,7 @@ bool network::disconnect_peer_softly(asQWORD peer_id) {
 	return true;
 }
 bool network::disconnect_peer(asQWORD peer_id) {
+	host_lock lock(mutex);
 	if (!host) return false;
 	ENetPeer* peer = get_peer(peer_id);
 	if (!peer) return false;
@@ -208,6 +288,7 @@ bool network::disconnect_peer(asQWORD peer_id) {
 	return true;
 }
 bool network::disconnect_peer_forcefully(asQWORD peer_id) {
+	host_lock lock(mutex);
 	if (!host) return false;
 	ENetPeer* peer = get_peer(peer_id);
 	if (!peer) return false;
@@ -217,6 +298,7 @@ bool network::disconnect_peer_forcefully(asQWORD peer_id) {
 }
 
 CScriptArray* network::list_peers() {
+	host_lock lock(mutex);
 	asITypeInfo* arrayType = get_array_type("uint64[]");
 	CScriptArray* array = CScriptArray::Create(arrayType);
 	if (!host) return array;
@@ -229,11 +311,13 @@ CScriptArray* network::list_peers() {
 }
 
 bool network::set_bandwidth_limits(unsigned int incoming, unsigned int outgoing) {
+	host_lock lock(mutex);
 	if (!host) return false;
 	enet_host_bandwidth_limit(host, incoming, outgoing);
 	return true;
 }
 void network::set_packet_compression(bool flag) {
+	host_lock lock(mutex);
 	if (!host) return;
 	if (flag) enet_host_compress_with_range_coder(host);
 	else enet_host_compress(host, nullptr);
@@ -320,6 +404,8 @@ void RegisterScriptNetwork(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod(_O("network"), _O("uint get_packets_sent() const property"), asMETHOD(network, get_packets_sent), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("void set_bandwidth_limits(uint max_incoming_bytes_per_second, uint max_outgoing_bytes_per_second)"), asMETHOD(network, set_bandwidth_limits), asCALL_THISCALL);
 	engine->RegisterObjectMethod(_O("network"), _O("bool get_active() const property"), asMETHOD(network, active), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("uint get_keep_alive_time() const property"), asMETHOD(network, get_keep_alive_time), asCALL_THISCALL);
+	engine->RegisterObjectMethod(_O("network"), _O("void set_keep_alive_time(uint milliseconds) property"), asMETHOD(network, set_keep_alive_time), asCALL_THISCALL);
 	engine->RegisterObjectProperty(_O("network"), _O("bool IPV6enabled"), asOFFSET(network, IPv6enabled));
 	engine->RegisterObjectProperty(_O("network"), _O("bool receive_timeout_event"), asOFFSET(network, receive_timeout_event));
 	engine->RegisterObjectProperty(_O("network"), _O("bool send_immediately"), asOFFSET(network, send_immediately));
