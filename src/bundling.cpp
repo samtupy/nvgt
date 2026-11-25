@@ -258,10 +258,12 @@ public:
 		xplatform_correct_path_to_stubs(stubpath);
 		alter_stub_path(stubpath);
 		stubpath = format("%snvgt_%s%s.bin", stubpath.toString(), platform, (stub != "" ? string("_") + stub : ""));
-		string outpath_str = config.getString("build.output_basename", format("%s", Path(input_file).setExtension("").makeAbsolute().toString()));
+		string outpath_str = config.getString("build.output_basename", "");
+		if (outpath_str.empty()) outpath_str = Path(input_file).setExtension("").makeAbsolute().toString();
 		replaceInPlace(outpath_str, "$platform"s, platform);
 		outpath_str = Path(outpath_str).makeAbsolute().toString();
-		if (DirectoryExists(outpath_str)) File(outpath_str).remove(true);
+		// A previous bundle directory is only removed when it sits at least one level below the script's directory and does not contain the working directory, as anything else could be the script's directory, the working directory or one of their parents, and recursively deleting those has wiped entire projects (#484).
+		if (DirectoryExists(outpath_str) && Path(outpath_str).depth() >= Path(input_file).makeAbsolute().depth() && !toLower(Path::current()).starts_with(toLower(Path(outpath_str).makeDirectory().toString()))) File(outpath_str).remove(true);
 		outpath = outpath_str;
 		File(outpath.parent()).createDirectories();
 		alter_output_path(outpath);

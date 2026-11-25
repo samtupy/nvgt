@@ -962,9 +962,8 @@ int PragmaCallback(const string &pragmaText, CScriptBuilder &builder, void* /*us
 		builder.DefineWord(Poco::format("plugin_%s", plugin_name).c_str());
 	} else if (cleanText.starts_with("compiled_basename ")) {
 		string bn = cleanText.substr(18);
-		if (bn == "*")
-			bn.clear();
-		config.setString("build.output_basename", bn);
+		if (bn == "*") config.remove("build.output_basename");
+		else config.setString("build.output_basename", bn);
 	} else if (cleanText.starts_with("bytecode_compression ")) {
 		g_bcCompressionLevel = strtol(cleanText.substr(21).c_str(), NULL, 10);
 		if (g_bcCompressionLevel < 0 || g_bcCompressionLevel > 9)
