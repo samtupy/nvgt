@@ -235,7 +235,7 @@ private:
 		char c;
 		if (stream->Read(&c, 1) != 1)
 			return char_traits::eof();
-		return c;
+		return char_traits::to_int_type(c); // A plain char would sign extend a 0xff byte into eof(), ending the stream partway through the header.
 	}
 	int writeToDevice(char c) { return stream->Write(&c, 1); }
 	NVGTBytecodeStream* stream;
