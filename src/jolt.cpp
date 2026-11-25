@@ -10,6 +10,8 @@
  * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#include <cfloat>
+#include <cmath>
 #include <cstdarg>
 #include <cstdio>
 #include <mutex>
@@ -463,6 +465,12 @@ static Vec3* vec3_opMul_f(const Vec3& self, float s) { return new_vec3(self * s)
 static Vec3* vec3_opDiv_f(const Vec3& self, float s) { return new_vec3(self / s); }
 static Vec3* vec3_opNeg(const Vec3& self) { return new_vec3(-self); }
 static Vec3* vec3_cross(const Vec3& self, const Vec3& other) { return new_vec3(self.Cross(other)); }
+static Vec3* vec3_opDiv_v(const Vec3& self, const Vec3& other) { return new_vec3(self / other); }
+static void vec3_normalize(Vec3& self) { float len = self.Length(); if (len > FLT_EPSILON) self /= len; } // Like the reactphysics3d vector this replaced, a zero length vector is left unchanged rather than turned into NaN.
+static void vec3_set_to_zero(Vec3& self) { self = Vec3::sZero(); }
+static bool vec3_is_zero(const Vec3& self) { return self.LengthSq() < FLT_EPSILON; }
+static bool vec3_is_unit(const Vec3& self) { return std::abs(self.LengthSq() - 1.0f) < FLT_EPSILON; }
+static bool vec3_is_finite(const Vec3& self) { return std::isfinite(self.GetX()) && std::isfinite(self.GetY()) && std::isfinite(self.GetZ()); }
 static string vec3_to_string(const Vec3& v) { return "vector(" + to_string(v.GetX()) + ", " + to_string(v.GetY()) + ", " + to_string(v.GetZ()) + ")"; }
 static Vec3* vec3_sZero() { return new_vec3(Vec3::sZero()); }
 static Vec3* vec3_sOne() { return new_vec3(Vec3::sOne()); }
@@ -1187,6 +1195,7 @@ static void RegisterJoltMathTypes(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("vector", "vector@ opMul(const vector&in) const", asFUNCTION(vec3_opMul_v), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("vector", "vector@ opMul(float) const", asFUNCTION(vec3_opMul_f), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("vector", "vector@ opDiv(float) const", asFUNCTION(vec3_opDiv_f), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("vector", "vector@ opDiv(const vector&in) const", asFUNCTION(vec3_opDiv_v), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("vector", "vector@ opNeg() const", asFUNCTION(vec3_opNeg), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("vector", "vector& opAddAssign(const vector&in)", asFUNCTION(vec3_add_assign), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("vector", "vector& opSubAssign(const vector&in)", asFUNCTION(vec3_sub_assign), asCALL_CDECL_OBJFIRST);
@@ -1198,11 +1207,20 @@ static void RegisterJoltMathTypes(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("vector", "float length() const", asMETHOD(Vec3, Length), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "float length_sq() const", asMETHOD(Vec3, LengthSq), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "vector@ normalized() const", asFUNCTION((scoped_ret<Vec3, Vec3, &Vec3::Normalized>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("vector", "void normalize()", asFUNCTION(vec3_normalize), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("vector", "void set_to_zero()", asFUNCTION(vec3_set_to_zero), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("vector", "void setToZero()", asFUNCTION(vec3_set_to_zero), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("vector", "bool get_is_zero() const property", asFUNCTION(vec3_is_zero), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("vector", "bool get_is_unit() const property", asFUNCTION(vec3_is_unit), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("vector", "bool get_is_finite() const property", asFUNCTION(vec3_is_finite), asCALL_CDECL_OBJFIRST);
 	engine->RegisterObjectMethod("vector", "bool is_normalized(float tolerance = 1.0e-6f) const", asMETHOD(Vec3, IsNormalized), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "bool is_near_zero(float max_dist_sq = 1.0e-12f) const", asMETHOD(Vec3, IsNearZero), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "float get_min_value() const property", asMETHOD(Vec3, ReduceMin), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "float get_max_value() const property", asMETHOD(Vec3, ReduceMax), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "vector@ abs() const", asFUNCTION((scoped_ret<Vec3, Vec3, &Vec3::Abs>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("vector", "vector@ get_absolute() const property", asFUNCTION((scoped_ret<Vec3, Vec3, &Vec3::Abs>)), asCALL_CDECL_OBJFIRST);
+	engine->RegisterObjectMethod("vector", "int get_min_axis() const property", asMETHOD(Vec3, GetLowestComponentIndex), asCALL_THISCALL);
+	engine->RegisterObjectMethod("vector", "int get_max_axis() const property", asMETHOD(Vec3, GetHighestComponentIndex), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "float get_opIndex(uint i) const property", asMETHODPR(Vec3, operator[], (uint) const, float), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "void set_opIndex(uint i, float v) property", asMETHOD(Vec3, SetComponent), asCALL_THISCALL);
 	engine->RegisterObjectMethod("vector", "string opImplConv() const", asFUNCTION(vec3_to_string), asCALL_CDECL_OBJFIRST);

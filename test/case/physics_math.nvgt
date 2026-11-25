@@ -17,6 +17,25 @@ void test_vector_compound_property_assignment() {
 	assert(vector(0, 0, 0).is_near_zero() and !vector(0.1, 0, 0).is_near_zero(), "is_near_zero with default distance");
 	assert(vector(0.1, 0, 0).is_near_zero(0.1), "is_near_zero with explicit distance");
 }
+void test_vector_reactphysics_compatibility() {
+	vector v(3, 0, 4);
+	v.normalize();
+	assert(near(v, vector(0.6, 0, 0.8)) and v.is_unit, "normalize gave " + v);
+	vector z;
+	z.normalize();
+	assert(z == VEC3_ZERO and z.is_finite, "normalizing a zero vector should leave it unchanged, got " + z);
+	v.setToZero();
+	assert(v.is_zero and v == VEC3_ZERO, "setToZero gave " + v);
+	v.set(1, 1, 1);
+	v.set_to_zero();
+	assert(v.is_zero, "set_to_zero gave " + v);
+	assert(!vector(1, 0, 0).is_zero and !vector(2, 0, 0).is_unit, "is_zero and is_unit on non matching vectors");
+	assert(!(vector(1, 0, 0) / 0.0f).is_finite, "dividing by zero should not be finite");
+	assert(vector(6, 8, 10) / vector(2, 4, 5) == vector(3, 2, 2), "component wise division gave " + (vector(6, 8, 10) / vector(2, 4, 5)));
+	vector w(-4, 2, -9);
+	assert(w.absolute == vector(4, 2, 9), "absolute gave " + w.absolute);
+	assert(w.min_axis == 2 and w.max_axis == 1, "min_axis and max_axis gave " + w.min_axis + " and " + w.max_axis);
+}
 void test_quaternion() {
 	quaternion id;
 	assert(id == IDENTITY_QUATERNION and id.w == 1, "default quaternion should be identity, got " + id);

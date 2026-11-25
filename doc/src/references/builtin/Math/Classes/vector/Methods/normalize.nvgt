@@ -1,0 +1,13 @@
+/**
+	Change the vector's length to 1 while keeping the direction it points in.
+	void vector::normalize();
+	## Remarks:
+		Unlike `normalized()`, this changes the vector itself rather than returning a copy. A vector of length 0 has no direction, so it is left unchanged instead of being filled with invalid numbers.
+*/
+
+// Example:
+void main() {
+	vector v(3, 4, 0);
+	v.normalize();
+	alert("Vector", "(" + v.x + ", " + v.y + ", " + v.z + ")");
+}

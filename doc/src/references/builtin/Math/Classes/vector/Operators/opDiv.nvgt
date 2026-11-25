@@ -1,10 +1,14 @@
 /**
-	Overloads the / operator, dividing a vector by a number.
-	vector@ vector::opDiv(float scalar) const;
+	Overloads the / operator, dividing a vector by a number or by another vector.
+	1. vector@ vector::opDiv(const vector&in other) const;
+	2. vector@ vector::opDiv(float scalar) const;
 	## Arguments:
-		* float scalar: the number to divide every coordinate by.
+		* const vector&in other (1): the vector to divide by.
+		* float scalar (2): the number to divide every coordinate by.
 	## Returns:
 		vector@: the quotient.
+	## Remarks:
+		Dividing two vectors divides each coordinate by the same coordinate of the other.
 */
 
 // Example:

@@ -1,0 +1,10 @@
+/**
+	The index of the vector's largest coordinate, 0 for x, 1 for y or 2 for z.
+	const int vector::max_axis;
+*/
+
+// Example:
+void main() {
+	vector v(4, -2, 9);
+	alert("Largest axis", "" + v.max_axis); // 2
+}

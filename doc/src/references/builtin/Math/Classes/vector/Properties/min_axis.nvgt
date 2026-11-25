@@ -1,0 +1,10 @@
+/**
+	The index of the vector's smallest coordinate, 0 for x, 1 for y or 2 for z.
+	const int vector::min_axis;
+*/
+
+// Example:
+void main() {
+	vector v(4, -2, 9);
+	alert("Smallest axis", "" + v.min_axis); // 1
+}

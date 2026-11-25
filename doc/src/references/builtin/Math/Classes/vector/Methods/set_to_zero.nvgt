@@ -1,0 +1,14 @@
+/**
+	Set all three coordinates of the vector to 0.
+	1. void vector::set_to_zero();
+	2. void vector::setToZero();
+	## Remarks:
+		This is the same as `v = VEC3_ZERO;`. `setToZero()` is an older name for the same method.
+*/
+
+// Example:
+void main() {
+	vector v(1, 2, 3);
+	v.set_to_zero();
+	alert("Vector", "(" + v.x + ", " + v.y + ", " + v.z + ")");
+}

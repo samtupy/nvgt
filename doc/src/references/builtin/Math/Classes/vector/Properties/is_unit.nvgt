@@ -1,0 +1,14 @@
+/**
+	Whether the vector's length is 1, allowing for a tiny rounding error.
+	const bool vector::is_unit;
+	## Remarks:
+		Use `is_normalized()` if you need to choose how much error is allowed.
+*/
+
+// Example:
+void main() {
+	vector v(3, 4, 0);
+	alert("Is unit", "" + v.is_unit); // false
+	v.normalize();
+	alert("Is unit", "" + v.is_unit); // true
+}

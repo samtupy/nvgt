@@ -1,0 +1,14 @@
+/**
+	Whether the vector's length is 0, allowing for a tiny rounding error.
+	const bool vector::is_zero;
+	## Remarks:
+		Use `is_near_zero()` if you need to choose how much error is allowed.
+*/
+
+// Example:
+void main() {
+	vector v(1, 2, 3);
+	alert("Is zero", "" + v.is_zero); // false
+	v.set_to_zero();
+	alert("Is zero", "" + v.is_zero); // true
+}
