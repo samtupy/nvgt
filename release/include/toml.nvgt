@@ -1,0 +1,223 @@
+/* toml.nvgt - TOML reader and writer
+ *
+ * Copyright (c) 2025-2026 [Harry Min Khant](https://github.com/harrymkt), under the same license as the NVGT:
+ *
+ * NVGT - NonVisual Gaming Toolkit
+ * Copyright (c) 2022-2025 Sam Tupy
+ * https://nvgt.gg
+ * This software is provided "as-is", without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+ * Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+ * 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+*/
+class toml {
+	toml_section@[] sections(0);
+	toml() {
+		this.initialize_section(create = true);
+	}
+	bool load(string filename) {
+		file f;
+		if (!f.open(filename, "r")) return false;
+		bool result = this.load(f);
+		f.close();
+		return result;
+	}
+	bool load(datastream@ f) {
+		if (@f != null && f.active) return this.loads(f.read());
+		return false;
+	}
+	bool loads(string str) {
+		this.parse(str);
+		return this.sections.length() > 0;
+	}
+	toml_section@ initialize_section(string name = "", bool create = false) {
+		if (name == "" && this.sections.length() < 1 && create) {
+			this.sections.insert_last(toml_section(name));
+			return @this.sections[0];
+		} else if (name == "" && this.sections.length() > 0) return @this.sections[0];
+		else if (name != "") {
+			int index = this.section_index[name];
+			if (index < 0 && create) {
+				toml_section@ t = toml_section(name);
+				this.sections.insert_last(t);
+				return @t;
+			}
+			return (index > -1 ? @this.sections[index] : null);
+		}
+		return null;
+	}
+	void parse(string d) {
+		this.sections.resize(0);
+		toml_section@ t = this.initialize_section("", true); // Create the main section.
+		d.replace_this("\r\n", "\n");
+		string[] lines = d.split("\n");
+		if (lines.length() < 1) return;
+		for (uint i = 0; i < lines.length(); i++) {
+			string l = lines[i].trim_whitespace();
+			if (l.starts_with("#")) continue; // Skip commented lines.
+			string key = l, value; // Initializes the key to the l (main value), since keys such as [section_name] would not contain assigned value.
+			int ei = l.find("=");
+			if (ei > -1) {
+				key = l.substr(0, ei).trim_whitespace(); // If the separator is found, trims the key, taking the content left of the separator.
+				value = l.substr(ei + 1).trim_whitespace(); // The value, the right content after the separator.
+			}
+			int comment = value.find("#");
+			if (comment > -1) {
+				int q = value.rfind('"', comment);
+				if (q > -1) value = value.slice(0, q + 1); // Trims the right side comment out of a quoted string.
+				else {
+					q = value.find("#");
+					if (q > -1) value = value.slice(0, q);
+				}
+			}
+			value.trim_whitespace_this(); // Make sure the whitespace trim verification is done.
+			string oneval = value.split(" ")[0]; // For values that cannot contain spaces, i.e comment with numbers, e.g., key = 24 #comment.
+			if (key == "") continue; // Empty line.
+			if (key.starts_with("[") && key.ends_with("]")) { // Section.
+				string name = "";
+				if (key.length() > 2) name = key.slice(1, key.length() - 1); // For security, only trims the brackets when the key has more than 2 characters to avoid trimming empty sections, i.e, [].
+				@t = this.initialize_section(name, true); // Initializes a section, creating if necessary as the boolean parameter is set to true
+				continue;
+			}
+			if (value.starts_with('"') && value.ends_with('"')) // A string
+				t.set(key, value.slice(1, value.length() - 1));
+			else if (oneval.find(".") > -1) { // Possibly floatingpoint number.
+				double f = parse_double(oneval);
+				t.set(key, f);
+			} else if (oneval.is_digits()) // Int / uint / these kinds.
+				t.set(key, parse_int(oneval));
+			else if (value.lower() == "true" || value.lower() == "false") // Boolean
+				t.set(key, ((value.lower() == "true" ? true : false)));
+			else if (value.starts_with("[") && value.ends_with("]")) { // Array, nonfunctional at this time.
+				string[] va = value.split(",");
+				if (value.find('"') > -1) va = value.split('",');
+				if (va.length() < 1) continue;
+				t.set(key, va);
+			}
+		}
+	}
+	string[] get_keys(string name, bool all = false) {
+		if (this.sections.length() < 1) return {};
+		string[] k;
+		for (uint a = 0; a < this.sections.length(); a++) {
+			if ((!all && this.sections[a].name == name) || (all)) k.extend(this.sections[a].keys);
+		}
+		return {};
+	}
+	string dump(bool indent = true, bool empty_sections = true) {
+		if (this.sections.length() < 1) return "";
+		string final = "";
+		for (uint a = 0; a < this.sections.length(); a++) {
+			int indentsize = (indent ? 1 : 0);
+			toml_section@ s = @this.sections[a];
+			if (indent) {
+				string[] parse = (s.name).split(".");
+				if (parse.length() > 0) indentsize = parse.length();
+			}
+			final += this.sections[a].dump(true, indentsize, indentsize - 1, empty_sections);
+		}
+		return final;
+	}
+	var@ get(string section, string key = "", var@ def = null) {
+		toml_section@ s = this.initialize_section(section);
+		if (@s == null) return def;
+		return s.get(key, def);
+	}
+	bool set(string section, string key = "", any@ value = null) {
+		toml_section@ t = this.initialize_section(section, true);
+		return @t != null && key != "" && t.set(key, value);
+	}
+	int get_section_index(string section) property {
+		if (this.sections.length() < 1) return -1;
+		for (uint a = 0; a < this.sections.length(); a++) {
+			if (this.sections[a].name == section) return a;
+		}
+		return -1;
+	}
+	bool remove(string section, string key = "") {
+		toml_section@ t = this.initialize_section(section);
+		if (@t == null) return false;
+		if (key != "") return t.remove(key);
+		int x = this.section_index[t.name];
+		if (x > -1) {
+			@this.sections[x] = null;
+			this.sections.remove_at(x);
+		}
+		return this.section_index[t.name] < 0;
+	}
+}
+class toml_section {
+	dictionary data;
+	string name;
+	private string[] knames; // To maintain key order.
+	toml_section(string name, dictionary data = dictionary()) {
+		this.name = name;
+		this.data = data;
+	}
+	private bool add(string key, any@ v) {
+		if (@v is null) return false;
+		bool r = true;
+		string vstr;
+		double vdouble;
+		int vint;
+		bool vbool;
+		if (v.retrieve(vstr)) this.data.set(key, vstr);
+		else if (v.retrieve(vdouble)) this.data.set(key, vdouble);
+		else if (v.retrieve(vint)) this.data.set(key, vint);
+		else if (v.retrieve(vbool)) this.data.set(key, vbool);
+		else r = false;
+		return r;
+	}
+	bool set(string key, any@ value) {
+		if (!this.add(key, value)) return false;
+		if (this.knames.find(key) < 0) this.knames.insert_last(key);
+		return true;
+	}
+	string[] get_keys() property {
+		return this.knames;
+	}
+	var@ get(string key, var@ def = null) {
+		if (!this.data.exists(key)) return def;
+		string vstr;
+		double vdouble;
+		int vint;
+		bool vbool;
+		if (this.data.get(key, vstr)) return vstr;
+		else if (this.data.get(key, vdouble)) return vdouble;
+		else if (this.data.get(key, vint)) return vint;
+		else if (this.data.get(key, vbool)) return vbool;
+		else return def;
+	}
+	bool remove(string key) {
+		int f = this.knames.find(key);
+		if (f > -1) this.knames.remove_at(f);
+		if (!this.data.exists(key)) return false;
+		return this.data.delete(key);
+	}
+	string dump(bool head, int indent_size = 0, int indent_head_size = 0, bool empty_sections = true) {
+		if (this.keys.length() < 1 && !empty_sections) return "";
+		string final = "";
+		string indent, indenthead;
+		int ind = indent_size, indhead = indent_head_size;
+		while(ind > 0) {
+			indent += "\t";
+			ind--;
+		}
+		while(indhead > 0) {
+			indenthead += "\t";
+			indhead--;
+		}
+		if (head && this.name != "") final += "%0[%1]\n".format(indenthead, this.name);
+		string[] k = this.keys;
+		for (uint a = 0; a < k.length(); a++) {
+			var@ v = this.get(k[a]);
+			if (@v is null) continue;
+			string[] vals = {string(v)};
+			if (v.is_string) vals = {'"', v, '"'};
+			else if (v.is_boolean) vals = {(v == true ? "true" : "false")};
+			final += (this.name != "" && head ? indent : "") + k[a] + " = " + join(vals, "") + "\n";
+		}
+		return final;
+	}
+}
