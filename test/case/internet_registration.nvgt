@@ -12,6 +12,13 @@ void test_uri_normalize() {
 	u.normalize(); // Was registered as returning bool though it returns nothing.
 	assert(u.path == "/a/c", "normalized to " + u.path);
 }
+void test_http_credentials_getters() {
+	http_credentials c("user", "pw");
+	c.host = "example.com";
+	assert(c.username == "user" and c.password == "pw" and c.host == "example.com", "got [" + c.username + "] [" + c.password + "] [" + c.host + "]"); // The getters return references but were registered as returning strings by value, giving empty strings, bad_alloc exceptions or crashes.
+	c.clear();
+	assert(c.empty and c.username.empty() and c.host.empty());
+}
 void test_http_settings_survive_requests() {
 	http h;
 	h.max_retries = 3;

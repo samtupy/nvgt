@@ -343,11 +343,11 @@ void RegisterHTTPCredentials(asIScriptEngine* engine) {
 	engine->RegisterObjectMethod("http_credentials", "void from_uri(const spec::uri&in uri)", asMETHOD(HTTPCredentials, fromURI), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http_credentials", "void clear()", asMETHOD(HTTPCredentials, clear), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http_credentials", "void set_username(const string&in username) property", asMETHOD(HTTPCredentials, setUsername), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http_credentials", "string get_username() const property", asMETHOD(HTTPCredentials, getUsername), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "const string& get_username() const property", asMETHOD(HTTPCredentials, getUsername), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http_credentials", "void set_password(const string&in password) property", asMETHOD(HTTPCredentials, setPassword), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http_credentials", "string get_password() const property", asMETHOD(HTTPCredentials, getPassword), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "const string& get_password() const property", asMETHOD(HTTPCredentials, getPassword), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http_credentials", "void set_host(const string&in host) property", asMETHOD(HTTPCredentials, setHost), asCALL_THISCALL);
-	engine->RegisterObjectMethod("http_credentials", "string get_host() const property", asMETHOD(HTTPCredentials, getHost), asCALL_THISCALL);
+	engine->RegisterObjectMethod("http_credentials", "const string& get_host() const property", asMETHOD(HTTPCredentials, getHost), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http_credentials", "bool get_empty() const property", asMETHOD(HTTPCredentials, empty), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http_credentials", "void authenticate(http_request& request, const http_response&in response)", asMETHOD(HTTPCredentials, authenticate), asCALL_THISCALL);
 	engine->RegisterObjectMethod("http_credentials", "void update_auth_info(http_request& request)", asMETHOD(HTTPCredentials, updateAuthInfo), asCALL_THISCALL);
