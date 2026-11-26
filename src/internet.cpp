@@ -18,6 +18,7 @@
 #include <Poco/RefCountedObject.h>
 #include <Poco/Runnable.h>
 #include <Poco/StreamCopier.h>
+#include <Poco/String.h>
 #include <Poco/SynchronizedObject.h>
 #include <Poco/Thread.h>
 #include <Poco/URI.h>
@@ -37,6 +38,7 @@
 #include <Poco/Net/HTTPSStreamFactory.h>
 #include <Poco/Net/HTTPStreamFactory.h>
 #include <Poco/Net/MessageHeader.h>
+#include <Poco/Net/SSLException.h>
 #include <Poco/Net/SSLManager.h>
 #include <Poco/Net/WebSocket.h>
 #include <scriptarray.h>
@@ -699,6 +701,7 @@ public:
 				ScopedLock lock(*this);
 				_response_body.clear();
 				_bytes_downloaded = 0;
+				if (dynamic_cast<SSLContextException*>(&e) || (dynamic_cast<SSLException*>(&e) && toLower(e.displayText()).find("certificate") != string::npos)) break; // A rejected certificate or broken TLS setup would only fail the same way again. Poco reports a certificate rejected during the handshake as SSLConnectionUnexpectedlyClosedException, the same as a dropped connection that is worth retrying, so only the message, such as "certificate verify failed", tells them apart.
 			}
 		}
 		if (_session) {
