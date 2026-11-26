@@ -97,6 +97,7 @@ protected:
 		#ifdef _WIN32
 		timeBeginPeriod(1);
 		setlocale(LC_ALL, ".UTF8");
+		setlocale(LC_NUMERIC, "C");
 		wstring dir_u;
 		UnicodeConverter::convert(Path(config().getString("application.dir")).append("lib").toString(), dir_u);
 		SetDllDirectoryW(dir_u.c_str());
