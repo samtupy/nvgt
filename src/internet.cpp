@@ -829,7 +829,11 @@ string url_get(const string& url, HTTPResponse* resp) { return url_request(HTTPR
 string url_post(const string& url, const string& data, HTTPResponse* resp) { return url_request(HTTPRequest::HTTP_POST, url, data, resp); }
 
 void RegisterInternet(asIScriptEngine* engine) {
-	SSLManager::instance().initializeClient(NULL, new AcceptCertificateHandler(false), new Context(Context::TLS_CLIENT_USE, ""));
+	Context::Ptr client_context = new Context(Context::TLS_CLIENT_USE, "");
+	#ifdef _WIN32
+		client_context->disableProtocols(Context::PROTO_TLSV1_3); // Poco 1.15.4's NetSSL_Win completes TLS 1.3 handshakes but then reads nothing from some servers such as letsencrypt.org and mastodon.social (pocoproject/poco#5452). Its main branch has the fixes, so turn TLS 1.3 back on once a Poco release includes them.
+	#endif
+	SSLManager::instance().initializeClient(NULL, new AcceptCertificateHandler(false), client_context);
 	FTPStreamFactory::registerFactory();
 	HTTPStreamFactory::registerFactory();
 	HTTPSStreamFactory::registerFactory();
