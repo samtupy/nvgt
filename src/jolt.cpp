@@ -479,8 +479,7 @@ static Vec3* vec3_sAxisY() { return new_vec3(Vec3::sAxisY()); }
 static Vec3* vec3_sAxisZ() { return new_vec3(Vec3::sAxisZ()); }
 
 // -- global math helpers (backward compat) --
-static int nvgt_clamp_int(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
-static float nvgt_clamp_float(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
+static double nvgt_clamp(double v, double lo, double hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
 // -- AABox additional wrappers --
 static void aabb_inflate(AABox& b, float x, float y, float z) { Vec3 e(x, y, z); b.mMin -= e; b.mMax += e; }
@@ -1230,8 +1229,7 @@ static void RegisterJoltMathTypes(asIScriptEngine* engine) {
 	engine->RegisterGlobalFunction("vector@ get_VEC3_AXIS_X() property", asFUNCTION(vec3_sAxisX), asCALL_CDECL);
 	engine->RegisterGlobalFunction("vector@ get_VEC3_AXIS_Y() property", asFUNCTION(vec3_sAxisY), asCALL_CDECL);
 	engine->RegisterGlobalFunction("vector@ get_VEC3_AXIS_Z() property", asFUNCTION(vec3_sAxisZ), asCALL_CDECL);
-	engine->RegisterGlobalFunction("int clamp(int value, int min, int max)", asFUNCTION(nvgt_clamp_int), asCALL_CDECL);
-	engine->RegisterGlobalFunction("float clamp(float value, float min, float max)", asFUNCTION(nvgt_clamp_float), asCALL_CDECL);
+	engine->RegisterGlobalFunction("double clamp(double value, double min, double max)", asFUNCTION(nvgt_clamp), asCALL_CDECL); // A single double version, because with int and float overloads AngelScript picks the int one for clamp(0.5, 0, 1) and truncates the value.
 
 	// quaternion (JPH::Quat - 16-byte SIMD aligned; registered as scoped reference type to guarantee alignment)
 	engine->RegisterObjectType("quaternion", 0, asOBJ_REF | asOBJ_SCOPED);

@@ -1,0 +1,15 @@
+// AI generated tests for clamp, which once had int and float overloads that truncated a fractional value whenever the bounds were integer literals.
+void test_clamp_mixed_types() {
+	assert(clamp(0.5, 0, 1) == 0.5);
+	float volume = 0.25;
+	assert(clamp(volume, 0, 1) == 0.25);
+	assert(clamp(7, 0.5, 2.5) == 2.5);
+	assert(clamp(-1.5, 0, 1) == 0);
+}
+void test_clamp_integers() {
+	assert(clamp(150, 0, 100) == 100);
+	int x = clamp(-3, 0, 10);
+	assert(x == 0);
+	int[] t = {1, 2, 3};
+	assert(t[clamp(5, 0, 2)] == 3);
+}

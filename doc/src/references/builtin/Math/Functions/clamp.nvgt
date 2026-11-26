@@ -1,16 +1,18 @@
 /**
 	Restrict a number to a range.
-	1. int clamp(int value, int min, int max);
-	2. float clamp(float value, float min, float max);
+	double clamp(double value, double min, double max);
 	## Arguments:
-		* int/float value: the number to restrict.
-		* int/float min: the smallest allowed result.
-		* int/float max: the largest allowed result.
+		* double value: the number to restrict.
+		* double min: the smallest allowed result.
+		* double max: the largest allowed result.
 	## Returns:
-		int/float: value if it is within the range, otherwise the nearest end of it.
+		double: value if it is within the range, otherwise the nearest end of it.
+	## Remarks:
+		Integers and floats can be mixed freely in the arguments, so `clamp(volume, 0, 1)` keeps a fractional volume intact. The result can be assigned straight to an integer variable or used as an array index, though the compiler warns about the implicit conversion when warnings are enabled.
 */
 
 // Example:
 void main() {
 	alert("Volume", "" + clamp(150, 0, 100)); // 100
+	alert("Fraction", "" + clamp(0.5, 0, 1)); // 0.5
 }
