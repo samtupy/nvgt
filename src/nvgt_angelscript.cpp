@@ -886,17 +886,20 @@ int ExecuteScript(asIScriptEngine *engine, const string &scriptFile) {
 	int r = ctx->GetState();
 	int retcode = 0;
 	if (r != asEXECUTION_FINISHED) {
+		// Runtime errors go to stderr when there is a console to show them, such as when running nvgt.exe or the binary inside a macOS app bundle from a terminal, so automated runs aren't left waiting on a message box. nvgtw, a windowed game or an app opened from Finder still shows one.
+		bool console = is_console_available(), silent = Util::Application::instance().config().hasOption("application.QUIET");
 		if (r == asEXECUTION_EXCEPTION) {
 			string exc = GetExceptionInfo(ctx, true);
-			string msg = exc + "\r\nCopy to clipboard?";
-			int c = question("unhandled exception", msg, false, SDL_MESSAGEBOX_ERROR);
-			if (c == 1)
-				ClipboardSetText(exc);
+			if (console) {
+				if (!silent) fprintf(stderr, "unhandled exception\n%s\n", exc.c_str());
+			} else if (question("unhandled exception", exc + "\r\nCopy to clipboard?", false, SDL_MESSAGEBOX_ERROR) == 1) ClipboardSetText(exc);
 			retcode = -1;
 		} else if (r == asEXECUTION_ABORTED)
 			retcode = g_retcode;
 		else {
-			alert("script terminated", "script terminated unexpectedly");
+			if (console) {
+				if (!silent) fputs("script terminated unexpectedly\n", stderr);
+			} else alert("script terminated", "script terminated unexpectedly");
 			retcode = -1;
 		}
 		if (r != asEXECUTION_ABORTED)

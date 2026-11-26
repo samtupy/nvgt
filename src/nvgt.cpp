@@ -141,7 +141,7 @@ protected:
 		options.addOption(Option("compile-debug", "C", "compile script in debug mode").group("compiletype"));
 		options.addOption(Option("platform", "p", "select target platform to compile for (auto|windows|linux|mac|android|ios)", false, "platform", true).validator(new RegExpValidator("^(auto|windows|linux|mac|android|ios)$")));
 		options.addOption(Option("quiet", "q", "do not output anything upon successful compilation").binding("application.quiet").group("quiet"));
-		options.addOption(Option("QUIET", "Q", "do not output anything (work in progress), error status must be determined by process exit code (intended for automation)").binding("application.QUIET").group("quiet"));
+		options.addOption(Option("silent", "Q", "do not output anything (work in progress), error status must be determined by process exit code (intended for automation)").binding("application.QUIET").group("quiet"));
 		options.addOption(Option("debug", "d", "run with the Angelscript debugger").binding("application.as_debug"));
 		options.addOption(Option("warnings", "w", "select how script warnings should be handled (0 ignore (default), 1 print, 2 treat as error)", false, "level", true).binding("scripting.compiler_warnings").validator(new IntValidator(0, 2)));
 		options.addOption(Option("asset", "a", "bundle an asset when compiling similar to the #pragma asset directive", false, "path", true).repeatable(true));

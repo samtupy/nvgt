@@ -22,7 +22,7 @@ The following is a list of all available command line arguments, though note tha
 * -C, --compile-debug: compile script in debug mode
 * -pplatform, --platform=platform: select target platform to compile for (auto|android|windows|linux|mac|ios)
 * -q, --quiet: do not output anything upon successful compilation
-* -Q, --QUIET: do not output anything (work in progress), error status must be determined by process exit code (intended for automation)
+* -Q, --silent: do not output anything (work in progress), error status must be determined by process exit code (intended for automation)
 * -d, --debug: run with the Angelscript debugger
 * -wlevel, --warnings=level: select how script warnings should be handled (0 ignore (default), 1 print, 2 treat as error)
 * -iscript, --include=script: include an additional script similar to the #include directive
