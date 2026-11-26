@@ -44,3 +44,9 @@ void test_http_retries_after_network_error() {
 	assert(ticks() - start >= 190, "a refused connection was only tried once, finished after " + (ticks() - start) + " ms"); // Each of the two tries waits for the retry delay first, a network error used to end the request without trying again.
 	assert(h.status_code == 0);
 }
+const int test_url_get_failure_status_level = 3; // url_get always tries 10 times, and Windows takes about two seconds to report each refused connection.
+void test_url_get_failure_status() {
+	http_response resp;
+	assert(url_get("http://127.0.0.1:1/", resp).empty());
+	assert(resp.status == 0, "a request that got no response reported status " + resp.status + " " + resp.reason); // A default constructed response used to claim 200 OK.
+}

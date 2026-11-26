@@ -6,7 +6,7 @@ Make an HTTP POST request and wait for the response.
 ## Arguments:
 * const string&in url: the URL to post to, with a scheme of http or https.
 * const string&in data: the body of the request. Unless the request says otherwise, servers take it to be form data, such as `name=Sam&score=1500`.
-* http_response&out response = void: if given, receives the status and headers of the response.
+* http_response&out response = void: if given, receives the status and headers of the response, or a status of 0 if no response arrived.
 
 ## Returns:
 string: the body of the response, or an empty string if the request failed.

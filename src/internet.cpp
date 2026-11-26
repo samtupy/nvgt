@@ -819,14 +819,17 @@ void RegisterHTTP(asIScriptEngine* engine) {
 // NVGT's highest level HTTP.
 string url_request(const string& method, const string& url, const string& data, HTTPResponse* resp) {
 	http h;
-	if (!h.request(method, URI(url), nullptr, data)) return "";
-	h.wait();
+	bool sent = h.request(method, URI(url), nullptr, data);
+	if (sent) h.wait();
 	if (resp) {
-		HTTPResponse* headers = h.get_response_headers();
-		*resp = *headers;
-		angelscript_refcounted_release(headers);
+		if (!sent || h.get_status_code() == 0) resp->setStatusAndReason(HTTPResponse::HTTPStatus(0), ""); // No response arrived, and a default constructed HTTPResponse would otherwise claim 200 OK.
+		else {
+			HTTPResponse* headers = h.get_response_headers();
+			*resp = *headers;
+			angelscript_refcounted_release(headers);
+		}
 	}
-	return h.get_response_body();
+	return sent ? h.get_response_body() : "";
 }
 string url_get(const string& url, HTTPResponse* resp) { return url_request(HTTPRequest::HTTP_GET, url, "", resp); }
 string url_post(const string& url, const string& data, HTTPResponse* resp) { return url_request(HTTPRequest::HTTP_POST, url, data, resp); }

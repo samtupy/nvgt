@@ -3,7 +3,7 @@
 	string url_get(const string&in url, http_response&out response = void);
 	## Arguments:
 		* const string&in url: the URL to request, with a scheme of http or https.
-		* http_response&out response = void: if given, receives the status and headers of the response.
+		* http_response&out response = void: if given, receives the status and headers of the response, or a status of 0 if no response arrived.
 	## Returns:
 		string: the body of the response, or an empty string if the request failed.
 	## Remarks:
