@@ -11,10 +11,12 @@ else()
 		list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS_RELEASE -DCMAKE_BUILD_TYPE=MinSizeRel "-DCMAKE_CXX_FLAGS_MINSIZEREL=/O1 /Ob1 /DNDEBUG /Oi /GS-")
 	endif()
 endif()
+# vcpkg doesn't build with /Gw, so a library's data stays in the executable even after the linker has dropped all the code that used it; utf8proc's Unicode tables alone were 343 KB that NVGT never touched. /Zc:inline stops every object file from carrying its own copy of each inline function, which keeps the C++ libraries about 40% smaller on disk.
+set(VCPKG_C_FLAGS "/Gw")
+set(VCPKG_CXX_FLAGS "/Gw /Zc:inline")
 # Prism only converts short strings between UTF-8 and UTF-16 with simdutf, so its scalar implementation is plenty and leaving out the SIMD ones saves around 300 KB.
 if(PORT STREQUAL "simdutf")
-	set(VCPKG_C_FLAGS "")
-	set(VCPKG_CXX_FLAGS "/DSIMDUTF_IMPLEMENTATION_HASWELL=0 /DSIMDUTF_IMPLEMENTATION_WESTMERE=0 /DSIMDUTF_IMPLEMENTATION_ICELAKE=0")
+	string(APPEND VCPKG_CXX_FLAGS " /DSIMDUTF_IMPLEMENTATION_HASWELL=0 /DSIMDUTF_IMPLEMENTATION_WESTMERE=0 /DSIMDUTF_IMPLEMENTATION_ICELAKE=0")
 endif()
 # Poco uses Windows' own TLS (Schannel) rather than OpenSSL for HTTPS, keeping OpenSSL out of NVGT on Windows, where it was the largest part of the executable. This is enabled directly rather than through the POCO_ENABLE_NETSSL_WIN triplet variable, which needs the netssl feature that depends on Poco's OpenSSL based crypto library.
 if(PORT STREQUAL "poco")
