@@ -5,11 +5,7 @@ else
 	export IS_CI=0
 fi
 set -e
-brew install autoconf automake libtool upx
-python3 -m venv venv --upgrade-deps
-chmod +x venv/bin/activate
-source ./venv/bin/activate
-pip3 install scons
+brew install autoconf automake libtool upx cmake ninja
 echo Building NVGT...
 if [[ "$IS_CI" != 1 ]]; then
 	# Assumed to not be running on CI; NVGT should be cloned outside of deps first.
@@ -19,8 +15,9 @@ if [[ "$IS_CI" != 1 ]]; then
 else
 	echo Running on CI.
 fi
-scons -s
+cmake --preset macos
+cmake --build --preset macos
 echo Building NVGT IOS stubs...
-scons -s no_plugins=1 target=ios
+cmake --preset ios
+cmake --build --preset ios
 echo NVGT built.
-deactivate

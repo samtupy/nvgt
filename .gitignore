@@ -13,13 +13,10 @@
 __pycache__
 
 # other intermediet build
-build/config.log
-build/lastbuild
-build/windev_path
+build/*/
 src/version.cpp
-.sconf_temp
-.sconsign.dblite
 *.orig
+jni/.cxx
 jni/.gradle
 jni/build
 install/nvgt_version.ish

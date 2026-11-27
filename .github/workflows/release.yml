@@ -176,7 +176,6 @@ jobs:
         curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.dev/ci/devlibs_update.php"
     - name: build
       run: |
-        pip3 install scons
         sudo chmod +x build/build_linux.sh
         ./build/build_linux.sh ci
     - uses: actions/upload-artifact@v7
@@ -266,8 +265,6 @@ jobs:
         cd ..
     - name: build
       run: |
-        pip3 install scons --break-system-packages
-        scons target=android
         cd jni
         ./gradlew assembleRunnerRelease AssembleStubRelease AssembleStubncRelease --no-daemon -Pandroid.injected.signing.store.file=android.keystore -Pandroid.injected.signing.store.password=${{env.ANDROID_RUNNER_KEYSTORE_PW}} -Pandroid.injected.signing.key.alias=app -Pandroid.injected.signing.key.password="${{env.ANDROID_RUNNER_KEYSTORE_PW}}"
         mv build/outputs/apk/runner/release/nvgt-runner-release.apk ../release/nvgt.apk
@@ -332,11 +329,12 @@ jobs:
       run: |
         curl -u "${{secrets.CIFTP}}" -s -T windev.zip ftp://nvgt.dev
         curl -H "X-Auth: ${{secrets.CIPHP}}" -s "https://nvgt.dev/ci/devlibs_update.php"
+    - uses: ilammy/msvc-dev-cmd@v1
     - name: build
       run: |
-        pip3 install scons
-        choco install -y upx
-        scons -s no_upx=0
+        choco install -y upx ninja
+        cmake --preset windows -DNVGT_UPX=ON
+        cmake --build --preset windows
     - uses: actions/upload-artifact@v7
       with:
         name: windows_release

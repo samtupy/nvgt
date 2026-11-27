@@ -36,8 +36,7 @@ If you wish to build manually, some rather old instructions are below. At this t
 Assuming xcode and homebrew are installed:
 
 ```bash
-pip3 install scons
-brew install autoconf automake libgit2 libtool openssl sdl2 bullet
+brew install cmake ninja autoconf automake libgit2 libtool openssl sdl2 bullet
 
 mkdir deps
 git clone https://github.com/codecat/angelscript-mirror
@@ -72,5 +71,6 @@ cmake --build .
 sudo cmake --install .
 
 cd nvgt
-scons -s
+cmake --preset macos
+cmake --build --preset macos
 ```

@@ -20,6 +20,12 @@ apply plugin: 'com.android.application'
 android {
 	namespace "com.samtupy.nvgt"
 	compileSdkVersion 35
+	if (System.getenv("ANDROID_NDK_HOME")) { // Use the NDK that ANDROID_NDK_HOME points to, whichever version it is.
+		ndkPath System.getenv("ANDROID_NDK_HOME")
+		def ndkProperties = new Properties()
+		file("${ndkPath}/source.properties").withInputStream { ndkProperties.load(it) }
+		ndkVersion ndkProperties.getProperty("Pkg.Revision")
+	}
 	aaptOptions {
 		cruncherEnabled = false  
 	}
@@ -29,6 +35,21 @@ android {
 		targetSdkVersion 35
 		versionCode 1
 		versionName "1.0"
+		ndk {
+			abiFilters "arm64-v8a"
+		}
+		externalNativeBuild {
+			cmake {
+				// Pass -PnvgtDepsPath=<dir> to use NVGT's Android dependencies from somewhere other than the droidev folder.
+				arguments "-DANDROID_STL=c++_shared", "-DANDROID_USE_LEGACY_TOOLCHAIN_FILE=OFF" // The NDK's legacy toolchain file sets its own compiler flags in a way NVGT's CMakeLists.txt can't replace.
+				if (project.hasProperty("nvgtDepsPath")) arguments "-DNVGT_DEPS_PATH=${project.property("nvgtDepsPath")}"
+			}
+		}
+	}
+	externalNativeBuild {
+		cmake {
+			path file("../CMakeLists.txt")
+		}
 	}
 	buildTypes {
 		release {
@@ -42,30 +63,30 @@ android {
 			dimension "version"
 			applicationId "com.samtupy.nvgt.runner"
 			versionName file("../version").getText().trim()
+			externalNativeBuild { cmake { arguments "-DNVGT_ANDROID_VARIANT=runner"; targets "main" } }
 		}
 		stub {
 			dimension "version"
 			applicationId "com.samtupy.nvgt.stub"
+			externalNativeBuild { cmake { arguments "-DNVGT_ANDROID_VARIANT=stub"; targets "game" } }
 		}
 		stubnc { // compiler-less stub, packaged as nvgt_android_nc.bin
 			dimension "version"
 			applicationId "com.samtupy.nvgt.stub"
+			externalNativeBuild { cmake { arguments "-DNVGT_ANDROID_VARIANT=stubnc"; targets "game" } }
 		}
 	}
 
 	sourceSets {
 		runner {
-			jniLibs.srcDirs = ['libs/runner']
 			assets.srcDirs = ['../release/include']
 		}
 		stub {
-			jniLibs.srcDirs = ['libs/stub']
 			assets.srcDirs = []
 		}
 		stubnc {
 			manifest.srcFile 'src/stub/AndroidManifest.xml'
 			java.srcDirs = ['src/stub/java']
-			jniLibs.srcDirs = ['libs/stub_nc']
 			assets.srcDirs = []
 		}
 	}

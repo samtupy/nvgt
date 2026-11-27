@@ -72,39 +72,33 @@ As mentioned a couple of times above, NVGT's official repository already contain
 ### The plugin directory
 In nvgt's main repository, the plugin directory contains all publicly available plugins. Either if you have downloaded NVGT's repository outside of version control (such as a public release artifact) or if you intend to contribute your plugin to the community by submitting a pull request, you can feel free to use this directory as well.
 
-Here, each directory is typically one plugin. It is not required that this be the case, other directories that are not plugins can also exist here, however any directory within the plugin folder that contains a file called _SConscript will automatically be considered as a plugin by the SConstruct script that builds NVGT.
+Here, each directory is typically one plugin. It is not required that this be the case, other directories that are not plugins can also exist here, however any directory within the plugin folder that contains a file called CMakeLists.txt will automatically be considered as a plugin by the CMakeLists.txt that builds NVGT, and gets an `NVGT_PLUGIN_<name>` option that can turn it off.
 
-The source code in these plugins can be arranged any way you like, as it is the _SConscript file you provide that instructs the system how to build your plugin.
-
-An example _SConscript file for such a plugin might look like this:
+The source code in these plugins can be arranged any way you like, as it is the CMakeLists.txt file you provide that instructs the system how to build your plugin. Most plugins need only a call to `nvgt_add_plugin`, which builds the plugin both as a shared library in release/lib and as a static library that NVGT can link. An example CMakeLists.txt file for such a plugin might look like this:
 ```
-# Import the SCons environment we are using
-Import("env")
-
-# Create the shared version of our plugin if the user has not disabled this feature.
-if ARGUMENTS.get("no_shared_plugins", "0") == "0":
-	env.SharedLibrary("#release/lib/test_plugin", ["test.cpp"], libs = ["user32"])
-
-# If we want to make a static version along side our shared one, we need to specifically rebuild the object file containing the plugin's entry point with a different name so that SCons can maintain a proper dependency graph. Note the NVGT_PLUGIN_STATIC define.
-static = env.Object("test_plugin_static", "test.cpp", CPPDEFINES = [("NVGT_PLUGIN_STATIC", "test_plugin")])
-# now actually build the static library, reusing the same variable from above for fewer declarations.
-static = env.StaticLibrary("#build/lib/test_plugin", [static])
-
-# Tell NVGT's SConstruct script that the static version of this plugin needs symbols from the user32 library.
-static = [static, "user32"]
-
-# What is being returned to NVGT's SConstruct in the end is a list of additional static library objects that should be linked.
-Return("static")
+nvgt_add_plugin(test_plugin
+	SOURCES test.cpp
+	# Angelscript addons from ASAddon/plugin that the shared plugin uses.
+	ADDONS scriptarray
+	# Libraries the shared plugin links with.
+	SHARED_LIBRARIES user32
+	# Libraries NVGT must link with when this plugin is linked into it statically.
+	STATIC_LIBRARIES user32
+)
 ```
 
-Note that while the above example returns the user32 library back to NVGT's build script, it should be noted that most system libraries are already linked into nvgt's builds. The example exists to show how an extra static library would be passed to NVGT from a plugin if required, but this should only be done either as a reaction to a linker error or if you know for sure that your plugin requires a dependency that is not automatically linked to NVGT, examples in the git2, curl or sqlite3 plugins.
+The static version is compiled with `NVGT_PLUGIN_STATIC` defined to the plugin's name, test_plugin here. If the plugin registers itself under a different name, pass it as `STATIC_NAME`. Use `LIBRARIES` for libraries both versions need. Library names are looked up in NVGT's dependencies folder (such as windev) first and otherwise passed to the linker as they are, and CMake targets work too. The full list of arguments, such as `DEFINITIONS`, `INCLUDE_DIRECTORIES`, `COMPILE_OPTIONS` and `SHARED_LINK_OPTIONS`, is documented at the top of cmake/NvgtPlugin.cmake, and a CMakeLists.txt can of course use any other CMake commands it needs.
+
+Note that while the above example gives NVGT the user32 library for the static version of the plugin, it should be noted that most system libraries are already linked into nvgt's builds. The example exists to show how an extra library would be passed to NVGT from a plugin if required, but this should only be done either as a reaction to a linker error or if you know for sure that your plugin requires a dependency that is not automatically linked to NVGT, examples in the git2, curl or sqlite3 plugins.
+
+To link plugins into NVGT statically, name them by their directory name or their `nvgt_add_plugin` name in the `NVGT_STATIC_PLUGINS` option, or list one per line in a file called user/static_plugins.
 
 ### the user directory
 NVGT's github repository also contains another root folder called user. This is a private scratchpad directory that exists so that a user can add plugins or any other code to NVGT that they do not want included in the repository.
 
 First, the repository's .gitignore file ignores everything in here accept for readme.md, meaning that you can do anything you like here with the peace of mind that you won't accidentally commit your private encryption plugin to the public repository when you try contributing a bugfix to the engine.
 
-Second, if a _SConscript file is present in this directory, NVGT's main build script will execute it, providing 2 environments to it via SCons exports. The nvgt_env environment is what is used to directly build NVGT, for example if you need any extra static libraries linked to nvgt.exe or the stubs, you'd add one by importing the nvgt_env variable and appending the library you want to link with to the environment's LIBS construction variable.
+Second, if a CMakeLists.txt file is present in this directory, NVGT's main build script will add it with add_subdirectory before it links NVGT. It can call `nvgt_add_plugin` for private plugins, and it can add to 2 interface targets: anything linked to `nvgt_engine` with target_link_libraries or target_link_options is linked into nvgt.exe and the stubs, and anything added to `nvgt_plugin_options` applies to every plugin.
 
 Last but not least, if a file called nvgt_config.h is present in the user folder, this will also be loaded in place of the nvgt_config.h in the repo's src directory.
 
@@ -123,38 +117,37 @@ user/nvgt_config.h:
 ```
 and
 
-user/_SConscript:
+user/CMakeLists.txt:
 ```
-Import(["plugin_env", "nvgt_env"])
-SConscript("nvgt_user/_SConscript", exports=["plugin_env", "nvgt_env"])
+add_subdirectory(nvgt_user)
 ```
 
-Now, user/nvgt_user/nvgt_config.h and user/nvgt_user/_SConscript will be loaded as they should be, respectively.
+Now, user/nvgt_user/nvgt_config.h and user/nvgt_user/CMakeLists.txt will be loaded as they should be, respectively.
 
-In the nvgt_user folder itself we have _SConscript, nvgt_plugin.h, and some folders containing private plugins as well as an unimportant folder called setup we'll describe near the end of the example.
+In the nvgt_user folder itself we have CMakeLists.txt, nvgt_plugin.h, and some folders containing private plugins as well as an unimportant folder called setup we'll describe near the end of the example.
 
 nvgt_config.h contains the custom encryption routines / static plugin configuration that is used to build the version of NVGT used for Survive the Wild.
 
-The user/nvgt_user/_SConscript file looks something like this:
+The user/nvgt_user/CMakeLists.txt file looks something like this:
 ```
-Import("plugin_env", "nvgt_env")
-
-SConscript("plugname1/_SConscript", variant_dir = "#build/obj_plugin/plugname1", duplicate = 0, exports = ["plugin_env", "nvgt_env"])
-SConscript("plugname2/_SConscript", variant_dir = "#build/obj_plugin/plugname2", duplicate = 0, exports = ["plugin_env", "nvgt_env"])
+add_subdirectory(plugname1)
+add_subdirectory(plugname2)
 # nvgt_user/nvgt_config.h statically links with the git2 plugin, lets delay load that dll on windows so that users won't get errors if it's not found.
-if nvgt_env["PLATFORM"] == "win32":
-	nvgt_env.Append(LINKFLAGS = ["/delayload:git2.dll"])
+if(WIN32)
+	target_link_options(nvgt_engine INTERFACE /delayload:git2.dll)
+endif()
 ```
-And finally an _SConscript file for nvgt_user/plugname\* might look something like this:
+And finally a CMakeLists.txt file for nvgt_user/plugname\* might look something like this:
 ```
-Import(["plugin_env", "nvgt_env"])
-
-static = plugin_env.StaticLibrary("#build/lib/plugname2", ["code.cpp"], CPPDEFINES = [("NVGT_PLUGIN_STATIC", "plugname2")], LIBS = ["somelib"])
-nvgt_env.Append(LIBS = [static, "somelib"])
+add_library(plugname2 STATIC code.cpp)
+target_compile_definitions(plugname2 PRIVATE NVGT_PLUGIN_STATIC=plugname2)
+target_link_libraries(plugname2 PRIVATE nvgt_plugin_options)
+nvgt_dep_libraries(somelib somelib)
+target_link_libraries(nvgt_engine INTERFACE plugname2 ${somelib})
 ```
 As you can see, the decision regarding the custom plugins used for Survive the Wild is to simply not support building them as shared libraries, as that will never be needed from the context of that game.
 
-The only other item in the private nvgt_user repository used for Survive the Wild is a folder called setup, and it's nothing but a tiny all be it useful convenience mechanism. The setup folder simply contains copies of the user/_SConscript and user/nvgt_config.h files that were described at the beginning of this example, meaning that if nvgt's repository ever needs to be cloned from scratch to continue STW development (such as on a new workstation), the following commands can be executed without worrying about creating the extra files that are outside of the nvgt_user repository in the root of the user folder:
+The only other item in the private nvgt_user repository used for Survive the Wild is a folder called setup, and it's nothing but a tiny all be it useful convenience mechanism. The setup folder simply contains copies of the user/CMakeLists.txt and user/nvgt_config.h files that were described at the beginning of this example, meaning that if nvgt's repository ever needs to be cloned from scratch to continue STW development (such as on a new workstation), the following commands can be executed without worrying about creating the extra files that are outside of the nvgt_user repository in the root of the user folder:
 
 ```bash
 git clone https://github.com/samtupy/nvgt

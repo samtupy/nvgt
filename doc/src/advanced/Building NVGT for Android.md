@@ -1,7 +1,7 @@
 # Building NVGT for Android
 To build NVGT for Android, you will need the Android SDK. The easiest way to get this at least on Windows is if you have Visual Studio to download the Mobile Development workload, or else to install Android Studio.
 
-As with other platforms, most of the work regarding building libraries has been done for you, you can download [droidev.zip](https://nvgt.dev/droidev.zip) here, and extract it similarly to how it is described above for other platforms. Look at jni/example-custom.mk to learn how to set a custom location to this directory.
+As with other platforms, most of the work regarding building libraries has been done for you: the build downloads [droidev.zip](https://nvgt.dev/droidev.zip) and extracts it to a droidev folder in the root of the repository if it isn't already there. To use a copy of these dependencies from somewhere else, pass `-PnvgtDepsPath=<path>` to the gradlew commands below. You will also need the Android SDK's CMake package (3.22.1 or later, installable with the SDK Manager) and the Android NDK, which Gradle finds from the `ANDROID_NDK_HOME` environment variable if it is set.
 
 On some systems, the Android SDK requires a bit of setup to use it extensively enough to build NVGT. If you are using Android Studio directly or if anything else has configured your Android SDK for you it is unlikely you'll need any of this, but in case you need to set up your SDK manually especially on Windows, here are a few notes:
 1. The Android SDK on Windows must not be in a directory containing spaces, or at least must not be invoked with one. For example, the Mobile Development workload on Visual Studio by default installs the tools in "C:\Program Files (x86)\Android". So to use it, you may need to symlink the folder with a command run as administrator like `mklink /d C:\android "C:\Program Files (x86)\Android"`.
@@ -10,7 +10,7 @@ On some systems, the Android SDK requires a bit of setup to use it extensively e
 4. If at any point you need to run sdkmanager to accept licenses on Windows, run it... yep, as admin. Otherwise you will be informed that the licenses have been successfully accepted, but when you try using the tools, you'll be told to accept them again.
 5. It should be noted that both Visual Studio and Android Studio install a functioning Java runtime environment for you, so you don't have to go hunting for one. On Visual Studio, this may be at "C:\Program Files (x86)\Android\openjdk\jdk-17.0.8.101-hotspot", and for Android Studio it may be at "C:\Android\Android Studio\jre". Sadly these paths might change a bit over time (especially the JDK version in the Visual Studio path), so you may need to look up the latest paths if you are having trouble.
 
-Once the Android SDK is set up, cd to the jni directory and run `gradlew assembleRunnerDebug assembleStubRelease assembleStubncRelease` (the last one produces the compiler-less nvgt_android_nc.bin used by `#pragma stub nc`)
+Once the Android SDK is set up, cd to the jni directory and run `gradlew assembleRunnerDebug assembleStubRelease assembleStubncRelease` (the last one produces the compiler-less nvgt_android_nc.bin used by `#pragma stub nc`). Gradle builds NVGT's native code with CMake as part of this, and building the runner also writes NVGT's plugins for Android to release/lib_android.
 
 On platforms other than Windows you may need to run `./gradlew` instead of `gradlew`.
 

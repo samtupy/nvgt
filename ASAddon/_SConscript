@@ -1,8 +1,0 @@
-# Build angelscript addons
-# NVGT - NonVisual Gaming Toolkit (https://nvgt.dev)
-# Copyright (c) 2022-2025 Sam Tupy
-# license: zlib
-
-Import("env")
-
-env.StaticLibrary("#build/lib/ASAddon", [Glob("src/*.cpp")], CPPPATH = [env["CPPPATH"], "include"], CPPDEFINES = list(env["CPPDEFINES"]) + ["_LIB", ("AS_WRITE_OPS", "1"), "AS_USE_STLNAMES"])
